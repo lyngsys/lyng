@@ -1,0 +1,11 @@
+[package]
+name = "lyng-js-lexer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bitflags = { workspace = true }
+lyng-js-common = { workspace = true }
+unicode-id-start = { workspace = true }
+
+[dev-dependencies]

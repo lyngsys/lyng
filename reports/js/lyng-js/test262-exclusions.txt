@@ -1,0 +1,15 @@
+# Lyng JS Test262 exclusion manifest
+#
+# Format:
+#   kind|pattern|reason
+#
+# Kinds:
+#   suite  Prefix match for a suite or subtree. Patterns should be relative to
+#          testdata/test262/test/ and typically end in /*.
+#   path   Exact relative test path under testdata/test262/test/.
+#
+# This manifest is intentionally narrow. It is reserved for
+# out-of-scope intl402 coverage and any future explicit host-extension-only
+# cases. Missing engine work stays visible in reports as skips or failures.
+
+suite|intl402/*|ECMA-402 Intl is out of scope for the active ECMA-262 conformance sweep.

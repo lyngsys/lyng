@@ -1,0 +1,31 @@
+[package]
+name = "lyng-js-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+lyng-js-bytecode = { path = "../bytecode" }
+lyng-js-common = { path = "../common" }
+lyng-js-lexer = { path = "../lexer" }
+lyng-js-parser = { path = "../parser" }
+libfuzzer-sys = "0.4"
+
+# Prevent this from interfacing with the workspace (fuzz crates can't be
+# workspace members because cargo-fuzz manages them independently).
+[workspace]
+
+[[bin]]
+name = "fuzz_lexer"
+path = "fuzz_targets/fuzz_lexer.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_parser"
+path = "fuzz_targets/fuzz_parser.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_bytecode_disassembler"
+path = "fuzz_targets/fuzz_bytecode_disassembler.rs"
+doc = false

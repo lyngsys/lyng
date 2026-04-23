@@ -1,0 +1,20 @@
+[package]
+name = "lyng-js-test262"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "lyng-js-test262"
+path = "src/main.rs"
+
+[dependencies]
+lyng-js-builtins = { workspace = true }
+lyng-js-common = { workspace = true }
+lyng-js-compiler = { workspace = true }
+lyng-js-env = { workspace = true }
+lyng-js-host = { workspace = true }
+lyng-js-ops = { workspace = true }
+lyng-js-parser = { workspace = true }
+lyng-js-sema = { workspace = true }
+lyng-js-types = { workspace = true }
+lyng-js-vm = { workspace = true }

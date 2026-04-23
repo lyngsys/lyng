@@ -1,0 +1,8 @@
+[package]
+name = "lyng-js-sema"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+lyng-js-common = { workspace = true }
+lyng-js-ast = { workspace = true }

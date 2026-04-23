@@ -1,0 +1,18 @@
+[package]
+name = "lyng-js-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+lyng-js-builtins.workspace = true
+lyng-js-bytecode.workspace = true
+lyng-js-common.workspace = true
+lyng-js-compiler.workspace = true
+lyng-js-env.workspace = true
+lyng-js-host.workspace = true
+lyng-js-parser.workspace = true
+lyng-js-sema.workspace = true
+lyng-js-types.workspace = true
+lyng-js-vm.workspace = true

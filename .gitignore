@@ -1,0 +1,10 @@
+/.DS_Store
+/target
+/Cargo.lock
+/docs/ECMA-262_16th_edition_june_2025.pdf
+/.worktrees
+/crates/js3/fuzz/target
+/crates/js3/fuzz/Cargo.lock
+/crates/js3/fuzz/corpus
+.dogcats/config.local.toml
+.dogcats/.issues.lock

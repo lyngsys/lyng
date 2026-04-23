@@ -1,0 +1,8 @@
+[package]
+name = "lyng-js-host"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+lyng-js-common = { workspace = true }
+lyng-js-types = { workspace = true }

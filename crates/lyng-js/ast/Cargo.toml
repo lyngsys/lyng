@@ -1,0 +1,7 @@
+[package]
+name = "lyng-js-ast"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+lyng-js-common = { workspace = true }

@@ -1,0 +1,66 @@
+[workspace]
+resolver = "2"
+members = [
+    # HTML/DOM
+    "crates/dom",
+    "crates/html_parser",
+    # JS3 engine
+    "crates/lyng-js/common",
+    "crates/lyng-js/lexer",
+    "crates/lyng-js/ast",
+    "crates/lyng-js/parser",
+    "crates/lyng-js/sema",
+    "crates/lyng-js/types",
+    "crates/lyng-js/gc",
+    "crates/lyng-js/ops",
+    "crates/lyng-js/host",
+    "crates/lyng-js/objects",
+    "crates/lyng-js/env",
+    "crates/lyng-js/bytecode",
+    "crates/lyng-js/compiler",
+    "crates/lyng-js/vm",
+    "crates/lyng-js/builtins",
+    "crates/lyng-js/cli",
+    "crates/lyng-js/tests",
+    # Tools
+    "tools/html5lib_runner",
+    "tools/lyng-js-bench",
+    "tools/lyng-js-test262",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+bitflags = "2"
+hashbrown = "0.15"
+itoa = "1"
+log = "0.4"
+memchr = "2"
+ryu = "1"
+smallvec = "1"
+unicode-id-start = "1"
+
+# DOM/HTML
+lyng-dom = { path = "crates/dom" }
+
+# JS3 engine
+lyng-js-common = { path = "crates/lyng-js/common" }
+lyng-js-lexer = { path = "crates/lyng-js/lexer" }
+lyng-js-ast = { path = "crates/lyng-js/ast" }
+lyng-js-parser = { path = "crates/lyng-js/parser" }
+lyng-js-sema = { path = "crates/lyng-js/sema" }
+lyng-js-types = { path = "crates/lyng-js/types" }
+lyng-js-gc = { path = "crates/lyng-js/gc" }
+lyng-js-ops = { path = "crates/lyng-js/ops" }
+lyng-js-host = { path = "crates/lyng-js/host" }
+lyng-js-objects = { path = "crates/lyng-js/objects" }
+lyng-js-env = { path = "crates/lyng-js/env" }
+lyng-js-bytecode = { path = "crates/lyng-js/bytecode" }
+lyng-js-compiler = { path = "crates/lyng-js/compiler" }
+lyng-js-vm = { path = "crates/lyng-js/vm" }
+lyng-js-builtins = { path = "crates/lyng-js/builtins" }
+lyng-js-cli = { path = "crates/lyng-js/cli" }
+lyng-js-tests = { path = "crates/lyng-js/tests" }

@@ -1,0 +1,2677 @@
+use super::support::{compile_and_run, compile_and_run_string, compile_unit};
+use lyng_js_common::AtomTable;
+use lyng_js_types::Value;
+
+#[test]
+fn script_core_executes_locals_globals_objects_and_arrays() {
+    let result = compile_and_run(
+        r#"
+        let x = 1;
+        let y = 2;
+        var z = 3;
+        let obj = { answer: x + y };
+        let arr = [obj.answer, z];
+        let i = 0;
+        let sum = 0;
+        while (i < 2) {
+            sum = sum + arr[i];
+            i = i + 1;
+        }
+        sum;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(6));
+}
+
+#[test]
+fn script_core_executes_if_blocks_and_local_assignment() {
+    let result = compile_and_run(
+        r#"
+        let value = 1;
+        if (value < 2) {
+            value = value + 4;
+        } else {
+            value = 99;
+        }
+        value;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(5));
+}
+
+#[test]
+fn script_core_executes_for_loops_with_local_register_updates() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        for (let i = 0; i < 4; i = i + 1) {
+            total = total + i;
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(6));
+}
+
+#[test]
+fn script_core_executes_sibling_lexical_for_loops_with_duplicate_names() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        for (let i = 0; i < 3; ++i) {
+            total = total + 1;
+        }
+        for (let i = 0; i < 2; ++i) {
+            total = total + 10;
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(23));
+}
+
+#[test]
+fn script_core_supports_switch_fallthrough_and_break() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        switch (2) {
+            case 1:
+                total = 100;
+                break;
+            case 2:
+                total = total + 2;
+            default:
+                total = total + 4;
+                break;
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(6));
+}
+
+#[test]
+fn script_core_supports_for_of_over_arrays() {
+    let result = compile_and_run_string(
+        r#"
+        let s = "";
+        for (const x of [1, 2, 3]) {
+            s = s + x;
+        }
+        s;
+        "#,
+    );
+
+    assert_eq!(result, "123");
+}
+
+#[test]
+fn script_core_supports_for_of_destructuring_assignment_heads() {
+    let result = compile_and_run_string(
+        r#"
+        let left = "";
+        let right = "";
+        for ([left, right] of [["x", "y"]]) {}
+        left + right;
+        "#,
+    );
+
+    assert_eq!(result, "xy");
+}
+
+#[test]
+fn script_core_supports_for_of_destructuring_assignment_to_properties() {
+    let result = compile_and_run(
+        r#"
+        let target = { value: 0 };
+        for ({ value: target.value } of [{ value: 7 }]) {}
+        target.value;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_supports_for_of_declaration_defaults_in_destructuring_heads() {
+    let result = compile_and_run_string(
+        r#"
+        let seen = "";
+        for (let [x = "a", y = "z"] of [[undefined, "b"]]) {
+            seen = x + y;
+        }
+        seen;
+        "#,
+    );
+
+    assert_eq!(result, "ab");
+}
+
+#[test]
+fn script_core_supports_for_of_lexical_computed_property_bindings() {
+    let result = compile_and_run(
+        r#"
+        let key = "value";
+        let seen = 0;
+        for (let { [key]: entry } of [{ value: 7 }]) {
+            seen = entry;
+        }
+        seen;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_coerces_object_property_keys_before_array_index_classification() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let values = [];
+
+        values[new Boolean(true)] = 3;
+        score += (values[1] === undefined ? 1 : 0);
+        score += (values["true"] === 3 ? 2 : 0);
+
+        let key = {
+            valueOf: function() { return 1; },
+            toString: function() { return 0; }
+        };
+        values[key] = 7;
+        score += (values[0] === 7 ? 4 : 0);
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_handles_object_property_key_to_primitive_edge_cases() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let values = [];
+
+        let key = {
+            valueOf: function() {
+                return 1;
+            }
+        };
+        values[key] = 0;
+        score += (values["[object Object]"] === 0 ? 1 : 0);
+
+        let keyed = {
+            valueOf: function() {
+                return 1;
+            },
+            toString: function() {
+                return 0;
+            }
+        };
+        values[keyed] = 7;
+        score += (values[0] === 7 ? 2 : 0);
+
+        try {
+            let source = [];
+            let dynamic = {
+                valueOf: function() {
+                    throw "error";
+                },
+                toString: function() {
+                    return 1;
+                }
+            };
+            source[dynamic] = 9;
+            score += (source[1] === 9 ? 4 : 0);
+        } catch (error) {
+            score += 64;
+        }
+
+        try {
+            let source = [];
+            let dynamic = {
+                valueOf: function() {
+                    return 1;
+                },
+                toString: function() {
+                    throw "error";
+                }
+            };
+            source[dynamic];
+            score += 128;
+        } catch (error) {
+            score += (error === "error" ? 8 : 0);
+        }
+
+        try {
+            let source = [];
+            let dynamic = {
+                valueOf: function() {
+                    return {};
+                },
+                toString: function() {
+                    return {};
+                }
+            };
+            source[dynamic];
+            score += 256;
+        } catch (error) {
+            score += (error instanceof TypeError ? 16 : 0);
+        }
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_supports_for_of_var_binding_pattern_expressions() {
+    let result = compile_and_run(
+        r#"
+        let key = "value";
+        var seen = 0;
+        for (var { [key]: fn = function() { return 7; } } of [{}]) {
+            seen = fn();
+        }
+        seen;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_supports_sloppy_for_of_destructuring_with_eval_and_arguments_targets() {
+    let result = compile_and_run(
+        r#"
+        var eval, arguments;
+        let score = 0;
+        for ({ eval = 3, arguments = 4 } of [{}]) {
+            score += (eval === 3 ? 1 : 0);
+            score += (arguments === 4 ? 2 : 0);
+        }
+        for ({ eval, arguments } of [{ eval: 5, arguments: 6 }]) {
+            score += (eval === 5 ? 4 : 0);
+            score += (arguments === 6 ? 8 : 0);
+        }
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_supports_for_of_object_rest_without_exclusions() {
+    let result = compile_and_run(
+        r#"
+        let sym = Symbol("foo");
+        let calls = "";
+        let source = {};
+        Object.defineProperty(source, 1, {
+            get: function() {
+                calls = calls + "1|";
+                return 3;
+            },
+            enumerable: true
+        });
+        Object.defineProperty(source, "z", {
+            get: function() {
+                calls = calls + "z|";
+                return 1;
+            },
+            enumerable: true
+        });
+        Object.defineProperty(source, "a", {
+            get: function() {
+                calls = calls + "a|";
+                return 2;
+            },
+            enumerable: true
+        });
+        Object.defineProperty(source, sym, {
+            get: function() {
+                calls = calls + "sym|";
+                return 4;
+            },
+            enumerable: true
+        });
+
+        var rest;
+        for ({ ...rest } of [source]) {}
+
+        let score = 0;
+        score += (rest[1] === 3 ? 1 : 0);
+        score += (rest.z === 1 ? 2 : 0);
+        score += (rest.a === 2 ? 4 : 0);
+        score += (rest[sym] === 4 ? 8 : 0);
+        score += (calls === "1|z|a|sym|" ? 16 : 0);
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_supports_for_of_object_rest_with_symbol_keys_and_exclusions() {
+    let result = compile_and_run(
+        r#"
+        let sym = Symbol("foo");
+        let calls = "";
+        let source = {};
+        Object.defineProperty(source, "skip", {
+            get: function() {
+                calls = calls + "skip|";
+                return 9;
+            },
+            enumerable: true
+        });
+        Object.defineProperty(source, 1, {
+            get: function() {
+                calls = calls + "1|";
+                return 3;
+            },
+            enumerable: true
+        });
+        Object.defineProperty(source, "keep", {
+            get: function() {
+                calls = calls + "keep|";
+                return 2;
+            },
+            enumerable: true
+        });
+        Object.defineProperty(source, sym, {
+            get: function() {
+                calls = calls + "sym|";
+                return 4;
+            },
+            enumerable: true
+        });
+
+        let skip = 0;
+        let rest = null;
+        for ({ skip, ...rest } of [source]) {}
+
+        let score = 0;
+        score += (skip === 9 ? 1 : 0);
+        score += (rest[1] === 3 ? 2 : 0);
+        score += (rest.keep === 2 ? 4 : 0);
+        score += (rest.skip === undefined ? 8 : 0);
+        score += (rest[sym] === 4 ? 16 : 0);
+        score += (calls === "skip|1|keep|sym|" ? 32 : 0);
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
+fn script_core_supports_for_of_binding_object_rest_copy_semantics() {
+    let result = compile_and_run(
+        r#"
+        let getterCount = 0;
+        let source = { a: 5, b: 3, x: 1, y: 2 };
+        Object.defineProperty(source, "hidden", {
+            value: 9,
+            enumerable: false
+        });
+        Object.defineProperty(source, "v", {
+            get: function() {
+                getterCount = getterCount + 1;
+                return 7;
+            },
+            enumerable: true
+        });
+
+        let seen = null;
+        for (const { a, b, ...rest } of [source]) {
+            seen = rest;
+        }
+
+        let xDesc = Object.getOwnPropertyDescriptor(seen, "x");
+        let vDesc = Object.getOwnPropertyDescriptor(seen, "v");
+        let score = 0;
+        score += (seen.a === undefined ? 1 : 0);
+        score += (seen.b === undefined ? 2 : 0);
+        score += (seen.hidden === undefined ? 4 : 0);
+        score += (seen.x === 1 ? 8 : 0);
+        score += (seen.y === 2 ? 16 : 0);
+        score += (seen.v === 7 ? 32 : 0);
+        score += (getterCount === 1 ? 64 : 0);
+        score += (xDesc.enumerable === true && xDesc.writable === true && xDesc.configurable === true ? 128 : 0);
+        score += (vDesc.enumerable === true && vDesc.writable === true && vDesc.configurable === true ? 256 : 0);
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(511));
+}
+
+#[test]
+fn script_core_object_keys_skips_non_enumerable_and_symbol_properties() {
+    let result = compile_and_run_string(
+        r#"
+        let sym = Symbol("hidden");
+        let source = { a: 1 };
+        source[2] = 4;
+        source[sym] = 8;
+        Object.defineProperty(source, "secret", {
+            value: 16,
+            enumerable: false
+        });
+        Object.keys(source).toString();
+        "#,
+    );
+
+    assert_eq!(result, "2,a");
+}
+
+#[test]
+fn script_core_object_get_own_property_names_includes_non_enumerable_strings() {
+    let result = compile_and_run_string(
+        r#"
+        let source = "ab";
+        let names = Object.getOwnPropertyNames(source);
+        names.toString();
+        "#,
+    );
+
+    assert_eq!(result, "0,1,length");
+}
+
+#[test]
+fn script_core_assigns_names_to_for_of_default_anonymous_functions() {
+    let result = compile_and_run_string(
+        r#"
+        let seen = "";
+        for (let [arrow = () => {}] of [[]]) {
+            seen = arrow.name;
+        }
+        seen;
+        "#,
+    );
+
+    assert_eq!(result, "arrow");
+}
+
+#[test]
+fn script_core_assigns_names_to_for_of_assignment_pattern_defaults() {
+    let result = compile_and_run(
+        r#"
+        let arrayArrow;
+        let arrayCover;
+        let objArrow;
+        let objFn;
+        let propArrow;
+        let named;
+        let score = 0;
+
+        for ([arrayArrow = () => {}, arrayCover = (function() {})] of [[]]) {
+            let arrowDesc = Object.getOwnPropertyDescriptor(arrayArrow, "name");
+            let coverDesc = Object.getOwnPropertyDescriptor(arrayCover, "name");
+            score += (arrowDesc.value === "arrayArrow" ? 1 : 0);
+            score += (arrowDesc.enumerable === false && arrowDesc.writable === false && arrowDesc.configurable === true ? 2 : 0);
+            score += (coverDesc.value === "arrayCover" ? 4 : 0);
+        }
+
+        for ({ objArrow = () => {}, objFn = function() {}, x: propArrow = () => {}, named = function named() {} } of [{}]) {
+            score += (objArrow.name === "objArrow" ? 8 : 0);
+            score += (objFn.name === "objFn" ? 16 : 0);
+            score += (propArrow.name === "propArrow" ? 32 : 0);
+            score += (named.name === "named" ? 64 : 0);
+        }
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
+fn script_core_consumes_iterables_for_for_of_array_binding_patterns() {
+    let result = compile_and_run(
+        r#"
+        let iterator = {
+            step: 0,
+            next: function() {
+                this.step = this.step + 1;
+                if (this.step === 1) {
+                    return { value: 4, done: false };
+                }
+                if (this.step === 2) {
+                    return { value: 9, done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+        let iterable = {
+            [Symbol.iterator]: function() {
+                return iterator;
+            }
+        };
+        let seen = 0;
+        for (let [a, b] of [iterable]) {
+            seen = a + b;
+        }
+        seen;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(13));
+}
+
+#[test]
+fn script_core_hides_iterator_internal_state_and_requires_real_iterator_receivers() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let arrayIterator = [1].values();
+        let stringIterator = "ab"[Symbol.iterator]();
+
+        score += (arrayIterator.__js3ArrayIteratorTarget === undefined ? 1 : 0);
+        score += (arrayIterator.__js3ArrayIteratorIndex === undefined ? 2 : 0);
+        score += (arrayIterator.__js3ArrayIteratorKind === undefined ? 4 : 0);
+        score += (stringIterator.__js3StringIteratorString === undefined ? 8 : 0);
+        score += (stringIterator.__js3StringIteratorIndex === undefined ? 16 : 0);
+
+        let arrayNext = arrayIterator.next;
+        let stringNext = stringIterator.next;
+        try {
+            arrayNext.call({});
+        } catch (error) {
+            score += (error.constructor === TypeError ? 32 : 0);
+        }
+        try {
+            stringNext.call({});
+        } catch (error) {
+            score += (error.constructor === TypeError ? 64 : 0);
+        }
+
+        score += (arrayIterator.next().value === 1 ? 128 : 0);
+        score += (stringIterator.next().value === "a" ? 256 : 0);
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(511));
+}
+
+#[test]
+fn script_core_closes_for_of_empty_array_assignment_patterns() {
+    let result = compile_and_run(
+        r#"
+        let closed = 0;
+        let iterator = {
+            next: function() {
+                return { value: 1, done: false };
+            },
+            return: function() {
+                closed = closed + 1;
+                return {};
+            }
+        };
+        let iterable = {
+            [Symbol.iterator]: function() {
+                return iterator;
+            }
+        };
+        for ([] of [iterable]) {}
+        closed;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_supports_for_of_object_shorthand_defaults() {
+    let result = compile_and_run(
+        r#"
+        var x = 0;
+        for ({ x = 1 } of [{}]) {}
+        x;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_supports_for_of_object_rest_assignment_heads() {
+    let result = compile_and_run(
+        r#"
+        let rest = null;
+        for ({ value: ignored, ...rest } of [{ value: 1, other: 2 }]) {}
+        rest.other;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(2));
+}
+
+#[test]
+fn script_core_supports_for_of_object_rest_assignment_same_name_targets() {
+    let result = compile_and_run(
+        r#"
+        let source = { x: 42, y: 39, z: "cheeseburger" };
+        let x = 0;
+        let y = "unset";
+        let z = null;
+        for ({ x, ...z } of [source]) {}
+        (x === 42 ? 1 : 0)
+            + (y === "unset" ? 2 : 0)
+            + (z !== null ? 4 : 0)
+            + (z !== null && z.y === 39 ? 8 : 0)
+            + (z !== null && z.z === "cheeseburger" ? 16 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_supports_for_of_array_rest_assignment_heads() {
+    let result = compile_and_run(
+        r#"
+        let x = 0;
+        let y = null;
+        for ([x, ...y] of [[1, 2, 3]]) {}
+        (x === 1 ? 1 : 0)
+            + (y !== null ? 2 : 0)
+            + (y !== null && Object.prototype.toString.call(y) === "[object Array]" ? 4 : 0)
+            + (y !== null && y.length === 2 ? 8 : 0)
+            + (y !== null && y[0] === 2 ? 16 : 0)
+            + (y !== null && y[1] === 3 ? 32 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
+fn script_core_requires_object_coercible_values_for_for_of_object_patterns() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        try {
+            for ({} of [null]) {
+                score += 100;
+            }
+        } catch (error) {
+            score += (error.constructor === TypeError ? 1 : 0);
+        }
+        try {
+            for (const {} of [undefined]) {
+                score += 100;
+            }
+        } catch (error) {
+            score += (error.constructor === TypeError ? 2 : 0);
+        }
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_requires_object_coercible_values_for_for_of_object_rest() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let rest;
+        try {
+            for ({ ...rest } of [null]) {
+                score += 100;
+            }
+        } catch (error) {
+            score += (error.constructor === TypeError ? 1 : 0);
+        }
+        try {
+            for ({ ...rest } of [undefined]) {
+                score += 100;
+            }
+        } catch (error) {
+            score += (error.constructor === TypeError ? 2 : 0);
+        }
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_for_of_destructuring_assignments_respect_global_lexical_tdz() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        try {
+            for ({ x } of [{}]) {
+                score += 100;
+            }
+        } catch (error) {
+            score += (error.constructor === ReferenceError ? 1 : 0);
+        }
+        let x;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_for_of_destructuring_assignments_reject_strict_unresolvables() {
+    let result = compile_and_run(
+        r#"
+        "use strict";
+        let score = 0;
+        try {
+            for ([...unresolvable] of [[]]) {
+                score += 100;
+            }
+        } catch (error) {
+            score += (error.constructor === ReferenceError ? 1 : 0);
+        }
+        try {
+            for ({ unbound } of [{}]) {
+                score += 100;
+            }
+        } catch (error) {
+            score += (error.constructor === ReferenceError ? 2 : 0);
+        }
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_string_keyed_computed_property_access() {
+    let result = compile_and_run(
+        r#"
+        let obj = { answer: 1 };
+        obj["answer"] = obj["answer"] + 2;
+        obj.answer;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_named_property_store_and_load() {
+    let result = compile_and_run(
+        r#"
+        let obj = { total: 0 };
+        obj.total = obj.total + 6;
+        obj.total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(6));
+}
+
+#[test]
+fn script_core_supports_repeated_named_property_updates() {
+    let result = compile_and_run(
+        r#"
+        let obj = { total: 0 };
+        obj.total = obj.total + 1;
+        obj.total = obj.total + 2;
+        obj.total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_string_addition_with_primitives() {
+    let result = compile_and_run_string(
+        r#"
+        "foo " + 5 + " bar";
+        "#,
+    );
+
+    assert_eq!(result, "foo 5 bar");
+}
+
+#[test]
+fn script_core_symbol_for_uses_shared_object_aware_string_coercion() {
+    let result = compile_and_run(
+        r#"
+        Symbol.keyFor(Symbol.for({
+            toString: function() {
+                return "phase5.shared";
+            }
+        })) === "phase5.shared" ? 1 : 0;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_symbol_description_reflects_symbol_for_string_key() {
+    let result = compile_and_run_string(
+        r#"
+        Symbol.for({
+            toString: function() {
+                return "phase5.description";
+            }
+        }).description;
+        "#,
+    );
+
+    assert_eq!(result, "phase5.description");
+}
+
+#[test]
+fn script_core_symbol_for_preserves_thrown_constructor_identity() {
+    let result = compile_and_run(
+        r#"
+        function Test262Error() {}
+        let total = 0;
+        try {
+            Symbol.for({
+                toString: function() {
+                    throw new Test262Error();
+                }
+            });
+        } catch (error) {
+            total = total + (error.constructor === Test262Error ? 1 : 0);
+        }
+        try {
+            Symbol.for(Symbol("s"));
+        } catch (error) {
+            total = total + (error.constructor === TypeError ? 2 : 0);
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_installs_date_parse_and_uri_global_families() {
+    let result = compile_and_run(
+        r#"
+        (typeof Date === "function" ? 1 : 0)
+            + (typeof parseInt === "function" ? 2 : 0)
+            + (typeof parseFloat === "function" ? 4 : 0)
+            + (typeof isNaN === "function" ? 8 : 0)
+            + (typeof isFinite === "function" ? 16 : 0)
+            + (typeof encodeURI === "function" ? 32 : 0)
+            + (typeof encodeURIComponent === "function" ? 64 : 0)
+            + (typeof decodeURI === "function" ? 128 : 0)
+            + (typeof decodeURIComponent === "function" ? 256 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(511));
+}
+
+#[test]
+fn script_core_date_objects_expose_value_payload_and_object_tag() {
+    let result = compile_and_run(
+        r#"
+        let d = new Date(123);
+        (d.valueOf() === 123 ? 1 : 0)
+            + (Object.prototype.toString.call(d) === "[object Date]" ? 2 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_date_constructor_balances_local_components_and_timezone_offset() {
+    let result = compile_and_run(
+        r#"
+        let epoch = new Date(1970, 0, 1, 0, 0, 0, 0);
+        let negative = new Date(1970, 0, 1, 0, 0, 0, -1);
+        let later = new Date(2016, 3, 12, 13, 21, 23, 24);
+        let total = 0;
+        total += (typeof Date.prototype.getTimezoneOffset === "function" ? 1 : 0);
+        total += (epoch.valueOf() - epoch.getTimezoneOffset() * 60000 === 0 ? 2 : 0);
+        total += (negative.valueOf() - negative.getTimezoneOffset() * 60000 === -1 ? 4 : 0);
+        total += (later.valueOf() - later.getTimezoneOffset() * 60000 === 1460467283024 ? 8 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_date_constructor_has_function_prototype_shape() {
+    let result = compile_and_run(
+        r#"
+        (Function.prototype.isPrototypeOf(Date) ? 1 : 0)
+            + (Object.getPrototypeOf(Date) === Function.prototype ? 2 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_parse_and_uri_globals_match_phase6_baseline_behavior() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        score = score + (parseInt("0x10") === 16 ? 1 : 0);
+        score = score + (parseInt("-0") === 0 && 1 / parseInt("-0") === -Infinity ? 2 : 0);
+        score = score + (parseFloat("1.5x") === 1.5 ? 4 : 0);
+        score = score + (isNaN("foo") ? 8 : 0);
+        score = score + (isFinite("3") ? 16 : 0);
+        score = score + (encodeURIComponent("a b") === "a%20b" ? 32 : 0);
+        score = score + (encodeURI("a/b") === "a/b" ? 64 : 0);
+        score = score + (decodeURIComponent("a%20b") === "a b" ? 128 : 0);
+        score = score + (decodeURI("%2F") === "%2F" ? 256 : 0);
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(511));
+}
+
+#[test]
+fn script_core_parse_and_numeric_predicate_globals_coerce_booleans() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        score = score + (parseInt(true) !== parseInt(true) ? 1 : 0);
+        score = score + (parseFloat(false) !== parseFloat(false) ? 2 : 0);
+        score = score + (isNaN(true) ? 0 : 4);
+        score = score + (isFinite(false) ? 8 : 0);
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_public_numeric_coercion_handles_arrays_symbols_and_radix_objects() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        score = score + (parseInt("11", false) === 11 ? 1 : 0);
+        score = score + (parseInt("11", true) !== parseInt("11", true) ? 2 : 0);
+        score = score + (parseInt("11", "2") === 3 ? 4 : 0);
+        score = score + (parseInt("11", {
+            valueOf: function() {
+                return 2;
+            }
+        }) === 3 ? 8 : 0);
+        try {
+            parseInt("11", {
+                valueOf: function() {
+                    throw "boom";
+                },
+                toString: function() {
+                    return 2;
+                }
+            });
+        } catch (error) {
+            score = score + (error === "boom" ? 16 : 0);
+        }
+        score = score + (isNaN([1]) ? 0 : 32);
+        score = score + (isNaN([NaN]) ? 64 : 0);
+        score = score + (isFinite([1]) ? 128 : 0);
+        score = score + (isFinite([Infinity]) ? 0 : 256);
+        try {
+            let exotic = {};
+            exotic[Symbol.toPrimitive] = function() {
+                return Symbol.toPrimitive;
+            };
+            isNaN(exotic);
+        } catch (error) {
+            score = score + (error.constructor === TypeError ? 512 : 0);
+        }
+        try {
+            let exotic = {};
+            exotic[Symbol.toPrimitive] = function() {
+                return Symbol.toPrimitive;
+            };
+            isFinite(exotic);
+        } catch (error) {
+            score = score + (error.constructor === TypeError ? 1024 : 0);
+        }
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(2047));
+}
+
+#[test]
+fn script_core_keeps_array_length_non_configurable() {
+    let result = compile_and_run(
+        r#"
+        let array = [1, 2, 3];
+        (delete array.length ? 100 : 0) + array.length;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_delete_returns_true_for_undeclared_global_assignments() {
+    let result = compile_and_run(
+        r#"
+        x = 1;
+        delete x ? 1 : 0;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_delete_returns_true_for_non_reference_unary_chains() {
+    let result = compile_and_run(
+        r#"
+        (delete +-~!0 ? 1 : 0)
+            + (delete typeof 0 ? 2 : 0)
+            + (delete delete 0 ? 4 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_supports_template_literals_with_primitives() {
+    let result = compile_and_run_string(
+        r#"
+        `foo ${5} ${true} ${1n} bar`;
+        "#,
+    );
+
+    assert_eq!(result, "foo 5 true 1 bar");
+}
+
+#[test]
+fn script_core_supports_template_literals_with_member_and_call_expressions() {
+    let result = compile_and_run_string(
+        r#"
+        let object = {
+            value: 5,
+            fn: function() { return "result"; }
+        };
+        `${object.value} ${object.fn()} bar`;
+        "#,
+    );
+
+    assert_eq!(result, "5 result bar");
+}
+
+#[test]
+fn script_core_supports_template_literals_with_object_string_coercion() {
+    let result = compile_and_run_string(
+        r#"
+        let plain = {};
+        let custom = {
+            toString: function() { return "custom"; }
+        };
+        `${plain}|${custom}`;
+        "#,
+    );
+
+    assert_eq!(result, "[object Object]|custom");
+}
+
+#[test]
+fn script_core_supports_postfix_update_expressions() {
+    let result = compile_and_run(
+        r#"
+        let i = 0;
+        let first = i++;
+        let second = ++i;
+        first * 10 + second * 100 + i;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(202));
+}
+
+#[test]
+fn script_core_supports_template_literal_left_to_right_updates() {
+    let result = compile_and_run_string(
+        r#"
+        let i = 0;
+        `a${i++}b${i++}c${i++}d`;
+        "#,
+    );
+
+    assert_eq!(result, "a0b1c2d");
+}
+
+#[test]
+fn script_core_supports_string_primitive_members_and_for_in() {
+    let result = compile_and_run_string(
+        r#"
+        let keys = "";
+        for (var key in "ab") {
+            keys = keys + key;
+        }
+        keys + ":" + "ab".length + ":" + "ab"[1] + ":" + "ab".indexOf("b");
+        "#,
+    );
+
+    assert_eq!(result, "01:2:b:1");
+}
+
+#[test]
+fn script_core_handles_delete_on_string_primitives() {
+    let result = compile_and_run(
+        r#"
+        (delete "Test262"[100] ? 1 : 0) + (delete "x"[0] ? 0 : 2);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_bootstraps_string_constructor_and_exotic_descriptors() {
+    let result = compile_and_run_string(
+        r#"
+        let wrapped = new String("abc");
+        let index = Object.getOwnPropertyDescriptor(wrapped, "0");
+        let length = Object.getOwnPropertyDescriptor(wrapped, "length");
+        let keys = "";
+        for (var key in wrapped) {
+            keys = keys + key;
+        }
+        String("abc")
+            + ":"
+            + wrapped.toString()
+            + ":"
+            + wrapped.valueOf()
+            + ":"
+            + keys
+            + ":"
+            + index.value
+            + ":"
+            + (index.writable ? 1 : 0)
+            + (index.enumerable ? 2 : 0)
+            + (index.configurable ? 4 : 0)
+            + ":"
+            + length.value
+            + ":"
+            + (length.writable ? 1 : 0)
+            + (length.enumerable ? 2 : 0)
+            + (length.configurable ? 4 : 0);
+        "#,
+    );
+
+    assert_eq!(result, "abc:abc:abc:012:a:020:3:000");
+}
+
+#[test]
+fn script_core_supports_string_char_and_pad_algorithms_on_wrapper_values() {
+    let result = compile_and_run(
+        r#"
+        let padded = "abc".padStart(6, "\uD83D\uDCA9");
+        let score = 0;
+        score += ("abcd".charAt("   +00200.0000E-0002   ") === "c" ? 1 : 0);
+        score += ("abcd".charCodeAt("   +00200.0000E-0002   ") === 99 ? 2 : 0);
+        score += ("abc".charAt(-0.99999) === "a" ? 4 : 0);
+        score += ("abc".charCodeAt(1.99999) === 98 ? 8 : 0);
+        score += (padded.length === 6 ? 16 : 0);
+        score += (padded.charCodeAt(0) === 0xD83D ? 32 : 0);
+        score += (padded.charCodeAt(1) === 0xDCA9 ? 64 : 0);
+        score += (padded.charCodeAt(2) === 0xD83D ? 128 : 0);
+        score += ("abc".padEnd(5, 0) === "abc00" ? 256 : 0);
+        try {
+            "abc".padStart(10, Symbol());
+        } catch (error) {
+            score += (error.constructor === TypeError ? 512 : 0);
+        }
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1023));
+}
+
+#[test]
+fn script_core_supports_string_repeat_counts_and_range_errors() {
+    let result = compile_and_run_string(
+        r#"
+        let negativeThrew = false;
+        let infiniteThrew = false;
+        try {
+            "x".repeat(-1);
+        } catch (error) {
+            negativeThrew = error.constructor === RangeError;
+        }
+        try {
+            "x".repeat(Infinity);
+        } catch (error) {
+            infiniteThrew = error.constructor === RangeError;
+        }
+        [
+            "ab".repeat(3),
+            "x".repeat(0),
+            String.prototype.repeat.call(7, 2),
+            "xy".repeat(2.9),
+            negativeThrew,
+            infiniteThrew,
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "ababab||77|xyxy|true|true");
+}
+
+#[test]
+fn script_core_preserves_lone_surrogate_string_literals() {
+    let result = compile_and_run(
+        r#"
+        let lone = "\uD83D";
+        let score = 0;
+        score += (lone.length === 1 ? 1 : 0);
+        score += (lone.charCodeAt(0) === 0xD83D ? 2 : 0);
+        score += ("\uD83D\uDCA9\uD83D".charCodeAt(2) === 0xD83D ? 4 : 0);
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_preserves_surrogate_pairs_through_string_concatenation_and_iteration() {
+    let result = compile_and_run(
+        r#"
+        let lo = "\uD834";
+        let hi = "\uDF06";
+        let pair = lo + hi;
+        let string = "a" + pair + "b" + lo + pair + hi + lo;
+        let iterator = string[Symbol.iterator]();
+        let score = 0;
+        let result;
+
+        score += (pair.length === 2 ? 1 : 0);
+        score += (pair.charCodeAt(0) === 0xD834 ? 2 : 0);
+        score += (pair.charCodeAt(1) === 0xDF06 ? 4 : 0);
+
+        result = iterator.next();
+        score += (result.value === "a" && result.done === false ? 8 : 0);
+        result = iterator.next();
+        score += (result.value === pair && result.done === false ? 16 : 0);
+        result = iterator.next();
+        score += (result.value === "b" && result.done === false ? 32 : 0);
+        result = iterator.next();
+        score += (result.value === lo && result.done === false ? 64 : 0);
+        result = iterator.next();
+        score += (result.value === pair && result.done === false ? 128 : 0);
+        result = iterator.next();
+        score += (result.value === hi && result.done === false ? 256 : 0);
+        result = iterator.next();
+        score += (result.value === lo && result.done === false ? 512 : 0);
+        result = iterator.next();
+        score += (result.value === undefined && result.done === true ? 1024 : 0);
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(2047));
+}
+
+#[test]
+fn script_core_supports_string_match_and_replace_regexp_basics() {
+    let result = compile_and_run(
+        r#"
+        let grouped = "Boston, MA 02134".match(/([\d]{5})([-\ ]?[\d]{4})?$/);
+        let globalDigits = "123456abcde7890".match(/\d{2}/g);
+        let replaced = "She sells seashells by the seashore.".replace(/sh/g, "$$sch");
+        let score = 0;
+        score += (grouped[0] === "02134" ? 1 : 0);
+        score += (grouped[1] === "02134" ? 2 : 0);
+        score += (grouped[2] === undefined ? 4 : 0);
+        score += (grouped.index === "Boston, MA 02134".lastIndexOf("0") ? 8 : 0);
+        score += (grouped.input === "Boston, MA 02134" ? 16 : 0);
+        score += (globalDigits.length === 5 ? 32 : 0);
+        score += (globalDigits[0] === "12" ? 64 : 0);
+        score += (globalDigits[4] === "90" ? 128 : 0);
+        score += (replaced === "She sells sea$schells by the sea$schore." ? 256 : 0);
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(511));
+}
+
+#[test]
+fn script_core_supports_string_split_and_observable_coercion_order() {
+    let result = compile_and_run(
+        r#"
+        function ExpectedError() {}
+        let score = 0;
+        let separator = {
+            toString: function() {
+                score = score + 1;
+                throw new Error("separator");
+            }
+        };
+        let limit = {
+            valueOf: function() {
+                score = score + 2;
+                throw new ExpectedError();
+            }
+        };
+        try {
+            "foo".split(separator, limit);
+        } catch (error) {
+            score += (error.constructor === ExpectedError ? 4 : 0);
+        }
+        let parts = "one two three".split(" ");
+        score += (parts.length === 3 ? 8 : 0);
+        score += (parts[0] === "one" ? 16 : 0);
+        score += (parts[2] === "three" ? 32 : 0);
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(62));
+}
+
+#[test]
+fn script_core_string_position_coercion_errors_preserve_type_error_identity() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let bad = Object.create(null);
+        try {
+            "".charAt(bad);
+        } catch (error) {
+            score += (error.constructor === TypeError ? 1 : 0);
+        }
+        try {
+            "".charCodeAt(bad);
+        } catch (error) {
+            score += (error.constructor === TypeError ? 2 : 0);
+        }
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_array_index_of_builtin_shim() {
+    let result = compile_and_run(
+        r#"
+        let values = [1, 2, 3];
+        values.indexOf(2);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_supports_object_has_own_property_builtin_shim() {
+    let result = compile_and_run(
+        r#"
+        let own = { answer: 1 };
+        (own.hasOwnProperty("answer") ? 1 : 0)
+            + (own.hasOwnProperty("missing") ? 10 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_supports_for_in_head_destructuring_bindings() {
+    let result = compile_and_run(
+        r#"
+        let seen = 0;
+        for (var [x, x] in { ab: null }) {
+            seen = seen + (x === "b" ? 1 : 100);
+        }
+        seen;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_preserves_outer_var_bindings_across_for_in_lexical_heads() {
+    let result = compile_and_run_string(
+        r#"
+        var probeBefore = function() { return x; };
+        var probeExpr, probeDecl, probeBody;
+        var x = 1;
+
+        for (
+            let [_ = probeDecl = function() { return x; }]
+            in
+            { '': probeExpr = function() { return x; }}
+        )
+            var x = 2, __ = probeBody = function() { return x; };
+
+        probeBefore() + ":" + probeExpr() + ":" + probeDecl() + ":" + probeBody() + ":" + x;
+        "#,
+    );
+
+    assert_eq!(result, "2:2:2:2:2");
+}
+
+#[test]
+fn script_core_uses_reference_errors_for_for_in_lexical_head_tdz() {
+    let result = compile_and_run_string(
+        r#"
+        try {
+            let x = 1;
+            for (let x in { x }) {}
+            "no-error";
+        } catch (error) {
+            error.name;
+        }
+        "#,
+    );
+
+    assert_eq!(result, "ReferenceError");
+}
+
+#[test]
+fn script_core_scopes_for_in_lexical_head_and_body_closures_correctly() {
+    let result = compile_and_run_string(
+        r#"
+        let x = 'outside';
+        var probeBefore = function() { return x; };
+        var probeExpr, probeDecl, probeBody;
+
+        try {
+            for (
+                let [x, _ = probeDecl = function() { return x; }]
+                in
+                { i: probeExpr = function() { typeof x; } }
+            )
+                probeBody = function() { return x; };
+            "loop-ok";
+        } catch (error) {
+            "caught:" + error.name;
+        }
+
+        let exprResult;
+        try {
+            exprResult = probeExpr();
+        } catch (error) {
+            exprResult = error.name;
+        }
+
+        probeBefore() + ":" + exprResult + ":" +
+            (probeDecl ? probeDecl() : "nodecl") + ":" +
+            (probeBody ? probeBody() : "nobody");
+        "#,
+    );
+
+    assert_eq!(result, "outside:ReferenceError:i:i");
+}
+
+#[test]
+fn script_core_lowers_named_group_match_result_destructuring() {
+    let mut atoms = AtomTable::new();
+    let _ = compile_unit(
+        r#"
+        let {a, b} = "bab".match(/(?<b>b)\k<a>(?<a>a)\k<b>/u).groups;
+        a + b;
+        "#,
+        &mut atoms,
+    );
+}
+
+#[test]
+fn script_core_lowers_var_declarators_that_share_names_with_hoisted_functions() {
+    let mut atoms = AtomTable::new();
+    let _ = compile_unit(
+        r#"
+        var __string;
+        var __re = /1|12/;
+        __re.exec(__string);
+        __re.test(__string);
+        function __string() {}
+        "#,
+        &mut atoms,
+    );
+}
+
+#[test]
+fn script_core_installs_phase6_numeric_globals_and_reflect_namespace() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            typeof Number,
+            typeof Math,
+            typeof BigInt,
+            typeof RegExp,
+            typeof Reflect,
+            typeof Reflect.apply,
+            typeof Reflect.construct,
+            typeof Reflect.defineProperty,
+            typeof Reflect.deleteProperty,
+            typeof Reflect.get,
+            typeof Reflect.getOwnPropertyDescriptor,
+            typeof Reflect.getPrototypeOf,
+            typeof Reflect.has,
+            typeof Reflect.isExtensible,
+            typeof Reflect.ownKeys,
+            typeof Reflect.preventExtensions,
+            typeof Reflect.set,
+            typeof Reflect.setPrototypeOf,
+            typeof Reflect.enumerate
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "function:object:function:function:object:function:function:function:function:function:function:function:function:function:function:function:function:function:undefined"
+    );
+}
+
+#[test]
+fn script_core_reflect_dispatches_basic_object_operations() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        let target = { answer: 1 };
+        let proto = { marker: 2 };
+
+        total += (Reflect.get(target, "answer") === 1 ? 1 : 0);
+        total += (Reflect.has(target, "answer") ? 2 : 0);
+        total += (Reflect.set(target, "answer", 5) && target.answer === 5 ? 4 : 0);
+        total += (Reflect.defineProperty(target, "sealed", {
+            value: 7,
+            configurable: false,
+            enumerable: true,
+            writable: false
+        }) ? 8 : 0);
+        total += (Reflect.getOwnPropertyDescriptor(target, "sealed").value === 7 ? 16 : 0);
+        total += (Reflect.deleteProperty(target, "answer") && !Reflect.has(target, "answer") ? 32 : 0);
+        total += (Reflect.setPrototypeOf(target, proto) && Reflect.getPrototypeOf(target) === proto ? 64 : 0);
+        total += (Reflect.preventExtensions(target) && !Reflect.isExtensible(target) ? 128 : 0);
+        total += (Reflect.ownKeys(target).join(",") === "sealed" ? 256 : 0);
+        total += (Reflect.construct(function Box(value) { this.value = value; }, [11]).value === 11 ? 512 : 0);
+        total += (Reflect.apply(function(a, b) { return this.base + a + b; }, { base: 3 }, [4, 5]) === 12 ? 1024 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(2047));
+}
+
+#[test]
+fn script_core_reflect_uses_accessor_paths_and_validates_argument_lists() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        let accessorBase = {};
+        let receiver = { marker: 41, stored: 0 };
+
+        Object.defineProperty(accessorBase, "value", {
+            get: function() {
+                return this.marker;
+            },
+            set: function(next) {
+                this.stored = next;
+            }
+        });
+
+        total += (Reflect.get(accessorBase, "value", receiver) === 41 ? 1 : 0);
+        total += (Reflect.get(Object.create(accessorBase), "value", receiver) === 41 ? 2 : 0);
+        total += (Reflect.set(accessorBase, "value", 7, receiver) && receiver.stored === 7 ? 4 : 0);
+
+        let throwing = {};
+        Object.defineProperty(throwing, "value", {
+            set: function() {
+                throw "setter";
+            }
+        });
+        try {
+            Reflect.set(throwing, "value", 1);
+        } catch (error) {
+            total += (error === "setter" ? 8 : 0);
+        }
+
+        let receiverAccessor = {};
+        Object.defineProperty(receiverAccessor, "slot", {
+            set: function(value) {}
+        });
+        total += (Reflect.set({}, "slot", 9, receiverAccessor) === false ? 16 : 0);
+
+        try {
+            Reflect.apply(function() {}, null, undefined);
+        } catch (error) {
+            total += (error.constructor === TypeError ? 32 : 0);
+        }
+
+        try {
+            Reflect.construct(function() {}, null);
+        } catch (error) {
+            total += (error.constructor === TypeError ? 64 : 0);
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
+fn script_core_installs_proxy_constructor_and_revocable_pair_surface() {
+    let result = compile_and_run_string(
+        r#"
+        let revocableType = "missing";
+        let pairTypes = "missing";
+        if (typeof Proxy === "function") {
+            revocableType = typeof Proxy.revocable;
+            if (revocableType === "function") {
+                let pair = Proxy.revocable({}, {});
+                pairTypes = typeof pair.proxy + ":" + typeof pair.revoke;
+            }
+        }
+        typeof Proxy + ":" + revocableType + ":" + pairTypes;
+        "#,
+    );
+
+    assert_eq!(result, "function:function:object:function");
+}
+
+#[test]
+fn script_core_proxy_is_construct_only_and_validates_constructor_arguments() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += (typeof Proxy === "function" ? 1 : 0);
+        total += (Object.prototype.hasOwnProperty.call(Proxy, "prototype") ? 0 : 2);
+        try {
+            Proxy({}, {});
+        } catch (error) {
+            total += (error.constructor === TypeError ? 4 : 0);
+        }
+        try {
+            new Proxy(1, {});
+        } catch (error) {
+            total += (error.constructor === TypeError ? 8 : 0);
+        }
+        try {
+            new Proxy({}, 1);
+        } catch (error) {
+            total += (error.constructor === TypeError ? 16 : 0);
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_proxy_revocable_revokes_idempotently_and_throws_afterward() {
+    let result = compile_and_run(
+        r#"
+        let pair = Proxy.revocable({ answer: 1 }, {});
+        let total = 0;
+        total += (pair.proxy.answer === 1 ? 1 : 0);
+        total += (pair.revoke() === undefined ? 2 : 0);
+        try {
+            pair.proxy.answer;
+        } catch (error) {
+            total += (error.constructor === TypeError ? 4 : 0);
+        }
+        try {
+            Object.getPrototypeOf(pair.proxy);
+        } catch (error) {
+            total += (error.constructor === TypeError ? 8 : 0);
+        }
+        total += (pair.revoke() === undefined ? 16 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_callable_proxies_reach_typeof_call_and_construct_paths() {
+    let result = compile_and_run(
+        r#"
+        let target = function(value) {
+            if (new.target) {
+                this.value = value;
+                return;
+            }
+            return value + 1;
+        };
+        target.prototype.marker = 1;
+        let proxy = new Proxy(target, {});
+        let total = 0;
+
+        try {
+            total += (typeof proxy === "function" ? 1 : 0);
+        } catch (error) {
+            total += 1024;
+        }
+        try {
+            total += (proxy(4) === 5 ? 2 : 0);
+        } catch (error) {
+            total += 2048;
+        }
+        try {
+            total += (Function.prototype.call.call(proxy, null, 5) === 6 ? 4 : 0);
+        } catch (error) {
+            total += 4096;
+        }
+        try {
+            total += (Reflect.apply(proxy, null, [6]) === 7 ? 8 : 0);
+        } catch (error) {
+            total += 8192;
+        }
+        try {
+            let instance = new proxy(8);
+            total += (instance.value === 8 ? 16 : 0);
+            total += (Object.getPrototypeOf(instance) === target.prototype ? 32 : 0);
+        } catch (error) {
+            total += 16384;
+        }
+        try {
+            let constructed = Reflect.construct(proxy, [9]);
+            total += (constructed.value === 9 ? 64 : 0);
+        } catch (error) {
+            total += 32768;
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
+fn script_core_proxy_named_property_caches_stay_proxy_aware() {
+    let result = compile_and_run(
+        r#"
+        let gets = 0;
+        let sets = 0;
+        let target = { value: 1 };
+        let proxy = new Proxy(target, {
+            get(target, key, receiver) {
+                if (key === "value") {
+                    gets += 1;
+                    return gets * 10;
+                }
+                return target[key];
+            },
+            set(target, key, value, receiver) {
+                if (key === "value") {
+                    sets += 1;
+                    target[key] = value + 1;
+                    return true;
+                }
+                target[key] = value;
+                return true;
+            }
+        });
+
+        let total = 0;
+        total += proxy.value;
+        total += proxy.value;
+        proxy.value = 4;
+        proxy.value = 7;
+        total += proxy.value;
+        total += (gets === 3 ? 1 : 0);
+        total += (sets === 2 ? 2 : 0);
+        total += (target.value === 8 ? 4 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(67));
+}
+
+#[test]
+fn script_core_proxy_null_traps_forward_and_own_keys_require_property_keys() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        let target = { value: 3 };
+        let proxy = new Proxy(target, { get: null, set: null });
+        total += (proxy.value === 3 ? 1 : 0);
+        proxy.value = 7;
+        total += (target.value === 7 ? 2 : 0);
+
+        let callable = new Proxy(function(value) { return value + 1; }, { apply: null });
+        total += (callable(4) === 5 ? 4 : 0);
+
+        let constructible = new Proxy(function(value) { this.value = value; }, { construct: null });
+        let instance = new constructible(6);
+        total += (instance.value === 6 ? 8 : 0);
+
+        try {
+            Object.keys(new Proxy({}, {
+                ownKeys: function() {
+                    return [true];
+                }
+            }));
+        } catch (error) {
+            total += (error.constructor === TypeError ? 16 : 0);
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_proxy_invariants_cover_define_delete_prototype_and_prevent_extensions() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+
+        let defineTrapCalls = 0;
+        let defineProxy = new Proxy({}, {
+            defineProperty: function(target, prop, desc) {
+                Object.defineProperty(target, prop, {
+                    configurable: false,
+                    writable: true
+                });
+                defineTrapCalls += 1;
+                return true;
+            }
+        });
+        try {
+            Reflect.defineProperty(defineProxy, "prop", { writable: false });
+        } catch (error) {
+            total += (error instanceof TypeError ? 1 : 0);
+        }
+        total += (defineTrapCalls === 1 ? 2 : 0);
+
+        let deleteTrapCalls = 0;
+        let deleteProxy = new Proxy({ prop: 1 }, {
+            deleteProperty: function(target, prop) {
+                Object.preventExtensions(target);
+                deleteTrapCalls += 1;
+                return true;
+            }
+        });
+        try {
+            Reflect.deleteProperty(deleteProxy, "prop");
+        } catch (error) {
+            total += (error instanceof TypeError ? 4 : 0);
+        }
+        total += (deleteTrapCalls === 1 ? 8 : 0);
+        total += (Reflect.deleteProperty(deleteProxy, "missing") ? 16 : 0);
+        total += (deleteTrapCalls === 2 ? 32 : 0);
+
+        function Custom() {}
+        let prototypeProxy = new Proxy({}, {
+            getPrototypeOf: function() {
+                return Custom.prototype;
+            }
+        });
+        total += (prototypeProxy instanceof Custom ? 64 : 0);
+
+        let observedHandler;
+        let observedTarget;
+        let observedProp;
+        let hasTarget = {};
+        let hasHandler = {
+            has: function(target, prop) {
+                observedHandler = this;
+                observedTarget = target;
+                observedProp = prop;
+                return false;
+            }
+        };
+        "attr" in Object.create(new Proxy(hasTarget, hasHandler));
+        total += (observedHandler === hasHandler ? 128 : 0);
+        total += (observedTarget === hasTarget ? 256 : 0);
+        total += (observedProp === "attr" ? 512 : 0);
+
+        let innerPrevent = new Proxy({}, {
+            preventExtensions: function() {
+                return false;
+            }
+        });
+        try {
+            Object.preventExtensions(new Proxy(innerPrevent, {}));
+        } catch (error) {
+            total += (error instanceof TypeError ? 1024 : 0);
+        }
+
+        let setProtoCalls = [];
+        let setProto = {};
+        let setProtoTarget = new Proxy(Object.create(setProto), {
+            isExtensible: function() {
+                setProtoCalls.push("target.[[IsExtensible]]");
+                return false;
+            },
+            getPrototypeOf: function() {
+                setProtoCalls.push("target.[[GetPrototypeOf]]");
+                return setProto;
+            }
+        });
+        Object.preventExtensions(setProtoTarget);
+        let setProtoProxy = new Proxy(setProtoTarget, {
+            setPrototypeOf: function() {
+                setProtoCalls.push("proxy.[[SetPrototypeOf]]");
+                return true;
+            }
+        });
+        total += (setProtoCalls.length === 0 ? 2048 : 0);
+        total += (Reflect.setPrototypeOf(setProtoProxy, setProto) ? 4096 : 0);
+        total += (
+            setProtoCalls.join(",") ===
+            "proxy.[[SetPrototypeOf]],target.[[IsExtensible]],target.[[GetPrototypeOf]]"
+                ? 8192
+                : 0
+        );
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(16383));
+}
+
+#[test]
+fn script_core_supports_phase6_number_math_and_bigint_basics() {
+    let result = compile_and_run(
+        r#"
+        let number = Number("41");
+        let wrapped = new Number(2);
+        let bigint = BigInt("9");
+        let total = 0;
+        total += (number === 41 ? 1 : 0);
+        total += (wrapped.valueOf() === 2 ? 2 : 0);
+        total += (wrapped.toString() === "2" ? 4 : 0);
+        total += (Math.max(-4, 8, 3) === 8 ? 8 : 0);
+        total += (Math.round(-0.25) === 0 ? 16 : 0);
+        total += (BigInt.prototype.valueOf.call(bigint) === bigint ? 32 : 0);
+        total += (BigInt.prototype.toString.call(bigint) === "9" ? 64 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
+fn script_core_bigint_boxing_exposes_wrapper_identity_and_value_of() {
+    let result = compile_and_run(
+        r#"
+        let boxed = Object(1n);
+        let total = 0;
+        total += (typeof boxed === "object" ? 1 : 0);
+        total += (boxed instanceof BigInt ? 2 : 0);
+        total += (BigInt.prototype.valueOf.call(boxed) === 1n ? 4 : 0);
+        total += (Object.prototype.toString.call(boxed) === "[object BigInt]" ? 8 : 0);
+        total += (Object.getPrototypeOf(boxed) === BigInt.prototype ? 16 : 0);
+        total += (boxed.valueOf() === 1n ? 32 : 0);
+        total += (!(boxed instanceof Boolean) ? 64 : 0);
+        total += (BigInt.prototype !== Boolean.prototype ? 128 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(255));
+}
+
+#[test]
+fn script_core_supports_bigint_literals_and_number_radix_poisoning_cases() {
+    let result = compile_and_run(
+        r#"
+        function Test262Error() {}
+        let total = 0;
+        let poisoned = {
+            valueOf() {
+                throw new Test262Error();
+            }
+        };
+        try {
+            0..toString(poisoned);
+        } catch (error) {
+            total += (error.constructor === Test262Error ? 1 : 0);
+        }
+        total += ((15n).toString(16) === "f" ? 2 : 0);
+        try {
+            (0n).toString(Symbol());
+        } catch (error) {
+            total += (error.constructor === TypeError ? 4 : 0);
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_sparse_array_literals_preserve_length_and_holes() {
+    let result = compile_and_run(
+        r#"
+        let oneHole = [,];
+        let twoHoles = [,,];
+        let total = 0;
+        total += (oneHole.length === 1 ? 1 : 0);
+        total += (!(0 in oneHole) ? 2 : 0);
+        total += (oneHole[0] === undefined ? 4 : 0);
+        total += (twoHoles.length === 2 ? 8 : 0);
+        total += (!(1 in twoHoles) ? 16 : 0);
+        total += ([].length === 0 ? 32 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
+fn script_core_map_and_set_iterables_preserve_size_and_insertion_order() {
+    let result = compile_and_run(
+        r#"
+        let set = new Set([1, "a", true]);
+        let map = new Map([[1, "a"], ["b", true]]);
+        let setOrder = "";
+        for (const value of set) {
+            setOrder += value + "|";
+        }
+        let mapOrder = "";
+        for (const entry of map) {
+            mapOrder += entry[0] + ":" + entry[1] + "|";
+        }
+        let total = 0;
+        total += (set.size === 3 ? 1 : 0);
+        total += (setOrder === "1|a|true|" ? 2 : 0);
+        total += (map.size === 2 ? 4 : 0);
+        total += (mapOrder === "1:a|b:true|" ? 8 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_supports_phase6_regexp_literals_and_constructor_state() {
+    let result = compile_and_run(
+        r#"
+        let literal = /ab+/gi;
+        let same = RegExp(literal);
+        let cloned = new RegExp(literal, "m");
+        let descriptor = Object.getOwnPropertyDescriptor(literal, "lastIndex");
+        let total = 0;
+        total += (Object.getPrototypeOf(literal) === RegExp.prototype ? 1 : 0);
+        total += (literal.source === "ab+" ? 2 : 0);
+        total += (literal.flags === "gi" ? 4 : 0);
+        total += (literal.lastIndex === 0 ? 8 : 0);
+        total += (descriptor.writable === true ? 16 : 0);
+        total += (descriptor.enumerable === false ? 32 : 0);
+        total += (descriptor.configurable === false ? 64 : 0);
+        total += (literal.toString() === "/ab+/gi" ? 128 : 0);
+        total += (Object.prototype.toString.call(literal) === "[object RegExp]" ? 256 : 0);
+        total += (same === literal ? 512 : 0);
+        total += (cloned !== literal ? 1024 : 0);
+        total += (cloned.source === "ab+" ? 2048 : 0);
+        total += (cloned.flags === "m" ? 4096 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(8191));
+}
+
+#[test]
+fn script_core_supports_regexp_exec_test_and_flag_getters() {
+    let result = compile_and_run(
+        r#"
+        let re = new RegExp("1|12", "gm");
+        let first = re.exec("123");
+        let second = re.exec("123");
+        let third = re.exec("123");
+        let total = 0;
+        total += (typeof re.exec === "function" ? 1 : 0);
+        total += (typeof re.test === "function" ? 2 : 0);
+        total += (re.global ? 4 : 0);
+        total += (re.multiline ? 8 : 0);
+        total += (!re.ignoreCase ? 16 : 0);
+        total += (first !== null && first[0] === "1" && first.index === 0 ? 32 : 0);
+        total += (second === null ? 64 : 0);
+        total += (third !== null && third[0] === "1" && third.index === 0 ? 128 : 0);
+        total += (re.lastIndex === 1 ? 256 : 0);
+        re.lastIndex = 0;
+        total += (re.test("123") ? 512 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1023));
+}
+
+#[test]
+fn script_core_supports_regexp_exec_for_escaped_literal_patterns() {
+    let result = compile_and_run(
+        r#"
+        let tab = /\t\t/.exec("a\u0009\u0009b");
+        let newline = /\n/.test("a\nb");
+        let control = /\cJ/.exec("\n");
+        (tab !== null && tab[0] === "\u0009\u0009" ? 1 : 0)
+            + (newline ? 2 : 0)
+            + (control !== null && control[0] === "\n" ? 4 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_supports_regexp_source_flags_and_indices_getters() {
+    let result = compile_and_run(
+        r#"
+        let sourceDescriptor = Object.getOwnPropertyDescriptor(RegExp.prototype, "source");
+        let flagsDescriptor = Object.getOwnPropertyDescriptor(RegExp.prototype, "flags");
+        let hasIndicesDescriptor = Object.getOwnPropertyDescriptor(RegExp.prototype, "hasIndices");
+        let empty = new RegExp();
+        let indexed = /(?<head>a)(b)?/d;
+        let match = indexed.exec("ac");
+        let total = 0;
+        total += (typeof sourceDescriptor.get === "function" ? 1 : 0);
+        total += (typeof flagsDescriptor.get === "function" ? 2 : 0);
+        total += (typeof hasIndicesDescriptor.get === "function" ? 4 : 0);
+        total += (Object.getOwnPropertyDescriptor(empty, "source") === undefined ? 8 : 0);
+        total += (empty.source === "(?:)" ? 16 : 0);
+        total += (indexed.hasIndices === true ? 32 : 0);
+        total += (indexed.flags === "d" ? 64 : 0);
+        total += (match !== null && match.groups.head === "a" ? 128 : 0);
+        total += (match !== null && match.indices[0][0] === 0 && match.indices[0][1] === 1 ? 256 : 0);
+        total += (match !== null && match.indices[1][0] === 0 && match.indices[1][1] === 1 ? 512 : 0);
+        total += (match !== null && match.indices[2] === undefined ? 1024 : 0);
+        total += (match !== null && match.indices.groups.head[0] === 0 && match.indices.groups.head[1] === 1 ? 2048 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(4095));
+}
+
+#[test]
+fn script_core_advances_unicode_zero_length_regexp_matches_by_code_point() {
+    let result = compile_and_run(
+        r#"
+        let re = /(?:)/uy;
+        let input = "\uD83D\uDE00a";
+        let first = re.exec(input);
+        let afterFirst = re.lastIndex;
+        let second = re.exec(input);
+        let afterSecond = re.lastIndex;
+        let third = re.exec(input);
+        let afterThird = re.lastIndex;
+        let total = 0;
+        total += (first !== null && afterFirst === 2 ? 1 : 0);
+        total += (second !== null && afterSecond === 3 ? 2 : 0);
+        total += (third !== null && afterThird === 4 ? 4 : 0);
+        let fourth = re.exec(input);
+        total += (fourth === null && re.lastIndex === 0 ? 8 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_validates_regexp_constructor_flags() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        try {
+            new RegExp("", "gg");
+        } catch (error) {
+            total += Object.getPrototypeOf(error) === SyntaxError.prototype ? 1 : 100;
+        }
+        try {
+            RegExp("", "z");
+        } catch (error) {
+            total += Object.getPrototypeOf(error) === SyntaxError.prototype ? 2 : 100;
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_regexp_prototype_escape_and_receiver_edges() {
+    let result = compile_and_run(
+        r#"
+        let sourceGet = Object.getOwnPropertyDescriptor(RegExp.prototype, "source").get;
+        let globalGet = Object.getOwnPropertyDescriptor(RegExp.prototype, "global").get;
+        let total = 0;
+        total += (sourceGet.call(RegExp.prototype) === "(?:)" ? 1 : 0);
+        total += (globalGet.call(RegExp.prototype) === undefined ? 2 : 0);
+        try {
+            RegExp.prototype.exec("");
+        } catch (error) {
+            total += (error.constructor === TypeError ? 4 : 0);
+        }
+        total += (RegExp.escape("a+b/ ") === "\\x61\\+b\\/\\x20" ? 8 : 0);
+        try {
+            RegExp.escape({});
+        } catch (error) {
+            total += (error.constructor === TypeError ? 16 : 0);
+        }
+        total += (Object.prototype.toString.call(RegExp.prototype) === "[object Object]" ? 32 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
+fn script_core_supports_string_slice_and_regexp_exec_array_to_string() {
+    let result = compile_and_run(
+        r#"
+        let sliced = "abcdefghijklmnabcdefghijklmn".slice(14);
+        let total = 0;
+        total += (sliced === "abcdefghijklmn" ? 1 : 0);
+        total += ("abcd".slice(1, 3) === "bc" ? 2 : 0);
+        total += ("abcd".slice(-3, -1) === "bc" ? 4 : 0);
+        total += (new RegExp("World").exec("Hello World!").toString() === "World" ? 8 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_supports_regexp_constructor_patterns_with_raw_line_terminators() {
+    let result = compile_and_run(
+        r#"
+        let re = new RegExp("(.|\r|\n)*", "");
+        let match = re.exec();
+        let total = 0;
+        total += (match[0] === "undefined" ? 1 : 0);
+        total += (new RegExp("\n").source === "\\n" ? 2 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_phase5_boolean_and_symbol_basics() {
+    let result = compile_and_run(
+        r#"
+        let key = Symbol.for("phase5.registry");
+        let wrapper = new Boolean(false);
+        (typeof Symbol.for("phase5.registry") === "symbol" ? 1 : 0)
+            + (Symbol.keyFor(key) === "phase5.registry" ? 2 : 0)
+            + (Boolean.prototype.valueOf.call(true) === true ? 4 : 0)
+            + (wrapper.valueOf() === false ? 8 : 0)
+            + (key.toString() === "Symbol(phase5.registry)" ? 16 : 0)
+            + (key.valueOf() === key ? 32 : 0)
+            + (key[Symbol.toPrimitive]() === key ? 64 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
+fn script_core_rejects_symbol_construction() {
+    let result = compile_and_run(
+        r#"
+        let threw = 0;
+        try {
+            new Symbol();
+        } catch (error) {
+            threw = typeof error === "object" ? 1 : -1;
+        }
+        threw;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_supports_bitwise_and_boolean_chains() {
+    let result = compile_and_run(
+        r#"
+        ((1 === 1) & (2 === 2)) + (((3 === 4) & (5 === 5)) * 10);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_supports_bitwise_or_in_comparator_style_expressions() {
+    let result = compile_and_run(
+        r#"
+        ((15 / 4) | 0) - ((3 / 4) | 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_exponentiation_and_right_associativity() {
+    let result = compile_and_run(
+        r#"
+        (2 ** 5) + (2 ** 3 ** 2) + (-(2 ** 4));
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(528));
+}
+
+#[test]
+fn script_core_treats_for_in_over_nullish_values_as_empty() {
+    let result = compile_and_run(
+        r#"
+        let seen = 0;
+        for (var key in undefined) {
+            seen = seen + 100;
+        }
+        for (var other in null) {
+            seen = seen + 100;
+        }
+        seen;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(0));
+}
+
+#[test]
+fn script_core_supports_non_index_numeric_computed_property_keys() {
+    let result = compile_and_run(
+        r#"
+        let obj = {
+            [1.2]: 1,
+            [1e55]: 2,
+            [0.000001]: 3,
+            [-0]: 4,
+            [Infinity]: 5,
+            [-Infinity]: 6,
+            [NaN]: 7
+        };
+        (obj['1.2'] === 1 ? 1 : 0)
+            + (obj['1e+55'] === 2 ? 2 : 0)
+            + (obj['0.000001'] === 3 ? 4 : 0)
+            + (obj[0] === 4 ? 8 : 0)
+            + (obj[Infinity] === 5 ? 16 : 0)
+            + (obj[-Infinity] === 6 ? 32 : 0)
+            + (obj[NaN] === 7 ? 64 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
+fn script_core_slice_handles_large_array_like_lengths_without_materializing_full_range() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        let arrayLike = {
+            "9007199254740989": "a",
+            "9007199254740990": "b",
+            length: 9007199254740994
+        };
+        let ranged = Array.prototype.slice.call(
+            arrayLike,
+            9007199254740989,
+            9007199254740996
+        );
+        total += ranged.length === 2 ? 1 : 0;
+        total += ranged[0] === "a" ? 2 : 0;
+        total += ranged[1] === "b" ? 4 : 0;
+
+        let tail = Array.prototype.slice.call(arrayLike, -2, -1);
+        total += tail.length === 1 ? 8 : 0;
+        total += tail[0] === "a" ? 16 : 0;
+
+        try {
+            let invalid = {
+                0: "x",
+                "4294967295": "y",
+                length: 4294967296
+            };
+            Array.prototype.slice.call(invalid, 0, 4294967296);
+        } catch (error) {
+            total += error && error.name === "RangeError" ? 32 : 0;
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
+fn script_core_array_from_closes_iterators_when_mapper_throws() {
+    let result = compile_and_run(
+        r#"
+        function Test262Error() {}
+        let step = 0;
+        let closeCount = 0;
+        let total = 0;
+        let items = {
+            [Symbol.iterator]() {
+                return {
+                    next() {
+                        step += 1;
+                        if (step === 1) {
+                            return { value: "first", done: false };
+                        }
+                        if (step === 2) {
+                            return { value: "second", done: false };
+                        }
+                        return { done: true };
+                    },
+                    return() {
+                        closeCount += 1;
+                        return {};
+                    }
+                };
+            }
+        };
+
+        try {
+            Array.from(items, function() {
+                throw new Test262Error();
+            });
+        } catch (error) {
+            total += (error.constructor === Test262Error ? 1 : 0);
+        }
+
+        total += (closeCount === 1 ? 2 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_fractional_computed_property_keys() {
+    let result = compile_and_run(
+        r#"
+        let obj = { [1.2]: 3 };
+        obj['1.2'];
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_exponential_computed_property_keys() {
+    let result = compile_and_run(
+        r#"
+        let obj = { [1e55]: 3 };
+        obj['1e+55'];
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_infinity_computed_property_keys() {
+    let result = compile_and_run(
+        r#"
+        let obj = { [Infinity]: 3 };
+        obj[Infinity];
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_long_additive_conditional_chains() {
+    let result = compile_and_run(
+        r#"
+        (1 === 1 ? 1 : 0)
+            + (2 === 2 ? 2 : 0)
+            + (3 === 3 ? 4 : 0)
+            + (4 === 4 ? 8 : 0)
+            + (5 === 5 ? 16 : 0)
+            + (6 === 6 ? 32 : 0)
+            + (7 === 7 ? 64 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
+fn script_core_supports_non_index_numeric_computed_property_keys_through_temporaries() {
+    let result = compile_and_run(
+        r#"
+        let obj = {
+            [1.2]: 1,
+            [1e55]: 2,
+            [0.000001]: 3,
+            [-0]: 4,
+            [Infinity]: 5,
+            [-Infinity]: 6,
+            [NaN]: 7
+        };
+        let a = obj['1.2'];
+        let b = obj['1e+55'];
+        let c = obj['0.000001'];
+        let d = obj[0];
+        let e = obj[Infinity];
+        let f = obj[-Infinity];
+        let g = obj[NaN];
+        (a === 1 ? 1 : 0)
+            + (b === 2 ? 2 : 0)
+            + (c === 3 ? 4 : 0)
+            + (d === 4 ? 8 : 0)
+            + (e === 5 ? 16 : 0)
+            + (f === 6 ? 32 : 0)
+            + (g === 7 ? 64 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
+fn script_core_supports_fractional_computed_keys_after_full_object_literal() {
+    let result = compile_and_run(
+        r#"
+        let obj = {
+            [1.2]: 1,
+            [1e55]: 2,
+            [0.000001]: 3,
+            [-0]: 4,
+            [Infinity]: 5,
+            [-Infinity]: 6,
+            [NaN]: 7
+        };
+        obj['1.2'];
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_supports_infinity_computed_keys_after_full_object_literal() {
+    let result = compile_and_run(
+        r#"
+        let obj = {
+            [1.2]: 1,
+            [1e55]: 2,
+            [0.000001]: 3,
+            [-0]: 4,
+            [Infinity]: 5,
+            [-Infinity]: 6,
+            [NaN]: 7
+        };
+        obj[Infinity];
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(5));
+}
+
+#[test]
+fn script_core_reads_default_infinity_global() {
+    let result = compile_and_run("Infinity;");
+
+    assert_eq!(result.as_f64(), Some(f64::INFINITY));
+}
+
+#[test]
+fn script_core_reads_default_nan_global() {
+    let result = compile_and_run("NaN;");
+
+    assert!(result.is_nan());
+}

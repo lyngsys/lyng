@@ -1,0 +1,10 @@
+[package]
+name = "lyng-js-parser"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+lyng-js-common = { workspace = true }
+lyng-js-lexer = { workspace = true }
+lyng-js-ast = { workspace = true }
+unicode-id-start = { workspace = true }

@@ -1,0 +1,8 @@
+[package]
+name = "lyng-dom"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "lyng_dom"

@@ -1,0 +1,487 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+fn make_temp_dir() -> PathBuf {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after unix epoch")
+        .as_nanos();
+    let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let path = std::env::temp_dir().join(format!(
+        "lyng-js-test262-harness-{}-{}-{}",
+        std::process::id(),
+        nonce,
+        counter
+    ));
+    fs::create_dir_all(&path).expect("temp dir should be created");
+    path
+}
+
+fn run_passing_test(path: &Path, source: &str) -> String {
+    let root = path.parent().expect("fixture path should have a parent");
+    let report_path = root.join("report.md");
+    fs::write(path, source).expect("fixture should be written");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+        .args([
+            "--filter",
+            path.to_str().expect("path should be utf-8"),
+            "--report",
+            report_path.to_str().expect("path should be utf-8"),
+            "--timeout-ms",
+            "1000",
+            "-j1",
+        ])
+        .output()
+        .expect("runner should execute");
+
+    assert!(
+        output.status.success(),
+        "runner exited with {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let report = fs::read_to_string(&report_path).expect("report should be written");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+    report
+}
+
+fn run_filtered_test(filter: &str) -> String {
+    run_filtered_test_with_timeout(filter, 1000)
+}
+
+fn run_filtered_test_with_timeout(filter: &str, timeout_ms: u32) -> String {
+    let root = make_temp_dir();
+    let report_path = root.join("report.md");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+        .args([
+            "--filter",
+            filter,
+            "--report",
+            report_path.to_str().expect("path should be utf-8"),
+            "--timeout-ms",
+            &timeout_ms.to_string(),
+            "-j1",
+        ])
+        .output()
+        .expect("runner should execute");
+
+    assert!(
+        output.status.success(),
+        "runner exited with {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let report = fs::read_to_string(&report_path).expect("report should be written");
+    let _ = fs::remove_dir_all(root);
+    report
+}
+
+fn run_single_test(path: &Path, source: &str) -> String {
+    let root = path.parent().expect("fixture path should have a parent");
+    let report_path = root.join("report.md");
+    fs::write(path, source).expect("fixture should be written");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+        .args([
+            "--filter",
+            path.to_str().expect("path should be utf-8"),
+            "--report",
+            report_path.to_str().expect("path should be utf-8"),
+            "--timeout-ms",
+            "1000",
+            "-j1",
+        ])
+        .output()
+        .expect("runner should execute");
+
+    assert!(
+        output.status.success(),
+        "runner exited with {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    fs::read_to_string(&report_path).expect("report should be written")
+}
+
+fn run_single_test_with_output(path: &Path, source: &str) -> (String, String) {
+    let root = path.parent().expect("fixture path should have a parent");
+    let report_path = root.join("report.md");
+    fs::write(path, source).expect("fixture should be written");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+        .args([
+            "--filter",
+            path.to_str().expect("path should be utf-8"),
+            "--report",
+            report_path.to_str().expect("path should be utf-8"),
+            "--timeout-ms",
+            "1000",
+            "-j1",
+        ])
+        .output()
+        .expect("runner should execute");
+
+    assert!(
+        output.status.success(),
+        "runner exited with {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    (
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        fs::read_to_string(&report_path).expect("report should be written"),
+    )
+}
+
+#[test]
+fn runner_exposes_eval_script_and_create_realm_through_external_embedding() {
+    let root = make_temp_dir();
+    let entry_path = root.join("realm.js");
+
+    let report = run_passing_test(
+        &entry_path,
+        r#"
+        let value = $262.evalScript("globalThis.fromEmbedding = 41; fromEmbedding;");
+        let other = $262.createRealm();
+        assert.sameValue(value, 41);
+        assert.sameValue(fromEmbedding, 41);
+        assert.sameValue(typeof other.evalScript, "function");
+        assert.sameValue(other.global === globalThis, false);
+        assert.sameValue(other.evalScript("typeof $262"), "object");
+        "#,
+    );
+
+    assert!(
+        report.contains("Skipped | `0` |"),
+        "unexpected report:\n{report}"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_exposes_detach_array_buffer_and_gc_through_external_embedding() {
+    let root = make_temp_dir();
+    let entry_path = root.join("detach.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r#"
+        let buffer = new ArrayBuffer(4);
+        assert.sameValue(buffer.byteLength, 4);
+        assert.sameValue($262.gc(), undefined);
+        assert.sameValue(typeof $262.gc, "function");
+        $262.detachArrayBuffer(buffer);
+        assert.sameValue(buffer.byteLength, 0);
+        "#,
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_supports_new_pure_helper_includes() {
+    let root = make_temp_dir();
+    let entry_path = root.join("helpers.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r"
+        /*---
+        includes: [compareIterator.js]
+        ---*/
+        let count = 0;
+        let iterator = {
+          next: function() {
+            count += 1;
+            if (count === 1) {
+              return { value: 3, done: false };
+            }
+            if (count === 2) {
+              return { value: 5, done: false };
+            }
+            return { value: undefined, done: true };
+          }
+        };
+        assert.compareIterator(iterator, [
+          function(value) { assert.sameValue(value, 3); },
+          function(value) { assert.sameValue(value, 5); },
+        ]);
+        ",
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_fails_wrong_runtime_negative_type() {
+    let root = make_temp_dir();
+    let entry_path = root.join("wrong-runtime-negative.js");
+
+    let report = run_single_test(
+        &entry_path,
+        r#"
+        /*---
+        negative:
+          phase: runtime
+          type: TypeError
+        ---*/
+        throw new RangeError("wrong type");
+        "#,
+    );
+
+    assert!(
+        report.contains("| Passed | `0` |"),
+        "unexpected report:\n{report}"
+    );
+    assert!(
+        report.contains("| Failed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_fails_wrong_resolution_negative_type() {
+    let root = make_temp_dir();
+    let entry_path = root.join("wrong-resolution-negative.js");
+    let dependency_path = root.join("dependency.js");
+    fs::write(
+        &dependency_path,
+        r"
+        /*---
+        flags: [module]
+        ---*/
+        export const present = 1;
+        ",
+    )
+    .expect("dependency should be written");
+
+    let report = run_single_test(
+        &entry_path,
+        r#"
+        /*---
+        flags: [module]
+        negative:
+          phase: resolution
+          type: TypeError
+        ---*/
+        import { missing } from "./dependency.js";
+        "#,
+    );
+
+    assert!(
+        report.contains("| Passed | `0` |"),
+        "unexpected report:\n{report}"
+    );
+    assert!(
+        report.contains("| Failed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_reports_skips_separately_from_failures() {
+    let root = make_temp_dir();
+    let entry_path = root.join("skipped.js");
+
+    let (stdout, report) = run_single_test_with_output(
+        &entry_path,
+        r#"
+        /*---
+        includes: [atomicsHelper.js]
+        ---*/
+        "#,
+    );
+
+    assert!(
+        stdout.contains("Failed:         0"),
+        "unexpected stdout:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("Skipped:        1"),
+        "unexpected stdout:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("skip included"),
+        "unexpected stdout:\n{stdout}"
+    );
+    assert!(
+        report.contains("| Failed | `0` |"),
+        "unexpected report:\n{report}"
+    );
+    assert!(
+        report.contains("| Skipped | `1` |"),
+        "unexpected report:\n{report}"
+    );
+    assert!(
+        report.contains("requires $262.agent multi-agent harness"),
+        "unexpected report:\n{report}"
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_passes_async_helper_self_test_without_async_flag_done() {
+    let report = run_filtered_test("harness/asyncHelpers-asyncTest-without-async-flag.js");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_assert_tostring_harness_self_test() {
+    let report = run_filtered_test("harness/assert-tostring.js");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_compare_array_arguments_harness_self_test() {
+    let report = run_filtered_test("harness/compare-array-arguments.js");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_decimal_to_hex_string_harness_self_test() {
+    let report = run_filtered_test("harness/decimalToHexString.js");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_assert_relative_date_ms_harness_self_test() {
+    let report = run_filtered_test("harness/assertRelativeDateMs.js");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_compare_array_sparse_harness_self_test() {
+    let report = run_filtered_test("harness/compare-array-sparse.js");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_deep_equal_mapset_harness_self_test() {
+    let report = run_filtered_test("harness/deepEqual-mapset.js");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_deep_equal_primitives_bigint_harness_self_test() {
+    let report = run_filtered_test("harness/deepEqual-primitives-bigint.js");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_well_known_intrinsics_helper_smoke_test() {
+    let root = make_temp_dir();
+    let entry_path = root.join("well-known-intrinsics.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r"
+        /*---
+        includes: [wellKnownIntrinsicObjects.js]
+        ---*/
+        var intrinsicArray = getWellKnownIntrinsicObject('%Array%');
+        assert.sameValue(intrinsicArray, Array);
+        assert.throws(Test262Error, function () {
+          getWellKnownIntrinsicObject('%AsyncFromSyncIteratorPrototype%');
+        });
+        ",
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_passes_well_known_intrinsics_harness_self_test() {
+    let report = run_filtered_test("harness/wellKnownIntrinsicObjects.js");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_tco_helper_harness_self_test() {
+    let report = run_filtered_test("harness/tcoHelper.js");
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_tco_non_eval_global_regression() {
+    let report =
+        run_filtered_test_with_timeout("language/expressions/call/tco-non-eval-global.js", 5000);
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_tco_non_eval_function_regression() {
+    let report =
+        run_filtered_test_with_timeout("language/expressions/call/tco-non-eval-function.js", 5000);
+    assert!(
+        report.contains("| Passed | `1` |"),
+        "unexpected report:\n{report}"
+    );
+}
+
+#[test]
+fn runner_passes_tco_coalesce_regressions() {
+    for test in [
+        "language/expressions/coalesce/tco-pos-null.js",
+        "language/expressions/coalesce/tco-pos-undefined.js",
+    ] {
+        let report = run_filtered_test_with_timeout(test, 5000);
+        assert!(
+            report.contains("| Passed | `1` |"),
+            "unexpected report for {test}:\n{report}"
+        );
+    }
+}

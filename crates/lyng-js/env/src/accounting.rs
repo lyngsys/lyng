@@ -1,0 +1,220 @@
+use lyng_js_gc::{PrimitiveDomainAccounting, PrimitiveHeapAccounting};
+
+/// Runtime-owned memory summary for one Phase 6 domain outside the primitive heap.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RuntimeDomainAccounting {
+    pub records: usize,
+    pub metadata_bytes: usize,
+    pub payload_bytes: usize,
+    pub live_bytes: usize,
+}
+
+impl RuntimeDomainAccounting {
+    #[inline]
+    pub const fn empty() -> Self {
+        Self {
+            records: 0,
+            metadata_bytes: 0,
+            payload_bytes: 0,
+            live_bytes: 0,
+        }
+    }
+
+    #[inline]
+    pub const fn merge(self, other: Self) -> Self {
+        Self {
+            records: self.records + other.records,
+            metadata_bytes: self.metadata_bytes + other.metadata_bytes,
+            payload_bytes: self.payload_bytes + other.payload_bytes,
+            live_bytes: self.live_bytes + other.live_bytes,
+        }
+    }
+}
+
+/// Agent-local Phase 6 accounting snapshot layered on top of primitive-heap accounting.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct AgentPhase6Accounting {
+    pub heap: PrimitiveHeapAccounting,
+    pub iterator_records: RuntimeDomainAccounting,
+    pub regexp_payloads: RuntimeDomainAccounting,
+    pub module_caches: RuntimeDomainAccounting,
+    pub promise_jobs: RuntimeDomainAccounting,
+    pub live_bytes: usize,
+}
+
+/// Runtime-wide Phase 6 accounting snapshot exposed to reports and benchmarks.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RuntimePhase6Accounting {
+    pub heap: PrimitiveHeapAccounting,
+    pub iterator_records: RuntimeDomainAccounting,
+    pub regexp_payloads: RuntimeDomainAccounting,
+    pub module_caches: RuntimeDomainAccounting,
+    pub promise_jobs: RuntimeDomainAccounting,
+    pub backing_stores: RuntimeDomainAccounting,
+    pub live_bytes: usize,
+}
+
+#[inline]
+pub(crate) const fn total_live_bytes(
+    heap: PrimitiveHeapAccounting,
+    iterator_records: RuntimeDomainAccounting,
+    regexp_payloads: RuntimeDomainAccounting,
+    module_caches: RuntimeDomainAccounting,
+    promise_jobs: RuntimeDomainAccounting,
+    backing_stores: RuntimeDomainAccounting,
+) -> usize {
+    heap.live_bytes
+        + iterator_records.live_bytes
+        + regexp_payloads.live_bytes
+        + module_caches.live_bytes
+        + promise_jobs.live_bytes
+        + backing_stores.live_bytes
+}
+
+#[inline]
+pub(crate) const fn merge_primitive_domain_accounting(
+    left: PrimitiveDomainAccounting,
+    right: PrimitiveDomainAccounting,
+) -> PrimitiveDomainAccounting {
+    PrimitiveDomainAccounting {
+        live_bytes: left.live_bytes + right.live_bytes,
+        reclaimable_bytes: left.reclaimable_bytes + right.reclaimable_bytes,
+        reserved_bytes: left.reserved_bytes + right.reserved_bytes,
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+pub(crate) fn merge_primitive_heap_accounting(
+    left: PrimitiveHeapAccounting,
+    right: PrimitiveHeapAccounting,
+) -> PrimitiveHeapAccounting {
+    PrimitiveHeapAccounting {
+        strings: merge_primitive_domain_accounting(left.strings, right.strings),
+        symbols: merge_primitive_domain_accounting(left.symbols, right.symbols),
+        bigints: merge_primitive_domain_accounting(left.bigints, right.bigints),
+        value_cells: merge_primitive_domain_accounting(left.value_cells, right.value_cells),
+        objects: merge_primitive_domain_accounting(left.objects, right.objects),
+        environments: merge_primitive_domain_accounting(left.environments, right.environments),
+        codes: merge_primitive_domain_accounting(left.codes, right.codes),
+        realms: merge_primitive_domain_accounting(left.realms, right.realms),
+        shapes: merge_primitive_domain_accounting(left.shapes, right.shapes),
+        live_bytes: left.live_bytes + right.live_bytes,
+        reclaimable_bytes: left.reclaimable_bytes + right.reclaimable_bytes,
+        reserved_bytes: left.reserved_bytes + right.reserved_bytes,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ExecutableId, Runtime};
+    use lyng_js_gc::AllocationLifetime;
+    use lyng_js_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
+    use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData, RegExpPayload};
+
+    #[test]
+    fn empty_runtime_phase6_accounting_starts_with_zero_future_domains() {
+        let runtime = Runtime::new(NoopHostHooks);
+        let accounting = runtime.phase6_accounting();
+
+        assert_eq!(
+            accounting.iterator_records,
+            RuntimeDomainAccounting::empty()
+        );
+        assert_eq!(accounting.regexp_payloads, RuntimeDomainAccounting::empty());
+        assert_eq!(accounting.module_caches, RuntimeDomainAccounting::empty());
+        assert_eq!(accounting.promise_jobs, RuntimeDomainAccounting::empty());
+        assert_eq!(accounting.backing_stores, RuntimeDomainAccounting::empty());
+        assert_eq!(accounting.live_bytes, accounting.heap.live_bytes);
+    }
+
+    #[test]
+    fn runtime_phase6_accounting_reports_promise_jobs_and_backing_stores() {
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let root = runtime.root_agent_id();
+        let worker = runtime
+            .root_cluster_mut()
+            .add_agent(None, Some("bench-worker".into()));
+        let local_store = runtime
+            .root_agent_mut()
+            .allocate_backing_store(128)
+            .expect("local backing store should allocate");
+        let shared_store = runtime
+            .root_cluster_mut()
+            .register_shared_backing_store(root, 4096)
+            .expect("shared backing store should allocate");
+        assert!(runtime
+            .root_cluster_mut()
+            .cache_shared_backing_store_handle(
+                shared_store,
+                HostSharedBufferId::from_raw(7).unwrap()
+            ));
+        assert!(runtime
+            .root_cluster_mut()
+            .share_shared_backing_store(shared_store, worker));
+        runtime
+            .enqueue_job(
+                root,
+                HostJobKind::Promise,
+                ExecutableId::Builtin,
+                None,
+                Some("phase6-promise".into()),
+            )
+            .unwrap();
+
+        let accounting = runtime.phase6_accounting();
+
+        assert_eq!(
+            runtime.root_agent().backing_store_byte_length(local_store),
+            Some(128)
+        );
+        assert_eq!(accounting.promise_jobs.records, 1);
+        assert!(accounting.promise_jobs.metadata_bytes >= std::mem::size_of::<crate::RuntimeJob>());
+        assert!(accounting.promise_jobs.payload_bytes >= "phase6-promise".len());
+        assert_eq!(accounting.backing_stores.records, 2);
+        assert_eq!(accounting.backing_stores.payload_bytes, 4096 + 128);
+        assert!(accounting.backing_stores.metadata_bytes > 0);
+        assert_eq!(
+            accounting.iterator_records,
+            RuntimeDomainAccounting::empty()
+        );
+        assert_eq!(accounting.regexp_payloads, RuntimeDomainAccounting::empty());
+        assert_eq!(accounting.module_caches, RuntimeDomainAccounting::empty());
+        assert_eq!(
+            accounting.live_bytes,
+            accounting.heap.live_bytes
+                + accounting.regexp_payloads.live_bytes
+                + accounting.promise_jobs.live_bytes
+                + accounting.backing_stores.live_bytes
+        );
+    }
+
+    #[test]
+    fn runtime_phase6_accounting_reports_regexp_payloads() {
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            let root = objects.root_shape(&mut mutator, None, AllocationLifetime::Default);
+            let regexp = objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root)
+                    .with_cold_data(ObjectColdData::Ordinary(OrdinaryObjectData::RegExp)),
+                AllocationLifetime::Default,
+            );
+            assert!(
+                objects.store_regexp_payload(regexp, RegExpPayload::compile("a", "dg").unwrap())
+            );
+        });
+
+        let accounting = runtime.phase6_accounting();
+
+        assert_eq!(accounting.regexp_payloads.records, 1);
+        assert!(accounting.regexp_payloads.metadata_bytes > 0);
+        assert!(accounting.regexp_payloads.payload_bytes > 0);
+        assert!(
+            accounting.live_bytes
+                >= accounting.heap.live_bytes + accounting.regexp_payloads.live_bytes
+        );
+    }
+}
