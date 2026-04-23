@@ -5,9 +5,9 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 
 ## Run
 
-- Filter: `built-ins/Array/prototype/map/create-non-array-invalid-len.js`
+- Filter: `language`
 - Skip mode: `default heuristics`
-- Per-test timeout: `2.0s`
+- Per-test timeout: `1.0s`
 - Exclusion manifest: `reports/js/lyng-js/test262-exclusions.txt`
 - Category breakdown groups tests by the first path component under `testdata/test262/test/`.
 - Skipped tests are reported separately and still count against the selected-test pass rate.
@@ -16,26 +16,37 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 
 | Metric | Count |
 | --- | ---: |
-| Candidate tests | `1` |
+| Candidate tests | `23637` |
 | Excluded from selection | `0` |
-| Selected tests | `1` |
-| Runnable | `1` |
-| Passed | `0` |
-| Failed | `1` |
+| Selected tests | `23637` |
+| Runnable | `22768` |
+| Passed | `22007` |
+| Failed | `761` |
 | Panicked | `0` |
-| Skipped | `0` |
-| Pass rate (selected) | `0.00%` |
-| Time | `2.5s` |
+| Skipped | `869` |
+| Pass rate (selected) | `93.10%` |
+| Time | `14.5s` |
 
 ## Category Breakdown
 
 | Category | Selected | Runnable | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `built-ins` | `1` | `1` | `0` | `1` | `0` | `0` | `0.00%` |
+| `language` | `23637` | `22768` | `22007` | `761` | `869` | `0` | `93.10%` |
 
 ## Top Skip Reasons
 
-No skips recorded.
+| Reason | Count |
+| --- | ---: |
+| deferred to async module milestones | `269` |
+| unsupported feature: source-phase-imports | `219` |
+| unsupported feature: import-defer | `214` |
+| unsupported feature: regexp-modifiers | `83` |
+| raw harness tests are deferred | `29` |
+| unsupported feature: decorators | `24` |
+| unsupported feature: json-modules | `13` |
+| unsupported feature: resizable-arraybuffer | `7` |
+| unsupported feature: import-text | `6` |
+| unsupported feature: immutable-arraybuffer | `5` |
 
 ## Checked-in Manifest Rules
 
@@ -45,7 +56,206 @@ No skips recorded.
 
 ## Failure Sample
 
-1. built-ins/Array/prototype/map/create-non-array-invalid-len.js: timeout after 2.0s
+1. language/arguments-object/10.6-12-2.js: runtime error: TypeError
+2. language/arguments-object/10.6-13-a-1.js: runtime error: Test262Error
+3. language/arguments-object/10.6-11-b-1.js: runtime error: TypeError
+4. language/arguments-object/10.6-13-a-3.js: runtime error: TypeError
+5. language/arguments-object/10.6-13-a-2.js: runtime error: TypeError
+6. language/arguments-object/10.6-13-c-2-s.js: runtime error: Test262Error
+7. language/arguments-object/10.6-14-c-1-s.js: runtime error: Test262Error
+8. language/arguments-object/10.6-6-3.js: runtime error: TypeError
+9. language/arguments-object/10.6-6-4.js: runtime error: TypeError
+10. language/arguments-object/S10.6_A3_T1.js: runtime error: Test262Error
+11. language/arguments-object/S10.6_A4.js: runtime error: Test262Error
+12. language/comments/S7.4_A5.js: runtime error: Test262Error
+13. language/comments/S7.4_A6.js: runtime error: Test262Error
+14. language/computed-property-names/class/static/method-number-order.js: runtime error: Test262Error
+15. language/computed-property-names/class/static/method-string-order.js: runtime error: Test262Error
+16. language/computed-property-names/class/static/method-symbol-order.js: runtime error: Test262Error
+17. language/computed-property-names/to-name-side-effects/class.js: runtime error: UnsupportedPropertyKey { code: CodeRef(23), instruction_offset: 148, value: Value::ObjectRef(707) }
+18. language/computed-property-names/to-name-side-effects/numbers-class.js: runtime error: UnsupportedPropertyKey { code: CodeRef(23), instruction_offset: 152, value: Value::ObjectRef(707) }
+19. language/destructuring/binding/keyed-destructuring-property-reference-target-evaluation-order-with-bindings.js: runtime error: Test262Error
+20. language/directive-prologue/10.1.1-30-s.js: runtime error: Test262Error
+21. language/directive-prologue/14.1-4-s.js: runtime error: Test262Error
+22. language/directive-prologue/14.1-5-s.js: runtime error: Test262Error
+23. language/expressions/addition/S11.6.1_A2.2_T2.js: runtime error: Test262Error
+24. language/expressions/addition/S11.6.1_A3.2_T1.2.js: runtime error: Test262Error
+25. language/expressions/addition/bigint-toprimitive.js: runtime error: TypeError
+26. language/expressions/addition/coerce-symbol-to-prim-invocation.js: runtime error: Test262Error
+27. language/expressions/addition/coerce-symbol-to-prim-return-prim.js: runtime error: Test262Error
+28. language/expressions/addition/order-of-evaluation.js: runtime error: Test262Error
+29. language/expressions/arrow-function/eval-var-scope-syntax-err.js: runtime error: Test262Error
+30. language/expressions/arrow-function/scope-body-lex-distinct.js: runtime error: Test262Error
+31. language/expressions/arrow-function/scope-param-rest-elem-var-close.js: runtime error: lowering error: UnsupportedPattern { pattern: PatternId(38) }
+32. language/expressions/arrow-function/scope-param-rest-elem-var-open.js: runtime error: lowering error: UnsupportedPattern { pattern: PatternId(38) }
+33. language/expressions/arrow-function/scope-param-elem-var-open.js: runtime error: Test262Error
+34. language/expressions/arrow-function/unscopables-with-in-nested-fn.js: runtime error: TypeError
+35. language/expressions/arrow-function/unscopables-with.js: runtime error: TypeError
+36. language/expressions/assignment/8.12.5-3-b_1.js: runtime error: TypeError
+37. language/expressions/assignment/destructuring/default-expr-throws-iterator-return-get-throws.js: runtime error: Test262Error
+38. language/expressions/assignment/destructuring/iterator-destructuring-property-reference-target-evaluation-order.js: runtime error: Test262Error
+39. language/expressions/assignment/destructuring/keyed-destructuring-property-reference-target-evaluation-order.js: runtime error: Test262Error
+40. language/expressions/assignment/destructuring/keyed-destructuring-property-reference-target-evaluation-order-with-bindings.js: runtime error: Test262Error
+41. language/expressions/assignment/destructuring/target-assign-throws-iterator-return-get-throws.js: runtime error: Test262Error
+42. language/expressions/assignment/dstr/array-elem-iter-rtrn-close-err.js: runtime error: TypeError
+43. language/expressions/assignment/dstr/array-elem-iter-rtrn-close.js: runtime error: Test262Error
+44. language/expressions/assignment/dstr/array-elem-iter-rtrn-close-null.js: runtime error: Test262Error
+45. language/expressions/assignment/dstr/array-elem-iter-thrw-close-err.js: runtime error: Test262Error
+46. language/expressions/assignment/dstr/array-elem-iter-thrw-close.js: runtime error: Test262Error
+47. language/expressions/assignment/dstr/array-elem-trlg-iter-list-rtrn-close-err.js: runtime error: Test262Error
+48. language/expressions/assignment/dstr/array-elem-trlg-iter-list-rtrn-close-null.js: runtime error: Test262Error
+49. language/expressions/assignment/dstr/array-elem-trlg-iter-list-rtrn-close.js: runtime error: Test262Error
+50. language/expressions/assignment/dstr/array-elem-trlg-iter-list-thrw-close-err.js: runtime error: Test262Error
+51. language/expressions/assignment/dstr/array-elem-trlg-iter-list-thrw-close.js: runtime error: Test262Error
+52. language/expressions/assignment/dstr/array-elem-trlg-iter-rest-rtrn-close-err.js: runtime error: Test262Error
+53. language/expressions/assignment/dstr/array-elem-trlg-iter-rest-rtrn-close-null.js: runtime error: Test262Error
+54. language/expressions/assignment/dstr/array-elem-trlg-iter-rest-rtrn-close.js: runtime error: Test262Error
+55. language/expressions/assignment/dstr/array-elem-trlg-iter-rest-thrw-close-err.js: runtime error: Test262Error
+56. language/expressions/assignment/dstr/array-elem-trlg-iter-rest-thrw-close.js: runtime error: Test262Error
+57. language/expressions/assignment/dstr/array-rest-iter-rtrn-close-err.js: runtime error: TypeError
+58. language/expressions/assignment/dstr/array-rest-iter-rtrn-close-null.js: runtime error: TypeError
+59. language/expressions/assignment/dstr/array-rest-iter-rtrn-close.js: runtime error: Test262Error
+60. language/expressions/assignment/dstr/array-rest-iter-thrw-close-err.js: runtime error: Test262Error
+61. language/expressions/assignment/dstr/array-rest-iter-thrw-close.js: runtime error: Test262Error
+62. language/expressions/assignment/dstr/array-rest-lref-err.js: runtime error: Test262Error
+63. language/expressions/assignment/fn-name-lhs-cover.js: runtime error: Test262Error
+64. language/expressions/async-arrow-function/unscopables-with-in-nested-fn.js: runtime error: Test262Error
+65. language/expressions/async-arrow-function/unscopables-with.js: runtime error: Test262Error
+66. language/expressions/async-function/named-unscopables-with-in-nested-fn.js: runtime error: Test262Error
+67. language/expressions/async-function/named-unscopables-with.js: runtime error: Test262Error
+68. language/expressions/async-function/nameless-unscopables-with.js: runtime error: Test262Error
+69. language/expressions/async-function/nameless-unscopables-with-in-nested-fn.js: runtime error: Test262Error
+70. language/expressions/async-generator/eval-var-scope-syntax-err.js: runtime error: Test262Error
+71. language/expressions/async-generator/named-eval-var-scope-syntax-err.js: runtime error: Test262Error
+72. language/expressions/async-generator/named-unscopables-with-in-nested-fn.js: runtime error: Test262Error
+73. language/expressions/async-generator/named-unscopables-with.js: runtime error: Test262Error
+74. language/expressions/async-generator/unscopables-with-in-nested-fn.js: runtime error: Test262Error
+75. language/expressions/async-generator/unscopables-with.js: runtime error: Test262Error
+76. language/expressions/bitwise-and/bigint-and-number.js: runtime error: Test262Error
+77. language/expressions/bitwise-and/bigint-errors.js: runtime error: Test262Error
+78. language/expressions/bitwise-and/bigint-non-primitive.js: runtime error: abrupt completion
+79. language/expressions/bitwise-and/bigint-wrapped-values.js: runtime error: abrupt completion
+80. language/expressions/bitwise-and/bigint-toprimitive.js: runtime error: abrupt completion
+81. language/expressions/bitwise-and/bigint.js: runtime error: abrupt completion
+82. language/expressions/bitwise-and/order-of-evaluation.js: runtime error: Test262Error
+83. language/expressions/bitwise-not/bigint-non-primitive.js: runtime error: abrupt completion
+84. language/expressions/bitwise-not/bigint.js: runtime error: abrupt completion
+85. language/expressions/bitwise-or/bigint-and-number.js: runtime error: Test262Error
+86. language/expressions/bitwise-or/bigint-errors.js: runtime error: Test262Error
+87. language/expressions/bitwise-or/bigint-non-primitive.js: runtime error: abrupt completion
+88. language/expressions/bitwise-or/bigint-wrapped-values.js: runtime error: abrupt completion
+89. language/expressions/bitwise-or/bigint-toprimitive.js: runtime error: abrupt completion
+90. language/expressions/bitwise-or/order-of-evaluation.js: runtime error: Test262Error
+91. language/expressions/bitwise-or/bigint.js: runtime error: abrupt completion
+92. language/expressions/bitwise-xor/bigint-and-number.js: runtime error: Test262Error
+93. language/expressions/bitwise-xor/bigint-non-primitive.js: runtime error: abrupt completion
+94. language/expressions/bitwise-xor/bigint-errors.js: runtime error: Test262Error
+95. language/expressions/bitwise-xor/bigint-wrapped-values.js: runtime error: abrupt completion
+96. language/expressions/bitwise-xor/bigint-toprimitive.js: runtime error: abrupt completion
+97. language/expressions/bitwise-xor/order-of-evaluation.js: runtime error: Test262Error
+98. language/expressions/bitwise-xor/bigint.js: runtime error: abrupt completion
+99. language/expressions/call/S11.2.3_A1.js: runtime error: Test262Error
+100. language/expressions/call/eval-spread-empty-leading.js: runtime error: Test262Error
+101. language/expressions/call/eval-spread-empty-trailing.js: runtime error: Test262Error
+102. language/expressions/call/eval-spread.js: runtime error: Test262Error
+103. language/expressions/call/tco-non-eval-function-dynamic.js: runtime error: Test262Error
+104. language/expressions/call/tco-non-eval-function.js: runner error: worker exited before replying (thread 'main' (35130824) has overflowed its stack | fatal runtime error: stack overflow, aborting)
+105. language/expressions/call/tco-non-eval-global.js: runner error: worker exited before replying (thread 'main' (35130818) has overflowed its stack | fatal runtime error: stack overflow, aborting)
+106. language/expressions/call/with-base-obj.js: runtime error: Test262Error
+107. language/expressions/class/accessor-name-inst/computed-err-to-prop-key.js: runtime error: UnsupportedPropertyKey { code: CodeRef(18), instruction_offset: 36, value: Value::ObjectRef(705) }
+108. language/expressions/call/tco-non-eval-with.js: runner error: worker exited before replying (thread 'main' (35130829) has overflowed its stack | fatal runtime error: stack overflow, aborting)
+109. language/expressions/class/accessor-name-static/computed-err-to-prop-key.js: runtime error: UnsupportedPropertyKey { code: CodeRef(18), instruction_offset: 36, value: Value::ObjectRef(705) }
+110. language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-arrow-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(33), instruction_offset: 117, value: Value::ObjectRef(707) }
+111. language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-async-arrow-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(33), instruction_offset: 117, value: Value::ObjectRef(707) }
+112. language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(33), instruction_offset: 117, value: Value::ObjectRef(708) }
+113. language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-generator-function-declaration.js: runtime error: UnsupportedPropertyKey { code: CodeRef(22), instruction_offset: 111, value: Value::ObjectRef(710) }
+114. language/expressions/class/cpn-class-expr-computed-property-name-from-arrow-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(25), instruction_offset: 117, value: Value::ObjectRef(707) }
+115. language/expressions/class/cpn-class-expr-computed-property-name-from-async-arrow-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(25), instruction_offset: 117, value: Value::ObjectRef(707) }
+116. language/expressions/class/cpn-class-expr-computed-property-name-from-generator-function-declaration.js: runtime error: UnsupportedPropertyKey { code: CodeRef(20), instruction_offset: 111, value: Value::ObjectRef(710) }
+117. language/expressions/class/cpn-class-expr-computed-property-name-from-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(25), instruction_offset: 117, value: Value::ObjectRef(708) }
+118. language/expressions/class/cpn-class-expr-fields-computed-property-name-from-arrow-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(23), instruction_offset: 104, value: Value::ObjectRef(707) }
+119. language/expressions/class/cpn-class-expr-fields-computed-property-name-from-async-arrow-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(23), instruction_offset: 104, value: Value::ObjectRef(707) }
+120. language/expressions/class/cpn-class-expr-fields-computed-property-name-from-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(23), instruction_offset: 104, value: Value::ObjectRef(708) }
+121. language/expressions/class/cpn-class-expr-fields-computed-property-name-from-generator-function-declaration.js: runtime error: UnsupportedPropertyKey { code: CodeRef(18), instruction_offset: 98, value: Value::ObjectRef(710) }
+122. language/expressions/class/cpn-class-expr-fields-methods-computed-property-name-from-arrow-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(25), instruction_offset: 104, value: Value::ObjectRef(707) }
+123. language/expressions/class/cpn-class-expr-fields-methods-computed-property-name-from-async-arrow-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(25), instruction_offset: 104, value: Value::ObjectRef(707) }
+124. language/expressions/class/cpn-class-expr-fields-methods-computed-property-name-from-generator-function-declaration.js: runtime error: UnsupportedPropertyKey { code: CodeRef(20), instruction_offset: 98, value: Value::ObjectRef(710) }
+125. language/expressions/class/cpn-class-expr-fields-methods-computed-property-name-from-function-expression.js: runtime error: UnsupportedPropertyKey { code: CodeRef(25), instruction_offset: 104, value: Value::ObjectRef(708) }
+126. language/expressions/class/elements/arrow-body-direct-eval-err-contains-newtarget.js: runtime error: Test262Error
+127. language/expressions/class/elements/computed-name-toprimitive-symbol.js: runtime error: UnsupportedPropertyKey { code: CodeRef(34), instruction_offset: 232, value: Value::ObjectRef(753) }
+128. language/expressions/class/elements/computed-name-toprimitive.js: runtime error: UnsupportedPropertyKey { code: CodeRef(34), instruction_offset: 220, value: Value::ObjectRef(753) }
+129. language/expressions/class/elements/direct-eval-err-contains-newtarget.js: runtime error: Test262Error
+130. language/expressions/class/elements/evaluation-error/computed-name-toprimitive-err.js: runtime error: UnsupportedPropertyKey { code: CodeRef(7), instruction_offset: 24, value: Value::ObjectRef(707) }
+131. language/expressions/class/elements/evaluation-error/computed-name-toprimitive-returns-nonobject.js: runtime error: UnsupportedPropertyKey { code: CodeRef(7), instruction_offset: 24, value: Value::ObjectRef(707) }
+132. language/expressions/class/elements/evaluation-error/computed-name-toprimitive-returns-noncallable.js: runtime error: UnsupportedPropertyKey { code: CodeRef(7), instruction_offset: 24, value: Value::ObjectRef(707) }
+133. language/expressions/class/elements/evaluation-error/computed-name-tostring-err.js: runtime error: UnsupportedPropertyKey { code: CodeRef(7), instruction_offset: 24, value: Value::ObjectRef(707) }
+134. language/expressions/class/elements/evaluation-error/computed-name-valueof-err.js: runtime error: UnsupportedPropertyKey { code: CodeRef(7), instruction_offset: 24, value: Value::ObjectRef(707) }
+135. language/expressions/class/elements/grammar-private-field-optional-chaining.js: runtime error: lowering error: UnsupportedExpression { expr: ExprId(416) }
+136. language/expressions/class/elements/intercalated-static-non-static-computed-fields.js: runtime error: Test262Error
+137. language/expressions/class/elements/nested-direct-eval-err-contains-arguments.js: runtime error: Test262Error
+138. language/expressions/class/elements/nested-direct-eval-err-contains-newtarget.js: runtime error: Test262Error
+139. language/expressions/class/elements/nested-private-direct-eval-err-contains-arguments.js: runtime error: Test262Error
+140. language/expressions/class/elements/private-async-generator-method-name.js: runtime error: Test262Error
+141. language/expressions/class/elements/private-async-method-name.js: runtime error: Test262Error
+142. language/expressions/class/elements/private-field-after-optional-chain.js: runtime error: lowering error: UnsupportedExpression { expr: ExprId(416) }
+143. language/expressions/class/elements/private-generator-method-name.js: runtime error: Test262Error
+144. language/expressions/class/elements/private-getter-is-not-a-own-property.js: runtime error: TypeError
+145. language/expressions/class/elements/private-methods/prod-private-async-generator.js: runtime error: Test262Error
+146. language/expressions/class/elements/private-methods/prod-private-async-method.js: runtime error: Test262Error
+147. language/expressions/class/elements/private-methods/prod-private-generator.js: runtime error: Test262Error
+148. language/expressions/class/elements/private-methods/prod-private-method.js: runtime error: Test262Error
+149. language/expressions/class/elements/private-setter-is-not-a-own-property.js: runtime error: TypeError
+150. language/expressions/class/elements/private-static-async-generator-method-name.js: runtime error: Test262Error
+151. language/expressions/class/elements/private-static-async-method-name.js: runtime error: Test262Error
+152. language/expressions/class/elements/private-static-generator-method-name.js: runtime error: Test262Error
+153. language/expressions/class/elements/private-static-method-name.js: runtime error: Test262Error
+154. language/expressions/class/elements/static-field-anonymous-function-name.js: runtime error: Test262Error
+155. language/expressions/class/elements/static-field-init-with-this.js: runtime error: Test262Error
+156. language/expressions/class/name.js: runtime error: Test262Error
+157. language/expressions/class/subclass-builtins/subclass-Array.js: runtime error: Test262Error
+158. language/expressions/compound-assignment/S11.13.2_A7.10_T4.js: runtime error: Test262Error
+159. language/expressions/compound-assignment/S11.13.2_A7.11_T4.js: runtime error: Test262Error
+160. language/expressions/compound-assignment/S11.13.2_A7.1_T4.js: runtime error: Test262Error
+161. language/expressions/compound-assignment/S11.13.2_A7.2_T4.js: runtime error: Test262Error
+162. language/expressions/compound-assignment/S11.13.2_A7.3_T4.js: runtime error: Test262Error
+163. language/expressions/compound-assignment/S11.13.2_A7.4_T4.js: runtime error: Test262Error
+164. language/expressions/compound-assignment/S11.13.2_A7.5_T4.js: runtime error: Test262Error
+165. language/expressions/compound-assignment/S11.13.2_A7.6_T4.js: runtime error: Test262Error
+166. language/expressions/compound-assignment/S11.13.2_A7.7_T4.js: runtime error: Test262Error
+167. language/expressions/compound-assignment/S11.13.2_A7.8_T4.js: runtime error: Test262Error
+168. language/expressions/compound-assignment/S11.13.2_A7.9_T4.js: runtime error: Test262Error
+169. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--1.js: runtime error: Test262Error
+170. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--11.js: runtime error: Test262Error
+171. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--13.js: runtime error: Test262Error
+172. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--15.js: runtime error: Test262Error
+173. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--17.js: runtime error: Test262Error
+174. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--19.js: runtime error: Test262Error
+175. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--21.js: runtime error: Test262Error
+176. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--3.js: runtime error: Test262Error
+177. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--5.js: runtime error: Test262Error
+178. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--7.js: runtime error: Test262Error
+179. language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--9.js: runtime error: Test262Error
+180. language/expressions/concatenation/S9.8_A5_T2.js: runtime error: Test262Error
+181. language/expressions/delete/super-property-method.js: runtime error: lowering error: UnsupportedExpression { expr: ExprId(415) }
+182. language/expressions/delete/super-property-null-base.js: runtime error: lowering error: UnsupportedExpression { expr: ExprId(412) }
+183. language/expressions/delete/super-property-uninitialized-this.js: runtime error: lowering error: UnsupportedExpression { expr: ExprId(417) }
+184. language/expressions/delete/super-property-topropertykey.js: runtime error: lowering error: UnsupportedExpression { expr: ExprId(418) }
+185. language/expressions/delete/super-property.js: runtime error: lowering error: UnsupportedExpression { expr: ExprId(415) }
+186. language/expressions/division/S11.5.2_A4_T10.js: runtime error: Test262Error
+187. language/expressions/division/bigint-toprimitive.js: runtime error: TypeError
+188. language/expressions/division/order-of-evaluation.js: runtime error: Test262Error
+189. language/expressions/does-not-equals/bigint-and-string.js: runtime error: Test262Error
+190. language/expressions/equals/bigint-and-string.js: runtime error: Test262Error
+191. language/expressions/equals/coerce-symbol-to-prim-invocation.js: runtime error: Test262Error
+192. language/expressions/equals/to-prim-hint.js: runtime error: Test262Error
+193. language/expressions/exponentiation/applying-the-exp-operator_A7.js: runtime error: Test262Error
+194. language/expressions/exponentiation/applying-the-exp-operator_A8.js: runtime error: Test262Error
+195. language/expressions/exponentiation/bigint-toprimitive.js: runtime error: TypeError
+196. language/expressions/exponentiation/exp-operator-precedence-unary-expression-semantics.js: runtime error: Test262Error
+197. language/expressions/exponentiation/order-of-evaluation.js: runtime error: Test262Error
+198. language/expressions/function/eval-var-scope-syntax-err.js: runtime error: Test262Error
+199. language/expressions/function/scope-body-lex-distinct.js: runtime error: Test262Error
+200. language/expressions/function/scope-param-rest-elem-var-close.js: runtime error: lowering error: UnsupportedPattern { pattern: PatternId(38) }
 
 ## Notes
 
