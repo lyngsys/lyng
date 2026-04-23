@@ -48,6 +48,15 @@ impl<'a> Analyzer<'a> {
         let pat = self.ast.get_pattern(pat_id);
         match pat {
             Pattern::Identifier { name, span, .. } => {
+                if self
+                    .pattern_bindings
+                    .get(pat_id.raw() as usize)
+                    .copied()
+                    .flatten()
+                    .is_some()
+                {
+                    return;
+                }
                 let binding = self.declare_binding(*name, kind, self.ctx.current_scope, *span);
                 self.record_pattern_binding(pat_id, binding);
             }

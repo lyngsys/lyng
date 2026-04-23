@@ -97,6 +97,90 @@ fn script_core_supports_switch_fallthrough_and_break() {
 }
 
 #[test]
+fn script_core_if_statement_completion_uses_a_fresh_undefined_seed() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            String(eval('1; if (false) { }')),
+            String(eval('2; do { 3; if (true) { 4; break; } 5; } while (false)')),
+            String(eval('6; do { 7; if (false) { 8; } else { break; } } while (false)'))
+        ].join(':');
+        "#,
+    );
+
+    assert_eq!(result, "undefined:4:undefined");
+}
+
+#[test]
+fn script_core_loop_statement_completion_updates_empty_abrupt_exits() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            String(eval('1; while (true) { break; }')),
+            String(eval('2; while (true) { 3; break; }')),
+            String(eval('4; do { continue; } while (false)')),
+            String(eval('5; do { 6; continue; } while (false)'))
+        ].join(':');
+        "#,
+    );
+
+    assert_eq!(result, "undefined:3:undefined:6");
+}
+
+#[test]
+fn script_core_switch_statement_matches_completion_and_lexical_open_rules() {
+    let completion_result = compile_and_run_string(
+        r#"
+        [
+            String(eval('1; switch ("a") { default: }')),
+            String(eval('2; switch ("a") { default: 3; }')),
+            String(eval('4; switch ("b") { case "a": 5; default: }')),
+            String(eval('6; switch ("b") { case "a": 7; default: 8; }'))
+        ].join(':');
+        "#,
+    );
+
+    assert_eq!(completion_result, "undefined:3:undefined:8");
+}
+
+#[test]
+fn script_core_switch_statement_opens_its_lexical_scope_for_case_evaluation_only() {
+    let result = compile_and_run_string(
+        r#"
+        let x = 'outside';
+        var probeExpr, probeSelector, probeStmt;
+
+        switch (probeExpr = function() { return x; }, null) {
+            case probeSelector = function() { return x; }, null:
+                probeStmt = function() { return x; };
+                let x = 'inside';
+        }
+
+        [probeExpr(), probeSelector(), probeStmt()].join(':');
+        "#,
+    );
+
+    assert_eq!(result, "outside:inside:inside");
+}
+
+#[test]
+fn script_core_try_statement_completion_preserves_the_pre_finally_value() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            String(eval('1; try { } catch (err) { }')),
+            String(eval('2; try { 3; } finally { 4; }')),
+            String(eval('5; try { throw null; } catch (err) { 6; } finally { 7; }')),
+            String(eval('8; do { try { 9; break; } finally { 10; } } while (false)')),
+            String(eval('11; do { try { break; } finally { 12; } } while (false)'))
+        ].join(':');
+        "#,
+    );
+
+    assert_eq!(result, "undefined:3:6:9:undefined");
+}
+
+#[test]
 fn script_core_supports_for_of_over_arrays() {
     let result = compile_and_run_string(
         r#"

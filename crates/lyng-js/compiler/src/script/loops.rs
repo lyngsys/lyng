@@ -52,6 +52,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         test: ExprId,
         span: Span,
     ) -> LoweringResult<()> {
+        self.reset_statement_result()?;
         let target = self.push_control_target(label, ControlTargetKind::Loop);
         let loop_start = self.builder.current_offset();
         self.lower_statement(body)?;
@@ -78,6 +79,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         body: StmtId,
         span: Span,
     ) -> LoweringResult<()> {
+        self.reset_statement_result()?;
         let target = self.push_control_target(label, ControlTargetKind::Loop);
         let loop_start = self.builder.current_offset();
         self.patch_continue_placeholders(target, loop_start);
@@ -357,7 +359,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.lower_statement(body)?;
         }
         let protected_end = self.builder.current_offset();
-        self.set_completion_state(CompletionKind::Normal, None, None)?;
+        self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
         self.emit_jump_to_finally(finally_index);
 
         let throw_entry = self.builder.current_offset();

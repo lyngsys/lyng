@@ -197,7 +197,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let scope = self.active_disposal_scopes.last().copied()?;
         match kind {
             VariableKind::Using => Some(scope),
-            VariableKind::AwaitUsing if scope.kind == lyng_js_env::DisposalCapabilityKind::Async => {
+            VariableKind::AwaitUsing
+                if scope.kind == lyng_js_env::DisposalCapabilityKind::Async =>
+            {
                 Some(scope)
             }
             _ => None,
@@ -312,7 +314,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             return Err(error);
         }
         let protected_end = self.builder.current_offset();
-        self.set_completion_state(CompletionKind::Normal, None, None)?;
+        self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
         self.emit_jump_to_finally(finally_index);
 
         let throw_entry = self.builder.current_offset();
@@ -383,6 +385,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 alternate,
                 ..
             } => {
+                self.reset_statement_result()?;
                 let test_register = self.lower_expr_to_temp(test)?;
                 let jump_false = self.builder.emit_cond_jump_placeholder(
                     Opcode::JumpIfFalse,
@@ -484,7 +487,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let protected_start = self.builder.current_offset();
         self.lower_statement(body)?;
         let protected_end = self.builder.current_offset();
-        self.set_completion_state(CompletionKind::Normal, None, None)?;
+        self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
         self.emit_jump_to_finally(finally_index);
 
         let throw_entry = self.builder.current_offset();
@@ -518,6 +521,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         cases: lyng_js_ast::NodeList<SwitchCase>,
         span: Span,
     ) -> LoweringResult<()> {
+        self.reset_statement_result()?;
         if let Some(kind) = self.switch_disposal_scope_kind(cases) {
             return self.with_disposal_scope(kind, span, move |this| {
                 this.lower_switch_statement_core(label, discriminant, cases)

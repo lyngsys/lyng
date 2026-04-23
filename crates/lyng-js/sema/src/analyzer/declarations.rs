@@ -80,6 +80,90 @@ impl<'a> Analyzer<'a> {
         self.report_duplicate_lexical_names(ScopeKind::Switch, &lexical_names);
     }
 
+    pub(super) fn predeclare_switch_case_bindings(
+        &mut self,
+        cases: lyng_js_ast::NodeList<lyng_js_ast::SwitchCase>,
+    ) {
+        for case in self.ast.get_switch_case_list(cases) {
+            for &stmt_id in self.ast.get_stmt_list(case.consequent) {
+                self.predeclare_stmt_lexical_bindings(stmt_id);
+            }
+        }
+    }
+
+    fn predeclare_stmt_lexical_bindings(&mut self, stmt_id: lyng_js_ast::StmtId) {
+        let Stmt::Declaration { decl, .. } = self.ast.get_stmt(stmt_id) else {
+            return;
+        };
+        self.predeclare_decl_lexical_bindings(*decl);
+    }
+
+    fn predeclare_decl_lexical_bindings(&mut self, decl_id: lyng_js_ast::DeclId) {
+        let decl = self.ast.get_decl(decl_id);
+        match decl {
+            Decl::Variable {
+                kind, declarators, ..
+            } => {
+                let declaration_kind = match kind {
+                    VariableKind::Var => return,
+                    VariableKind::Let => DeclarationKind::Let,
+                    VariableKind::Const => DeclarationKind::Const,
+                    VariableKind::Using => DeclarationKind::Using,
+                    VariableKind::AwaitUsing => DeclarationKind::AwaitUsing,
+                };
+                for declarator in self.ast.get_var_declarator_list(*declarators) {
+                    self.declare_pattern_bindings(declarator.id, declaration_kind);
+                }
+            }
+            Decl::Class { name, span, .. } => {
+                if let Some(name) = name {
+                    if !self
+                        .scope_binding_names
+                        .contains_key(&(self.ctx.current_scope, *name))
+                    {
+                        self.declare_binding(
+                            *name,
+                            DeclarationKind::Class,
+                            self.ctx.current_scope,
+                            *span,
+                        );
+                    }
+                }
+            }
+            Decl::Export { kind, .. } => match kind {
+                lyng_js_ast::ExportKind::Declaration { decl } => {
+                    self.predeclare_decl_lexical_bindings(*decl);
+                }
+                lyng_js_ast::ExportKind::Default { declaration } => match declaration {
+                    lyng_js_ast::ExportDefaultDecl::Class(class) => {
+                        if let Decl::Class {
+                            name: Some(name),
+                            span,
+                            ..
+                        } = self.ast.get_decl(*class)
+                        {
+                            if !self
+                                .scope_binding_names
+                                .contains_key(&(self.ctx.current_scope, *name))
+                            {
+                                self.declare_binding(
+                                    *name,
+                                    DeclarationKind::Class,
+                                    self.ctx.current_scope,
+                                    *span,
+                                );
+                            }
+                        }
+                    }
+                    lyng_js_ast::ExportDefaultDecl::Function(_) => {}
+                    lyng_js_ast::ExportDefaultDecl::Expression(_) => {}
+                },
+                lyng_js_ast::ExportKind::Named { .. } | lyng_js_ast::ExportKind::All { .. } => {}
+            },
+            Decl::Function { .. } | Decl::Import { .. } | Decl::InvalidDeclaration { .. } => {}
+        }
+    }
+
     pub(super) fn report_lexical_var_conflicts(
         &mut self,
         lexical_names: &[LexicalDeclaredName],
@@ -441,7 +525,8 @@ impl<'a> Analyzer<'a> {
                             }
                         }
                         lyng_js_ast::ExportKind::Default { declaration } => {
-                            if let lyng_js_ast::ExportDefaultDecl::Function(function) = declaration {
+                            if let lyng_js_ast::ExportDefaultDecl::Function(function) = declaration
+                            {
                                 let func = self.ast.get_function(*function);
                                 if let Some(name) = func.name {
                                     self.hoist_function_binding(
@@ -544,7 +629,17 @@ impl<'a> Analyzer<'a> {
                 let old_strict = self.ctx.strict;
                 self.ctx.strict = true;
                 if let Some(n) = name {
-                    self.declare_binding(*n, DeclarationKind::Class, self.ctx.current_scope, *span);
+                    if !self
+                        .scope_binding_names
+                        .contains_key(&(self.ctx.current_scope, *n))
+                    {
+                        self.declare_binding(
+                            *n,
+                            DeclarationKind::Class,
+                            self.ctx.current_scope,
+                            *span,
+                        );
+                    }
                 }
                 self.walk_class_body(*body, *span, *name, *super_class, super_class.is_some());
                 self.ctx.strict = old_strict;

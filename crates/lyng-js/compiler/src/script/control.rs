@@ -178,7 +178,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         if let Some(finally_index) = self.nearest_active_finally() {
             let target_id = self.control_targets[target].id;
-            self.set_completion_state(kind, None, Some(target_id))?;
+            self.set_completion_state(kind, self.result_register, Some(target_id))?;
             self.emit_jump_to_finally(finally_index);
             return Ok(());
         }
@@ -204,6 +204,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         handler: Option<CatchClause>,
         finalizer: Option<StmtId>,
     ) -> LoweringResult<()> {
+        self.reset_statement_result()?;
         match (handler, finalizer) {
             (Some(handler), Some(finalizer)) => {
                 self.lower_try_catch_finally(block, handler, finalizer)
@@ -251,7 +252,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let protected_start = self.builder.current_offset();
         self.lower_statement(block)?;
         let protected_end = self.builder.current_offset();
-        self.set_completion_state(CompletionKind::Normal, None, None)?;
+        self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
         self.emit_jump_to_finally(finally_index);
 
         let throw_entry = self.builder.current_offset();
@@ -289,7 +290,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let try_start = self.builder.current_offset();
         self.lower_statement(block)?;
         let try_end = self.builder.current_offset();
-        self.set_completion_state(CompletionKind::Normal, None, None)?;
+        self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
         self.emit_jump_to_finally(finally_index);
 
         let catch_entry = self.builder.current_offset();
@@ -299,7 +300,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_catch_clause(handler)?;
         self.emit_leave_handler();
         let catch_end = self.builder.current_offset();
-        self.set_completion_state(CompletionKind::Normal, None, None)?;
+        self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
         self.emit_jump_to_finally(finally_index);
 
         let throw_entry = self.builder.current_offset();
@@ -364,6 +365,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
     pub(super) fn emit_finally_dispatch(&mut self, current_finally: usize) -> LoweringResult<()> {
         let registers = self.ensure_completion_registers()?;
+        if let Some(result_register) = self.result_register {
+            self.emit_move(result_register, registers.value)?;
+        }
         let kind_test = self.alloc_temp()?;
         let zero = self.alloc_temp()?;
         self.emit_load_smi(zero, CompletionKind::Normal.encoded())?;
@@ -566,6 +570,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         };
         self.completion_registers = Some(registers);
         Ok(registers)
+    }
+
+    pub(super) fn reset_statement_result(&mut self) -> LoweringResult<()> {
+        if let Some(result_register) = self.result_register {
+            self.emit_load_undefined(result_register)?;
+        }
+        Ok(())
     }
 
     pub(super) fn set_completion_state(

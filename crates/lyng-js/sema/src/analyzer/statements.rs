@@ -175,6 +175,7 @@ impl<'a> Analyzer<'a> {
                 self.walk_expr(*discriminant);
                 self.check_switch_case_redeclarations(*cases);
                 self.push_scope(ScopeKind::Switch);
+                self.predeclare_switch_case_bindings(*cases);
                 let old_in_switch = self.ctx.in_switch;
                 self.ctx.in_switch = true;
                 let case_list = self.ast.get_switch_case_list(*cases);
