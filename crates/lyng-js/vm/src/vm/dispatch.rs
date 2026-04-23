@@ -1,4 +1,7 @@
-use super::values::{decode_env_operand, to_f64_number};
+use super::values::{
+    bigint_bitwise_and_values, bigint_bitwise_or_values, bigint_bitwise_xor_values,
+    compare_numeric_values, decode_env_operand, to_f64_number,
+};
 use super::*;
 use crate::vm::property_access::ToPrimitiveHint;
 use crate::vm::property_access::VmProxyBridge;
@@ -955,7 +958,7 @@ impl Vm {
                         }
                         Opcode::LoadGlobal => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
-                            let load_result = self.load_global(agent, frame, atom);
+                            let load_result = self.load_global(agent, host, registry, frame, atom);
                             let Some(value) = self.handle_vm_result(agent, load_result)? else {
                                 continue;
                             };
@@ -1392,46 +1395,26 @@ impl Vm {
                         .map_err(VmError::Abrupt)?,
                 ))
             }
-            Opcode::LessThan => self.relational_compare(
-                agent,
-                host,
-                registry,
-                frame,
-                left,
-                right,
-                |a, b| a < b,
-                |ordering| ordering.is_lt(),
-            ),
-            Opcode::LessEqual => self.relational_compare(
-                agent,
-                host,
-                registry,
-                frame,
-                left,
-                right,
-                |a, b| a <= b,
-                |ordering| !ordering.is_gt(),
-            ),
-            Opcode::GreaterThan => self.relational_compare(
-                agent,
-                host,
-                registry,
-                frame,
-                left,
-                right,
-                |a, b| a > b,
-                |ordering| ordering.is_gt(),
-            ),
-            Opcode::GreaterEqual => self.relational_compare(
-                agent,
-                host,
-                registry,
-                frame,
-                left,
-                right,
-                |a, b| a >= b,
-                |ordering| !ordering.is_lt(),
-            ),
+            Opcode::LessThan => {
+                self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
+                    ordering.is_lt()
+                })
+            }
+            Opcode::LessEqual => {
+                self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
+                    !ordering.is_gt()
+                })
+            }
+            Opcode::GreaterThan => {
+                self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
+                    ordering.is_gt()
+                })
+            }
+            Opcode::GreaterEqual => {
+                self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
+                    !ordering.is_lt()
+                })
+            }
             _ => unreachable!("caller filters supported ABC value opcodes"),
         }
     }
@@ -1471,6 +1454,30 @@ impl Vm {
         Ok(())
     }
 
+    fn to_numeric_register(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        register: u16,
+    ) -> VmResult<Value> {
+        let primitive = self.to_primitive(
+            agent,
+            host,
+            registry,
+            frame,
+            self.read_register(frame, register)?,
+            ToPrimitiveHint::Number,
+        )?;
+        self.to_numeric_primitive(agent, primitive)
+    }
+
+    fn to_numeric_primitive(&mut self, agent: &mut Agent, value: Value) -> VmResult<Value> {
+        read::to_numeric(agent.heap().view(), value)
+            .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
+    }
+
     pub(super) fn relational_compare(
         &mut self,
         agent: &mut Agent,
@@ -1479,8 +1486,7 @@ impl Vm {
         frame: FrameRecord,
         left_register: u16,
         right_register: u16,
-        numeric_op: impl FnOnce(f64, f64) -> bool,
-        string_op: impl FnOnce(std::cmp::Ordering) -> bool,
+        compare_op: impl FnOnce(std::cmp::Ordering) -> bool,
     ) -> VmResult<Value> {
         let left = self.to_primitive(
             agent,
@@ -1501,11 +1507,34 @@ impl Vm {
         if left.is_string() && right.is_string() {
             let left_units = self.value_to_string_code_units(agent, left)?;
             let right_units = self.value_to_string_code_units(agent, right)?;
-            return Ok(Value::from_bool(string_op(left_units.cmp(&right_units))));
+            return Ok(Value::from_bool(compare_op(left_units.cmp(&right_units))));
         }
-        let left = to_f64_number(agent, left)?;
-        let right = to_f64_number(agent, right)?;
-        Ok(Value::from_bool(numeric_op(left, right)))
+        if left.is_bigint() && right.is_string() {
+            let Some(right) =
+                object::string_to_bigint_value(agent, right).map_err(VmError::Abrupt)?
+            else {
+                return Ok(Value::from_bool(false));
+            };
+            let ordering = compare_numeric_values(agent, left, right)?
+                .expect("BigInt/StringToBigInt comparison must be ordered");
+            return Ok(Value::from_bool(compare_op(ordering)));
+        }
+        if left.is_string() && right.is_bigint() {
+            let Some(left) =
+                object::string_to_bigint_value(agent, left).map_err(VmError::Abrupt)?
+            else {
+                return Ok(Value::from_bool(false));
+            };
+            let ordering = compare_numeric_values(agent, left, right)?
+                .expect("StringToBigInt/BigInt comparison must be ordered");
+            return Ok(Value::from_bool(compare_op(ordering)));
+        }
+        let left = self.to_numeric_primitive(agent, left)?;
+        let right = self.to_numeric_primitive(agent, right)?;
+        let Some(ordering) = compare_numeric_values(agent, left, right)? else {
+            return Ok(Value::from_bool(false));
+        };
+        Ok(Value::from_bool(compare_op(ordering)))
     }
 
     pub(super) fn bitwise_and(
@@ -1517,24 +1546,16 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let left = number_to_int32(to_f64_number(agent, left)?);
-        let right = number_to_int32(to_f64_number(agent, right)?);
+        let left = self.to_numeric_register(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_register(agent, host, registry, frame, right_register)?;
+        if left.is_bigint() || right.is_bigint() {
+            if !left.is_bigint() || !right.is_bigint() {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
+            return bigint_bitwise_and_values(agent, left, right);
+        }
+        let left = number_to_int32(numeric_value_to_f64(left));
+        let right = number_to_int32(numeric_value_to_f64(right));
         Ok(Value::from_smi(left & right))
     }
 
@@ -1547,24 +1568,16 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let left = number_to_int32(to_f64_number(agent, left)?);
-        let right = number_to_int32(to_f64_number(agent, right)?);
+        let left = self.to_numeric_register(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_register(agent, host, registry, frame, right_register)?;
+        if left.is_bigint() || right.is_bigint() {
+            if !left.is_bigint() || !right.is_bigint() {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
+            return bigint_bitwise_or_values(agent, left, right);
+        }
+        let left = number_to_int32(numeric_value_to_f64(left));
+        let right = number_to_int32(numeric_value_to_f64(right));
         Ok(Value::from_smi(left | right))
     }
 
@@ -1577,24 +1590,16 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let left = number_to_int32(to_f64_number(agent, left)?);
-        let right = number_to_int32(to_f64_number(agent, right)?);
+        let left = self.to_numeric_register(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_register(agent, host, registry, frame, right_register)?;
+        if left.is_bigint() || right.is_bigint() {
+            if !left.is_bigint() || !right.is_bigint() {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
+            return bigint_bitwise_xor_values(agent, left, right);
+        }
+        let left = number_to_int32(numeric_value_to_f64(left));
+        let right = number_to_int32(numeric_value_to_f64(right));
         Ok(Value::from_smi(left ^ right))
     }
 
@@ -1692,6 +1697,21 @@ impl Vm {
             Ok(Value::from_f64(f64::from(result)))
         }
     }
+}
+
+fn numeric_conversion_error(agent: &mut Agent, abrupt: AbruptCompletion) -> VmError {
+    match abrupt {
+        AbruptCompletion::Throw(value) if value.is_undefined() => {
+            VmError::Abrupt(errors::throw_type_error(agent))
+        }
+        abrupt => VmError::Abrupt(abrupt),
+    }
+}
+
+fn numeric_value_to_f64(value: Value) -> f64 {
+    value
+        .as_f64()
+        .expect("numeric non-BigInt Value should expose an f64 payload")
 }
 
 fn number_to_int32(number: f64) -> i32 {

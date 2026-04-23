@@ -1,7 +1,8 @@
 use crate::{
     convert::{
         bigint_parts_to_radix_string, bigint_view_to_radix_string, bigint_view_to_string,
-        integral_number_to_bigint, number_to_string, parse_string_to_bigint,
+        integral_number_to_bigint, lossy_string_from_view, number_to_string,
+        parse_string_to_bigint,
     },
     errors::{internal_method_error, throw_range_error, throw_syntax_error, throw_type_error},
     read,
@@ -57,6 +58,11 @@ pub trait ToPrimitiveContext {
         object: ObjectRef,
         key: PropertyKey,
     ) -> Result<Value, Self::Error>;
+
+    fn callable_object(&mut self, value: Value) -> Option<ObjectRef> {
+        let object = value.as_object_ref()?;
+        self.agent().objects().is_callable(object).then_some(object)
+    }
 
     fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error>;
 
@@ -520,6 +526,30 @@ pub fn primitive_to_bigint(agent: &mut Agent, value: Value) -> Completion<Value>
         return Ok(Value::from_bigint_ref(bigint));
     }
     Err(throw_type_error(agent))
+}
+
+/// ECMAScript `StringToBigInt` for relational BigInt/string comparisons.
+///
+/// # Errors
+/// Returns `TypeError` if the input is not a live string handle.
+pub fn string_to_bigint_value(agent: &mut Agent, value: Value) -> Completion<Option<Value>> {
+    let string = value
+        .as_string_ref()
+        .ok_or_else(|| throw_type_error(agent))?;
+    let text = agent
+        .heap()
+        .view()
+        .string_view(string)
+        .map(lossy_string_from_view)
+        .ok_or_else(|| throw_type_error(agent))?;
+    let Some((sign, limbs)) = parse_string_to_bigint(&text) else {
+        return Ok(None);
+    };
+    let bigint = agent
+        .heap_mut()
+        .mutator()
+        .alloc_bigint(sign, &limbs, AllocationLifetime::Default);
+    Ok(Some(Value::from_bigint_ref(bigint)))
 }
 
 /// Formats one BigInt value using the selected radix.
@@ -1112,7 +1142,8 @@ fn ordinary_to_primitive<Cx: ToPrimitiveContext>(
 ) -> Result<Value, Cx::Error> {
     for method_name in hint.method_names() {
         let key = PropertyKey::from_atom(method_name);
-        let Some(method) = get_method(cx, object, key)? else {
+        let method = cx.get_property_value(object, key)?;
+        let Some(method) = cx.callable_object(method) else {
             continue;
         };
         if let Some(result) = default_ordinary_to_primitive_result(cx, object, method_name, method)?

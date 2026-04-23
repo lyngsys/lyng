@@ -360,6 +360,74 @@ fn script_core_handles_object_property_key_to_primitive_edge_cases() {
 }
 
 #[test]
+fn script_core_computed_assignment_reuses_prepared_property_key() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        let order = "";
+        let assigned = {};
+        let assignmentKey = {
+            toString: function() {
+                order += "key";
+                return "value";
+            }
+        };
+        function rhs() {
+            order += "rhs";
+            return 3;
+        }
+        assigned[assignmentKey] = rhs();
+        total += (order === "keyrhs" && assigned.value === 3 ? 1 : 0);
+
+        let compoundKeyCount = 0;
+        let compound = { value: 5 };
+        let compoundKey = {
+            toString: function() {
+                compoundKeyCount += 1;
+                return "value";
+            }
+        };
+        compound[compoundKey] ^= 3;
+        total += (compoundKeyCount === 1 && compound.value === 6 ? 2 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_strict_compound_global_reference_observes_deleted_binding() {
+    let result = compile_and_run(
+        r#"
+        var count = 0;
+        Object.defineProperty(this, "x", {
+            configurable: true,
+            get: function() {
+                delete this.x;
+                return 2;
+            }
+        });
+
+        (function() {
+            "use strict";
+            try {
+                count++;
+                x ^= 3;
+                count += 100;
+            } catch (error) {
+                count += (error.constructor === ReferenceError ? 1 : 10);
+            }
+        })();
+
+        count + (!("x" in this) ? 10 : 1000);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(12));
+}
+
+#[test]
 fn script_core_supports_for_of_var_binding_pattern_expressions() {
     let result = compile_and_run(
         r#"
@@ -2163,6 +2231,78 @@ fn script_core_supports_bigint_literals_and_number_radix_poisoning_cases() {
     );
 
     assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_bigint_bitwise_operators_use_to_numeric() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += ((0b101n & 0b011n) === 0b001n ? 1 : 0);
+        total += ((-2n & -3n) === -4n ? 2 : 0);
+
+        let calls = "";
+        let left = {
+            [Symbol.toPrimitive]: function(hint) {
+                calls += "L" + hint;
+                return 5n;
+            }
+        };
+        let right = {
+            [Symbol.toPrimitive]: function(hint) {
+                calls += "R" + hint;
+                return 3n;
+            }
+        };
+        total += ((left & right) === 1n ? 4 : 0);
+        total += (calls === "LnumberRnumber" ? 8 : 0);
+        total += (({
+            valueOf: 1,
+            toString: function() {
+                return 6n;
+            }
+        } & 7n) === 6n ? 16 : 0);
+
+        try {
+            1n & 1;
+        } catch (error) {
+            total += (error.constructor === TypeError ? 32 : 0);
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
+fn script_core_bigint_relational_comparison_uses_to_numeric_ordering() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += (0n < 1 ? 1 : 0);
+        total += (0.000000000001 < 1n ? 2 : 0);
+        total += ((1n < 1) === false ? 4 : 0);
+        total += ((Number.MIN_VALUE < -10n) === false ? 8 : 0);
+        total += (1n < "2" ? 16 : 0);
+        total += ("2" < 3n ? 32 : 0);
+        total += ((1n < "not numeric") === false ? 64 : 0);
+        total += (("0e0" < 1n) === false ? 128 : 0);
+        total += ((0n < "1e0") === false ? 256 : 0);
+        total += (("" < 1n) ? 512 : 0);
+
+        try {
+            1n < Symbol();
+        } catch (error) {
+            total += (error.constructor === TypeError ? 1024 : 0);
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(2047));
 }
 
 #[test]

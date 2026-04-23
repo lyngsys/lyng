@@ -1090,6 +1090,59 @@ fn bigint_exponentiate_values(agent: &mut Agent, left: Value, right: Value) -> V
     Ok(alloc_bigint_value(agent, sign, &result_limbs))
 }
 
+pub(super) fn bigint_bitwise_and_values(
+    agent: &mut Agent,
+    left: Value,
+    right: Value,
+) -> VmResult<Value> {
+    bigint_bitwise_values(agent, left, right, |left, right| left & right)
+}
+
+pub(super) fn bigint_bitwise_or_values(
+    agent: &mut Agent,
+    left: Value,
+    right: Value,
+) -> VmResult<Value> {
+    bigint_bitwise_values(agent, left, right, |left, right| left | right)
+}
+
+pub(super) fn bigint_bitwise_xor_values(
+    agent: &mut Agent,
+    left: Value,
+    right: Value,
+) -> VmResult<Value> {
+    bigint_bitwise_values(agent, left, right, |left, right| left ^ right)
+}
+
+pub(super) fn compare_numeric_values(
+    agent: &mut Agent,
+    left: Value,
+    right: Value,
+) -> VmResult<Option<std::cmp::Ordering>> {
+    if left.is_number() && right.is_number() {
+        return Ok(left.as_f64().unwrap().partial_cmp(&right.as_f64().unwrap()));
+    }
+    if left.is_bigint() && right.is_bigint() {
+        let (left_sign, left_limbs) = bigint_value_parts(agent, left)?;
+        let (right_sign, right_limbs) = bigint_value_parts(agent, right)?;
+        return Ok(Some(compare_bigint_signed_parts(
+            left_sign,
+            &left_limbs,
+            right_sign,
+            &right_limbs,
+        )));
+    }
+    if left.is_bigint() && right.is_number() {
+        return compare_bigint_to_number(agent, left, right.as_f64().unwrap());
+    }
+    if left.is_number() && right.is_bigint() {
+        return compare_bigint_to_number(agent, right, left.as_f64().unwrap())
+            .map(|ordering| ordering.map(std::cmp::Ordering::reverse));
+    }
+
+    Err(VmError::Abrupt(errors::throw_type_error(agent)))
+}
+
 fn bigint_value_parts(agent: &mut Agent, value: Value) -> VmResult<(BigIntSign, Vec<u64>)> {
     let bigint = value
         .as_bigint_ref()
@@ -1110,6 +1163,194 @@ fn alloc_bigint_value(agent: &mut Agent, sign: BigIntSign, limbs: &[u64]) -> Val
         .mutator()
         .alloc_bigint(sign, limbs, AllocationLifetime::Default);
     Value::from_bigint_ref(bigint)
+}
+
+fn bigint_bitwise_values(
+    agent: &mut Agent,
+    left: Value,
+    right: Value,
+    op: impl Fn(u64, u64) -> u64,
+) -> VmResult<Value> {
+    let (left_sign, left_limbs) = bigint_value_parts(agent, left)?;
+    let (right_sign, right_limbs) = bigint_value_parts(agent, right)?;
+    let width =
+        normalized_bigint_limb_len(&left_limbs).max(normalized_bigint_limb_len(&right_limbs)) + 1;
+    let left_bits = bigint_to_twos_complement(left_sign, &left_limbs, width);
+    let right_bits = bigint_to_twos_complement(right_sign, &right_limbs, width);
+    let mut result = Vec::with_capacity(width);
+    for (left, right) in left_bits.iter().zip(right_bits.iter()) {
+        result.push(op(*left, *right));
+    }
+    Ok(twos_complement_to_bigint(agent, &result))
+}
+
+fn bigint_to_twos_complement(sign: BigIntSign, limbs: &[u64], width: usize) -> Vec<u64> {
+    let mut bits = vec![0; width.max(1)];
+    let len = normalized_bigint_limb_len(limbs).min(bits.len());
+    bits[..len].copy_from_slice(&limbs[..len]);
+    if normalize_bigint_sign(sign, limbs) == BigIntSign::Negative {
+        for limb in &mut bits {
+            *limb = !*limb;
+        }
+        add_one_to_limbs(&mut bits);
+    }
+    bits
+}
+
+fn twos_complement_to_bigint(agent: &mut Agent, bits: &[u64]) -> Value {
+    let negative = bits.last().is_some_and(|limb| (limb & (1_u64 << 63)) != 0);
+    let mut limbs = bits.to_vec();
+    let sign = if negative {
+        for limb in &mut limbs {
+            *limb = !*limb;
+        }
+        add_one_to_limbs(&mut limbs);
+        BigIntSign::Negative
+    } else {
+        BigIntSign::NonNegative
+    };
+    normalize_bigint_limbs(&mut limbs);
+    alloc_bigint_value(agent, normalize_bigint_sign(sign, &limbs), &limbs)
+}
+
+fn add_one_to_limbs(limbs: &mut [u64]) {
+    let mut carry = true;
+    for limb in limbs {
+        if !carry {
+            return;
+        }
+        let (next, overflow) = limb.overflowing_add(1);
+        *limb = next;
+        carry = overflow;
+    }
+}
+
+fn compare_bigint_signed_parts(
+    left_sign: BigIntSign,
+    left_limbs: &[u64],
+    right_sign: BigIntSign,
+    right_limbs: &[u64],
+) -> std::cmp::Ordering {
+    let left_sign = normalize_bigint_sign(left_sign, left_limbs);
+    let right_sign = normalize_bigint_sign(right_sign, right_limbs);
+    match (left_sign, right_sign) {
+        (BigIntSign::Negative, BigIntSign::NonNegative) => std::cmp::Ordering::Less,
+        (BigIntSign::NonNegative, BigIntSign::Negative) => std::cmp::Ordering::Greater,
+        (BigIntSign::NonNegative, BigIntSign::NonNegative) => {
+            bigint_compare_limbs(left_limbs, right_limbs)
+        }
+        (BigIntSign::Negative, BigIntSign::Negative) => {
+            bigint_compare_limbs(right_limbs, left_limbs)
+        }
+    }
+}
+
+fn compare_bigint_to_number(
+    agent: &mut Agent,
+    bigint: Value,
+    number: f64,
+) -> VmResult<Option<std::cmp::Ordering>> {
+    if number.is_nan() {
+        return Ok(None);
+    }
+    if number == f64::INFINITY {
+        return Ok(Some(std::cmp::Ordering::Less));
+    }
+    if number == f64::NEG_INFINITY {
+        return Ok(Some(std::cmp::Ordering::Greater));
+    }
+
+    let (bigint_sign, bigint_limbs) = bigint_value_parts(agent, bigint)?;
+    let truncated = number.trunc();
+    let (number_sign, number_limbs) = number_to_bigint_parts(truncated)
+        .expect("finite truncated number must convert to bigint parts");
+    let ordering =
+        compare_bigint_signed_parts(bigint_sign, &bigint_limbs, number_sign, &number_limbs);
+    if number.fract() == 0.0 {
+        return Ok(Some(ordering));
+    }
+    if number.is_sign_positive() {
+        if ordering.is_gt() {
+            Ok(Some(std::cmp::Ordering::Greater))
+        } else {
+            Ok(Some(std::cmp::Ordering::Less))
+        }
+    } else if ordering.is_lt() {
+        Ok(Some(std::cmp::Ordering::Less))
+    } else {
+        Ok(Some(std::cmp::Ordering::Greater))
+    }
+}
+
+#[allow(clippy::float_cmp)]
+fn number_to_bigint_parts(number: f64) -> Option<(BigIntSign, Vec<u64>)> {
+    if !number.is_finite() || number != number.trunc() {
+        return None;
+    }
+    if number == 0.0 {
+        return Some((BigIntSign::NonNegative, Vec::new()));
+    }
+
+    let bits = number.to_bits();
+    let sign = if bits >> 63 == 0 {
+        BigIntSign::NonNegative
+    } else {
+        BigIntSign::Negative
+    };
+    let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+    if exponent_bits == 0 {
+        return None;
+    }
+
+    let exponent = exponent_bits - 1023;
+    let significand = (1_u64 << 52) | (bits & ((1_u64 << 52) - 1));
+    let shift = exponent - 52;
+    let mut limbs = if shift >= 0 {
+        number_shift_left_word(significand, shift.cast_unsigned())
+    } else {
+        let right_shift = (-shift).cast_unsigned();
+        if right_shift >= 64 {
+            return None;
+        }
+        let mask = (1_u64 << right_shift) - 1;
+        if significand & mask != 0 {
+            return None;
+        }
+        let truncated = significand >> right_shift;
+        if truncated == 0 {
+            Vec::new()
+        } else {
+            vec![truncated]
+        }
+    };
+    normalize_bigint_limbs(&mut limbs);
+    Some((sign, limbs))
+}
+
+fn number_shift_left_word(word: u64, shift: u32) -> Vec<u64> {
+    let whole_words = usize::try_from(shift / 64).expect("whole-word shift must fit into usize");
+    let bit_shift = shift % 64;
+    let mut limbs = vec![0; whole_words];
+
+    if bit_shift == 0 {
+        limbs.push(word);
+        return limbs;
+    }
+
+    limbs.push(word << bit_shift);
+    let carry = word >> (64 - bit_shift);
+    if carry != 0 {
+        limbs.push(carry);
+    }
+    limbs
+}
+
+fn normalize_bigint_sign(sign: BigIntSign, limbs: &[u64]) -> BigIntSign {
+    if normalized_bigint_limb_len(limbs) == 0 {
+        BigIntSign::NonNegative
+    } else {
+        sign
+    }
 }
 
 fn bigint_add_signed_parts(

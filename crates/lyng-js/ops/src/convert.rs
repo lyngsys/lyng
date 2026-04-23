@@ -185,7 +185,7 @@ pub(crate) fn string_to_number(text: &str) -> f64 {
 pub(crate) fn parse_string_to_bigint(text: &str) -> Option<(BigIntSign, Vec<u64>)> {
     let trimmed = text.trim_matches(is_ecmascript_trim_whitespace);
     if trimmed.is_empty() {
-        return None;
+        return Some((BigIntSign::NonNegative, Vec::new()));
     }
 
     let (sign, mut digits, signed) = match trimmed.as_bytes()[0] {

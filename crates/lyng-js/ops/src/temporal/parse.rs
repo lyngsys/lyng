@@ -17,11 +17,11 @@ pub struct ParsedPlainDateTime {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CalendarAnnotationPolicy {
     RequireIso8601,
-    IgnoreNonCritical,
+    IgnoreCalendarValue,
 }
 
 pub fn parse_instant(text: &str) -> Option<i128> {
-    let text = strip_temporal_annotations(text, CalendarAnnotationPolicy::IgnoreNonCritical)?;
+    let text = strip_temporal_annotations(text, CalendarAnnotationPolicy::IgnoreCalendarValue)?;
     let bytes = text.as_bytes();
     let mut index = 0;
     let year = parse_iso_year(text, &mut index)?;
@@ -386,9 +386,7 @@ fn validate_temporal_annotation(
     }
     let accepts_value = match calendar_policy {
         CalendarAnnotationPolicy::RequireIso8601 => value.eq_ignore_ascii_case("iso8601"),
-        CalendarAnnotationPolicy::IgnoreNonCritical => {
-            !critical || value.eq_ignore_ascii_case("iso8601")
-        }
+        CalendarAnnotationPolicy::IgnoreCalendarValue => true,
     };
     if !accepts_value {
         return None;

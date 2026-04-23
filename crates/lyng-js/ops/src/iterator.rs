@@ -451,7 +451,11 @@ mod tests {
             _heap: &mut lyng_js_gc::PrimitiveMutator<'_>,
             request: NativeCallRequest<'_>,
         ) -> InternalMethodResult<Value> {
-            let raw = request.entry().raw().get();
+            let raw = request
+                .entry()
+                .builtin_entry()
+                .expect("iterator tests install builtin entries")
+                .get();
             match raw {
                 ITERATOR_ENTRY => Ok(Value::from_object_ref(
                     self.iterator_object
