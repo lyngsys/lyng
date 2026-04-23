@@ -1,3 +1,6 @@
 [submodule "testdata/test262"]
 	path = testdata/test262
 	url = https://github.com/tc39/test262.git
+[submodule "testdata/html5lib"]
+	path = testdata/html5lib
+	url = https://github.com/html5lib/html5lib-tests.git
