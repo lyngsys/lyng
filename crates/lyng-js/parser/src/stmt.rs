@@ -230,12 +230,13 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             return false;
         };
 
-        let lyng_js_ast::Expr::StringLiteral { value, .. } = self.ast().get_expr(*expression)
+        let lyng_js_ast::Expr::StringLiteral { value, syntax, .. } =
+            self.ast().get_expr(*expression)
         else {
             return false;
         };
 
-        self.ast().literals().string_equals(*value, "use strict")
+        !syntax.contains_escape && self.ast().literals().string_equals(*value, "use strict")
     }
 
     // -----------------------------------------------------------------------

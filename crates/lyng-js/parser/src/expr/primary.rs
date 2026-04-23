@@ -73,6 +73,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     pub(crate) fn parse_string_literal(&mut self) -> ExprId {
         let span = self.current_span();
         let syntax = StringLiteralSyntax {
+            contains_escape: self.current().contains_escape(),
             contains_legacy_octal_escape: self.current().has_legacy_octal_escape(),
             contains_non_octal_decimal_escape: self.current().has_non_octal_decimal_escape(),
         };

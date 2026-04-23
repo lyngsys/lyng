@@ -3761,6 +3761,38 @@ fn evaluate_script_with_statement_respects_symbol_unscopables() {
 }
 
 #[test]
+fn evaluate_script_with_statement_unscopables_keeps_global_hoisted_functions_callable() {
+    let unit = compile_test_unit(
+        2396,
+        r#"
+            function check(value) {
+                return value + 1;
+            }
+
+            function wrap() {
+                var object = {};
+                object[Symbol.unscopables] = { check: true };
+                return function(value) {
+                    with (object) {
+                        return globalThis.check(value) + check(value);
+                    }
+                };
+            }
+
+            wrap()(4);
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_smi(10));
+}
+
+#[test]
 fn evaluate_script_with_statement_call_target_only_uses_has_trap_for_missing_binding() {
     let unit = compile_test_unit(
         2395,

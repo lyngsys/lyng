@@ -267,6 +267,7 @@ impl Vm {
                 has_rest_parameter: prepared.has_rest_parameter,
                 lexical_env: prepared.lexical_env,
                 arguments,
+                callee: Value::from_object_ref(prepared.callee),
                 strict,
             },
         ) {

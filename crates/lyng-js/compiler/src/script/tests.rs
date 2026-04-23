@@ -979,6 +979,46 @@ fn compile_script_marks_conditional_tail_calls_in_each_branch() {
 }
 
 #[test]
+fn compile_script_keeps_shadowed_eval_tail_calls_on_the_tail_path() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(22),
+        r#"
+            function recur(step, value) {
+                var eval = step;
+                return eval(value);
+            }
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let recur = unit
+        .functions()
+        .iter()
+        .find(|function| function.name().and_then(|name| unit.atom_text(name)) == Some("recur"))
+        .expect("recursive function should be lowered");
+
+    assert!(recur.instructions().iter().any(|instruction| matches!(
+        instruction,
+        lyng_js_bytecode::Instruction::Abc {
+            opcode: Opcode::TailCall,
+            ..
+        }
+    )));
+    assert!(!recur.instructions().iter().any(|instruction| matches!(
+        instruction,
+        lyng_js_bytecode::Instruction::Abc {
+            opcode: Opcode::Call,
+            ..
+        }
+    )));
+}
+
+#[test]
 fn compile_script_attaches_metadata_at_allocation_loop_and_exception_boundaries() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(

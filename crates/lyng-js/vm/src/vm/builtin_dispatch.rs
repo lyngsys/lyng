@@ -30,6 +30,7 @@ use lyng_js_objects::{
 use lyng_js_ops::object::ToPrimitiveHint;
 use lyng_js_ops::{errors, names as ops_names, object, proxy, read};
 use lyng_js_parser::parse_script;
+use lyng_js_parser::parse_script_with_initial_strict;
 use lyng_js_sema::{
     analyze_direct_eval_script, analyze_script,
     ClassPrivateElementKind as SemaClassPrivateElementKind, ClassPrivateElementRecord,
@@ -1486,10 +1487,12 @@ impl Vm {
     ) -> VmResult<Value> {
         let realm = caller.realm();
         let source_id = self.allocate_dynamic_source_id();
-        let mut parsed = parse_script(agent.atoms_mut(), source_id, source_text);
-        if self.caller_is_strict(caller) {
-            parsed.strict = true;
-        }
+        let parsed = parse_script_with_initial_strict(
+            agent.atoms_mut(),
+            source_id,
+            source_text,
+            self.caller_is_strict(caller),
+        );
         if parsed.diagnostics.has_errors() {
             return Err(Self::syntax_error(agent, realm, "evalScript parse failure"));
         }

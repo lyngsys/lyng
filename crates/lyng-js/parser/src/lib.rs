@@ -37,7 +37,7 @@ mod tests;
 
 use lyng_js_ast::{Module, ParsedModule, ParsedScript, Script};
 use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_lexer::TokenKind;
+use lyng_js_lexer::{TokenKind, TokenPayload};
 
 use parser::Parser;
 
@@ -45,21 +45,37 @@ pub use regexp::validate_regexp_literal;
 
 /// Parses a script and returns the complete parse result.
 pub fn parse_script(atoms: &mut AtomTable, source_id: SourceId, source: &str) -> ParsedScript {
+    parse_script_with_initial_strict(atoms, source_id, source, false)
+}
+
+/// Parses a script, optionally starting in strict mode before any directive
+/// prologue is processed.
+pub fn parse_script_with_initial_strict(
+    atoms: &mut AtomTable,
+    source_id: SourceId,
+    source: &str,
+    initial_strict: bool,
+) -> ParsedScript {
     let mut parser = Parser::new(source, source_id, atoms, true);
+    if initial_strict {
+        parser.set_strict(true);
+    }
 
     let start_span = parser.current_span();
     let mut stmts = Vec::new();
 
     // Check for "use strict" directive prologue
-    let mut strict = false;
-    if parser.at(TokenKind::StringLiteral) {
+    let mut strict = initial_strict;
+    if !strict && parser.at(TokenKind::StringLiteral) {
         // Check if this is a "use strict" directive
         let token = parser.current();
-        if let lyng_js_lexer::TokenPayload::Literal(lit_id) = token.payload {
-            let lit = parser.lexer().literals.get_string(lit_id);
-            if lit.equals_text("use strict") {
-                strict = true;
-                parser.set_strict(true);
+        if !token.contains_escape() {
+            if let TokenPayload::Literal(lit_id) = token.payload {
+                let lit = parser.lexer().literals.get_string(lit_id);
+                if lit.equals_text("use strict") {
+                    strict = true;
+                    parser.set_strict(true);
+                }
             }
         }
     }

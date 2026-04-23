@@ -255,6 +255,27 @@ fn phase6_mapped_arguments_descriptors_reflect_current_parameter_values() {
 }
 
 #[test]
+fn phase6_sloppy_arguments_define_data_callee_descriptor() {
+    let result = compile_and_run(
+        r#"
+        function sample() {
+            let descriptor = Object.getOwnPropertyDescriptor(arguments, "callee");
+            if (descriptor === undefined) {
+                return 0;
+            }
+            return (descriptor.value === sample ? 1 : 0)
+                + (descriptor.writable === true ? 2 : 0)
+                + (descriptor.enumerable === false ? 4 : 0)
+                + (descriptor.configurable === true ? 8 : 0);
+        }
+        sample(1, 2);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
 fn phase6_define_property_value_updates_mapped_arguments_parameters() {
     let result = compile_and_run(
         r#"

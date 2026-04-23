@@ -105,12 +105,55 @@ fn strict_duplicate_params() {
 }
 
 #[test]
+fn escaped_use_strict_does_not_enable_script_strict_mode() {
+    let (parsed, sema) = script_sema("'use str\\u0069ct'; var eval = 1;");
+    assert!(
+        !parsed.strict,
+        "escaped directives must not enable strict mode"
+    );
+    assert!(
+        !parsed.diagnostics.has_errors(),
+        "escaped script directives should parse as ordinary string literals"
+    );
+    assert!(
+        !sema.diagnostics.has_errors(),
+        "escaped script directives should not trigger strict binding errors"
+    );
+}
+
+#[test]
 fn function_use_strict_with_non_simple_params_is_error() {
     let (parsed, sema) = script_sema("function f(a = 1) { 'use strict'; }");
     let has_error = parsed.diagnostics.has_errors() || sema.diagnostics.has_errors();
     assert!(
         has_error,
         "'use strict' with non-simple params should be an early error"
+    );
+}
+
+#[test]
+fn escaped_function_use_strict_with_non_simple_params_is_not_an_early_error() {
+    let (parsed, sema) = script_sema("function f(a = 1) { 'use str\\u0069ct'; }");
+    assert!(
+        !parsed.diagnostics.has_errors(),
+        "escaped directives should not trigger function-body strict parsing"
+    );
+    assert!(
+        !sema.diagnostics.has_errors(),
+        "escaped directives should not trigger non-simple parameter strict errors"
+    );
+}
+
+#[test]
+fn escaped_function_use_strict_keeps_duplicate_params_sloppy() {
+    let (parsed, sema) = script_sema("function f(a, a) { 'use str\\u0069ct'; return a; }");
+    assert!(
+        !parsed.diagnostics.has_errors(),
+        "escaped directives should not enable duplicate-parameter early errors"
+    );
+    assert!(
+        !sema.diagnostics.has_errors(),
+        "escaped directives should keep duplicate parameters in sloppy mode"
     );
 }
 

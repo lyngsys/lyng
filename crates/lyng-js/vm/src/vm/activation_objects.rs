@@ -13,6 +13,7 @@ impl Vm {
         agent: &mut Agent,
         realm: RealmRef,
         arguments: &[Value],
+        callee: Value,
         mapped_slots: Option<Vec<Option<u32>>>,
         environment: EnvironmentRef,
         strict: bool,
@@ -89,6 +90,17 @@ impl Vm {
 
         if strict {
             self.define_strict_arguments_callee(agent, realm, object)?;
+        } else {
+            let callee_key = agent.atoms_mut().intern_collectible("callee");
+            self.define_data_property_with_attrs(
+                agent,
+                object,
+                PropertyKey::from_atom(callee_key),
+                callee,
+                true,
+                false,
+                true,
+            )?;
         }
 
         Ok(object)
@@ -269,6 +281,7 @@ impl Vm {
             agent,
             init.realm,
             init.arguments,
+            init.callee,
             mapped_slots,
             init.lexical_env,
             init.strict,
@@ -324,6 +337,7 @@ pub(super) struct ActivationObjectInit<'a> {
     pub(super) has_rest_parameter: bool,
     pub(super) lexical_env: EnvironmentRef,
     pub(super) arguments: &'a [Value],
+    pub(super) callee: Value,
     pub(super) strict: bool,
 }
 

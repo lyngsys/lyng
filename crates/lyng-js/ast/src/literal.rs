@@ -32,6 +32,7 @@ pub enum NumericLiteralSyntax {
 /// errors later in semantic analysis.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct StringLiteralSyntax {
+    pub contains_escape: bool,
     pub contains_legacy_octal_escape: bool,
     pub contains_non_octal_decimal_escape: bool,
 }
@@ -246,6 +247,7 @@ mod tests {
     #[test]
     fn string_literal_syntax_strict_escape() {
         let syntax = StringLiteralSyntax {
+            contains_escape: false,
             contains_legacy_octal_escape: false,
             contains_non_octal_decimal_escape: true,
         };

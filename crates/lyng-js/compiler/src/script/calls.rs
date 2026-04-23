@@ -1,16 +1,20 @@
 use super::*;
 
 impl<'a, 'b> FunctionCompiler<'a, 'b> {
-    fn direct_eval_identifier(&self, callee: ExprId) -> bool {
+    fn direct_eval_identifier(&self, callee: ExprId) -> LoweringResult<bool> {
         let mut current = callee;
         while let Expr::ParenthesizedExpression { expression, .. } = self.ast().get_expr(current) {
             current = *expression;
         }
 
-        matches!(
-            self.ast().get_expr(current),
-            Expr::Identifier { name, .. } if *name == WellKnownAtom::eval.id()
-        )
+        let Expr::Identifier { name, .. } = self.ast().get_expr(current) else {
+            return Ok(false);
+        };
+        if *name != WellKnownAtom::eval.id() {
+            return Ok(false);
+        }
+
+        Ok(self.use_site(current)?.resolved_binding.is_none())
     }
 
     fn lower_direct_eval_call_expression(
@@ -20,7 +24,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         arguments: lyng_js_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<bool> {
-        if !self.direct_eval_identifier(callee) {
+        if !self.direct_eval_identifier(callee)? {
             return Ok(false);
         }
 

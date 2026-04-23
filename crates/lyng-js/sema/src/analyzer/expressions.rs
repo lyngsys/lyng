@@ -211,7 +211,7 @@ impl<'a> Analyzer<'a> {
                     let Expr::Identifier { name, .. } = self.ast.get_expr(*callee) else {
                         unreachable!("identifier match guarded above");
                     };
-                    if *name == WellKnownAtom::eval.id() {
+                    if *name == WellKnownAtom::eval.id() && self.resolve_name(*name).0.is_none() {
                         self.scopes.get_mut(self.ctx.current_scope).has_eval = true;
                         if let Some(func_id) = self.ctx.current_function {
                             self.functions.get_mut(func_id).has_eval = true;

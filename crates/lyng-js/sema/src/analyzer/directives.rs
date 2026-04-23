@@ -57,7 +57,7 @@ impl<'a> Analyzer<'a> {
                             legacy_escape_span = Some(expr.span());
                         }
                         let s = self.ast.literals().get_string(*value);
-                        if s == "use strict" {
+                        if !syntax.contains_escape && s == "use strict" {
                             return (Some(stmt.span()), legacy_escape_span);
                         }
                         continue;

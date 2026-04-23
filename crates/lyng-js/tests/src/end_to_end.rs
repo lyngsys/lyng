@@ -74,8 +74,8 @@ fn arrow_function_captures_resolved() {
     assert!(xb.is_captured, "x should be marked as captured by arrow");
     assert_eq!(
         xb.storage_class,
-        StorageClass::EnvironmentSlot,
-        "captured var should use EnvironmentSlot"
+        StorageClass::GlobalName,
+        "captured global var should stay on the global-name path"
     );
 }
 

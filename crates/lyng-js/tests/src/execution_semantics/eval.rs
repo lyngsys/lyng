@@ -246,6 +246,26 @@ fn direct_eval_in_strict_caller_keeps_function_declarations_local() {
 }
 
 #[test]
+fn direct_eval_in_strict_caller_parses_source_as_strict_code() {
+    let result = compile_and_run_string(
+        r#"
+            function testcase() {
+                "use strict";
+                try {
+                    eval("public = 1;");
+                    return "ok";
+                } catch (error) {
+                    return error.constructor === SyntaxError ? "syntax" : "other";
+                }
+            }
+            testcase();
+        "#,
+    );
+
+    assert_eq!(result, "syntax");
+}
+
+#[test]
 fn direct_eval_in_global_code_creates_var_binding_before_initializer_reads() {
     let result = compile_and_run_string(
         r#"

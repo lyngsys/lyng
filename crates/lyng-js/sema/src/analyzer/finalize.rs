@@ -51,14 +51,14 @@ impl<'a> Analyzer<'a> {
                 && binding.kind == crate::binding::DeclarationKind::ClassName
             {
                 StorageClass::EnvironmentSlot
+            } else if scope_rec.kind == ScopeKind::Global && binding.kind.is_hoisted() {
+                StorageClass::GlobalName
             } else if scope_rec.kind == ScopeKind::Global && binding.kind.is_lexical() {
                 StorageClass::EnvironmentSlot
             } else if scope_rec.kind == ScopeKind::ForLoop && binding.kind.is_lexical() {
                 StorageClass::EnvironmentSlot
             } else if binding.is_captured {
                 StorageClass::EnvironmentSlot
-            } else if scope_rec.kind == ScopeKind::Global && binding.kind.is_hoisted() {
-                StorageClass::GlobalName
             } else {
                 StorageClass::FrameLocal
             };
