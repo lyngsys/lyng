@@ -8,14 +8,9 @@ const UNSUPPORTED_FEATURES: &[&str] = &[
     "decorators",
     "Error.isError",
     "import-assertions",
-    "import-defer",
-    "import-text",
     "regexp-v-flag",
     "regexp-duplicate-named-groups",
     "regexp-modifiers",
-    "source-phase-imports",
-    "source-phase-imports-module-source",
-    "json-modules",
     "resizable-arraybuffer",
     "arraybuffer-transfer",
     "immutable-arraybuffer",
@@ -452,14 +447,6 @@ fn skip_reason(
 }
 
 fn should_skip_metadata(metadata: &TestMetadata, helpers: &HelperCatalog) -> Option<String> {
-    if is_module_test(metadata)
-        && metadata
-            .features
-            .iter()
-            .any(|feature| feature == "top-level-await")
-    {
-        return Some("deferred to async module milestones".to_string());
-    }
     if metadata.flags.iter().any(|flag| flag == "CanBlockIsFalse") {
         return Some("host runs with [[CanBlock]] true".to_string());
     }
@@ -699,5 +686,65 @@ mod tests {
                 "requires $262.agent multi-agent harness".to_string()
             ))
         );
+    }
+
+    #[test]
+    fn skip_decision_runs_module_proposal_feature_buckets() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        for feature in [
+            "source-phase-imports",
+            "source-phase-imports-module-source",
+            "import-defer",
+            "json-modules",
+            "import-text",
+        ] {
+            let metadata = parse_metadata(&format!(
+                r"
+                /*---
+                features: [{feature}]
+                flags: [module]
+                ---*/
+                "
+            ));
+
+            let decision = skip_decision(
+                Path::new("/tmp/test.js"),
+                Path::new("/tmp"),
+                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &metadata,
+                &helpers,
+                false,
+            );
+
+            assert_eq!(
+                decision, None,
+                "module proposal feature `{feature}` should remain runnable"
+            );
+        }
+    }
+
+    #[test]
+    fn skip_decision_runs_top_level_await_modules() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [top-level-await]
+            flags: [module]
+            ---*/
+            await Promise.resolve(1);
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test.js"),
+            Path::new("/tmp"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+        );
+
+        assert_eq!(decision, None);
     }
 }
