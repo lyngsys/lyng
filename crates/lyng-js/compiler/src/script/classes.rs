@@ -2,6 +2,29 @@ use super::state::ClassInstanceElementPlan;
 use super::*;
 use lyng_js_types::js3_internal_construct_super_spread_builtin;
 
+#[derive(Clone, Copy)]
+enum StaticPublicFieldKey {
+    Atom(AtomId),
+    Register(u16),
+}
+
+#[derive(Clone, Copy)]
+enum PendingStaticClassElement {
+    PublicField {
+        key: StaticPublicFieldKey,
+        value: Option<ExprId>,
+    },
+    PrivateField {
+        name: AtomId,
+        value: Option<ExprId>,
+        span: Span,
+    },
+    Block {
+        body: NodeList<StmtId>,
+        span: Span,
+    },
+}
+
 impl<'a, 'b> FunctionCompiler<'a, 'b> {
     pub(super) fn lower_class_expression(
         &mut self,
@@ -174,6 +197,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let previous_class_body = self.active_class_body.replace(body);
         let previous_class_span = self.active_class_span.replace(class_span);
         let mut next_computed_instance_field_key = 0u32;
+        let mut pending_static_elements = Vec::new();
         for element_id in elements {
             match self.ast().get_class_element(element_id).clone() {
                 lyng_js_ast::ClassElement::Method {
@@ -346,25 +370,15 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             None,
                             span,
                         )?;
-                        self.lower_private_element_initializer(
-                            dest,
-                            private_name,
-                            lyng_js_sema::ClassPrivateElementKind::Field,
+                        pending_static_elements.push(PendingStaticClassElement::PrivateField {
+                            name: private_name,
                             value,
-                            body,
                             span,
-                            Some(dest),
-                            Some(dest),
-                        )?;
+                        });
                     } else {
-                        self.lower_class_field_initializer(
-                            dest,
-                            key,
-                            value,
-                            computed,
-                            Some(dest),
-                            Some(dest),
-                        )?;
+                        let key = self.lower_static_public_field_key(key, computed)?;
+                        pending_static_elements
+                            .push(PendingStaticClassElement::PublicField { key, value });
                     }
                 }
                 lyng_js_ast::ClassElement::Property {
@@ -393,15 +407,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     )?;
                 }
                 lyng_js_ast::ClassElement::StaticBlock { body, span } => {
-                    let previous_override = self.this_override_register.replace(dest);
-                    let previous_home_object = self.super_home_object_override.replace(dest);
-                    self.lower_statement_list_with_disposal(body, span)?;
-                    self.this_override_register = previous_override;
-                    self.super_home_object_override = previous_home_object;
+                    pending_static_elements.push(PendingStaticClassElement::Block { body, span });
                 }
                 lyng_js_ast::ClassElement::Property { .. }
                 | lyng_js_ast::ClassElement::InvalidElement { .. } => {}
             }
+        }
+        for element in pending_static_elements {
+            self.lower_pending_static_class_element(dest, body, element)?;
         }
         self.active_class_body = previous_class_body;
         self.active_class_span = previous_class_span;
@@ -491,15 +504,69 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok((key_value, None))
     }
 
-    fn lower_class_field_initializer(
+    fn lower_static_public_field_key(
         &mut self,
-        target: u16,
         key: ExprId,
-        value: Option<ExprId>,
         computed: bool,
+    ) -> LoweringResult<StaticPublicFieldKey> {
+        if !computed {
+            if let Some(atom) = self.named_property_atom(key)? {
+                return Ok(StaticPublicFieldKey::Atom(atom));
+            }
+        }
+        let raw_key = self.lower_expr_to_temp(key)?;
+        let property_key = self.alloc_temp()?;
+        self.emit_to_property_key(property_key, raw_key)?;
+        Ok(StaticPublicFieldKey::Register(property_key))
+    }
+
+    fn lower_pending_static_class_element(
+        &mut self,
+        class_object: u16,
+        class_body: NodeList<lyng_js_ast::ClassElementId>,
+        element: PendingStaticClassElement,
+    ) -> LoweringResult<()> {
+        match element {
+            PendingStaticClassElement::PublicField { key, value } => {
+                let value_register =
+                    self.lower_class_field_value(value, Some(class_object), Some(class_object))?;
+                match key {
+                    StaticPublicFieldKey::Atom(atom) => {
+                        self.emit_define_property_by_atom(class_object, value_register, atom)
+                    }
+                    StaticPublicFieldKey::Register(key_register) => {
+                        self.emit_define_keyed_property(class_object, value_register, key_register)
+                    }
+                }
+            }
+            PendingStaticClassElement::PrivateField { name, value, span } => self
+                .lower_private_element_initializer(
+                    class_object,
+                    name,
+                    lyng_js_sema::ClassPrivateElementKind::Field,
+                    value,
+                    class_body,
+                    span,
+                    Some(class_object),
+                    Some(class_object),
+                ),
+            PendingStaticClassElement::Block { body, span } => {
+                let previous_override = self.this_override_register.replace(class_object);
+                let previous_home_object = self.super_home_object_override.replace(class_object);
+                let result = self.lower_statement_list_with_disposal(body, span);
+                self.this_override_register = previous_override;
+                self.super_home_object_override = previous_home_object;
+                result
+            }
+        }
+    }
+
+    fn lower_class_field_value(
+        &mut self,
+        value: Option<ExprId>,
         this_override: Option<u16>,
         home_object_override: Option<u16>,
-    ) -> LoweringResult<()> {
+    ) -> LoweringResult<u16> {
         let previous_override = this_override
             .and_then(|this_override| self.this_override_register.replace(this_override));
         let previous_home_object = home_object_override
@@ -514,11 +581,26 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Ok(undefined)
         };
         self.in_class_field_initializer = previous_in_class_field_initializer;
-        let value_register = value_register?;
-        if this_override.is_some() || home_object_override.is_some() {
+        if this_override.is_some() {
             self.this_override_register = previous_override;
+        }
+        if home_object_override.is_some() {
             self.super_home_object_override = previous_home_object;
         }
+        value_register
+    }
+
+    fn lower_class_field_initializer(
+        &mut self,
+        target: u16,
+        key: ExprId,
+        value: Option<ExprId>,
+        computed: bool,
+        this_override: Option<u16>,
+        home_object_override: Option<u16>,
+    ) -> LoweringResult<()> {
+        let value_register =
+            self.lower_class_field_value(value, this_override, home_object_override)?;
 
         if !computed {
             if let Some(atom) = self.named_property_atom(key)? {

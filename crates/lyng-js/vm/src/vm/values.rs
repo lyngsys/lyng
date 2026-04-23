@@ -418,6 +418,14 @@ impl Vm {
         if let Some(symbol) = value.as_symbol_ref() {
             return Ok(PropertyKey::from_symbol(symbol));
         }
+        if value.is_bigint() {
+            let text = object::bigint_to_string(agent, value, 10).map_err(VmError::Abrupt)?;
+            if let Some(index) = string_text_array_index(&text) {
+                return Ok(PropertyKey::Index(index));
+            }
+            let atom = self.property_atom_from_text(agent, &text);
+            return Ok(PropertyKey::from_atom(atom));
+        }
         if let Some(atom) = self.primitive_property_key_atom(agent, value) {
             return Ok(PropertyKey::from_atom(atom));
         }
@@ -941,6 +949,27 @@ fn string_view_array_index(view: PrimitiveStringView<'_>) -> Option<u32> {
     let mut value = u64::from(first);
     for index in 1..len {
         let digit = u64::from(ascii_digit_value(view.code_unit_at(index)?)?);
+        value = value.checked_mul(10)?.checked_add(digit)?;
+        if value > u64::from(PropertyKey::MAX_ARRAY_INDEX) {
+            return None;
+        }
+    }
+    u32::try_from(value).ok()
+}
+
+#[inline]
+fn string_text_array_index(text: &str) -> Option<u32> {
+    let bytes = text.as_bytes();
+    if bytes.is_empty() {
+        return None;
+    }
+    let first = bytes[0].checked_sub(b'0').filter(|digit| *digit <= 9)?;
+    if first == 0 {
+        return (bytes.len() == 1).then_some(0);
+    }
+    let mut value = u64::from(first);
+    for &byte in &bytes[1..] {
+        let digit = u64::from(byte.checked_sub(b'0').filter(|digit| *digit <= 9)?);
         value = value.checked_mul(10)?.checked_add(digit)?;
         if value > u64::from(PropertyKey::MAX_ARRAY_INDEX) {
             return None;

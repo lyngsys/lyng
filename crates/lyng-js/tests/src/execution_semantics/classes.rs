@@ -173,6 +173,105 @@ fn phase6_computed_instance_field_keys_are_fixed_at_class_definition_time() {
 }
 
 #[test]
+fn phase6_computed_class_element_keys_apply_to_property_key() {
+    let result = compile_and_run(
+        r#"
+        let log = "";
+        let methodKey = {
+            [Symbol.toPrimitive](hint) {
+                log += "m:" + hint + "|";
+                return "method";
+            }
+        };
+        let getterKey = {
+            [Symbol.toPrimitive](hint) {
+                log += "g:" + hint + "|";
+                return "value";
+            }
+        };
+        let setterKey = {
+            [Symbol.toPrimitive](hint) {
+                log += "s:" + hint + "|";
+                return "value";
+            }
+        };
+        let fieldKey = {
+            [Symbol.toPrimitive](hint) {
+                log += "f:" + hint + "|";
+                return "field";
+            }
+        };
+
+        class C {
+            [fieldKey] = 10;
+            [methodKey]() { return this.field; }
+            get [getterKey]() { return this.field + 1; }
+            set [setterKey](value) { this.field = value; }
+        }
+
+        let instance = new C();
+        let total = 0;
+        total += instance.method() === 10 ? 1 : 0;
+        total += instance.value === 11 ? 2 : 0;
+        instance.value = 20;
+        total += instance.field === 20 ? 4 : 0;
+        total += log === "f:string|m:string|g:string|s:string|" ? 8 : 0;
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn phase6_computed_class_function_expression_keys_use_trimmed_source_text() {
+    let result = compile_and_run(
+        r#"
+        class C {
+            [function () {}]() {
+                return 1;
+            }
+            static [function () {}]() {
+                return 2;
+            }
+        }
+
+        new C()[function () {}]()
+            + C[function () {}]()
+            + new C()[String(function () {})]()
+            + C[String(function () {})]();
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(6));
+}
+
+#[test]
+fn phase6_intercalated_static_and_instance_computed_field_keys_run_before_values() {
+    let result = compile_and_run(
+        r#"
+        let i = 0;
+        class C {
+            [i++] = i++;
+            static [i++] = i++;
+            [i++] = i++;
+        }
+
+        let c = new C();
+        (c[0] === 4 ? 1 : 0)
+            + (C[1] === 3 ? 2 : 0)
+            + (c[2] === 5 ? 4 : 0)
+            + (i === 6 ? 8 : 0)
+            + (c.hasOwnProperty("1") ? 0 : 16)
+            + (C.hasOwnProperty("0") ? 0 : 32)
+            + (C.hasOwnProperty("2") ? 0 : 64);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
 fn phase6_classes_execute_private_instance_fields_and_brand_checks() {
     let result = compile_and_run(
         r#"
@@ -293,6 +392,24 @@ fn phase6_static_computed_prototype_elements_throw_type_error() {
     );
 
     assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn phase6_class_constructor_own_property_names_order_indices_before_builtin_names() {
+    let result = compile_and_run_string(
+        r#"
+        class C {
+            static a() { return "A"; }
+            static [1]() { return "B"; }
+            static c() { return "C"; }
+            static [2]() { return "D"; }
+        }
+
+        Object.getOwnPropertyNames(C).join(",");
+        "#,
+    );
+
+    assert_eq!(result, "1,2,length,name,prototype,a,c");
 }
 
 #[test]

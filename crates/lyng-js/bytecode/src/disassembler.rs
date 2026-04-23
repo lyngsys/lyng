@@ -168,7 +168,7 @@ fn format_abc_instruction(
                 operands.c()
             )
         }
-        crate::Opcode::SetFunctionName => {
+        crate::Opcode::SetFunctionName | crate::Opcode::ToPropertyKey => {
             format!("{opcode}r{}, r{}", operands.a(), operands.b())
         }
         crate::Opcode::GetNamedProperty

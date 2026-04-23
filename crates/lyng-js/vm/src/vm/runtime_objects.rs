@@ -200,15 +200,6 @@ impl Vm {
                     true,
                 )?;
             }
-            self.define_data_property_with_attrs(
-                agent,
-                function,
-                PropertyKey::from_atom(WellKnownAtom::prototype.id()),
-                Value::from_object_ref(prototype),
-                !kind_flags.is_class_constructor(),
-                false,
-                false,
-            )?;
         }
 
         self.define_data_property_with_attrs(
@@ -227,6 +218,18 @@ impl Vm {
             let name_value =
                 Value::from_string_ref(super::values::alloc_atom_string(agent, name, &name_text));
             self.set_function_name(agent, function, name_value)?;
+        }
+
+        if let Some(prototype) = home_object {
+            self.define_data_property_with_attrs(
+                agent,
+                function,
+                PropertyKey::from_atom(WellKnownAtom::prototype.id()),
+                Value::from_object_ref(prototype),
+                !kind_flags.is_class_constructor(),
+                false,
+                false,
+            )?;
         }
 
         Ok(function)

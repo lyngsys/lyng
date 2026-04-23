@@ -1794,12 +1794,38 @@ impl Vm {
                 continue;
             }
             let end = index + ch.len_utf8();
-            let parsed = parse_script(&mut atoms, source, &candidate[..end]);
-            if !parsed.diagnostics.has_errors() {
+            let source_text = &candidate[..end];
+            if Self::function_source_candidate_parses(&mut atoms, source, source_text) {
                 return Some(candidate[..end].to_owned());
             }
         }
         None
+    }
+
+    fn function_source_candidate_parses(
+        atoms: &mut AtomTable,
+        source: lyng_js_common::SourceId,
+        source_text: &str,
+    ) -> bool {
+        if !parse_script(atoms, source, source_text)
+            .diagnostics
+            .has_errors()
+        {
+            return true;
+        }
+
+        let expression_text = format!("({source_text});");
+        if !parse_script(atoms, source, &expression_text)
+            .diagnostics
+            .has_errors()
+        {
+            return true;
+        }
+
+        let method_text = format!("({{{source_text}}});");
+        !parse_script(atoms, source, &method_text)
+            .diagnostics
+            .has_errors()
     }
 
     fn collect_array_like_arguments(
@@ -2009,19 +2035,15 @@ impl Vm {
     fn object_has_own_property_builtin(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let object = self.to_object_for_value(agent, caller.realm(), this_value)?;
         let key_value = arguments.first().copied().unwrap_or(Value::undefined());
-        let key = self.value_to_property_key(
-            agent,
-            caller,
-            caller.code(),
-            caller.instruction_offset(),
-            key_value,
-        )?;
+        let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
         let has_property = object::get_own_property(agent, object, key)
             .map_err(VmError::Abrupt)?
             .is_some();
@@ -2502,6 +2524,8 @@ impl Vm {
     fn define_accessor_property_builtin(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
         arguments: &[Value],
         is_getter: bool,
@@ -2518,13 +2542,7 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
 
-        let key = self.value_to_property_key(
-            agent,
-            caller,
-            caller.code(),
-            caller.instruction_offset(),
-            key_value,
-        )?;
+        let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
         if let Some(accessor) = accessor.as_object_ref() {
             self.set_function_name_from_property_key(
                 agent,
@@ -2561,6 +2579,8 @@ impl Vm {
     fn define_method_property_builtin(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
@@ -2571,13 +2591,7 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
         let value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let key = self.value_to_property_key(
-            agent,
-            caller,
-            caller.code(),
-            caller.instruction_offset(),
-            key_value,
-        )?;
+        let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
         if let Some(function) = value.as_object_ref() {
             self.set_function_name_from_property_key(agent, function, key, None)?;
         }
@@ -2784,6 +2798,8 @@ impl Vm {
     fn install_instance_field_key_builtin(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
@@ -2799,13 +2815,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let key_value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let key = self.value_to_property_key(
-            agent,
-            caller,
-            caller.code(),
-            caller.instruction_offset(),
-            key_value,
-        )?;
+        let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
         let canonical_key = self.property_key_to_enumeration_value(agent, key);
         object::install_instance_public_field_key(agent, class_object, field_index, canonical_key)
             .map_err(VmError::Abrupt)
@@ -3947,6 +3957,8 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     ) -> Result<Value, Self::Error> {
         self.vm.define_method_property_builtin(
             self.agent,
+            self.host,
+            self.registry,
             self.caller_frame,
             invocation.arguments(),
         )
@@ -3958,6 +3970,8 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     ) -> Result<Value, Self::Error> {
         self.vm.define_accessor_property_builtin(
             self.agent,
+            self.host,
+            self.registry,
             self.caller_frame,
             invocation.arguments(),
             true,
@@ -3971,6 +3985,8 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     ) -> Result<Value, Self::Error> {
         self.vm.define_accessor_property_builtin(
             self.agent,
+            self.host,
+            self.registry,
             self.caller_frame,
             invocation.arguments(),
             false,
@@ -3984,6 +4000,8 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     ) -> Result<Value, Self::Error> {
         self.vm.define_accessor_property_builtin(
             self.agent,
+            self.host,
+            self.registry,
             self.caller_frame,
             invocation.arguments(),
             true,
@@ -3997,6 +4015,8 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     ) -> Result<Value, Self::Error> {
         self.vm.define_accessor_property_builtin(
             self.agent,
+            self.host,
+            self.registry,
             self.caller_frame,
             invocation.arguments(),
             false,
@@ -4112,6 +4132,8 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     ) -> Result<Value, Self::Error> {
         self.vm.object_has_own_property_builtin(
             self.agent,
+            self.host,
+            self.registry,
             self.caller_frame,
             invocation.this_value(),
             invocation.arguments(),
@@ -4156,6 +4178,8 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     ) -> Result<Value, Self::Error> {
         self.vm.install_instance_field_key_builtin(
             self.agent,
+            self.host,
+            self.registry,
             self.caller_frame,
             invocation.arguments(),
         )

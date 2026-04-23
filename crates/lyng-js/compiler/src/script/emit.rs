@@ -637,6 +637,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
+    pub(super) fn emit_to_property_key(&mut self, dest: u16, value: u16) -> LoweringResult<()> {
+        self.builder.emit_abc(
+            Opcode::ToPropertyKey,
+            self.encode_register(dest)?,
+            self.encode_register(value)?,
+            0,
+        );
+        Ok(())
+    }
+
     pub(super) fn emit_profiled_binary(
         &mut self,
         opcode: Opcode,

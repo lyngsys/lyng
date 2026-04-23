@@ -578,6 +578,18 @@ impl Vm {
                             };
                             self.advance_instruction()?;
                         }
+                        Opcode::ToPropertyKey => {
+                            let key_value = self.read_register(frame, b)?;
+                            let key_result = self.to_property_key_from_value(
+                                agent, host, registry, frame, key_value,
+                            );
+                            let Some(key) = self.handle_vm_result(agent, key_result)? else {
+                                continue;
+                            };
+                            let value = self.property_key_to_enumeration_value(agent, key);
+                            self.write_register(frame, a, value)?;
+                            self.advance_instruction()?;
+                        }
                         Opcode::DeleteProperty => {
                             let receiver = self.read_register(frame, b)?;
                             let key_value = self.read_register(frame, c)?;

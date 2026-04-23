@@ -202,6 +202,7 @@ fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::DeleteProperty
         | Opcode::CopyDataProperties
         | Opcode::SetFunctionName
+        | Opcode::ToPropertyKey
         | Opcode::Call
         | Opcode::CallMethod
         | Opcode::TailCall

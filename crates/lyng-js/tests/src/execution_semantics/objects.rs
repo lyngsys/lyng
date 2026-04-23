@@ -107,6 +107,94 @@ fn phase5_object_is_uses_same_value_semantics() {
 }
 
 #[test]
+fn phase6_object_literal_bigint_property_names_become_string_keys() {
+    let result = compile_and_run(
+        r#"
+        let object = {
+            1n: "one",
+            [-2n]: "minus two"
+        };
+
+        (object["1"] === "one" ? 1 : 0)
+            + (object["-2"] === "minus two" ? 2 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn phase6_object_literal_accessor_keys_apply_to_property_key() {
+    let result = compile_and_run(
+        r#"
+        let log = "";
+        let key = {
+            [Symbol.toPrimitive](hint) {
+                log += hint;
+                return "value";
+            }
+        };
+        let object = {
+            backing: 3,
+            get [key]() {
+                return this.backing + 1;
+            },
+            set [key](value) {
+                this.backing = value;
+            }
+        };
+
+        let total = 0;
+        total += object.value === 4 ? 1 : 0;
+        object.value = 9;
+        total += object.backing === 9 ? 2 : 0;
+        total += log === "stringstring" ? 4 : 0;
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn phase6_object_literal_computed_key_coerces_before_value_evaluation() {
+    let result = compile_and_run_string(
+        r#"
+        let value = "bad";
+        let key = {
+            toString() {
+                value = "ok";
+                return "p";
+            }
+        };
+
+        let object = {
+            [key]: value
+        };
+
+        object.p;
+        "#,
+    );
+
+    assert_eq!(result, "ok");
+}
+
+#[test]
+fn phase6_object_literal_function_expression_keys_use_trimmed_source_text() {
+    let result = compile_and_run(
+        r#"
+        let object = {
+            [function () {}]: 7
+        };
+
+        object[function () {}] + object[String(function () {})];
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(14));
+}
+
+#[test]
 fn phase5_object_create_routes_properties_through_shared_descriptor_semantics() {
     let result = compile_and_run(
         r#"

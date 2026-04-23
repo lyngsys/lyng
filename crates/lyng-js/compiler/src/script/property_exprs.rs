@@ -114,12 +114,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
         match property.kind {
             PropertyKind::Init => {
+                let named_atom = if property.computed {
+                    None
+                } else {
+                    self.named_property_atom(property.key)?
+                };
+                let key_register = if named_atom.is_none() {
+                    let raw_key = self.lower_expr_to_temp(property.key)?;
+                    let property_key = self.alloc_temp()?;
+                    self.emit_to_property_key(property_key, raw_key)?;
+                    Some(property_key)
+                } else {
+                    None
+                };
                 let value_register = self.lower_expr_to_temp(property.value)?;
                 if !property.computed
                     && !property.method
                     && !property.shorthand
-                    && self.named_property_atom(property.key)?
-                        == Some(WellKnownAtom::__proto__.id())
+                    && named_atom == Some(WellKnownAtom::__proto__.id())
                 {
                     return self.emit_internal_builtin_call(
                         js3_internal_object_literal_set_prototype_builtin(),
@@ -130,15 +142,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 if property.method {
                     self.bind_function_home_object(value_register, object, property.span)?;
                 }
-                if !property.computed {
-                    if let Some(atom) = self.named_property_atom(property.key)? {
-                        self.emit_define_property_by_atom(object, value_register, atom)?;
-                        return Ok(());
-                    }
+                if let Some(atom) = named_atom {
+                    self.emit_define_property_by_atom(object, value_register, atom)?;
+                    return Ok(());
                 }
 
-                let key_register = self.lower_expr_to_temp(property.key)?;
-                self.emit_define_keyed_property(object, value_register, key_register)
+                self.emit_define_keyed_property(
+                    object,
+                    value_register,
+                    key_register.expect("non-atom property keys should be lowered"),
+                )
             }
             PropertyKind::Get | PropertyKind::Set => {
                 let key = self.lower_object_property_key_value(property)?;
@@ -162,7 +175,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 return Ok(key);
             }
         }
-        self.lower_expr_to_temp(property.key)
+        let raw_key = self.lower_expr_to_temp(property.key)?;
+        let key = self.alloc_temp()?;
+        self.emit_to_property_key(key, raw_key)?;
+        Ok(key)
     }
 
     fn lower_object_accessor_property(
