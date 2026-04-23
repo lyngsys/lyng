@@ -19,14 +19,13 @@ Out of scope for core completion:
 
 ## Current Status
 
-- JS3 is the only in-repo JavaScript engine implementation
-- Phase 6 is the active stage
-- milestones `6A1` through `6G2c` are closed
-- `6H` is the active remaining tail:
+- Lyng JS is the only in-repo JavaScript engine implementation
+- current work remains focused on the remaining ECMA-262 completion and conformance gaps
+- active completion and conformance areas include:
   - direct and indirect `eval`
   - `with` and `@@unscopables`
   - proper tail calls
-  - Annex B closure
+  - Annex B closure behavior
   - remaining Temporal conformance work
   - optional-chaining, RegExp-literal, and final whole-suite burn-down work
 

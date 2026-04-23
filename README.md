@@ -8,12 +8,13 @@ active implementation tracks:
 - **`lyng-html-parser`** in [`crates/html_parser/`](crates/html_parser/README.md), a WHATWG-style
   HTML parser backed by an arena DOM
 
-Current focus: Lyng JS is in Phase 6 ECMA-262 completion work. The active remaining tail is `6H`,
-covering dynamic scope, proper tail calls, Annex B closure, and final conformance burn-down.
+Current focus: Lyng JS remains focused on the remaining ECMA-262 completion and conformance
+work, including dynamic scope, proper tail calls, Annex B closure behavior, Temporal coverage,
+and final Test262 burn-down.
 
 ## Workspace Shape
 
-- `crates/lyng-js/`: JS3 engine crates, integration tests, and runtime/compiler implementation
+- `crates/lyng-js/`: Lyng JS engine crates, integration tests, and runtime/compiler implementation
 - `crates/html_parser/`: HTML tokenizer, tree builder, parse APIs, and html5lib-backed validation
 - `crates/dom/`: arena-backed DOM used by the HTML parser
 - `tools/`: html5lib, benchmark, and Test262 runners
