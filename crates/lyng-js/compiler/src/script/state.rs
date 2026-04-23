@@ -1188,7 +1188,10 @@ fn collect_class_lowering_from_class_body(
                     *value,
                     ClassFunctionMetadata {
                         constructible: matches!(kind, lyng_js_ast::MethodKind::Constructor),
-                        has_prototype_property: matches!(kind, lyng_js_ast::MethodKind::Constructor),
+                        has_prototype_property: matches!(
+                            kind,
+                            lyng_js_ast::MethodKind::Constructor
+                        ),
                         class_constructor: matches!(kind, lyng_js_ast::MethodKind::Constructor),
                         derived_class_constructor: matches!(
                             kind,

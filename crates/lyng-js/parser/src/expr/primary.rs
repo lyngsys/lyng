@@ -748,7 +748,8 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
 
         if let Some(rest_param) = rest {
-            if let lyng_js_ast::Pattern::Assignment { span, .. } = self.ast().get_pattern(rest_param)
+            if let lyng_js_ast::Pattern::Assignment { span, .. } =
+                self.ast().get_pattern(rest_param)
             {
                 self.error_at(
                     *span,

@@ -78,7 +78,10 @@ fn is_simple_parameter_pattern(ast: &lyng_js_ast::Ast, pattern: lyng_js_ast::Pat
     matches!(ast.get_pattern(pattern), Pattern::Identifier { .. })
 }
 
-fn function_has_non_simple_params(ast: &lyng_js_ast::Ast, function: &lyng_js_ast::Function) -> bool {
+fn function_has_non_simple_params(
+    ast: &lyng_js_ast::Ast,
+    function: &lyng_js_ast::Function,
+) -> bool {
     function.params.rest.is_some()
         || ast
             .get_pattern_list(function.params.params)

@@ -7824,7 +7824,9 @@ fn load_const_still_rejects_builtin_constants_without_runtime_support() {
         Err(VmError::UnsupportedConstant {
             code: installed.code(),
             index: 0,
-            constant: ConstantValue::Builtin(lyng_js_types::BuiltinFunctionId::from_raw(9).unwrap()),
+            constant: ConstantValue::Builtin(
+                lyng_js_types::BuiltinFunctionId::from_raw(9).unwrap()
+            ),
         })
     );
 }

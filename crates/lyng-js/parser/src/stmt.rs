@@ -230,7 +230,8 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             return false;
         };
 
-        let lyng_js_ast::Expr::StringLiteral { value, .. } = self.ast().get_expr(*expression) else {
+        let lyng_js_ast::Expr::StringLiteral { value, .. } = self.ast().get_expr(*expression)
+        else {
             return false;
         };
 

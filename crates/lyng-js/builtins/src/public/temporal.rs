@@ -189,7 +189,9 @@ pub(super) fn install_temporal_public_objects(
         function_prototype,
         object_prototype,
         lyng_js_types::js3_temporal_instant_epoch_seconds_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_epoch_seconds_getter_builtin())?,
+        public_builtin_metadata(
+            lyng_js_types::js3_temporal_instant_epoch_seconds_getter_builtin(),
+        )?,
         None,
     );
     let instant_to_string = allocate_builtin_function_object(
@@ -411,7 +413,9 @@ pub(super) fn install_temporal_public_objects(
         function_prototype,
         object_prototype,
         lyng_js_types::js3_temporal_duration_milliseconds_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_milliseconds_getter_builtin())?,
+        public_builtin_metadata(
+            lyng_js_types::js3_temporal_duration_milliseconds_getter_builtin(),
+        )?,
         None,
     );
     let duration_microseconds_getter = allocate_builtin_function_object(
@@ -422,7 +426,9 @@ pub(super) fn install_temporal_public_objects(
         function_prototype,
         object_prototype,
         lyng_js_types::js3_temporal_duration_microseconds_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_microseconds_getter_builtin())?,
+        public_builtin_metadata(
+            lyng_js_types::js3_temporal_duration_microseconds_getter_builtin(),
+        )?,
         None,
     );
     let duration_nanoseconds_getter = allocate_builtin_function_object(
@@ -642,7 +648,9 @@ pub(super) fn install_temporal_public_objects(
         function_prototype,
         object_prototype,
         lyng_js_types::js3_temporal_plain_date_month_code_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_month_code_getter_builtin())?,
+        public_builtin_metadata(
+            lyng_js_types::js3_temporal_plain_date_month_code_getter_builtin(),
+        )?,
         None,
     );
     let plain_date_day_getter = allocate_builtin_function_object(
@@ -1081,7 +1089,9 @@ pub(super) fn install_temporal_public_objects(
         function_prototype,
         object_prototype,
         lyng_js_types::js3_temporal_plain_time_nanosecond_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_nanosecond_getter_builtin())?,
+        public_builtin_metadata(
+            lyng_js_types::js3_temporal_plain_time_nanosecond_getter_builtin(),
+        )?,
         None,
     );
     let plain_time_to_string = allocate_builtin_function_object(
@@ -1270,7 +1280,9 @@ pub(super) fn install_temporal_public_objects(
         function_prototype,
         object_prototype,
         lyng_js_types::js3_temporal_plain_date_time_month_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_month_getter_builtin())?,
+        public_builtin_metadata(
+            lyng_js_types::js3_temporal_plain_date_time_month_getter_builtin(),
+        )?,
         None,
     );
     let plain_date_time_month_code_getter = allocate_builtin_function_object(
@@ -1756,7 +1768,9 @@ pub(super) fn install_temporal_public_objects(
         function_prototype,
         object_prototype,
         lyng_js_types::js3_temporal_plain_year_month_year_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_year_getter_builtin())?,
+        public_builtin_metadata(
+            lyng_js_types::js3_temporal_plain_year_month_year_getter_builtin(),
+        )?,
         None,
     );
     let plain_year_month_month_getter = allocate_builtin_function_object(
@@ -2191,7 +2205,9 @@ pub(super) fn install_temporal_public_objects(
         function_prototype,
         object_prototype,
         lyng_js_types::js3_temporal_zoned_date_time_month_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_month_getter_builtin())?,
+        public_builtin_metadata(
+            lyng_js_types::js3_temporal_zoned_date_time_month_getter_builtin(),
+        )?,
         None,
     );
     let zoned_date_time_month_code_getter = allocate_builtin_function_object(
@@ -2661,7 +2677,9 @@ pub(super) fn install_temporal_public_objects(
         function_prototype,
         object_prototype,
         lyng_js_types::js3_temporal_zoned_date_time_start_of_day_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_start_of_day_builtin())?,
+        public_builtin_metadata(
+            lyng_js_types::js3_temporal_zoned_date_time_start_of_day_builtin(),
+        )?,
         None,
     );
     let zoned_date_time_hours_in_day_getter = allocate_builtin_function_object(

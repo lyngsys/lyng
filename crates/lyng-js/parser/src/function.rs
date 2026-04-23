@@ -179,8 +179,8 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         check_yield: bool,
     ) {
         match self.ast().get_pattern(pattern_id).clone() {
-            lyng_js_ast::Pattern::Identifier { .. } | lyng_js_ast::Pattern::InvalidPattern { .. } => {
-            }
+            lyng_js_ast::Pattern::Identifier { .. }
+            | lyng_js_ast::Pattern::InvalidPattern { .. } => {}
             lyng_js_ast::Pattern::Object {
                 properties, rest, ..
             } => {

@@ -5074,7 +5074,8 @@ impl BuiltinCache {
                 function_prototype,
                 object_prototype,
                 lyng_js_types::js3_reflect_is_extensible_builtin(),
-                public_builtin_metadata(lyng_js_types::js3_reflect_is_extensible_builtin()).unwrap(),
+                public_builtin_metadata(lyng_js_types::js3_reflect_is_extensible_builtin())
+                    .unwrap(),
                 None,
             ),
             reflect_own_keys: allocate_builtin_function_object(
@@ -5334,7 +5335,8 @@ impl BuiltinCache {
                 function_prototype,
                 object_prototype,
                 lyng_js_types::js3_disposable_stack_move_builtin(),
-                public_builtin_metadata(lyng_js_types::js3_disposable_stack_move_builtin()).unwrap(),
+                public_builtin_metadata(lyng_js_types::js3_disposable_stack_move_builtin())
+                    .unwrap(),
                 None,
             ),
             disposable_stack_disposed_getter: allocate_builtin_function_object(
@@ -9135,7 +9137,9 @@ impl BuiltinCache {
         let reflect_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(apply_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::js3_reflect_apply_builtin()),
+                BuiltinPropertyValueSpec::BuiltinFunction(
+                    lyng_js_types::js3_reflect_apply_builtin(),
+                ),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(

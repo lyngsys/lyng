@@ -794,7 +794,10 @@ fn compile_script_uses_direct_env_slot_updates_for_sibling_lexical_for_loops() {
         .iter()
         .map(|binding| binding.name())
         .collect::<Vec<_>>();
-    assert_eq!(env_binding_names, vec![Some(atoms.intern("i")), Some(atoms.intern("i"))]);
+    assert_eq!(
+        env_binding_names,
+        vec![Some(atoms.intern("i")), Some(atoms.intern("i"))]
+    );
 
     assert!(!entry.instructions().iter().any(|instruction| matches!(
         instruction,

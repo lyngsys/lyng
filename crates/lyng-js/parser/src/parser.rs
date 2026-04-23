@@ -650,7 +650,9 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             lyng_js_ast::Expr::StaticMemberExpression { .. }
             | lyng_js_ast::Expr::ComputedMemberExpression { .. }
             | lyng_js_ast::Expr::PrivateMemberExpression { .. } => true,
-            lyng_js_ast::Expr::CallExpression { .. } => self.allows_annex_b_call_assignment_target(),
+            lyng_js_ast::Expr::CallExpression { .. } => {
+                self.allows_annex_b_call_assignment_target()
+            }
             lyng_js_ast::Expr::ParenthesizedExpression { expression, .. } => {
                 self.is_simple_assignment_target(*expression)
             }
@@ -695,7 +697,9 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             | lyng_js_ast::Expr::PrivateMemberExpression { .. }
             | lyng_js_ast::Expr::ObjectExpression { .. }
             | lyng_js_ast::Expr::ArrayExpression { .. } => true,
-            lyng_js_ast::Expr::CallExpression { .. } => self.allows_annex_b_call_assignment_target(),
+            lyng_js_ast::Expr::CallExpression { .. } => {
+                self.allows_annex_b_call_assignment_target()
+            }
             lyng_js_ast::Expr::ParenthesizedExpression { expression, .. } => {
                 self.is_valid_assignment_lhs(*expression)
             }
