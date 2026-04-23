@@ -7,7 +7,7 @@ This file is the repo-level operating guide for coding agents working in `lyng`.
 `lyng` is a Rust workspace with two active implementation tracks:
 
 - A WHATWG-style HTML parser in `crates/html_parser`, backed by an arena DOM in `crates/dom`
-- A JS3 JavaScript engine in `crates/lyng-js/*`, which is the active JavaScript implementation and is now in Phase 6 ECMA-262 completion work after closing the Phase 4.5 quality/readiness gate
+- The `lyng-js` JavaScript engine in `crates/lyng-js/*`, which is the active JavaScript implementation and remains under active ECMA-262 completion and conformance work
 
 The root workspace members are defined in `Cargo.toml`. Several other directories exist as placeholders (`crates/css`, `crates/gfx`, `crates/layout`, `crates/net`, `crates/platform`, `components/webview`) but are not active workspace crates today.
 
@@ -35,9 +35,9 @@ If you are changing a specific subsystem, read the crate-local sources and tests
 - `tools/html5lib_runner`: runs html5lib suites and writes reports under `reports/html/`
 - `testdata/html5lib`: upstream-style fixture corpus for tokenizer, tree construction, serializer, and encoding
 
-### JS3 stack
+### Lyng JS stack
 
-- `crates/lyng-js/common`: shared JS3 value/string/source-location types and interning
+- `crates/lyng-js/common`: shared Lyng JS value/string/source-location types and interning
 - `crates/lyng-js/lexer`: hand-written lexer
 - `crates/lyng-js/parser`: parser and parse errors
 - `crates/lyng-js/ast`: arena-backed AST nodes
@@ -53,10 +53,10 @@ If you are changing a specific subsystem, read the crate-local sources and tests
 - `crates/lyng-js/vm`: bytecode interpreter
 - `crates/lyng-js/builtins`: builtin bootstrap, constructors, prototypes, and globals
 - `crates/lyng-js/cli`: CLI entrypoint for parse/compile/evaluate flows
-- `crates/lyng-js/tests`: JS3 integration, conformance, and regression coverage
-- `tools/lyng-js-bench`: unified JS3 benchmark, memory-report, and bytecode-density runner
+- `crates/lyng-js/tests`: Lyng JS integration, conformance, and regression coverage
+- `tools/lyng-js-bench`: unified Lyng JS benchmark, memory-report, and bytecode-density runner
 - `tools/lyng-js-test262`: external whole-corpus Test262 embedding and report entrypoint with path-based filtering
-- `testdata/test262`: Test262 checkout used by the JS3 harnesses
+- `testdata/test262`: Test262 checkout used by the Lyng JS harnesses
 
 ## Repo Priorities
 
@@ -69,15 +69,14 @@ Follow these project-specific constraints when making changes:
 - Preserve crate boundaries. Shared types belong in `common` or `dom`; avoid creating sideways dependencies between higher-level crates.
 - Do not treat placeholder directories as implemented subsystems unless the user explicitly asks to expand them.
 
-## JS3 Phase 6 Priorities
+## Lyng JS Priorities
 
-- Phase 6 ECMA-262 completion is the active JS3 stage. Treat work as progress through the named Phase 6 sub-milestones and their fixed order, not as an undifferentiated backlog.
-- Phase 4.5 is historical context only; do not describe it as the active stage.
+- Lyng JS remains focused on ECMA-262 completion and conformance work. Treat the remaining work as a prioritized backlog, not as phase-based milestones.
 - Aim for a gold-standard implementation bar. Do not treat code quality or readability as secondary to feature completion.
 - Prioritize code quality, readability, performance, memory behavior, cleanup, auditability, and verification clarity while broadening the remaining ECMA-262 surface.
-- Keep docs, tooling, reports, and issue tracking aligned with the live JS3 docs and the checked-in report/report-manifest flow under `reports/js/lyng-js/`.
-- Do not blur Phase 6 core-completion work with ECMA-402 Intl or Phase 7 extension work unless the user explicitly asks for that scope.
-- The old JavaScript engine has been removed. Treat JS3 as the only in-repo JavaScript engine and keep docs, tooling, and verification aligned with that cutover.
+- Keep docs, tooling, reports, and issue tracking aligned with the live Lyng JS docs and the checked-in report/report-manifest flow under `reports/js/lyng-js/`.
+- Do not blur core ECMA-262 completion work with ECMA-402 Intl or other extension work unless the user explicitly asks for that scope.
+- The old JavaScript engine has been removed. Treat Lyng JS as the only in-repo JavaScript engine and keep docs, tooling, and verification aligned with that cutover.
 
 ## Editing Expectations
 
@@ -133,7 +132,7 @@ Notes:
 - The html5lib runner writes a Markdown report under `reports/html/` by default.
 - `encoding_rs` support in `crates/html_parser` is behind the `encoding` feature; `--all-features` is the safest full validation path.
 
-### JS3 engine
+### Lyng JS engine
 
 - `cargo test -p lyng-js-parser`
 - `cargo test -p lyng-js-compiler`
@@ -146,7 +145,7 @@ Notes:
 
 Notes:
 
-- JS3 is the only JavaScript implementation track in this repo.
+- Lyng JS is the only JavaScript implementation track in this repo.
 - Prefer targeted `lyng-js-*` crate tests first, then the relevant `lyng-js-test262 --filter ...` slice or whole-corpus report flow when semantics or performance-sensitive VM/compiler behavior changes.
 - Use `lyng-js-bench density` for bytecode-density/encoding validation.
 
@@ -157,7 +156,7 @@ Pick the narrowest useful verification for the area you touch:
 - DOM or tree-construction change: run at least the relevant `tree_tests` or html5lib tree filter
 - Tokenizer change: run `tokenizer_tests` and any affected serializer/tree coverage
 - HTML encoding change: run `encoding_tests` with `--all-features`
-- JS3 parser/compiler/vm change: run the nearest `lyng-js-*` crate tests plus the relevant `lyng-js-test262 --filter ...` slice or whole-corpus report flow if behavior changes; add `lyng-js-bench runtime` for hot-path or memory-sensitive work and `lyng-js-bench density` when bytecode density/encoding changes
+- Lyng JS parser/compiler/vm change: run the nearest `lyng-js-*` crate tests plus the relevant `lyng-js-test262 --filter ...` slice or whole-corpus report flow if behavior changes; add `lyng-js-bench runtime` for hot-path or memory-sensitive work and `lyng-js-bench density` when bytecode density/encoding changes
 - CLI-only change: run the binary directly with a representative script
 
 If you do not run verification, say so clearly in your handoff.
@@ -193,7 +192,7 @@ Useful files when tracing behavior:
 - Do not hand-edit generated reports as if they were source.
 - Do not run the full compatibility suites by default when a targeted slice is enough.
 - Do not change parser or VM control flow without reading the corresponding tests and docs first.
-- Do not reintroduce legacy-JS assumptions into docs, tooling, or verification; JS3 is the repository JavaScript engine.
+- Do not reintroduce legacy-JS assumptions into docs, tooling, or verification; Lyng JS is the repository JavaScript engine.
 
 # Agent Instructions
 
