@@ -4,6 +4,35 @@ use std::path::{Component, Path, PathBuf};
 use crate::helpers::HelperCatalog;
 use crate::metadata::{is_module_test, TestMetadata};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ProposalStage {
+    Stage4,
+    Stage3,
+    Stage2_7,
+}
+
+impl ProposalStage {
+    pub(crate) const fn label(self) -> &'static str {
+        match self {
+            Self::Stage4 => "Stage 4",
+            Self::Stage3 => "Stage 3+",
+            Self::Stage2_7 => "Stage 2.7+",
+        }
+    }
+
+    const fn rank(self) -> u8 {
+        match self {
+            Self::Stage4 => 40,
+            Self::Stage3 => 30,
+            Self::Stage2_7 => 27,
+        }
+    }
+
+    const fn includes(self, feature_stage: Self) -> bool {
+        feature_stage.rank() >= self.rank()
+    }
+}
+
 const UNSUPPORTED_FEATURES: &[&str] = &[
     "decorators",
     "Error.isError",
@@ -26,7 +55,30 @@ const UNSUPPORTED_FEATURES: &[&str] = &[
     "symbols-as-weakmap-keys",
 ];
 
-const EXCLUDED_FEATURES: &[&str] = &["Error.isError"];
+const PROPOSAL_FEATURE_STAGES: &[(&str, ProposalStage)] = &[
+    ("Temporal", ProposalStage::Stage4),
+    ("regexp-duplicate-named-groups", ProposalStage::Stage4),
+    ("legacy-regexp", ProposalStage::Stage3),
+    ("decorators", ProposalStage::Stage3),
+    ("explicit-resource-management", ProposalStage::Stage3),
+    ("source-phase-imports", ProposalStage::Stage3),
+    ("source-phase-imports-module-source", ProposalStage::Stage3),
+    ("Atomics.pause", ProposalStage::Stage3),
+    ("import-defer", ProposalStage::Stage3),
+    ("import-text", ProposalStage::Stage3),
+    ("nonextensible-applies-to-private", ProposalStage::Stage3),
+    ("joint-iteration", ProposalStage::Stage3),
+    ("ShadowRealm", ProposalStage::Stage2_7),
+    ("immutable-arraybuffer", ProposalStage::Stage2_7),
+    ("import-bytes", ProposalStage::Stage2_7),
+    ("await-dictionary", ProposalStage::Stage2_7),
+];
+
+fn proposal_feature_stage(feature: &str) -> Option<ProposalStage> {
+    PROPOSAL_FEATURE_STAGES
+        .iter()
+        .find_map(|(candidate, stage)| (*candidate == feature).then_some(*stage))
+}
 
 const FEATURE_REASON_ALIASES: &[(&str, &str)] = &[
     (
@@ -364,12 +416,13 @@ pub(crate) fn skip_decision(
     metadata: &TestMetadata,
     helpers: &HelperCatalog,
     no_skip: bool,
+    proposal_stage: ProposalStage,
 ) -> Option<SkipDecision> {
-    if !no_skip && should_exclude_from_selection(metadata) {
-        return Some(SkipDecision::ExcludedFromSelection);
-    }
     if no_skip {
         return None;
+    }
+    if should_exclude_from_selection(metadata, proposal_stage) {
+        return Some(SkipDecision::ExcludedFromSelection);
     }
 
     skip_reason(path, test_dir, manifest, metadata, helpers).map(SkipDecision::Skip)
@@ -492,11 +545,12 @@ fn should_skip_metadata(metadata: &TestMetadata, helpers: &HelperCatalog) -> Opt
     None
 }
 
-fn should_exclude_from_selection(metadata: &TestMetadata) -> bool {
+fn should_exclude_from_selection(metadata: &TestMetadata, proposal_stage: ProposalStage) -> bool {
     metadata
         .features
         .iter()
-        .any(|feature| EXCLUDED_FEATURES.iter().any(|excluded| feature == excluded))
+        .filter_map(|feature| proposal_feature_stage(feature))
+        .any(|feature_stage| !proposal_stage.includes(feature_stage))
 }
 
 fn should_skip_path(path: &Path) -> Option<String> {
@@ -590,7 +644,7 @@ mod tests {
 
     use super::{
         category_for_test, disabled_manifest, manifest_matches_pattern, parse_manifest_line,
-        skip_decision, ExclusionKind, ExclusionRule, SkipDecision,
+        skip_decision, ExclusionKind, ExclusionRule, ProposalStage, SkipDecision,
     };
 
     fn workspace_root() -> PathBuf {
@@ -638,7 +692,7 @@ mod tests {
     }
 
     #[test]
-    fn skip_decision_excludes_error_is_error_tests_before_skip_reasons() {
+    fn skip_decision_does_not_exclude_stage_4_error_is_error_tests() {
         let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
         let metadata = parse_metadata(
             r"
@@ -655,9 +709,15 @@ mod tests {
             &metadata,
             &helpers,
             false,
+            ProposalStage::Stage3,
         );
 
-        assert_eq!(decision, Some(SkipDecision::ExcludedFromSelection));
+        assert_eq!(
+            decision,
+            Some(SkipDecision::Skip(
+                "unsupported feature: Error.isError".to_string()
+            ))
+        );
     }
 
     #[test]
@@ -678,6 +738,7 @@ mod tests {
             &metadata,
             &helpers,
             false,
+            ProposalStage::Stage3,
         );
 
         assert_eq!(
@@ -714,6 +775,7 @@ mod tests {
                 &metadata,
                 &helpers,
                 false,
+                ProposalStage::Stage3,
             );
 
             assert_eq!(
@@ -743,6 +805,114 @@ mod tests {
             &metadata,
             &helpers,
             false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_excludes_stage_2_7_proposals_by_default() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [ShadowRealm]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test.js"),
+            Path::new("/tmp"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, Some(SkipDecision::ExcludedFromSelection));
+    }
+
+    #[test]
+    fn skip_decision_includes_stage_2_7_proposals_when_opted_in() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [ShadowRealm]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test.js"),
+            Path::new("/tmp"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage2_7,
+        );
+
+        assert_eq!(
+            decision,
+            Some(SkipDecision::Skip(
+                "unsupported feature: ShadowRealm".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn skip_decision_stage_4_policy_excludes_stage_3_and_stage_2_7_proposals() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        for feature in ["source-phase-imports", "ShadowRealm"] {
+            let metadata = parse_metadata(&format!(
+                r"
+                /*---
+                features: [{feature}]
+                ---*/
+                "
+            ));
+
+            let decision = skip_decision(
+                Path::new("/tmp/test.js"),
+                Path::new("/tmp"),
+                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &metadata,
+                &helpers,
+                false,
+                ProposalStage::Stage4,
+            );
+
+            assert_eq!(
+                decision,
+                Some(SkipDecision::ExcludedFromSelection),
+                "feature `{feature}` should be excluded by strict Stage 4 policy"
+            );
+        }
+    }
+
+    #[test]
+    fn skip_decision_no_skip_bypasses_proposal_stage_exclusions() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [ShadowRealm]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test.js"),
+            Path::new("/tmp"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            true,
+            ProposalStage::Stage4,
         );
 
         assert_eq!(decision, None);

@@ -1,3 +1,5 @@
+use crate::selection::ProposalStage;
+
 use std::env;
 
 pub(crate) const DEFAULT_REPORT_PATH: &str = "reports/js/lyng-js/test262.md";
@@ -14,6 +16,7 @@ pub(crate) struct RunnerConfig {
     pub(crate) list_failures: bool,
     pub(crate) jobs: usize,
     pub(crate) timeout_ms: u64,
+    pub(crate) proposal_stage: ProposalStage,
     pub(crate) worker: bool,
 }
 
@@ -29,6 +32,7 @@ pub(crate) fn parse_args_from(args: &[String]) -> RunnerConfig {
     let mut no_skip = false;
     let mut list_failures = false;
     let mut timeout_ms = DEFAULT_TIMEOUT_MS;
+    let mut proposal_stage = ProposalStage::Stage3;
     let mut worker = false;
     let mut jobs = std::thread::available_parallelism()
         .map(std::num::NonZeroUsize::get)
@@ -67,6 +71,19 @@ pub(crate) fn parse_args_from(args: &[String]) -> RunnerConfig {
                     .and_then(|value| value.parse().ok())
                     .unwrap_or(DEFAULT_TIMEOUT_MS)
                     .max(1);
+            }
+            "--proposal-stage" => {
+                index += 1;
+                let Some(value) = args.get(index) else {
+                    eprintln!("Missing value for --proposal-stage");
+                    print_help();
+                    std::process::exit(1);
+                };
+                proposal_stage = parse_proposal_stage_arg(value).unwrap_or_else(|| {
+                    eprintln!("Invalid proposal stage: {value}");
+                    print_help();
+                    std::process::exit(1);
+                });
             }
             "--jobs" | "-j" => {
                 index += 1;
@@ -110,20 +127,33 @@ pub(crate) fn parse_args_from(args: &[String]) -> RunnerConfig {
         list_failures,
         jobs,
         timeout_ms,
+        proposal_stage,
         worker,
+    }
+}
+
+pub(crate) fn parse_proposal_stage_arg(value: &str) -> Option<ProposalStage> {
+    match value {
+        "4" => Some(ProposalStage::Stage4),
+        "3" => Some(ProposalStage::Stage3),
+        "2.7" => Some(ProposalStage::Stage2_7),
+        _ => None,
     }
 }
 
 pub(crate) fn print_help() {
     eprintln!(
-        "Usage: lyng-js-test262 [--filter <path-or-fragment>] [--report <path>] [--manifest <path>] [--no-skip] [--list-failures] [--timeout-ms <N>] [-j <N>]"
+        "Usage: lyng-js-test262 [--filter <path-or-fragment>] [--report <path>] [--manifest <path>] [--proposal-stage <4|3|2.7>] [--no-skip] [--list-failures] [--timeout-ms <N>] [-j <N>]"
     );
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::selection::ProposalStage;
+
     use super::{
-        parse_args_from, RunnerConfig, DEFAULT_MANIFEST_PATH, DEFAULT_TIMEOUT_MS, WORKER_FLAG,
+        parse_args_from, parse_proposal_stage_arg, RunnerConfig, DEFAULT_MANIFEST_PATH,
+        DEFAULT_TIMEOUT_MS, WORKER_FLAG,
     };
 
     #[test]
@@ -139,6 +169,8 @@ mod tests {
             "--list-failures".to_string(),
             "--timeout-ms".to_string(),
             "250".to_string(),
+            "--proposal-stage".to_string(),
+            "2.7".to_string(),
             "-j8".to_string(),
         ]);
 
@@ -152,6 +184,7 @@ mod tests {
                 list_failures: true,
                 jobs: 8,
                 timeout_ms: 250,
+                proposal_stage: ProposalStage::Stage2_7,
                 worker: false,
             }
         );
@@ -163,6 +196,29 @@ mod tests {
 
         assert!(options.worker);
         assert_eq!(options.timeout_ms, DEFAULT_TIMEOUT_MS);
+    }
+
+    #[test]
+    fn parse_args_defaults_to_stage_3_proposal_policy() {
+        let options = parse_args_from(&[]);
+
+        assert_eq!(options.proposal_stage, ProposalStage::Stage3);
+    }
+
+    #[test]
+    fn parse_proposal_stage_arg_accepts_supported_policy_values() {
+        assert_eq!(parse_proposal_stage_arg("4"), Some(ProposalStage::Stage4));
+        assert_eq!(parse_proposal_stage_arg("3"), Some(ProposalStage::Stage3));
+        assert_eq!(
+            parse_proposal_stage_arg("2.7"),
+            Some(ProposalStage::Stage2_7)
+        );
+    }
+
+    #[test]
+    fn parse_proposal_stage_arg_rejects_invalid_policy_values() {
+        assert_eq!(parse_proposal_stage_arg("2"), None);
+        assert_eq!(parse_proposal_stage_arg("stage3"), None);
     }
 
     #[test]

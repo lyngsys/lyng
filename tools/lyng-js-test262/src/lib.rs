@@ -132,6 +132,7 @@ pub fn main_entry() {
         manifest: &manifest,
         filter: options.filter.as_deref(),
         no_skip: options.no_skip,
+        proposal_stage: options.proposal_stage,
         timeout,
         candidate_total: suite.candidate_total,
         selected_total,
@@ -235,6 +236,7 @@ fn prepare_suite(
             &metadata,
             helpers,
             options.no_skip,
+            options.proposal_stage,
         ) {
             Some(SkipDecision::ExcludedFromSelection) => continue,
             Some(SkipDecision::Skip(reason)) => {

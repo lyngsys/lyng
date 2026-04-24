@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::selection::ExclusionManifest;
+use crate::selection::{ExclusionManifest, ProposalStage};
 
 pub(crate) const DEFAULT_FAILURE_LIMIT: usize = 200;
 
@@ -44,6 +44,7 @@ pub(crate) struct SuiteReport<'a> {
     pub(crate) manifest: &'a ExclusionManifest,
     pub(crate) filter: Option<&'a str>,
     pub(crate) no_skip: bool,
+    pub(crate) proposal_stage: ProposalStage,
     pub(crate) timeout: Duration,
     pub(crate) candidate_total: usize,
     pub(crate) selected_total: usize,
@@ -173,6 +174,7 @@ fn write_run_section(out: &mut String, report: &SuiteReport<'_>) {
         "- Per-test timeout: `{:.1}s`",
         report.timeout.as_secs_f64()
     );
+    let _ = writeln!(out, "- Proposal stage: `{}`", report.proposal_stage.label());
     let _ = writeln!(out, "- Exclusion manifest: `{}`", report.manifest.path);
     let _ = writeln!(
         out,
@@ -304,7 +306,7 @@ fn write_notes_section(out: &mut String, report: &SuiteReport<'_>) {
     if report.no_skip {
         let _ = writeln!(
             out,
-            "- `--no-skip` was enabled for this run, so manifest exclusions, explicit path skips, and metadata/capability skips were all bypassed."
+            "- `--no-skip` was enabled for this run, so manifest exclusions, explicit path skips, proposal-stage exclusions, and metadata/capability skips were all bypassed."
         );
     } else {
         let _ = writeln!(
@@ -314,7 +316,7 @@ fn write_notes_section(out: &mut String, report: &SuiteReport<'_>) {
     }
     let _ = writeln!(
         out,
-        "- Tests carrying `Error.isError` remain excluded from selection because they are outside the core ECMA-262 runner surface tracked by this tool."
+        "- Stage 4 implementation gaps remain visible as skips or failures; proposal-stage policy only excludes tests below the configured proposal maturity."
     );
 }
 
@@ -324,7 +326,7 @@ mod tests {
     use std::fs;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-    use crate::selection::ExclusionManifest;
+    use crate::selection::{ExclusionManifest, ProposalStage};
 
     use super::{format_pass_rate, write_report, CategoryStats, SuiteReport};
 
@@ -380,6 +382,7 @@ mod tests {
             manifest: &manifest,
             filter: None,
             no_skip: false,
+            proposal_stage: ProposalStage::Stage3,
             timeout: Duration::from_secs(1),
             candidate_total: 2,
             selected_total: 2,
@@ -397,5 +400,8 @@ mod tests {
         assert!(output.contains("| Failed | `0` |"));
         assert!(output.contains("| Skipped | `1` |"));
         assert!(output.contains("| Pass rate (selected) | `50.00%` |"));
+        assert!(output.contains("- Proposal stage: `Stage 3+`"));
+        assert!(output.contains("Stage 4 implementation gaps remain visible"));
+        assert!(!output.contains("Tests carrying `Error.isError` remain excluded"));
     }
 }
