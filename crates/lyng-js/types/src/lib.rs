@@ -516,6 +516,24 @@ const JS3_REGEXP_SYMBOL_SPLIT_RAW: u32 = 2_247;
 const JS3_REGEXP_SYMBOL_MATCH_ALL_RAW: u32 = 2_248;
 const JS3_STRING_MATCH_ALL_RAW: u32 = 2_249;
 const JS3_ARRAY_LAST_INDEX_OF_RAW: u32 = 2_250;
+const JS3_ARRAY_EVERY_RAW: u32 = 2_251;
+const JS3_ARRAY_SOME_RAW: u32 = 2_252;
+const JS3_ARRAY_INCLUDES_RAW: u32 = 2_253;
+const JS3_ARRAY_INDEX_OF_RAW: u32 = 2_254;
+const JS3_ARRAY_REDUCE_RAW: u32 = 2_255;
+const JS3_ARRAY_REDUCE_RIGHT_RAW: u32 = 2_256;
+const JS3_ARRAY_FIND_RAW: u32 = 2_257;
+const JS3_ARRAY_FIND_INDEX_RAW: u32 = 2_258;
+const JS3_ARRAY_FIND_LAST_RAW: u32 = 2_259;
+const JS3_ARRAY_FIND_LAST_INDEX_RAW: u32 = 2_260;
+const JS3_ARRAY_TO_REVERSED_RAW: u32 = 2_261;
+const JS3_ARRAY_TO_SORTED_RAW: u32 = 2_262;
+const JS3_ARRAY_TO_SPLICED_RAW: u32 = 2_263;
+const JS3_ARRAY_WITH_RAW: u32 = 2_264;
+const JS3_ARRAY_AT_RAW: u32 = 2_265;
+const JS3_ARRAY_OF_RAW: u32 = 2_266;
+const JS3_ARRAY_FLAT_RAW: u32 = 2_267;
+const JS3_ARRAY_FLAT_MAP_RAW: u32 = 2_268;
 const JS3_PROMISE_RAW: u32 = 3_101;
 const JS3_PROMISE_THEN_RAW: u32 = 3_102;
 const JS3_PROMISE_CATCH_RAW: u32 = 3_103;
@@ -953,7 +971,7 @@ pub const JS3_INTERNAL_BUILTIN_NAMESPACE_END: u32 = JS3_INTERNAL_DIRECT_EVAL_RAW
 pub const JS3_CORE_BUILTIN_NAMESPACE_START: u32 = JS3_BOOLEAN_RAW;
 
 /// Last reserved builtin-entry payload for the public core builtin namespace.
-pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_ARRAY_LAST_INDEX_OF_RAW;
+pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_ARRAY_FLAT_MAP_RAW;
 
 /// First reserved builtin-entry payload for the public completion builtin namespace.
 pub const JS3_COMPLETION_BUILTIN_NAMESPACE_START: u32 = JS3_PROMISE_RAW;
@@ -3170,6 +3188,150 @@ pub fn js3_array_slice_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn js3_array_last_index_of_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_ARRAY_LAST_INDEX_OF_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_every_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_EVERY_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_some_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_SOME_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_includes_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_INCLUDES_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_index_of_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_INDEX_OF_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_reduce_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_REDUCE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_reduce_right_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_REDUCE_RIGHT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_find_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_FIND_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_find_index_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_FIND_INDEX_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_find_last_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_FIND_LAST_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_find_last_index_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_FIND_LAST_INDEX_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_to_reversed_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_TO_REVERSED_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_to_sorted_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_TO_SORTED_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_to_spliced_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_TO_SPLICED_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_with_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_WITH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_at_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_AT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_of_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_OF_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_flat_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_FLAT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_flat_map_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_FLAT_MAP_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }
@@ -6845,7 +7007,7 @@ mod tests {
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_END, 1_036);
         assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_START, 2_001);
-        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_250);
+        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_268);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_START, 3_101);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_END, 3_500);
     }

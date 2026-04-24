@@ -15,17 +15,23 @@ use lyng_js_objects::{
     ObjectColdData, PrimitiveWrapperKind,
 };
 use lyng_js_types::{
-    js3_aggregate_error_builtin, js3_array_buffer_builtin,
+    js3_aggregate_error_builtin, js3_array_at_builtin, js3_array_buffer_builtin,
     js3_array_buffer_byte_length_getter_builtin, js3_array_buffer_is_view_builtin,
     js3_array_buffer_slice_builtin, js3_array_builtin, js3_array_concat_builtin,
-    js3_array_copy_within_builtin, js3_array_entries_builtin, js3_array_fill_builtin,
-    js3_array_filter_builtin, js3_array_for_each_builtin, js3_array_from_builtin,
+    js3_array_copy_within_builtin, js3_array_entries_builtin, js3_array_every_builtin,
+    js3_array_fill_builtin, js3_array_filter_builtin, js3_array_find_builtin,
+    js3_array_find_index_builtin, js3_array_find_last_builtin, js3_array_find_last_index_builtin,
+    js3_array_flat_builtin, js3_array_flat_map_builtin, js3_array_for_each_builtin,
+    js3_array_from_builtin, js3_array_includes_builtin, js3_array_index_of_builtin,
     js3_array_is_array_builtin, js3_array_iterator_next_builtin, js3_array_join_builtin,
     js3_array_keys_builtin, js3_array_last_index_of_builtin, js3_array_map_builtin,
+    js3_array_of_builtin, js3_array_reduce_builtin, js3_array_reduce_right_builtin,
     js3_array_reverse_builtin, js3_array_shift_builtin, js3_array_slice_builtin,
-    js3_array_sort_builtin, js3_array_species_getter_builtin, js3_array_splice_builtin,
-    js3_array_to_locale_string_builtin, js3_array_to_string_builtin, js3_array_unshift_builtin,
-    js3_array_values_builtin, js3_async_function_builtin, js3_async_generator_function_builtin,
+    js3_array_some_builtin, js3_array_sort_builtin, js3_array_species_getter_builtin,
+    js3_array_splice_builtin, js3_array_to_locale_string_builtin, js3_array_to_reversed_builtin,
+    js3_array_to_sorted_builtin, js3_array_to_spliced_builtin, js3_array_to_string_builtin,
+    js3_array_unshift_builtin, js3_array_values_builtin, js3_array_with_builtin,
+    js3_async_function_builtin, js3_async_generator_function_builtin,
     js3_async_generator_next_builtin, js3_async_generator_return_builtin,
     js3_async_generator_throw_builtin, js3_atomics_add_builtin, js3_atomics_and_builtin,
     js3_atomics_compare_exchange_builtin, js3_atomics_exchange_builtin,
@@ -245,6 +251,8 @@ pub struct PublicRealmBuiltins {
     async_iterator_prototype: ObjectRef,
     array: ObjectRef,
     array_from: ObjectRef,
+    array_of: ObjectRef,
+    array_unscopables: ObjectRef,
     map: ObjectRef,
     set: ObjectRef,
     weak_map: ObjectRef,
@@ -271,25 +279,42 @@ pub struct PublicRealmBuiltins {
     uint8_clamped_array: ObjectRef,
     uint8_array: ObjectRef,
     array_is_array: ObjectRef,
+    array_at: ObjectRef,
     array_concat: ObjectRef,
     array_copy_within: ObjectRef,
     array_fill: ObjectRef,
+    array_flat: ObjectRef,
+    array_flat_map: ObjectRef,
     array_join: ObjectRef,
     array_shift: ObjectRef,
     array_unshift: ObjectRef,
+    array_every: ObjectRef,
     array_filter: ObjectRef,
+    array_find: ObjectRef,
+    array_find_index: ObjectRef,
+    array_find_last: ObjectRef,
+    array_find_last_index: ObjectRef,
     array_for_each: ObjectRef,
+    array_includes: ObjectRef,
+    array_index_of: ObjectRef,
     array_map: ObjectRef,
+    array_reduce: ObjectRef,
+    array_reduce_right: ObjectRef,
     array_reverse: ObjectRef,
     array_slice: ObjectRef,
+    array_some: ObjectRef,
     array_last_index_of: ObjectRef,
     array_sort: ObjectRef,
     array_splice: ObjectRef,
+    array_to_reversed: ObjectRef,
+    array_to_sorted: ObjectRef,
+    array_to_spliced: ObjectRef,
     array_to_string: ObjectRef,
     array_to_locale_string: ObjectRef,
     array_values: ObjectRef,
     array_keys: ObjectRef,
     array_entries: ObjectRef,
+    array_with: ObjectRef,
     map_get: ObjectRef,
     map_set: ObjectRef,
     map_has: ObjectRef,
@@ -997,6 +1022,9 @@ impl PublicRealmBuiltins {
         if entry == js3_array_is_array_builtin() {
             return Some(self.array_is_array);
         }
+        if entry == js3_array_at_builtin() {
+            return Some(self.array_at);
+        }
         if entry == js3_array_concat_builtin() {
             return Some(self.array_concat);
         }
@@ -1005,6 +1033,12 @@ impl PublicRealmBuiltins {
         }
         if entry == js3_array_fill_builtin() {
             return Some(self.array_fill);
+        }
+        if entry == js3_array_flat_builtin() {
+            return Some(self.array_flat);
+        }
+        if entry == js3_array_flat_map_builtin() {
+            return Some(self.array_flat_map);
         }
         if entry == js3_array_join_builtin() {
             return Some(self.array_join);
@@ -1015,20 +1049,50 @@ impl PublicRealmBuiltins {
         if entry == js3_array_unshift_builtin() {
             return Some(self.array_unshift);
         }
+        if entry == js3_array_every_builtin() {
+            return Some(self.array_every);
+        }
         if entry == js3_array_filter_builtin() {
             return Some(self.array_filter);
+        }
+        if entry == js3_array_find_builtin() {
+            return Some(self.array_find);
+        }
+        if entry == js3_array_find_index_builtin() {
+            return Some(self.array_find_index);
+        }
+        if entry == js3_array_find_last_builtin() {
+            return Some(self.array_find_last);
+        }
+        if entry == js3_array_find_last_index_builtin() {
+            return Some(self.array_find_last_index);
         }
         if entry == js3_array_for_each_builtin() {
             return Some(self.array_for_each);
         }
+        if entry == js3_array_includes_builtin() {
+            return Some(self.array_includes);
+        }
+        if entry == js3_array_index_of_builtin() {
+            return Some(self.array_index_of);
+        }
         if entry == js3_array_map_builtin() {
             return Some(self.array_map);
+        }
+        if entry == js3_array_reduce_builtin() {
+            return Some(self.array_reduce);
+        }
+        if entry == js3_array_reduce_right_builtin() {
+            return Some(self.array_reduce_right);
         }
         if entry == js3_array_reverse_builtin() {
             return Some(self.array_reverse);
         }
         if entry == js3_array_slice_builtin() {
             return Some(self.array_slice);
+        }
+        if entry == js3_array_some_builtin() {
+            return Some(self.array_some);
         }
         if entry == js3_array_last_index_of_builtin() {
             return Some(self.array_last_index_of);
@@ -1038,6 +1102,15 @@ impl PublicRealmBuiltins {
         }
         if entry == js3_array_splice_builtin() {
             return Some(self.array_splice);
+        }
+        if entry == js3_array_to_reversed_builtin() {
+            return Some(self.array_to_reversed);
+        }
+        if entry == js3_array_to_sorted_builtin() {
+            return Some(self.array_to_sorted);
+        }
+        if entry == js3_array_to_spliced_builtin() {
+            return Some(self.array_to_spliced);
         }
         if entry == js3_array_to_string_builtin() {
             return Some(self.array_to_string);
@@ -1053,6 +1126,12 @@ impl PublicRealmBuiltins {
         }
         if entry == js3_array_entries_builtin() {
             return Some(self.array_entries);
+        }
+        if entry == js3_array_with_builtin() {
+            return Some(self.array_with);
+        }
+        if entry == js3_array_of_builtin() {
+            return Some(self.array_of);
         }
         if entry == js3_map_get_builtin() {
             return Some(self.map_get);
@@ -2223,6 +2302,7 @@ impl BuiltinCache {
         reparent_builtin_object(agent, symbol_prototype, Some(object_prototype));
         let array_prototype = internal.array_prototype();
         reparent_builtin_object(agent, array_prototype, Some(object_prototype));
+        let array_unscopables = allocate_builtin_ordinary_object(agent, root_shape, None);
         let map_prototype = existing_intrinsics.map_prototype().unwrap_or_else(|| {
             allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
         });
@@ -2976,6 +3056,18 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_array_from_builtin()).unwrap(),
                 None,
             ),
+            array_of: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_of_builtin(),
+                public_builtin_metadata(js3_array_of_builtin()).unwrap(),
+                None,
+            ),
+            array_unscopables,
             map: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -3252,6 +3344,17 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_array_is_array_builtin()).unwrap(),
                 None,
             ),
+            array_at: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_at_builtin(),
+                public_builtin_metadata(js3_array_at_builtin()).unwrap(),
+                None,
+            ),
             array_concat: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -3283,6 +3386,28 @@ impl BuiltinCache {
                 object_prototype,
                 js3_array_fill_builtin(),
                 public_builtin_metadata(js3_array_fill_builtin()).unwrap(),
+                None,
+            ),
+            array_flat: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_flat_builtin(),
+                public_builtin_metadata(js3_array_flat_builtin()).unwrap(),
+                None,
+            ),
+            array_flat_map: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_flat_map_builtin(),
+                public_builtin_metadata(js3_array_flat_map_builtin()).unwrap(),
                 None,
             ),
             array_join: allocate_builtin_function_object(
@@ -3318,6 +3443,17 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_array_shift_builtin()).unwrap(),
                 None,
             ),
+            array_every: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_every_builtin(),
+                public_builtin_metadata(js3_array_every_builtin()).unwrap(),
+                None,
+            ),
             array_filter: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -3327,6 +3463,50 @@ impl BuiltinCache {
                 object_prototype,
                 js3_array_filter_builtin(),
                 public_builtin_metadata(js3_array_filter_builtin()).unwrap(),
+                None,
+            ),
+            array_find: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_find_builtin(),
+                public_builtin_metadata(js3_array_find_builtin()).unwrap(),
+                None,
+            ),
+            array_find_index: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_find_index_builtin(),
+                public_builtin_metadata(js3_array_find_index_builtin()).unwrap(),
+                None,
+            ),
+            array_find_last: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_find_last_builtin(),
+                public_builtin_metadata(js3_array_find_last_builtin()).unwrap(),
+                None,
+            ),
+            array_find_last_index: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_find_last_index_builtin(),
+                public_builtin_metadata(js3_array_find_last_index_builtin()).unwrap(),
                 None,
             ),
             array_for_each: allocate_builtin_function_object(
@@ -3340,6 +3520,28 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_array_for_each_builtin()).unwrap(),
                 None,
             ),
+            array_includes: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_includes_builtin(),
+                public_builtin_metadata(js3_array_includes_builtin()).unwrap(),
+                None,
+            ),
+            array_index_of: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_index_of_builtin(),
+                public_builtin_metadata(js3_array_index_of_builtin()).unwrap(),
+                None,
+            ),
             array_map: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -3349,6 +3551,28 @@ impl BuiltinCache {
                 object_prototype,
                 js3_array_map_builtin(),
                 public_builtin_metadata(js3_array_map_builtin()).unwrap(),
+                None,
+            ),
+            array_reduce: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_reduce_builtin(),
+                public_builtin_metadata(js3_array_reduce_builtin()).unwrap(),
+                None,
+            ),
+            array_reduce_right: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_reduce_right_builtin(),
+                public_builtin_metadata(js3_array_reduce_right_builtin()).unwrap(),
                 None,
             ),
             array_reverse: allocate_builtin_function_object(
@@ -3371,6 +3595,17 @@ impl BuiltinCache {
                 object_prototype,
                 js3_array_slice_builtin(),
                 public_builtin_metadata(js3_array_slice_builtin()).unwrap(),
+                None,
+            ),
+            array_some: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_some_builtin(),
+                public_builtin_metadata(js3_array_some_builtin()).unwrap(),
                 None,
             ),
             array_last_index_of: allocate_builtin_function_object(
@@ -3404,6 +3639,39 @@ impl BuiltinCache {
                 object_prototype,
                 js3_array_splice_builtin(),
                 public_builtin_metadata(js3_array_splice_builtin()).unwrap(),
+                None,
+            ),
+            array_to_reversed: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_to_reversed_builtin(),
+                public_builtin_metadata(js3_array_to_reversed_builtin()).unwrap(),
+                None,
+            ),
+            array_to_sorted: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_to_sorted_builtin(),
+                public_builtin_metadata(js3_array_to_sorted_builtin()).unwrap(),
+                None,
+            ),
+            array_to_spliced: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_to_spliced_builtin(),
+                public_builtin_metadata(js3_array_to_spliced_builtin()).unwrap(),
                 None,
             ),
             array_to_string: allocate_builtin_function_object(
@@ -3459,6 +3727,17 @@ impl BuiltinCache {
                 object_prototype,
                 js3_array_entries_builtin(),
                 public_builtin_metadata(js3_array_entries_builtin()).unwrap(),
+                None,
+            ),
+            array_with: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_with_builtin(),
+                public_builtin_metadata(js3_array_with_builtin()).unwrap(),
                 None,
             ),
             map_get: allocate_builtin_function_object(
@@ -7873,6 +8152,8 @@ impl BuiltinCache {
         let every_atom = agent.atoms_mut().intern_collectible("every");
         let fill_atom = agent.atoms_mut().intern_collectible("fill");
         let filter_atom = agent.atoms_mut().intern_collectible("filter");
+        let flat_atom = agent.atoms_mut().intern_collectible("flat");
+        let flat_map_atom = agent.atoms_mut().intern_collectible("flatMap");
         let find_atom = agent.atoms_mut().intern_collectible("find");
         let find_index_atom = agent.atoms_mut().intern_collectible("findIndex");
         let find_last_atom = agent.atoms_mut().intern_collectible("findLast");
@@ -7922,6 +8203,7 @@ impl BuiltinCache {
         let to_locale_string_atom = agent.atoms_mut().intern_collectible("toLocaleString");
         let to_reversed_atom = agent.atoms_mut().intern_collectible("toReversed");
         let to_sorted_atom = agent.atoms_mut().intern_collectible("toSorted");
+        let to_spliced_atom = agent.atoms_mut().intern_collectible("toSpliced");
         let shift_atom = agent.atoms_mut().intern_collectible("shift");
         let unshift_atom = agent.atoms_mut().intern_collectible("unshift");
         let values_atom = agent.atoms_mut().intern_collectible("values");
@@ -8311,6 +8593,11 @@ impl BuiltinCache {
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(from_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_array_from_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(of_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_of_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -10067,6 +10354,11 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(at_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_at_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_array_to_string_builtin()),
                 BuiltinAttributes::new(true, false, true),
@@ -10107,8 +10399,43 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(every_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_every_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(filter_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_array_filter_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(flat_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_flat_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(flat_map_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_flat_map_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(find_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_find_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(find_index_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_find_index_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(find_last_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_find_last_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(find_last_index_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_find_last_index_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -10117,8 +10444,28 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(includes_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_includes_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(index_of_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_index_of_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(map_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_array_map_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(reduce_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_reduce_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(reduce_right_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_reduce_right_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -10129,6 +10476,11 @@ impl BuiltinCache {
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(slice_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_array_slice_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(some_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_some_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -10144,6 +10496,21 @@ impl BuiltinCache {
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(splice_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_array_splice_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_reversed_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_to_reversed_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_sorted_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_to_sorted_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_spliced_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_to_spliced_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -10167,6 +10534,16 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(with_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_with_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Unscopables),
+                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.array_unscopables)),
+                BuiltinAttributes::new(false, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_array_values_builtin()),
                 BuiltinAttributes::new(true, false, true),
@@ -10175,6 +10552,88 @@ impl BuiltinCache {
                 BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
                 BuiltinPropertyValueSpec::Data(array_tag),
                 BuiltinAttributes::new(false, false, true),
+            ),
+        ];
+        let array_unscopables_descriptors = [
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(at_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(copy_within_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(entries_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(fill_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(find_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(find_index_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(find_last_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(find_last_index_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(flat_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(flat_map_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(includes_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(keys_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_reversed_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_sorted_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_spliced_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(values_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
+                BuiltinAttributes::new(true, true, true),
             ),
         ];
         let iterator_prototype_descriptors = [BuiltinPropertyDescriptor::new(
@@ -12036,6 +12495,10 @@ impl BuiltinCache {
                 &array_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
+                BuiltinInstallTarget::Object(builtins.array_unscopables),
+                &array_unscopables_descriptors,
+            ),
+            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::IteratorPrototype),
                 &iterator_prototype_descriptors,
             ),
@@ -12382,6 +12845,9 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if entry == js3_array_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
     }
+    if entry == js3_array_of_builtin() {
+        return Some(BuiltinEntryMetadata::new("of", 0, false, false));
+    }
     if entry == js3_map_builtin() {
         return Some(BuiltinEntryMetadata::new("Map", 0, true, true));
     }
@@ -12544,6 +13010,9 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if entry == js3_array_is_array_builtin() {
         return Some(BuiltinEntryMetadata::new("isArray", 1, false, false));
     }
+    if entry == js3_array_at_builtin() {
+        return Some(BuiltinEntryMetadata::new("at", 1, false, false));
+    }
     if entry == js3_array_concat_builtin() {
         return Some(BuiltinEntryMetadata::new("concat", 1, false, false));
     }
@@ -12562,20 +13031,56 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if entry == js3_array_unshift_builtin() {
         return Some(BuiltinEntryMetadata::new("unshift", 1, false, false));
     }
+    if entry == js3_array_every_builtin() {
+        return Some(BuiltinEntryMetadata::new("every", 1, false, false));
+    }
     if entry == js3_array_filter_builtin() {
         return Some(BuiltinEntryMetadata::new("filter", 1, false, false));
+    }
+    if entry == js3_array_flat_builtin() {
+        return Some(BuiltinEntryMetadata::new("flat", 0, false, false));
+    }
+    if entry == js3_array_flat_map_builtin() {
+        return Some(BuiltinEntryMetadata::new("flatMap", 1, false, false));
+    }
+    if entry == js3_array_find_builtin() {
+        return Some(BuiltinEntryMetadata::new("find", 1, false, false));
+    }
+    if entry == js3_array_find_index_builtin() {
+        return Some(BuiltinEntryMetadata::new("findIndex", 1, false, false));
+    }
+    if entry == js3_array_find_last_builtin() {
+        return Some(BuiltinEntryMetadata::new("findLast", 1, false, false));
+    }
+    if entry == js3_array_find_last_index_builtin() {
+        return Some(BuiltinEntryMetadata::new("findLastIndex", 1, false, false));
     }
     if entry == js3_array_for_each_builtin() {
         return Some(BuiltinEntryMetadata::new("forEach", 1, false, false));
     }
+    if entry == js3_array_includes_builtin() {
+        return Some(BuiltinEntryMetadata::new("includes", 1, false, false));
+    }
+    if entry == js3_array_index_of_builtin() {
+        return Some(BuiltinEntryMetadata::new("indexOf", 1, false, false));
+    }
     if entry == js3_array_map_builtin() {
         return Some(BuiltinEntryMetadata::new("map", 1, false, false));
+    }
+    if entry == js3_array_reduce_builtin() {
+        return Some(BuiltinEntryMetadata::new("reduce", 1, false, false));
+    }
+    if entry == js3_array_reduce_right_builtin() {
+        return Some(BuiltinEntryMetadata::new("reduceRight", 1, false, false));
     }
     if entry == js3_array_reverse_builtin() {
         return Some(BuiltinEntryMetadata::new("reverse", 0, false, false));
     }
     if entry == js3_array_slice_builtin() {
         return Some(BuiltinEntryMetadata::new("slice", 2, false, false));
+    }
+    if entry == js3_array_some_builtin() {
+        return Some(BuiltinEntryMetadata::new("some", 1, false, false));
     }
     if entry == js3_array_last_index_of_builtin() {
         return Some(BuiltinEntryMetadata::new("lastIndexOf", 1, false, false));
@@ -12585,6 +13090,15 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     }
     if entry == js3_array_splice_builtin() {
         return Some(BuiltinEntryMetadata::new("splice", 2, false, false));
+    }
+    if entry == js3_array_to_reversed_builtin() {
+        return Some(BuiltinEntryMetadata::new("toReversed", 0, false, false));
+    }
+    if entry == js3_array_to_sorted_builtin() {
+        return Some(BuiltinEntryMetadata::new("toSorted", 1, false, false));
+    }
+    if entry == js3_array_to_spliced_builtin() {
+        return Some(BuiltinEntryMetadata::new("toSpliced", 2, false, false));
     }
     if entry == js3_array_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
@@ -12600,6 +13114,9 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     }
     if entry == js3_array_entries_builtin() {
         return Some(BuiltinEntryMetadata::new("entries", 0, false, false));
+    }
+    if entry == js3_array_with_builtin() {
+        return Some(BuiltinEntryMetadata::new("with", 2, false, false));
     }
     if entry == js3_map_get_builtin() {
         return Some(BuiltinEntryMetadata::new("get", 1, false, false));

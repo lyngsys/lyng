@@ -32,17 +32,23 @@ use std::fmt::Write as _;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::{
-    js3_aggregate_error_builtin, js3_array_buffer_builtin,
+    js3_aggregate_error_builtin, js3_array_at_builtin, js3_array_buffer_builtin,
     js3_array_buffer_byte_length_getter_builtin, js3_array_buffer_is_view_builtin,
     js3_array_buffer_slice_builtin, js3_array_builtin, js3_array_concat_builtin,
-    js3_array_copy_within_builtin, js3_array_entries_builtin, js3_array_fill_builtin,
-    js3_array_filter_builtin, js3_array_for_each_builtin, js3_array_from_builtin,
+    js3_array_copy_within_builtin, js3_array_entries_builtin, js3_array_every_builtin,
+    js3_array_fill_builtin, js3_array_filter_builtin, js3_array_find_builtin,
+    js3_array_find_index_builtin, js3_array_find_last_builtin, js3_array_find_last_index_builtin,
+    js3_array_flat_builtin, js3_array_flat_map_builtin, js3_array_for_each_builtin,
+    js3_array_from_builtin, js3_array_includes_builtin, js3_array_index_of_builtin,
     js3_array_is_array_builtin, js3_array_iterator_next_builtin, js3_array_join_builtin,
     js3_array_keys_builtin, js3_array_last_index_of_builtin, js3_array_map_builtin,
+    js3_array_of_builtin, js3_array_reduce_builtin, js3_array_reduce_right_builtin,
     js3_array_reverse_builtin, js3_array_shift_builtin, js3_array_slice_builtin,
-    js3_array_sort_builtin, js3_array_species_getter_builtin, js3_array_splice_builtin,
-    js3_array_to_locale_string_builtin, js3_array_to_string_builtin, js3_array_unshift_builtin,
-    js3_array_values_builtin, js3_async_function_builtin, js3_async_generator_function_builtin,
+    js3_array_some_builtin, js3_array_sort_builtin, js3_array_species_getter_builtin,
+    js3_array_splice_builtin, js3_array_to_locale_string_builtin, js3_array_to_reversed_builtin,
+    js3_array_to_sorted_builtin, js3_array_to_spliced_builtin, js3_array_to_string_builtin,
+    js3_array_unshift_builtin, js3_array_values_builtin, js3_array_with_builtin,
+    js3_async_function_builtin, js3_async_generator_function_builtin,
     js3_async_generator_next_builtin, js3_async_generator_return_builtin,
     js3_async_generator_throw_builtin, js3_atomics_add_builtin, js3_atomics_and_builtin,
     js3_atomics_compare_exchange_builtin, js3_atomics_exchange_builtin,
@@ -1106,8 +1112,14 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_array_from_builtin() {
         return array_from_builtin(context, invocation).map(Some);
     }
+    if entry == js3_array_of_builtin() {
+        return array_of_builtin(context, invocation).map(Some);
+    }
     if entry == js3_array_is_array_builtin() {
         return array_is_array_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_at_builtin() {
+        return array_at_builtin(context, invocation).map(Some);
     }
     if entry == js3_array_concat_builtin() {
         return array_concat_builtin(context, invocation).map(Some);
@@ -1127,20 +1139,56 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_array_unshift_builtin() {
         return array_unshift_builtin(context, invocation).map(Some);
     }
+    if entry == js3_array_every_builtin() {
+        return array_every_builtin(context, invocation).map(Some);
+    }
     if entry == js3_array_filter_builtin() {
         return array_filter_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_flat_builtin() {
+        return array_flat_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_flat_map_builtin() {
+        return array_flat_map_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_find_builtin() {
+        return array_find_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_find_index_builtin() {
+        return array_find_index_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_find_last_builtin() {
+        return array_find_last_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_find_last_index_builtin() {
+        return array_find_last_index_builtin(context, invocation).map(Some);
     }
     if entry == js3_array_for_each_builtin() {
         return array_for_each_builtin(context, invocation).map(Some);
     }
+    if entry == js3_array_includes_builtin() {
+        return array_includes_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_index_of_builtin() {
+        return array_index_of_builtin(context, invocation).map(Some);
+    }
     if entry == js3_array_map_builtin() {
         return array_map_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_reduce_builtin() {
+        return array_reduce_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_reduce_right_builtin() {
+        return array_reduce_right_builtin(context, invocation).map(Some);
     }
     if entry == js3_array_reverse_builtin() {
         return array_reverse_builtin(context, invocation).map(Some);
     }
     if entry == js3_array_slice_builtin() {
         return array_slice_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_some_builtin() {
+        return array_some_builtin(context, invocation).map(Some);
     }
     if entry == js3_array_last_index_of_builtin() {
         return array_last_index_of_builtin(context, invocation).map(Some);
@@ -1150,6 +1198,15 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == js3_array_splice_builtin() {
         return array_splice_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_to_reversed_builtin() {
+        return array_to_reversed_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_to_sorted_builtin() {
+        return array_to_sorted_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_to_spliced_builtin() {
+        return array_to_spliced_builtin(context, invocation).map(Some);
     }
     if entry == js3_array_to_string_builtin() {
         return array_to_string_builtin(context, invocation).map(Some);
@@ -1168,6 +1225,9 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_array_entries_builtin() {
         return array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Entry)
             .map(Some);
+    }
+    if entry == js3_array_with_builtin() {
+        return array_with_builtin(context, invocation).map(Some);
     }
     if entry == js3_map_get_builtin() {
         return map_get_builtin(context, invocation).map(Some);
@@ -3104,14 +3164,38 @@ fn is_engine_array<Cx: PublicBuiltinDispatchContext>(
 fn is_array_for_species<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object: lyng_js_types::ObjectRef,
-) -> bool {
+) -> Result<bool, Cx::Error> {
     if is_engine_array(cx, object) {
-        return true;
+        return Ok(true);
     }
-    cx.agent()
-        .objects()
-        .proxy_data(object)
-        .is_some_and(|proxy| !proxy.revoked() && is_engine_array(cx, proxy.target()))
+    let proxy_target = {
+        let agent = cx.agent();
+        agent.objects().proxy_data(object).map(|proxy| {
+            if proxy.revoked() {
+                None
+            } else {
+                Some(proxy.target())
+            }
+        })
+    };
+    match proxy_target {
+        Some(Some(target)) => is_array_for_species(cx, target),
+        Some(None) => Err(type_error(cx)),
+        None => Ok(false),
+    }
+}
+
+fn is_any_realm_array_constructor<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    object: lyng_js_types::ObjectRef,
+) -> bool {
+    let agent = cx.agent();
+    agent.realm_refs().iter().copied().any(|realm| {
+        agent
+            .realm(realm)
+            .and_then(|record| record.intrinsics().array())
+            == Some(object)
+    })
 }
 
 fn builtin_function_entry(
@@ -3753,6 +3837,9 @@ fn array_species_create<Cx: PublicBuiltinDispatchContext>(
     if Some(constructor_object) == default_array {
         return create_array_result(cx, length_hint);
     }
+    if is_any_realm_array_constructor(cx, constructor_object) {
+        return create_array_result(cx, length_hint);
+    }
 
     let species_symbol = {
         let agent = cx.agent();
@@ -3780,7 +3867,7 @@ fn array_species_create_for_length<Cx: PublicBuiltinDispatchContext>(
     original: lyng_js_types::ObjectRef,
     length: u64,
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
-    if !is_array_for_species(cx, original) {
+    if !is_array_for_species(cx, original)? {
         return create_array_result_for_length(cx, length);
     }
 
@@ -3804,6 +3891,9 @@ fn array_species_create_for_length<Cx: PublicBuiltinDispatchContext>(
             .and_then(|record| record.intrinsics().array())
     };
     if Some(constructor_object) == default_array {
+        return create_array_result_for_length(cx, length);
+    }
+    if is_any_realm_array_constructor(cx, constructor_object) {
         return create_array_result_for_length(cx, length);
     }
 
@@ -3892,12 +3982,17 @@ fn set_length_property<Cx: PublicBuiltinDispatchContext>(
     object_ref: lyng_js_types::ObjectRef,
     length: u64,
 ) -> Result<(), Cx::Error> {
-    set_property_on_object(
+    let key = PropertyKey::from_atom(WellKnownAtom::length.id());
+    if !set_property_on_object_with_receiver(
         cx,
         object_ref,
-        PropertyKey::from_atom(WellKnownAtom::length.id()),
+        key,
         length_value_u64(length),
-    )
+        Value::from_object_ref(object_ref),
+    )? {
+        return Err(type_error(cx));
+    }
+    Ok(())
 }
 
 fn create_iterator_result_value<Cx: PublicBuiltinDispatchContext>(
@@ -4210,6 +4305,20 @@ fn array_from_builtin<Cx: PublicBuiltinDispatchContext>(
         create_data_property_or_throw(cx, array, key, mapped)?;
     }
     set_length_property(cx, array, u64::try_from(values.len()).unwrap_or(u64::MAX))?;
+    Ok(Value::from_object_ref(array))
+}
+
+fn array_of_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let length = invocation.arguments().len();
+    let array = array_from_result_object(cx, invocation.this_value(), length, false)?;
+    for (index, value) in invocation.arguments().iter().copied().enumerate() {
+        let key = array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
+        create_data_property_or_throw(cx, array, key, value)?;
+    }
+    set_length_property(cx, array, u64::try_from(length).unwrap_or(u64::MAX))?;
     Ok(Value::from_object_ref(array))
 }
 
@@ -9512,6 +9621,32 @@ fn array_species_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(invocation.this_value())
 }
 
+fn array_at_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length_u64(cx, object_ref)?;
+    let relative_index = to_integer_or_infinity_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let actual_index = if relative_index < 0.0 {
+        length as f64 + relative_index
+    } else {
+        relative_index
+    };
+    if !actual_index.is_finite() || actual_index < 0.0 || actual_index >= length as f64 {
+        return Ok(Value::undefined());
+    }
+    let key = array_like_index_property_key(cx, actual_index as u64);
+    get_property_from_object(cx, object_ref, key)
+}
+
 fn array_concat_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -9666,11 +9801,19 @@ fn array_fill_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_object_ref(object_ref))
 }
 
-fn array_filter_builtin<Cx: PublicBuiltinDispatchContext>(
+#[derive(Clone, Copy)]
+enum ArrayPredicateKind {
+    Every,
+    Some,
+}
+
+fn array_predicate_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
+    kind: ArrayPredicateKind,
 ) -> Result<Value, Cx::Error> {
     let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length_u64(cx, object_ref)?;
     let callback = cx.require_callable_object(
         invocation
             .arguments()
@@ -9683,12 +9826,406 @@ fn array_filter_builtin<Cx: PublicBuiltinDispatchContext>(
         .get(1)
         .copied()
         .unwrap_or(Value::undefined());
-    let length = array_like_length(cx, object_ref)?;
-    let result = array_species_create(
-        cx,
-        object_ref,
-        usize::try_from(length).unwrap_or(usize::MAX),
+    let receiver = Value::from_object_ref(object_ref);
+    for index in 0..length {
+        let key = array_like_index_property_key(cx, index);
+        if !has_property_on_object(cx, object_ref, key)? {
+            continue;
+        }
+        let value = get_property_from_object(cx, object_ref, key)?;
+        let selected = cx.call_to_completion(
+            callback,
+            this_arg,
+            &[value, length_value_u64(index), receiver],
+        )?;
+        let selected = to_boolean_for_builtin(cx, selected)?;
+        match kind {
+            ArrayPredicateKind::Every if !selected => return Ok(Value::from_bool(false)),
+            ArrayPredicateKind::Some if selected => return Ok(Value::from_bool(true)),
+            ArrayPredicateKind::Every | ArrayPredicateKind::Some => {}
+        }
+    }
+    Ok(match kind {
+        ArrayPredicateKind::Every => Value::from_bool(true),
+        ArrayPredicateKind::Some => Value::from_bool(false),
+    })
+}
+
+fn array_every_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_predicate_builtin(cx, invocation, ArrayPredicateKind::Every)
+}
+
+fn array_some_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_predicate_builtin(cx, invocation, ArrayPredicateKind::Some)
+}
+
+#[derive(Clone, Copy)]
+enum ArrayFindKind {
+    Find,
+    FindIndex,
+    FindLast,
+    FindLastIndex,
+}
+
+fn array_find_builtin_common<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    kind: ArrayFindKind,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length_u64(cx, object_ref)?;
+    let callback = cx.require_callable_object(
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
     )?;
+    let this_arg = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let receiver = Value::from_object_ref(object_ref);
+
+    match kind {
+        ArrayFindKind::Find | ArrayFindKind::FindIndex => {
+            for index in 0..length {
+                let key = array_like_index_property_key(cx, index);
+                let value = get_property_from_object(cx, object_ref, key)?;
+                let selected = cx.call_to_completion(
+                    callback,
+                    this_arg,
+                    &[value, length_value_u64(index), receiver],
+                )?;
+                if to_boolean_for_builtin(cx, selected)? {
+                    return Ok(match kind {
+                        ArrayFindKind::Find => value,
+                        ArrayFindKind::FindIndex => length_value_u64(index),
+                        ArrayFindKind::FindLast | ArrayFindKind::FindLastIndex => unreachable!(),
+                    });
+                }
+            }
+        }
+        ArrayFindKind::FindLast | ArrayFindKind::FindLastIndex => {
+            if length == 0 {
+                return Ok(match kind {
+                    ArrayFindKind::FindLast => Value::undefined(),
+                    ArrayFindKind::FindLastIndex => Value::from_smi(-1),
+                    ArrayFindKind::Find | ArrayFindKind::FindIndex => unreachable!(),
+                });
+            }
+            let mut index = length - 1;
+            loop {
+                let key = array_like_index_property_key(cx, index);
+                let value = get_property_from_object(cx, object_ref, key)?;
+                let selected = cx.call_to_completion(
+                    callback,
+                    this_arg,
+                    &[value, length_value_u64(index), receiver],
+                )?;
+                if to_boolean_for_builtin(cx, selected)? {
+                    return Ok(match kind {
+                        ArrayFindKind::FindLast => value,
+                        ArrayFindKind::FindLastIndex => length_value_u64(index),
+                        ArrayFindKind::Find | ArrayFindKind::FindIndex => unreachable!(),
+                    });
+                }
+                if index == 0 {
+                    break;
+                }
+                index -= 1;
+            }
+        }
+    }
+
+    Ok(match kind {
+        ArrayFindKind::Find | ArrayFindKind::FindLast => Value::undefined(),
+        ArrayFindKind::FindIndex | ArrayFindKind::FindLastIndex => Value::from_smi(-1),
+    })
+}
+
+fn array_find_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_find_builtin_common(cx, invocation, ArrayFindKind::Find)
+}
+
+fn array_find_index_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_find_builtin_common(cx, invocation, ArrayFindKind::FindIndex)
+}
+
+fn array_find_last_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_find_builtin_common(cx, invocation, ArrayFindKind::FindLast)
+}
+
+fn array_find_last_index_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_find_builtin_common(cx, invocation, ArrayFindKind::FindLastIndex)
+}
+
+#[derive(Clone, Copy)]
+enum ArraySearchKind {
+    Includes,
+    IndexOf,
+}
+
+fn array_search_matches<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    kind: ArraySearchKind,
+    search_element: Value,
+    element: Value,
+) -> Result<bool, Cx::Error> {
+    let same = {
+        let heap_view = cx.agent().heap().view();
+        match kind {
+            ArraySearchKind::Includes => read::same_value_zero(heap_view, search_element, element),
+            ArraySearchKind::IndexOf => read::is_strictly_equal(heap_view, search_element, element),
+        }
+    };
+    map_completion(cx, same)
+}
+
+fn array_search_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    kind: ArraySearchKind,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length_u64(cx, object_ref)?;
+    let search_element = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    if length == 0 {
+        return Ok(match kind {
+            ArraySearchKind::Includes => Value::from_bool(false),
+            ArraySearchKind::IndexOf => Value::from_smi(-1),
+        });
+    }
+
+    let relative_index = to_integer_or_infinity_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    if relative_index == f64::INFINITY {
+        return Ok(match kind {
+            ArraySearchKind::Includes => Value::from_bool(false),
+            ArraySearchKind::IndexOf => Value::from_smi(-1),
+        });
+    }
+    let start = if relative_index == f64::NEG_INFINITY {
+        0
+    } else {
+        normalize_relative_index_u64(length, relative_index)
+    };
+    if start >= length {
+        return Ok(match kind {
+            ArraySearchKind::Includes => Value::from_bool(false),
+            ArraySearchKind::IndexOf => Value::from_smi(-1),
+        });
+    }
+
+    for index in start..length {
+        let key = array_like_index_property_key(cx, index);
+        let element = match kind {
+            ArraySearchKind::Includes => get_property_from_object(cx, object_ref, key)?,
+            ArraySearchKind::IndexOf => {
+                if !has_property_on_object(cx, object_ref, key)? {
+                    continue;
+                }
+                get_property_from_object(cx, object_ref, key)?
+            }
+        };
+        if array_search_matches(cx, kind, search_element, element)? {
+            return Ok(match kind {
+                ArraySearchKind::Includes => Value::from_bool(true),
+                ArraySearchKind::IndexOf => length_value_u64(index),
+            });
+        }
+    }
+
+    Ok(match kind {
+        ArraySearchKind::Includes => Value::from_bool(false),
+        ArraySearchKind::IndexOf => Value::from_smi(-1),
+    })
+}
+
+fn array_includes_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_search_builtin(cx, invocation, ArraySearchKind::Includes)
+}
+
+fn array_index_of_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_search_builtin(cx, invocation, ArraySearchKind::IndexOf)
+}
+
+#[derive(Clone, Copy)]
+enum ArrayReduceDirection {
+    Forward,
+    Reverse,
+}
+
+fn array_reduce_common<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    direction: ArrayReduceDirection,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length_u64(cx, object_ref)?;
+    let callback = cx.require_callable_object(
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let receiver = Value::from_object_ref(object_ref);
+
+    let mut accumulator;
+    let mut next_index;
+    match invocation.arguments().get(1).copied() {
+        Some(initial_value) => {
+            accumulator = initial_value;
+            next_index = match direction {
+                ArrayReduceDirection::Forward => Some(0),
+                ArrayReduceDirection::Reverse => length.checked_sub(1),
+            };
+        }
+        None => {
+            if length == 0 {
+                return Err(type_error(cx));
+            }
+            match direction {
+                ArrayReduceDirection::Forward => {
+                    let mut index = 0_u64;
+                    loop {
+                        let key = array_like_index_property_key(cx, index);
+                        if has_property_on_object(cx, object_ref, key)? {
+                            accumulator = get_property_from_object(cx, object_ref, key)?;
+                            next_index = index.checked_add(1);
+                            break;
+                        }
+                        index += 1;
+                        if index >= length {
+                            return Err(type_error(cx));
+                        }
+                    }
+                }
+                ArrayReduceDirection::Reverse => {
+                    let mut index = length - 1;
+                    loop {
+                        let key = array_like_index_property_key(cx, index);
+                        if has_property_on_object(cx, object_ref, key)? {
+                            accumulator = get_property_from_object(cx, object_ref, key)?;
+                            next_index = index.checked_sub(1);
+                            break;
+                        }
+                        if index == 0 {
+                            return Err(type_error(cx));
+                        }
+                        index -= 1;
+                    }
+                }
+            }
+        }
+    }
+
+    match direction {
+        ArrayReduceDirection::Forward => {
+            while let Some(index) = next_index {
+                if index >= length {
+                    break;
+                }
+                let key = array_like_index_property_key(cx, index);
+                if has_property_on_object(cx, object_ref, key)? {
+                    let value = get_property_from_object(cx, object_ref, key)?;
+                    accumulator = cx.call_to_completion(
+                        callback,
+                        Value::undefined(),
+                        &[accumulator, value, length_value_u64(index), receiver],
+                    )?;
+                }
+                next_index = index.checked_add(1);
+            }
+        }
+        ArrayReduceDirection::Reverse => {
+            while let Some(index) = next_index {
+                let key = array_like_index_property_key(cx, index);
+                if has_property_on_object(cx, object_ref, key)? {
+                    let value = get_property_from_object(cx, object_ref, key)?;
+                    accumulator = cx.call_to_completion(
+                        callback,
+                        Value::undefined(),
+                        &[accumulator, value, length_value_u64(index), receiver],
+                    )?;
+                }
+                next_index = index.checked_sub(1);
+            }
+        }
+    }
+
+    Ok(accumulator)
+}
+
+fn array_reduce_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_reduce_common(cx, invocation, ArrayReduceDirection::Forward)
+}
+
+fn array_reduce_right_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_reduce_common(cx, invocation, ArrayReduceDirection::Reverse)
+}
+
+fn array_filter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length(cx, object_ref)?;
+    let callback = cx.require_callable_object(
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let this_arg = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let result = array_species_create_for_length(cx, object_ref, 0)?;
     let mut to = 0_u32;
     for index in 0..length {
         let key = PropertyKey::Index(index);
@@ -9706,11 +10243,142 @@ fn array_filter_builtin<Cx: PublicBuiltinDispatchContext>(
             ],
         )?;
         if to_boolean_for_builtin(cx, selected)? {
-            set_property_on_object(cx, result, PropertyKey::Index(to), value)?;
+            create_data_property_or_throw(cx, result, PropertyKey::Index(to), value)?;
             to = to.saturating_add(1);
         }
     }
     define_array_length(cx, result, to)?;
+    Ok(Value::from_object_ref(result))
+}
+
+fn array_flatten_into_array<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    target: ObjectRef,
+    source: ObjectRef,
+    source_len: u64,
+    start: u64,
+    depth: u64,
+    mapper: Option<(ObjectRef, Value)>,
+) -> Result<u64, Cx::Error> {
+    let mut target_index = start;
+    for source_index in 0..source_len {
+        let source_key = array_like_index_property_key(cx, source_index);
+        if !has_property_on_object(cx, source, source_key)? {
+            continue;
+        }
+        let mut element = get_property_from_object(cx, source, source_key)?;
+        if let Some((mapper, this_arg)) = mapper {
+            element = cx.call_to_completion(
+                mapper,
+                this_arg,
+                &[
+                    element,
+                    length_value_u64(source_index),
+                    Value::from_object_ref(source),
+                ],
+            )?;
+        }
+
+        let should_flatten = if depth > 0 {
+            if let Some(element_object) = element.as_object_ref() {
+                is_array_for_species(cx, element_object)?
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if should_flatten {
+            let element_object = element
+                .as_object_ref()
+                .expect("flattenable element should be an object");
+            let element_len = array_like_length_u64(cx, element_object)?;
+            target_index = array_flatten_into_array(
+                cx,
+                target,
+                element_object,
+                element_len,
+                target_index,
+                depth.saturating_sub(1),
+                None,
+            )?;
+        } else {
+            if target_index >= MAX_SAFE_INTEGER_U64 {
+                return Err(type_error(cx));
+            }
+            let target_key = array_like_index_property_key(cx, target_index);
+            create_data_property_or_throw(cx, target, target_key, element)?;
+            target_index += 1;
+        }
+    }
+    Ok(target_index)
+}
+
+fn array_flat_depth<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    depth_value: Value,
+) -> Result<u64, Cx::Error> {
+    if depth_value.is_undefined() {
+        return Ok(1);
+    }
+    let depth = to_integer_or_infinity_for_builtin(cx, depth_value)?;
+    if depth <= 0.0 || depth.is_nan() {
+        Ok(0)
+    } else if depth.is_infinite() {
+        Ok(u64::MAX)
+    } else {
+        Ok(depth as u64)
+    }
+}
+
+fn array_flat_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let source_len = array_like_length_u64(cx, object_ref)?;
+    let depth = array_flat_depth(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let result = array_species_create_for_length(cx, object_ref, 0)?;
+    array_flatten_into_array(cx, result, object_ref, source_len, 0, depth, None)?;
+    Ok(Value::from_object_ref(result))
+}
+
+fn array_flat_map_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let source_len = array_like_length_u64(cx, object_ref)?;
+    let mapper = cx.require_callable_object(
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let this_arg = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let result = array_species_create_for_length(cx, object_ref, 0)?;
+    array_flatten_into_array(
+        cx,
+        result,
+        object_ref,
+        source_len,
+        0,
+        1,
+        Some((mapper, this_arg)),
+    )?;
     Ok(Value::from_object_ref(result))
 }
 
@@ -9719,6 +10387,7 @@ fn array_for_each_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length(cx, object_ref)?;
     let callback = cx.require_callable_object(
         invocation
             .arguments()
@@ -9731,7 +10400,6 @@ fn array_for_each_builtin<Cx: PublicBuiltinDispatchContext>(
         .get(1)
         .copied()
         .unwrap_or(Value::undefined());
-    let length = array_like_length(cx, object_ref)?;
     for index in 0..length {
         let key = PropertyKey::Index(index);
         if !has_property_on_object(cx, object_ref, key)? {
@@ -9756,6 +10424,7 @@ fn array_map_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length_u64(cx, object_ref)?;
     let callback = cx.require_callable_object(
         invocation
             .arguments()
@@ -9768,7 +10437,6 @@ fn array_map_builtin<Cx: PublicBuiltinDispatchContext>(
         .get(1)
         .copied()
         .unwrap_or(Value::undefined());
-    let length = array_like_length_u64(cx, object_ref)?;
     let result = array_species_create_for_length(cx, object_ref, length)?;
     for index in 0..length {
         let key = array_like_index_property_key(cx, index);
@@ -9785,7 +10453,7 @@ fn array_map_builtin<Cx: PublicBuiltinDispatchContext>(
                 Value::from_object_ref(object_ref),
             ],
         )?;
-        set_property_on_object(cx, result, key, mapped)?;
+        create_data_property_or_throw(cx, result, key, mapped)?;
     }
     Ok(Value::from_object_ref(result))
 }
@@ -9937,6 +10605,15 @@ fn compare_array_sort_values<Cx: PublicBuiltinDispatchContext>(
     left: Value,
     right: Value,
 ) -> Result<std::cmp::Ordering, Cx::Error> {
+    if left.is_undefined() && right.is_undefined() {
+        return Ok(std::cmp::Ordering::Equal);
+    }
+    if left.is_undefined() {
+        return Ok(std::cmp::Ordering::Greater);
+    }
+    if right.is_undefined() {
+        return Ok(std::cmp::Ordering::Less);
+    }
     if let Some(compare_fn) = compare_fn {
         let compared = cx.call_to_completion(compare_fn, Value::undefined(), &[left, right])?;
         let number = to_number_for_builtin(cx, compared)?;
@@ -10090,6 +10767,172 @@ fn array_splice_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     set_length_property(cx, object_ref, new_length)?;
     Ok(Value::from_object_ref(removed))
+}
+
+fn array_to_reversed_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length_u64(cx, object_ref)?;
+    let result = create_array_result_for_length(cx, length)?;
+    for index in 0..length {
+        let from_key = array_like_index_property_key(cx, length - index - 1);
+        let value = get_property_from_object(cx, object_ref, from_key)?;
+        let to_key = array_like_index_property_key(cx, index);
+        create_data_property_or_throw(cx, result, to_key, value)?;
+    }
+    Ok(Value::from_object_ref(result))
+}
+
+fn array_to_sorted_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let compare_fn = match invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined())
+    {
+        value if value.is_undefined() => None,
+        value => Some(cx.require_callable_object(value)?),
+    };
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length_u64(cx, object_ref)?;
+    let result = create_array_result_for_length(cx, length)?;
+    let mut elements = Vec::with_capacity(array_result_capacity_hint(length));
+    for index in 0..length {
+        let key = array_like_index_property_key(cx, index);
+        elements.push(get_property_from_object(cx, object_ref, key)?);
+    }
+    for i in 1..elements.len() {
+        let mut j = i;
+        while j > 0
+            && compare_array_sort_values(cx, compare_fn, elements[j - 1], elements[j])?
+                == std::cmp::Ordering::Greater
+        {
+            elements.swap(j - 1, j);
+            j -= 1;
+        }
+    }
+    for (index, value) in elements.into_iter().enumerate() {
+        let key = array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
+        create_data_property_or_throw(cx, result, key, value)?;
+    }
+    Ok(Value::from_object_ref(result))
+}
+
+fn array_to_spliced_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let arguments = invocation.arguments();
+    let length = array_like_length_u64(cx, object_ref)?;
+    let actual_start = normalize_relative_index_u64(
+        length,
+        to_integer_or_infinity_for_builtin(
+            cx,
+            arguments.first().copied().unwrap_or(Value::undefined()),
+        )?,
+    );
+    let actual_delete_count = if arguments.is_empty() {
+        0
+    } else if arguments.len() == 1 {
+        length.saturating_sub(actual_start)
+    } else {
+        let delete_count = to_integer_or_infinity_for_builtin(
+            cx,
+            arguments.get(1).copied().unwrap_or(Value::undefined()),
+        )?;
+        if delete_count <= 0.0 || delete_count.is_nan() {
+            0
+        } else {
+            (delete_count as u64).min(length.saturating_sub(actual_start))
+        }
+    };
+    let items = if arguments.len() > 2 {
+        &arguments[2..]
+    } else {
+        &[]
+    };
+    let insert_count = u64::try_from(items.len()).unwrap_or(u64::MAX);
+    let Some(new_length) = length
+        .checked_add(insert_count)
+        .and_then(|value| value.checked_sub(actual_delete_count))
+    else {
+        return Err(type_error(cx));
+    };
+    if new_length > MAX_SAFE_INTEGER_U64 {
+        return Err(type_error(cx));
+    }
+
+    let result = create_array_result_for_length(cx, new_length)?;
+    let mut to_index = 0_u64;
+    for from_index in 0..actual_start {
+        let from_key = array_like_index_property_key(cx, from_index);
+        let value = get_property_from_object(cx, object_ref, from_key)?;
+        let to_key = array_like_index_property_key(cx, to_index);
+        create_data_property_or_throw(cx, result, to_key, value)?;
+        to_index += 1;
+    }
+    for value in items.iter().copied() {
+        let to_key = array_like_index_property_key(cx, to_index);
+        create_data_property_or_throw(cx, result, to_key, value)?;
+        to_index += 1;
+    }
+    let tail_start = actual_start.saturating_add(actual_delete_count);
+    for from_index in tail_start..length {
+        let from_key = array_like_index_property_key(cx, from_index);
+        let value = get_property_from_object(cx, object_ref, from_key)?;
+        let to_key = array_like_index_property_key(cx, to_index);
+        create_data_property_or_throw(cx, result, to_key, value)?;
+        to_index += 1;
+    }
+    Ok(Value::from_object_ref(result))
+}
+
+fn array_with_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length_u64(cx, object_ref)?;
+    let relative_index = to_integer_or_infinity_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let actual_index = if relative_index < 0.0 {
+        length as f64 + relative_index
+    } else {
+        relative_index
+    };
+    if !actual_index.is_finite() || actual_index < 0.0 || actual_index >= length as f64 {
+        return Err(range_error(cx));
+    }
+    let actual_index = actual_index as u64;
+    let replacement = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let result = create_array_result_for_length(cx, length)?;
+    for index in 0..length {
+        let value = if index == actual_index {
+            replacement
+        } else {
+            let key = array_like_index_property_key(cx, index);
+            get_property_from_object(cx, object_ref, key)?
+        };
+        let key = array_like_index_property_key(cx, index);
+        create_data_property_or_throw(cx, result, key, value)?;
+    }
+    Ok(Value::from_object_ref(result))
 }
 
 fn array_to_string_builtin<Cx: PublicBuiltinDispatchContext>(

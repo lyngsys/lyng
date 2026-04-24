@@ -1960,6 +1960,375 @@ fn script_core_supports_array_index_of_builtin_shim() {
 }
 
 #[test]
+fn script_core_array_search_helpers_are_generic() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        Math[1] = true;
+        Math.length = 2;
+        score += Array.prototype.indexOf.call(Math, true) === 1 ? 1 : 0;
+        score += Array.prototype.indexOf.call([1, 2, 1], 1, 1) === 2 ? 2 : 0;
+        score += Array.prototype.includes.call(true) === false ? 4 : 0;
+        score += [0, NaN].includes(NaN) ? 8 : 0;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_array_predicate_helpers_are_generic() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let obj = new Date(0);
+        obj.length = 2;
+        obj[0] = 1;
+        obj[1] = 2;
+        score += Array.prototype.every.call(obj, function(value, index, receiver) {
+            return receiver instanceof Date && value < 2 && index === 0;
+        }) === false ? 1 : 0;
+        score += Array.prototype.some.call(obj, function(value, index, receiver) {
+            return receiver instanceof Date && value === 2 && index === 1;
+        }) ? 2 : 0;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_array_predicate_helpers_read_length_before_callback_validation() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let everyLength = false;
+        let everyLoop = false;
+        let everyObject = {};
+        Object.defineProperty(everyObject, "length", {
+            get: function() {
+                everyLength = true;
+                return 1;
+            }
+        });
+        Object.defineProperty(everyObject, "0", {
+            get: function() {
+                everyLoop = true;
+                return 1;
+            }
+        });
+        try {
+            Array.prototype.every.call(everyObject);
+        } catch (error) {
+            score += error.constructor === TypeError ? 1 : 0;
+        }
+        score += everyLength ? 2 : 0;
+        score += everyLoop ? 0 : 4;
+
+        let someLength = false;
+        let someLoop = false;
+        let someObject = {};
+        Object.defineProperty(someObject, "length", {
+            get: function() {
+                someLength = true;
+                return 1;
+            }
+        });
+        Object.defineProperty(someObject, "0", {
+            get: function() {
+                someLoop = true;
+                return 1;
+            }
+        });
+        try {
+            Array.prototype.some.call(someObject);
+        } catch (error) {
+            score += error.constructor === TypeError ? 8 : 0;
+        }
+        score += someLength ? 16 : 0;
+        score += someLoop ? 0 : 32;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
+fn script_core_array_reduce_helpers_are_generic_and_skip_holes() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let obj = new Date(0);
+        obj.length = 3;
+        obj[0] = 2;
+        obj[2] = 5;
+        score += Array.prototype.reduce.call(obj, function(acc, value, index, receiver) {
+            return acc + value + (receiver instanceof Date ? index : 100);
+        }, 1);
+        score += Array.prototype.reduceRight.call(obj, function(acc, value, index, receiver) {
+            return acc + value + (receiver instanceof Date ? index : 100);
+        }, 1) * 10;
+        try {
+            Array.prototype.reduce.call({ length: 2 }, function(acc, value) {
+                return acc + value;
+            });
+        } catch (error) {
+            score += error.constructor === TypeError ? 100 : 0;
+        }
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(210));
+}
+
+#[test]
+fn script_core_array_find_helpers_are_generic_and_visit_holes() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let values = [, 2];
+        let sawHole = false;
+        score += values.findIndex(function(value, index, receiver) {
+            if (index === 0 && value === undefined && receiver === values) {
+                sawHole = true;
+            }
+            return index === 1 && value === 2;
+        }) === 1 ? 1 : 0;
+        score += sawHole ? 2 : 0;
+
+        let obj = new Date(0);
+        obj.length = 3;
+        obj[2] = 5;
+        score += Array.prototype.find.call(obj, function(value, index, receiver) {
+            return receiver instanceof Date && index === 2 && value === 5;
+        }) === 5 ? 4 : 0;
+
+        let sparse = { 0: "a", 2: "c", length: 3 };
+        score += Array.prototype.findLast.call(sparse, function(value) {
+            return value !== undefined;
+        }) === "c" ? 8 : 0;
+        score += Array.prototype.findLastIndex.call(true, function() {
+            return true;
+        }) === -1 ? 16 : 0;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_array_change_by_copy_helpers_are_generic_and_non_mutating() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+
+        let values = [1, , 3];
+        let reversed = values.toReversed();
+        score += reversed !== values
+            && reversed.length === 3
+            && reversed[0] === 3
+            && reversed[1] === undefined
+            && reversed.hasOwnProperty("1")
+            && reversed[2] === 1 ? 1 : 0;
+        score += values.length === 3
+            && values[0] === 1
+            && !values.hasOwnProperty("1")
+            && values[2] === 3 ? 2 : 0;
+
+        let arrayLike = { 0: "b", 2: "a", length: 3 };
+        let sorted = Array.prototype.toSorted.call(arrayLike);
+        score += sorted.join(":") === "a:b:" ? 4 : 0;
+
+        let replaced = Array.prototype.with.call(arrayLike, -1, "z");
+        score += replaced[0] === "b"
+            && replaced[1] === undefined
+            && replaced.hasOwnProperty("1")
+            && replaced[2] === "z" ? 8 : 0;
+
+        let spliced = Array.prototype.toSpliced.call(
+            { 0: "a", 1: "b", 2: "c", length: 3 },
+            1,
+            1,
+            "x",
+            "y"
+        );
+        score += spliced.join("") === "axyc" && spliced.length === 4 ? 16 : 0;
+
+        try {
+            [1, 2].with(2, 9);
+        } catch (error) {
+            score += error.constructor === RangeError ? 32 : 0;
+        }
+
+        try {
+            Array.prototype.toSpliced.call({ length: 9007199254740991 }, 0, 0, 1);
+        } catch (error) {
+            score += error.constructor === TypeError ? 64 : 0;
+        }
+
+        score += Array.prototype[Symbol.unscopables].toReversed === true
+            && Array.prototype[Symbol.unscopables].toSorted === true
+            && Array.prototype[Symbol.unscopables].toSpliced === true
+            && !Object.prototype.hasOwnProperty.call(
+                Array.prototype[Symbol.unscopables],
+                "with"
+            ) ? 128 : 0;
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(255));
+}
+
+#[test]
+fn script_core_array_callback_helpers_read_length_before_callback_validation() {
+    let result = compile_and_run(
+        r#"
+        function probe(method) {
+            let score = 0;
+            let lengthRead = false;
+            let elementRead = false;
+            let receiver = {};
+            Object.defineProperty(receiver, "length", {
+                get: function() {
+                    lengthRead = true;
+                    return 1;
+                }
+            });
+            Object.defineProperty(receiver, "0", {
+                get: function() {
+                    elementRead = true;
+                    return 1;
+                }
+            });
+            try {
+                Array.prototype[method].call(receiver);
+            } catch (error) {
+                score += error.constructor === TypeError ? 1 : 0;
+            }
+            score += lengthRead ? 2 : 0;
+            score += elementRead ? 0 : 4;
+            return score;
+        }
+
+        probe("forEach") + probe("map") * 10 + probe("filter") * 100;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(777));
+}
+
+#[test]
+fn script_core_array_callback_copy_helpers_define_own_result_properties() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        Object.defineProperty(Array.prototype, "1", {
+            get: function() {
+                return "prototype";
+            },
+            configurable: true
+        });
+
+        try {
+            let mapped = [1, 2].map(function(value) {
+                return value * 2;
+            });
+            score += mapped.length === 2
+                && mapped.hasOwnProperty("1")
+                && mapped[1] === 4 ? 1 : 0;
+
+            let filtered = [1, 2].filter(function() {
+                return true;
+            });
+            score += filtered.length === 2
+                && filtered.hasOwnProperty("1")
+                && filtered[1] === 2 ? 2 : 0;
+        } finally {
+            delete Array.prototype[1];
+        }
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_array_at_and_of_are_generic() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let object = { 0: "a", 2: "c", length: 3 };
+        score += Array.prototype.at.call(object, -1) === "c" ? 1 : 0;
+        score += Array.prototype.at.call(object, 1) === undefined ? 2 : 0;
+        score += Array.prototype.at.call(true, 0) === undefined ? 4 : 0;
+
+        let values = Array.of(1, 2, 3);
+        score += values.length === 3
+            && values[0] === 1
+            && values[2] === 3 ? 8 : 0;
+
+        function C(len) {
+            this.lengthFromConstructor = len;
+        }
+        let custom = Array.of.call(C, "x", "y");
+        score += custom instanceof C
+            && custom.lengthFromConstructor === 2
+            && custom.length === 2
+            && custom[1] === "y" ? 16 : 0;
+
+        score += Array.of.call({ notConstructor: true }, 5).join(":") === "5" ? 32 : 0;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
+fn script_core_array_flat_and_flat_map_are_generic() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let nested = [1, [2, , [3]]];
+        let flattened = nested.flat(2);
+        score += flattened.length === 3
+            && flattened[0] === 1
+            && flattened[1] === 2
+            && flattened[2] === 3 ? 1 : 0;
+
+        let arrayLike = { 0: [4, 5], 1: 6, length: 2 };
+        let generic = Array.prototype.flat.call(arrayLike);
+        score += generic.length === 3
+            && generic[0] === 4
+            && generic[1] === 5
+            && generic[2] === 6 ? 2 : 0;
+
+        let mapped = [1, , 3].flatMap(function(value, index, receiver) {
+            return receiver.length === 3 ? [value, index] : [0];
+        });
+        score += mapped.join(":") === "1:0:3:2" ? 4 : 0;
+
+        let boolResult = Array.prototype.flatMap.call(true, function() {
+            return [1];
+        });
+        score += boolResult.length === 0 ? 8 : 0;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
 fn script_core_supports_object_has_own_property_builtin_shim() {
     let result = compile_and_run(
         r#"
