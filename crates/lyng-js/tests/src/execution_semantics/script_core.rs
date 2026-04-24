@@ -1978,6 +1978,354 @@ fn script_core_array_search_helpers_are_generic() {
 }
 
 #[test]
+fn script_core_array_join_uses_to_length_for_generic_receivers() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let object = { 0: "x", 1: null, 2: "z" };
+
+        score += Array.prototype.join.call(object) === "" ? 1 : 0;
+        score += object.length === undefined ? 2 : 0;
+
+        object.length = null;
+        score += Array.prototype.join.call(object) === "" ? 4 : 0;
+        score += object.length === null ? 8 : 0;
+
+        object.length = 2.8;
+        score += Array.prototype.join.call(object, "|") === "x|" ? 16 : 0;
+        score += object.length === 2.8 ? 32 : 0;
+
+        let wrappedLength = new Number(3.9);
+        object.length = wrappedLength;
+        score += Array.prototype.join.call(object, "|") === "x||z" ? 64 : 0;
+        score += object.length === wrappedLength ? 128 : 0;
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(255));
+}
+
+#[test]
+fn script_core_array_pop_push_use_length_of_array_like() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+
+        let popTarget = { 0: "first" };
+        score += Array.prototype.pop.call(popTarget) === undefined ? 1 : 0;
+        score += popTarget.length === 0 ? 2 : 0;
+
+        popTarget[1] = "last";
+        popTarget.length = 2.8;
+        score += Array.prototype.pop.call(popTarget) === "last" ? 4 : 0;
+        score += popTarget.length === 1 ? 8 : 0;
+        score += popTarget[1] === undefined ? 16 : 0;
+
+        let pushTarget = {};
+        let wrappedLength = new Number(1.9);
+        pushTarget.length = wrappedLength;
+        score += Array.prototype.push.call(pushTarget, "x") === 2 ? 32 : 0;
+        score += pushTarget[1] === "x" ? 64 : 0;
+        score += pushTarget.length === 2 ? 128 : 0;
+
+        let limitTarget = { length: Infinity };
+        score += Array.prototype.push.call(limitTarget) === Number.MAX_SAFE_INTEGER ? 256 : 0;
+        score += limitTarget.length === Number.MAX_SAFE_INTEGER ? 512 : 0;
+
+        score += Array.prototype.push.call(true) === 0 ? 1024 : 0;
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(2047));
+}
+
+#[test]
+fn script_core_array_push_observes_inherited_setter_before_length_write() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let array = [];
+        let calls = 0;
+
+        Object.defineProperty(Array.prototype, "0", {
+            set: function(_value) {
+                Object.freeze(array);
+                calls++;
+            },
+            configurable: true
+        });
+
+        try {
+            array.push(1);
+        } catch (error) {
+            score += error.constructor === TypeError ? 1 : 0;
+        } finally {
+            delete Array.prototype[0];
+        }
+
+        score += !array.hasOwnProperty("0") ? 2 : 0;
+        score += array.length === 0 ? 4 : 0;
+        score += calls === 1 ? 8 : 0;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_array_concat_boxes_receiver_and_defines_result_elements() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let boxed = Array.prototype.concat.call(true);
+        score += boxed[0] instanceof Boolean ? 1 : 0;
+
+        Object.defineProperty(Array.prototype, "0", {
+            value: "inherited",
+            writable: false,
+            configurable: true
+        });
+
+        try {
+            let result = Array.prototype.concat.call([101]);
+            let descriptor = Object.getOwnPropertyDescriptor(result, "0");
+            score += result[0] === 101 ? 2 : 0;
+            score += descriptor.writable === true ? 4 : 0;
+            score += descriptor.enumerable === true ? 8 : 0;
+            score += descriptor.configurable === true ? 16 : 0;
+        } finally {
+            delete Array.prototype[0];
+        }
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_array_result_helpers_define_indices_under_poisoned_array_prototype() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let symbol = Symbol("s");
+        let symbolHolder = {};
+        symbolHolder[symbol] = 1;
+
+        Object.defineProperty(Array.prototype, "0", {
+            value: "inherited",
+            writable: false,
+            configurable: true
+        });
+
+        try {
+            let names = Object.getOwnPropertyNames({ value: 1, writable: true });
+            let nameDesc = Object.getOwnPropertyDescriptor(names, "0");
+            score += names[0] === "value" ? 1 : 0;
+            score += nameDesc.writable === true ? 2 : 0;
+
+            let keys = Object.keys({ a: 1 });
+            score += keys[0] === "a" ? 4 : 0;
+
+            let values = Object.values({ a: 1 });
+            score += values[0] === 1 ? 8 : 0;
+
+            let entries = Object.entries({ a: 1 });
+            score += entries[0][0] === "a" ? 16 : 0;
+            score += entries[0][1] === 1 ? 32 : 0;
+
+            let symbols = Object.getOwnPropertySymbols(symbolHolder);
+            score += symbols[0] === symbol ? 64 : 0;
+        } finally {
+            delete Array.prototype[0];
+        }
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
+fn script_core_array_is_array_observes_array_exotics_and_proxies() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+
+        score += Array.isArray(Array.prototype) ? 1 : 0;
+
+        let objectProxy = new Proxy({}, {});
+        let arrayProxy = new Proxy([], {});
+        let nestedProxy = new Proxy(arrayProxy, {});
+        score += Array.isArray(objectProxy) === false ? 2 : 0;
+        score += Array.isArray(arrayProxy) === true ? 4 : 0;
+        score += Array.isArray(nestedProxy) === true ? 8 : 0;
+
+        let revoked = Proxy.revocable([], {});
+        revoked.revoke();
+        try {
+            Array.isArray(revoked.proxy);
+        } catch (error) {
+            score += error.constructor === TypeError ? 16 : 0;
+        }
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_array_length_define_property_coerces_before_descriptor_validation() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let array = [1, 2];
+        let valueOfCalls = 0;
+        let length = {
+            valueOf: function() {
+                valueOfCalls++;
+                if (valueOfCalls !== 1) {
+                    Object.defineProperty(array, "length", { writable: false });
+                }
+                return array.length;
+            }
+        };
+
+        try {
+            Object.defineProperty(array, "length", { value: length, writable: true });
+        } catch (error) {
+            score += error.constructor === TypeError ? 1 : 0;
+        }
+        score += valueOfCalls === 2 ? 2 : 0;
+
+        array = [1, 2];
+        valueOfCalls = 0;
+        try {
+            score += Reflect.defineProperty(array, "length", { value: length, writable: true }) === false ? 4 : 0;
+        } catch (_error) {}
+        score += valueOfCalls === 2 ? 8 : 0;
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_array_length_set_coerces_before_writable_check() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let array = [1, 2, 3];
+        let hints = [];
+        let length = {};
+        length[Symbol.toPrimitive] = function(hint) {
+            hints.push(hint);
+            Object.defineProperty(array, "length", { writable: false });
+            return 0;
+        };
+
+        try {
+            (function() {
+                "use strict";
+                array.length = length;
+            })();
+        } catch (error) {
+            score += error.constructor === TypeError ? 1 : 0;
+        }
+        score += hints.length === 2 && hints[0] === "number" && hints[1] === "number" ? 2 : 0;
+
+        array = [1, 2, 3];
+        hints = [];
+        try {
+            score += Reflect.set(array, "length", length) === false ? 4 : 0;
+        } catch (_error) {}
+        score += hints.length === 2 && hints[0] === "number" && hints[1] === "number" ? 8 : 0;
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_array_reverse_gets_lower_before_testing_upper() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let array = ["first", "second"];
+
+        Object.defineProperty(array, 0, {
+            get: function() {
+                array.length = 0;
+                return "first";
+            },
+            configurable: true
+        });
+
+        array.reverse();
+        score += (0 in array) === false ? 1 : 0;
+        score += (1 in array) === true ? 2 : 0;
+        score += array[1] === "first" ? 4 : 0;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_array_slice_uses_species_and_defines_result_elements() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+
+        function Ctor(length) {
+            this.lengthSeen = length;
+        }
+
+        let array = [10, 20];
+        array.constructor = {};
+        array.constructor[Symbol.species] = Ctor;
+
+        let result = array.slice(0, 1);
+        score += Object.getPrototypeOf(result) === Ctor.prototype ? 1 : 0;
+        score += result.lengthSeen === 1 ? 2 : 0;
+        score += result[0] === 10 ? 4 : 0;
+
+        Object.defineProperty(Ctor.prototype, "0", {
+            value: "inherited",
+            writable: false,
+            configurable: true
+        });
+
+        try {
+            result = array.slice(0, 1);
+            score += result.hasOwnProperty("0") ? 8 : 0;
+            score += result[0] === 10 ? 16 : 0;
+        } finally {
+            delete Ctor.prototype[0];
+        }
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
 fn script_core_array_predicate_helpers_are_generic() {
     let result = compile_and_run(
         r#"

@@ -21,6 +21,14 @@ fn bigint_to_uint64_bits(agent: &Agent, value: Value) -> Option<u64> {
     })
 }
 
+fn array_length_to_uint32(number: f64) -> u32 {
+    if !number.is_finite() || number == 0.0 {
+        return 0;
+    }
+    const TWO_32: f64 = 4_294_967_296.0;
+    number.trunc().rem_euclid(TWO_32) as u32
+}
+
 fn vm_typed_array_storage_bits(kind: TypedArrayElementKind, number: f64) -> u64 {
     match kind {
         TypedArrayElementKind::BigInt64 => number as u64,
@@ -696,7 +704,7 @@ impl Vm {
         object: ObjectRef,
         receiver: Value,
         key: PropertyKey,
-        value: Value,
+        mut value: Value,
     ) -> VmResult<bool> {
         if agent.objects().is_proxy_object(object) {
             let mut bridge = VmProxyBridge {
@@ -735,6 +743,9 @@ impl Vm {
                 return Ok(false);
             }
         }
+        if Self::is_engine_array_length_property(agent, object, key) {
+            value = self.normalize_array_length_set_value(agent, host, registry, caller, value)?;
+        }
         let own_descriptor =
             object::get_own_property(agent, object, key).map_err(VmError::Abrupt)?;
         if let Some(descriptor) = own_descriptor {
@@ -756,6 +767,50 @@ impl Vm {
         self.create_or_update_receiver_data_property(
             agent, host, registry, caller, receiver, key, value,
         )
+    }
+
+    fn is_engine_array_length_property(agent: &Agent, object: ObjectRef, key: PropertyKey) -> bool {
+        key.as_atom() == Some(WellKnownAtom::length.id())
+            && agent
+                .objects()
+                .object_header(agent.heap().view(), object)
+                .is_some_and(|header| header.flags().is_engine_array())
+    }
+
+    fn normalize_array_length_set_value(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        value: Value,
+    ) -> VmResult<Value> {
+        let primitive = self.to_primitive(
+            agent,
+            host,
+            registry,
+            caller,
+            value,
+            ToPrimitiveHint::Number,
+        )?;
+        let _ = read::to_number(agent.heap().view(), primitive).map_err(VmError::Abrupt)?;
+        let primitive = self.to_primitive(
+            agent,
+            host,
+            registry,
+            caller,
+            value,
+            ToPrimitiveHint::Number,
+        )?;
+        let number = read::to_number(agent.heap().view(), primitive).map_err(VmError::Abrupt)?;
+        let number = number
+            .as_f64()
+            .expect("ToNumber must always produce a numeric Value");
+        let length = array_length_to_uint32(number);
+        if number != f64::from(length) {
+            return Err(VmError::Abrupt(errors::throw_range_error(agent)));
+        }
+        Ok(encode_number(f64::from(length)))
     }
 
     fn set_property_from_descriptor(
@@ -795,27 +850,8 @@ impl Vm {
         let Some(receiver) = receiver.as_object_ref() else {
             return Ok(false);
         };
-        let is_engine_array_length = key.as_atom() == Some(WellKnownAtom::length.id())
-            && agent
-                .objects()
-                .object_header(agent.heap().view(), receiver)
-                .is_some_and(|header| header.flags().is_engine_array());
-        if is_engine_array_length {
-            let primitive = self.to_primitive(
-                agent,
-                host,
-                registry,
-                caller,
-                value,
-                ToPrimitiveHint::Number,
-            )?;
-            let number =
-                read::to_number(agent.heap().view(), primitive).map_err(VmError::Abrupt)?;
-            value = encode_number(
-                number
-                    .as_f64()
-                    .expect("ToNumber must always produce a numeric Value"),
-            );
+        if Self::is_engine_array_length_property(agent, receiver, key) {
+            value = self.normalize_array_length_set_value(agent, host, registry, caller, value)?;
         }
         if key.as_index().is_some() && agent.objects().typed_array(receiver).is_some() {
             return self.set_typed_array_index(agent, host, registry, caller, receiver, key, value);

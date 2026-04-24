@@ -17,8 +17,9 @@ use lyng_js_host::{
 };
 use lyng_js_objects::{
     ArrayBufferObjectData, DataViewObjectData, FunctionEntryIdentity, MapEntry, MapObjectData,
-    ObjectAllocation, ObjectColdData, ObjectKind, OrdinaryObjectData, PrimitiveWrapperKind,
-    ProxyObjectData, SetObjectData, TypedArrayElementKind, TypedArrayObjectData,
+    ObjectAllocation, ObjectColdData, ObjectFlags, ObjectKind, OrdinaryObjectData,
+    PrimitiveWrapperKind, ProxyObjectData, SetObjectData, TypedArrayElementKind,
+    TypedArrayObjectData,
 };
 use lyng_js_ops::{
     errors, iterator, object, promise, proxy, read, shared_memory as shared_memory_ops,
@@ -42,13 +43,13 @@ use super::{
     js3_array_from_builtin, js3_array_includes_builtin, js3_array_index_of_builtin,
     js3_array_is_array_builtin, js3_array_iterator_next_builtin, js3_array_join_builtin,
     js3_array_keys_builtin, js3_array_last_index_of_builtin, js3_array_map_builtin,
-    js3_array_of_builtin, js3_array_reduce_builtin, js3_array_reduce_right_builtin,
-    js3_array_reverse_builtin, js3_array_shift_builtin, js3_array_slice_builtin,
-    js3_array_some_builtin, js3_array_sort_builtin, js3_array_species_getter_builtin,
-    js3_array_splice_builtin, js3_array_to_locale_string_builtin, js3_array_to_reversed_builtin,
-    js3_array_to_sorted_builtin, js3_array_to_spliced_builtin, js3_array_to_string_builtin,
-    js3_array_unshift_builtin, js3_array_values_builtin, js3_array_with_builtin,
-    js3_async_function_builtin, js3_async_generator_function_builtin,
+    js3_array_of_builtin, js3_array_pop_builtin, js3_array_push_builtin, js3_array_reduce_builtin,
+    js3_array_reduce_right_builtin, js3_array_reverse_builtin, js3_array_shift_builtin,
+    js3_array_slice_builtin, js3_array_some_builtin, js3_array_sort_builtin,
+    js3_array_species_getter_builtin, js3_array_splice_builtin, js3_array_to_locale_string_builtin,
+    js3_array_to_reversed_builtin, js3_array_to_sorted_builtin, js3_array_to_spliced_builtin,
+    js3_array_to_string_builtin, js3_array_unshift_builtin, js3_array_values_builtin,
+    js3_array_with_builtin, js3_async_function_builtin, js3_async_generator_function_builtin,
     js3_async_generator_next_builtin, js3_async_generator_return_builtin,
     js3_async_generator_throw_builtin, js3_atomics_add_builtin, js3_atomics_and_builtin,
     js3_atomics_compare_exchange_builtin, js3_atomics_exchange_builtin,
@@ -1132,6 +1133,12 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == js3_array_join_builtin() {
         return array_join_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_pop_builtin() {
+        return array_pop_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_push_builtin() {
+        return array_push_builtin(context, invocation).map(Some);
     }
     if entry == js3_array_shift_builtin() {
         return array_shift_builtin(context, invocation).map(Some);
@@ -3214,11 +3221,7 @@ fn array_like_join_text<Cx: PublicBuiltinDispatchContext>(
     object: lyng_js_types::ObjectRef,
     separator: &str,
 ) -> Result<String, Cx::Error> {
-    let length = cx.get_property_value(
-        Value::from_object_ref(object),
-        PropertyKey::from_atom(WellKnownAtom::length.id()),
-    )?;
-    let length = length.as_f64().ok_or_else(|| type_error(cx))?.max(0.0) as u32;
+    let length = array_like_length(cx, object)?;
     let mut text = String::new();
     for index in 0..length {
         if index != 0 {
@@ -3283,6 +3286,14 @@ fn valid_array_length(number: f64) -> Option<u32> {
     Some(number as u32)
 }
 
+fn to_uint32_length(number: f64) -> u32 {
+    if !number.is_finite() || number == 0.0 {
+        return 0;
+    }
+    const TWO_32: f64 = 4_294_967_296.0;
+    number.trunc().rem_euclid(TWO_32) as u32
+}
+
 fn normalize_engine_array_length_descriptor<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     descriptor: PropertyDescriptor,
@@ -3290,11 +3301,13 @@ fn normalize_engine_array_length_descriptor<Cx: PublicBuiltinDispatchContext>(
     if !descriptor.has_value() {
         return Ok(descriptor);
     }
-    let new_len_number =
-        to_number_for_builtin(cx, descriptor.value().unwrap_or(Value::undefined()))?;
-    let Some(new_len) = valid_array_length(new_len_number) else {
+    let value = descriptor.value().unwrap_or(Value::undefined());
+    let _ = to_number_for_builtin(cx, value)?;
+    let number_len = to_number_for_builtin(cx, value)?;
+    let new_len = to_uint32_length(number_len);
+    if number_len != f64::from(new_len) {
         return Err(range_error(cx));
-    };
+    }
     let mut normalized = descriptor;
     normalized.set_value(length_value(new_len));
     Ok(normalized)
@@ -3400,9 +3413,14 @@ impl<Cx: PublicBuiltinDispatchContext> proxy::ProxyTrapContext for BuiltinProxyB
         &mut self,
         object: ObjectRef,
         key: PropertyKey,
-        descriptor: PropertyDescriptor,
+        mut descriptor: PropertyDescriptor,
         lifetime: AllocationLifetime,
     ) -> Result<bool, Self::Error> {
+        if is_engine_array(self.cx, object)
+            && key == PropertyKey::from_atom(WellKnownAtom::length.id())
+        {
+            descriptor = normalize_engine_array_length_descriptor(self.cx, descriptor)?;
+        }
         self.cx
             .define_property_on_object(object, key, descriptor, lifetime)
     }
@@ -3627,11 +3645,13 @@ fn set_property_on_object<Cx: PublicBuiltinDispatchContext>(
             return Ok(());
         }
     }
-    let stored = {
-        let agent = cx.agent();
-        object::set(agent, object_ref, key, value, AllocationLifetime::Default)
-    };
-    if !map_completion(cx, stored)? {
+    if !set_property_on_object_with_receiver(
+        cx,
+        object_ref,
+        key,
+        value,
+        Value::from_object_ref(object_ref),
+    )? {
         return Err(type_error(cx));
     }
     Ok(())
@@ -3790,6 +3810,49 @@ fn create_array_result<Cx: PublicBuiltinDispatchContext>(
     cx.create_array_object(cx.builtin_realm(), length_hint)
 }
 
+fn create_array_result_with_prototype<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    realm: RealmRef,
+    prototype: ObjectRef,
+    length_hint: usize,
+) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+    let root_shape = {
+        let agent = cx.agent();
+        agent.realm(realm).and_then(|record| record.root_shape())
+    }
+    .ok_or_else(|| type_error(cx))?;
+    let array = cx.agent().with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape)
+                .with_flags(ObjectFlags::extensible().union(ObjectFlags::ENGINE_ARRAY))
+                .with_prototype(Some(prototype))
+                .with_element_capacity(length_hint),
+            AllocationLifetime::Default,
+        )
+    });
+    let mut descriptor = PropertyDescriptor::new();
+    descriptor.set_value(length_value(0));
+    descriptor.set_writable(true);
+    descriptor.set_enumerable(false);
+    descriptor.set_configurable(false);
+    let defined = {
+        let agent = cx.agent();
+        object::define_property(
+            agent,
+            array,
+            PropertyKey::from_atom(WellKnownAtom::length.id()),
+            descriptor,
+            AllocationLifetime::Default,
+        )
+    };
+    if !map_completion(cx, defined)? {
+        return Err(type_error(cx));
+    }
+    Ok(array)
+}
+
 fn array_result_capacity_hint(length: u64) -> usize {
     usize::try_from(length)
         .unwrap_or(ARRAY_RESULT_CAPACITY_HINT_LIMIT)
@@ -3804,62 +3867,6 @@ fn create_array_result_for_length<Cx: PublicBuiltinDispatchContext>(
     let array = create_array_result(cx, array_result_capacity_hint(u64::from(length)))?;
     define_array_length(cx, array, length)?;
     Ok(array)
-}
-
-fn array_species_create<Cx: PublicBuiltinDispatchContext>(
-    cx: &mut Cx,
-    original: lyng_js_types::ObjectRef,
-    length_hint: usize,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
-    if !is_engine_array(cx, original) {
-        return create_array_result(cx, length_hint);
-    }
-
-    let constructor = get_property_from_object(
-        cx,
-        original,
-        PropertyKey::from_atom(WellKnownAtom::constructor.id()),
-    )?;
-    if constructor.is_undefined() {
-        return create_array_result(cx, length_hint);
-    }
-    let Some(constructor_object) = constructor.as_object_ref() else {
-        return Err(type_error(cx));
-    };
-
-    let default_array = {
-        let realm = cx.builtin_realm();
-        let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(|record| record.intrinsics().array())
-    };
-    if Some(constructor_object) == default_array {
-        return create_array_result(cx, length_hint);
-    }
-    if is_any_realm_array_constructor(cx, constructor_object) {
-        return create_array_result(cx, length_hint);
-    }
-
-    let species_symbol = {
-        let agent = cx.agent();
-        agent.well_known_symbol(WellKnownSymbolId::Species)
-    };
-    let Some(species_symbol) = species_symbol else {
-        return create_array_result(cx, length_hint);
-    };
-    let species = get_property_from_object(
-        cx,
-        constructor_object,
-        PropertyKey::from_symbol(species_symbol),
-    )?;
-    if species.is_undefined() || species.is_null() {
-        return create_array_result(cx, length_hint);
-    }
-    if species.as_object_ref() == default_array {
-        return create_array_result(cx, length_hint);
-    }
-    Err(type_error(cx))
 }
 
 fn array_species_create_for_length<Cx: PublicBuiltinDispatchContext>(
@@ -3935,46 +3942,7 @@ fn is_concat_spreadable<Cx: PublicBuiltinDispatchContext>(
             return to_boolean_for_builtin(cx, spreadable);
         }
     }
-    Ok(is_engine_array(cx, object_ref))
-}
-
-fn snapshot_indexed_entries<Cx: PublicBuiltinDispatchContext>(
-    cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
-    length: u32,
-) -> Result<Vec<Option<Value>>, Cx::Error> {
-    let mut entries = Vec::with_capacity(usize::try_from(length).unwrap_or(usize::MAX));
-    for index in 0..length {
-        let key = PropertyKey::Index(index);
-        if has_property_on_object(cx, object_ref, key)? {
-            entries.push(Some(get_property_from_object(cx, object_ref, key)?));
-        } else {
-            entries.push(None);
-        }
-    }
-    Ok(entries)
-}
-
-fn store_indexed_entries<Cx: PublicBuiltinDispatchContext>(
-    cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
-    entries: &[Option<Value>],
-) -> Result<(), Cx::Error> {
-    let current_len = array_like_length(cx, object_ref)?;
-    for (index, entry) in entries.iter().copied().enumerate() {
-        let index = u32::try_from(index).unwrap_or(u32::MAX);
-        match entry {
-            Some(value) => {
-                set_property_on_object(cx, object_ref, PropertyKey::Index(index), value)?
-            }
-            None => delete_property_from_object(cx, object_ref, PropertyKey::Index(index))?,
-        }
-    }
-    let new_len = u32::try_from(entries.len()).unwrap_or(u32::MAX);
-    for index in new_len..current_len {
-        delete_property_from_object(cx, object_ref, PropertyKey::Index(index))?;
-    }
-    define_array_length(cx, object_ref, new_len)
+    is_array_for_species(cx, object_ref)
 }
 
 fn set_length_property<Cx: PublicBuiltinDispatchContext>(
@@ -4119,7 +4087,20 @@ fn array_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let arguments = invocation.arguments();
-    let array = create_array_result(cx, arguments.len())?;
+    let realm = cx.builtin_realm();
+    let default_prototype = {
+        let agent = cx.agent();
+        agent
+            .realm(realm)
+            .and_then(|record| record.intrinsics().array_prototype())
+    }
+    .ok_or_else(|| type_error(cx))?;
+    let new_target = invocation
+        .new_target()
+        .unwrap_or_else(|| cx.callee_object());
+    let prototype =
+        cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)?;
+    let array = create_array_result_with_prototype(cx, realm, prototype, arguments.len())?;
     if arguments.is_empty() {
         return Ok(Value::from_object_ref(array));
     }
@@ -4151,9 +4132,10 @@ fn array_is_array_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
-    let is_array = value
-        .as_object_ref()
-        .is_some_and(|object| is_engine_array(cx, object));
+    let is_array = match value.as_object_ref() {
+        Some(object) => is_array_for_species(cx, object)?,
+        None => false,
+    };
     Ok(Value::from_bool(is_array))
 }
 
@@ -9652,14 +9634,10 @@ fn array_concat_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
-    let result = array_species_create(
-        cx,
-        object_ref,
-        invocation.arguments().len().saturating_add(1),
-    )?;
+    let result = array_species_create_for_length(cx, object_ref, 0)?;
     let mut next_index = 0_u64;
-    for value in
-        std::iter::once(invocation.this_value()).chain(invocation.arguments().iter().copied())
+    for value in std::iter::once(Value::from_object_ref(object_ref))
+        .chain(invocation.arguments().iter().copied())
     {
         if let Some(source_object) = value.as_object_ref() {
             if is_concat_spreadable(cx, value)? {
@@ -9675,7 +9653,7 @@ fn array_concat_builtin<Cx: PublicBuiltinDispatchContext>(
                     if has_property_on_object(cx, source_object, source_key)? {
                         let item = get_property_from_object(cx, source_object, source_key)?;
                         let target_key = array_like_index_property_key(cx, next_index);
-                        set_property_on_object(cx, result, target_key, item)?;
+                        create_data_property_or_throw(cx, result, target_key, item)?;
                     }
                     next_index = next_index.saturating_add(1);
                 }
@@ -9686,11 +9664,10 @@ fn array_concat_builtin<Cx: PublicBuiltinDispatchContext>(
             return Err(type_error(cx));
         }
         let target_key = array_like_index_property_key(cx, next_index);
-        set_property_on_object(cx, result, target_key, value)?;
+        create_data_property_or_throw(cx, result, target_key, value)?;
         next_index = next_index.saturating_add(1);
     }
-    let result_length = u32::try_from(next_index).map_err(|_| type_error(cx))?;
-    define_array_length(cx, result, result_length)?;
+    set_length_property(cx, result, next_index)?;
     Ok(Value::from_object_ref(result))
 }
 
@@ -10471,26 +10448,32 @@ fn array_reverse_builtin<Cx: PublicBuiltinDispatchContext>(
         let lower_key = array_like_index_property_key(cx, lower);
         let upper_key = array_like_index_property_key(cx, upper);
         let lower_present = has_property_on_object(cx, object_ref, lower_key)?;
+        let lower_value = if lower_present {
+            Some(get_property_from_object(cx, object_ref, lower_key)?)
+        } else {
+            None
+        };
         let upper_present = has_property_on_object(cx, object_ref, upper_key)?;
+        let upper_value = if upper_present {
+            Some(get_property_from_object(cx, object_ref, upper_key)?)
+        } else {
+            None
+        };
 
-        match (lower_present, upper_present) {
-            (true, true) => {
-                let lower_value = get_property_from_object(cx, object_ref, lower_key)?;
-                let upper_value = get_property_from_object(cx, object_ref, upper_key)?;
+        match (lower_value, upper_value) {
+            (Some(lower_value), Some(upper_value)) => {
                 set_property_on_object(cx, object_ref, lower_key, upper_value)?;
                 set_property_on_object(cx, object_ref, upper_key, lower_value)?;
             }
-            (false, true) => {
-                let upper_value = get_property_from_object(cx, object_ref, upper_key)?;
+            (None, Some(upper_value)) => {
                 set_property_on_object(cx, object_ref, lower_key, upper_value)?;
                 delete_property_from_object(cx, object_ref, upper_key)?;
             }
-            (true, false) => {
-                let lower_value = get_property_from_object(cx, object_ref, lower_key)?;
+            (Some(lower_value), None) => {
                 delete_property_from_object(cx, object_ref, lower_key)?;
                 set_property_on_object(cx, object_ref, upper_key, lower_value)?;
             }
-            (false, false) => {}
+            (None, None) => {}
         }
 
         lower += 1;
@@ -10527,7 +10510,7 @@ fn array_slice_builtin<Cx: PublicBuiltinDispatchContext>(
     if count > u64::from(u32::MAX) {
         return Err(range_error(cx));
     }
-    let result = array_species_create(cx, object_ref, array_result_capacity_hint(count))?;
+    let result = array_species_create_for_length(cx, object_ref, count)?;
     for offset in 0..count {
         let source_key = array_like_index_property_key(cx, start.saturating_add(offset));
         if !has_property_on_object(cx, object_ref, source_key)? {
@@ -10535,7 +10518,7 @@ fn array_slice_builtin<Cx: PublicBuiltinDispatchContext>(
         }
         let value = get_property_from_object(cx, object_ref, source_key)?;
         let target_index = u32::try_from(offset).expect("slice result length already validated");
-        set_property_on_object(cx, result, PropertyKey::Index(target_index), value)?;
+        create_data_property_or_throw(cx, result, PropertyKey::Index(target_index), value)?;
     }
     define_array_length(
         cx,
@@ -10634,8 +10617,6 @@ fn array_sort_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
-    let length = array_like_length(cx, object_ref)?;
     let compare_fn = match invocation
         .arguments()
         .first()
@@ -10645,22 +10626,52 @@ fn array_sort_builtin<Cx: PublicBuiltinDispatchContext>(
         value if value.is_undefined() => None,
         value => Some(cx.require_callable_object(value)?),
     };
-    let entries = snapshot_indexed_entries(cx, object_ref, length)?;
-    let mut present = entries.into_iter().flatten().collect::<Vec<_>>();
-    let present_len = present.len();
-    for i in 1..present_len {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length(cx, object_ref)?;
+    let mut items = Vec::with_capacity(usize::try_from(length).unwrap_or(usize::MAX));
+    let mut undefined_count = 0_u32;
+    for index in 0..length {
+        let key = PropertyKey::Index(index);
+        if !has_property_on_object(cx, object_ref, key)? {
+            continue;
+        }
+        let value = get_property_from_object(cx, object_ref, key)?;
+        if value.is_undefined() {
+            undefined_count = undefined_count.saturating_add(1);
+        } else {
+            items.push(value);
+        }
+    }
+
+    for i in 1..items.len() {
         let mut j = i;
         while j > 0
-            && compare_array_sort_values(cx, compare_fn, present[j - 1], present[j])?
+            && compare_array_sort_values(cx, compare_fn, items[j - 1], items[j])?
                 == std::cmp::Ordering::Greater
         {
-            present.swap(j - 1, j);
+            items.swap(j - 1, j);
             j -= 1;
         }
     }
-    let mut sorted = present.into_iter().map(Some).collect::<Vec<_>>();
-    sorted.resize(usize::try_from(length).unwrap_or(usize::MAX), None);
-    store_indexed_entries(cx, object_ref, &sorted)?;
+
+    let mut index = 0_u32;
+    for value in items {
+        set_property_on_object(cx, object_ref, PropertyKey::Index(index), value)?;
+        index = index.saturating_add(1);
+    }
+    for _ in 0..undefined_count {
+        set_property_on_object(
+            cx,
+            object_ref,
+            PropertyKey::Index(index),
+            Value::undefined(),
+        )?;
+        index = index.saturating_add(1);
+    }
+    while index < length {
+        delete_property_from_object(cx, object_ref, PropertyKey::Index(index))?;
+        index = index.saturating_add(1);
+    }
     Ok(Value::from_object_ref(object_ref))
 }
 
@@ -10973,6 +10984,45 @@ fn array_join_builtin<Cx: PublicBuiltinDispatchContext>(
     };
     let text = array_like_join_text(cx, object_ref, &separator)?;
     Ok(string_value(cx, &text))
+}
+
+fn array_pop_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length_u64(cx, object_ref)?;
+    if length == 0 {
+        set_length_property(cx, object_ref, 0)?;
+        return Ok(Value::undefined());
+    }
+
+    let new_length = length - 1;
+    let key = array_like_index_property_key(cx, new_length);
+    let element = get_property_from_object(cx, object_ref, key)?;
+    delete_property_from_object(cx, object_ref, key)?;
+    set_length_property(cx, object_ref, new_length)?;
+    Ok(element)
+}
+
+fn array_push_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let mut length = array_like_length_u64(cx, object_ref)?;
+    let item_count = u64::try_from(invocation.arguments().len()).unwrap_or(u64::MAX);
+    if item_count > MAX_SAFE_INTEGER_U64.saturating_sub(length) {
+        return Err(type_error(cx));
+    }
+
+    for argument in invocation.arguments() {
+        let key = array_like_index_property_key(cx, length);
+        set_property_on_object(cx, object_ref, key, *argument)?;
+        length += 1;
+    }
+    set_length_property(cx, object_ref, length)?;
+    Ok(length_value_u64(length))
 }
 
 fn array_shift_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -11651,11 +11701,8 @@ fn define_property_or_throw_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     target: lyng_js_types::ObjectRef,
     key: PropertyKey,
-    mut descriptor: PropertyDescriptor,
+    descriptor: PropertyDescriptor,
 ) -> Result<(), Cx::Error> {
-    if is_engine_array(cx, target) && key == PropertyKey::from_atom(WellKnownAtom::length.id()) {
-        descriptor = normalize_engine_array_length_descriptor(cx, descriptor)?;
-    }
     if let Some(index) = key.as_index() {
         let typed_array = cx.agent().objects().typed_array(target);
         if let Some(record) = typed_array {
@@ -11819,7 +11866,7 @@ fn own_property_name_list_builtin<Cx: PublicBuiltinDispatchContext>(
     for (index, key) in names.into_iter().enumerate() {
         let index = u32::try_from(index).unwrap_or(u32::MAX);
         let value = property_key_string_value(cx, key);
-        set_property_on_object(cx, result, PropertyKey::Index(index), value)?;
+        create_data_property_or_throw(cx, result, PropertyKey::Index(index), value)?;
     }
     Ok(Value::from_object_ref(result))
 }
@@ -11860,7 +11907,7 @@ fn object_get_own_property_symbols_builtin<Cx: PublicBuiltinDispatchContext>(
     let result = create_array_result(cx, symbols.len())?;
     for (index, symbol) in symbols.into_iter().enumerate() {
         let index = u32::try_from(index).unwrap_or(u32::MAX);
-        set_property_on_object(
+        create_data_property_or_throw(
             cx,
             result,
             PropertyKey::Index(index),
@@ -12149,10 +12196,10 @@ fn object_entries_builtin<Cx: PublicBuiltinDispatchContext>(
         let entry = create_array_result(cx, 2)?;
         let key_value = property_key_string_value(cx, key);
         let value = get_property_from_object(cx, object_ref, key)?;
-        set_property_on_object(cx, entry, PropertyKey::Index(0), key_value)?;
-        set_property_on_object(cx, entry, PropertyKey::Index(1), value)?;
+        create_data_property_or_throw(cx, entry, PropertyKey::Index(0), key_value)?;
+        create_data_property_or_throw(cx, entry, PropertyKey::Index(1), value)?;
         let index = u32::try_from(index).unwrap_or(u32::MAX);
-        set_property_on_object(
+        create_data_property_or_throw(
             cx,
             result,
             PropertyKey::Index(index),
@@ -12194,7 +12241,7 @@ fn object_values_builtin<Cx: PublicBuiltinDispatchContext>(
     for (index, key) in names.into_iter().enumerate() {
         let value = get_property_from_object(cx, object_ref, key)?;
         let index = u32::try_from(index).unwrap_or(u32::MAX);
-        set_property_on_object(cx, result, PropertyKey::Index(index), value)?;
+        create_data_property_or_throw(cx, result, PropertyKey::Index(index), value)?;
     }
     Ok(Value::from_object_ref(result))
 }

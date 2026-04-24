@@ -1298,14 +1298,7 @@ impl ObjectRuntime {
 
         let current = current.expect("checked above");
         if !descriptor.has_value() {
-            return self.ordinary_define_own_named_property(
-                heap,
-                id,
-                key,
-                Some(current),
-                descriptor,
-                lifetime,
-            );
+            return self.ordinary_define_own_property(heap, id, key, descriptor, lifetime);
         }
 
         let (old_len, old_writable) = array_length_descriptor_state(current)?;
@@ -1318,14 +1311,7 @@ impl ObjectRuntime {
         normalized.set_value(length_value(new_len));
 
         if new_len >= old_len {
-            return self.ordinary_define_own_named_property(
-                heap,
-                id,
-                key,
-                Some(current),
-                normalized,
-                lifetime,
-            );
+            return self.ordinary_define_own_property(heap, id, key, normalized, lifetime);
         }
 
         if !old_writable {
@@ -1336,14 +1322,7 @@ impl ObjectRuntime {
         if final_writable {
             normalized.set_writable(true);
         }
-        if !self.ordinary_define_own_named_property(
-            heap,
-            id,
-            key,
-            Some(current),
-            normalized,
-            lifetime,
-        )? {
+        if !self.ordinary_define_own_property(heap, id, key, normalized, lifetime)? {
             return Ok(false);
         }
 

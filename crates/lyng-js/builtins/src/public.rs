@@ -25,13 +25,13 @@ use lyng_js_types::{
     js3_array_from_builtin, js3_array_includes_builtin, js3_array_index_of_builtin,
     js3_array_is_array_builtin, js3_array_iterator_next_builtin, js3_array_join_builtin,
     js3_array_keys_builtin, js3_array_last_index_of_builtin, js3_array_map_builtin,
-    js3_array_of_builtin, js3_array_reduce_builtin, js3_array_reduce_right_builtin,
-    js3_array_reverse_builtin, js3_array_shift_builtin, js3_array_slice_builtin,
-    js3_array_some_builtin, js3_array_sort_builtin, js3_array_species_getter_builtin,
-    js3_array_splice_builtin, js3_array_to_locale_string_builtin, js3_array_to_reversed_builtin,
-    js3_array_to_sorted_builtin, js3_array_to_spliced_builtin, js3_array_to_string_builtin,
-    js3_array_unshift_builtin, js3_array_values_builtin, js3_array_with_builtin,
-    js3_async_function_builtin, js3_async_generator_function_builtin,
+    js3_array_of_builtin, js3_array_pop_builtin, js3_array_push_builtin, js3_array_reduce_builtin,
+    js3_array_reduce_right_builtin, js3_array_reverse_builtin, js3_array_shift_builtin,
+    js3_array_slice_builtin, js3_array_some_builtin, js3_array_sort_builtin,
+    js3_array_species_getter_builtin, js3_array_splice_builtin, js3_array_to_locale_string_builtin,
+    js3_array_to_reversed_builtin, js3_array_to_sorted_builtin, js3_array_to_spliced_builtin,
+    js3_array_to_string_builtin, js3_array_unshift_builtin, js3_array_values_builtin,
+    js3_array_with_builtin, js3_async_function_builtin, js3_async_generator_function_builtin,
     js3_async_generator_next_builtin, js3_async_generator_return_builtin,
     js3_async_generator_throw_builtin, js3_atomics_add_builtin, js3_atomics_and_builtin,
     js3_atomics_compare_exchange_builtin, js3_atomics_exchange_builtin,
@@ -286,6 +286,8 @@ pub struct PublicRealmBuiltins {
     array_flat: ObjectRef,
     array_flat_map: ObjectRef,
     array_join: ObjectRef,
+    array_pop: ObjectRef,
+    array_push: ObjectRef,
     array_shift: ObjectRef,
     array_unshift: ObjectRef,
     array_every: ObjectRef,
@@ -1042,6 +1044,12 @@ impl PublicRealmBuiltins {
         }
         if entry == js3_array_join_builtin() {
             return Some(self.array_join);
+        }
+        if entry == js3_array_pop_builtin() {
+            return Some(self.array_pop);
+        }
+        if entry == js3_array_push_builtin() {
+            return Some(self.array_push);
         }
         if entry == js3_array_shift_builtin() {
             return Some(self.array_shift);
@@ -3419,6 +3427,28 @@ impl BuiltinCache {
                 object_prototype,
                 js3_array_join_builtin(),
                 public_builtin_metadata(js3_array_join_builtin()).unwrap(),
+                None,
+            ),
+            array_pop: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_pop_builtin(),
+                public_builtin_metadata(js3_array_pop_builtin()).unwrap(),
+                None,
+            ),
+            array_push: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_push_builtin(),
+                public_builtin_metadata(js3_array_push_builtin()).unwrap(),
                 None,
             ),
             array_unshift: allocate_builtin_function_object(
@@ -8185,6 +8215,8 @@ impl BuiltinCache {
         let map_atom = agent.atoms_mut().intern_collectible("map");
         let next_atom = agent.atoms_mut().intern_collectible("next");
         let of_atom = agent.atoms_mut().intern_collectible("of");
+        let pop_atom = agent.atoms_mut().intern_collectible("pop");
+        let push_atom = agent.atoms_mut().intern_collectible("push");
         let reduce_atom = agent.atoms_mut().intern_collectible("reduce");
         let reduce_right_atom = agent.atoms_mut().intern_collectible("reduceRight");
         let reverse_atom = agent.atoms_mut().intern_collectible("reverse");
@@ -10386,6 +10418,16 @@ impl BuiltinCache {
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(join_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_array_join_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(pop_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_pop_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(push_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_push_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -13024,6 +13066,12 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     }
     if entry == js3_array_join_builtin() {
         return Some(BuiltinEntryMetadata::new("join", 1, false, false));
+    }
+    if entry == js3_array_pop_builtin() {
+        return Some(BuiltinEntryMetadata::new("pop", 0, false, false));
+    }
+    if entry == js3_array_push_builtin() {
+        return Some(BuiltinEntryMetadata::new("push", 1, false, false));
     }
     if entry == js3_array_shift_builtin() {
         return Some(BuiltinEntryMetadata::new("shift", 0, false, false));

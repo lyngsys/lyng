@@ -2362,13 +2362,76 @@ impl Vm {
         Ok(Value::from_smi(-1))
     }
 
+    fn array_like_length_from_value(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        value: Value,
+    ) -> VmResult<u64> {
+        const MAX_SAFE_INTEGER_U64: u64 = (1_u64 << 53) - 1;
+
+        let primitive = self.to_primitive(
+            agent,
+            host,
+            registry,
+            caller,
+            value,
+            ToPrimitiveHint::Number,
+        )?;
+        let number = read::to_number(agent.heap().view(), primitive).map_err(VmError::Abrupt)?;
+        let number = number
+            .as_f64()
+            .expect("ToNumber must always produce a numeric Value");
+        if number.is_nan() || number <= 0.0 {
+            return Ok(0);
+        }
+        if !number.is_finite() {
+            return Ok(MAX_SAFE_INTEGER_U64);
+        }
+        Ok(number.trunc().min(MAX_SAFE_INTEGER_U64 as f64) as u64)
+    }
+
+    fn array_length_value(length: u64) -> Value {
+        u32::try_from(length)
+            .map(length_value)
+            .unwrap_or_else(|_| Value::from_f64(length as f64))
+    }
+
+    fn array_like_index_key(agent: &mut Agent, index: u64) -> PropertyKey {
+        if let Some(key) = PropertyKey::from_array_index(index) {
+            return key;
+        }
+        let atom = agent.atoms_mut().intern_collectible(&index.to_string());
+        PropertyKey::from_atom(atom)
+    }
+
+    fn set_array_property_or_throw(
+        agent: &mut Agent,
+        object: ObjectRef,
+        key: PropertyKey,
+        value: Value,
+    ) -> VmResult<()> {
+        let stored = object::set(agent, object, key, value, AllocationLifetime::Default)
+            .map_err(VmError::Abrupt)?;
+        if !stored {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        Ok(())
+    }
+
     fn array_push_builtin(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<Value> {
+        const MAX_SAFE_INTEGER_U64: u64 = (1_u64 << 53) - 1;
+
         let object = self.to_object_for_value(agent, caller.realm(), this_value)?;
         let length = object::get(
             agent,
@@ -2376,53 +2439,33 @@ impl Vm {
             PropertyKey::from_atom(WellKnownAtom::length.id()),
         )
         .map_err(VmError::Abrupt)?;
-        let length_number = to_f64_number(agent, length)?;
-        let length_uint32 =
-            if length_number.is_nan() || length_number == 0.0 || !length_number.is_finite() {
-                0
-            } else {
-                let integer = length_number.trunc();
-                let mut modulo = integer % 4_294_967_296.0;
-                if modulo < 0.0 {
-                    modulo += 4_294_967_296.0;
-                }
-                modulo as u32
-            };
-        if f64::from(length_uint32) != length_number {
-            return Err(VmError::Abrupt(errors::throw_range_error(agent)));
+        let mut length =
+            self.array_like_length_from_value(agent, host, registry, caller, length)?;
+        let argument_count = u64::try_from(arguments.len()).unwrap_or(u64::MAX);
+        if argument_count > MAX_SAFE_INTEGER_U64.saturating_sub(length) {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
-
-        let mut next_index = u64::from(length_uint32);
 
         for argument in arguments {
-            let key = if next_index <= u64::from(u32::MAX - 1) {
-                PropertyKey::Index(next_index as u32)
-            } else {
-                let atom = agent
-                    .atoms_mut()
-                    .intern_collectible(&next_index.to_string());
-                PropertyKey::from_atom(atom)
-            };
-            let stored = object::set(agent, object, key, *argument, AllocationLifetime::Default)
-                .map_err(VmError::Abrupt)?;
-            if !stored {
-                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
-            }
-            next_index = next_index.saturating_add(1);
+            let key = Self::array_like_index_key(agent, length);
+            Self::set_array_property_or_throw(agent, object, key, *argument)?;
+            length += 1;
         }
 
-        if next_index > u64::from(u32::MAX) {
-            return Err(VmError::Abrupt(errors::throw_range_error(agent)));
-        }
-
-        let new_length = next_index as u32;
-        Self::define_length_property(agent, object, new_length, false)?;
-        Ok(length_value(new_length))
+        Self::set_array_property_or_throw(
+            agent,
+            object,
+            PropertyKey::from_atom(WellKnownAtom::length.id()),
+            Self::array_length_value(length),
+        )?;
+        Ok(Self::array_length_value(length))
     }
 
     fn array_pop_builtin(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
         this_value: Value,
     ) -> VmResult<Value> {
@@ -2433,35 +2476,30 @@ impl Vm {
             PropertyKey::from_atom(WellKnownAtom::length.id()),
         )
         .map_err(VmError::Abrupt)?;
-        let length_number = to_f64_number(agent, length)?;
-        let length_uint32 =
-            if length_number.is_nan() || length_number == 0.0 || !length_number.is_finite() {
-                0
-            } else {
-                let integer = length_number.trunc();
-                let mut modulo = integer % 4_294_967_296.0;
-                if modulo < 0.0 {
-                    modulo += 4_294_967_296.0;
-                }
-                modulo as u32
-            };
-        if f64::from(length_uint32) != length_number {
-            return Err(VmError::Abrupt(errors::throw_range_error(agent)));
-        }
-        if length_uint32 == 0 {
-            Self::define_length_property(agent, object, 0, false)?;
+        let length = self.array_like_length_from_value(agent, host, registry, caller, length)?;
+        if length == 0 {
+            Self::set_array_property_or_throw(
+                agent,
+                object,
+                PropertyKey::from_atom(WellKnownAtom::length.id()),
+                Value::from_smi(0),
+            )?;
             return Ok(Value::undefined());
         }
 
-        let index = length_uint32 - 1;
-        let element =
-            object::get(agent, object, PropertyKey::Index(index)).map_err(VmError::Abrupt)?;
-        let deleted = object::delete_property(agent, object, PropertyKey::Index(index))
-            .map_err(VmError::Abrupt)?;
+        let new_length = length - 1;
+        let key = Self::array_like_index_key(agent, new_length);
+        let element = object::get(agent, object, key).map_err(VmError::Abrupt)?;
+        let deleted = object::delete_property(agent, object, key).map_err(VmError::Abrupt)?;
         if !deleted {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
-        Self::define_length_property(agent, object, index, false)?;
+        Self::set_array_property_or_throw(
+            agent,
+            object,
+            PropertyKey::from_atom(WellKnownAtom::length.id()),
+            Self::array_length_value(new_length),
+        )?;
         Ok(element)
     }
 
@@ -4104,6 +4142,8 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     ) -> Result<Value, Self::Error> {
         self.vm.array_push_builtin(
             self.agent,
+            self.host,
+            self.registry,
             self.caller_frame,
             invocation.this_value(),
             invocation.arguments(),
@@ -4114,8 +4154,13 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .array_pop_builtin(self.agent, self.caller_frame, invocation.this_value())
+        self.vm.array_pop_builtin(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            invocation.this_value(),
+        )
     }
 
     fn object_to_string_builtin(

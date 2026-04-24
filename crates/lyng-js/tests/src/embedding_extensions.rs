@@ -258,6 +258,33 @@ fn embedding_extensions_propagate_to_child_realms() {
 }
 
 #[test]
+fn array_constructor_uses_new_target_realm_default_prototype() {
+    let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let childGlobal = embedding.createRealm();
+        let newTarget = new childGlobal.Function();
+        newTarget.prototype = undefined;
+
+        let empty = Reflect.construct(Array, [], newTarget);
+        score += Object.getPrototypeOf(empty) === childGlobal.Array.prototype ? 1 : 0;
+
+        let sized = Reflect.construct(Array, [1], newTarget);
+        score += Object.getPrototypeOf(sized) === childGlobal.Array.prototype ? 2 : 0;
+
+        let items = Reflect.construct(Array, ["a", "b"], newTarget);
+        score += Object.getPrototypeOf(items) === childGlobal.Array.prototype ? 4 : 0;
+
+        score;
+        "#,
+        Some(&provider),
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
 fn indirect_eval_uses_eval_functions_realm() {
     let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
     let result = compile_and_run_string(

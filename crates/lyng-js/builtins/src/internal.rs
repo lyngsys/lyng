@@ -3,8 +3,8 @@ use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
 use lyng_js_gc::{AllocationLifetime, PrimitiveMutator};
 use lyng_js_objects::{
-    FunctionObjectData, FunctionThisMode, ObjectAllocation, ObjectColdData, OrdinaryObjectData,
-    PrimitiveWrapperKind,
+    FunctionObjectData, FunctionThisMode, ObjectAllocation, ObjectColdData, ObjectFlags,
+    OrdinaryObjectData, PrimitiveWrapperKind,
 };
 use lyng_js_types::{
     js3_internal_array_index_of_builtin, js3_internal_array_pop_builtin,
@@ -275,7 +275,9 @@ impl InternalBuiltinCache {
             let array_prototype = existing_intrinsics.array_prototype().unwrap_or_else(|| {
                 objects.alloc_object(
                     &mut mutator,
-                    ObjectAllocation::ordinary(root_shape).with_prototype(Some(object_prototype)),
+                    ObjectAllocation::ordinary(root_shape)
+                        .with_flags(ObjectFlags::extensible().union(ObjectFlags::ENGINE_ARRAY))
+                        .with_prototype(Some(object_prototype)),
                     AllocationLifetime::Default,
                 )
             });
