@@ -25,12 +25,12 @@ use lyng_js_host::{
 };
 use lyng_js_objects::{
     ClassPrivateElementKind, FunctionConstructorFlags, FunctionEntryIdentity, FunctionObjectData,
-    FunctionThisMode, InternalMethodError, ObjectAllocation, ObjectColdData, PrimitiveWrapperKind,
+    FunctionThisMode, InternalMethodError, ObjectAllocation, ObjectColdData, OrdinaryObjectData,
+    PrimitiveWrapperKind, RegExpPayload,
 };
 use lyng_js_ops::object::ToPrimitiveHint;
 use lyng_js_ops::{errors, names as ops_names, object, proxy, read};
-use lyng_js_parser::parse_script;
-use lyng_js_parser::parse_script_with_initial_strict;
+use lyng_js_parser::{parse_script, parse_script_with_initial_strict, validate_regexp_literal};
 use lyng_js_sema::{
     analyze_direct_eval_script, analyze_script,
     ClassPrivateElementKind as SemaClassPrivateElementKind, ClassPrivateElementRecord,
@@ -40,10 +40,91 @@ use lyng_js_sema::{
 use lyng_js_types::{
     js3_eval_builtin, js3_internal_dynamic_import_builtin, js3_internal_import_meta_builtin,
     js3_object_to_string_builtin, js3_promise_capability_executor_builtin, AbruptCompletion,
-    BuiltinFunctionId, EmbeddingFunctionId, PropertyDescriptor, PropertyKey, RealmRef,
+    BuiltinFunctionId, EmbeddingFunctionId, PropertyDescriptor, PropertyKey, RealmRef, StringRef,
     WellKnownSymbolId,
 };
 use std::collections::HashMap;
+
+fn split_eval_regexp_literal_source(source: &str) -> Option<(&str, &str)> {
+    let mut chars = source.char_indices();
+    if chars.next()?.1 != '/' {
+        return None;
+    }
+
+    let mut escaped = false;
+    let mut in_class = false;
+    for (index, ch) in chars {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' => escaped = true,
+            '[' => in_class = true,
+            ']' if in_class => in_class = false,
+            '/' if !in_class => {
+                let pattern = &source[1..index];
+                let flags = &source[index + ch.len_utf8()..];
+                if flags.chars().all(is_regexp_literal_flag_char) {
+                    return Some((pattern, flags));
+                }
+                return None;
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn is_regexp_literal_flag_char(ch: char) -> bool {
+    ch == '$' || ch == '_' || ch.is_ascii_alphanumeric()
+}
+
+fn split_eval_regexp_literal_units(units: &[u16]) -> Option<(&[u16], String)> {
+    if units.first().copied()? != u16::from(b'/') {
+        return None;
+    }
+    let mut escaped = false;
+    let mut in_class = false;
+    for (index, unit) in units.iter().copied().enumerate().skip(1) {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match unit {
+            0x005c => escaped = true,
+            0x005b => in_class = true,
+            0x005d if in_class => in_class = false,
+            0x002f if !in_class => {
+                let flags = units[index + 1..]
+                    .iter()
+                    .copied()
+                    .map(|unit| u8::try_from(unit).ok().map(char::from))
+                    .collect::<Option<String>>()?;
+                if flags.chars().all(is_regexp_literal_flag_char) {
+                    return Some((&units[1..index], flags));
+                }
+                return None;
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn string_ref_code_units(agent: &Agent, string: StringRef) -> Option<Vec<u16>> {
+    let view = agent.heap().view().string_view(string)?;
+    if let Some(bytes) = view.latin1_bytes() {
+        return Some(bytes.iter().copied().map(u16::from).collect());
+    }
+    let bytes = view.utf16_bytes()?;
+    Some(
+        bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect(),
+    )
+}
 
 impl Vm {
     fn abrupt_intrinsic_error(
@@ -746,6 +827,114 @@ impl Vm {
         }
     }
 
+    fn try_evaluate_regexp_literal_eval_source(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRef,
+        source_text: &str,
+    ) -> VmResult<Option<Value>> {
+        let Some((pattern, flags)) = split_eval_regexp_literal_source(source_text) else {
+            return Ok(None);
+        };
+        if validate_regexp_literal(pattern, flags).is_err() {
+            return Err(Self::syntax_error(agent, realm, "evalScript parse failure"));
+        }
+        let regexp = self.allocate_eval_regexp_literal(agent, realm, pattern, flags)?;
+        Ok(Some(Value::from_object_ref(regexp)))
+    }
+
+    fn try_evaluate_regexp_literal_eval_string_ref(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRef,
+        source: StringRef,
+    ) -> VmResult<Option<Value>> {
+        let units = string_ref_code_units(agent, source).ok_or(VmError::MissingRootShape(realm))?;
+        let Some((pattern_units, flags)) = split_eval_regexp_literal_units(&units) else {
+            return Ok(None);
+        };
+        let pattern = String::from_utf16_lossy(pattern_units);
+        if validate_regexp_literal(&pattern, &flags).is_err() {
+            return Err(Self::syntax_error(agent, realm, "evalScript parse failure"));
+        }
+        let regexp = self.allocate_eval_regexp_literal_with_source_units(
+            agent,
+            realm,
+            &pattern,
+            pattern_units.to_vec().into_boxed_slice(),
+            &flags,
+        )?;
+        Ok(Some(Value::from_object_ref(regexp)))
+    }
+
+    fn allocate_eval_regexp_literal(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRef,
+        pattern: &str,
+        flags: &str,
+    ) -> VmResult<ObjectRef> {
+        let payload = RegExpPayload::compile(pattern, flags)
+            .map_err(|_| Self::syntax_error(agent, realm, "evalScript parse failure"))?;
+        self.allocate_eval_regexp_literal_with_payload(agent, realm, payload)
+    }
+
+    fn allocate_eval_regexp_literal_with_source_units(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRef,
+        pattern: &str,
+        source_units: Box<[u16]>,
+        flags: &str,
+    ) -> VmResult<ObjectRef> {
+        let payload = RegExpPayload::compile_with_source_units(pattern, source_units, flags)
+            .map_err(|_| Self::syntax_error(agent, realm, "evalScript parse failure"))?;
+        self.allocate_eval_regexp_literal_with_payload(agent, realm, payload)
+    }
+
+    fn allocate_eval_regexp_literal_with_payload(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRef,
+        payload: RegExpPayload,
+    ) -> VmResult<ObjectRef> {
+        let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
+        let root_shape = realm_record
+            .root_shape()
+            .ok_or(VmError::MissingRootShape(realm))?;
+        let prototype = realm_record
+            .intrinsics()
+            .regexp_prototype()
+            .ok_or(VmError::MissingRootShape(realm))?;
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            let object = objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape)
+                    .with_prototype(Some(prototype))
+                    .with_cold_data(ObjectColdData::Ordinary(OrdinaryObjectData::RegExp)),
+                AllocationLifetime::Default,
+            );
+            let stored = objects.store_regexp_payload(object, payload);
+            debug_assert!(stored, "fresh RegExp objects should accept payload storage");
+            object
+        });
+        let key = PropertyKey::from_atom(agent.bootstrap_atoms().last_index());
+        let mut descriptor = PropertyDescriptor::new();
+        descriptor.set_value(Value::from_smi(0));
+        descriptor.set_writable(true);
+        descriptor.set_enumerable(false);
+        descriptor.set_configurable(false);
+        let defined =
+            object::define_property(agent, object, key, descriptor, AllocationLifetime::Default)
+                .map_err(VmError::Abrupt)?;
+        if defined {
+            Ok(object)
+        } else {
+            Err(VmError::Abrupt(errors::throw_type_error(agent)))
+        }
+    }
+
     pub(crate) fn evaluate_script_source(
         &mut self,
         agent: &mut Agent,
@@ -789,6 +978,12 @@ impl Vm {
         realm: RealmRef,
         source_text: &str,
     ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_evaluate_regexp_literal_eval_source(agent, realm, source_text)?
+        {
+            return Ok(value);
+        }
+
         let source_id = self.allocate_dynamic_source_id();
         let parsed = parse_script(agent.atoms_mut(), source_id, source_text);
         if parsed.diagnostics.has_errors() {
@@ -1486,6 +1681,12 @@ impl Vm {
         source_text: &str,
     ) -> VmResult<Value> {
         let realm = caller.realm();
+        if let Some(value) =
+            self.try_evaluate_regexp_literal_eval_source(agent, realm, source_text)?
+        {
+            return Ok(value);
+        }
+
         let source_id = self.allocate_dynamic_source_id();
         let parsed = parse_script_with_initial_strict(
             agent.atoms_mut(),
@@ -3844,6 +4045,13 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         let Some(source_ref) = source.as_string_ref() else {
             return Ok(source);
         };
+        if let Some(value) = self.vm.try_evaluate_regexp_literal_eval_string_ref(
+            self.agent,
+            self.caller_frame.realm(),
+            source_ref,
+        )? {
+            return Ok(value);
+        }
         let source_text = self.builtin_value_to_string_text(Value::from_string_ref(source_ref))?;
         self.vm.evaluate_direct_eval_source(
             self.agent,

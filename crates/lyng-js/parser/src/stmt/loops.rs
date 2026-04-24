@@ -1,4 +1,4 @@
-use lyng_js_ast::{Decl, ForInOfLeft, ForInit, Stmt, StmtId, VariableKind};
+use lyng_js_ast::{Decl, Expr, ExprId, ForInOfLeft, ForInit, Stmt, StmtId, VariableKind};
 use lyng_js_common::{Span, WellKnownAtom};
 use lyng_js_lexer::TokenKind;
 
@@ -108,6 +108,13 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
 
         if self.at_contextual(WellKnownAtom::of) {
+            if !is_await && self.is_unescaped_async_for_of_lhs(expr) {
+                let span = self.ast().get_expr(expr).span();
+                self.error_at(
+                    span,
+                    "`async` cannot be used as this for-of left-hand side".to_string(),
+                );
+            }
             if self.is_destructuring_pattern_expression(expr) {
                 self.validate_pattern_expression(expr, false, true);
             } else if !self.is_simple_assignment_target(expr) {
@@ -136,6 +143,13 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         self.expect(TokenKind::Semicolon);
         self.parse_for_rest(start, Some(ForInit::Expression(expr)))
+    }
+
+    fn is_unescaped_async_for_of_lhs(&self, expr: ExprId) -> bool {
+        let Expr::Identifier { span, name } = self.ast().get_expr(expr) else {
+            return false;
+        };
+        *name == WellKnownAtom::async_.id() && self.span_text(*span) == "async"
     }
 
     fn at_let_declaration(&mut self) -> bool {

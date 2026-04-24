@@ -115,24 +115,24 @@ use super::{
     js3_set_values_builtin, js3_shared_array_buffer_builtin,
     js3_shared_array_buffer_byte_length_getter_builtin, js3_shared_array_buffer_slice_builtin,
     js3_string_builtin, js3_string_char_at_builtin, js3_string_char_code_at_builtin,
-    js3_string_iterator_builtin, js3_string_iterator_next_builtin,
-    js3_string_last_index_of_builtin, js3_string_match_builtin, js3_string_pad_end_builtin,
-    js3_string_pad_start_builtin, js3_string_repeat_builtin, js3_string_replace_builtin,
-    js3_string_slice_builtin, js3_string_split_builtin, js3_string_starts_with_builtin,
-    js3_string_substring_builtin, js3_string_to_string_builtin, js3_string_value_of_builtin,
-    js3_symbol_builtin, js3_symbol_description_getter_builtin, js3_symbol_for_builtin,
-    js3_symbol_key_for_builtin, js3_symbol_to_primitive_builtin, js3_symbol_to_string_builtin,
-    js3_symbol_value_of_builtin, js3_syntax_error_builtin, js3_type_error_builtin,
-    js3_typed_array_at_builtin, js3_typed_array_builtin, js3_typed_array_copy_within_builtin,
-    js3_typed_array_every_builtin, js3_typed_array_fill_builtin, js3_typed_array_filter_builtin,
-    js3_typed_array_find_builtin, js3_typed_array_find_index_builtin,
-    js3_typed_array_find_last_builtin, js3_typed_array_find_last_index_builtin,
-    js3_typed_array_for_each_builtin, js3_typed_array_from_builtin,
-    js3_typed_array_includes_builtin, js3_typed_array_index_of_builtin,
-    js3_typed_array_join_builtin, js3_typed_array_last_index_of_builtin,
-    js3_typed_array_map_builtin, js3_typed_array_of_builtin, js3_typed_array_reduce_builtin,
-    js3_typed_array_reduce_right_builtin, js3_typed_array_reverse_builtin,
-    js3_typed_array_some_builtin, js3_typed_array_sort_builtin,
+    js3_string_from_char_code_builtin, js3_string_iterator_builtin,
+    js3_string_iterator_next_builtin, js3_string_last_index_of_builtin, js3_string_match_builtin,
+    js3_string_pad_end_builtin, js3_string_pad_start_builtin, js3_string_repeat_builtin,
+    js3_string_replace_builtin, js3_string_search_builtin, js3_string_slice_builtin,
+    js3_string_split_builtin, js3_string_starts_with_builtin, js3_string_substring_builtin,
+    js3_string_to_string_builtin, js3_string_value_of_builtin, js3_symbol_builtin,
+    js3_symbol_description_getter_builtin, js3_symbol_for_builtin, js3_symbol_key_for_builtin,
+    js3_symbol_to_primitive_builtin, js3_symbol_to_string_builtin, js3_symbol_value_of_builtin,
+    js3_syntax_error_builtin, js3_type_error_builtin, js3_typed_array_at_builtin,
+    js3_typed_array_builtin, js3_typed_array_copy_within_builtin, js3_typed_array_every_builtin,
+    js3_typed_array_fill_builtin, js3_typed_array_filter_builtin, js3_typed_array_find_builtin,
+    js3_typed_array_find_index_builtin, js3_typed_array_find_last_builtin,
+    js3_typed_array_find_last_index_builtin, js3_typed_array_for_each_builtin,
+    js3_typed_array_from_builtin, js3_typed_array_includes_builtin,
+    js3_typed_array_index_of_builtin, js3_typed_array_join_builtin,
+    js3_typed_array_last_index_of_builtin, js3_typed_array_map_builtin, js3_typed_array_of_builtin,
+    js3_typed_array_reduce_builtin, js3_typed_array_reduce_right_builtin,
+    js3_typed_array_reverse_builtin, js3_typed_array_some_builtin, js3_typed_array_sort_builtin,
     js3_typed_array_to_locale_string_builtin, js3_typed_array_to_reversed_builtin,
     js3_typed_array_to_sorted_builtin, js3_typed_array_to_string_builtin,
     js3_typed_array_to_string_tag_getter_builtin, js3_typed_array_with_builtin,
@@ -1254,6 +1254,9 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_string_char_code_at_builtin() {
         return string_char_code_at_builtin(context, invocation).map(Some);
     }
+    if entry == js3_string_from_char_code_builtin() {
+        return string_from_char_code_builtin(context, invocation).map(Some);
+    }
     if entry == js3_string_match_builtin() {
         return string_match_builtin(context, invocation).map(Some);
     }
@@ -1271,6 +1274,9 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == js3_string_replace_builtin() {
         return string_replace_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_string_search_builtin() {
+        return string_search_builtin(context, invocation).map(Some);
     }
     if entry == js3_string_split_builtin() {
         return string_split_builtin(context, invocation).map(Some);
@@ -13757,6 +13763,17 @@ fn string_char_code_at_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_smi(i32::from(units[index])))
 }
 
+fn string_from_char_code_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let mut units = Vec::with_capacity(invocation.arguments().len());
+    for value in invocation.arguments().iter().copied() {
+        units.push((to_uint32_for_builtin(cx, value)? & 0xffff) as u16);
+    }
+    Ok(string_from_code_units(cx, &units))
+}
+
 fn string_match_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -13808,6 +13825,48 @@ fn string_match_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Value::null());
     };
     build_regexp_match_result(cx, &source_units, source_value, &state)
+}
+
+fn string_search_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let source_ref = string_this_ref(cx, invocation.this_value())?;
+    let source_units = string_ref_code_units(cx, source_ref)?;
+    let pattern_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+
+    let matched = if let Some(object_ref) = pattern_value.as_object_ref() {
+        if is_regexp_object(cx, object_ref)? {
+            let payload = {
+                let agent = cx.agent();
+                agent.objects().regexp_payload(object_ref).cloned()
+            }
+            .ok_or_else(|| type_error(cx))?;
+            payload.find_from_code_units(&source_units, 0)
+        } else {
+            let pattern_text = cx.value_to_string_text(pattern_value)?;
+            let payload = lyng_js_objects::RegExpPayload::compile(&pattern_text, "")
+                .map_err(|_| syntax_error(cx))?;
+            payload.find_from_code_units(&source_units, 0)
+        }
+    } else {
+        let pattern_text = if pattern_value.is_undefined() {
+            String::new()
+        } else {
+            cx.value_to_string_text(pattern_value)?
+        };
+        let payload = lyng_js_objects::RegExpPayload::compile(&pattern_text, "")
+            .map_err(|_| syntax_error(cx))?;
+        payload.find_from_code_units(&source_units, 0)
+    };
+
+    Ok(matched
+        .map(|record| usize_index_value(record.range().start))
+        .unwrap_or_else(|| Value::from_smi(-1)))
 }
 
 fn string_last_index_of_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -14617,6 +14676,11 @@ fn regexp_flag_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_bool(value))
 }
 
+enum RegExpSource {
+    Text(String),
+    Units(Vec<u16>),
+}
+
 fn regexp_source_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -14628,15 +14692,24 @@ fn regexp_source_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     let source = {
         let agent = cx.agent();
         agent.objects().regexp_payload(object_ref).map(|payload| {
-            if payload.source().is_empty() {
-                "(?:)".to_owned()
+            if let Some(units) = payload.source_units() {
+                if units.is_empty() {
+                    RegExpSource::Text("(?:)".to_owned())
+                } else {
+                    RegExpSource::Units(units.to_vec())
+                }
+            } else if payload.source().is_empty() {
+                RegExpSource::Text("(?:)".to_owned())
             } else {
-                payload.source().to_owned()
+                RegExpSource::Text(payload.source().to_owned())
             }
         })
     };
     if let Some(source) = source {
-        return Ok(string_value(cx, &source));
+        return Ok(match source {
+            RegExpSource::Text(source) => string_value(cx, &source),
+            RegExpSource::Units(units) => string_from_code_units(cx, &units),
+        });
     }
     if current_intrinsic_regexp_prototype(cx) == Some(object_ref) {
         return Ok(string_value(cx, "(?:)"));

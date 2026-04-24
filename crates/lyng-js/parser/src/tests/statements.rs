@@ -317,6 +317,21 @@ fn parse_for_await_of_with_async_identifier_lhs() {
 }
 
 #[test]
+fn parse_for_of_rejects_unescaped_async_identifier_lhs() {
+    let p = script("var async; for (async of [1]) ;");
+    assert!(p.diagnostics.has_errors());
+}
+
+#[test]
+fn parse_for_of_allows_parenthesized_or_escaped_async_identifier_lhs() {
+    let parenthesized = script_ok("let async; for ((async) of [7]) ;");
+    assert!(!parenthesized.diagnostics.has_errors());
+
+    let escaped = script_ok(r"let async; for (\u0061sync of [7]) ;");
+    assert!(!escaped.diagnostics.has_errors());
+}
+
+#[test]
 fn parse_for_empty_init() {
     let p = script_ok("for (;;) { break; }");
     let stmts = body(&p);

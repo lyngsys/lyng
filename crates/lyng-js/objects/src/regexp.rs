@@ -260,6 +260,7 @@ pub struct RegExpPayloadAccounting {
 #[derive(Clone, Debug)]
 pub struct RegExpPayload {
     source: Box<str>,
+    source_units: Option<Box<[u16]>>,
     flags: RegExpObjectFlags,
     flag_text: Box<str>,
     backend: Regex,
@@ -297,15 +298,31 @@ impl RegExpPayload {
         let backend = Regex::with_flags(&backend_pattern, parsed_flags.compile_flags())?;
         Ok(Self {
             source: pattern.into(),
+            source_units: None,
             flags: parsed_flags,
             flag_text: parsed_flags.ordered_flag_text().into_boxed_str(),
             backend,
         })
     }
 
+    pub fn compile_with_source_units(
+        pattern: &str,
+        source_units: Box<[u16]>,
+        flags: &str,
+    ) -> Result<Self, regress::Error> {
+        let mut payload = Self::compile(pattern, flags)?;
+        payload.source_units = Some(source_units);
+        Ok(payload)
+    }
+
     #[inline]
     pub fn source(&self) -> &str {
         &self.source
+    }
+
+    #[inline]
+    pub fn source_units(&self) -> Option<&[u16]> {
+        self.source_units.as_deref()
     }
 
     #[inline]
@@ -320,7 +337,13 @@ impl RegExpPayload {
 
     #[inline]
     pub fn payload_bytes(&self) -> usize {
-        self.source.len() + self.flag_text.len() + size_of::<Regex>()
+        self.source.len()
+            + self
+                .source_units
+                .as_ref()
+                .map_or(0, |units| units.len() * size_of::<u16>())
+            + self.flag_text.len()
+            + size_of::<Regex>()
     }
 
     pub fn find_from_code_units(&self, text: &[u16], start: usize) -> Option<RegExpMatchRecord> {

@@ -21,8 +21,8 @@ use lyng_js_host::{
     LoadedModuleSource, ModuleKey, ModuleSourceRequest, NoopHostHooks, TestHost,
 };
 use lyng_js_objects::{
-    FunctionEntryIdentity, InternalMethodResult, NativeCallRequest, NativeConstructRequest,
-    NativeFunctionRegistry, ObjectAllocation, ObjectRuntime,
+    FunctionEntryIdentity, InternalMethodResult, NamedPropertyStorageMode, NativeCallRequest,
+    NativeConstructRequest, NativeFunctionRegistry, ObjectAllocation, ObjectRuntime,
 };
 use lyng_js_ops::object::{create_data_property, get};
 use lyng_js_parser::{parse_module, parse_script};
@@ -2987,6 +2987,26 @@ fn evaluate_script_eval_executes_string_source_in_the_current_realm() {
 }
 
 #[test]
+fn evaluate_script_eval_fast_paths_regexp_literal_source() {
+    let unit = compile_test_unit(
+        23801,
+        r#"
+            eval("/a/").source === "a" &&
+            eval("/" + String.fromCharCode(0xd800) + "/").source.charCodeAt(0) === 0xd800 &&
+            (0, eval)("/b/g").global === true;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn evaluate_script_direct_eval_poisoned_scope_reads_var_binding() {
     let unit = compile_test_unit(
         2381,
@@ -4523,6 +4543,42 @@ fn evaluate_script_string_literal_strict_equality_with_identifier() {
         r#"
             var __10_4_2_1_1_1 = "str1";
             'str1' === __10_4_2_1_1_1;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn evaluate_script_string_from_char_code_uses_uint16_code_units() {
+    let unit = compile_test_unit(
+        2392,
+        r#"
+            String.fromCharCode(65, 0x20ac, -1) === "A\u20ac\uffff";
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn evaluate_script_string_search_uses_regexp_payloads() {
+    let unit = compile_test_unit(
+        2393,
+        r#"
+            "abc".search(/b/) === 1 && "\x00\u136c".search(/\0\u136c$/u) === 0;
         "#,
     );
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -7527,6 +7583,43 @@ fn global_script_instantiation_precreates_non_configurable_var_bindings() {
 }
 
 #[test]
+fn global_script_instantiation_uses_dictionary_storage_for_bulk_var_bindings() {
+    let mut source = String::new();
+    for index in 0..96 {
+        source.push_str(&format!("var binding_{index};\n"));
+    }
+    let unit = compile_test_unit(5_301, &source);
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let _ = vm
+        .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
+        .expect("bootstrap should succeed");
+    let _ = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.instantiate_global_script(agent, realm, unit.instantiation_plan())
+        .unwrap();
+
+    assert_eq!(
+        agent
+            .objects()
+            .named_property_storage_mode(realm.global_object()),
+        Some(NamedPropertyStorageMode::Dictionary)
+    );
+    let last_atom = agent.atoms_mut().intern_collectible("binding_95");
+    assert!(agent
+        .objects()
+        .get_own_property(
+            agent.heap().view(),
+            realm.global_object(),
+            PropertyKey::from_atom(last_atom),
+        )
+        .unwrap()
+        .is_some());
+}
+
+#[test]
 fn vm_executes_wide_register_and_constant_operands() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8828,6 +8921,38 @@ fn tail_calls_reuse_frame_depth_for_recursive_bytecode_calls() {
         .unwrap();
 
     assert_eq!(result, Value::from_smi(200));
+    assert_eq!(vm.peak_frame_depth(), 2);
+}
+
+#[test]
+fn tail_calls_through_rebound_global_eval_reuse_frame_depth() {
+    let unit = compile_test_unit(
+        37,
+        r#"
+        var callCount = 0;
+        function f(n) {
+            "use strict";
+            if (n === 0) {
+                callCount += 1;
+                return callCount;
+            }
+            return eval(n - 1);
+        }
+        eval = f;
+        f(8);
+        "#,
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(1));
     assert_eq!(vm.peak_frame_depth(), 2);
 }
 

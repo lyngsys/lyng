@@ -109,6 +109,13 @@ impl TestExpectation {
             _ => None,
         }
     }
+
+    fn requires_standalone_frontend_check(&self) -> bool {
+        matches!(
+            self.negative.as_ref().map(|negative| &negative.phase),
+            Some(ExpectedFailurePhase::Parse | ExpectedFailurePhase::Early)
+        )
+    }
 }
 
 impl ExpectedFailure {
@@ -152,71 +159,85 @@ pub(crate) fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> Run
         return outcome;
     }
 
-    let parse_source = effective_parse_source(&source, &test.metadata);
-    let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mut atoms = AtomTable::new();
-        if expectation.module_goal {
-            let parsed = parse_module(&mut atoms, SourceId::new(0), &parse_source);
-            (atoms, parsed.diagnostics, true)
-        } else {
-            let parsed = parse_script(&mut atoms, SourceId::new(0), &parse_source);
-            (atoms, parsed.diagnostics, false)
-        }
-    }));
-
-    let (atoms, parse_diagnostics, parsed_as_module) = match parse_result {
-        Ok(result) => result,
-        Err(panic) => return RunOutcome::Fail(format!("PANIC parse: {}", panic_message(&panic))),
-    };
-
-    if parse_diagnostics.has_errors() {
-        return match expectation
-            .negative
-            .as_ref()
-            .map(|negative| &negative.phase)
-        {
-            Some(ExpectedFailurePhase::Parse) => frontend_negative_outcome("parse", expectation),
-            _ => RunOutcome::Fail("unexpected parse error".to_string()),
-        };
-    }
-
-    let sema_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mut atoms = atoms;
-        if parsed_as_module {
-            let parsed = parse_module(&mut atoms, SourceId::new(0), &parse_source);
-            analyze_module(&parsed, &atoms).diagnostics
-        } else {
-            let parsed = parse_script(&mut atoms, SourceId::new(0), &parse_source);
-            analyze_script(&parsed, &atoms).diagnostics
-        }
-    }));
-    let sema_diagnostics = match sema_result {
-        Ok(sema) => sema,
-        Err(panic) => return RunOutcome::Fail(format!("PANIC sema: {}", panic_message(&panic))),
-    };
-
-    if sema_diagnostics.has_errors() {
-        return match expectation
-            .negative
-            .as_ref()
-            .map(|negative| &negative.phase)
-        {
-            Some(ExpectedFailurePhase::Parse) => frontend_negative_outcome("parse", expectation),
-            Some(ExpectedFailurePhase::Early) => frontend_negative_outcome("early", expectation),
-            _ => RunOutcome::Fail("unexpected sema error".to_string()),
-        };
-    }
-
-    if let Some(negative) = expectation.negative.as_ref() {
-        match negative.phase {
-            ExpectedFailurePhase::Parse => {
-                return RunOutcome::Fail("expected parse error but frontend succeeded".to_string());
+    if expectation.requires_standalone_frontend_check() {
+        let parse_source = effective_parse_source(&source, &test.metadata);
+        let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut atoms = AtomTable::new();
+            if expectation.module_goal {
+                let parsed = parse_module(&mut atoms, SourceId::new(0), &parse_source);
+                (atoms, parsed.diagnostics, true)
+            } else {
+                let parsed = parse_script(&mut atoms, SourceId::new(0), &parse_source);
+                (atoms, parsed.diagnostics, false)
             }
-            ExpectedFailurePhase::Early => {
-                return RunOutcome::Fail("expected early error but sema passed".to_string());
+        }));
+
+        let (atoms, parse_diagnostics, parsed_as_module) = match parse_result {
+            Ok(result) => result,
+            Err(panic) => {
+                return RunOutcome::Fail(format!("PANIC parse: {}", panic_message(&panic)));
             }
-            ExpectedFailurePhase::Other(_) => unreachable!("unknown phase handled earlier"),
-            ExpectedFailurePhase::Runtime | ExpectedFailurePhase::Resolution => {}
+        };
+
+        if parse_diagnostics.has_errors() {
+            return match expectation
+                .negative
+                .as_ref()
+                .map(|negative| &negative.phase)
+            {
+                Some(ExpectedFailurePhase::Parse) => {
+                    frontend_negative_outcome("parse", expectation)
+                }
+                _ => RunOutcome::Fail("unexpected parse error".to_string()),
+            };
+        }
+
+        let sema_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut atoms = atoms;
+            if parsed_as_module {
+                let parsed = parse_module(&mut atoms, SourceId::new(0), &parse_source);
+                analyze_module(&parsed, &atoms).diagnostics
+            } else {
+                let parsed = parse_script(&mut atoms, SourceId::new(0), &parse_source);
+                analyze_script(&parsed, &atoms).diagnostics
+            }
+        }));
+        let sema_diagnostics = match sema_result {
+            Ok(sema) => sema,
+            Err(panic) => {
+                return RunOutcome::Fail(format!("PANIC sema: {}", panic_message(&panic)));
+            }
+        };
+
+        if sema_diagnostics.has_errors() {
+            return match expectation
+                .negative
+                .as_ref()
+                .map(|negative| &negative.phase)
+            {
+                Some(ExpectedFailurePhase::Parse) => {
+                    frontend_negative_outcome("parse", expectation)
+                }
+                Some(ExpectedFailurePhase::Early) => {
+                    frontend_negative_outcome("early", expectation)
+                }
+                _ => RunOutcome::Fail("unexpected sema error".to_string()),
+            };
+        }
+
+        if let Some(negative) = expectation.negative.as_ref() {
+            match negative.phase {
+                ExpectedFailurePhase::Parse => {
+                    return RunOutcome::Fail(
+                        "expected parse error but frontend succeeded".to_string(),
+                    );
+                }
+                ExpectedFailurePhase::Early => {
+                    return RunOutcome::Fail("expected early error but sema passed".to_string());
+                }
+                ExpectedFailurePhase::Other(_) => unreachable!("unknown phase handled earlier"),
+                ExpectedFailurePhase::Runtime | ExpectedFailurePhase::Resolution => {}
+            }
         }
     }
 
@@ -933,6 +954,45 @@ mod tests {
                 module_goal: true,
             }
         );
+    }
+
+    #[test]
+    fn expectation_runs_standalone_frontend_check_only_for_parse_and_early_negatives() {
+        let positive = TestExpectation::from_metadata(&parse_metadata(""));
+        assert!(!positive.requires_standalone_frontend_check());
+
+        let runtime = TestExpectation::from_metadata(&parse_metadata(
+            r"
+            /*---
+            negative:
+              phase: runtime
+              type: TypeError
+            ---*/
+            ",
+        ));
+        assert!(!runtime.requires_standalone_frontend_check());
+
+        let parse = TestExpectation::from_metadata(&parse_metadata(
+            r"
+            /*---
+            negative:
+              phase: parse
+              type: SyntaxError
+            ---*/
+            ",
+        ));
+        assert!(parse.requires_standalone_frontend_check());
+
+        let early = TestExpectation::from_metadata(&parse_metadata(
+            r"
+            /*---
+            negative:
+              phase: early
+              type: SyntaxError
+            ---*/
+            ",
+        ));
+        assert!(early.requires_standalone_frontend_check());
     }
 
     #[test]

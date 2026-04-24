@@ -52,6 +52,81 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(true)
     }
 
+    fn lower_direct_eval_tail_call_expression(
+        &mut self,
+        expr_id: ExprId,
+        callee: ExprId,
+        arguments: lyng_js_ast::NodeList<ExprId>,
+    ) -> LoweringResult<bool> {
+        if !self.direct_eval_identifier(callee)? {
+            return Ok(false);
+        }
+
+        let argument_values = self.lower_call_arguments(arguments)?;
+        if argument_values.spread_mask != 0 {
+            return Ok(false);
+        }
+
+        let callee_register = self.lower_expr_to_temp(callee)?;
+        let builtin_eval = self.alloc_temp()?;
+        self.emit_load_builtin(builtin_eval, js3_eval_builtin())?;
+        let is_builtin_eval = self.alloc_temp()?;
+        self.emit_profiled_binary(
+            Opcode::StrictEqual,
+            is_builtin_eval,
+            callee_register,
+            builtin_eval,
+        )?;
+        let non_eval_branch = self.builder.emit_cond_jump_placeholder(
+            Opcode::JumpIfFalse,
+            self.encode_register(is_builtin_eval)?,
+        );
+
+        let direct_eval_result = self.alloc_temp()?;
+        let mut direct_eval_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
+        direct_eval_arguments.push(callee_register);
+        direct_eval_arguments.extend(argument_values.registers.iter().copied());
+        let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
+            js3_internal_direct_eval_builtin(),
+            &direct_eval_arguments,
+            self.ast().get_expr(expr_id).span(),
+            direct_eval_result,
+        )?;
+        let lexical_scopes = self.active_direct_eval_lexical_scopes();
+        let flags = self.active_direct_eval_site_flags();
+        if !lexical_scopes.is_empty() || !flags.is_empty() {
+            self.builder
+                .add_direct_eval_lexical_site(instruction_offset, lexical_scopes, flags);
+        }
+        self.builder
+            .emit_ax(Opcode::Return, i32::from(direct_eval_result));
+
+        let non_eval_offset = self.builder.current_offset();
+        self.builder.patch_jump_to(non_eval_branch, non_eval_offset);
+        let this_register = self.alloc_temp()?;
+        self.emit_load_undefined(this_register)?;
+        let argument_range = self.materialize_argument_block(&argument_values.registers)?;
+        let (tail_callee, tail_this) =
+            self.bridge_tail_call_registers(callee_register, this_register)?;
+        let instruction_offset = self.builder.emit_tail_call(
+            self.encode_register(tail_callee)?,
+            self.encode_register(tail_this)?,
+            argument_range,
+        );
+        let span = self.ast().get_expr(expr_id).span();
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        self.builder.add_feedback_site(
+            instruction_offset,
+            FeedbackSiteKind::Call,
+            self.call_feedback_metadata(
+                argument_range.argument_count(),
+                argument_values.spread_mask,
+            ),
+        );
+
+        Ok(true)
+    }
+
     pub(super) fn reserve_call_bridge_registers(&mut self) -> LoweringResult<()> {
         if self.call_bridge_registers.is_some() {
             return Ok(());
@@ -223,10 +298,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.builder.emit_ax(Opcode::Return, i32::from(result));
             return Ok(());
         }
-        let direct_eval_result = self.alloc_temp()?;
-        if self.lower_direct_eval_call_expression(expr_id, callee, arguments, direct_eval_result)? {
-            self.builder
-                .emit_ax(Opcode::Return, i32::from(direct_eval_result));
+        if self.lower_direct_eval_tail_call_expression(expr_id, callee, arguments)? {
             return Ok(());
         }
         let (callee_register, this_register) = self.lower_call_target(callee)?;

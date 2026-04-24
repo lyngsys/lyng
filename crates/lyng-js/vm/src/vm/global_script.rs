@@ -3,6 +3,8 @@ use lyng_js_bytecode::GlobalScriptInstantiationPlan;
 use lyng_js_ops::{errors, object};
 use lyng_js_types::{PropertyDescriptor, PropertyKey};
 
+const BULK_GLOBAL_BINDING_DICTIONARY_THRESHOLD: usize = 64;
+
 impl Vm {
     pub(crate) fn instantiate_global_script(
         &self,
@@ -50,6 +52,12 @@ impl Vm {
             }
         }
 
+        if plan.function_names().len() + plan.var_names().len()
+            >= BULK_GLOBAL_BINDING_DICTIONARY_THRESHOLD
+        {
+            ensure_global_object_dictionary(agent, global_object)?;
+        }
+
         for name in plan.lexical_names() {
             let name = agent.atoms_mut().intern_collectible(name);
             let _ = agent.global_add_lexical_name(global_env, name);
@@ -72,6 +80,18 @@ impl Vm {
         }
 
         Ok(())
+    }
+}
+
+fn ensure_global_object_dictionary(agent: &mut Agent, global_object: ObjectRef) -> VmResult<()> {
+    let converted = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.ensure_named_property_dictionary(&mut mutator, global_object)
+    });
+    if converted {
+        Ok(())
+    } else {
+        Err(VmError::Abrupt(errors::throw_type_error(agent)))
     }
 }
 

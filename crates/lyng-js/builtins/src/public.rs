@@ -99,24 +99,24 @@ use lyng_js_types::{
     js3_set_values_builtin, js3_shared_array_buffer_builtin,
     js3_shared_array_buffer_byte_length_getter_builtin, js3_shared_array_buffer_slice_builtin,
     js3_string_builtin, js3_string_char_at_builtin, js3_string_char_code_at_builtin,
-    js3_string_iterator_builtin, js3_string_iterator_next_builtin,
-    js3_string_last_index_of_builtin, js3_string_match_builtin, js3_string_pad_end_builtin,
-    js3_string_pad_start_builtin, js3_string_repeat_builtin, js3_string_replace_builtin,
-    js3_string_slice_builtin, js3_string_split_builtin, js3_string_starts_with_builtin,
-    js3_string_substring_builtin, js3_string_to_string_builtin, js3_string_value_of_builtin,
-    js3_symbol_builtin, js3_symbol_description_getter_builtin, js3_symbol_for_builtin,
-    js3_symbol_key_for_builtin, js3_symbol_to_primitive_builtin, js3_symbol_to_string_builtin,
-    js3_symbol_value_of_builtin, js3_syntax_error_builtin, js3_type_error_builtin,
-    js3_typed_array_at_builtin, js3_typed_array_builtin, js3_typed_array_copy_within_builtin,
-    js3_typed_array_every_builtin, js3_typed_array_fill_builtin, js3_typed_array_filter_builtin,
-    js3_typed_array_find_builtin, js3_typed_array_find_index_builtin,
-    js3_typed_array_find_last_builtin, js3_typed_array_find_last_index_builtin,
-    js3_typed_array_for_each_builtin, js3_typed_array_from_builtin,
-    js3_typed_array_includes_builtin, js3_typed_array_index_of_builtin,
-    js3_typed_array_join_builtin, js3_typed_array_last_index_of_builtin,
-    js3_typed_array_map_builtin, js3_typed_array_of_builtin, js3_typed_array_reduce_builtin,
-    js3_typed_array_reduce_right_builtin, js3_typed_array_reverse_builtin,
-    js3_typed_array_some_builtin, js3_typed_array_sort_builtin,
+    js3_string_from_char_code_builtin, js3_string_iterator_builtin,
+    js3_string_iterator_next_builtin, js3_string_last_index_of_builtin, js3_string_match_builtin,
+    js3_string_pad_end_builtin, js3_string_pad_start_builtin, js3_string_repeat_builtin,
+    js3_string_replace_builtin, js3_string_search_builtin, js3_string_slice_builtin,
+    js3_string_split_builtin, js3_string_starts_with_builtin, js3_string_substring_builtin,
+    js3_string_to_string_builtin, js3_string_value_of_builtin, js3_symbol_builtin,
+    js3_symbol_description_getter_builtin, js3_symbol_for_builtin, js3_symbol_key_for_builtin,
+    js3_symbol_to_primitive_builtin, js3_symbol_to_string_builtin, js3_symbol_value_of_builtin,
+    js3_syntax_error_builtin, js3_type_error_builtin, js3_typed_array_at_builtin,
+    js3_typed_array_builtin, js3_typed_array_copy_within_builtin, js3_typed_array_every_builtin,
+    js3_typed_array_fill_builtin, js3_typed_array_filter_builtin, js3_typed_array_find_builtin,
+    js3_typed_array_find_index_builtin, js3_typed_array_find_last_builtin,
+    js3_typed_array_find_last_index_builtin, js3_typed_array_for_each_builtin,
+    js3_typed_array_from_builtin, js3_typed_array_includes_builtin,
+    js3_typed_array_index_of_builtin, js3_typed_array_join_builtin,
+    js3_typed_array_last_index_of_builtin, js3_typed_array_map_builtin, js3_typed_array_of_builtin,
+    js3_typed_array_reduce_builtin, js3_typed_array_reduce_right_builtin,
+    js3_typed_array_reverse_builtin, js3_typed_array_some_builtin, js3_typed_array_sort_builtin,
     js3_typed_array_to_locale_string_builtin, js3_typed_array_to_reversed_builtin,
     js3_typed_array_to_sorted_builtin, js3_typed_array_to_string_builtin,
     js3_typed_array_to_string_tag_getter_builtin, js3_typed_array_with_builtin,
@@ -386,12 +386,14 @@ pub struct PublicRealmBuiltins {
     string_value_of: ObjectRef,
     string_char_at: ObjectRef,
     string_char_code_at: ObjectRef,
+    string_from_char_code: ObjectRef,
     string_match: ObjectRef,
     string_last_index_of: ObjectRef,
     string_pad_end: ObjectRef,
     string_pad_start: ObjectRef,
     string_repeat: ObjectRef,
     string_replace: ObjectRef,
+    string_search: ObjectRef,
     string_split: ObjectRef,
     string_slice: ObjectRef,
     string_substring: ObjectRef,
@@ -1243,6 +1245,9 @@ impl PublicRealmBuiltins {
         if entry == js3_string_char_code_at_builtin() {
             return Some(self.string_char_code_at);
         }
+        if entry == js3_string_from_char_code_builtin() {
+            return Some(self.string_from_char_code);
+        }
         if entry == js3_string_match_builtin() {
             return Some(self.string_match);
         }
@@ -1260,6 +1265,9 @@ impl PublicRealmBuiltins {
         }
         if entry == js3_string_replace_builtin() {
             return Some(self.string_replace);
+        }
+        if entry == js3_string_search_builtin() {
+            return Some(self.string_search);
         }
         if entry == js3_string_split_builtin() {
             return Some(self.string_split);
@@ -4259,6 +4267,17 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_string_char_code_at_builtin()).unwrap(),
                 None,
             ),
+            string_from_char_code: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_string_from_char_code_builtin(),
+                public_builtin_metadata(js3_string_from_char_code_builtin()).unwrap(),
+                None,
+            ),
             string_match: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -4323,6 +4342,17 @@ impl BuiltinCache {
                 object_prototype,
                 js3_string_replace_builtin(),
                 public_builtin_metadata(js3_string_replace_builtin()).unwrap(),
+                None,
+            ),
+            string_search: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_string_search_builtin(),
+                public_builtin_metadata(js3_string_search_builtin()).unwrap(),
                 None,
             ),
             string_split: allocate_builtin_function_object(
@@ -6206,6 +6236,7 @@ impl BuiltinCache {
         let is_view_atom = agent.atoms_mut().intern_collectible("isView");
         let sort_atom = agent.atoms_mut().intern_collectible("sort");
         let splice_atom = agent.atoms_mut().intern_collectible("splice");
+        let search_atom = agent.atoms_mut().intern_collectible("search");
         let to_locale_string_atom = agent.atoms_mut().intern_collectible("toLocaleString");
         let to_reversed_atom = agent.atoms_mut().intern_collectible("toReversed");
         let to_sorted_atom = agent.atoms_mut().intern_collectible("toSorted");
@@ -6218,6 +6249,7 @@ impl BuiltinCache {
         let sqrt_atom = agent.atoms_mut().intern_collectible("sqrt");
         let char_at_atom = agent.atoms_mut().intern_collectible("charAt");
         let char_code_at_atom = agent.atoms_mut().intern_collectible("charCodeAt");
+        let from_char_code_atom = agent.atoms_mut().intern_collectible("fromCharCode");
         let dot_all_atom = agent.atoms_mut().intern_collectible("dotAll");
         let exec_atom = agent.atoms_mut().intern_collectible("exec");
         let get_own_property_names_atom =
@@ -8509,6 +8541,11 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
+        let string_descriptors = [BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(from_char_code_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_string_from_char_code_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        )];
         let string_prototype_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
@@ -8563,6 +8600,11 @@ impl BuiltinCache {
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(replace_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_string_replace_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(search_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_search_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -9758,6 +9800,10 @@ impl BuiltinCache {
                 &set_iterator_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
+                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::String),
+                &string_descriptors,
+            ),
+            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::StringPrototype),
                 &string_prototype_descriptors,
             ),
@@ -10646,6 +10692,9 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if entry == js3_string_char_code_at_builtin() {
         return Some(BuiltinEntryMetadata::new("charCodeAt", 1, false, false));
     }
+    if entry == js3_string_from_char_code_builtin() {
+        return Some(BuiltinEntryMetadata::new("fromCharCode", 1, false, false));
+    }
     if entry == js3_string_match_builtin() {
         return Some(BuiltinEntryMetadata::new("match", 1, false, false));
     }
@@ -10663,6 +10712,9 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     }
     if entry == js3_string_replace_builtin() {
         return Some(BuiltinEntryMetadata::new("replace", 2, false, false));
+    }
+    if entry == js3_string_search_builtin() {
+        return Some(BuiltinEntryMetadata::new("search", 1, false, false));
     }
     if entry == js3_string_split_builtin() {
         return Some(BuiltinEntryMetadata::new("split", 2, false, false));

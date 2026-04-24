@@ -25,6 +25,73 @@ enum PendingStaticClassElement {
     },
 }
 
+struct PrivateElementDescriptorLookup {
+    by_name_and_kind: HashMap<(AtomId, lyng_js_sema::ClassPrivateElementKind), (u32, Span)>,
+}
+
+#[derive(Clone, Copy)]
+struct PrivateElementDefinitionScratch {
+    arguments: u16,
+}
+
+impl PrivateElementDefinitionScratch {
+    const ARGUMENT_COUNT: u16 = 6;
+
+    fn allocate(compiler: &mut FunctionCompiler<'_, '_>) -> LoweringResult<Self> {
+        let arguments = compiler
+            .builder
+            .try_alloc_registers(Self::ARGUMENT_COUNT)
+            .ok_or(LoweringError::RegisterOverflow { register: u16::MAX })?;
+        let last_argument = arguments + Self::ARGUMENT_COUNT - 1;
+        let _ = compiler.encode_register(last_argument)?;
+        Ok(Self { arguments })
+    }
+}
+
+#[derive(Clone, Copy)]
+struct PrivateElementInitializerScratch {
+    arguments: u16,
+}
+
+impl PrivateElementInitializerScratch {
+    const ARGUMENT_COUNT: u16 = 3;
+
+    fn allocate(compiler: &mut FunctionCompiler<'_, '_>) -> LoweringResult<Self> {
+        let arguments = compiler
+            .builder
+            .try_alloc_registers(Self::ARGUMENT_COUNT)
+            .ok_or(LoweringError::RegisterOverflow { register: u16::MAX })?;
+        let last_argument = arguments + Self::ARGUMENT_COUNT - 1;
+        let _ = compiler.encode_register(last_argument)?;
+        Ok(Self { arguments })
+    }
+}
+
+impl PrivateElementDescriptorLookup {
+    fn from_layout(layout: &lyng_js_sema::ClassPrivateLayoutRecord) -> Self {
+        let mut by_name_and_kind = HashMap::with_capacity(layout.entries().len());
+        for (index, entry) in layout.entries().iter().copied().enumerate() {
+            by_name_and_kind
+                .entry((entry.name(), entry.kind()))
+                .or_insert_with(|| {
+                    (
+                        u32::try_from(index).expect("descriptor index should fit u32"),
+                        entry.span(),
+                    )
+                });
+        }
+        Self { by_name_and_kind }
+    }
+
+    fn get(
+        &self,
+        name: AtomId,
+        kind: lyng_js_sema::ClassPrivateElementKind,
+    ) -> Option<(u32, Span)> {
+        self.by_name_and_kind.get(&(name, kind)).copied()
+    }
+}
+
 impl<'a, 'b> FunctionCompiler<'a, 'b> {
     pub(super) fn lower_class_expression(
         &mut self,
@@ -196,6 +263,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
         let previous_class_body = self.active_class_body.replace(body);
         let previous_class_span = self.active_class_span.replace(class_span);
+        let private_define_scratch = if has_private_entries {
+            Some(PrivateElementDefinitionScratch::allocate(self)?)
+        } else {
+            None
+        };
+        let private_initializer_scratch = if has_private_entries {
+            Some(PrivateElementInitializerScratch::allocate(self)?)
+        } else {
+            None
+        };
         let mut next_computed_instance_field_key = 0u32;
         let mut pending_static_elements = Vec::new();
         for element_id in elements {
@@ -229,47 +306,44 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     let home_object = if r#static { dest } else { prototype };
                     self.bind_function_home_object(method, home_object, span)?;
                     self.bind_function_private_env(method, span)?;
-                    self.emit_define_private_element(
+                    let private_kind = match kind {
+                        lyng_js_ast::MethodKind::Method | lyng_js_ast::MethodKind::Constructor => {
+                            lyng_js_sema::ClassPrivateElementKind::Method
+                        }
+                        lyng_js_ast::MethodKind::Get => {
+                            lyng_js_sema::ClassPrivateElementKind::Getter
+                        }
+                        lyng_js_ast::MethodKind::Set => {
+                            lyng_js_sema::ClassPrivateElementKind::Setter
+                        }
+                    };
+                    self.emit_define_private_element_with_scratch(
                         dest,
                         prototype,
                         private_name,
                         r#static,
-                        match kind {
-                            lyng_js_ast::MethodKind::Method
-                            | lyng_js_ast::MethodKind::Constructor => {
-                                lyng_js_sema::ClassPrivateElementKind::Method
-                            }
-                            lyng_js_ast::MethodKind::Get => {
-                                lyng_js_sema::ClassPrivateElementKind::Getter
-                            }
-                            lyng_js_ast::MethodKind::Set => {
-                                lyng_js_sema::ClassPrivateElementKind::Setter
-                            }
-                        },
+                        private_kind,
                         Some(method),
                         span,
+                        private_define_scratch
+                            .expect("private definition scratch should exist for private methods"),
                     )?;
                     if r#static {
-                        self.lower_private_element_initializer(
-                            dest,
-                            private_name,
-                            match kind {
-                                lyng_js_ast::MethodKind::Method
-                                | lyng_js_ast::MethodKind::Constructor => {
-                                    lyng_js_sema::ClassPrivateElementKind::Method
-                                }
-                                lyng_js_ast::MethodKind::Get => {
-                                    lyng_js_sema::ClassPrivateElementKind::Getter
-                                }
-                                lyng_js_ast::MethodKind::Set => {
-                                    lyng_js_sema::ClassPrivateElementKind::Setter
-                                }
-                            },
-                            None,
+                        let descriptor_index = self.private_element_descriptor_index(
                             body,
+                            private_name,
+                            private_kind,
+                        )?;
+                        self.lower_private_element_initializer_with_scratch(
+                            dest,
+                            descriptor_index,
+                            None,
                             span,
                             None,
                             None,
+                            private_initializer_scratch.expect(
+                                "private initializer scratch should exist for private methods",
+                            ),
                         )?;
                     }
                 }
@@ -361,7 +435,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                                 })
                             }
                         };
-                        self.emit_define_private_element(
+                        self.emit_define_private_element_with_scratch(
                             dest,
                             prototype,
                             private_name,
@@ -369,6 +443,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             lyng_js_sema::ClassPrivateElementKind::Field,
                             None,
                             span,
+                            private_define_scratch.expect(
+                                "private definition scratch should exist for private fields",
+                            ),
                         )?;
                         pending_static_elements.push(PendingStaticClassElement::PrivateField {
                             name: private_name,
@@ -396,7 +473,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             })
                         }
                     };
-                    self.emit_define_private_element(
+                    self.emit_define_private_element_with_scratch(
                         dest,
                         prototype,
                         private_name,
@@ -404,6 +481,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         lyng_js_sema::ClassPrivateElementKind::Field,
                         None,
                         span,
+                        private_define_scratch
+                            .expect("private definition scratch should exist for private fields"),
                     )?;
                 }
                 lyng_js_ast::ClassElement::StaticBlock { body, span } => {
@@ -414,7 +493,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
         }
         for element in pending_static_elements {
-            self.lower_pending_static_class_element(dest, body, element)?;
+            self.lower_pending_static_class_element(
+                dest,
+                body,
+                element,
+                private_initializer_scratch,
+            )?;
         }
         self.active_class_body = previous_class_body;
         self.active_class_span = previous_class_span;
@@ -525,6 +609,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         class_object: u16,
         class_body: NodeList<lyng_js_ast::ClassElementId>,
         element: PendingStaticClassElement,
+        private_initializer_scratch: Option<PrivateElementInitializerScratch>,
     ) -> LoweringResult<()> {
         match element {
             PendingStaticClassElement::PublicField { key, value } => {
@@ -539,17 +624,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     }
                 }
             }
-            PendingStaticClassElement::PrivateField { name, value, span } => self
-                .lower_private_element_initializer(
-                    class_object,
+            PendingStaticClassElement::PrivateField { name, value, span } => {
+                let descriptor_index = self.private_element_descriptor_index(
+                    class_body,
                     name,
                     lyng_js_sema::ClassPrivateElementKind::Field,
+                )?;
+                self.lower_private_element_initializer_with_scratch(
+                    class_object,
+                    descriptor_index,
                     value,
-                    class_body,
                     span,
                     Some(class_object),
                     Some(class_object),
-                ),
+                    private_initializer_scratch.ok_or(LoweringError::UnsupportedDeclaration {
+                        decl: DeclId::new(0),
+                    })?,
+                )
+            }
             PendingStaticClassElement::Block { body, span } => {
                 let previous_override = self.this_override_register.replace(class_object);
                 let previous_home_object = self.super_home_object_override.replace(class_object);
@@ -612,7 +704,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.emit_define_keyed_property(target, value_register, key_register)
     }
 
-    fn emit_define_private_element(
+    fn emit_define_private_element_with_scratch(
         &mut self,
         class_object: u16,
         prototype: u16,
@@ -621,58 +713,48 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         kind: lyng_js_sema::ClassPrivateElementKind,
         value: Option<u16>,
         span: Span,
+        scratch: PrivateElementDefinitionScratch,
     ) -> LoweringResult<()> {
-        let name_register = self.alloc_temp()?;
-        self.emit_load_atom_string(name_register, name)?;
-        let static_register = self.alloc_temp()?;
-        self.emit_load_bool(static_register, is_static)?;
-        let kind_register = self.alloc_temp()?;
-        self.emit_load_smi(kind_register, Self::private_element_kind_tag(kind))?;
+        let arguments = scratch.arguments;
+        self.emit_move(arguments, class_object)?;
+        self.emit_move(arguments + 1, prototype)?;
+        self.emit_load_atom_string(arguments + 2, name)?;
+        self.emit_load_bool(arguments + 3, is_static)?;
+        self.emit_load_smi(arguments + 4, Self::private_element_kind_tag(kind))?;
         match value {
-            Some(value) => self.emit_internal_builtin_call(
+            Some(value) => {
+                self.emit_move(arguments + 5, value)?;
+                self.emit_internal_builtin_call_from_argument_range(
+                    js3_internal_define_private_field_builtin(),
+                    CallRange::new(arguments, 6),
+                    span,
+                )
+            }
+            None => self.emit_internal_builtin_call_from_argument_range(
                 js3_internal_define_private_field_builtin(),
-                &[
-                    class_object,
-                    prototype,
-                    name_register,
-                    static_register,
-                    kind_register,
-                    value,
-                ],
-                span,
-            ),
-            None => self.emit_internal_builtin_call(
-                js3_internal_define_private_field_builtin(),
-                &[
-                    class_object,
-                    prototype,
-                    name_register,
-                    static_register,
-                    kind_register,
-                ],
+                CallRange::new(arguments, 5),
                 span,
             ),
         }
     }
 
-    fn lower_private_element_initializer(
+    fn lower_private_element_initializer_with_scratch(
         &mut self,
         target: u16,
-        name: AtomId,
-        kind: lyng_js_sema::ClassPrivateElementKind,
+        descriptor_index: u32,
         value: Option<ExprId>,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
         span: Span,
         this_override: Option<u16>,
         home_object_override: Option<u16>,
+        scratch: PrivateElementInitializerScratch,
     ) -> LoweringResult<()> {
-        let descriptor_index = self.private_element_descriptor_index(body, name, kind)?;
-        let descriptor = self.alloc_temp()?;
+        let arguments = scratch.arguments;
+        self.emit_move(arguments, target)?;
         let descriptor_smi =
             i16::try_from(descriptor_index).map_err(|_| LoweringError::UnsupportedDeclaration {
                 decl: DeclId::new(0),
             })?;
-        self.emit_load_smi(descriptor, descriptor_smi)?;
+        self.emit_load_smi(arguments + 1, descriptor_smi)?;
         let previous_override = this_override
             .and_then(|this_override| self.this_override_register.replace(this_override));
         let previous_home_object = home_object_override
@@ -682,9 +764,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let value_register = if let Some(value) = value {
             self.lower_expr_to_temp(value)
         } else {
-            let undefined = self.alloc_temp()?;
-            self.emit_load_undefined(undefined)?;
-            Ok(undefined)
+            self.emit_load_undefined(arguments + 2)?;
+            Ok(arguments + 2)
         };
         self.in_class_field_initializer = previous_in_class_field_initializer;
         let value_register = value_register?;
@@ -692,9 +773,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.this_override_register = previous_override;
             self.super_home_object_override = previous_home_object;
         }
-        self.emit_internal_builtin_call(
+        if value_register != arguments + 2 {
+            self.emit_move(arguments + 2, value_register)?;
+        }
+        self.emit_internal_builtin_call_from_argument_range(
             js3_internal_private_field_init_builtin(),
-            &[target, descriptor, value_register],
+            CallRange::new(arguments, PrivateElementInitializerScratch::ARGUMENT_COUNT),
             span,
         )
     }
@@ -913,6 +997,18 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         instance_elements: &[ClassInstanceElementPlan],
         class_body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
     ) -> LoweringResult<()> {
+        let private_descriptors = self
+            .active_class_layout(class_body)
+            .map(PrivateElementDescriptorLookup::from_layout);
+        let private_initializer_scratch = if instance_elements
+            .iter()
+            .any(|element| matches!(element, ClassInstanceElementPlan::PrivateElement { .. }))
+        {
+            Some(PrivateElementInitializerScratch::allocate(self)?)
+        } else {
+            None
+        };
+
         for element in instance_elements.iter().copied() {
             let ClassInstanceElementPlan::PrivateElement { name, kind, .. } = element else {
                 continue;
@@ -920,18 +1016,17 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             if kind == lyng_js_sema::ClassPrivateElementKind::Field {
                 continue;
             }
-            let span = self
-                .private_layout_entry(class_body, name, kind)
-                .map_or(self.root_span(), |entry| entry.span());
-            self.lower_private_element_initializer(
+            let (descriptor_index, span) =
+                Self::private_element_descriptor_from_lookup(&private_descriptors, name, kind)?;
+            self.lower_private_element_initializer_with_scratch(
                 this_register,
-                name,
-                kind,
+                descriptor_index,
                 None,
-                class_body,
                 span,
                 None,
                 None,
+                private_initializer_scratch
+                    .expect("private initializer scratch should exist for private elements"),
             )?;
         }
 
@@ -991,18 +1086,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     if kind != lyng_js_sema::ClassPrivateElementKind::Field {
                         continue;
                     }
-                    let span = self
-                        .private_layout_entry(class_body, name, kind)
-                        .map_or(self.root_span(), |entry| entry.span());
-                    self.lower_private_element_initializer(
-                        this_register,
+                    let (descriptor_index, span) = Self::private_element_descriptor_from_lookup(
+                        &private_descriptors,
                         name,
                         kind,
+                    )?;
+                    self.lower_private_element_initializer_with_scratch(
+                        this_register,
+                        descriptor_index,
                         value,
-                        class_body,
                         span,
                         Some(this_register),
                         None,
+                        private_initializer_scratch.expect(
+                            "private initializer scratch should exist for private elements",
+                        ),
                     )?;
                 }
             }
@@ -1010,19 +1108,17 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
-    fn private_layout_entry(
-        &self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+    fn private_element_descriptor_from_lookup(
+        private_descriptors: &Option<PrivateElementDescriptorLookup>,
         name: AtomId,
         kind: lyng_js_sema::ClassPrivateElementKind,
-    ) -> Option<lyng_js_sema::ClassPrivateElementRecord> {
-        self.active_class_layout(body).and_then(|layout| {
-            layout
-                .entries()
-                .iter()
-                .find(|entry| entry.name() == name && entry.kind() == kind)
-                .copied()
-        })
+    ) -> LoweringResult<(u32, Span)> {
+        private_descriptors
+            .as_ref()
+            .and_then(|descriptors| descriptors.get(name, kind))
+            .ok_or(LoweringError::UnsupportedDeclaration {
+                decl: DeclId::new(0),
+            })
     }
 
     fn private_element_descriptor_index(
@@ -1329,5 +1425,26 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.emit_move(dest, call_result)?;
         }
         Ok(instruction_offset)
+    }
+
+    fn emit_internal_builtin_call_from_argument_range(
+        &mut self,
+        builtin: BuiltinFunctionId,
+        arguments: CallRange,
+        span: Span,
+    ) -> LoweringResult<()> {
+        let bridges = self
+            .call_bridge_registers
+            .expect("call bridge registers should be reserved before lowering");
+        self.emit_load_builtin(bridges.callee, builtin)?;
+        self.emit_load_undefined(bridges.this_value)?;
+        let instruction_offset = self.builder.emit_call(
+            self.encode_register(bridges.result)?,
+            self.encode_register(bridges.callee)?,
+            self.encode_register(bridges.this_value)?,
+            arguments,
+        );
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        Ok(())
     }
 }

@@ -337,9 +337,7 @@ impl BytecodeBuilder {
             operands.narrow_c(),
         ));
         if operands.needs_wide() {
-            self.set_wide_operand(offset, operands.encode_payload());
-        } else {
-            self.remove_wide_operand(offset);
+            self.add_wide_operand(offset, operands.encode_payload());
         }
         offset
     }
@@ -365,9 +363,7 @@ impl BytecodeBuilder {
             operands.narrow_bx(),
         ));
         if operands.needs_wide() {
-            self.set_wide_operand(offset, operands.encode_payload());
-        } else {
-            self.remove_wide_operand(offset);
+            self.add_wide_operand(offset, operands.encode_payload());
         }
         offset
     }

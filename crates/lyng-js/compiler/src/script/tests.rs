@@ -640,7 +640,7 @@ fn compile_script_supports_large_register_functions_and_high_register_calls() {
 }
 
 #[test]
-fn compile_script_reports_register_overflow_for_extremely_large_private_field_classes() {
+fn compile_script_reuses_private_field_registers_for_extremely_large_classes() {
     let mut source = String::from("class Overflow {\n");
     for index in 0..10_000 {
         source.push_str(&format!("#field{index};\n"));
@@ -653,12 +653,10 @@ fn compile_script_reports_register_overflow_for_extremely_large_private_field_cl
     let sema = analyze_script(&parsed, &atoms);
     assert!(!sema.diagnostics.has_errors());
 
-    let result = compile_script(&parsed, &sema, &mut atoms);
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
 
-    assert!(matches!(
-        result,
-        Err(LoweringError::RegisterOverflow { register: u16::MAX })
-    ));
+    assert!(entry.register_count() < u16::MAX);
 }
 
 #[test]

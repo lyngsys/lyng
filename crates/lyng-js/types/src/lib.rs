@@ -396,6 +396,8 @@ const JS3_STRING_REPEAT_RAW: u32 = 2_142;
 const JS3_OBJECT_GET_OWN_PROPERTY_DESCRIPTORS_RAW: u32 = 2_143;
 const JS3_OBJECT_IS_RAW: u32 = 2_144;
 const JS3_DATE_GET_TIMEZONE_OFFSET_RAW: u32 = 2_145;
+const JS3_STRING_FROM_CHAR_CODE_RAW: u32 = 2_146;
+const JS3_STRING_SEARCH_RAW: u32 = 2_147;
 const JS3_PROMISE_RAW: u32 = 3_101;
 const JS3_PROMISE_THEN_RAW: u32 = 3_102;
 const JS3_PROMISE_CATCH_RAW: u32 = 3_103;
@@ -833,7 +835,7 @@ pub const JS3_INTERNAL_BUILTIN_NAMESPACE_END: u32 = JS3_INTERNAL_DIRECT_EVAL_RAW
 pub const JS3_CORE_BUILTIN_NAMESPACE_START: u32 = JS3_BOOLEAN_RAW;
 
 /// Last reserved builtin-entry payload for the public core builtin namespace.
-pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_STRING_REPEAT_RAW;
+pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_STRING_SEARCH_RAW;
 
 /// First reserved builtin-entry payload for the public completion builtin namespace.
 pub const JS3_COMPLETION_BUILTIN_NAMESPACE_START: u32 = JS3_PROMISE_RAW;
@@ -1698,6 +1700,22 @@ pub fn js3_string_char_at_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn js3_string_char_code_at_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_STRING_CHAR_CODE_AT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_from_char_code_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_FROM_CHAR_CODE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_search_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_SEARCH_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }
@@ -5885,9 +5903,9 @@ mod tests {
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_END, 1_036);
         assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_START, 2_001);
-        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_142);
+        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_147);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_START, 3_101);
-        assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_END, 3_488);
+        assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_END, 3_500);
     }
 
     #[test]

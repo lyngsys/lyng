@@ -22,7 +22,7 @@ use lyng_js_types::{
     js3_add_async_disposable_resource_builtin, js3_add_sync_disposable_resource_builtin,
     js3_bigint_builtin, js3_create_async_disposal_scope_builtin,
     js3_create_sync_disposal_scope_builtin, js3_dispose_scope_async_builtin,
-    js3_dispose_scope_builtin, js3_internal_bind_function_private_env_builtin,
+    js3_dispose_scope_builtin, js3_eval_builtin, js3_internal_bind_function_private_env_builtin,
     js3_internal_construct_super_builtin, js3_internal_define_class_getter_property_builtin,
     js3_internal_define_class_setter_property_builtin, js3_internal_define_getter_property_builtin,
     js3_internal_define_method_property_builtin, js3_internal_define_private_field_builtin,
