@@ -8,6 +8,8 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 - Filter: `whole corpus`
 - Skip mode: `default heuristics`
 - Per-test timeout: `1.0s`
+- Proposal stage: `Stage 3+`
+- Jobs: `12`
 - Exclusion manifest: `reports/js/lyng-js/test262-exclusions.txt`
 - Category breakdown groups tests by the first path component under `testdata/test262/test/`.
 - Skipped tests are reported separately and still count against the selected-test pass rate.
@@ -17,77 +19,98 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Metric | Count |
 | --- | ---: |
 | Candidate tests | `53125` |
-| Excluded from selection | `13` |
-| Selected tests | `53112` |
-| Runnable | `47264` |
-| Passed | `40450` |
-| Failed | `6814` |
+| Excluded from selection | `96` |
+| Selected tests | `53029` |
+| Runnable | `47252` |
+| Passed | `40445` |
+| Failed | `6807` |
 | Panicked | `0` |
-| Skipped | `5848` |
-| Pass rate (selected) | `76.16%` |
-| Time | `13.8s` |
+| Skipped | `5777` |
+| Pass rate (selected) | `76.27%` |
+| Time | `16.1s` |
+
+## Delta From Previous Report
+
+| Metric | Previous | Current | Delta |
+| --- | ---: | ---: | ---: |
+| Candidate tests | `53125` | `53125` | `+0` |
+| Excluded from selection | `96` | `96` | `+0` |
+| Selected tests | `53029` | `53029` | `+0` |
+| Runnable | `47252` | `47252` | `+0` |
+| Passed | `40448` | `40445` | `-3` |
+| Failed | `6804` | `6807` | `+3` |
+| Panicked | `0` | `0` | `+0` |
+| Skipped | `5777` | `5777` | `+0` |
+| Pass rate (selected) | `76.28%` | `76.27%` | `-0.01pp` |
+
+## Selection Exclusions
+
+| Reason | Count |
+| --- | ---: |
+| proposal stage below Stage 3+: ShadowRealm | `64` |
+| proposal stage below Stage 3+: immutable-arraybuffer | `20` |
+| proposal stage below Stage 3+: await-dictionary | `12` |
 
 ## Category Breakdown
 
 | Category | Selected | Runnable | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `annexB` | `1086` | `1082` | `204` | `878` | `4` | `0` | `18.78%` |
-| `built-ins` | `23467` | `21451` | `16529` | `4922` | `2016` | `0` | `70.44%` |
+| `built-ins` | `23388` | `21439` | `16529` | `4910` | `1949` | `0` | `70.67%` |
 | `harness` | `116` | `116` | `116` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `3323` | `0` | `0` | `0` | `3323` | `0` | `0.00%` |
-| `language` | `23637` | `23486` | `22871` | `615` | `151` | `0` | `96.76%` |
-| `staging` | `1483` | `1129` | `730` | `399` | `354` | `0` | `49.22%` |
+| `language` | `23632` | `23486` | `22866` | `620` | `146` | `0` | `96.76%` |
+| `staging` | `1484` | `1129` | `730` | `399` | `355` | `0` | `49.19%` |
 
-## Top Skip Reasons
+## Skip Breakdown
 
-| Reason | Count |
-| --- | ---: |
-| manifest exclusion (suite): ECMA-402 Intl is out of scope for the active ECMA-262 conformance sweep. | `3323` |
-| unsupported feature: iterator-helpers | `677` |
-| unsupported feature: resizable-arraybuffer | `461` |
-| unsupported feature: regexp-modifiers | `230` |
-| unsupported feature: set-methods | `192` |
-| unsupported feature: regexp-v-flag | `187` |
-| unsupported feature: Atomics.waitAsync | `101` |
-| unsupported feature: Array.fromAsync | `95` |
-| unsupported feature: upsert | `66` |
-| unsupported feature: ShadowRealm | `64` |
-| requires $262.agent multi-agent harness | `59` |
-| unsupported harness include: sm/non262-TypedArray-shell.js | `54` |
-| unsupported feature: arraybuffer-transfer | `43` |
-| unsupported harness include: sm/non262-strict-shell.js | `35` |
-| raw harness tests are deferred | `32` |
-| unsupported feature: decorators | `27` |
-| unsupported feature: symbols-as-weakmap-keys | `27` |
-| unsupported harness include: sm/assertThrowsValue.js | `25` |
-| unsupported feature: regexp-duplicate-named-groups | `19` |
-| unsupported feature: immutable-arraybuffer | `17` |
-| unsupported harness include: sm/non262-Math-shell.js | `15` |
-| unsupported feature: promise-try | `12` |
-| unsupported feature: promise-with-resolvers | `9` |
-| unsupported harness include: sm/non262-Date-shell.js | `8` |
-| unsupported harness include: sm/non262-JSON-shell.js | `7` |
-| unsupported harness include: sm/non262-Set-shell.js | `7` |
-| needs builtin bootstrap: Number | `6` |
-| needs builtin bootstrap: String | `6` |
-| unsupported feature: Atomics.pause | `6` |
-| unsupported harness include: sm/non262-expressions-shell.js | `6` |
-| unsupported harness include: sm/non262-generators-shell.js | `5` |
-| runtime abort: oversize Array.prototype.slice length guard missing | `4` |
-| needs builtin bootstrap: Array | `3` |
-| needs builtin bootstrap: Object.getOwnPropertyNames | `3` |
-| host runs with [[CanBlock]] true | `2` |
-| needs builtin bootstrap: JSON | `2` |
-| needs builtin bootstrap: Math | `2` |
-| runtime abort: oversize ArrayBuffer allocation guard missing | `2` |
-| unsupported harness include: sm/non262-Reflect-shell.js | `2` |
-| needs builtin bootstrap: Math/JSON | `1` |
-| needs builtin bootstrap: Number/String | `1` |
-| needs builtin bootstrap: Object.defineProperties | `1` |
-| needs builtin bootstrap: Object.getOwnPropertyNames/Object.getOwnPropertySymbols | `1` |
-| needs builtin bootstrap: Object.keys | `1` |
-| needs builtin bootstrap: Object.prototype.toLocaleString | `1` |
-| needs builtin bootstrap: eval | `1` |
+| Class | Reason | Count |
+| --- | --- | ---: |
+| Bootstrap gap | needs builtin bootstrap: Number | `6` |
+| Bootstrap gap | needs builtin bootstrap: String | `6` |
+| Bootstrap gap | needs builtin bootstrap: Array | `3` |
+| Bootstrap gap | needs builtin bootstrap: Object.getOwnPropertyNames | `3` |
+| Bootstrap gap | needs builtin bootstrap: JSON | `2` |
+| Bootstrap gap | needs builtin bootstrap: Math | `2` |
+| Bootstrap gap | needs builtin bootstrap: Math/JSON | `1` |
+| Bootstrap gap | needs builtin bootstrap: Number/String | `1` |
+| Bootstrap gap | needs builtin bootstrap: Object.defineProperties | `1` |
+| Bootstrap gap | needs builtin bootstrap: Object.getOwnPropertyNames/Object.getOwnPropertySymbols | `1` |
+| Bootstrap gap | needs builtin bootstrap: Object.keys | `1` |
+| Bootstrap gap | needs builtin bootstrap: Object.prototype.toLocaleString | `1` |
+| Bootstrap gap | needs builtin bootstrap: eval | `1` |
+| Harness capability | requires $262.agent multi-agent harness | `59` |
+| Harness capability | unsupported harness include: sm/non262-TypedArray-shell.js | `54` |
+| Harness capability | unsupported harness include: sm/non262-strict-shell.js | `35` |
+| Harness capability | raw harness tests are deferred | `32` |
+| Harness capability | unsupported harness include: sm/assertThrowsValue.js | `25` |
+| Harness capability | unsupported harness include: sm/non262-Math-shell.js | `15` |
+| Harness capability | unsupported harness include: sm/non262-Date-shell.js | `8` |
+| Harness capability | unsupported harness include: sm/non262-JSON-shell.js | `7` |
+| Harness capability | unsupported harness include: sm/non262-Set-shell.js | `7` |
+| Harness capability | unsupported harness include: sm/non262-expressions-shell.js | `6` |
+| Harness capability | unsupported harness include: sm/non262-generators-shell.js | `5` |
+| Harness capability | unsupported harness include: sm/non262-Reflect-shell.js | `2` |
+| Host/runtime policy | host runs with [[CanBlock]] true | `2` |
+| Manifest/out of scope | manifest exclusion (suite): ECMA-402 Intl is out of scope for the active ECMA-262 conformance sweep. | `3323` |
+| Runtime safety | runtime abort: oversize Array.prototype.slice length guard missing | `4` |
+| Runtime safety | runtime abort: oversize ArrayBuffer allocation guard missing | `2` |
+| Unsupported ECMA-262 feature | unsupported feature: iterator-helpers | `677` |
+| Unsupported ECMA-262 feature | unsupported feature: resizable-arraybuffer | `460` |
+| Unsupported ECMA-262 feature | unsupported feature: regexp-modifiers | `230` |
+| Unsupported ECMA-262 feature | unsupported feature: set-methods | `192` |
+| Unsupported ECMA-262 feature | unsupported feature: regexp-v-flag | `187` |
+| Unsupported ECMA-262 feature | unsupported feature: Atomics.waitAsync | `101` |
+| Unsupported ECMA-262 feature | unsupported feature: Array.fromAsync | `95` |
+| Unsupported ECMA-262 feature | unsupported feature: upsert | `66` |
+| Unsupported ECMA-262 feature | unsupported feature: arraybuffer-transfer | `41` |
+| Unsupported ECMA-262 feature | unsupported feature: decorators | `27` |
+| Unsupported ECMA-262 feature | unsupported feature: symbols-as-weakmap-keys | `27` |
+| Unsupported ECMA-262 feature | unsupported feature: regexp-duplicate-named-groups | `19` |
+| Unsupported ECMA-262 feature | unsupported feature: Error.isError | `13` |
+| Unsupported ECMA-262 feature | unsupported feature: promise-try | `12` |
+| Unsupported ECMA-262 feature | unsupported feature: promise-with-resolvers | `9` |
+| Unsupported ECMA-262 feature | unsupported feature: Atomics.pause | `6` |
 
 ## Checked-in Manifest Rules
 
@@ -95,210 +118,62 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | --- | --- | --- |
 | `suite` | `intl402/*` | ECMA-402 Intl is out of scope for the active ECMA-262 conformance sweep. |
 
-## Failure Sample
+## Failure Clusters
 
-1. annexB/built-ins/Array/from/iterator-method-emulates-undefined.js: runtime error: Test262Error
-2. annexB/built-ins/Date/prototype/setYear/date-value-read-before-tonumber-when-date-is-invalid.js: runtime error: TypeError
-3. annexB/built-ins/Date/prototype/getYear/not-a-constructor.js: runtime error: Test262Error
-4. annexB/built-ins/Date/prototype/setYear/B.2.5.js: runtime error: Test262Error
-5. annexB/built-ins/Date/prototype/getYear/this-not-date.js: runtime error: Test262Error
-6. annexB/built-ins/Date/prototype/getYear/return-value.js: runtime error: TypeError
-7. annexB/built-ins/Date/prototype/getYear/nan.js: runtime error: TypeError
-8. annexB/built-ins/Date/prototype/getYear/name.js: runtime error: TypeError
-9. annexB/built-ins/Date/prototype/getYear/length.js: runtime error: TypeError
-10. annexB/built-ins/Date/prototype/setYear/date-value-read-before-tonumber-when-date-is-valid.js: runtime error: TypeError
-11. annexB/built-ins/Date/prototype/getYear/B.2.4.js: runtime error: Test262Error
-12. annexB/built-ins/Date/prototype/setYear/length.js: runtime error: TypeError
-13. annexB/built-ins/Date/prototype/setYear/not-a-constructor.js: runtime error: Test262Error
-14. annexB/built-ins/Date/prototype/setYear/name.js: runtime error: TypeError
-15. annexB/built-ins/Date/prototype/setYear/this-time-nan.js: runtime error: TypeError
-16. annexB/built-ins/Date/prototype/setYear/year-nan.js: runtime error: TypeError
-17. annexB/built-ins/Date/prototype/setYear/this-not-date.js: runtime error: Test262Error
-18. annexB/built-ins/Date/prototype/setYear/year-number-relative.js: runtime error: TypeError
-19. annexB/built-ins/Date/prototype/setYear/this-time-valid.js: runtime error: TypeError
-20. annexB/built-ins/Date/prototype/setYear/time-clip.js: runtime error: TypeError
-21. annexB/built-ins/Date/prototype/setYear/year-number-absolute.js: runtime error: TypeError
-22. annexB/built-ins/Date/prototype/setYear/year-to-number-err.js: runtime error: Test262Error
-23. annexB/built-ins/Function/createdynfn-html-close-comment-params.js: runtime error: SyntaxError
-24. annexB/built-ins/Date/prototype/toGMTString/not-a-constructor.js: runtime error: Test262Error
-25. annexB/built-ins/Function/createdynfn-html-open-comment-params.js: runtime error: SyntaxError
-26. annexB/built-ins/RegExp/RegExp-control-escape-russian-letter.js: runtime error: TypeError
-27. annexB/built-ins/Object/is/emulates-undefined.js: runtime error: Test262Error
-28. annexB/built-ins/Date/prototype/toGMTString/prop-desc.js: runtime error: Test262Error
-29. annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js: runtime error: TypeError
-30. annexB/built-ins/RegExp/RegExp-invalid-control-escape-character-class.js: runtime error: TypeError
-31. annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js: runtime error: TypeError
-32. annexB/built-ins/RegExp/legacy-accessors/index/this-cross-realm-constructor.js: runtime error: Test262Error
-33. annexB/built-ins/RegExp/legacy-accessors/index/prop-desc.js: runtime error: TypeError
-34. annexB/built-ins/RegExp/legacy-accessors/index/this-not-regexp-constructor.js: runtime error: TypeError
-35. annexB/built-ins/RegExp/legacy-accessors/index/this-subclass-constructor.js: runtime error: Test262Error
-36. annexB/built-ins/RegExp/legacy-accessors/input/prop-desc.js: runtime error: TypeError
-37. annexB/built-ins/RegExp/legacy-accessors/lastMatch/prop-desc.js: runtime error: TypeError
-38. annexB/built-ins/RegExp/legacy-accessors/lastMatch/this-subclass-constructor.js: runtime error: Test262Error
-39. annexB/built-ins/RegExp/legacy-accessors/input/this-subclass-constructor.js: runtime error: Test262Error
-40. annexB/built-ins/RegExp/legacy-accessors/input/this-cross-realm-constructor.js: runtime error: Test262Error
-41. annexB/built-ins/RegExp/legacy-accessors/lastMatch/this-not-regexp-constructor.js: runtime error: TypeError
-42. annexB/built-ins/RegExp/legacy-accessors/lastParen/prop-desc.js: runtime error: TypeError
-43. annexB/built-ins/RegExp/legacy-accessors/lastParen/this-cross-realm-constructor.js: runtime error: Test262Error
-44. annexB/built-ins/RegExp/legacy-accessors/input/this-not-regexp-constructor.js: runtime error: TypeError
-45. annexB/built-ins/RegExp/legacy-accessors/lastParen/this-subclass-constructor.js: runtime error: Test262Error
-46. annexB/built-ins/RegExp/legacy-accessors/lastMatch/this-cross-realm-constructor.js: runtime error: Test262Error
-47. annexB/built-ins/RegExp/legacy-accessors/lastParen/this-not-regexp-constructor.js: runtime error: TypeError
-48. annexB/built-ins/RegExp/legacy-accessors/rightContext/prop-desc.js: runtime error: TypeError
-49. annexB/built-ins/RegExp/prototype/Symbol.split/Symbol.match-getter-recompiles-source.js: runtime error: TypeError
-50. annexB/built-ins/RegExp/legacy-accessors/rightContext/this-cross-realm-constructor.js: runtime error: Test262Error
-51. annexB/built-ins/RegExp/legacy-accessors/leftContext/this-subclass-constructor.js: runtime error: Test262Error
-52. annexB/built-ins/RegExp/legacy-accessors/rightContext/this-subclass-constructor.js: runtime error: Test262Error
-53. annexB/built-ins/RegExp/legacy-accessors/leftContext/this-cross-realm-constructor.js: runtime error: Test262Error
-54. annexB/built-ins/RegExp/legacy-accessors/rightContext/this-not-regexp-constructor.js: runtime error: TypeError
-55. annexB/built-ins/RegExp/legacy-accessors/leftContext/this-not-regexp-constructor.js: runtime error: TypeError
-56. annexB/built-ins/RegExp/legacy-accessors/leftContext/prop-desc.js: runtime error: TypeError
-57. annexB/built-ins/RegExp/prototype/Symbol.split/toint32-limit-recompiles-source.js: runtime error: TypeError
-58. annexB/built-ins/RegExp/prototype/compile/B.RegExp.prototype.compile.js: runtime error: Test262Error
-59. annexB/built-ins/RegExp/prototype/compile/flags-undefined.js: runtime error: TypeError
-60. annexB/built-ins/RegExp/prototype/compile/pattern-regexp-distinct.js: runtime error: TypeError
-61. annexB/built-ins/RegExp/prototype/compile/length.js: runtime error: TypeError
-62. annexB/built-ins/RegExp/prototype/compile/pattern-regexp-immutable-lastindex.js: runtime error: Test262Error
-63. annexB/built-ins/RegExp/prototype/compile/name.js: runtime error: TypeError
-64. annexB/built-ins/RegExp/prototype/compile/pattern-regexp-same.js: runtime error: TypeError
-65. annexB/built-ins/RegExp/prototype/compile/pattern-regexp-flags-defined.js: runtime error: Test262Error
-66. annexB/built-ins/RegExp/prototype/compile/flags-to-string.js: runtime error: TypeError
-67. annexB/built-ins/RegExp/prototype/compile/flags-string-invalid.js: runtime error: Test262Error
-68. annexB/built-ins/RegExp/prototype/compile/flags-to-string-err.js: runtime error: Test262Error
-69. annexB/built-ins/RegExp/prototype/compile/pattern-regexp-props.js: runtime error: TypeError
-70. annexB/built-ins/RegExp/prototype/compile/pattern-string-invalid-u.js: runtime error: Test262Error
-71. annexB/built-ins/RegExp/prototype/compile/pattern-string-invalid.js: runtime error: Test262Error
-72. annexB/built-ins/RegExp/prototype/compile/pattern-string-u.js: runtime error: TypeError
-73. annexB/built-ins/RegExp/prototype/compile/this-not-object.js: runtime error: Test262Error
-74. annexB/built-ins/RegExp/prototype/compile/this-obj-not-regexp.js: runtime error: Test262Error
-75. annexB/built-ins/RegExp/prototype/compile/pattern-to-string-err.js: runtime error: Test262Error
-76. annexB/built-ins/RegExp/prototype/compile/this-cross-realm-instance.js: runtime error: Test262Error
-77. annexB/built-ins/RegExp/prototype/compile/pattern-string.js: runtime error: TypeError
-78. annexB/built-ins/String/prototype/anchor/attr-tostring-err.js: runtime error: Test262Error
-79. annexB/built-ins/RegExp/prototype/flags/order-after-compile.js: runtime error: TypeError
-80. annexB/built-ins/RegExp/prototype/compile/pattern-undefined.js: runtime error: TypeError
-81. annexB/built-ins/String/prototype/anchor/B.2.3.2.js: runtime error: TypeError
-82. annexB/built-ins/String/prototype/anchor/not-a-constructor.js: runtime error: Test262Error
-83. annexB/built-ins/String/prototype/anchor/length.js: runtime error: TypeError
-84. annexB/built-ins/String/prototype/anchor/name.js: runtime error: TypeError
-85. annexB/built-ins/String/prototype/anchor/prop-desc.js: runtime error: Test262Error
-86. annexB/built-ins/String/prototype/anchor/this-val-tostring-err.js: runtime error: Test262Error
-87. annexB/built-ins/String/prototype/big/this-val-tostring-err.js: runtime error: Test262Error
-88. annexB/built-ins/String/prototype/big/length.js: runtime error: TypeError
-89. annexB/built-ins/String/prototype/big/B.2.3.3.js: runtime error: TypeError
-90. annexB/built-ins/String/prototype/big/name.js: runtime error: TypeError
-91. annexB/built-ins/String/prototype/blink/B.2.3.4.js: runtime error: TypeError
-92. annexB/built-ins/String/prototype/big/prop-desc.js: runtime error: Test262Error
-93. annexB/built-ins/String/prototype/blink/not-a-constructor.js: runtime error: Test262Error
-94. annexB/built-ins/String/prototype/big/not-a-constructor.js: runtime error: Test262Error
-95. annexB/built-ins/String/prototype/blink/prop-desc.js: runtime error: Test262Error
-96. annexB/built-ins/String/prototype/blink/name.js: runtime error: TypeError
-97. annexB/built-ins/String/prototype/blink/this-val-tostring-err.js: runtime error: Test262Error
-98. annexB/built-ins/String/prototype/blink/length.js: runtime error: TypeError
-99. annexB/built-ins/String/prototype/bold/B.2.3.5.js: runtime error: TypeError
-100. annexB/built-ins/String/prototype/bold/not-a-constructor.js: runtime error: Test262Error
-101. annexB/built-ins/String/prototype/bold/length.js: runtime error: TypeError
-102. annexB/built-ins/String/prototype/fixed/B.2.3.6.js: runtime error: TypeError
-103. annexB/built-ins/String/prototype/bold/prop-desc.js: runtime error: Test262Error
-104. annexB/built-ins/String/prototype/bold/name.js: runtime error: TypeError
-105. annexB/built-ins/String/prototype/fixed/this-val-tostring-err.js: runtime error: Test262Error
-106. annexB/built-ins/String/prototype/fixed/prop-desc.js: runtime error: Test262Error
-107. annexB/built-ins/String/prototype/fontcolor/B.2.3.7.js: runtime error: TypeError
-108. annexB/built-ins/String/prototype/fontcolor/attr-tostring-err.js: runtime error: Test262Error
-109. annexB/built-ins/String/prototype/bold/this-val-tostring-err.js: runtime error: Test262Error
-110. annexB/built-ins/String/prototype/fixed/name.js: runtime error: TypeError
-111. annexB/built-ins/String/prototype/fontcolor/not-a-constructor.js: runtime error: Test262Error
-112. annexB/built-ins/String/prototype/fixed/not-a-constructor.js: runtime error: Test262Error
-113. annexB/built-ins/String/prototype/fixed/length.js: runtime error: TypeError
-114. annexB/built-ins/String/prototype/fontcolor/length.js: runtime error: TypeError
-115. annexB/built-ins/String/prototype/fontcolor/name.js: runtime error: TypeError
-116. annexB/built-ins/String/prototype/fontsize/B.2.3.8.js: runtime error: TypeError
-117. annexB/built-ins/String/prototype/fontsize/attr-tostring-err.js: runtime error: Test262Error
-118. annexB/built-ins/String/prototype/fontsize/this-val-tostring-err.js: runtime error: Test262Error
-119. annexB/built-ins/String/prototype/fontsize/name.js: runtime error: TypeError
-120. annexB/built-ins/String/prototype/fontcolor/this-val-tostring-err.js: runtime error: Test262Error
-121. annexB/built-ins/String/prototype/fontsize/not-a-constructor.js: runtime error: Test262Error
-122. annexB/built-ins/String/prototype/fontcolor/prop-desc.js: runtime error: Test262Error
-123. annexB/built-ins/String/prototype/fontsize/prop-desc.js: runtime error: Test262Error
-124. annexB/built-ins/String/prototype/italics/B.2.3.9.js: runtime error: TypeError
-125. annexB/built-ins/String/prototype/italics/name.js: runtime error: TypeError
-126. annexB/built-ins/String/prototype/fontsize/length.js: runtime error: TypeError
-127. annexB/built-ins/String/prototype/italics/prop-desc.js: runtime error: Test262Error
-128. annexB/built-ins/String/prototype/italics/this-val-tostring-err.js: runtime error: Test262Error
-129. annexB/built-ins/String/prototype/link/not-a-constructor.js: runtime error: Test262Error
-130. annexB/built-ins/String/prototype/italics/length.js: runtime error: TypeError
-131. annexB/built-ins/String/prototype/link/B.2.3.10.js: runtime error: TypeError
-132. annexB/built-ins/String/prototype/italics/not-a-constructor.js: runtime error: Test262Error
-133. annexB/built-ins/String/prototype/link/length.js: runtime error: TypeError
-134. annexB/built-ins/String/prototype/match/custom-matcher-emulates-undefined.js: runtime error: TypeError
-135. annexB/built-ins/String/prototype/link/this-val-tostring-err.js: runtime error: Test262Error
-136. annexB/built-ins/String/prototype/link/name.js: runtime error: TypeError
-137. annexB/built-ins/String/prototype/link/attr-tostring-err.js: runtime error: Test262Error
-138. annexB/built-ins/String/prototype/replace/custom-replacer-emulates-undefined.js: runtime error: TypeError
-139. annexB/built-ins/String/prototype/matchAll/custom-matcher-emulates-undefined.js: runtime error: TypeError
-140. annexB/built-ins/String/prototype/search/custom-searcher-emulates-undefined.js: runtime error: TypeError
-141. annexB/built-ins/String/prototype/link/prop-desc.js: runtime error: Test262Error
-142. annexB/built-ins/String/prototype/small/length.js: runtime error: TypeError
-143. annexB/built-ins/String/prototype/small/B.2.3.11.js: runtime error: TypeError
-144. annexB/built-ins/String/prototype/replaceAll/custom-replacer-emulates-undefined.js: runtime error: TypeError
-145. annexB/built-ins/String/prototype/small/prop-desc.js: runtime error: Test262Error
-146. annexB/built-ins/String/prototype/small/name.js: runtime error: TypeError
-147. annexB/built-ins/String/prototype/split/custom-splitter-emulates-undefined.js: runtime error: TypeError
-148. annexB/built-ins/String/prototype/small/not-a-constructor.js: runtime error: Test262Error
-149. annexB/built-ins/String/prototype/small/this-val-tostring-err.js: runtime error: Test262Error
-150. annexB/built-ins/String/prototype/strike/length.js: runtime error: TypeError
-151. annexB/built-ins/String/prototype/strike/prop-desc.js: runtime error: Test262Error
-152. annexB/built-ins/String/prototype/strike/not-a-constructor.js: runtime error: Test262Error
-153. annexB/built-ins/String/prototype/strike/B.2.3.12.js: runtime error: TypeError
-154. annexB/built-ins/String/prototype/strike/this-val-tostring-err.js: runtime error: Test262Error
-155. annexB/built-ins/String/prototype/sub/not-a-constructor.js: runtime error: Test262Error
-156. annexB/built-ins/String/prototype/strike/name.js: runtime error: TypeError
-157. annexB/built-ins/String/prototype/sub/B.2.3.13.js: runtime error: TypeError
-158. annexB/built-ins/String/prototype/sub/this-val-tostring-err.js: runtime error: Test262Error
-159. annexB/built-ins/String/prototype/substr/length-negative.js: runtime error: TypeError
-160. annexB/built-ins/String/prototype/substr/length-falsey.js: runtime error: TypeError
-161. annexB/built-ins/String/prototype/substr/length-positive.js: runtime error: TypeError
-162. annexB/built-ins/String/prototype/sub/length.js: runtime error: TypeError
-163. annexB/built-ins/String/prototype/substr/length-to-int-err.js: runtime error: Test262Error
-164. annexB/built-ins/String/prototype/substr/B.2.3.js: runtime error: Test262Error
-165. annexB/built-ins/String/prototype/substr/length-undef.js: runtime error: TypeError
-166. annexB/built-ins/String/prototype/sub/name.js: runtime error: TypeError
-167. annexB/built-ins/String/prototype/substr/length.js: runtime error: TypeError
-168. annexB/built-ins/String/prototype/sub/prop-desc.js: runtime error: Test262Error
-169. annexB/built-ins/String/prototype/substr/start-negative.js: runtime error: TypeError
-170. annexB/built-ins/String/prototype/substr/surrogate-pairs.js: runtime error: TypeError
-171. annexB/built-ins/String/prototype/substr/start-to-int-err.js: runtime error: Test262Error
-172. annexB/built-ins/String/prototype/substr/name.js: runtime error: TypeError
-173. annexB/built-ins/String/prototype/substr/not-a-constructor.js: runtime error: Test262Error
-174. annexB/built-ins/String/prototype/substr/start-and-length-as-numbers.js: runtime error: TypeError
-175. annexB/built-ins/String/prototype/substr/this-to-str-err.js: runtime error: Test262Error
-176. annexB/built-ins/String/prototype/substr/this-non-obj-coerce.js: runtime error: Test262Error
-177. annexB/built-ins/String/prototype/sup/name.js: runtime error: TypeError
-178. annexB/built-ins/String/prototype/sup/prop-desc.js: runtime error: Test262Error
-179. annexB/built-ins/String/prototype/sup/B.2.3.14.js: runtime error: TypeError
-180. annexB/built-ins/String/prototype/trimLeft/name.js: runtime error: TypeError
-181. annexB/built-ins/String/prototype/trimLeft/prop-desc.js: runtime error: Test262Error
-182. annexB/built-ins/String/prototype/sup/not-a-constructor.js: runtime error: Test262Error
-183. annexB/built-ins/String/prototype/trimLeft/length.js: runtime error: TypeError
-184. annexB/built-ins/String/prototype/trimRight/length.js: runtime error: TypeError
-185. annexB/built-ins/String/prototype/sup/this-val-tostring-err.js: runtime error: Test262Error
-186. annexB/built-ins/String/prototype/sup/length.js: runtime error: TypeError
-187. annexB/built-ins/escape/empty-string.js: runtime error: ReferenceError
-188. annexB/built-ins/String/prototype/trimRight/prop-desc.js: runtime error: Test262Error
-189. annexB/built-ins/escape/escape-above.js: runtime error: ReferenceError
-190. annexB/built-ins/escape/argument_types.js: runtime error: ReferenceError
-191. annexB/built-ins/TypedArrayConstructors/from/iterator-method-emulates-undefined.js: runtime error: Test262Error
-192. annexB/built-ins/escape/argument_bigint.js: runtime error: ReferenceError
-193. annexB/built-ins/String/prototype/trimRight/name.js: runtime error: TypeError
-194. annexB/built-ins/escape/escape-below.js: runtime error: ReferenceError
-195. annexB/built-ins/escape/name.js: runtime error: ReferenceError
-196. annexB/built-ins/escape/not-a-constructor.js: runtime error: ReferenceError
-197. annexB/built-ins/escape/length.js: runtime error: ReferenceError
-198. annexB/built-ins/escape/to-primitive-err.js: runtime error: Test262Error
-199. annexB/built-ins/escape/to-string-observe.js: runtime error: ReferenceError
-200. annexB/built-ins/escape/escape-above-astral.js: runtime error: ReferenceError
+| Cluster | Outcome | Count | Examples |
+| --- | --- | ---: | --- |
+| `built-ins/RegExp/property-escapes/generated` | `runtime error: TypeError` | `441` | `built-ins/RegExp/property-escapes/generated/ASCII.js: runtime error: TypeError`<br>`built-ins/RegExp/property-escapes/generated/Any.js: runtime error: TypeError`<br>`built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js: runtime error: TypeError` |
+| `built-ins/Array/prototype/reduce` | `runtime error: TypeError` | `214` | `built-ins/Array/prototype/reduce/15.4.4.21-1-10.js: runtime error: TypeError`<br>`built-ins/Array/prototype/reduce/15.4.4.21-1-11.js: runtime error: TypeError`<br>`built-ins/Array/prototype/reduce/15.4.4.21-1-12.js: runtime error: TypeError` |
+| `built-ins/Array/prototype/reduceRight` | `runtime error: TypeError` | `213` | `built-ins/Array/prototype/reduceRight/15.4.4.22-1-10.js: runtime error: TypeError`<br>`built-ins/Array/prototype/reduceRight/15.4.4.22-1-12.js: runtime error: TypeError`<br>`built-ins/Array/prototype/reduceRight/15.4.4.22-1-13.js: runtime error: TypeError` |
+| `built-ins/Array/prototype/some` | `runtime error: TypeError` | `195` | `built-ins/Array/prototype/some/15.4.4.17-1-10.js: runtime error: TypeError`<br>`built-ins/Array/prototype/some/15.4.4.17-1-11.js: runtime error: TypeError`<br>`built-ins/Array/prototype/some/15.4.4.17-1-12.js: runtime error: TypeError` |
+| `built-ins/Array/prototype/every` | `runtime error: TypeError` | `194` | `built-ins/Array/prototype/every/15.4.4.16-1-11.js: runtime error: TypeError`<br>`built-ins/Array/prototype/every/15.4.4.16-1-12.js: runtime error: TypeError`<br>`built-ins/Array/prototype/every/15.4.4.16-1-13.js: runtime error: TypeError` |
+| `built-ins/Array/prototype/lastIndexOf` | `runtime error: TypeError` | `184` | `built-ins/Array/prototype/lastIndexOf/15.4.4.15-1-10.js: runtime error: TypeError`<br>`built-ins/Array/prototype/lastIndexOf/15.4.4.15-1-14.js: runtime error: TypeError`<br>`built-ins/Array/prototype/lastIndexOf/15.4.4.15-1-15.js: runtime error: TypeError` |
+| `annexB/language/eval-code/direct` | `runtime error: SyntaxError` | `182` | `annexB/language/eval-code/direct/func-block-decl-eval-func-existing-block-fn-no-init.js: runtime error: SyntaxError`<br>`annexB/language/eval-code/direct/func-block-decl-eval-func-existing-fn-no-init.js: runtime error: SyntaxError`<br>`annexB/language/eval-code/direct/func-block-decl-eval-func-existing-fn-update.js: runtime error: SyntaxError` |
+| `built-ins/String/prototype/trim` | `runtime error: TypeError` | `124` | `built-ins/String/prototype/trim/15.5.4.20-0-2.js: runtime error: TypeError`<br>`built-ins/String/prototype/trim/15.5.4.20-1-3.js: runtime error: TypeError`<br>`built-ins/String/prototype/trim/15.5.4.20-1-4.js: runtime error: TypeError` |
+| `built-ins/Array/prototype/indexOf` | `runtime error: TypeError` | `108` | `built-ins/Array/prototype/indexOf/15.4.4.14-1-10.js: runtime error: TypeError`<br>`built-ins/Array/prototype/indexOf/15.4.4.14-1-13.js: runtime error: TypeError`<br>`built-ins/Array/prototype/indexOf/15.4.4.14-1-15.js: runtime error: TypeError` |
+| `annexB/language/eval-code/indirect` | `runtime error: SyntaxError` | `97` | `annexB/language/eval-code/indirect/global-block-decl-eval-global-existing-block-fn-no-init.js: runtime error: SyntaxError`<br>`annexB/language/eval-code/indirect/global-block-decl-eval-global-existing-fn-no-init.js: runtime error: SyntaxError`<br>`annexB/language/eval-code/indirect/global-block-decl-eval-global-existing-fn-update.js: runtime error: SyntaxError` |
+| `language/expressions/dynamic-import/syntax/valid` | `unexpected parse error` | `84` | `language/expressions/dynamic-import/syntax/valid/nested-arrow-assignment-expression-import-defer-empty-str-is-valid-assign-expr.js: unexpected parse error`<br>`language/expressions/dynamic-import/syntax/valid/nested-arrow-assignment-expression-import-defer-script-code-valid.js: unexpected parse error`<br>`language/expressions/dynamic-import/syntax/valid/nested-arrow-assignment-expression-import-source-empty-str-is-valid-assign-expr.js: unexpected parse error` |
+| `built-ins/Object/getOwnPropertyDescriptor` | `runtime error: TypeError` | `70` | `built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-100.js: runtime error: TypeError`<br>`built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-101.js: runtime error: TypeError`<br>`built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-105.js: runtime error: TypeError` |
+| `language/import/import-defer/evaluation-triggers` | `unexpected parse error` | `66` | `language/import/import-defer/evaluation-triggers/ignore-exported-then-defineOwnProperty.js: unexpected parse error`<br>`language/import/import-defer/evaluation-triggers/ignore-exported-then-get-in-prototype.js: unexpected parse error`<br>`language/import/import-defer/evaluation-triggers/ignore-exported-then-get.js: unexpected parse error` |
+| `language/expressions/dynamic-import/catch` | `unexpected parse error` | `64` | `language/expressions/dynamic-import/catch/nested-arrow-import-catch-import-defer-specifier-tostring-abrupt-rejects.js: unexpected parse error`<br>`language/expressions/dynamic-import/catch/nested-arrow-import-catch-import-source-source-text-module.js: unexpected parse error`<br>`language/expressions/dynamic-import/catch/nested-arrow-import-catch-import-source-specifier-tostring-abrupt-rejects.js: unexpected parse error` |
+| `annexB/language/function-code` | `runtime error: lowering error: MissingDeclarationBinding { name: AtomId(115) }` | `45` | `annexB/language/function-code/block-decl-func-existing-block-fn-no-init.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(115) }`<br>`annexB/language/function-code/block-decl-func-existing-block-fn-update.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(115) }`<br>`annexB/language/function-code/block-decl-func-existing-fn-no-init.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(115) }` |
+| `built-ins/RegExp/prototype/Symbol.replace` | `runtime error: TypeError` | `42` | `built-ins/RegExp/prototype/Symbol.replace/arg-1-coerce.js: runtime error: TypeError`<br>`built-ins/RegExp/prototype/Symbol.replace/coerce-lastindex.js: runtime error: TypeError`<br>`built-ins/RegExp/prototype/Symbol.replace/coerce-unicode.js: runtime error: TypeError` |
+| `built-ins/Temporal/Duration/prototype/round` | `runtime error: RangeError` | `40` | `built-ins/Temporal/Duration/prototype/round/balances-days-up-to-both-years-and-months.js: runtime error: RangeError`<br>`built-ins/Temporal/Duration/prototype/round/balances-up-to-next-unit-after-rounding.js: runtime error: RangeError`<br>`built-ins/Temporal/Duration/prototype/round/balances-up-to-weeks.js: runtime error: RangeError` |
+| `built-ins/Date/prototype` | `runtime error: Test262Error` | `38` | `built-ins/Date/prototype/S15.9.5_A03_T1.js: runtime error: Test262Error`<br>`built-ins/Date/prototype/S15.9.5_A04_T1.js: runtime error: Test262Error`<br>`built-ins/Date/prototype/S15.9.5_A07_T1.js: runtime error: Test262Error` |
+| `built-ins/Number/prototype/toString` | `runtime error: TypeError` | `38` | `built-ins/Number/prototype/toString/S15.7.4.2_A1_T01.js: runtime error: TypeError`<br>`built-ins/Number/prototype/toString/S15.7.4.2_A1_T02.js: runtime error: TypeError`<br>`built-ins/Number/prototype/toString/S15.7.4.2_A1_T03.js: runtime error: TypeError` |
+| `annexB/language/eval-code/direct` | `runtime error: ReferenceError` | `36` | `annexB/language/eval-code/direct/func-block-decl-eval-func-init.js: runtime error: ReferenceError`<br>`annexB/language/eval-code/direct/func-block-decl-eval-func-skip-early-err-for-of.js: runtime error: ReferenceError`<br>`annexB/language/eval-code/direct/func-block-decl-eval-func-skip-early-err-for.js: runtime error: ReferenceError` |
+| `annexB/language/global-code` | `runtime error: lowering error: MissingDeclarationBinding { name: AtomId(115) }` | `36` | `annexB/language/global-code/if-decl-else-decl-a-global-existing-block-fn-no-init.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(115) }`<br>`annexB/language/global-code/if-decl-else-decl-a-global-existing-block-fn-update.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(115) }`<br>`annexB/language/global-code/if-decl-else-decl-a-global-existing-fn-no-init.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(115) }` |
+| `built-ins/Function/prototype/toString` | `runtime error: Test262Error` | `34` | `built-ins/Function/prototype/toString/async-generator-method-class-expression-static.js: runtime error: Test262Error`<br>`built-ins/Function/prototype/toString/async-generator-method-class-expression.js: runtime error: Test262Error`<br>`built-ins/Function/prototype/toString/async-method-class-expression-static.js: runtime error: Test262Error` |
+| `built-ins/String/prototype/search` | `runtime error: TypeError` | `33` | `built-ins/String/prototype/search/S15.5.4.12_A1.1_T1.js: runtime error: TypeError`<br>`built-ins/String/prototype/search/S15.5.4.12_A10.js: runtime error: TypeError`<br>`built-ins/String/prototype/search/S15.5.4.12_A1_T10.js: runtime error: TypeError` |
+| `built-ins/String/prototype/split` | `runtime error: Test262Error` | `33` | `built-ins/String/prototype/split/argument-is-regexp-a-z-and-instance-is-string-abc.js: runtime error: Test262Error`<br>`built-ins/String/prototype/split/argument-is-regexp-and-instance-is-number.js: runtime error: Test262Error`<br>`built-ins/String/prototype/split/argument-is-regexp-d-and-instance-is-string-dfe23iu-34-65.js: runtime error: Test262Error` |
+| `annexB/language/function-code` | `runtime error: lowering error: MissingDeclarationBinding { name: AtomId(116) }` | `31` | `annexB/language/function-code/if-decl-else-decl-a-func-existing-block-fn-no-init.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(116) }`<br>`annexB/language/function-code/if-decl-else-decl-a-func-existing-block-fn-update.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(116) }`<br>`annexB/language/function-code/if-decl-else-decl-a-func-existing-fn-no-init.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(116) }` |
+| `built-ins/RegExp/prototype/Symbol.match` | `runtime error: TypeError` | `30` | `built-ins/RegExp/prototype/Symbol.match/builtin-coerce-lastindex.js: runtime error: TypeError`<br>`built-ins/RegExp/prototype/Symbol.match/builtin-failure-g-set-lastindex.js: runtime error: TypeError`<br>`built-ins/RegExp/prototype/Symbol.match/builtin-failure-y-return-val.js: runtime error: TypeError` |
+| `staging/sm/RegExp` | `runtime error: TypeError` | `30` | `staging/sm/RegExp/RegExpExec-exec-type-check.js: runtime error: TypeError`<br>`staging/sm/RegExp/RegExpExec-exec.js: runtime error: TypeError`<br>`staging/sm/RegExp/RegExpExec-return.js: runtime error: TypeError` |
+| `built-ins/Number` | `runtime error: Test262Error` | `29` | `built-ins/Number/S15.7.1.1_A2.js: runtime error: Test262Error`<br>`built-ins/Number/S15.7.2.1_A3.js: runtime error: Test262Error`<br>`built-ins/Number/S9.3.1_A10.js: runtime error: Test262Error` |
+| `built-ins/String/prototype/replaceAll` | `runtime error: TypeError` | `29` | `built-ins/String/prototype/replaceAll/cstm-replaceall-on-boolean-primitive.js: runtime error: TypeError`<br>`built-ins/String/prototype/replaceAll/cstm-replaceall-on-number-primitive.js: runtime error: TypeError`<br>`built-ins/String/prototype/replaceAll/cstm-replaceall-on-string-primitive.js: runtime error: TypeError` |
+| `language/identifiers` | `timeout after 1.0s` | `28` | `language/identifiers/start-unicode-10.0.0-class-escaped.js: timeout after 1.0s`<br>`language/identifiers/start-unicode-10.0.0-class.js: timeout after 1.0s`<br>`language/identifiers/start-unicode-10.0.0.js: timeout after 1.0s` |
+| `annexB/language/eval-code/direct` | `runtime error: Test262Error` | `27` | `annexB/language/eval-code/direct/block-decl-nostrict.js: runtime error: Test262Error`<br>`annexB/language/eval-code/direct/func-block-decl-eval-func-existing-var-update.js: runtime error: Test262Error`<br>`annexB/language/eval-code/direct/func-block-decl-eval-func-no-skip-param.js: runtime error: Test262Error` |
+| `annexB/language/function-code` | `runtime error: ReferenceError` | `27` | `annexB/language/function-code/block-decl-func-block-scoping.js: runtime error: ReferenceError`<br>`annexB/language/function-code/block-decl-func-init.js: runtime error: ReferenceError`<br>`annexB/language/function-code/block-decl-func-no-skip-try.js: runtime error: ReferenceError` |
+| `annexB/language/global-code` | `runtime error: lowering error: MissingDeclarationBinding { name: AtomId(114) }` | `27` | `annexB/language/global-code/block-decl-global-existing-block-fn-no-init.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(114) }`<br>`annexB/language/global-code/block-decl-global-existing-block-fn-update.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(114) }`<br>`annexB/language/global-code/block-decl-global-existing-fn-no-init.js: runtime error: lowering error: MissingDeclarationBinding { name: AtomId(114) }` |
+| `built-ins/Array/prototype/toSpliced` | `runtime error: TypeError` | `26` | `built-ins/Array/prototype/toSpliced/deleteCount-clamped-between-zero-and-remaining-count.js: runtime error: TypeError`<br>`built-ins/Array/prototype/toSpliced/deleteCount-missing.js: runtime error: TypeError`<br>`built-ins/Array/prototype/toSpliced/deleteCount-undefined.js: runtime error: TypeError` |
+| `built-ins/RegExp/prototype/Symbol.split` | `runtime error: TypeError` | `26` | `built-ins/RegExp/prototype/Symbol.split/coerce-flags.js: runtime error: TypeError`<br>`built-ins/RegExp/prototype/Symbol.split/coerce-limit.js: runtime error: TypeError`<br>`built-ins/RegExp/prototype/Symbol.split/coerce-string.js: runtime error: TypeError` |
+| `built-ins/Object/assign` | `runtime error: TypeError` | `24` | `built-ins/Object/assign/ObjectOverride-sameproperty.js: runtime error: TypeError`<br>`built-ins/Object/assign/OnlyOneArgument.js: runtime error: TypeError`<br>`built-ins/Object/assign/Override-notstringtarget.js: runtime error: TypeError` |
+| `built-ins/RegExp/prototype/Symbol.replace` | `runtime error: Test262Error` | `24` | `built-ins/RegExp/prototype/Symbol.replace/arg-1-coerce-err.js: runtime error: Test262Error`<br>`built-ins/RegExp/prototype/Symbol.replace/coerce-lastindex-err.js: runtime error: Test262Error`<br>`built-ins/RegExp/prototype/Symbol.replace/exec-err.js: runtime error: Test262Error` |
+| `built-ins/String/prototype/toLocaleLowerCase` | `runtime error: TypeError` | `23` | `built-ins/String/prototype/toLocaleLowerCase/Final_Sigma_U180E.js: runtime error: TypeError`<br>`built-ins/String/prototype/toLocaleLowerCase/S15.5.4.17_A11.js: runtime error: TypeError`<br>`built-ins/String/prototype/toLocaleLowerCase/S15.5.4.17_A1_T1.js: runtime error: TypeError` |
+| `built-ins/String/prototype/toLowerCase` | `runtime error: TypeError` | `23` | `built-ins/String/prototype/toLowerCase/Final_Sigma_U180E.js: runtime error: TypeError`<br>`built-ins/String/prototype/toLowerCase/S15.5.4.16_A10.js: runtime error: TypeError`<br>`built-ins/String/prototype/toLowerCase/S15.5.4.16_A1_T1.js: runtime error: TypeError` |
+| `built-ins/Array/prototype/reduceRight` | `runtime error: Test262Error` | `22` | `built-ins/Array/prototype/reduceRight/15.4.4.22-3-22.js: runtime error: Test262Error`<br>`built-ins/Array/prototype/reduceRight/15.4.4.22-4-10.js: runtime error: Test262Error`<br>`built-ins/Array/prototype/reduceRight/15.4.4.22-4-11.js: runtime error: Test262Error` |
+| `staging/sm/Array` | `runtime error: TypeError` | `22` | `staging/sm/Array/at.js: runtime error: TypeError`<br>`staging/sm/Array/change-array-by-copy-cross-compartment-create.js: runtime error: TypeError`<br>`staging/sm/Array/concat-proxy.js: runtime error: TypeError` |
+| `annexB/language/global-code` | `runtime error: ReferenceError` | `21` | `annexB/language/global-code/block-decl-global-block-scoping.js: runtime error: ReferenceError`<br>`annexB/language/global-code/block-decl-global-init.js: runtime error: ReferenceError`<br>`annexB/language/global-code/block-decl-global-no-skip-try.js: runtime error: ReferenceError` |
+| `built-ins/Array/prototype/reduce` | `runtime error: Test262Error` | `21` | `built-ins/Array/prototype/reduce/15.4.4.21-3-22.js: runtime error: Test262Error`<br>`built-ins/Array/prototype/reduce/15.4.4.21-4-10.js: runtime error: Test262Error`<br>`built-ins/Array/prototype/reduce/15.4.4.21-4-15.js: runtime error: Test262Error` |
+| `built-ins/Array/prototype/sort` | `runtime error: TypeError` | `21` | `built-ins/Array/prototype/sort/precise-getter-decreases-length.js: runtime error: TypeError`<br>`built-ins/Array/prototype/sort/precise-getter-deletes-successor.js: runtime error: TypeError`<br>`built-ins/Array/prototype/sort/precise-getter-increases-length.js: runtime error: TypeError` |
+| `built-ins/Function` | `runtime error: TypeError` | `21` | `built-ins/Function/15.3.5.4_2-12gs.js: runtime error: TypeError`<br>`built-ins/Function/15.3.5.4_2-14gs.js: runtime error: TypeError`<br>`built-ins/Function/15.3.5.4_2-75gs.js: runtime error: TypeError` |
+| `built-ins/String/prototype/toLocaleUpperCase` | `runtime error: TypeError` | `21` | `built-ins/String/prototype/toLocaleUpperCase/S15.5.4.19_A11.js: runtime error: TypeError`<br>`built-ins/String/prototype/toLocaleUpperCase/S15.5.4.19_A1_T1.js: runtime error: TypeError`<br>`built-ins/String/prototype/toLocaleUpperCase/S15.5.4.19_A1_T10.js: runtime error: TypeError` |
+| `built-ins/String/prototype/toUpperCase` | `runtime error: TypeError` | `21` | `built-ins/String/prototype/toUpperCase/S15.5.4.18_A11.js: runtime error: TypeError`<br>`built-ins/String/prototype/toUpperCase/S15.5.4.18_A1_T10.js: runtime error: TypeError`<br>`built-ins/String/prototype/toUpperCase/S15.5.4.18_A1_T13.js: runtime error: TypeError` |
+| `built-ins/Temporal/ZonedDateTime/from` | `runtime error: Test262Error` | `21` | `built-ins/Temporal/ZonedDateTime/from/argument-propertybag-invalid-offset-string.js: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/from/argument-propertybag-offset-not-agreeing-with-timezone.js: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/from/argument-string-limits.js: runtime error: Test262Error` |
+| `built-ins/Temporal/ZonedDateTime/prototype/with` | `runtime error: Test262Error` | `20` | `built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-invalid-string.js: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-wrong-type.js: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/invalid-offset.js: runtime error: Test262Error` |
+| `built-ins/Date/prototype/setHours` | `runtime error: TypeError` | `19` | `built-ins/Date/prototype/setHours/arg-hour-to-number-err.js: runtime error: TypeError`<br>`built-ins/Date/prototype/setHours/arg-min-to-number-err.js: runtime error: TypeError`<br>`built-ins/Date/prototype/setHours/arg-ms-to-number-err.js: runtime error: TypeError` |
 
 ## Notes
 
 - The checked-in exclusion manifest remains intentionally narrow. Missing engine work stays visible here as skips or failures instead of being hidden in the manifest.
-- Tests carrying `Error.isError` remain excluded from selection because they are outside the core ECMA-262 runner surface tracked by this tool.
+- Stage 4 implementation gaps remain visible as skips or failures; proposal-stage policy only excludes tests below the configured proposal maturity.

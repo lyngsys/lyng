@@ -31,6 +31,7 @@ struct PreparedSuite {
     category_stats: HashMap<String, CategoryStats>,
     selected_counts: HashMap<String, usize>,
     skip_reasons: HashMap<String, u32>,
+    exclusion_reasons: HashMap<String, u32>,
     failures: Vec<String>,
 }
 
@@ -133,12 +134,14 @@ pub fn main_entry() {
         filter: options.filter.as_deref(),
         no_skip: options.no_skip,
         proposal_stage: options.proposal_stage,
+        jobs,
         timeout,
         candidate_total: suite.candidate_total,
         selected_total,
         selected_counts: &suite.selected_counts,
         category_stats: &suite.category_stats,
         skip_reasons: &suite.skip_reasons,
+        exclusion_reasons: &suite.exclusion_reasons,
         failures: &suite.failures,
         elapsed: execution.elapsed,
     });
@@ -213,6 +216,7 @@ fn prepare_suite(
     let mut category_stats: HashMap<String, CategoryStats> = HashMap::new();
     let mut selected_counts: HashMap<String, usize> = HashMap::new();
     let mut skip_reasons: HashMap<String, u32> = HashMap::new();
+    let mut exclusion_reasons: HashMap<String, u32> = HashMap::new();
     let mut failures = Vec::new();
 
     for path in &all_paths {
@@ -238,7 +242,10 @@ fn prepare_suite(
             options.no_skip,
             options.proposal_stage,
         ) {
-            Some(SkipDecision::ExcludedFromSelection) => continue,
+            Some(SkipDecision::ExcludedFromSelection(reason)) => {
+                *exclusion_reasons.entry(reason).or_default() += 1;
+                continue;
+            }
             Some(SkipDecision::Skip(reason)) => {
                 *selected_counts.entry(category.clone()).or_default() += 1;
                 category_stats.entry(category).or_default().skip += 1;
@@ -263,6 +270,7 @@ fn prepare_suite(
         category_stats,
         selected_counts,
         skip_reasons,
+        exclusion_reasons,
         failures,
     }
 }

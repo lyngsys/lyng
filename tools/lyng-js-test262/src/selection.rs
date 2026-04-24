@@ -337,7 +337,7 @@ impl ExclusionKind {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum SkipDecision {
-    ExcludedFromSelection,
+    ExcludedFromSelection(String),
     Skip(String),
 }
 
@@ -421,8 +421,8 @@ pub(crate) fn skip_decision(
     if no_skip {
         return None;
     }
-    if should_exclude_from_selection(metadata, proposal_stage) {
-        return Some(SkipDecision::ExcludedFromSelection);
+    if let Some(reason) = selection_exclusion_reason(metadata, proposal_stage) {
+        return Some(SkipDecision::ExcludedFromSelection(reason));
     }
 
     skip_reason(path, test_dir, manifest, metadata, helpers).map(SkipDecision::Skip)
@@ -545,12 +545,16 @@ fn should_skip_metadata(metadata: &TestMetadata, helpers: &HelperCatalog) -> Opt
     None
 }
 
-fn should_exclude_from_selection(metadata: &TestMetadata, proposal_stage: ProposalStage) -> bool {
+fn selection_exclusion_reason(
+    metadata: &TestMetadata,
+    proposal_stage: ProposalStage,
+) -> Option<String> {
     metadata
         .features
         .iter()
-        .filter_map(|feature| proposal_feature_stage(feature))
-        .any(|feature_stage| !proposal_stage.includes(feature_stage))
+        .filter_map(|feature| proposal_feature_stage(feature).map(|stage| (feature, stage)))
+        .find(|(_, feature_stage)| !proposal_stage.includes(*feature_stage))
+        .map(|(feature, _)| format!("proposal stage below {}: {feature}", proposal_stage.label()))
 }
 
 fn should_skip_path(path: &Path) -> Option<String> {
@@ -832,7 +836,12 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(decision, Some(SkipDecision::ExcludedFromSelection));
+        assert_eq!(
+            decision,
+            Some(SkipDecision::ExcludedFromSelection(
+                "proposal stage below Stage 3+: ShadowRealm".to_string()
+            ))
+        );
     }
 
     #[test]
@@ -888,7 +897,9 @@ mod tests {
 
             assert_eq!(
                 decision,
-                Some(SkipDecision::ExcludedFromSelection),
+                Some(SkipDecision::ExcludedFromSelection(format!(
+                    "proposal stage below Stage 4: {feature}"
+                ))),
                 "feature `{feature}` should be excluded by strict Stage 4 policy"
             );
         }

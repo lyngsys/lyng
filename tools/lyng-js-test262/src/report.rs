@@ -6,7 +6,8 @@ use std::time::Duration;
 
 use crate::selection::{ExclusionManifest, ProposalStage};
 
-pub(crate) const DEFAULT_FAILURE_LIMIT: usize = 200;
+const FAILURE_CLUSTER_LIMIT: usize = 50;
+const FAILURE_EXAMPLE_LIMIT: usize = 3;
 
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct CategoryStats {
@@ -45,17 +46,22 @@ pub(crate) struct SuiteReport<'a> {
     pub(crate) filter: Option<&'a str>,
     pub(crate) no_skip: bool,
     pub(crate) proposal_stage: ProposalStage,
+    pub(crate) jobs: usize,
     pub(crate) timeout: Duration,
     pub(crate) candidate_total: usize,
     pub(crate) selected_total: usize,
     pub(crate) selected_counts: &'a HashMap<String, usize>,
     pub(crate) category_stats: &'a HashMap<String, CategoryStats>,
     pub(crate) skip_reasons: &'a HashMap<String, u32>,
+    pub(crate) exclusion_reasons: &'a HashMap<String, u32>,
     pub(crate) failures: &'a [String],
     pub(crate) elapsed: Duration,
 }
 
+#[derive(Clone, Copy, Debug)]
 struct ReportTotals {
+    candidate_total: usize,
+    selected_total: usize,
     total_pass: u32,
     total_fail: u32,
     total_skip: u32,
@@ -70,16 +76,21 @@ pub(crate) fn write_report(report: &SuiteReport<'_>) {
         let _ = fs::create_dir_all(parent);
     }
 
+    let previous_totals = fs::read_to_string(report.report_path)
+        .ok()
+        .and_then(|source| parse_previous_totals(&source));
     let totals = compute_totals(report);
 
     let mut out = String::new();
     write_report_header(&mut out, report);
     write_run_section(&mut out, report);
     write_summary_section(&mut out, report, &totals);
+    write_delta_section(&mut out, previous_totals.as_ref(), &totals);
+    write_selection_exclusion_section(&mut out, report, &totals);
     write_category_section(&mut out, report);
     write_skip_section(&mut out, report);
     write_manifest_section(&mut out, report);
-    write_failure_section(&mut out, report);
+    write_failure_cluster_section(&mut out, report);
     write_notes_section(&mut out, report);
 
     if let Err(error) = fs::write(report.report_path, out) {
@@ -127,6 +138,8 @@ fn compute_totals(report: &SuiteReport<'_>) -> ReportTotals {
     };
 
     ReportTotals {
+        candidate_total: report.candidate_total,
+        selected_total: report.selected_total,
         total_pass,
         total_fail,
         total_skip,
@@ -175,6 +188,7 @@ fn write_run_section(out: &mut String, report: &SuiteReport<'_>) {
         report.timeout.as_secs_f64()
     );
     let _ = writeln!(out, "- Proposal stage: `{}`", report.proposal_stage.label());
+    let _ = writeln!(out, "- Jobs: `{}`", report.jobs);
     let _ = writeln!(out, "- Exclusion manifest: `{}`", report.manifest.path);
     let _ = writeln!(
         out,
@@ -213,6 +227,116 @@ fn write_summary_section(out: &mut String, report: &SuiteReport<'_>, totals: &Re
     let _ = writeln!(out);
 }
 
+fn write_delta_section(
+    out: &mut String,
+    previous_totals: Option<&ReportTotals>,
+    totals: &ReportTotals,
+) {
+    let _ = writeln!(out, "## Delta From Previous Report");
+    let _ = writeln!(out);
+    let Some(previous) = previous_totals else {
+        let _ = writeln!(
+            out,
+            "No previous report summary was available at this report path."
+        );
+        let _ = writeln!(out);
+        return;
+    };
+
+    let _ = writeln!(out, "| Metric | Previous | Current | Delta |");
+    let _ = writeln!(out, "| --- | ---: | ---: | ---: |");
+    write_delta_count_row(
+        out,
+        "Candidate tests",
+        previous.candidate_total as i128,
+        totals.candidate_total as i128,
+    );
+    write_delta_count_row(
+        out,
+        "Excluded from selection",
+        previous.excluded_from_selection as i128,
+        totals.excluded_from_selection as i128,
+    );
+    write_delta_count_row(
+        out,
+        "Selected tests",
+        previous.selected_total as i128,
+        totals.selected_total as i128,
+    );
+    write_delta_count_row(
+        out,
+        "Runnable",
+        i128::from(previous.runnable),
+        i128::from(totals.runnable),
+    );
+    write_delta_count_row(
+        out,
+        "Passed",
+        i128::from(previous.total_pass),
+        i128::from(totals.total_pass),
+    );
+    write_delta_count_row(
+        out,
+        "Failed",
+        i128::from(previous.total_fail),
+        i128::from(totals.total_fail),
+    );
+    write_delta_count_row(
+        out,
+        "Panicked",
+        i128::from(previous.total_panic),
+        i128::from(totals.total_panic),
+    );
+    write_delta_count_row(
+        out,
+        "Skipped",
+        i128::from(previous.total_skip),
+        i128::from(totals.total_skip),
+    );
+    let _ = writeln!(
+        out,
+        "| Pass rate (selected) | `{}%` | `{}%` | `{:+.2}pp` |",
+        format_pass_rate(previous.pass_rate),
+        format_pass_rate(totals.pass_rate),
+        totals.pass_rate - previous.pass_rate
+    );
+    let _ = writeln!(out);
+}
+
+fn write_delta_count_row(out: &mut String, metric: &str, previous: i128, current: i128) {
+    let delta = current - previous;
+    let _ = writeln!(
+        out,
+        "| {metric} | `{}` | `{}` | `{delta:+}` |",
+        previous, current
+    );
+}
+
+fn write_selection_exclusion_section(
+    out: &mut String,
+    report: &SuiteReport<'_>,
+    totals: &ReportTotals,
+) {
+    let _ = writeln!(out, "## Selection Exclusions");
+    let _ = writeln!(out);
+    if report.exclusion_reasons.is_empty() {
+        if totals.excluded_from_selection == 0 {
+            let _ = writeln!(out, "No tests were excluded from selection.");
+        } else {
+            let _ = writeln!(out, "No exclusion reason detail was recorded.");
+        }
+    } else {
+        let _ = writeln!(out, "| Reason | Count |");
+        let _ = writeln!(out, "| --- | ---: |");
+        let mut reason_rows: Vec<_> = report.exclusion_reasons.iter().collect();
+        reason_rows.sort_by(|left, right| right.1.cmp(left.1).then_with(|| left.0.cmp(right.0)));
+        for (reason, count) in reason_rows {
+            let _ = writeln!(out, "| {reason} | `{count}` |");
+        }
+    }
+    let _ = writeln!(out);
+}
+
 fn write_category_section(out: &mut String, report: &SuiteReport<'_>) {
     let _ = writeln!(out, "## Category Breakdown");
     let _ = writeln!(out);
@@ -245,20 +369,53 @@ fn write_category_section(out: &mut String, report: &SuiteReport<'_>) {
 }
 
 fn write_skip_section(out: &mut String, report: &SuiteReport<'_>) {
-    let _ = writeln!(out, "## Top Skip Reasons");
+    let _ = writeln!(out, "## Skip Breakdown");
     let _ = writeln!(out);
     if report.skip_reasons.is_empty() {
         let _ = writeln!(out, "No skips recorded.");
     } else {
-        let _ = writeln!(out, "| Reason | Count |");
-        let _ = writeln!(out, "| --- | ---: |");
+        let _ = writeln!(out, "| Class | Reason | Count |");
+        let _ = writeln!(out, "| --- | --- | ---: |");
         let mut reason_rows: Vec<_> = report.skip_reasons.iter().collect();
-        reason_rows.sort_by(|left, right| right.1.cmp(left.1).then_with(|| left.0.cmp(right.0)));
+        reason_rows.sort_by(|left, right| {
+            skip_reason_class(left.0)
+                .cmp(skip_reason_class(right.0))
+                .then_with(|| right.1.cmp(left.1))
+                .then_with(|| left.0.cmp(right.0))
+        });
         for (reason, count) in reason_rows {
-            let _ = writeln!(out, "| {reason} | `{count}` |");
+            let _ = writeln!(
+                out,
+                "| {} | {reason} | `{count}` |",
+                skip_reason_class(reason)
+            );
         }
     }
     let _ = writeln!(out);
+}
+
+fn skip_reason_class(reason: &str) -> &'static str {
+    if reason.starts_with("manifest exclusion") {
+        "Manifest/out of scope"
+    } else if reason.starts_with("unsupported feature:") {
+        "Unsupported ECMA-262 feature"
+    } else if reason.starts_with("unsupported harness include:")
+        || reason.contains("$262.agent")
+        || reason.starts_with("raw harness tests")
+    {
+        "Harness capability"
+    } else if reason.starts_with("runtime abort:") {
+        "Runtime safety"
+    } else if reason.starts_with("needs builtin bootstrap:") {
+        "Bootstrap gap"
+    } else if reason.starts_with("host runs with")
+        || reason.starts_with("resolution-phase")
+        || reason.contains("host")
+    {
+        "Host/runtime policy"
+    } else {
+        "Other"
+    }
 }
 
 fn write_manifest_section(out: &mut String, report: &SuiteReport<'_>) {
@@ -282,22 +439,172 @@ fn write_manifest_section(out: &mut String, report: &SuiteReport<'_>) {
     let _ = writeln!(out);
 }
 
-fn write_failure_section(out: &mut String, report: &SuiteReport<'_>) {
-    let _ = writeln!(out, "## Failure Sample");
+fn write_failure_cluster_section(out: &mut String, report: &SuiteReport<'_>) {
+    let _ = writeln!(out, "## Failure Clusters");
     let _ = writeln!(out);
     if report.failures.is_empty() {
         let _ = writeln!(out, "No failures recorded.");
     } else {
-        for (index, failure) in report
-            .failures
-            .iter()
-            .take(DEFAULT_FAILURE_LIMIT)
-            .enumerate()
+        let _ = writeln!(out, "| Cluster | Outcome | Count | Examples |");
+        let _ = writeln!(out, "| --- | --- | ---: | --- |");
+        for cluster in failure_clusters(report.failures)
+            .into_iter()
+            .take(FAILURE_CLUSTER_LIMIT)
         {
-            let _ = writeln!(out, "{}. {}", index + 1, failure);
+            let examples = cluster
+                .examples
+                .iter()
+                .map(|example| table_code_cell(example))
+                .collect::<Vec<_>>()
+                .join("<br>");
+            let _ = writeln!(
+                out,
+                "| {} | {} | `{}` | {examples} |",
+                table_code_cell(&cluster.path),
+                table_code_cell(&cluster.outcome),
+                cluster.count
+            );
         }
     }
     let _ = writeln!(out);
+}
+
+#[derive(Debug)]
+struct FailureCluster {
+    path: String,
+    outcome: String,
+    count: usize,
+    examples: Vec<String>,
+}
+
+fn failure_clusters(failures: &[String]) -> Vec<FailureCluster> {
+    let mut clusters: HashMap<(String, String), FailureCluster> = HashMap::new();
+    for failure in failures {
+        let (path, outcome) = split_failure(failure);
+        let cluster_path = failure_cluster_path(path);
+        let key = (cluster_path.clone(), outcome.to_string());
+        let cluster = clusters.entry(key).or_insert_with(|| FailureCluster {
+            path: cluster_path,
+            outcome: outcome.to_string(),
+            count: 0,
+            examples: Vec::new(),
+        });
+        cluster.count += 1;
+        if cluster.examples.len() < FAILURE_EXAMPLE_LIMIT {
+            cluster.examples.push(failure.clone());
+        }
+    }
+
+    let mut clusters: Vec<_> = clusters.into_values().collect();
+    for cluster in &mut clusters {
+        cluster.examples.sort();
+    }
+    clusters.sort_by(|left, right| {
+        right
+            .count
+            .cmp(&left.count)
+            .then_with(|| left.path.cmp(&right.path))
+            .then_with(|| left.outcome.cmp(&right.outcome))
+    });
+    clusters
+}
+
+fn split_failure(failure: &str) -> (&str, &str) {
+    failure
+        .split_once(": ")
+        .unwrap_or((failure, "unclassified failure"))
+}
+
+fn failure_cluster_path(path: &str) -> String {
+    let mut parts: Vec<_> = path.split('/').collect();
+    if parts.len() <= 1 {
+        return path.to_string();
+    }
+    parts.pop();
+    parts.join("/")
+}
+
+fn table_code_cell(value: &str) -> String {
+    format!("`{}`", value.replace('|', "\\|"))
+}
+
+fn parse_previous_totals(source: &str) -> Option<ReportTotals> {
+    let mut in_summary = false;
+    let mut candidate_total = None;
+    let mut excluded_from_selection = None;
+    let mut selected_total = None;
+    let mut runnable = None;
+    let mut total_pass = None;
+    let mut total_fail = None;
+    let mut total_panic = None;
+    let mut total_skip = None;
+    let mut pass_rate = None;
+
+    for line in source.lines() {
+        if line.trim() == "## Summary" {
+            in_summary = true;
+            continue;
+        }
+        if in_summary && line.starts_with("## ") {
+            break;
+        }
+        if !in_summary || !line.starts_with('|') {
+            continue;
+        }
+
+        let mut cells = line.split('|').skip(1).map(str::trim);
+        let Some(metric) = cells.next() else {
+            continue;
+        };
+        let Some(value) = cells.next() else {
+            continue;
+        };
+
+        match metric {
+            "Candidate tests" => candidate_total = parse_usize_cell(value),
+            "Excluded from selection" => excluded_from_selection = parse_usize_cell(value),
+            "Selected tests" => selected_total = parse_usize_cell(value),
+            "Runnable" => runnable = parse_u32_cell(value),
+            "Passed" => total_pass = parse_u32_cell(value),
+            "Failed" => total_fail = parse_u32_cell(value),
+            "Panicked" => total_panic = parse_u32_cell(value),
+            "Skipped" => total_skip = parse_u32_cell(value),
+            "Pass rate (selected)" => pass_rate = parse_percent_cell(value),
+            _ => {}
+        }
+    }
+
+    Some(ReportTotals {
+        candidate_total: candidate_total?,
+        selected_total: selected_total?,
+        total_pass: total_pass?,
+        total_fail: total_fail?,
+        total_skip: total_skip?,
+        total_panic: total_panic?,
+        runnable: runnable?,
+        excluded_from_selection: excluded_from_selection?,
+        pass_rate: pass_rate?,
+    })
+}
+
+fn parse_usize_cell(value: &str) -> Option<usize> {
+    normalized_metric_value(value).parse().ok()
+}
+
+fn parse_u32_cell(value: &str) -> Option<u32> {
+    normalized_metric_value(value).parse().ok()
+}
+
+fn parse_percent_cell(value: &str) -> Option<f64> {
+    normalized_metric_value(value).parse().ok()
+}
+
+fn normalized_metric_value(value: &str) -> String {
+    value
+        .trim()
+        .trim_matches('`')
+        .trim_end_matches('%')
+        .replace(',', "")
 }
 
 fn write_notes_section(out: &mut String, report: &SuiteReport<'_>) {
@@ -324,6 +631,7 @@ fn write_notes_section(out: &mut String, report: &SuiteReport<'_>) {
 mod tests {
     use std::collections::HashMap;
     use std::fs;
+    use std::path::PathBuf;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use crate::selection::{ExclusionManifest, ProposalStage};
@@ -345,6 +653,19 @@ mod tests {
         assert_eq!(format_pass_rate(stats.pass_rate()), "72.03");
     }
 
+    fn unique_report_path(name: &str) -> (PathBuf, String) {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after unix epoch")
+            .as_nanos();
+        let report_path = std::env::temp_dir().join(format!(
+            "lyng-js-test262-{name}-{}-{unique}.md",
+            std::process::id()
+        ));
+        let report_path_string = report_path.display().to_string();
+        (report_path, report_path_string)
+    }
+
     #[test]
     fn report_documents_top_level_grouping_and_lists_skips_separately() {
         let mut selected_counts = HashMap::new();
@@ -362,20 +683,13 @@ mod tests {
         );
 
         let skip_reasons = HashMap::from([("unsupported feature".to_string(), 1)]);
+        let exclusion_reasons = HashMap::new();
         let failures = Vec::new();
         let manifest = ExclusionManifest {
             path: "reports/js/lyng-js/test262-exclusions.txt".to_string(),
             rules: Vec::new(),
         };
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system clock should be after unix epoch")
-            .as_nanos();
-        let report_path = std::env::temp_dir().join(format!(
-            "lyng-js-test262-report-{}-{unique}.md",
-            std::process::id()
-        ));
-        let report_path_string = report_path.display().to_string();
+        let (report_path, report_path_string) = unique_report_path("report");
 
         write_report(&SuiteReport {
             report_path: &report_path_string,
@@ -383,12 +697,14 @@ mod tests {
             filter: None,
             no_skip: false,
             proposal_stage: ProposalStage::Stage3,
+            jobs: 1,
             timeout: Duration::from_secs(1),
             candidate_total: 2,
             selected_total: 2,
             selected_counts: &selected_counts,
             category_stats: &category_stats,
             skip_reasons: &skip_reasons,
+            exclusion_reasons: &exclusion_reasons,
             failures: &failures,
             elapsed: Duration::from_secs(2),
         });
@@ -403,5 +719,254 @@ mod tests {
         assert!(output.contains("- Proposal stage: `Stage 3+`"));
         assert!(output.contains("Stage 4 implementation gaps remain visible"));
         assert!(!output.contains("Tests carrying `Error.isError` remain excluded"));
+    }
+
+    #[test]
+    fn report_includes_delta_from_previous_summary() {
+        let mut selected_counts = HashMap::new();
+        selected_counts.insert("built-ins".to_string(), 2);
+
+        let mut category_stats = HashMap::new();
+        category_stats.insert(
+            "built-ins".to_string(),
+            CategoryStats {
+                pass: 1,
+                fail: 0,
+                skip: 1,
+                panic: 0,
+            },
+        );
+
+        let skip_reasons = HashMap::new();
+        let exclusion_reasons = HashMap::new();
+        let failures = Vec::new();
+        let manifest = ExclusionManifest {
+            path: "reports/js/lyng-js/test262-exclusions.txt".to_string(),
+            rules: Vec::new(),
+        };
+        let (report_path, report_path_string) = unique_report_path("delta");
+        fs::write(
+            &report_path,
+            r"# Lyng JS Whole-Suite Test262 Report
+
+## Summary
+
+| Metric | Count |
+| --- | ---: |
+| Candidate tests | `3` |
+| Excluded from selection | `2` |
+| Selected tests | `1` |
+| Runnable | `1` |
+| Passed | `0` |
+| Failed | `1` |
+| Panicked | `0` |
+| Skipped | `0` |
+| Pass rate (selected) | `0.00%` |
+",
+        )
+        .expect("previous report should be writable");
+
+        write_report(&SuiteReport {
+            report_path: &report_path_string,
+            manifest: &manifest,
+            filter: None,
+            no_skip: false,
+            proposal_stage: ProposalStage::Stage3,
+            jobs: 4,
+            timeout: Duration::from_secs(1),
+            candidate_total: 3,
+            selected_total: 2,
+            selected_counts: &selected_counts,
+            category_stats: &category_stats,
+            skip_reasons: &skip_reasons,
+            exclusion_reasons: &exclusion_reasons,
+            failures: &failures,
+            elapsed: Duration::from_secs(2),
+        });
+
+        let output = fs::read_to_string(&report_path).expect("report should be readable");
+        let _ = fs::remove_file(&report_path);
+
+        assert!(output.contains("## Delta From Previous Report"));
+        assert!(output.contains("| Passed | `0` | `1` | `+1` |"));
+        assert!(output.contains("| Excluded from selection | `2` | `1` | `-1` |"));
+        assert!(output.contains("| Pass rate (selected) | `0.00%` | `50.00%` | `+50.00pp` |"));
+        assert!(output.contains("- Jobs: `4`"));
+    }
+
+    #[test]
+    fn report_breaks_down_selection_exclusions_by_reason() {
+        let selected_counts = HashMap::new();
+        let category_stats = HashMap::new();
+        let skip_reasons = HashMap::new();
+        let exclusion_reasons =
+            HashMap::from([("proposal stage below Stage 3+: ShadowRealm".to_string(), 64)]);
+        let failures = Vec::new();
+        let manifest = ExclusionManifest {
+            path: "reports/js/lyng-js/test262-exclusions.txt".to_string(),
+            rules: Vec::new(),
+        };
+        let (report_path, report_path_string) = unique_report_path("exclusions");
+
+        write_report(&SuiteReport {
+            report_path: &report_path_string,
+            manifest: &manifest,
+            filter: None,
+            no_skip: false,
+            proposal_stage: ProposalStage::Stage3,
+            jobs: 1,
+            timeout: Duration::from_secs(1),
+            candidate_total: 64,
+            selected_total: 0,
+            selected_counts: &selected_counts,
+            category_stats: &category_stats,
+            skip_reasons: &skip_reasons,
+            exclusion_reasons: &exclusion_reasons,
+            failures: &failures,
+            elapsed: Duration::from_secs(2),
+        });
+
+        let output = fs::read_to_string(&report_path).expect("report should be readable");
+        let _ = fs::remove_file(&report_path);
+
+        assert!(output.contains("## Selection Exclusions"));
+        assert!(output.contains("| proposal stage below Stage 3+: ShadowRealm | `64` |"));
+    }
+
+    #[test]
+    fn report_splits_skip_reasons_by_class() {
+        let mut selected_counts = HashMap::new();
+        selected_counts.insert("built-ins".to_string(), 10);
+
+        let mut category_stats = HashMap::new();
+        category_stats.insert(
+            "built-ins".to_string(),
+            CategoryStats {
+                pass: 0,
+                fail: 0,
+                skip: 10,
+                panic: 0,
+            },
+        );
+
+        let skip_reasons = HashMap::from([
+            ("unsupported feature: iterator-helpers".to_string(), 2),
+            (
+                "manifest exclusion (suite): ECMA-402 Intl is out of scope for Lyng JS core"
+                    .to_string(),
+                3,
+            ),
+            ("unsupported harness include: sm/foo.js".to_string(), 4),
+            (
+                "runtime abort: oversize ArrayBuffer allocation guard missing".to_string(),
+                1,
+            ),
+        ]);
+        let exclusion_reasons = HashMap::new();
+        let failures = Vec::new();
+        let manifest = ExclusionManifest {
+            path: "reports/js/lyng-js/test262-exclusions.txt".to_string(),
+            rules: Vec::new(),
+        };
+        let (report_path, report_path_string) = unique_report_path("skip-classes");
+
+        write_report(&SuiteReport {
+            report_path: &report_path_string,
+            manifest: &manifest,
+            filter: None,
+            no_skip: false,
+            proposal_stage: ProposalStage::Stage3,
+            jobs: 1,
+            timeout: Duration::from_secs(1),
+            candidate_total: 10,
+            selected_total: 10,
+            selected_counts: &selected_counts,
+            category_stats: &category_stats,
+            skip_reasons: &skip_reasons,
+            exclusion_reasons: &exclusion_reasons,
+            failures: &failures,
+            elapsed: Duration::from_secs(2),
+        });
+
+        let output = fs::read_to_string(&report_path).expect("report should be readable");
+        let _ = fs::remove_file(&report_path);
+
+        assert!(output.contains("## Skip Breakdown"));
+        assert!(output.contains(
+            "| Unsupported ECMA-262 feature | unsupported feature: iterator-helpers | `2` |"
+        ));
+        assert!(output.contains("| Manifest/out of scope | manifest exclusion (suite): ECMA-402 Intl is out of scope for Lyng JS core | `3` |"));
+        assert!(output
+            .contains("| Harness capability | unsupported harness include: sm/foo.js | `4` |"));
+        assert!(output.contains("| Runtime safety | runtime abort: oversize ArrayBuffer allocation guard missing | `1` |"));
+    }
+
+    #[test]
+    fn report_clusters_failures_instead_of_listing_raw_sample() {
+        let mut selected_counts = HashMap::new();
+        selected_counts.insert("annexB".to_string(), 2);
+        selected_counts.insert("built-ins".to_string(), 1);
+
+        let mut category_stats = HashMap::new();
+        category_stats.insert(
+            "annexB".to_string(),
+            CategoryStats {
+                pass: 0,
+                fail: 2,
+                skip: 0,
+                panic: 0,
+            },
+        );
+        category_stats.insert(
+            "built-ins".to_string(),
+            CategoryStats {
+                pass: 0,
+                fail: 1,
+                skip: 0,
+                panic: 0,
+            },
+        );
+
+        let skip_reasons = HashMap::new();
+        let exclusion_reasons = HashMap::new();
+        let failures = vec![
+            "annexB/built-ins/Date/prototype/getYear/nan.js: runtime error: TypeError".to_string(),
+            "annexB/built-ins/Date/prototype/getYear/name.js: runtime error: TypeError".to_string(),
+            "built-ins/RegExp/abc.js: runtime error: Test262Error".to_string(),
+        ];
+        let manifest = ExclusionManifest {
+            path: "reports/js/lyng-js/test262-exclusions.txt".to_string(),
+            rules: Vec::new(),
+        };
+        let (report_path, report_path_string) = unique_report_path("failure-clusters");
+
+        write_report(&SuiteReport {
+            report_path: &report_path_string,
+            manifest: &manifest,
+            filter: None,
+            no_skip: false,
+            proposal_stage: ProposalStage::Stage3,
+            jobs: 1,
+            timeout: Duration::from_secs(1),
+            candidate_total: 3,
+            selected_total: 3,
+            selected_counts: &selected_counts,
+            category_stats: &category_stats,
+            skip_reasons: &skip_reasons,
+            exclusion_reasons: &exclusion_reasons,
+            failures: &failures,
+            elapsed: Duration::from_secs(2),
+        });
+
+        let output = fs::read_to_string(&report_path).expect("report should be readable");
+        let _ = fs::remove_file(&report_path);
+
+        assert!(output.contains("## Failure Clusters"));
+        assert!(!output.contains("## Failure Sample"));
+        assert!(output.contains(
+            "| `annexB/built-ins/Date/prototype/getYear` | `runtime error: TypeError` | `2` |"
+        ));
+        assert!(output.contains("annexB/built-ins/Date/prototype/getYear/nan.js"));
+        assert!(!output.contains("1. annexB/built-ins/Date/prototype/getYear/nan.js"));
     }
 }
