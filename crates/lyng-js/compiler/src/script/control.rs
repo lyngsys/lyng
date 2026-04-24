@@ -339,16 +339,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     pub(super) fn lower_catch_clause(&mut self, handler: CatchClause) -> LoweringResult<()> {
         self.with_child_scope(ScopeKind::Catch, true, handler.body, |this| {
             if let Some(pattern) = handler.param {
-                let Pattern::Identifier { name, .. } = this.ast().get_pattern(pattern).clone()
-                else {
-                    return Err(LoweringError::UnsupportedPattern { pattern });
-                };
-                let binding =
-                    this.declared_binding_for_pattern(pattern, DeclarationKind::CatchParam)?;
                 let value = this.alloc_temp()?;
                 this.builder
                     .emit_ax(Opcode::LoadException, i32::from(value));
-                this.store_binding_value(binding, name, value)?;
+                this.lower_binding_pattern_initialization(
+                    pattern,
+                    DeclarationKind::CatchParam,
+                    value,
+                )?;
             }
             this.lower_statement(handler.body)
         })

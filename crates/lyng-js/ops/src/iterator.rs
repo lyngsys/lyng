@@ -23,7 +23,7 @@ pub enum AsyncFromSyncState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct IteratorRecord {
     iterator: ObjectRef,
-    next_method: ObjectRef,
+    next_method: Value,
     kind: IteratorKind,
     async_from_sync_state: AsyncFromSyncState,
     preserve_completion_on_close: bool,
@@ -36,8 +36,25 @@ impl IteratorRecord {
     pub const fn new(iterator: ObjectRef, next_method: ObjectRef) -> Self {
         Self {
             iterator,
-            next_method,
+            next_method: Value::from_object_ref(next_method),
             kind: IteratorKind::Sync,
+            async_from_sync_state: AsyncFromSyncState::None,
+            preserve_completion_on_close: false,
+            done: false,
+            delegate_started: false,
+        }
+    }
+
+    #[inline]
+    const fn new_with_next_value(
+        iterator: ObjectRef,
+        next_method: Value,
+        kind: IteratorKind,
+    ) -> Self {
+        Self {
+            iterator,
+            next_method,
+            kind,
             async_from_sync_state: AsyncFromSyncState::None,
             preserve_completion_on_close: false,
             done: false,
@@ -52,32 +69,24 @@ impl IteratorRecord {
 
     #[inline]
     pub const fn new_async(iterator: ObjectRef, next_method: ObjectRef) -> Self {
-        Self {
+        Self::new_with_next_value(
             iterator,
-            next_method,
-            kind: IteratorKind::Async,
-            async_from_sync_state: AsyncFromSyncState::None,
-            preserve_completion_on_close: false,
-            done: false,
-            delegate_started: false,
-        }
+            Value::from_object_ref(next_method),
+            IteratorKind::Async,
+        )
     }
 
     #[inline]
     pub const fn new_async_from_sync(iterator: ObjectRef, next_method: ObjectRef) -> Self {
-        Self {
+        Self::new_with_next_value(
             iterator,
-            next_method,
-            kind: IteratorKind::AsyncFromSync,
-            async_from_sync_state: AsyncFromSyncState::None,
-            preserve_completion_on_close: false,
-            done: false,
-            delegate_started: false,
-        }
+            Value::from_object_ref(next_method),
+            IteratorKind::AsyncFromSync,
+        )
     }
 
     #[inline]
-    pub const fn next_method(self) -> ObjectRef {
+    pub const fn next_method(self) -> Value {
         self.next_method
     }
 
@@ -202,13 +211,18 @@ fn get_iterator_from_method<Cx: IteratorOpsContext>(
         key_from_text(agent, "next")
     };
     let next_value = cx.get_property_value(Value::from_object_ref(iterator_object), next_key)?;
-    let next_method = cx.require_callable_object(next_value)?;
     Ok(match kind {
-        IteratorKind::Sync => IteratorRecord::new(iterator_object, next_method),
-        IteratorKind::Async => IteratorRecord::new_async(iterator_object, next_method),
-        IteratorKind::AsyncFromSync => {
-            IteratorRecord::new_async_from_sync(iterator_object, next_method)
+        IteratorKind::Sync => {
+            IteratorRecord::new_with_next_value(iterator_object, next_value, IteratorKind::Sync)
         }
+        IteratorKind::Async => {
+            IteratorRecord::new_with_next_value(iterator_object, next_value, IteratorKind::Async)
+        }
+        IteratorKind::AsyncFromSync => IteratorRecord::new_with_next_value(
+            iterator_object,
+            next_value,
+            IteratorKind::AsyncFromSync,
+        ),
     })
 }
 
@@ -329,8 +343,9 @@ pub fn iterator_next<Cx: IteratorOpsContext>(
     } else {
         &arguments[..0]
     };
+    let next_method = cx.require_callable_object(iterator_record.next_method())?;
     let result = cx.call_to_completion(
-        iterator_record.next_method(),
+        next_method,
         Value::from_object_ref(iterator_record.iterator()),
         slice,
     )?;

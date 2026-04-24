@@ -81,7 +81,7 @@ use activation::{
     build_function_activation_plan, collect_arguments_owners, parent_function_for,
     FunctionActivationPlan,
 };
-use reference_targets::ReferenceUsage;
+use reference_targets::{PreparedReferenceTarget, ReferenceUsage};
 pub(crate) use state::CompilationState;
 use state::{
     ActiveClassContext, CallBridgeRegisters, CompletionKind, CompletionRegisters, ControlTarget,

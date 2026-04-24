@@ -375,12 +375,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
 
         if let Some(rest_pattern) = ast_function.params.rest {
-            let Pattern::Identifier { .. } = self.ast().get_pattern(rest_pattern).clone() else {
-                return Err(LoweringError::UnsupportedPattern {
-                    pattern: rest_pattern,
-                });
-            };
-            let _ = self.declared_binding_for_pattern(rest_pattern, DeclarationKind::Parameter)?;
+            if matches!(
+                self.ast().get_pattern(rest_pattern),
+                Pattern::Identifier { .. }
+            ) {
+                let _ =
+                    self.declared_binding_for_pattern(rest_pattern, DeclarationKind::Parameter)?;
+            }
         }
 
         Ok(())
@@ -406,6 +407,26 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             if needs_env_copy {
                 let slot = self.state.runtime_slot_for_binding(binding_id)?;
                 self.emit_store_env_slot(register, 0, slot)?;
+            }
+        }
+        if let Some(rest_pattern) = self
+            .current_function_ast
+            .and_then(|function| self.ast().get_function(function).params.rest)
+        {
+            if !matches!(
+                self.ast().get_pattern(rest_pattern),
+                Pattern::Identifier { .. }
+            ) {
+                let rest_register = self.alloc_temp()?;
+                let rest_slot = activation
+                    .rest_slot()
+                    .expect("rest parameter should reserve a synthetic rest slot");
+                self.emit_load_env_slot(rest_register, 0, u32::from(rest_slot))?;
+                self.lower_binding_pattern_initialization(
+                    rest_pattern,
+                    DeclarationKind::Parameter,
+                    rest_register,
+                )?;
             }
         }
         Ok(())

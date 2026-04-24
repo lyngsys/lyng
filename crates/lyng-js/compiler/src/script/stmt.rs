@@ -685,9 +685,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.builder.patch_jump_to(end, end_offset);
                 Ok(())
             }
-            Expr::ArrayExpression { elements, .. } => {
-                self.lower_array_destructuring_assignment_from_iterator(elements, source_register)
-            }
+            Expr::ArrayExpression { elements, .. } => self
+                .lower_array_destructuring_assignment_from_iterator(
+                    elements,
+                    source_register,
+                    self.ast().get_expr(expr_id).span(),
+                ),
             Expr::ObjectExpression { properties, .. } => {
                 self.emit_check_object_coercible(source_register)?;
                 let mut rest_target = None;
@@ -836,10 +839,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         &mut self,
         elements: lyng_js_ast::NodeList<Option<ExprId>>,
         source_register: u16,
+        span: Span,
     ) -> LoweringResult<()> {
         let iterator_register = self.alloc_temp()?;
-        let value_register = self.alloc_temp()?;
-        let done_register = self.alloc_temp()?;
         self.builder.emit_abc(
             Opcode::CreateIterator,
             self.encode_register(iterator_register)?,
@@ -847,14 +849,52 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             0,
         );
 
+        let finally_index = self.push_finally_context();
+        let protected_start = self.builder.current_offset();
+        if let Err(error) =
+            self.lower_array_destructuring_assignment_elements(elements, iterator_register)
+        {
+            self.pop_finally_context(finally_index);
+            return Err(error);
+        }
+        let protected_end = self.builder.current_offset();
+        self.set_completion_state(CompletionKind::Normal, None, None)?;
+        self.emit_jump_to_finally(finally_index);
+
+        let throw_entry = self.builder.current_offset();
+        let enter_handler = self.emit_enter_handler();
+        self.attach_safepoint(enter_handler, span, SafepointKind::ExceptionEdge);
+        self.begin_exception_finally_path()?;
+        let normal_entry = self.builder.current_offset();
+        self.set_finally_normal_entry(finally_index, normal_entry);
+        self.mark_finally_body(finally_index, true);
+        self.emit_close_iterator_for_completion(iterator_register)?;
+        self.emit_leave_handler();
+        self.emit_finally_dispatch(finally_index)?;
+        self.mark_finally_body(finally_index, false);
+        self.pop_finally_context(finally_index);
+
+        self.builder.add_exception_handler(ExceptionHandler::new(
+            protected_start,
+            protected_end,
+            throw_entry,
+            ExceptionHandlerKind::Finally,
+            self.builder.header().register_count(),
+            None,
+        ));
+        Ok(())
+    }
+
+    fn lower_array_destructuring_assignment_elements(
+        &mut self,
+        elements: lyng_js_ast::NodeList<Option<ExprId>>,
+        iterator_register: u16,
+    ) -> LoweringResult<()> {
+        let value_register = self.alloc_temp()?;
+        let done_register = self.alloc_temp()?;
         for element in self.ast().get_opt_expr_list(elements).to_vec() {
             let Some(element) = element else {
-                self.builder.emit_abc(
-                    Opcode::AdvanceIterator,
-                    self.encode_register(iterator_register)?,
-                    self.encode_register(value_register)?,
-                    self.encode_register(done_register)?,
-                );
+                self.emit_advance_iterator(iterator_register, value_register, done_register)?;
                 continue;
             };
             match self.ast().get_expr(element).clone() {
@@ -862,23 +902,141 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     self.lower_array_rest_assignment_from_iterator(argument, iterator_register)?;
                     break;
                 }
-                _ => {
-                    self.builder.emit_abc(
-                        Opcode::AdvanceIterator,
-                        self.encode_register(iterator_register)?,
-                        self.encode_register(value_register)?,
-                        self.encode_register(done_register)?,
-                    );
-                    self.lower_destructuring_assignment_from_register(element, value_register)?;
-                }
+                _ => self.lower_array_assignment_element_from_iterator(
+                    element,
+                    iterator_register,
+                    value_register,
+                    done_register,
+                )?,
             }
         }
 
+        Ok(())
+    }
+
+    fn emit_advance_iterator(
+        &mut self,
+        iterator_register: u16,
+        value_register: u16,
+        done_register: u16,
+    ) -> LoweringResult<()> {
+        self.builder.emit_abc(
+            Opcode::AdvanceIterator,
+            self.encode_register(iterator_register)?,
+            self.encode_register(value_register)?,
+            self.encode_register(done_register)?,
+        );
+        Ok(())
+    }
+
+    fn lower_array_assignment_element_from_iterator(
+        &mut self,
+        element: ExprId,
+        iterator_register: u16,
+        value_register: u16,
+        done_register: u16,
+    ) -> LoweringResult<()> {
+        match self.ast().get_expr(element).clone() {
+            Expr::AssignmentExpression {
+                operator: AssignOp::Assign,
+                left,
+                right,
+                ..
+            } if !self.assignment_rest_target_is_pattern(left) => {
+                let target = self
+                    .prepare_reference_target(left, ReferenceUsage::WriteOnly)?
+                    .ok_or(LoweringError::UnsupportedExpression { expr: left })?;
+                self.emit_advance_iterator(iterator_register, value_register, done_register)?;
+                self.assign_array_element_value_to_prepared_target(
+                    target,
+                    value_register,
+                    Some(right),
+                )
+            }
+            Expr::AssignmentExpression {
+                operator: AssignOp::Assign,
+                ..
+            } => {
+                self.emit_advance_iterator(iterator_register, value_register, done_register)?;
+                self.lower_destructuring_assignment_from_register(element, value_register)
+            }
+            _ if !self.assignment_rest_target_is_pattern(element) => {
+                let target = self
+                    .prepare_reference_target(element, ReferenceUsage::WriteOnly)?
+                    .ok_or(LoweringError::UnsupportedExpression { expr: element })?;
+                self.emit_advance_iterator(iterator_register, value_register, done_register)?;
+                self.assign_array_element_value_to_prepared_target(target, value_register, None)
+            }
+            _ => {
+                self.emit_advance_iterator(iterator_register, value_register, done_register)?;
+                self.lower_destructuring_assignment_from_register(element, value_register)
+            }
+        }
+    }
+
+    fn assign_array_element_value_to_prepared_target(
+        &mut self,
+        target: PreparedReferenceTarget,
+        value_register: u16,
+        default_initializer: Option<ExprId>,
+    ) -> LoweringResult<()> {
+        let Some(default_initializer) = default_initializer else {
+            return self.assign_prepared_reference(target, value_register);
+        };
+
+        let undefined = self.alloc_temp()?;
+        self.emit_load_undefined(undefined)?;
+        let is_undefined = self.alloc_temp()?;
+        self.emit_profiled_binary(Opcode::StrictEqual, is_undefined, value_register, undefined)?;
+        let use_source = self
+            .builder
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(is_undefined)?);
+        let default_value = self.alloc_temp()?;
+        self.lower_initializer_with_inferred_name(
+            default_initializer,
+            self.reference_target_inferred_name(target),
+            default_value,
+        )?;
+        self.assign_prepared_reference(target, default_value)?;
+        let end = self.builder.emit_jump_placeholder(Opcode::Jump);
+        let use_source_offset = self.builder.current_offset();
+        self.builder.patch_jump_to(use_source, use_source_offset);
+        self.assign_prepared_reference(target, value_register)?;
+        let end_offset = self.builder.current_offset();
+        self.builder.patch_jump_to(end, end_offset);
+        Ok(())
+    }
+
+    fn emit_close_iterator_for_completion(&mut self, iterator_register: u16) -> LoweringResult<()> {
+        let registers = self.ensure_completion_registers()?;
+        let throw_kind = self.alloc_temp()?;
+        self.emit_load_smi(throw_kind, CompletionKind::Throw.encoded())?;
+        let is_throw = self.alloc_temp()?;
+        self.builder.emit_abc(
+            Opcode::StrictEqual,
+            self.encode_register(is_throw)?,
+            self.encode_register(registers.kind)?,
+            self.encode_register(throw_kind)?,
+        );
+        let close_without_preserving = self
+            .builder
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(is_throw)?);
+        self.builder.emit_abx(
+            Opcode::CloseIterator,
+            self.encode_register(iterator_register)?,
+            1,
+        );
+        let end = self.builder.emit_jump_placeholder(Opcode::Jump);
+        let close_without_preserving_offset = self.builder.current_offset();
+        self.builder
+            .patch_jump_to(close_without_preserving, close_without_preserving_offset);
         self.builder.emit_abx(
             Opcode::CloseIterator,
             self.encode_register(iterator_register)?,
             0,
         );
+        let end_offset = self.builder.current_offset();
+        self.builder.patch_jump_to(end, end_offset);
         Ok(())
     }
 
@@ -887,6 +1045,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         target_expr: ExprId,
         iterator_register: u16,
     ) -> LoweringResult<()> {
+        let prepared_target = if self.assignment_rest_target_is_pattern(target_expr) {
+            None
+        } else {
+            Some(
+                self.prepare_reference_target(target_expr, ReferenceUsage::WriteOnly)?
+                    .ok_or(LoweringError::UnsupportedExpression { expr: target_expr })?,
+            )
+        };
         let rest_value = self.alloc_temp()?;
         let instruction_offset =
             self.builder
@@ -926,7 +1092,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.builder.patch_jump_to(exit_jump, end);
         self.emit_set_property_by_atom(rest_value, rest_index, WellKnownAtom::length.id())?;
 
-        self.lower_destructuring_assignment_from_register(target_expr, rest_value)
+        if let Some(target) = prepared_target {
+            self.assign_prepared_reference(target, rest_value)
+        } else {
+            self.lower_destructuring_assignment_from_register(target_expr, rest_value)
+        }
+    }
+
+    fn assignment_rest_target_is_pattern(&self, expr_id: ExprId) -> bool {
+        match self.ast().get_expr(expr_id) {
+            Expr::ParenthesizedExpression { expression, .. } => {
+                self.assignment_rest_target_is_pattern(*expression)
+            }
+            Expr::ArrayExpression { .. } | Expr::ObjectExpression { .. } => true,
+            _ => false,
+        }
     }
 
     fn lower_object_rest_assignment_from_register(

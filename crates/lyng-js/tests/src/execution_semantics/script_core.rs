@@ -181,6 +181,23 @@ fn script_core_try_statement_completion_preserves_the_pre_finally_value() {
 }
 
 #[test]
+fn script_core_supports_destructured_catch_bindings() {
+    let result = compile_and_run_string(
+        r#"
+        let result = "";
+        try {
+            throw ["left", "right"];
+        } catch ([left, right]) {
+            result = left + ":" + right;
+        }
+        result;
+        "#,
+    );
+
+    assert_eq!(result, "left:right");
+}
+
+#[test]
 fn script_core_supports_for_of_over_arrays() {
     let result = compile_and_run_string(
         r#"
@@ -207,6 +224,106 @@ fn script_core_supports_for_of_destructuring_assignment_heads() {
     );
 
     assert_eq!(result, "xy");
+}
+
+#[test]
+fn script_core_closes_assignment_pattern_iterators_on_generator_return() {
+    let result = compile_and_run(
+        r#"
+        let returnCount = 0;
+        let iterator = {
+            next: function() {
+                return { done: false, value: undefined };
+            },
+            return: function() {
+                returnCount = returnCount + 1;
+                return {};
+            }
+        };
+        let iterable = {};
+        iterable[Symbol.iterator] = function() {
+            return iterator;
+        };
+
+        function* probe() {
+            [ {} = yield ] = iterable;
+        }
+
+        let iter = probe();
+        iter.next();
+        iter.return(7);
+        returnCount;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_does_not_require_iterator_next_before_assignment_reference_suspends() {
+    let result = compile_and_run(
+        r#"
+        let returnCount = 0;
+        let iterator = {
+            return: function() {
+                returnCount = returnCount + 1;
+                return {};
+            }
+        };
+        let iterable = {};
+        iterable[Symbol.iterator] = function() {
+            return iterator;
+        };
+
+        function* probe() {
+            [ {}[yield] ] = iterable;
+        }
+
+        let iter = probe();
+        iter.next();
+        iter.return(9);
+        returnCount;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_evaluates_array_rest_assignment_reference_before_iterating() {
+    let result = compile_and_run_string(
+        r#"
+        let nextCount = 0;
+        let returnCount = 0;
+        let iterator = {
+            next: function() {
+                nextCount = nextCount + 1;
+                return { done: true };
+            },
+            return: function() {
+                returnCount = returnCount + 1;
+                return {};
+            }
+        };
+        let iterable = {};
+        iterable[Symbol.iterator] = function() {
+            return iterator;
+        };
+        function thrower() {
+            throw "sentinel";
+        }
+
+        let caught = "";
+        try {
+            [...{}[thrower()]] = iterable;
+        } catch (error) {
+            caught = error;
+        }
+        caught + ":" + nextCount + ":" + returnCount;
+        "#,
+    );
+
+    assert_eq!(result, "sentinel:0:1");
 }
 
 #[test]

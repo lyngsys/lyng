@@ -628,15 +628,9 @@ impl Vm {
         }
 
         let receiver = Value::from_object_ref(record.iterator());
-        let result = self.call_to_completion(
-            agent,
-            host,
-            registry,
-            frame,
-            record.next_method(),
-            receiver,
-            &[],
-        )?;
+        let next_method = Self::require_callable_object(agent, frame, record.next_method())?;
+        let result =
+            self.call_to_completion(agent, host, registry, frame, next_method, receiver, &[])?;
         match record.kind() {
             iterator::IteratorKind::Async => {
                 let promise =

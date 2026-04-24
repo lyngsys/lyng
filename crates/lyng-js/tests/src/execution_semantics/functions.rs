@@ -900,6 +900,20 @@ fn phase4_functions_compile_nested_destructuring_parameter_shapes() {
 }
 
 #[test]
+fn phase4_functions_support_object_pattern_rest_parameters() {
+    let result = compile_and_run_string(
+        r#"
+        function describe(...{ 0: first, 2: third, length }) {
+            return first + ":" + third + ":" + length;
+        }
+        describe("a", "b", "c");
+        "#,
+    );
+
+    assert_eq!(result, "a:c:3");
+}
+
+#[test]
 fn phase4_functions_cache_tagged_template_objects_by_site() {
     let result = compile_and_run(
         r#"
