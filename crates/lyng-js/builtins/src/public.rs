@@ -12991,71 +12991,191 @@ impl BuiltinCache {
 }
 
 /// Compatibility metadata for the public core builtin namespace.
+#[derive(Clone, Copy, Debug)]
+struct PublicBuiltinMetadataRow {
+    entry: fn() -> BuiltinFunctionId,
+    metadata: BuiltinEntryMetadata,
+}
+
+impl PublicBuiltinMetadataRow {
+    #[inline]
+    const fn new(entry: fn() -> BuiltinFunctionId, metadata: BuiltinEntryMetadata) -> Self {
+        Self { entry, metadata }
+    }
+
+    #[inline]
+    fn metadata_for(self, entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
+        if (self.entry)() == entry {
+            Some(self.metadata)
+        } else {
+            None
+        }
+    }
+}
+
+const PUBLIC_OBJECT_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(
+        js3_object_builtin,
+        BuiltinEntryMetadata::new("Object", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_create_builtin,
+        BuiltinEntryMetadata::new("create", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_get_prototype_of_builtin,
+        BuiltinEntryMetadata::new("getPrototypeOf", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_set_prototype_of_builtin,
+        BuiltinEntryMetadata::new("setPrototypeOf", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_get_own_property_descriptor_builtin,
+        BuiltinEntryMetadata::new("getOwnPropertyDescriptor", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_get_own_property_descriptors_builtin,
+        BuiltinEntryMetadata::new("getOwnPropertyDescriptors", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_get_own_property_names_builtin,
+        BuiltinEntryMetadata::new("getOwnPropertyNames", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_get_own_property_symbols_builtin,
+        BuiltinEntryMetadata::new("getOwnPropertySymbols", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_define_properties_builtin,
+        BuiltinEntryMetadata::new("defineProperties", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_define_property_builtin,
+        BuiltinEntryMetadata::new("defineProperty", 3, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_assign_builtin,
+        BuiltinEntryMetadata::new("assign", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_from_entries_builtin,
+        BuiltinEntryMetadata::new("fromEntries", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_group_by_builtin,
+        BuiltinEntryMetadata::new("groupBy", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_prevent_extensions_builtin,
+        BuiltinEntryMetadata::new("preventExtensions", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_is_extensible_builtin,
+        BuiltinEntryMetadata::new("isExtensible", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_is_builtin,
+        BuiltinEntryMetadata::new("is", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_seal_builtin,
+        BuiltinEntryMetadata::new("seal", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_freeze_builtin,
+        BuiltinEntryMetadata::new("freeze", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_is_sealed_builtin,
+        BuiltinEntryMetadata::new("isSealed", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_is_frozen_builtin,
+        BuiltinEntryMetadata::new("isFrozen", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_to_locale_string_builtin,
+        BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_to_string_builtin,
+        BuiltinEntryMetadata::new("toString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_value_of_builtin,
+        BuiltinEntryMetadata::new("valueOf", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_has_own_property_builtin,
+        BuiltinEntryMetadata::new("hasOwnProperty", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_is_prototype_of_builtin,
+        BuiltinEntryMetadata::new("isPrototypeOf", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_property_is_enumerable_builtin,
+        BuiltinEntryMetadata::new("propertyIsEnumerable", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_define_getter_builtin,
+        BuiltinEntryMetadata::new("__defineGetter__", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_define_setter_builtin,
+        BuiltinEntryMetadata::new("__defineSetter__", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_lookup_getter_builtin,
+        BuiltinEntryMetadata::new("__lookupGetter__", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_lookup_setter_builtin,
+        BuiltinEntryMetadata::new("__lookupSetter__", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_proto_getter_builtin,
+        BuiltinEntryMetadata::new("get __proto__", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_proto_setter_builtin,
+        BuiltinEntryMetadata::new("set __proto__", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_keys_builtin,
+        BuiltinEntryMetadata::new("keys", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_entries_builtin,
+        BuiltinEntryMetadata::new("entries", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_values_builtin,
+        BuiltinEntryMetadata::new("values", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_object_has_own_builtin,
+        BuiltinEntryMetadata::new("hasOwn", 2, false, false),
+    ),
+];
+
+fn public_builtin_metadata_from_rows(
+    entry: BuiltinFunctionId,
+    rows: &[PublicBuiltinMetadataRow],
+) -> Option<BuiltinEntryMetadata> {
+    rows.iter().find_map(|row| row.metadata_for(entry))
+}
+
+fn object_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
+    public_builtin_metadata_from_rows(entry, PUBLIC_OBJECT_BUILTIN_METADATA)
+}
+
+/// Compatibility metadata for the public core builtin namespace.
 #[inline]
 pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
-    if entry == js3_object_builtin() {
-        return Some(BuiltinEntryMetadata::new("Object", 1, true, true));
-    }
-    if entry == js3_object_create_builtin() {
-        return Some(BuiltinEntryMetadata::new("create", 2, false, false));
-    }
-    if entry == js3_object_get_prototype_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("getPrototypeOf", 1, false, false));
-    }
-    if entry == js3_object_set_prototype_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("setPrototypeOf", 2, false, false));
-    }
-    if entry == js3_object_get_own_property_descriptor_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "getOwnPropertyDescriptor",
-            2,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_get_own_property_descriptors_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "getOwnPropertyDescriptors",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_get_own_property_names_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "getOwnPropertyNames",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_get_own_property_symbols_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "getOwnPropertySymbols",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_define_properties_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "defineProperties",
-            2,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_define_property_builtin() {
-        return Some(BuiltinEntryMetadata::new("defineProperty", 3, false, false));
-    }
-    if entry == js3_object_assign_builtin() {
-        return Some(BuiltinEntryMetadata::new("assign", 2, false, false));
-    }
-    if entry == js3_object_from_entries_builtin() {
-        return Some(BuiltinEntryMetadata::new("fromEntries", 1, false, false));
-    }
-    if entry == js3_object_group_by_builtin() {
-        return Some(BuiltinEntryMetadata::new("groupBy", 2, false, false));
+    if let Some(metadata) = object_public_builtin_metadata(entry) {
+        return Some(metadata);
     }
     if entry == js3_abstract_module_source_builtin() {
         return Some(BuiltinEntryMetadata::new(
@@ -13072,105 +13192,6 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
             false,
             false,
         ));
-    }
-    if entry == js3_object_prevent_extensions_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "preventExtensions",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_is_extensible_builtin() {
-        return Some(BuiltinEntryMetadata::new("isExtensible", 1, false, false));
-    }
-    if entry == js3_object_is_builtin() {
-        return Some(BuiltinEntryMetadata::new("is", 2, false, false));
-    }
-    if entry == js3_object_seal_builtin() {
-        return Some(BuiltinEntryMetadata::new("seal", 1, false, false));
-    }
-    if entry == js3_object_freeze_builtin() {
-        return Some(BuiltinEntryMetadata::new("freeze", 1, false, false));
-    }
-    if entry == js3_object_is_sealed_builtin() {
-        return Some(BuiltinEntryMetadata::new("isSealed", 1, false, false));
-    }
-    if entry == js3_object_is_frozen_builtin() {
-        return Some(BuiltinEntryMetadata::new("isFrozen", 1, false, false));
-    }
-    if entry == js3_object_to_locale_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
-    }
-    if entry == js3_object_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
-    }
-    if entry == js3_object_value_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
-    }
-    if entry == js3_object_has_own_property_builtin() {
-        return Some(BuiltinEntryMetadata::new("hasOwnProperty", 1, false, false));
-    }
-    if entry == js3_object_is_prototype_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("isPrototypeOf", 1, false, false));
-    }
-    if entry == js3_object_property_is_enumerable_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "propertyIsEnumerable",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_define_getter_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "__defineGetter__",
-            2,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_define_setter_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "__defineSetter__",
-            2,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_lookup_getter_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "__lookupGetter__",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_lookup_setter_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "__lookupSetter__",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_object_proto_getter_builtin() {
-        return Some(BuiltinEntryMetadata::new("get __proto__", 0, false, false));
-    }
-    if entry == js3_object_proto_setter_builtin() {
-        return Some(BuiltinEntryMetadata::new("set __proto__", 1, false, false));
-    }
-    if entry == js3_object_keys_builtin() {
-        return Some(BuiltinEntryMetadata::new("keys", 1, false, false));
-    }
-    if entry == js3_object_entries_builtin() {
-        return Some(BuiltinEntryMetadata::new("entries", 1, false, false));
-    }
-    if entry == js3_object_values_builtin() {
-        return Some(BuiltinEntryMetadata::new("values", 1, false, false));
-    }
-    if entry == js3_object_has_own_builtin() {
-        return Some(BuiltinEntryMetadata::new("hasOwn", 2, false, false));
     }
     if entry == js3_function_builtin() {
         return Some(BuiltinEntryMetadata::new("Function", 1, true, true));
@@ -14735,6 +14756,167 @@ fn native_error_prototype_descriptors(
             BuiltinAttributes::new(true, false, true),
         ),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn object_public_metadata_table_matches_public_lookup() {
+        let expected = [
+            (
+                js3_object_builtin(),
+                BuiltinEntryMetadata::new("Object", 1, true, true),
+            ),
+            (
+                js3_object_create_builtin(),
+                BuiltinEntryMetadata::new("create", 2, false, false),
+            ),
+            (
+                js3_object_get_prototype_of_builtin(),
+                BuiltinEntryMetadata::new("getPrototypeOf", 1, false, false),
+            ),
+            (
+                js3_object_set_prototype_of_builtin(),
+                BuiltinEntryMetadata::new("setPrototypeOf", 2, false, false),
+            ),
+            (
+                js3_object_get_own_property_descriptor_builtin(),
+                BuiltinEntryMetadata::new("getOwnPropertyDescriptor", 2, false, false),
+            ),
+            (
+                js3_object_get_own_property_descriptors_builtin(),
+                BuiltinEntryMetadata::new("getOwnPropertyDescriptors", 1, false, false),
+            ),
+            (
+                js3_object_get_own_property_names_builtin(),
+                BuiltinEntryMetadata::new("getOwnPropertyNames", 1, false, false),
+            ),
+            (
+                js3_object_get_own_property_symbols_builtin(),
+                BuiltinEntryMetadata::new("getOwnPropertySymbols", 1, false, false),
+            ),
+            (
+                js3_object_define_properties_builtin(),
+                BuiltinEntryMetadata::new("defineProperties", 2, false, false),
+            ),
+            (
+                js3_object_define_property_builtin(),
+                BuiltinEntryMetadata::new("defineProperty", 3, false, false),
+            ),
+            (
+                js3_object_assign_builtin(),
+                BuiltinEntryMetadata::new("assign", 2, false, false),
+            ),
+            (
+                js3_object_from_entries_builtin(),
+                BuiltinEntryMetadata::new("fromEntries", 1, false, false),
+            ),
+            (
+                js3_object_group_by_builtin(),
+                BuiltinEntryMetadata::new("groupBy", 2, false, false),
+            ),
+            (
+                js3_object_prevent_extensions_builtin(),
+                BuiltinEntryMetadata::new("preventExtensions", 1, false, false),
+            ),
+            (
+                js3_object_is_extensible_builtin(),
+                BuiltinEntryMetadata::new("isExtensible", 1, false, false),
+            ),
+            (
+                js3_object_is_builtin(),
+                BuiltinEntryMetadata::new("is", 2, false, false),
+            ),
+            (
+                js3_object_seal_builtin(),
+                BuiltinEntryMetadata::new("seal", 1, false, false),
+            ),
+            (
+                js3_object_freeze_builtin(),
+                BuiltinEntryMetadata::new("freeze", 1, false, false),
+            ),
+            (
+                js3_object_is_sealed_builtin(),
+                BuiltinEntryMetadata::new("isSealed", 1, false, false),
+            ),
+            (
+                js3_object_is_frozen_builtin(),
+                BuiltinEntryMetadata::new("isFrozen", 1, false, false),
+            ),
+            (
+                js3_object_to_locale_string_builtin(),
+                BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
+            ),
+            (
+                js3_object_to_string_builtin(),
+                BuiltinEntryMetadata::new("toString", 0, false, false),
+            ),
+            (
+                js3_object_value_of_builtin(),
+                BuiltinEntryMetadata::new("valueOf", 0, false, false),
+            ),
+            (
+                js3_object_has_own_property_builtin(),
+                BuiltinEntryMetadata::new("hasOwnProperty", 1, false, false),
+            ),
+            (
+                js3_object_is_prototype_of_builtin(),
+                BuiltinEntryMetadata::new("isPrototypeOf", 1, false, false),
+            ),
+            (
+                js3_object_property_is_enumerable_builtin(),
+                BuiltinEntryMetadata::new("propertyIsEnumerable", 1, false, false),
+            ),
+            (
+                js3_object_define_getter_builtin(),
+                BuiltinEntryMetadata::new("__defineGetter__", 2, false, false),
+            ),
+            (
+                js3_object_define_setter_builtin(),
+                BuiltinEntryMetadata::new("__defineSetter__", 2, false, false),
+            ),
+            (
+                js3_object_lookup_getter_builtin(),
+                BuiltinEntryMetadata::new("__lookupGetter__", 1, false, false),
+            ),
+            (
+                js3_object_lookup_setter_builtin(),
+                BuiltinEntryMetadata::new("__lookupSetter__", 1, false, false),
+            ),
+            (
+                js3_object_proto_getter_builtin(),
+                BuiltinEntryMetadata::new("get __proto__", 0, false, false),
+            ),
+            (
+                js3_object_proto_setter_builtin(),
+                BuiltinEntryMetadata::new("set __proto__", 1, false, false),
+            ),
+            (
+                js3_object_keys_builtin(),
+                BuiltinEntryMetadata::new("keys", 1, false, false),
+            ),
+            (
+                js3_object_entries_builtin(),
+                BuiltinEntryMetadata::new("entries", 1, false, false),
+            ),
+            (
+                js3_object_values_builtin(),
+                BuiltinEntryMetadata::new("values", 1, false, false),
+            ),
+            (
+                js3_object_has_own_builtin(),
+                BuiltinEntryMetadata::new("hasOwn", 2, false, false),
+            ),
+        ];
+
+        assert_eq!(PUBLIC_OBJECT_BUILTIN_METADATA.len(), expected.len());
+        for (entry, metadata) in expected {
+            assert_eq!(object_public_builtin_metadata(entry), Some(metadata));
+            assert_eq!(public_builtin_metadata(entry), Some(metadata));
+        }
+    }
 }
 
 pub(crate) fn allocate_builtin_function_object(
