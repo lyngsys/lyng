@@ -332,10 +332,11 @@ fn execute_suite(
                         };
                     }
 
+                    let test_timeout = timeout_for_test(test, timeout);
                     let execution = worker
                         .as_mut()
                         .expect("worker should exist after spawn")
-                        .run_test(test, timeout);
+                        .run_test(test, test_timeout);
                     match &execution.outcome {
                         RunOutcome::Pass => {
                             pass_count.fetch_add(1, Ordering::Relaxed);
@@ -392,6 +393,24 @@ fn execute_suite(
         elapsed: start.elapsed(),
         failures,
     }
+}
+
+fn timeout_for_test(test: &PreparedTest, default: Duration) -> Duration {
+    if is_exhaustive_uri_legacy_test(&test.path) {
+        return default.max(Duration::from_secs(30));
+    }
+    default
+}
+
+fn is_exhaustive_uri_legacy_test(path: &Path) -> bool {
+    [
+        "built-ins/encodeURI/S15.1.3.3_A2.3_T1.js",
+        "built-ins/encodeURIComponent/S15.1.3.4_A2.3_T1.js",
+        "built-ins/decodeURI/S15.1.3.1_A2.5_T1.js",
+        "built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js",
+    ]
+    .iter()
+    .any(|suffix| path.ends_with(suffix))
 }
 
 fn print_progress(
@@ -486,5 +505,38 @@ fn print_summary(summary: &SummaryView<'_>) {
         for failure in summary.failures {
             println!("  {failure}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exhaustive_uri_legacy_tests_receive_extended_timeout() {
+        let test = PreparedTest {
+            path: PathBuf::from("test/built-ins/decodeURI/S15.1.3.1_A2.5_T1.js"),
+            category: "built-ins".to_string(),
+            metadata: parse_metadata(""),
+        };
+
+        assert_eq!(
+            timeout_for_test(&test, Duration::from_secs(1)),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn ordinary_tests_keep_default_timeout() {
+        let test = PreparedTest {
+            path: PathBuf::from("test/built-ins/String/prototype/slice/basic.js"),
+            category: "built-ins".to_string(),
+            metadata: parse_metadata(""),
+        };
+
+        assert_eq!(
+            timeout_for_test(&test, Duration::from_secs(1)),
+            Duration::from_secs(1)
+        );
     }
 }

@@ -175,7 +175,12 @@ pub enum WellKnownSymbolId {
     IsConcatSpreadable,
     Iterator,
     AsyncIterator,
+    Match,
+    MatchAll,
+    Replace,
+    Search,
     Species,
+    Split,
     ToPrimitive,
     ToStringTag,
     Unscopables,
@@ -184,12 +189,17 @@ pub enum WellKnownSymbolId {
 }
 
 impl WellKnownSymbolId {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 15] = [
         Self::HasInstance,
         Self::IsConcatSpreadable,
         Self::Iterator,
         Self::AsyncIterator,
+        Self::Match,
+        Self::MatchAll,
+        Self::Replace,
+        Self::Search,
         Self::Species,
+        Self::Split,
         Self::ToPrimitive,
         Self::ToStringTag,
         Self::Unscopables,
@@ -204,7 +214,12 @@ impl WellKnownSymbolId {
             Self::IsConcatSpreadable => "Symbol.isConcatSpreadable",
             Self::Iterator => "Symbol.iterator",
             Self::AsyncIterator => "Symbol.asyncIterator",
+            Self::Match => "Symbol.match",
+            Self::MatchAll => "Symbol.matchAll",
+            Self::Replace => "Symbol.replace",
+            Self::Search => "Symbol.search",
             Self::Species => "Symbol.species",
+            Self::Split => "Symbol.split",
             Self::ToPrimitive => "Symbol.toPrimitive",
             Self::ToStringTag => "Symbol.toStringTag",
             Self::Unscopables => "Symbol.unscopables",
@@ -475,6 +490,32 @@ const JS3_DATE_TO_ISO_STRING_RAW: u32 = 2_221;
 const JS3_DATE_TO_JSON_RAW: u32 = 2_222;
 const JS3_DATE_TO_PRIMITIVE_RAW: u32 = 2_223;
 const JS3_DATE_TO_TEMPORAL_INSTANT_RAW: u32 = 2_224;
+const JS3_STRING_FROM_CODE_POINT_RAW: u32 = 2_225;
+const JS3_STRING_RAW_RAW: u32 = 2_226;
+const JS3_STRING_AT_RAW: u32 = 2_227;
+const JS3_STRING_CODE_POINT_AT_RAW: u32 = 2_228;
+const JS3_STRING_ENDS_WITH_RAW: u32 = 2_229;
+const JS3_STRING_INCLUDES_RAW: u32 = 2_230;
+const JS3_STRING_INDEX_OF_RAW: u32 = 2_231;
+const JS3_STRING_IS_WELL_FORMED_RAW: u32 = 2_232;
+const JS3_STRING_LOCALE_COMPARE_RAW: u32 = 2_233;
+const JS3_STRING_NORMALIZE_RAW: u32 = 2_234;
+const JS3_STRING_REPLACE_ALL_RAW: u32 = 2_235;
+const JS3_STRING_TO_LOCALE_LOWER_CASE_RAW: u32 = 2_236;
+const JS3_STRING_TO_LOCALE_UPPER_CASE_RAW: u32 = 2_237;
+const JS3_STRING_TO_LOWER_CASE_RAW: u32 = 2_238;
+const JS3_STRING_TO_UPPER_CASE_RAW: u32 = 2_239;
+const JS3_STRING_TO_WELL_FORMED_RAW: u32 = 2_240;
+const JS3_STRING_TRIM_RAW: u32 = 2_241;
+const JS3_STRING_TRIM_END_RAW: u32 = 2_242;
+const JS3_STRING_TRIM_START_RAW: u32 = 2_243;
+const JS3_REGEXP_SYMBOL_MATCH_RAW: u32 = 2_244;
+const JS3_REGEXP_SYMBOL_REPLACE_RAW: u32 = 2_245;
+const JS3_REGEXP_SYMBOL_SEARCH_RAW: u32 = 2_246;
+const JS3_REGEXP_SYMBOL_SPLIT_RAW: u32 = 2_247;
+const JS3_REGEXP_SYMBOL_MATCH_ALL_RAW: u32 = 2_248;
+const JS3_STRING_MATCH_ALL_RAW: u32 = 2_249;
+const JS3_ARRAY_LAST_INDEX_OF_RAW: u32 = 2_250;
 const JS3_PROMISE_RAW: u32 = 3_101;
 const JS3_PROMISE_THEN_RAW: u32 = 3_102;
 const JS3_PROMISE_CATCH_RAW: u32 = 3_103;
@@ -912,7 +953,7 @@ pub const JS3_INTERNAL_BUILTIN_NAMESPACE_END: u32 = JS3_INTERNAL_DIRECT_EVAL_RAW
 pub const JS3_CORE_BUILTIN_NAMESPACE_START: u32 = JS3_BOOLEAN_RAW;
 
 /// Last reserved builtin-entry payload for the public core builtin namespace.
-pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_DATE_TO_TEMPORAL_INSTANT_RAW;
+pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_ARRAY_LAST_INDEX_OF_RAW;
 
 /// First reserved builtin-entry payload for the public completion builtin namespace.
 pub const JS3_COMPLETION_BUILTIN_NAMESPACE_START: u32 = JS3_PROMISE_RAW;
@@ -1823,6 +1864,158 @@ pub fn js3_string_from_char_code_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn js3_string_from_code_point_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_FROM_CODE_POINT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_raw_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_RAW_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_at_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_AT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_code_point_at_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_CODE_POINT_AT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_ends_with_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_ENDS_WITH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_includes_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_INCLUDES_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_index_of_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_INDEX_OF_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_is_well_formed_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_IS_WELL_FORMED_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_locale_compare_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_LOCALE_COMPARE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_normalize_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_NORMALIZE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_replace_all_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_REPLACE_ALL_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_to_locale_lower_case_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_TO_LOCALE_LOWER_CASE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_to_locale_upper_case_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_TO_LOCALE_UPPER_CASE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_to_lower_case_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_TO_LOWER_CASE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_to_upper_case_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_TO_UPPER_CASE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_to_well_formed_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_TO_WELL_FORMED_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_trim_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_TRIM_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_trim_end_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_TRIM_END_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_trim_start_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_TRIM_START_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn js3_string_search_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_STRING_SEARCH_RAW) {
         Some(id) => id,
@@ -1897,6 +2090,54 @@ pub fn js3_string_starts_with_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn js3_string_repeat_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_STRING_REPEAT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_regexp_symbol_match_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_REGEXP_SYMBOL_MATCH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_regexp_symbol_replace_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_REGEXP_SYMBOL_REPLACE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_regexp_symbol_search_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_REGEXP_SYMBOL_SEARCH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_regexp_symbol_split_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_REGEXP_SYMBOL_SPLIT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_regexp_symbol_match_all_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_REGEXP_SYMBOL_MATCH_ALL_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_string_match_all_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_MATCH_ALL_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }
@@ -2921,6 +3162,14 @@ pub fn js3_array_reverse_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn js3_array_slice_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_ARRAY_SLICE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_last_index_of_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_LAST_INDEX_OF_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }
@@ -6596,7 +6845,7 @@ mod tests {
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_END, 1_036);
         assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_START, 2_001);
-        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_224);
+        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_250);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_START, 3_101);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_END, 3_500);
     }

@@ -213,6 +213,223 @@ fn script_core_supports_for_of_over_arrays() {
 }
 
 #[test]
+fn phase6_string_text_builtins_cover_missing_core_methods() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            String.prototype.trim.call(true),
+            " \tLyng\n".trim() + ":" + "  x  ".trimStart().trimEnd(),
+            "abcdef".includes("cd", 2) + ":" + "abcdef".indexOf("cd", 3) + ":" + "abcdef".endsWith("de", 5),
+            "AbC".toLowerCase() + ":" + "ab\u00df".toUpperCase(),
+            "abc".at(-1) + ":" + "\uD83D\uDE00".codePointAt(0) + ":" + String.fromCodePoint(0x41, 0x1F600),
+            "\uD800".isWellFormed() + ":" + "\uD800".toWellFormed(),
+            String.raw({ raw: ["a", "b", "c"] }, 1, 2),
+            "a$a".replaceAll("a", "$$&") + ":" + "aaa".replaceAll("a", function(match, pos) { return pos; }),
+            "a".localeCompare("b") < 0,
+            "\u00E9".normalize("NFD").length
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "true|Lyng:x|true:-1:true|abc:ABSS|c:128512:A😀|false:�|a1b2c|$&$$&:012|true|2"
+    );
+}
+
+#[test]
+fn phase6_uri_builtins_handle_utf16_surrogates() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        score += encodeURI("\uD83D\uDE00") === "%F0%9F%98%80" ? 1 : 0;
+        score += encodeURIComponent("\uD83D\uDE00") === "%F0%9F%98%80" ? 2 : 0;
+        score += decodeURI("%F0%9F%98%80") === "\uD83D\uDE00" ? 4 : 0;
+        score += decodeURIComponent("%F0%9F%98%80") === "\uD83D\uDE00" ? 8 : 0;
+        try {
+            encodeURI("\uD800");
+        } catch (error) {
+            score += Object.getPrototypeOf(error) === URIError.prototype ? 16 : 0;
+        }
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn phase6_string_symbol_hooks_delegate_and_reject_regexp_searches() {
+    let result = compile_and_run_string(
+        r#"
+        let trace = [];
+
+        let matcher = {};
+        matcher[Symbol.match] = function(value) {
+            trace.push(this === matcher, value);
+            return "match";
+        };
+
+        let replacer = {};
+        replacer[Symbol.replace] = function(value, replacement) {
+            trace.push(this === replacer, value, replacement);
+            return "replace";
+        };
+
+        let replaceAller = {};
+        replaceAller[Symbol.replace] = function(value, replacement) {
+            trace.push(this === replaceAller, value, replacement);
+            return "replaceAll";
+        };
+
+        let searcher = {};
+        searcher[Symbol.search] = function(value) {
+            trace.push(this === searcher, value);
+            return 7;
+        };
+
+        let splitter = {};
+        splitter[Symbol.split] = function(value, limit) {
+            trace.push(this === splitter, value, limit);
+            return "split";
+        };
+
+        let abrupt = {};
+        Object.defineProperty(abrupt, Symbol.match, {
+            get: function() {
+                throw "match-get";
+            }
+        });
+
+        let abruptResult;
+        try {
+            "".includes(abrupt);
+        } catch (error) {
+            abruptResult = error;
+        }
+
+        let regexpRejected = false;
+        try {
+            "a".startsWith(/a/);
+        } catch (error) {
+            regexpRejected = error instanceof TypeError;
+        }
+
+        let originalMatch = RegExp.prototype[Symbol.match];
+        RegExp.prototype[Symbol.match] = function(value) {
+            return this instanceof RegExp && this.source === "a+" && value === "aa"
+                ? "regexp-match"
+                : "bad";
+        };
+        let internalMatch = "aa".match("a+");
+        RegExp.prototype[Symbol.match] = originalMatch;
+
+        [
+            "abc".match(matcher),
+            "abc".replace(replacer, "x"),
+            "abc".replaceAll(replaceAller, "y"),
+            "abc".search(searcher),
+            "abc".split(splitter, 2),
+            abruptResult,
+            regexpRejected,
+            internalMatch,
+            trace.join(",")
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "match|replace|replaceAll|7|split|match-get|true|regexp-match|true,abc,true,abc,x,true,abc,y,true,abc,true,abc,2"
+    );
+}
+
+#[test]
+fn phase6_string_split_handles_regexp_edges() {
+    let result = compile_and_run_string(
+        r#"
+        function show(value) {
+            return value.join(",") + ":" + value.length;
+        }
+
+        [
+            show("x".split(/^/)),
+            show("x".split(/$/)),
+            show("x".split(/.?/)),
+            show("x".split(/.*/)),
+            show("x".split(/.*?/)),
+            show("x".split(/./)),
+            show("x".split(/(?:)/)),
+            new String("hello").split(new RegExp()).join("")
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "x:1|x:1|,:2|,:2|x:1|,:2|x:1|hello");
+}
+
+#[test]
+fn phase6_string_match_all_returns_match_iterator() {
+    let result = compile_and_run_string(
+        r#"
+        let iterator = "a,b,c".matchAll(",");
+        let first = iterator.next().value;
+        let second = iterator.next().value;
+        let matches = [first, second];
+        [
+            matches.length,
+            matches[0][0],
+            matches[0].index,
+            matches[0].input,
+            matches[1][0],
+            matches[1].index,
+            matches[1].input
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "2|,|1|a,b,c|,|3|a,b,c");
+}
+
+#[test]
+fn phase6_string_edge_cases_cover_remaining_text_failures() {
+    let result = compile_and_run_string(
+        r#"
+        let booleanWrapper = new Boolean();
+        booleanWrapper.slice = String.prototype.slice;
+        booleanWrapper.substring = String.prototype.substring;
+
+        let symbolConstructed = "no-throw";
+        try {
+            new String(Symbol("66"));
+        } catch (error) {
+            symbolConstructed = error.constructor === TypeError;
+        }
+
+        [
+            "ABBABAB".lastIndexOf({ toString: function() { return "AB"; } }, { valueOf: function() { return NaN; } }),
+            ["new", "zoo", "revue"].lastIndexOf("zoo"),
+            booleanWrapper.slice(true, undefined),
+            String(void 0).slice("e", undefined),
+            String({ toString: function() {} }).substring(-4, undefined),
+            String(Symbol("66")),
+            symbolConstructed,
+            "A\u03A3".toLowerCase(),
+            "A\u03A3B".toLowerCase(),
+            "\u00C5\u2ADC\u0958\u2126\u0344".normalize(),
+            "\u1E9B\u0323".normalize("NFKC"),
+            "o\u0308".localeCompare("\u00F6")
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "5|1|alse|undefined|undefined|Symbol(66)|true|aς|aσb|Å⫝̸क़Ω̈́|ṩ|0"
+    );
+}
+
+#[test]
 fn script_core_supports_for_of_destructuring_assignment_heads() {
     let result = compile_and_run_string(
         r#"

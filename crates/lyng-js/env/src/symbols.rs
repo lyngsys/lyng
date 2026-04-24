@@ -97,12 +97,22 @@ pub struct BootstrapAtoms {
     symbol_is_concat_spreadable: AtomId,
     symbol_iterator: AtomId,
     symbol_async_iterator: AtomId,
+    match_: AtomId,
+    match_all: AtomId,
+    replace: AtomId,
+    search: AtomId,
     symbol_species: AtomId,
+    split: AtomId,
     symbol_to_primitive: AtomId,
     symbol_to_string_tag: AtomId,
     symbol_unscopables: AtomId,
     symbol_dispose: AtomId,
     symbol_async_dispose: AtomId,
+    symbol_match: AtomId,
+    symbol_match_all: AtomId,
+    symbol_replace: AtomId,
+    symbol_search: AtomId,
+    symbol_split: AtomId,
 }
 
 impl BootstrapAtoms {
@@ -201,12 +211,22 @@ impl BootstrapAtoms {
                 .intern(WellKnownSymbolId::IsConcatSpreadable.description()),
             symbol_iterator: atoms.intern(WellKnownSymbolId::Iterator.description()),
             symbol_async_iterator: atoms.intern(WellKnownSymbolId::AsyncIterator.description()),
+            match_: atoms.intern("match"),
+            match_all: atoms.intern("matchAll"),
+            replace: atoms.intern("replace"),
+            search: atoms.intern("search"),
             symbol_species: atoms.intern(WellKnownSymbolId::Species.description()),
+            split: atoms.intern("split"),
             symbol_to_primitive: atoms.intern(WellKnownSymbolId::ToPrimitive.description()),
             symbol_to_string_tag: atoms.intern(WellKnownSymbolId::ToStringTag.description()),
             symbol_unscopables: atoms.intern(WellKnownSymbolId::Unscopables.description()),
             symbol_dispose: atoms.intern(WellKnownSymbolId::Dispose.description()),
             symbol_async_dispose: atoms.intern(WellKnownSymbolId::AsyncDispose.description()),
+            symbol_match: atoms.intern(WellKnownSymbolId::Match.description()),
+            symbol_match_all: atoms.intern(WellKnownSymbolId::MatchAll.description()),
+            symbol_replace: atoms.intern(WellKnownSymbolId::Replace.description()),
+            symbol_search: atoms.intern(WellKnownSymbolId::Search.description()),
+            symbol_split: atoms.intern(WellKnownSymbolId::Split.description()),
         }
     }
 
@@ -621,8 +641,33 @@ impl BootstrapAtoms {
     }
 
     #[inline]
+    pub const fn match_(self) -> AtomId {
+        self.match_
+    }
+
+    #[inline]
+    pub const fn match_all(self) -> AtomId {
+        self.match_all
+    }
+
+    #[inline]
+    pub const fn replace(self) -> AtomId {
+        self.replace
+    }
+
+    #[inline]
+    pub const fn search(self) -> AtomId {
+        self.search
+    }
+
+    #[inline]
     pub const fn species(self) -> AtomId {
         self.species
+    }
+
+    #[inline]
+    pub const fn split(self) -> AtomId {
+        self.split
     }
 
     #[inline]
@@ -657,7 +702,12 @@ impl BootstrapAtoms {
             WellKnownSymbolId::IsConcatSpreadable => self.symbol_is_concat_spreadable,
             WellKnownSymbolId::Iterator => self.symbol_iterator,
             WellKnownSymbolId::AsyncIterator => self.symbol_async_iterator,
+            WellKnownSymbolId::Match => self.symbol_match,
+            WellKnownSymbolId::MatchAll => self.symbol_match_all,
+            WellKnownSymbolId::Replace => self.symbol_replace,
+            WellKnownSymbolId::Search => self.symbol_search,
             WellKnownSymbolId::Species => self.symbol_species,
+            WellKnownSymbolId::Split => self.symbol_split,
             WellKnownSymbolId::ToPrimitive => self.symbol_to_primitive,
             WellKnownSymbolId::ToStringTag => self.symbol_to_string_tag,
             WellKnownSymbolId::Unscopables => self.symbol_unscopables,
@@ -747,7 +797,12 @@ impl TraceAtomEdges for BootstrapAtoms {
         self.is_concat_spreadable.trace_atom_edges(sweep);
         self.iterator.trace_atom_edges(sweep);
         self.async_iterator.trace_atom_edges(sweep);
+        self.match_.trace_atom_edges(sweep);
+        self.match_all.trace_atom_edges(sweep);
+        self.replace.trace_atom_edges(sweep);
+        self.search.trace_atom_edges(sweep);
         self.species.trace_atom_edges(sweep);
+        self.split.trace_atom_edges(sweep);
         self.to_primitive.trace_atom_edges(sweep);
         self.to_string_tag.trace_atom_edges(sweep);
         self.unscopables.trace_atom_edges(sweep);
@@ -757,7 +812,12 @@ impl TraceAtomEdges for BootstrapAtoms {
         self.symbol_is_concat_spreadable.trace_atom_edges(sweep);
         self.symbol_iterator.trace_atom_edges(sweep);
         self.symbol_async_iterator.trace_atom_edges(sweep);
+        self.symbol_match.trace_atom_edges(sweep);
+        self.symbol_match_all.trace_atom_edges(sweep);
+        self.symbol_replace.trace_atom_edges(sweep);
+        self.symbol_search.trace_atom_edges(sweep);
         self.symbol_species.trace_atom_edges(sweep);
+        self.symbol_split.trace_atom_edges(sweep);
         self.symbol_to_primitive.trace_atom_edges(sweep);
         self.symbol_to_string_tag.trace_atom_edges(sweep);
         self.symbol_unscopables.trace_atom_edges(sweep);
@@ -773,7 +833,12 @@ pub struct WellKnownSymbols {
     is_concat_spreadable: Option<SymbolRef>,
     iterator: Option<SymbolRef>,
     async_iterator: Option<SymbolRef>,
+    match_: Option<SymbolRef>,
+    match_all: Option<SymbolRef>,
+    replace: Option<SymbolRef>,
+    search: Option<SymbolRef>,
     species: Option<SymbolRef>,
+    split: Option<SymbolRef>,
     to_primitive: Option<SymbolRef>,
     to_string_tag: Option<SymbolRef>,
     unscopables: Option<SymbolRef>,
@@ -789,7 +854,12 @@ impl WellKnownSymbols {
             is_concat_spreadable: None,
             iterator: None,
             async_iterator: None,
+            match_: None,
+            match_all: None,
+            replace: None,
+            search: None,
             species: None,
+            split: None,
             to_primitive: None,
             to_string_tag: None,
             unscopables: None,
@@ -805,7 +875,12 @@ impl WellKnownSymbols {
             WellKnownSymbolId::IsConcatSpreadable => self.is_concat_spreadable,
             WellKnownSymbolId::Iterator => self.iterator,
             WellKnownSymbolId::AsyncIterator => self.async_iterator,
+            WellKnownSymbolId::Match => self.match_,
+            WellKnownSymbolId::MatchAll => self.match_all,
+            WellKnownSymbolId::Replace => self.replace,
+            WellKnownSymbolId::Search => self.search,
             WellKnownSymbolId::Species => self.species,
+            WellKnownSymbolId::Split => self.split,
             WellKnownSymbolId::ToPrimitive => self.to_primitive,
             WellKnownSymbolId::ToStringTag => self.to_string_tag,
             WellKnownSymbolId::Unscopables => self.unscopables,
@@ -821,7 +896,12 @@ impl WellKnownSymbols {
             WellKnownSymbolId::IsConcatSpreadable => self.is_concat_spreadable = value,
             WellKnownSymbolId::Iterator => self.iterator = value,
             WellKnownSymbolId::AsyncIterator => self.async_iterator = value,
+            WellKnownSymbolId::Match => self.match_ = value,
+            WellKnownSymbolId::MatchAll => self.match_all = value,
+            WellKnownSymbolId::Replace => self.replace = value,
+            WellKnownSymbolId::Search => self.search = value,
             WellKnownSymbolId::Species => self.species = value,
+            WellKnownSymbolId::Split => self.split = value,
             WellKnownSymbolId::ToPrimitive => self.to_primitive = value,
             WellKnownSymbolId::ToStringTag => self.to_string_tag = value,
             WellKnownSymbolId::Unscopables => self.unscopables = value,
@@ -851,8 +931,33 @@ impl WellKnownSymbols {
     }
 
     #[inline]
+    pub const fn match_(self) -> Option<SymbolRef> {
+        self.match_
+    }
+
+    #[inline]
+    pub const fn match_all(self) -> Option<SymbolRef> {
+        self.match_all
+    }
+
+    #[inline]
+    pub const fn replace(self) -> Option<SymbolRef> {
+        self.replace
+    }
+
+    #[inline]
+    pub const fn search(self) -> Option<SymbolRef> {
+        self.search
+    }
+
+    #[inline]
     pub const fn species(self) -> Option<SymbolRef> {
         self.species
+    }
+
+    #[inline]
+    pub const fn split(self) -> Option<SymbolRef> {
+        self.split
     }
 
     #[inline]
@@ -887,7 +992,12 @@ impl TraceHeapEdges for WellKnownSymbols {
         self.is_concat_spreadable.trace_heap_edges(tracer);
         self.iterator.trace_heap_edges(tracer);
         self.async_iterator.trace_heap_edges(tracer);
+        self.match_.trace_heap_edges(tracer);
+        self.match_all.trace_heap_edges(tracer);
+        self.replace.trace_heap_edges(tracer);
+        self.search.trace_heap_edges(tracer);
         self.species.trace_heap_edges(tracer);
+        self.split.trace_heap_edges(tracer);
         self.to_primitive.trace_heap_edges(tracer);
         self.to_string_tag.trace_heap_edges(tracer);
         self.unscopables.trace_heap_edges(tracer);
