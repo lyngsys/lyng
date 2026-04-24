@@ -34,7 +34,7 @@ use lyng_js_types::{
     js3_internal_private_has_builtin, js3_internal_set_function_home_object_builtin,
     js3_internal_super_property_get_builtin, js3_internal_super_property_set_builtin,
     js3_internal_template_to_string_builtin, js3_object_set_prototype_of_builtin,
-    js3_regexp_builtin, BuiltinFunctionId,
+    js3_reference_error_builtin, js3_regexp_builtin, BuiltinFunctionId,
 };
 
 use crate::error::{LoweringError, LoweringResult};
@@ -64,6 +64,7 @@ mod expr;
 mod function;
 mod loops;
 mod operators;
+mod optional_chains;
 mod property_exprs;
 mod reference_targets;
 mod state;

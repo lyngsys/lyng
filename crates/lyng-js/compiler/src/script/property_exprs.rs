@@ -43,6 +43,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         property: AtomId,
         dest: u16,
     ) -> LoweringResult<()> {
+        if self.expr_continues_optional_chain(object) {
+            return self.lower_optional_chain_static_member_continuation(object, property, dest);
+        }
         if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
             let receiver = self.lower_super_receiver()?;
             let key = self.alloc_temp()?;
@@ -64,6 +67,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         property: ExprId,
         dest: u16,
     ) -> LoweringResult<()> {
+        if self.expr_continues_optional_chain(object) {
+            return self.lower_optional_chain_computed_member_continuation(object, property, dest);
+        }
         if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
             let receiver = self.lower_super_receiver()?;
             let key = self.lower_expr_to_temp(property)?;
@@ -302,6 +308,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Expr::StaticMemberExpression {
                 object, property, ..
             } => {
+                if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
+                    let _receiver = self.lower_super_receiver()?;
+                    return self.emit_throw_reference_error(self.ast().get_expr(object).span());
+                }
                 let object_register = self.lower_expr_to_temp(object)?;
                 let key_register = self.alloc_temp()?;
                 self.emit_load_atom_string(key_register, property)?;
@@ -316,6 +326,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Expr::ComputedMemberExpression {
                 object, property, ..
             } => {
+                if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
+                    let _receiver = self.lower_super_receiver()?;
+                    let _key_value = self.lower_expr_to_temp(property)?;
+                    return self.emit_throw_reference_error(self.ast().get_expr(object).span());
+                }
                 let object_register = self.lower_expr_to_temp(object)?;
                 let key_register = self.lower_expr_to_temp(property)?;
                 self.builder.emit_abc(
@@ -414,5 +429,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             current = *expression;
         }
         current
+    }
+
+    fn emit_throw_reference_error(&mut self, span: Span) -> LoweringResult<()> {
+        let error = self.alloc_temp()?;
+        self.emit_internal_builtin_call_into(js3_reference_error_builtin(), &[], span, error)?;
+        self.builder.emit_ax(Opcode::Throw, i32::from(error));
+        Ok(())
     }
 }

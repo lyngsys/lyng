@@ -4,6 +4,7 @@ mod eval;
 mod exceptions;
 mod functions;
 mod objects;
+mod optional_chaining;
 mod runtime_scaffolding;
 mod script_core;
 mod support;

@@ -169,6 +169,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         arguments: lyng_js_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
+        if self.expr_continues_optional_chain(callee) {
+            return self.lower_optional_chain_call_continuation(expr_id, callee, arguments, dest);
+        }
         if matches!(self.ast().get_expr(callee), Expr::Super { .. }) {
             return self.lower_super_construct_call(expr_id, arguments, dest);
         }
@@ -208,6 +211,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         callee: ExprId,
         arguments: lyng_js_ast::NodeList<ExprId>,
     ) -> LoweringResult<()> {
+        if self.expr_continues_optional_chain(callee) {
+            let result = self.alloc_temp()?;
+            self.lower_optional_chain_call_continuation(expr_id, callee, arguments, result)?;
+            self.builder.emit_ax(Opcode::Return, i32::from(result));
+            return Ok(());
+        }
         if matches!(self.ast().get_expr(callee), Expr::Super { .. }) {
             let result = self.alloc_temp()?;
             self.lower_super_construct_call(expr_id, arguments, result)?;
@@ -279,6 +288,20 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     pub(super) fn lower_call_target(&mut self, callee: ExprId) -> LoweringResult<(u16, u16)> {
         let expr = self.ast().get_expr(callee).clone();
         match expr {
+            Expr::ParenthesizedExpression { expression, .. } => self.lower_call_target(expression),
+            Expr::OptionalChainExpression { .. } => {
+                let shorted = self.alloc_temp()?;
+                self.emit_load_bool(shorted, false)?;
+                let callee_register = self.alloc_temp()?;
+                let this_register = self.alloc_temp()?;
+                self.lower_optional_chain_call_target(
+                    callee,
+                    callee_register,
+                    this_register,
+                    shorted,
+                )?;
+                Ok((callee_register, this_register))
+            }
             Expr::StaticMemberExpression {
                 object, property, ..
             } => {
@@ -447,16 +470,22 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
 
         let argument_values = self.lower_call_arguments(arguments)?;
-        if argument_values.spread_mask != 0 {
-            return Err(LoweringError::UnsupportedExpression { expr: expr_id });
-        }
         let span = self.ast().get_expr(expr_id).span();
-        self.emit_internal_builtin_call_into(
+        let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
             js3_internal_construct_super_builtin(),
             &argument_values.registers,
             span,
             dest,
         )?;
+        if argument_values.spread_mask != 0 {
+            let expected_arity = u16::try_from(argument_values.registers.len())
+                .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+            self.builder.add_feedback_site(
+                instruction_offset,
+                FeedbackSiteKind::Call,
+                self.call_feedback_metadata(expected_arity, argument_values.spread_mask),
+            );
+        }
         self.emit_derived_class_super_call_epilogue(dest)
     }
 }

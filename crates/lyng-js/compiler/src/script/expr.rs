@@ -90,6 +90,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Expr::PrivateInExpression {
                 object, property, ..
             } => self.lower_private_has_expression(expr_id, object, property, dest),
+            Expr::OptionalChainExpression { .. } => {
+                self.lower_optional_chain_expression(expr_id, dest)
+            }
             Expr::CallExpression {
                 callee, arguments, ..
             } => self.lower_call_expression(expr_id, callee, arguments, dest),

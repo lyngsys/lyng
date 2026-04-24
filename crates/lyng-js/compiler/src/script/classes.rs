@@ -1114,9 +1114,25 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         property: AtomId,
         dest: u16,
     ) -> LoweringResult<()> {
+        if self.expr_continues_optional_chain(object) {
+            return self
+                .lower_optional_chain_private_member_continuation(expr_id, object, property, dest);
+        }
+        let receiver = self.lower_expr_to_temp(object)?;
+        let span = self.ast().get_expr(object).span();
+        self.emit_private_field_get_from_receiver(expr_id, receiver, property, span, dest)
+    }
+
+    pub(super) fn emit_private_field_get_from_receiver(
+        &mut self,
+        expr_id: ExprId,
+        receiver: u16,
+        property: AtomId,
+        span: Span,
+        dest: u16,
+    ) -> LoweringResult<()> {
         let (descriptor_index, class_depth) =
             self.resolved_private_field_access(expr_id, property, false)?;
-        let receiver = self.lower_expr_to_temp(object)?;
         let descriptor = self.alloc_temp()?;
         let descriptor_smi = i16::try_from(descriptor_index)
             .map_err(|_| LoweringError::UnsupportedExpression { expr: expr_id })?;
@@ -1125,7 +1141,6 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let depth_smi = i16::try_from(class_depth)
             .map_err(|_| LoweringError::UnsupportedExpression { expr: expr_id })?;
         self.emit_load_smi(depth, depth_smi)?;
-        let span = self.ast().get_expr(object).span();
         self.emit_internal_builtin_call_into(
             js3_internal_private_field_get_builtin(),
             &[receiver, descriptor, depth],
