@@ -53,11 +53,8 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         })
     }
 
-    /// Parses a method function (for object literal methods and class methods).
-    /// Starts parsing from `(params) { body }`.
-    pub fn parse_method_function(&mut self, kind: FunctionKind) -> FunctionId {
-        let start = self.current_span();
-
+    /// Parses a method function with a source span that starts at the method introducer/key.
+    pub fn parse_method_function_from(&mut self, kind: FunctionKind, start: Span) -> FunctionId {
         let prev_in_func = self.in_function();
         let prev_yield = self.allow_yield;
         let prev_await = self.allow_await;

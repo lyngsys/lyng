@@ -350,6 +350,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         // Get/Set accessors
         if self.at_contextual(WellKnownAtom::get) || self.at_contextual(WellKnownAtom::set) {
+            let method_start = self.current_span();
             let is_get = self.at_contextual(WellKnownAtom::get);
             let peek = self.peek();
             if !peek.preceded_by_line_terminator() && is_property_name_start(peek.kind) {
@@ -360,7 +361,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 };
                 self.advance(); // eat get/set
                 let (key, computed, private) = self.parse_class_element_name();
-                let func_id = self.parse_method_function(FunctionKind::Normal);
+                let func_id = self.parse_method_function_from(FunctionKind::Normal, method_start);
                 let span = start.cover(self.ast().get_function(func_id).span);
                 return self.ast_mut().alloc_class_element(ClassElement::Method {
                     span,
@@ -376,6 +377,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         // Async methods
         if self.at_contextual(WellKnownAtom::async_) {
+            let method_start = self.current_span();
             let peek = self.peek();
             if !peek.preceded_by_line_terminator() && is_property_name_start(peek.kind) {
                 self.advance(); // eat `async`
@@ -386,7 +388,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 } else {
                     FunctionKind::Async
                 };
-                let func_id = self.parse_method_function(kind);
+                let func_id = self.parse_method_function_from(kind, method_start);
                 let span = start.cover(self.ast().get_function(func_id).span);
                 return self.ast_mut().alloc_class_element(ClassElement::Method {
                     span,
@@ -402,9 +404,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         // Generator methods
         if self.at(TokenKind::Star) {
+            let method_start = self.current_span();
             self.advance();
             let (key, computed, private) = self.parse_class_element_name();
-            let func_id = self.parse_method_function(FunctionKind::Generator);
+            let func_id = self.parse_method_function_from(FunctionKind::Generator, method_start);
             let span = start.cover(self.ast().get_function(func_id).span);
             return self.ast_mut().alloc_class_element(ClassElement::Method {
                 span,
@@ -418,10 +421,16 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
 
         // Regular method or field
+        let key_start = self.current_span();
         let (key, computed, private) = self.parse_class_element_name();
 
         // Method: has `(` after key
         if self.at(TokenKind::LParen) {
+            let method_start = if computed {
+                key_start
+            } else {
+                self.ast().get_expr(key).span()
+            };
             // Check if this is the constructor
             let method_kind = if !computed && !private && !is_static {
                 if let lyng_js_ast::Expr::Identifier { name, .. } = self.ast().get_expr(key) {
@@ -437,7 +446,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 MethodKind::Method
             };
 
-            let func_id = self.parse_method_function(FunctionKind::Normal);
+            let func_id = self.parse_method_function_from(FunctionKind::Normal, method_start);
             let span = start.cover(self.ast().get_function(func_id).span);
             return self.ast_mut().alloc_class_element(ClassElement::Method {
                 span,

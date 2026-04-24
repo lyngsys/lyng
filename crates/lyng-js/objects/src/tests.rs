@@ -1160,7 +1160,7 @@ fn proxy_objects_allocate_kind_payload_and_idempotent_revocation_state() {
     );
     assert_eq!(runtime.proxy_handler(proxy), None);
     assert_eq!(runtime.is_proxy_revoked(proxy), Some(true));
-    assert!(!runtime.is_callable(proxy));
+    assert!(runtime.is_callable(proxy));
     assert!(!runtime.is_constructor(proxy));
     assert_eq!(
         runtime.named_slots(mutator.view(), proxy).unwrap(),

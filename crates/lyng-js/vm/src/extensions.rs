@@ -7,7 +7,8 @@ use lyng_js_host::HostHooks;
 use lyng_js_objects::{NativeFunctionRegistry, ObjectAllocation};
 use lyng_js_ops::errors;
 use lyng_js_types::{
-    EmbeddingFunctionId, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value,
+    BuiltinFunctionId, EmbeddingFunctionId, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
+    Value,
 };
 use std::sync::Arc;
 
@@ -160,6 +161,12 @@ impl<'a> RealmExtensionInstallation<'a> {
     pub fn allocate_function(&mut self, entry: EmbeddingFunctionId) -> Result<ObjectRef, VmError> {
         self.vm
             .allocate_embedding_function_object(self.agent, self.realm(), entry, self.provider)
+    }
+
+    pub fn builtin_constant(&mut self, entry: BuiltinFunctionId) -> Result<Value, VmError> {
+        self.vm
+            .builtin_constant(self.agent, self.realm(), entry)
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(self.agent)))
     }
 
     pub fn define_property(

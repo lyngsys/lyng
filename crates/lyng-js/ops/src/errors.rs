@@ -1,6 +1,6 @@
 use lyng_js_env::{Agent, Intrinsics, RealmRecord};
 use lyng_js_gc::AllocationLifetime;
-use lyng_js_objects::{InternalMethodError, ObjectAllocation};
+use lyng_js_objects::{InternalMethodError, ObjectAllocation, ObjectFlags};
 use lyng_js_types::{
     AbruptCompletion, Completion, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value,
 };
@@ -66,7 +66,9 @@ pub fn create_error_object(
         let mut mutator = heap.mutator();
         objects.alloc_object(
             &mut mutator,
-            ObjectAllocation::ordinary(root_shape).with_prototype(prototype),
+            ObjectAllocation::ordinary(root_shape)
+                .with_prototype(prototype)
+                .with_flags(ObjectFlags::extensible().union(ObjectFlags::ERROR_OBJECT)),
             AllocationLifetime::Default,
         )
     });

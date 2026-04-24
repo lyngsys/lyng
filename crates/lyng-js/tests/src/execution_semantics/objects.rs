@@ -262,13 +262,15 @@ fn phase5_object_prototype_to_string_reports_foundational_tags() {
             + "|"
             + Object.prototype.toString.call([])
             + "|"
-            + Object.prototype.toString.call(new TypeError("boom"));
+            + Object.prototype.toString.call(new TypeError("boom"))
+            + "|"
+            + Object.prototype.toString.call(TypeError.prototype);
         "#,
     );
 
     assert_eq!(
         result,
-        "[object Object]|[object Function]|[object Array]|[object Error]"
+        "[object Object]|[object Function]|[object Array]|[object Error]|[object Object]"
     );
 }
 
@@ -291,6 +293,27 @@ fn phase5_object_prototype_to_string_handles_arguments_and_symbol_tag_overrides(
     );
 
     assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn phase6_object_prototype_to_string_uses_proxy_aware_array_and_tag_fallbacks() {
+    let result = compile_and_run_string(
+        r#"
+        let handle = Proxy.revocable([], {
+            get() {
+                handle.revoke();
+            }
+        });
+
+        Object.defineProperty(BigInt.prototype, Symbol.toStringTag, { value: 86 });
+
+        Object.prototype.toString.call(handle.proxy)
+            + "|"
+            + Object.prototype.toString.call(Object(BigInt(0)));
+        "#,
+    );
+
+    assert_eq!(result, "[object Array]|[object Object]");
 }
 
 #[test]
@@ -335,6 +358,374 @@ fn phase5_object_property_keys_use_shared_object_aware_coercion() {
     );
 
     assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn phase6_object_assign_copies_enumerable_own_properties_to_target() {
+    let result = compile_and_run_string(
+        r#"
+        let symbol = Symbol("copy");
+        let log = "";
+        let source = {};
+        Object.defineProperty(source, "hidden", {
+            value: 1,
+            enumerable: false
+        });
+        Object.defineProperty(source, "a", {
+            get: function() {
+                log += "get";
+                return 5;
+            },
+            enumerable: true
+        });
+        source[symbol] = 7;
+
+        let target = {};
+        let result = Object.assign(target, source);
+        let descriptor = Object.getOwnPropertyDescriptor(result, "a");
+
+        (result === target ? "same" : "different")
+            + "|"
+            + String(result.a)
+            + "|"
+            + String(result[symbol])
+            + "|"
+            + String("hidden" in result)
+            + "|"
+            + String(descriptor.enumerable)
+            + "/"
+            + String(descriptor.writable)
+            + "/"
+            + String(descriptor.configurable)
+            + "|"
+            + log
+            + "|"
+            + typeof Object.assign("x")
+            + "|"
+            + Object.assign("x").valueOf();
+        "#,
+    );
+
+    assert_eq!(result, "same|5|7|false|true/true/true|get|object|x");
+}
+
+#[test]
+fn phase6_object_from_entries_defines_ordinary_data_properties() {
+    let result = compile_and_run_string(
+        r#"
+        let symbol = Symbol("entry");
+        let log = "";
+        let key = {
+            [Symbol.toPrimitive](hint) {
+                log += hint;
+                return "coerced";
+            }
+        };
+
+        let result = Object.fromEntries([
+            ["a", 1],
+            [key, 2],
+            [symbol, 3]
+        ]);
+        let descriptor = Object.getOwnPropertyDescriptor(result, "coerced");
+
+        (Object.getPrototypeOf(result) === Object.prototype ? "proto" : "bad")
+            + "|"
+            + String(result.a)
+            + "|"
+            + String(result.coerced)
+            + "|"
+            + String(result[symbol])
+            + "|"
+            + String(descriptor.enumerable)
+            + "/"
+            + String(descriptor.writable)
+            + "/"
+            + String(descriptor.configurable)
+            + "|"
+            + log;
+        "#,
+    );
+
+    assert_eq!(result, "proto|1|2|3|true/true/true|string");
+}
+
+#[test]
+fn phase6_object_from_entries_closes_iterator_after_bad_entry() {
+    let result = compile_and_run_string(
+        r#"
+        let closed = false;
+        let iterable = {
+            [Symbol.iterator]() {
+                return {
+                    next() {
+                        return { value: null, done: false };
+                    },
+                    return() {
+                        closed = true;
+                        return {};
+                    }
+                };
+            }
+        };
+
+        try {
+            Object.fromEntries(iterable);
+        } catch (error) {}
+
+        String(closed);
+        "#,
+    );
+
+    assert_eq!(result, "true");
+}
+
+#[test]
+fn phase6_object_from_entries_reads_entry_value_before_key_coercion() {
+    let result = compile_and_run_string(
+        r#"
+        let effects = [];
+        let entry = {};
+        Object.defineProperty(entry, "0", {
+            get: function() {
+                effects.push("get 0");
+                return {
+                    toString: function() {
+                        effects.push("key toString");
+                        return "key";
+                    }
+                };
+            }
+        });
+        Object.defineProperty(entry, "1", {
+            get: function() {
+                effects.push("get 1");
+                return "value";
+            }
+        });
+
+        let result = Object.fromEntries([entry]);
+        effects.join("|") + "|" + result.key;
+        "#,
+    );
+
+    assert_eq!(result, "get 0|get 1|key toString|value");
+}
+
+#[test]
+fn phase6_annex_b_object_proto_accessor_gets_and_sets_prototypes() {
+    let result = compile_and_run_string(
+        r#"
+        let descriptor = Object.getOwnPropertyDescriptor(Object.prototype, "__proto__");
+        let base = { marker: 1 };
+        let object = {};
+        descriptor.set.call(object, base);
+        let nullProto = Object.create(null);
+
+        [
+            typeof descriptor.get,
+            typeof descriptor.set,
+            String(descriptor.enumerable),
+            String(descriptor.configurable),
+            String(descriptor.get.call(object) === base),
+            String(object.marker),
+            String(descriptor.get.call(nullProto)),
+            String(descriptor.set.call(1, base))
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "function|function|false|true|true|1|null|undefined");
+}
+
+#[test]
+fn phase6_annex_b_define_and_lookup_accessors_walk_prototypes() {
+    let result = compile_and_run_string(
+        r#"
+        let prototype = {};
+        let child = Object.create(prototype);
+        function getValue() { return 11; }
+        function setValue(value) { this.seen = value; }
+
+        prototype.__defineGetter__("value", getValue);
+        prototype.__defineSetter__("value", setValue);
+        let getter = child.__lookupGetter__("value");
+        let setter = child.__lookupSetter__("value");
+        child.value = 17;
+        let descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+
+        [
+            String(getter === getValue),
+            String(setter === setValue),
+            String(child.value),
+            String(child.seen),
+            String(descriptor.enumerable),
+            String(descriptor.configurable),
+            String(child.__lookupGetter__("missing"))
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|true|11|17|true|true|undefined");
+}
+
+#[test]
+fn phase6_proto_cycle_detection_stops_at_proxy_exotic_prototype() {
+    let result = compile_and_run_string(
+        r#"
+        let root = {};
+        let intermediary = new Proxy(Object.create(root), {});
+        let leaf = Object.create(intermediary);
+
+        root.__proto__ = leaf;
+
+        String(Object.getPrototypeOf(root) === leaf);
+        "#,
+    );
+
+    assert_eq!(result, "true");
+}
+
+#[test]
+fn phase6_object_group_by_groups_iterable_values_into_null_prototype_object() {
+    let result = compile_and_run_string(
+        r#"
+        let calls = "";
+        let grouped = Object.groupBy([1, 2, 3], function(value, index) {
+            calls += String(value) + ":" + String(index) + ";";
+            return value % 2 === 0 ? "even" : "odd";
+        });
+
+        [
+            String(Object.getPrototypeOf(grouped)),
+            grouped.odd.join(","),
+            grouped.even.join(","),
+            Object.keys(grouped).join(","),
+            calls
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "null|1,3|2|odd,even|1:0;2:1;3:2;");
+}
+
+#[test]
+fn phase6_object_define_properties_rejects_primitive_targets() {
+    let result = compile_and_run_string(
+        r#"
+        let results = [];
+        for (let value of [0, true, "abc"]) {
+            try {
+                Object.defineProperties(value, {});
+                results.push("no");
+            } catch (error) {
+                results.push("throw");
+            }
+        }
+        results.join("|");
+        "#,
+    );
+
+    assert_eq!(result, "throw|throw|throw");
+}
+
+#[test]
+fn phase6_object_freeze_uses_proxy_traps_and_partial_descriptors() {
+    let result = compile_and_run_string(
+        r#"
+        let symbol = Symbol("s");
+        let target = {};
+        target[symbol] = 1;
+        target.foo = 2;
+        target[0] = 3;
+
+        let seen = [];
+        let proxy = new Proxy(target, {
+            getOwnPropertyDescriptor(target, key) {
+                seen.push(typeof key === "symbol" ? "sym" : String(key));
+                return Reflect.getOwnPropertyDescriptor(target, key);
+            },
+            defineProperty(target, key, descriptor) {
+                seen.push(
+                    "def:"
+                        + (typeof key === "symbol" ? "sym" : String(key))
+                        + ":"
+                        + String("value" in descriptor)
+                        + "/"
+                        + String("writable" in descriptor)
+                        + "/"
+                        + String("enumerable" in descriptor)
+                        + "/"
+                        + String(descriptor.configurable)
+                );
+                return Reflect.defineProperty(target, key, descriptor);
+            }
+        });
+
+        Object.freeze(proxy);
+
+        let preventFalseThrows = false;
+        try {
+            Object.freeze(new Proxy({}, {
+                preventExtensions() {
+                    return false;
+                }
+            }));
+        } catch (error) {
+            preventFalseThrows = true;
+        }
+
+        seen.join("|") + "|" + String(preventFalseThrows);
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "0|def:0:false/true/false/false|foo|def:foo:false/true/false/false|sym|def:sym:false/true/false/false|true"
+    );
+}
+
+#[test]
+fn phase6_object_prototype_has_immutable_prototype() {
+    let result = compile_and_run_string(
+        r#"
+        let candidate = Object.create(null);
+        let setThrows = false;
+        try {
+            Object.setPrototypeOf(Object.prototype, candidate);
+        } catch (error) {
+            setThrows = true;
+        }
+
+        [
+            String(setThrows),
+            String(Reflect.setPrototypeOf(Object.prototype, candidate)),
+            String(Object.getPrototypeOf(Object.prototype) === null)
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|false|true");
+}
+
+#[test]
+fn phase6_object_constructor_subclass_ignores_object_argument() {
+    let result = compile_and_run_string(
+        r#"
+        class Derived extends Object {}
+        let constructed = new Derived({ marker: 1 });
+        let reflected = Reflect.construct(Object, [{ marker: 2 }], Derived);
+
+        [
+            String(constructed.marker),
+            String(reflected.marker),
+            String(Object.getPrototypeOf(constructed) === Derived.prototype),
+            String(Object.getPrototypeOf(reflected) === Derived.prototype)
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "undefined|undefined|true|true");
 }
 
 #[test]
@@ -533,6 +924,44 @@ fn phase6_proxy_routes_script_and_object_operations_through_traps() {
     );
 
     assert_eq!(result, Value::from_smi(2047));
+}
+
+#[test]
+fn phase6_proxy_set_trap_from_prototype_receives_original_receiver() {
+    let result = compile_and_run(
+        r#"
+        let seenHandler;
+        let seenTarget;
+        let seenProp;
+        let seenValue;
+        let seenReceiver;
+        let target = {};
+        let handler = {
+            set(target, prop, value, receiver) {
+                seenHandler = this;
+                seenTarget = target;
+                seenProp = prop;
+                seenValue = value;
+                seenReceiver = receiver;
+                return true;
+            }
+        };
+        let proxy = new Proxy(target, handler);
+        let receiver = Object.create(proxy);
+
+        receiver.prop = "value";
+
+        let total = 0;
+        total += seenHandler === handler ? 1 : 0;
+        total += seenTarget === target ? 2 : 0;
+        total += seenProp === "prop" ? 4 : 0;
+        total += seenValue === "value" ? 8 : 0;
+        total += seenReceiver === receiver ? 16 : 0;
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
 }
 
 #[test]

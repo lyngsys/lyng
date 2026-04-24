@@ -5,7 +5,7 @@ use super::{
     ThisBindingStatus, ThisState, Value, Vm, VmError, VmResult, WellKnownAtom,
 };
 use lyng_js_objects::{FunctionEntryIdentity, FunctionThisMode, NativeFunctionRegistry};
-use lyng_js_ops::{errors, object};
+use lyng_js_ops::errors;
 use lyng_js_types::PropertyKey;
 
 impl Vm {
@@ -74,6 +74,8 @@ impl Vm {
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<()> {
+        let tail_caller = caller_frame.callee();
+        let tail_caller_strict = self.frame_is_strict(caller_frame);
         let prepared =
             self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, None)?;
         let register_base = caller_frame.registers().base();
@@ -93,7 +95,11 @@ impl Vm {
             caller_frame.return_register(),
             construct_this,
             caller_frame.flags().contains(FrameFlags::construct()),
-        )
+        )?;
+        if let Some(frame) = self.frames.last_mut() {
+            frame.set_tail_caller(tail_caller, tail_caller_strict);
+        }
+        Ok(())
     }
 
     pub(super) fn prepare_bytecode_call(
@@ -145,6 +151,7 @@ impl Vm {
         let outer_environment = function_data
             .environment()
             .ok_or(VmError::MissingEnvironment(caller_frame.lexical_env()))?;
+        let realm = function_data.realm().unwrap_or(caller_frame.realm());
         let derived_construct_call = new_target.is_some() && derived_class_constructor;
         let (effective_this, execution_this_state, env_this_status, effective_new_target) =
             match function_data.this_mode() {
@@ -171,8 +178,7 @@ impl Vm {
                     new_target,
                 ),
                 FunctionThisMode::Global => {
-                    let resolved =
-                        self.resolve_global_this(agent, caller_frame.realm(), this_value)?;
+                    let resolved = self.resolve_global_this(agent, realm, this_value)?;
                     (
                         resolved,
                         ThisState::Value(resolved),
@@ -182,7 +188,6 @@ impl Vm {
                 }
             };
 
-        let realm = function_data.realm().unwrap_or(caller_frame.realm());
         let (lexical_env, variable_env) = if needs_environment {
             let layout = environment_layout
                 .and_then(|layout| lyng_js_env::EnvironmentLayoutId::from_raw(layout.get()))
@@ -254,10 +259,6 @@ impl Vm {
         .with_this_state(prepared.execution_this_state)
         .with_script_or_module_referrer(script_or_module_referrer)
         .with_new_target(prepared.new_target);
-        let strict = self
-            .installed_function(prepared.code)
-            .map(|function| function.flags().strict())
-            .unwrap_or(false);
         if let Err(error) = self.initialize_activation_objects(
             agent,
             ActivationObjectInit {
@@ -268,7 +269,6 @@ impl Vm {
                 lexical_env: prepared.lexical_env,
                 arguments,
                 callee: Value::from_object_ref(prepared.callee),
-                strict,
             },
         ) {
             self.register_stack.truncate(
@@ -367,13 +367,18 @@ impl Vm {
     pub(super) fn reject_class_constructor_call(
         agent: &mut Agent,
         callee: ObjectRef,
+        fallback_realm: RealmRef,
     ) -> VmResult<()> {
-        if agent
-            .objects()
-            .function_data(callee)
-            .is_some_and(|data| data.kind_flags().is_class_constructor())
-        {
-            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        let Some(data) = agent.objects().function_data(callee) else {
+            return Ok(());
+        };
+        if data.kind_flags().is_class_constructor() {
+            let realm = data.realm().unwrap_or(fallback_realm);
+            return Err(Self::abrupt_intrinsic_error(
+                agent,
+                realm,
+                errors::ErrorKind::Type,
+            ));
         }
         Ok(())
     }
@@ -482,16 +487,23 @@ impl Vm {
     }
 
     pub(super) fn create_construct_this(
+        &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
         realm: RealmRef,
         new_target: ObjectRef,
     ) -> VmResult<ObjectRef> {
-        let prototype = object::get(
+        let prototype = self.get_property_from_object(
             agent,
+            host,
+            registry,
+            frame,
             new_target,
+            Value::from_object_ref(new_target),
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),
-        )
-        .map_err(VmError::Abrupt)?;
+        )?;
         let prototype = if let Some(prototype) = prototype.as_object_ref() {
             Some(prototype)
         } else {

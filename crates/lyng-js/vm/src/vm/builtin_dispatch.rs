@@ -127,7 +127,7 @@ fn string_ref_code_units(agent: &Agent, string: StringRef) -> Option<Vec<u16>> {
 }
 
 impl Vm {
-    fn abrupt_intrinsic_error(
+    pub(super) fn abrupt_intrinsic_error(
         agent: &mut Agent,
         realm: RealmRef,
         kind: errors::ErrorKind,
@@ -777,16 +777,16 @@ impl Vm {
 
         let source_text = match kind {
             DynamicFunctionKind::Ordinary => {
-                format!("(function anonymous({parameters_source}) {{\n{body_source}\n}})")
+                format!("(function anonymous({parameters_source}\n) {{\n{body_source}\n}})")
             }
             DynamicFunctionKind::Generator => {
-                format!("(function* anonymous({parameters_source}) {{\n{body_source}\n}})")
+                format!("(function* anonymous({parameters_source}\n) {{\n{body_source}\n}})")
             }
             DynamicFunctionKind::Async => {
-                format!("(async function anonymous({parameters_source}) {{\n{body_source}\n}})")
+                format!("(async function anonymous({parameters_source}\n) {{\n{body_source}\n}})")
             }
             DynamicFunctionKind::AsyncGenerator => {
-                format!("(async function* anonymous({parameters_source}) {{\n{body_source}\n}})")
+                format!("(async function* anonymous({parameters_source}\n) {{\n{body_source}\n}})")
             }
         };
         let source_id = self.allocate_dynamic_source_id();
@@ -2024,7 +2024,15 @@ impl Vm {
         }
 
         let method_text = format!("({{{source_text}}});");
-        !parse_script(atoms, source, &method_text)
+        if !parse_script(atoms, source, &method_text)
+            .diagnostics
+            .has_errors()
+        {
+            return true;
+        }
+
+        let class_method_text = format!("(class {{{source_text}}});");
+        !parse_script(atoms, source, &class_method_text)
             .diagnostics
             .has_errors()
     }
@@ -2174,33 +2182,43 @@ impl Vm {
     fn set_integrity_level(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
         object_ref: ObjectRef,
         freeze: bool,
     ) -> VmResult<bool> {
-        if !object::prevent_extensions(agent, object_ref).map_err(VmError::Abrupt)? {
+        let mut bridge = VmProxyBridge {
+            vm: self,
+            agent,
+            host,
+            registry,
+            frame,
+        };
+        if !proxy::prevent_extensions(&mut bridge, object_ref)? {
             return Ok(false);
         }
-        let keys = object::own_property_keys(agent, object_ref).map_err(VmError::Abrupt)?;
+        let keys = proxy::own_property_keys(&mut bridge, object_ref)?;
         for key in keys {
-            let Some(mut descriptor) =
-                object::get_own_property(agent, object_ref, key).map_err(VmError::Abrupt)?
-            else {
+            let Some(current) = proxy::get_own_property(&mut bridge, object_ref, key)? else {
                 continue;
             };
+            let mut descriptor = PropertyDescriptor::new();
             descriptor.set_configurable(false);
-            let is_data_descriptor = (descriptor.has_value() || descriptor.has_writable())
-                && !(descriptor.has_get() || descriptor.has_set());
+            let is_data_descriptor = (current.has_value() || current.has_writable())
+                && !(current.has_get() || current.has_set());
             if freeze && is_data_descriptor {
                 descriptor.set_writable(false);
             }
-            let _ = object::define_property(
-                agent,
+            if !proxy::define_property(
+                &mut bridge,
                 object_ref,
                 key,
                 descriptor,
                 AllocationLifetime::Default,
-            )
-            .map_err(VmError::Abrupt)?;
+            )? {
+                return Err(proxy::ProxyTrapContext::type_error(&mut bridge));
+            }
         }
         Ok(true)
     }
@@ -2208,17 +2226,25 @@ impl Vm {
     fn test_integrity_level(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
         object_ref: ObjectRef,
         frozen: bool,
     ) -> VmResult<bool> {
-        if object::is_extensible(agent, object_ref).map_err(VmError::Abrupt)? {
+        let mut bridge = VmProxyBridge {
+            vm: self,
+            agent,
+            host,
+            registry,
+            frame,
+        };
+        if proxy::is_extensible(&mut bridge, object_ref)? {
             return Ok(false);
         }
-        let keys = object::own_property_keys(agent, object_ref).map_err(VmError::Abrupt)?;
+        let keys = proxy::own_property_keys(&mut bridge, object_ref)?;
         for key in keys {
-            let Some(descriptor) =
-                object::get_own_property(agent, object_ref, key).map_err(VmError::Abrupt)?
-            else {
+            let Some(descriptor) = proxy::get_own_property(&mut bridge, object_ref, key)? else {
                 continue;
             };
             if descriptor.configurable() != Some(false) {
@@ -2537,41 +2563,16 @@ impl Vm {
                 PrimitiveWrapperKind::String => "String",
                 PrimitiveWrapperKind::Number => "Number",
                 PrimitiveWrapperKind::Boolean => "Boolean",
-                PrimitiveWrapperKind::Symbol => "Symbol",
-                PrimitiveWrapperKind::BigInt => "BigInt",
+                PrimitiveWrapperKind::Symbol | PrimitiveWrapperKind::BigInt => "Object",
             }
+        } else if agent
+            .objects()
+            .object_header(agent.heap().view(), object)
+            .is_some_and(|header| header.flags().is_error_object())
+        {
+            "Error"
         } else {
-            let intrinsics = agent
-                .realm(caller.realm())
-                .map(|record| record.intrinsics())
-                .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
-            let error_prototypes = [
-                intrinsics.error_prototype(),
-                intrinsics.eval_error_prototype(),
-                intrinsics.range_error_prototype(),
-                intrinsics.reference_error_prototype(),
-                intrinsics.syntax_error_prototype(),
-                intrinsics.type_error_prototype(),
-                intrinsics.uri_error_prototype(),
-            ];
-            let mut current = Some(object);
-            let mut is_error_object = false;
-            while let Some(candidate) = current {
-                if error_prototypes
-                    .into_iter()
-                    .flatten()
-                    .any(|prototype| prototype == candidate)
-                {
-                    is_error_object = true;
-                    break;
-                }
-                current = object::get_prototype_of(agent, candidate).map_err(VmError::Abrupt)?;
-            }
-            if is_error_object {
-                "Error"
-            } else {
-                "Object"
-            }
+            "Object"
         };
         let to_string_tag = agent
             .well_known_symbol(WellKnownSymbolId::ToStringTag)
@@ -4640,7 +4641,14 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         object: ObjectRef,
         freeze: bool,
     ) -> Result<bool, Self::Error> {
-        self.vm.set_integrity_level(self.agent, object, freeze)
+        self.vm.set_integrity_level(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            object,
+            freeze,
+        )
     }
 
     fn test_integrity_level(
@@ -4648,7 +4656,14 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         object: ObjectRef,
         frozen: bool,
     ) -> Result<bool, Self::Error> {
-        self.vm.test_integrity_level(self.agent, object, frozen)
+        self.vm.test_integrity_level(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            object,
+            frozen,
+        )
     }
 
     fn park_agent(
@@ -4694,12 +4709,18 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     }
 
     fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
-        Vm::require_callable_object(self.agent, self.caller_frame, value).map_err(|error| {
-            match error {
-                VmError::Abrupt(abrupt) => self.abrupt(abrupt),
-                other => other,
-            }
-        })
+        let realm = self.builtin_realm();
+        let object = value.as_object_ref().ok_or_else(|| {
+            Vm::abrupt_intrinsic_error(self.agent, realm, errors::ErrorKind::Type)
+        })?;
+        if !self.agent.objects().is_callable(object) {
+            return Err(Vm::abrupt_intrinsic_error(
+                self.agent,
+                realm,
+                errors::ErrorKind::Type,
+            ));
+        }
+        Ok(object)
     }
 
     fn call_to_completion(

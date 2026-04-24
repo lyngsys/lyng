@@ -12,9 +12,10 @@ use lyng_js_env::Agent;
 use lyng_js_gc::{AllocationLifetime, SymbolFlags};
 use lyng_js_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, ObjectAllocation,
-    ObjectColdData, PrimitiveWrapperKind,
+    ObjectColdData, ObjectFlags, PrimitiveWrapperKind,
 };
 use lyng_js_types::{
+    js3_abstract_module_source_builtin, js3_abstract_module_source_to_string_tag_getter_builtin,
     js3_aggregate_error_builtin, js3_array_at_builtin, js3_array_buffer_builtin,
     js3_array_buffer_byte_length_getter_builtin, js3_array_buffer_is_view_builtin,
     js3_array_buffer_slice_builtin, js3_array_builtin, js3_array_concat_builtin,
@@ -77,13 +78,14 @@ use lyng_js_types::{
     js3_finalization_registry_unregister_builtin, js3_float32_array_builtin,
     js3_float64_array_builtin, js3_function_apply_builtin, js3_function_bind_builtin,
     js3_function_builtin, js3_function_call_builtin, js3_function_prototype_builtin,
-    js3_function_to_string_builtin, js3_generator_function_builtin, js3_generator_next_builtin,
-    js3_generator_return_builtin, js3_generator_throw_builtin, js3_int16_array_builtin,
-    js3_int32_array_builtin, js3_int8_array_builtin, js3_internal_throw_type_error_builtin,
-    js3_is_finite_builtin, js3_is_nan_builtin, js3_iterator_prototype_iterator_builtin,
-    js3_json_is_raw_json_builtin, js3_json_parse_builtin, js3_json_raw_json_builtin,
-    js3_json_stringify_builtin, js3_map_builtin, js3_map_clear_builtin, js3_map_delete_builtin,
-    js3_map_entries_builtin, js3_map_for_each_builtin, js3_map_get_builtin, js3_map_has_builtin,
+    js3_function_symbol_has_instance_builtin, js3_function_to_string_builtin,
+    js3_generator_function_builtin, js3_generator_next_builtin, js3_generator_return_builtin,
+    js3_generator_throw_builtin, js3_int16_array_builtin, js3_int32_array_builtin,
+    js3_int8_array_builtin, js3_internal_throw_type_error_builtin, js3_is_finite_builtin,
+    js3_is_nan_builtin, js3_iterator_prototype_iterator_builtin, js3_json_is_raw_json_builtin,
+    js3_json_parse_builtin, js3_json_raw_json_builtin, js3_json_stringify_builtin, js3_map_builtin,
+    js3_map_clear_builtin, js3_map_delete_builtin, js3_map_entries_builtin,
+    js3_map_for_each_builtin, js3_map_get_builtin, js3_map_has_builtin,
     js3_map_iterator_next_builtin, js3_map_keys_builtin, js3_map_set_builtin,
     js3_map_size_getter_builtin, js3_map_values_builtin, js3_math_abs_builtin,
     js3_math_acos_builtin, js3_math_acosh_builtin, js3_math_asin_builtin, js3_math_asinh_builtin,
@@ -100,20 +102,24 @@ use lyng_js_types::{
     js3_number_is_safe_integer_builtin, js3_number_to_exponential_builtin,
     js3_number_to_fixed_builtin, js3_number_to_locale_string_builtin,
     js3_number_to_precision_builtin, js3_number_to_string_builtin, js3_number_value_of_builtin,
-    js3_object_builtin, js3_object_create_builtin, js3_object_define_properties_builtin,
-    js3_object_define_property_builtin, js3_object_entries_builtin, js3_object_freeze_builtin,
+    js3_object_assign_builtin, js3_object_builtin, js3_object_create_builtin,
+    js3_object_define_getter_builtin, js3_object_define_properties_builtin,
+    js3_object_define_property_builtin, js3_object_define_setter_builtin,
+    js3_object_entries_builtin, js3_object_freeze_builtin, js3_object_from_entries_builtin,
     js3_object_get_own_property_descriptor_builtin,
     js3_object_get_own_property_descriptors_builtin, js3_object_get_own_property_names_builtin,
     js3_object_get_own_property_symbols_builtin, js3_object_get_prototype_of_builtin,
-    js3_object_has_own_builtin, js3_object_has_own_property_builtin, js3_object_is_builtin,
-    js3_object_is_extensible_builtin, js3_object_is_frozen_builtin,
+    js3_object_group_by_builtin, js3_object_has_own_builtin, js3_object_has_own_property_builtin,
+    js3_object_is_builtin, js3_object_is_extensible_builtin, js3_object_is_frozen_builtin,
     js3_object_is_prototype_of_builtin, js3_object_is_sealed_builtin, js3_object_keys_builtin,
+    js3_object_lookup_getter_builtin, js3_object_lookup_setter_builtin,
     js3_object_prevent_extensions_builtin, js3_object_property_is_enumerable_builtin,
-    js3_object_seal_builtin, js3_object_set_prototype_of_builtin,
-    js3_object_to_locale_string_builtin, js3_object_to_string_builtin, js3_object_value_of_builtin,
-    js3_object_values_builtin, js3_parse_float_builtin, js3_parse_int_builtin,
-    js3_promise_all_builtin, js3_promise_all_resolve_element_builtin,
-    js3_promise_all_settled_builtin, js3_promise_all_settled_reject_element_builtin,
+    js3_object_proto_getter_builtin, js3_object_proto_setter_builtin, js3_object_seal_builtin,
+    js3_object_set_prototype_of_builtin, js3_object_to_locale_string_builtin,
+    js3_object_to_string_builtin, js3_object_value_of_builtin, js3_object_values_builtin,
+    js3_parse_float_builtin, js3_parse_int_builtin, js3_promise_all_builtin,
+    js3_promise_all_resolve_element_builtin, js3_promise_all_settled_builtin,
+    js3_promise_all_settled_reject_element_builtin,
     js3_promise_all_settled_resolve_element_builtin, js3_promise_any_builtin,
     js3_promise_any_reject_element_builtin, js3_promise_builtin,
     js3_promise_capability_executor_builtin, js3_promise_catch_builtin,
@@ -125,17 +131,18 @@ use lyng_js_types::{
     js3_regexp_exec_builtin, js3_regexp_flags_getter_builtin, js3_regexp_global_getter_builtin,
     js3_regexp_has_indices_getter_builtin, js3_regexp_ignore_case_getter_builtin,
     js3_regexp_multiline_getter_builtin, js3_regexp_source_getter_builtin,
-    js3_regexp_sticky_getter_builtin, js3_regexp_symbol_match_all_builtin,
-    js3_regexp_symbol_match_builtin, js3_regexp_symbol_replace_builtin,
-    js3_regexp_symbol_search_builtin, js3_regexp_symbol_split_builtin, js3_regexp_test_builtin,
-    js3_regexp_to_string_builtin, js3_regexp_unicode_getter_builtin, js3_set_add_builtin,
-    js3_set_builtin, js3_set_clear_builtin, js3_set_delete_builtin, js3_set_entries_builtin,
-    js3_set_for_each_builtin, js3_set_has_builtin, js3_set_iterator_next_builtin,
-    js3_set_keys_builtin, js3_set_size_getter_builtin, js3_set_values_builtin,
-    js3_shared_array_buffer_builtin, js3_shared_array_buffer_byte_length_getter_builtin,
-    js3_shared_array_buffer_slice_builtin, js3_string_at_builtin, js3_string_builtin,
-    js3_string_char_at_builtin, js3_string_char_code_at_builtin, js3_string_code_point_at_builtin,
-    js3_string_concat_builtin, js3_string_ends_with_builtin, js3_string_from_char_code_builtin,
+    js3_regexp_species_getter_builtin, js3_regexp_sticky_getter_builtin,
+    js3_regexp_symbol_match_all_builtin, js3_regexp_symbol_match_builtin,
+    js3_regexp_symbol_replace_builtin, js3_regexp_symbol_search_builtin,
+    js3_regexp_symbol_split_builtin, js3_regexp_test_builtin, js3_regexp_to_string_builtin,
+    js3_regexp_unicode_getter_builtin, js3_set_add_builtin, js3_set_builtin, js3_set_clear_builtin,
+    js3_set_delete_builtin, js3_set_entries_builtin, js3_set_for_each_builtin, js3_set_has_builtin,
+    js3_set_iterator_next_builtin, js3_set_keys_builtin, js3_set_size_getter_builtin,
+    js3_set_values_builtin, js3_shared_array_buffer_builtin,
+    js3_shared_array_buffer_byte_length_getter_builtin, js3_shared_array_buffer_slice_builtin,
+    js3_string_at_builtin, js3_string_builtin, js3_string_char_at_builtin,
+    js3_string_char_code_at_builtin, js3_string_code_point_at_builtin, js3_string_concat_builtin,
+    js3_string_ends_with_builtin, js3_string_from_char_code_builtin,
     js3_string_from_code_point_builtin, js3_string_includes_builtin, js3_string_index_of_builtin,
     js3_string_is_well_formed_builtin, js3_string_iterator_builtin,
     js3_string_iterator_next_builtin, js3_string_last_index_of_builtin,
@@ -211,6 +218,9 @@ pub struct PublicRealmBuiltins {
     object_get_own_property_symbols: ObjectRef,
     object_define_properties: ObjectRef,
     object_define_property: ObjectRef,
+    object_assign: ObjectRef,
+    object_from_entries: ObjectRef,
+    object_group_by: ObjectRef,
     object_prevent_extensions: ObjectRef,
     object_is_extensible: ObjectRef,
     object_is: ObjectRef,
@@ -224,6 +234,12 @@ pub struct PublicRealmBuiltins {
     object_has_own_property: ObjectRef,
     object_is_prototype_of: ObjectRef,
     object_property_is_enumerable: ObjectRef,
+    object_define_getter: ObjectRef,
+    object_define_setter: ObjectRef,
+    object_lookup_getter: ObjectRef,
+    object_lookup_setter: ObjectRef,
+    object_proto_getter: ObjectRef,
+    object_proto_setter: ObjectRef,
     object_keys: ObjectRef,
     object_entries: ObjectRef,
     object_values: ObjectRef,
@@ -234,6 +250,7 @@ pub struct PublicRealmBuiltins {
     function_apply: ObjectRef,
     function_bind: ObjectRef,
     function_to_string: ObjectRef,
+    function_symbol_has_instance: ObjectRef,
     async_function: ObjectRef,
     async_function_prototype: ObjectRef,
     async_generator_function: ObjectRef,
@@ -501,6 +518,7 @@ pub struct PublicRealmBuiltins {
     regexp_source_getter: ObjectRef,
     regexp_flags_getter: ObjectRef,
     regexp_has_indices_getter: ObjectRef,
+    regexp_species_getter: ObjectRef,
     regexp_symbol_match: ObjectRef,
     regexp_symbol_replace: ObjectRef,
     regexp_symbol_search: ObjectRef,
@@ -646,6 +664,9 @@ pub struct PublicRealmBuiltins {
     reflect_set_prototype_of: ObjectRef,
     proxy: ObjectRef,
     proxy_revocable: ObjectRef,
+    abstract_module_source: ObjectRef,
+    abstract_module_source_prototype: ObjectRef,
+    abstract_module_source_to_string_tag_getter: ObjectRef,
     error: ObjectRef,
     error_prototype: ObjectRef,
     error_to_string: ObjectRef,
@@ -848,6 +869,15 @@ impl PublicRealmBuiltins {
         if entry == js3_object_define_property_builtin() {
             return Some(self.object_define_property);
         }
+        if entry == js3_object_assign_builtin() {
+            return Some(self.object_assign);
+        }
+        if entry == js3_object_from_entries_builtin() {
+            return Some(self.object_from_entries);
+        }
+        if entry == js3_object_group_by_builtin() {
+            return Some(self.object_group_by);
+        }
         if entry == js3_object_prevent_extensions_builtin() {
             return Some(self.object_prevent_extensions);
         }
@@ -887,6 +917,24 @@ impl PublicRealmBuiltins {
         if entry == js3_object_property_is_enumerable_builtin() {
             return Some(self.object_property_is_enumerable);
         }
+        if entry == js3_object_define_getter_builtin() {
+            return Some(self.object_define_getter);
+        }
+        if entry == js3_object_define_setter_builtin() {
+            return Some(self.object_define_setter);
+        }
+        if entry == js3_object_lookup_getter_builtin() {
+            return Some(self.object_lookup_getter);
+        }
+        if entry == js3_object_lookup_setter_builtin() {
+            return Some(self.object_lookup_setter);
+        }
+        if entry == js3_object_proto_getter_builtin() {
+            return Some(self.object_proto_getter);
+        }
+        if entry == js3_object_proto_setter_builtin() {
+            return Some(self.object_proto_setter);
+        }
         if entry == js3_object_keys_builtin() {
             return Some(self.object_keys);
         }
@@ -916,6 +964,9 @@ impl PublicRealmBuiltins {
         }
         if entry == js3_function_to_string_builtin() {
             return Some(self.function_to_string);
+        }
+        if entry == js3_function_symbol_has_instance_builtin() {
+            return Some(self.function_symbol_has_instance);
         }
         if entry == js3_async_function_builtin() {
             return Some(self.async_function);
@@ -1622,6 +1673,9 @@ impl PublicRealmBuiltins {
         if entry == js3_regexp_has_indices_getter_builtin() {
             return Some(self.regexp_has_indices_getter);
         }
+        if entry == js3_regexp_species_getter_builtin() {
+            return Some(self.regexp_species_getter);
+        }
         if entry == js3_regexp_symbol_match_builtin() {
             return Some(self.regexp_symbol_match);
         }
@@ -2033,6 +2087,12 @@ impl PublicRealmBuiltins {
         if entry == lyng_js_types::js3_proxy_revocable_builtin() {
             return Some(self.proxy_revocable);
         }
+        if entry == js3_abstract_module_source_builtin() {
+            return Some(self.abstract_module_source);
+        }
+        if entry == js3_abstract_module_source_to_string_tag_getter_builtin() {
+            return Some(self.abstract_module_source_to_string_tag_getter);
+        }
         if entry == js3_error_builtin() {
             return Some(self.error);
         }
@@ -2238,6 +2298,9 @@ impl BuiltinCache {
         let global_env = realm_record.global_env();
         let existing_intrinsics = realm_record.intrinsics();
         let object_prototype = allocate_builtin_ordinary_object(agent, root_shape, None);
+        let _ = agent
+            .objects_mut()
+            .insert_flags(object_prototype, ObjectFlags::IMMUTABLE_PROTOTYPE);
         let function_prototype = allocate_builtin_function_object(
             agent,
             realm,
@@ -2249,6 +2312,11 @@ impl BuiltinCache {
             public_builtin_metadata(js3_function_prototype_builtin()).unwrap(),
             None,
         );
+        if let Some(throw_type_error) =
+            internal.builtin_object(js3_internal_throw_type_error_builtin())
+        {
+            reparent_builtin_object(agent, throw_type_error, Some(function_prototype));
+        }
         let async_function_prototype = existing_intrinsics
             .async_function_prototype()
             .unwrap_or_else(|| {
@@ -2534,6 +2602,8 @@ impl BuiltinCache {
         let math = allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype));
         let json = allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype));
         let reflect = allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype));
+        let abstract_module_source_prototype =
+            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype));
 
         let error_prototype =
             allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype));
@@ -2698,6 +2768,39 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_object_define_property_builtin()).unwrap(),
                 None,
             ),
+            object_assign: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_object_assign_builtin(),
+                public_builtin_metadata(js3_object_assign_builtin()).unwrap(),
+                None,
+            ),
+            object_from_entries: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_object_from_entries_builtin(),
+                public_builtin_metadata(js3_object_from_entries_builtin()).unwrap(),
+                None,
+            ),
+            object_group_by: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_object_group_by_builtin(),
+                public_builtin_metadata(js3_object_group_by_builtin()).unwrap(),
+                None,
+            ),
             object_prevent_extensions: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -2841,6 +2944,72 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_object_property_is_enumerable_builtin()).unwrap(),
                 None,
             ),
+            object_define_getter: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_object_define_getter_builtin(),
+                public_builtin_metadata(js3_object_define_getter_builtin()).unwrap(),
+                None,
+            ),
+            object_define_setter: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_object_define_setter_builtin(),
+                public_builtin_metadata(js3_object_define_setter_builtin()).unwrap(),
+                None,
+            ),
+            object_lookup_getter: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_object_lookup_getter_builtin(),
+                public_builtin_metadata(js3_object_lookup_getter_builtin()).unwrap(),
+                None,
+            ),
+            object_lookup_setter: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_object_lookup_setter_builtin(),
+                public_builtin_metadata(js3_object_lookup_setter_builtin()).unwrap(),
+                None,
+            ),
+            object_proto_getter: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_object_proto_getter_builtin(),
+                public_builtin_metadata(js3_object_proto_getter_builtin()).unwrap(),
+                None,
+            ),
+            object_proto_setter: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_object_proto_setter_builtin(),
+                public_builtin_metadata(js3_object_proto_setter_builtin()).unwrap(),
+                None,
+            ),
             object_keys: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -2939,6 +3108,17 @@ impl BuiltinCache {
                 object_prototype,
                 js3_function_to_string_builtin(),
                 public_builtin_metadata(js3_function_to_string_builtin()).unwrap(),
+                None,
+            ),
+            function_symbol_has_instance: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_function_symbol_has_instance_builtin(),
+                public_builtin_metadata(js3_function_symbol_has_instance_builtin()).unwrap(),
                 None,
             ),
             async_function: allocate_builtin_function_object(
@@ -5569,6 +5749,17 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_regexp_has_indices_getter_builtin()).unwrap(),
                 None,
             ),
+            regexp_species_getter: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_regexp_species_getter_builtin(),
+                public_builtin_metadata(js3_regexp_species_getter_builtin()).unwrap(),
+                None,
+            ),
             regexp_symbol_match: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -7093,6 +7284,30 @@ impl BuiltinCache {
                 public_builtin_metadata(lyng_js_types::js3_proxy_revocable_builtin()).unwrap(),
                 None,
             ),
+            abstract_module_source: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_abstract_module_source_builtin(),
+                public_builtin_metadata(js3_abstract_module_source_builtin()).unwrap(),
+                Some(abstract_module_source_prototype),
+            ),
+            abstract_module_source_prototype,
+            abstract_module_source_to_string_tag_getter: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_abstract_module_source_to_string_tag_getter_builtin(),
+                public_builtin_metadata(js3_abstract_module_source_to_string_tag_getter_builtin())
+                    .unwrap(),
+                None,
+            ),
             error,
             error_prototype,
             error_to_string: allocate_builtin_function_object(
@@ -7821,16 +8036,31 @@ impl BuiltinCache {
         {
             return None;
         }
+        define_builtin_data_property(
+            agent,
+            builtins.abstract_module_source_prototype,
+            PropertyKey::from_atom(WellKnownAtom::constructor.id()),
+            Value::from_object_ref(builtins.abstract_module_source),
+            true,
+            false,
+            true,
+        );
+        if let Some(to_string_tag) = agent.well_known_symbol(WellKnownSymbolId::ToStringTag) {
+            define_builtin_accessor_property(
+                agent,
+                builtins.abstract_module_source_prototype,
+                PropertyKey::from_symbol(to_string_tag),
+                Some(builtins.abstract_module_source_to_string_tag_getter),
+                None,
+                false,
+                true,
+            );
+        }
 
         let bootstrap_atoms = agent.bootstrap_atoms();
         let empty_string = Value::from_string_ref(agent.alloc_runtime_string(
             "",
             Some(WellKnownAtom::Empty.id()),
-            AllocationLifetime::Default,
-        ));
-        let boolean_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Boolean",
-            Some(bootstrap_atoms.boolean()),
             AllocationLifetime::Default,
         ));
         let bigint_tag = Value::from_string_ref(agent.alloc_runtime_string(
@@ -7866,16 +8096,6 @@ impl BuiltinCache {
         let math_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "Math",
             Some(bootstrap_atoms.math()),
-            AllocationLifetime::Default,
-        ));
-        let number_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Number",
-            Some(bootstrap_atoms.number()),
-            AllocationLifetime::Default,
-        ));
-        let array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Array",
-            Some(bootstrap_atoms.array()),
             AllocationLifetime::Default,
         ));
         let map_tag = Value::from_string_ref(agent.alloc_runtime_string(
@@ -7956,11 +8176,6 @@ impl BuiltinCache {
         let async_iterator_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "AsyncIterator",
             None,
-            AllocationLifetime::Default,
-        ));
-        let string_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "String",
-            Some(bootstrap_atoms.string()),
             AllocationLifetime::Default,
         ));
         let array_iterator_tag = Value::from_string_ref(agent.alloc_runtime_string(
@@ -8256,6 +8471,13 @@ impl BuiltinCache {
         let unshift_atom = agent.atoms_mut().intern_collectible("unshift");
         let values_atom = agent.atoms_mut().intern_collectible("values");
         let with_atom = agent.atoms_mut().intern_collectible("with");
+        let assign_atom = agent.atoms_mut().intern_collectible("assign");
+        let from_entries_atom = agent.atoms_mut().intern_collectible("fromEntries");
+        let group_by_atom = agent.atoms_mut().intern_collectible("groupBy");
+        let define_getter_atom = agent.atoms_mut().intern_collectible("__defineGetter__");
+        let define_setter_atom = agent.atoms_mut().intern_collectible("__defineSetter__");
+        let lookup_getter_atom = agent.atoms_mut().intern_collectible("__lookupGetter__");
+        let lookup_setter_atom = agent.atoms_mut().intern_collectible("__lookupSetter__");
         let sqrt1_2_atom = agent.atoms_mut().intern_collectible("SQRT1_2");
         let sqrt2_atom = agent.atoms_mut().intern_collectible("SQRT2");
         let sqrt_atom = agent.atoms_mut().intern_collectible("sqrt");
@@ -8325,6 +8547,11 @@ impl BuiltinCache {
         let xor_atom = agent.atoms_mut().intern_collectible("xor");
         let object_descriptors = [
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(assign_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_assign_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.create()),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_object_create_builtin()),
                 BuiltinAttributes::new(true, false, true),
@@ -8375,6 +8602,16 @@ impl BuiltinCache {
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.define_property()),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_object_define_property_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(from_entries_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_from_entries_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(group_by_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_group_by_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -8440,6 +8677,16 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(define_getter_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_define_getter_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(define_setter_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_define_setter_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(to_locale_string_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_object_to_locale_string_builtin()),
                 BuiltinAttributes::new(true, false, true),
@@ -8460,6 +8707,16 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(lookup_getter_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_lookup_getter_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(lookup_setter_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_lookup_setter_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.is_prototype_of()),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_object_is_prototype_of_builtin()),
                 BuiltinAttributes::new(true, false, true),
@@ -8470,6 +8727,14 @@ impl BuiltinCache {
                     js3_object_property_is_enumerable_builtin(),
                 ),
                 BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::__proto__.id()),
+                BuiltinPropertyValueSpec::Accessor {
+                    get: Some(js3_object_proto_getter_builtin()),
+                    set: Some(js3_object_proto_setter_builtin()),
+                },
+                BuiltinAttributes::new(false, false, true),
             ),
         ];
         let function_prototype_descriptors = [
@@ -8497,6 +8762,13 @@ impl BuiltinCache {
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_function_to_string_builtin()),
                 BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::HasInstance),
+                BuiltinPropertyValueSpec::BuiltinFunction(
+                    js3_function_symbol_has_instance_builtin(),
+                ),
+                BuiltinAttributes::new(false, false, false),
             ),
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(caller_atom),
@@ -10611,11 +10883,6 @@ impl BuiltinCache {
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_array_values_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
         ];
         let array_unscopables_descriptors = [
             BuiltinPropertyDescriptor::new(
@@ -10948,11 +11215,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(string_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_string_iterator_builtin()),
                 BuiltinAttributes::new(true, false, true),
@@ -10970,11 +11232,21 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let regexp_descriptors = [BuiltinPropertyDescriptor::new(
-            BuiltinPropertyKeySpec::from_atom(escape_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_escape_builtin()),
-            BuiltinAttributes::new(true, false, true),
-        )];
+        let regexp_descriptors = [
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(escape_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_escape_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Species),
+                BuiltinPropertyValueSpec::Accessor {
+                    get: Some(js3_regexp_species_getter_builtin()),
+                    set: None,
+                },
+                BuiltinAttributes::new(false, false, true),
+            ),
+        ];
         let regexp_prototype_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
@@ -11451,11 +11723,6 @@ impl BuiltinCache {
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_number_value_of_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(number_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
         ];
         let math_descriptors = [
             BuiltinPropertyDescriptor::new(
@@ -11738,11 +12005,6 @@ impl BuiltinCache {
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::valueOf.id()),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_boolean_value_of_builtin()),
                 BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(boolean_tag),
-                BuiltinAttributes::new(false, false, true),
             ),
         ];
         let symbol_descriptors = [
@@ -12786,6 +13048,31 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if entry == js3_object_define_property_builtin() {
         return Some(BuiltinEntryMetadata::new("defineProperty", 3, false, false));
     }
+    if entry == js3_object_assign_builtin() {
+        return Some(BuiltinEntryMetadata::new("assign", 2, false, false));
+    }
+    if entry == js3_object_from_entries_builtin() {
+        return Some(BuiltinEntryMetadata::new("fromEntries", 1, false, false));
+    }
+    if entry == js3_object_group_by_builtin() {
+        return Some(BuiltinEntryMetadata::new("groupBy", 2, false, false));
+    }
+    if entry == js3_abstract_module_source_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "AbstractModuleSource",
+            0,
+            true,
+            true,
+        ));
+    }
+    if entry == js3_abstract_module_source_to_string_tag_getter_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "get [Symbol.toStringTag]",
+            0,
+            false,
+            false,
+        ));
+    }
     if entry == js3_object_prevent_extensions_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "preventExtensions",
@@ -12835,6 +13122,44 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
             false,
         ));
     }
+    if entry == js3_object_define_getter_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "__defineGetter__",
+            2,
+            false,
+            false,
+        ));
+    }
+    if entry == js3_object_define_setter_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "__defineSetter__",
+            2,
+            false,
+            false,
+        ));
+    }
+    if entry == js3_object_lookup_getter_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "__lookupGetter__",
+            1,
+            false,
+            false,
+        ));
+    }
+    if entry == js3_object_lookup_setter_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "__lookupSetter__",
+            1,
+            false,
+            false,
+        ));
+    }
+    if entry == js3_object_proto_getter_builtin() {
+        return Some(BuiltinEntryMetadata::new("get __proto__", 0, false, false));
+    }
+    if entry == js3_object_proto_setter_builtin() {
+        return Some(BuiltinEntryMetadata::new("set __proto__", 1, false, false));
+    }
     if entry == js3_object_keys_builtin() {
         return Some(BuiltinEntryMetadata::new("keys", 1, false, false));
     }
@@ -12864,6 +13189,14 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     }
     if entry == js3_function_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
+    }
+    if entry == js3_function_symbol_has_instance_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "[Symbol.hasInstance]",
+            1,
+            false,
+            false,
+        ));
     }
     if entry == js3_async_function_builtin() {
         return Some(BuiltinEntryMetadata::new("AsyncFunction", 1, true, true));
@@ -13694,6 +14027,14 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     }
     if entry == js3_regexp_has_indices_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get hasIndices", 0, false, false));
+    }
+    if entry == js3_regexp_species_getter_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "get [Symbol.species]",
+            0,
+            false,
+            false,
+        ));
     }
     if entry == js3_regexp_symbol_match_builtin() {
         return Some(BuiltinEntryMetadata::new("[Symbol.match]", 1, false, false));

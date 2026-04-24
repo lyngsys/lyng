@@ -158,7 +158,7 @@ impl Vm {
                 &mut effective_this,
                 &mut collected_arguments,
             )?;
-            Self::reject_class_constructor_call(agent, callee)?;
+            Self::reject_class_constructor_call(agent, callee, frame.realm())?;
 
             self.invoke_call_target(
                 agent,
@@ -208,7 +208,7 @@ impl Vm {
                 &mut effective_this,
                 &mut collected_arguments,
             )?;
-            Self::reject_class_constructor_call(agent, callee)?;
+            Self::reject_class_constructor_call(agent, callee, frame.realm())?;
 
             self.invoke_tail_call_target(
                 agent,
@@ -288,8 +288,11 @@ impl Vm {
                 let this_value = if derived_construct {
                     Value::undefined()
                 } else {
-                    Value::from_object_ref(Self::create_construct_this(
+                    Value::from_object_ref(self.create_construct_this(
                         agent,
+                        host,
+                        registry,
+                        frame,
                         frame.realm(),
                         new_target,
                     )?)
@@ -472,11 +475,11 @@ pub(super) fn finalize_frame_result(
 ) -> VmResult<Value> {
     if frame.flags().contains(FrameFlags::construct()) && result.as_object_ref().is_none() {
         if frame.flags().contains(FrameFlags::derived_construct()) {
-            if frame.construct_this().is_none() {
-                return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
-            }
             if !result.is_undefined() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
+            if frame.construct_this().is_none() {
+                return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
             }
         }
         return Ok(frame

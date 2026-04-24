@@ -206,7 +206,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         );
         builder.set_environment_bindings(state.function_environment_bindings(sema_id).to_vec());
         builder.set_has_rest_parameter(activation.has_rest_parameter);
-        builder.set_source_span(Some(ast_function.span));
+        builder.set_source_span(
+            class_metadata
+                .and_then(|metadata| metadata.class_source_span)
+                .or(Some(ast_function.span)),
+        );
         let current_scope = function_record
             .param_scope
             .unwrap_or(function_record.scope_root);

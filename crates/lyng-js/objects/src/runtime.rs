@@ -421,7 +421,7 @@ impl ObjectRuntime {
         {
             Some(ObjectColdData::Ordinary(_)) | None => false,
             Some(ObjectColdData::Function(_)) => true,
-            Some(ObjectColdData::Proxy(data)) => !data.revoked() && data.callable(),
+            Some(ObjectColdData::Proxy(data)) => data.callable(),
         }
     }
 
@@ -433,7 +433,7 @@ impl ObjectRuntime {
         {
             Some(ObjectColdData::Ordinary(_)) | None => false,
             Some(ObjectColdData::Function(data)) => data.is_constructible(),
-            Some(ObjectColdData::Proxy(data)) => !data.revoked() && data.constructible(),
+            Some(ObjectColdData::Proxy(data)) => data.constructible(),
         }
     }
 

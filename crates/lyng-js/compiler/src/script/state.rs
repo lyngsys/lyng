@@ -42,6 +42,7 @@ pub(super) struct ClassFunctionMetadata {
     pub(super) has_prototype_property: bool,
     pub(super) class_constructor: bool,
     pub(super) derived_class_constructor: bool,
+    pub(super) class_source_span: Option<lyng_js_common::Span>,
     pub(super) class_body: Option<lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>>,
 }
 
@@ -812,7 +813,10 @@ fn collect_class_lowering_from_decl(
             );
         }
         Decl::Class {
-            super_class, body, ..
+            span,
+            super_class,
+            body,
+            ..
         } => {
             if let Some(super_class) = super_class {
                 collect_class_lowering_from_expr(
@@ -826,6 +830,7 @@ fn collect_class_lowering_from_decl(
                 ast,
                 *body,
                 super_class.is_some(),
+                Some(*span),
                 function_metadata,
                 constructor_plans,
             );
@@ -976,6 +981,7 @@ fn collect_class_lowering_from_expr(
                                     has_prototype_property: false,
                                     class_constructor: false,
                                     derived_class_constructor: false,
+                                    class_source_span: None,
                                     class_body: None,
                                 },
                             );
@@ -1001,7 +1007,10 @@ fn collect_class_lowering_from_expr(
             );
         }
         Expr::ClassExpression {
-            super_class, body, ..
+            span,
+            super_class,
+            body,
+            ..
         } => {
             if let Some(super_class) = super_class {
                 collect_class_lowering_from_expr(
@@ -1015,6 +1024,7 @@ fn collect_class_lowering_from_expr(
                 ast,
                 *body,
                 super_class.is_some(),
+                Some(*span),
                 function_metadata,
                 constructor_plans,
             );
@@ -1158,6 +1168,7 @@ fn collect_class_lowering_from_class_body(
     ast: &lyng_js_ast::Ast,
     body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
     has_heritage: bool,
+    class_source_span: Option<lyng_js_common::Span>,
     function_metadata: &mut HashMap<FunctionId, ClassFunctionMetadata>,
     constructor_plans: &mut HashMap<FunctionId, ClassConstructorPlan>,
 ) {
@@ -1197,6 +1208,9 @@ fn collect_class_lowering_from_class_body(
                             kind,
                             lyng_js_ast::MethodKind::Constructor
                         ) && has_heritage,
+                        class_source_span: matches!(kind, lyng_js_ast::MethodKind::Constructor)
+                            .then_some(())
+                            .and(class_source_span),
                         class_body: Some(body),
                     },
                 );

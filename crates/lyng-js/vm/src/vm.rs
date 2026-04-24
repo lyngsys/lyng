@@ -32,8 +32,8 @@ use lyng_js_objects::{
 use lyng_js_parser::parse_module;
 use lyng_js_sema::analyze_module;
 use lyng_js_types::{
-    CodeRef, EnvironmentRef, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value,
-    WellKnownSymbolId,
+    BuiltinFunctionId, CodeRef, EnvironmentRef, ObjectRef, PropertyDescriptor, PropertyKey,
+    RealmRef, Value, WellKnownSymbolId,
 };
 
 use crate::activation::ActivationSideTables;
@@ -430,6 +430,15 @@ impl Vm {
             BootstrapRequest::new(mode),
         )
         .map_err(VmError::BuiltinBootstrap)
+    }
+
+    pub(crate) fn builtin_constant(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRef,
+        entry: BuiltinFunctionId,
+    ) -> Option<Value> {
+        self.builtin_cache.builtin_constant(agent, realm, entry)
     }
 
     fn with_extension_provider<T>(

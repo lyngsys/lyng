@@ -498,6 +498,25 @@ impl InternalBuiltinCache {
             has_own_property,
             builtins.object_has_own_property,
         );
+        define_data_property_with_attrs(
+            agent,
+            builtins.throw_type_error,
+            PropertyKey::from_atom(WellKnownAtom::length.id()),
+            Value::from_smi(0),
+            false,
+            false,
+            false,
+        );
+        define_data_property_with_attrs(
+            agent,
+            builtins.throw_type_error,
+            PropertyKey::from_atom(WellKnownAtom::name.id()),
+            Value::from_string_ref(empty_string),
+            false,
+            false,
+            false,
+        );
+        prevent_extensions(agent, builtins.throw_type_error);
 
         self.realms.insert(realm, builtins);
         Some(builtins)
@@ -1114,6 +1133,15 @@ fn define_data_property_with_attrs(
     assert!(
         matches!(defined, Ok(true)),
         "reserved internal builtin property installation should succeed"
+    );
+}
+
+fn prevent_extensions(agent: &mut Agent, object: ObjectRef) {
+    let prevented = agent
+        .with_heap_and_objects(|heap, objects| objects.prevent_extensions(heap.view(), object));
+    assert!(
+        matches!(prevented, Ok(true)),
+        "builtin object should accept PreventExtensions"
     );
 }
 

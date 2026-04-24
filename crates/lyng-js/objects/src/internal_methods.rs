@@ -1032,6 +1032,12 @@ impl ObjectRuntime {
         if current == prototype {
             return Ok(true);
         }
+        if self
+            .object_metadata(id)
+            .is_some_and(|metadata| metadata.flags.has_immutable_prototype())
+        {
+            return Ok(false);
+        }
         if !self.ordinary_is_extensible(id)? {
             return Ok(false);
         }
@@ -2320,7 +2326,10 @@ impl ObjectRuntime {
             if object == target {
                 return Ok(true);
             }
-            current = self.get_prototype_of(heap, object)?;
+            if self.require_object_kind(object)? == ObjectKind::Proxy {
+                return Ok(false);
+            }
+            current = Self::ordinary_get_prototype_of(heap, object)?;
         }
         Ok(false)
     }

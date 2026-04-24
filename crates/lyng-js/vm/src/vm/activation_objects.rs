@@ -16,7 +16,7 @@ impl Vm {
         callee: Value,
         mapped_slots: Option<Vec<Option<u32>>>,
         environment: EnvironmentRef,
-        strict: bool,
+        restricted_callee: bool,
     ) -> VmResult<ObjectRef> {
         let root_shape = agent
             .realm(realm)
@@ -88,7 +88,7 @@ impl Vm {
             );
         }
 
-        if strict {
+        if restricted_callee {
             self.define_strict_arguments_callee(agent, realm, object)?;
         } else {
             let callee_key = agent.atoms_mut().intern_collectible("callee");
@@ -284,7 +284,7 @@ impl Vm {
             init.callee,
             mapped_slots,
             init.lexical_env,
-            init.strict,
+            init.arguments_mode == ArgumentsMode::Unmapped,
         )?;
         self.initialize_environment_slot(
             agent,
@@ -338,7 +338,6 @@ pub(super) struct ActivationObjectInit<'a> {
     pub(super) lexical_env: EnvironmentRef,
     pub(super) arguments: &'a [Value],
     pub(super) callee: Value,
-    pub(super) strict: bool,
 }
 
 fn function_rest_slot(has_rest_parameter: bool) -> Option<u32> {

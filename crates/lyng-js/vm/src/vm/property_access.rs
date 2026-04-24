@@ -469,6 +469,79 @@ impl Vm {
         self.set_property_on_object(agent, host, registry, frame, object, receiver, key, value)
     }
 
+    pub(super) fn prototype_chain_has_proxy(agent: &Agent, object: ObjectRef) -> bool {
+        let mut current = Some(object);
+        while let Some(object) = current {
+            if agent.objects().is_proxy_object(object) {
+                return true;
+            }
+            current = agent
+                .objects()
+                .object_header(agent.heap().view(), object)
+                .and_then(|header| header.prototype());
+        }
+        false
+    }
+
+    fn legacy_function_caller(
+        &self,
+        agent: &mut Agent,
+        object: ObjectRef,
+        key: PropertyKey,
+    ) -> VmResult<Option<Value>> {
+        let PropertyKey::Atom(atom) = key else {
+            return Ok(None);
+        };
+        if agent.atoms().resolve(atom) != "caller" {
+            return Ok(None);
+        }
+        let Some(code) = Self::bytecode_entry(agent, object) else {
+            return Ok(None);
+        };
+        let Some(function) = self.installed_function(code) else {
+            return Ok(None);
+        };
+        if function.kind() != lyng_js_bytecode::BytecodeFunctionKind::Function
+            || function.flags().strict()
+        {
+            return Ok(None);
+        }
+
+        let Some(active_index) = self
+            .frames
+            .iter()
+            .rposition(|frame| frame.callee() == Some(object))
+        else {
+            return Ok(Some(Value::null()));
+        };
+        let Some(active_frame) = self.frames.get(active_index).copied() else {
+            return Ok(Some(Value::null()));
+        };
+        if let Some(caller) = active_frame.tail_caller() {
+            if active_frame.tail_caller_strict() {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
+            return Ok(Some(Value::from_object_ref(caller)));
+        }
+        let Some(caller_frame) = active_index
+            .checked_sub(1)
+            .and_then(|index| self.frames.get(index))
+            .copied()
+        else {
+            return Ok(Some(Value::null()));
+        };
+        let Some(caller) = caller_frame.callee() else {
+            return Ok(Some(Value::null()));
+        };
+        if Self::bytecode_entry(agent, caller).is_some_and(|caller_code| {
+            self.installed_function(caller_code)
+                .is_some_and(|function| function.flags().strict())
+        }) {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        Ok(Some(Value::from_object_ref(caller)))
+    }
+
     pub(super) fn copy_data_properties(
         &mut self,
         agent: &mut Agent,
@@ -591,6 +664,9 @@ impl Vm {
                 return Ok(value);
             }
             return Ok(Value::undefined());
+        }
+        if let Some(value) = self.legacy_function_caller(agent, object, key)? {
+            return Ok(value);
         }
 
         let prototype = agent

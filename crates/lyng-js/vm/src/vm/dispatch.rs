@@ -224,7 +224,7 @@ impl Vm {
                                     self.advance_instruction()?;
                                     continue;
                                 }
-                                let set_result = if agent.objects().is_proxy_object(object) {
+                                let set_result = if Self::prototype_chain_has_proxy(agent, object) {
                                     self.set_property_on_value(
                                         agent, host, registry, frame, receiver, key, value,
                                     )

@@ -331,6 +331,36 @@ fn phase5_functions_bind_installs_restricted_caller_and_arguments_accessors() {
 }
 
 #[test]
+fn phase6_legacy_function_caller_respects_immediate_caller_strictness() {
+    let result = compile_and_run(
+        r#"
+        function nonStrictCaller() {
+            return target();
+        }
+        function target() {
+            return target.caller === nonStrictCaller ? 1 : 0;
+        }
+        function strictCaller() {
+            "use strict";
+            return target();
+        }
+
+        let total = nonStrictCaller();
+        try {
+            strictCaller();
+        } catch (error) {
+            if (error.constructor === TypeError) {
+                total += 2;
+            }
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
 fn phase5_functions_bind_uses_spec_length_and_name_rules() {
     let result = compile_and_run(
         r#"
@@ -536,6 +566,42 @@ fn phase5_function_prototype_is_callable_but_not_constructible() {
 }
 
 #[test]
+fn phase6_function_symbol_has_instance_matches_ordinary_has_instance() {
+    let result = compile_and_run(
+        r#"
+        function C() {}
+        let c = new C();
+        let descriptor = Object.getOwnPropertyDescriptor(Function.prototype, Symbol.hasInstance);
+        let total = 0;
+        total += typeof descriptor.value === "function" ? 1 : 0;
+        total += descriptor.writable === false ? 2 : 0;
+        total += descriptor.enumerable === false ? 4 : 0;
+        total += descriptor.configurable === false ? 8 : 0;
+        total += descriptor.value.length === 1 ? 16 : 0;
+        total += descriptor.value.name === "[Symbol.hasInstance]" ? 32 : 0;
+        total += C[Symbol.hasInstance](c) ? 64 : 0;
+        total += !C[Symbol.hasInstance]({}) ? 128 : 0;
+        total += C.bind()[Symbol.hasInstance](c) ? 256 : 0;
+
+        let marker = {};
+        let proxy = new Proxy(Object.create(C.prototype), {
+            getPrototypeOf() {
+                throw marker;
+            }
+        });
+        try {
+            C[Symbol.hasInstance](proxy);
+        } catch (error) {
+            total += error === marker ? 512 : 0;
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1023));
+}
+
+#[test]
 fn phase5_functions_to_string_preserves_source_function_text() {
     let result =
         compile_and_run_string("function sample(value) { return value + 1; } sample.toString();");
@@ -547,7 +613,7 @@ fn phase5_functions_to_string_preserves_source_function_text() {
 fn phase5_functions_to_string_preserves_dynamic_function_text() {
     let result = compile_and_run_string(r#"Function("a", "b", "return a + b;").toString();"#);
 
-    assert_eq!(result, "function anonymous(a,b) {\nreturn a + b;\n}");
+    assert_eq!(result, "function anonymous(a,b\n) {\nreturn a + b;\n}");
 }
 
 #[test]
@@ -555,6 +621,15 @@ fn phase5_functions_to_string_formats_native_functions_stably() {
     let result = compile_and_run_string("Function.prototype.toString();");
 
     assert_eq!(result, "function () { [native code] }");
+}
+
+#[test]
+fn phase6_function_to_string_formats_regexp_species_getter() {
+    let result = compile_and_run_string(
+        "Object.getOwnPropertyDescriptor(RegExp, Symbol.species).get.toString();",
+    );
+
+    assert_eq!(result, "function get [Symbol.species]() { [native code] }");
 }
 
 #[test]

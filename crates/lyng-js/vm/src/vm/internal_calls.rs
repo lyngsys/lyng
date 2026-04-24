@@ -67,7 +67,7 @@ impl Vm {
                 &combined_arguments,
             );
         }
-        Self::reject_class_constructor_call(agent, callee_object)?;
+        Self::reject_class_constructor_call(agent, callee_object, caller_frame.realm())?;
         if let Some(result) = self.call_builtin(
             agent,
             host,
@@ -220,8 +220,11 @@ impl Vm {
         let construct_this = if derived_construct {
             None
         } else {
-            Some(Self::create_construct_this(
+            Some(self.create_construct_this(
                 agent,
+                host,
+                registry,
+                caller_frame,
                 caller_frame.realm(),
                 effective_new_target,
             )?)

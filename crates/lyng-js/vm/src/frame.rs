@@ -136,6 +136,8 @@ pub struct FrameRecord {
     construct_this: Option<ObjectRef>,
     new_target: Option<ObjectRef>,
     callee: Option<ObjectRef>,
+    tail_caller: Option<ObjectRef>,
+    tail_caller_strict: bool,
     handler_cursor: u16,
     flags: FrameFlags,
     kind: ExecutionContextKind,
@@ -170,6 +172,8 @@ impl FrameRecord {
             construct_this: None,
             new_target: None,
             callee: None,
+            tail_caller: None,
+            tail_caller_strict: false,
             handler_cursor: 0,
             flags: FrameFlags::empty(),
             kind,
@@ -201,6 +205,27 @@ impl FrameRecord {
     pub const fn with_callee(mut self, callee: Option<ObjectRef>) -> Self {
         self.callee = callee;
         self
+    }
+
+    #[inline]
+    pub const fn with_tail_caller(
+        mut self,
+        tail_caller: Option<ObjectRef>,
+        tail_caller_strict: bool,
+    ) -> Self {
+        self.tail_caller = tail_caller;
+        self.tail_caller_strict = tail_caller_strict;
+        self
+    }
+
+    #[inline]
+    pub(crate) fn set_tail_caller(
+        &mut self,
+        tail_caller: Option<ObjectRef>,
+        tail_caller_strict: bool,
+    ) {
+        self.tail_caller = tail_caller;
+        self.tail_caller_strict = tail_caller_strict;
     }
 
     #[inline]
@@ -319,6 +344,16 @@ impl FrameRecord {
     #[inline]
     pub const fn callee(self) -> Option<ObjectRef> {
         self.callee
+    }
+
+    #[inline]
+    pub const fn tail_caller(self) -> Option<ObjectRef> {
+        self.tail_caller
+    }
+
+    #[inline]
+    pub const fn tail_caller_strict(self) -> bool {
+        self.tail_caller_strict
     }
 
     #[inline]

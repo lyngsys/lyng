@@ -19,6 +19,8 @@ impl ObjectFlags {
     pub const NAMED_PROPERTIES_DICTIONARY: Self = Self(1 << 3);
     pub const ENGINE_ARRAY: Self = Self(1 << 4);
     pub const ARGUMENTS_OBJECT: Self = Self(1 << 5);
+    pub const IMMUTABLE_PROTOTYPE: Self = Self(1 << 6);
+    pub const ERROR_OBJECT: Self = Self(1 << 7);
 
     #[inline]
     pub const fn empty() -> Self {
@@ -73,6 +75,16 @@ impl ObjectFlags {
     #[inline]
     pub const fn is_arguments_object(self) -> bool {
         self.contains(Self::ARGUMENTS_OBJECT)
+    }
+
+    #[inline]
+    pub const fn has_immutable_prototype(self) -> bool {
+        self.contains(Self::IMMUTABLE_PROTOTYPE)
+    }
+
+    #[inline]
+    pub const fn is_error_object(self) -> bool {
+        self.contains(Self::ERROR_OBJECT)
     }
 }
 

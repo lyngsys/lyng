@@ -276,6 +276,38 @@ fn phase6_sloppy_arguments_define_data_callee_descriptor() {
 }
 
 #[test]
+fn phase6_unmapped_arguments_share_realm_throw_type_error() {
+    let result = compile_and_run(
+        r#"
+        let thrower = Object.getOwnPropertyDescriptor(function() {
+            "use strict";
+            return arguments;
+        }(), "callee").get;
+
+        function nonSimple(a = 0) {
+            return arguments;
+        }
+
+        let descriptor = Object.getOwnPropertyDescriptor(nonSimple(), "callee");
+        let total = 0;
+        total += descriptor.get === thrower ? 1 : 0;
+        total += descriptor.set === thrower ? 2 : 0;
+        total += descriptor.enumerable === false ? 4 : 0;
+        total += descriptor.configurable === false ? 8 : 0;
+        total += Object.getPrototypeOf(thrower) === Function.prototype ? 16 : 0;
+        try {
+            descriptor.get();
+        } catch (error) {
+            total += error.constructor === TypeError ? 32 : 64;
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
 fn phase6_define_property_value_updates_mapped_arguments_parameters() {
     let result = compile_and_run(
         r#"

@@ -33,6 +33,7 @@ use std::fmt::Write as _;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::{
+    js3_abstract_module_source_builtin, js3_abstract_module_source_to_string_tag_getter_builtin,
     js3_aggregate_error_builtin, js3_array_at_builtin, js3_array_buffer_builtin,
     js3_array_buffer_byte_length_getter_builtin, js3_array_buffer_is_view_builtin,
     js3_array_buffer_slice_builtin, js3_array_builtin, js3_array_concat_builtin,
@@ -95,9 +96,10 @@ use super::{
     js3_finalization_registry_unregister_builtin, js3_float32_array_builtin,
     js3_float64_array_builtin, js3_function_apply_builtin, js3_function_bind_builtin,
     js3_function_builtin, js3_function_call_builtin, js3_function_prototype_builtin,
-    js3_function_to_string_builtin, js3_generator_function_builtin, js3_generator_next_builtin,
-    js3_generator_return_builtin, js3_generator_throw_builtin, js3_int16_array_builtin,
-    js3_int32_array_builtin, js3_int8_array_builtin, js3_is_finite_builtin, js3_is_nan_builtin,
+    js3_function_symbol_has_instance_builtin, js3_function_to_string_builtin,
+    js3_generator_function_builtin, js3_generator_next_builtin, js3_generator_return_builtin,
+    js3_generator_throw_builtin, js3_int16_array_builtin, js3_int32_array_builtin,
+    js3_int8_array_builtin, js3_is_finite_builtin, js3_is_nan_builtin,
     js3_iterator_prototype_iterator_builtin, js3_json_is_raw_json_builtin, js3_json_parse_builtin,
     js3_json_raw_json_builtin, js3_json_stringify_builtin, js3_map_builtin, js3_map_clear_builtin,
     js3_map_delete_builtin, js3_map_entries_builtin, js3_map_for_each_builtin, js3_map_get_builtin,
@@ -117,20 +119,24 @@ use super::{
     js3_number_is_safe_integer_builtin, js3_number_to_exponential_builtin,
     js3_number_to_fixed_builtin, js3_number_to_locale_string_builtin,
     js3_number_to_precision_builtin, js3_number_to_string_builtin, js3_number_value_of_builtin,
-    js3_object_builtin, js3_object_create_builtin, js3_object_define_properties_builtin,
-    js3_object_define_property_builtin, js3_object_entries_builtin, js3_object_freeze_builtin,
+    js3_object_assign_builtin, js3_object_builtin, js3_object_create_builtin,
+    js3_object_define_getter_builtin, js3_object_define_properties_builtin,
+    js3_object_define_property_builtin, js3_object_define_setter_builtin,
+    js3_object_entries_builtin, js3_object_freeze_builtin, js3_object_from_entries_builtin,
     js3_object_get_own_property_descriptor_builtin,
     js3_object_get_own_property_descriptors_builtin, js3_object_get_own_property_names_builtin,
     js3_object_get_own_property_symbols_builtin, js3_object_get_prototype_of_builtin,
-    js3_object_has_own_builtin, js3_object_has_own_property_builtin, js3_object_is_builtin,
-    js3_object_is_extensible_builtin, js3_object_is_frozen_builtin,
+    js3_object_group_by_builtin, js3_object_has_own_builtin, js3_object_has_own_property_builtin,
+    js3_object_is_builtin, js3_object_is_extensible_builtin, js3_object_is_frozen_builtin,
     js3_object_is_prototype_of_builtin, js3_object_is_sealed_builtin, js3_object_keys_builtin,
+    js3_object_lookup_getter_builtin, js3_object_lookup_setter_builtin,
     js3_object_prevent_extensions_builtin, js3_object_property_is_enumerable_builtin,
-    js3_object_seal_builtin, js3_object_set_prototype_of_builtin,
-    js3_object_to_locale_string_builtin, js3_object_to_string_builtin, js3_object_value_of_builtin,
-    js3_object_values_builtin, js3_parse_float_builtin, js3_parse_int_builtin,
-    js3_promise_all_builtin, js3_promise_all_resolve_element_builtin,
-    js3_promise_all_settled_builtin, js3_promise_all_settled_reject_element_builtin,
+    js3_object_proto_getter_builtin, js3_object_proto_setter_builtin, js3_object_seal_builtin,
+    js3_object_set_prototype_of_builtin, js3_object_to_locale_string_builtin,
+    js3_object_to_string_builtin, js3_object_value_of_builtin, js3_object_values_builtin,
+    js3_parse_float_builtin, js3_parse_int_builtin, js3_promise_all_builtin,
+    js3_promise_all_resolve_element_builtin, js3_promise_all_settled_builtin,
+    js3_promise_all_settled_reject_element_builtin,
     js3_promise_all_settled_resolve_element_builtin, js3_promise_any_builtin,
     js3_promise_any_reject_element_builtin, js3_promise_builtin,
     js3_promise_capability_executor_builtin, js3_promise_catch_builtin,
@@ -142,17 +148,18 @@ use super::{
     js3_regexp_exec_builtin, js3_regexp_flags_getter_builtin, js3_regexp_global_getter_builtin,
     js3_regexp_has_indices_getter_builtin, js3_regexp_ignore_case_getter_builtin,
     js3_regexp_multiline_getter_builtin, js3_regexp_source_getter_builtin,
-    js3_regexp_sticky_getter_builtin, js3_regexp_symbol_match_all_builtin,
-    js3_regexp_symbol_match_builtin, js3_regexp_symbol_replace_builtin,
-    js3_regexp_symbol_search_builtin, js3_regexp_symbol_split_builtin, js3_regexp_test_builtin,
-    js3_regexp_to_string_builtin, js3_regexp_unicode_getter_builtin, js3_set_add_builtin,
-    js3_set_builtin, js3_set_clear_builtin, js3_set_delete_builtin, js3_set_entries_builtin,
-    js3_set_for_each_builtin, js3_set_has_builtin, js3_set_iterator_next_builtin,
-    js3_set_keys_builtin, js3_set_size_getter_builtin, js3_set_values_builtin,
-    js3_shared_array_buffer_builtin, js3_shared_array_buffer_byte_length_getter_builtin,
-    js3_shared_array_buffer_slice_builtin, js3_string_at_builtin, js3_string_builtin,
-    js3_string_char_at_builtin, js3_string_char_code_at_builtin, js3_string_code_point_at_builtin,
-    js3_string_concat_builtin, js3_string_ends_with_builtin, js3_string_from_char_code_builtin,
+    js3_regexp_species_getter_builtin, js3_regexp_sticky_getter_builtin,
+    js3_regexp_symbol_match_all_builtin, js3_regexp_symbol_match_builtin,
+    js3_regexp_symbol_replace_builtin, js3_regexp_symbol_search_builtin,
+    js3_regexp_symbol_split_builtin, js3_regexp_test_builtin, js3_regexp_to_string_builtin,
+    js3_regexp_unicode_getter_builtin, js3_set_add_builtin, js3_set_builtin, js3_set_clear_builtin,
+    js3_set_delete_builtin, js3_set_entries_builtin, js3_set_for_each_builtin, js3_set_has_builtin,
+    js3_set_iterator_next_builtin, js3_set_keys_builtin, js3_set_size_getter_builtin,
+    js3_set_values_builtin, js3_shared_array_buffer_builtin,
+    js3_shared_array_buffer_byte_length_getter_builtin, js3_shared_array_buffer_slice_builtin,
+    js3_string_at_builtin, js3_string_builtin, js3_string_char_at_builtin,
+    js3_string_char_code_at_builtin, js3_string_code_point_at_builtin, js3_string_concat_builtin,
+    js3_string_ends_with_builtin, js3_string_from_char_code_builtin,
     js3_string_from_code_point_builtin, js3_string_includes_builtin, js3_string_index_of_builtin,
     js3_string_is_well_formed_builtin, js3_string_iterator_builtin,
     js3_string_iterator_next_builtin, js3_string_last_index_of_builtin,
@@ -556,6 +563,12 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if let Some(result) = dispatch_internal_builtin(context, entry, invocation)? {
         return Ok(Some(result));
     }
+    if entry == js3_abstract_module_source_builtin() {
+        return Err(type_error(context));
+    }
+    if entry == js3_abstract_module_source_to_string_tag_getter_builtin() {
+        return Ok(Some(Value::undefined()));
+    }
     if entry == js3_object_builtin() {
         return object_builtin(context, invocation).map(Some);
     }
@@ -585,6 +598,15 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == js3_object_define_property_builtin() {
         return object_define_property_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_object_assign_builtin() {
+        return object_assign_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_object_from_entries_builtin() {
+        return object_from_entries_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_object_group_by_builtin() {
+        return object_group_by_builtin(context, invocation).map(Some);
     }
     if entry == js3_object_prevent_extensions_builtin() {
         return object_prevent_extensions_builtin(context, invocation).map(Some);
@@ -625,6 +647,24 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_object_property_is_enumerable_builtin() {
         return object_property_is_enumerable_builtin(context, invocation).map(Some);
     }
+    if entry == js3_object_define_getter_builtin() {
+        return object_define_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_object_define_setter_builtin() {
+        return object_define_setter_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_object_lookup_getter_builtin() {
+        return object_lookup_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_object_lookup_setter_builtin() {
+        return object_lookup_setter_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_object_proto_getter_builtin() {
+        return object_proto_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_object_proto_setter_builtin() {
+        return object_proto_setter_builtin(context, invocation).map(Some);
+    }
     if entry == js3_object_keys_builtin() {
         return object_keys_builtin(context, invocation).map(Some);
     }
@@ -654,6 +694,9 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == js3_function_to_string_builtin() {
         return function_to_string_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_function_symbol_has_instance_builtin() {
+        return function_symbol_has_instance_builtin(context, invocation).map(Some);
     }
     if entry == js3_async_function_builtin() {
         return async_function_builtin(context, invocation).map(Some);
@@ -1509,6 +1552,9 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == js3_regexp_has_indices_getter_builtin() {
         return regexp_has_indices_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_regexp_species_getter_builtin() {
+        return regexp_species_getter_builtin(context, invocation).map(Some);
     }
     if entry == js3_regexp_symbol_match_builtin() {
         return regexp_symbol_match_builtin(context, invocation).map(Some);
@@ -9829,6 +9875,13 @@ fn array_species_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(invocation.this_value())
 }
 
+fn regexp_species_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    _cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    Ok(invocation.this_value())
+}
+
 fn array_at_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -11793,44 +11846,11 @@ fn is_error_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: lyng_js_types::ObjectRef,
 ) -> Result<bool, Cx::Error> {
-    let error_prototypes = {
-        let agent = cx.agent();
-        let mut prototypes = Vec::new();
-        for realm in agent.realm_refs().iter().copied() {
-            let Some(intrinsics) = agent.realm(realm).map(|record| record.intrinsics()) else {
-                continue;
-            };
-            prototypes.extend(
-                [
-                    intrinsics.error_prototype(),
-                    intrinsics.eval_error_prototype(),
-                    intrinsics.range_error_prototype(),
-                    intrinsics.reference_error_prototype(),
-                    intrinsics.syntax_error_prototype(),
-                    intrinsics.type_error_prototype(),
-                    intrinsics.uri_error_prototype(),
-                    intrinsics.aggregate_error_prototype(),
-                ]
-                .into_iter()
-                .flatten(),
-            );
-        }
-        prototypes
-    };
-
-    let mut current = Some(object_ref);
-    while let Some(candidate) = current {
-        if error_prototypes
-            .iter()
-            .copied()
-            .any(|prototype| prototype == candidate)
-        {
-            return Ok(true);
-        }
-        let next = { proxy_get_prototype_of(cx, candidate) };
-        current = next?;
-    }
-    Ok(false)
+    let agent = cx.agent();
+    Ok(agent
+        .objects()
+        .object_header(agent.heap().view(), object_ref)
+        .is_some_and(|header| header.flags().is_error_object()))
 }
 
 fn object_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -11842,10 +11862,25 @@ fn object_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
+    let realm = cx.builtin_realm();
+    if let Some(new_target) = invocation.new_target() {
+        if new_target != cx.callee_object() {
+            let default_prototype = {
+                let agent = cx.agent();
+                agent
+                    .realm(realm)
+                    .and_then(|record| record.intrinsics().object_prototype())
+            }
+            .ok_or_else(|| type_error(cx))?;
+            let prototype =
+                cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)?;
+            let object = cx.allocate_ordinary_object_with_prototype(realm, Some(prototype))?;
+            return Ok(Value::from_object_ref(object));
+        }
+    }
     if let Some(object) = argument.as_object_ref() {
         return Ok(Value::from_object_ref(object));
     }
-    let realm = cx.builtin_realm();
     if argument.is_null() || argument.is_undefined() {
         let default_prototype = {
             let agent = cx.agent();
@@ -11990,7 +12025,9 @@ fn object_set_prototype_of_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
-    let object = cx.to_object_for_builtin_value(cx.builtin_realm(), value)?;
+    if value.is_undefined() || value.is_null() {
+        return Err(type_error(cx));
+    }
     let prototype_value = invocation
         .arguments()
         .get(1)
@@ -12002,6 +12039,9 @@ fn object_set_prototype_of_builtin<Cx: PublicBuiltinDispatchContext>(
         Some(object)
     } else {
         return Err(type_error(cx));
+    };
+    let Some(object) = value.as_object_ref() else {
+        return Ok(value);
     };
     if !proxy_set_prototype_of(cx, object, prototype)? {
         return Err(type_error(cx));
@@ -12180,7 +12220,7 @@ fn object_define_properties_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
-    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), target_value)?;
+    let object_ref = target_value.as_object_ref().ok_or_else(|| type_error(cx))?;
     let properties = invocation
         .arguments()
         .get(1)
@@ -12188,6 +12228,211 @@ fn object_define_properties_builtin<Cx: PublicBuiltinDispatchContext>(
         .unwrap_or(Value::undefined());
     define_properties_from_source(cx, object_ref, properties)?;
     Ok(Value::from_object_ref(object_ref))
+}
+
+fn object_assign_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let target_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let target = cx.to_object_for_builtin_value(cx.builtin_realm(), target_value)?;
+    let target_receiver = Value::from_object_ref(target);
+
+    for source in invocation.arguments().iter().copied().skip(1) {
+        if source.is_undefined() || source.is_null() {
+            continue;
+        }
+        let source = cx.to_object_for_builtin_value(cx.builtin_realm(), source)?;
+        let keys = proxy_own_property_keys(cx, source)?;
+
+        for key in keys {
+            let Some(descriptor) = proxy_get_own_property(cx, source, key)? else {
+                continue;
+            };
+            if descriptor.enumerable() != Some(true) {
+                continue;
+            }
+            let value = cx.get_property_value(Value::from_object_ref(source), key)?;
+            if !set_property_on_object_with_receiver(cx, target, key, value, target_receiver)? {
+                return Err(type_error(cx));
+            }
+        }
+    }
+
+    Ok(Value::from_object_ref(target))
+}
+
+fn add_entries_from_iterable_to_object<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    object: ObjectRef,
+    iterable: Value,
+) -> Result<(), Cx::Error> {
+    let mut iterator_record = {
+        let mut bridge = BuiltinIteratorBridge { cx };
+        iterator::get_iterator(&mut bridge, iterable)?
+    };
+
+    loop {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            return Ok(());
+        };
+
+        let next_value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let next_value = match next_value {
+            Ok(next_value) => next_value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let Some(entry) = next_value.as_object_ref() else {
+            let error = type_error(cx);
+            return close_iterator_after_error(cx, &mut iterator_record, error);
+        };
+
+        let key = match get_property_from_object(cx, entry, PropertyKey::Index(0)) {
+            Ok(key) => key,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let value = match get_property_from_object(cx, entry, PropertyKey::Index(1)) {
+            Ok(value) => value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let key = match cx.to_property_key(key) {
+            Ok(key) => key,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        if let Err(error) = create_data_property_or_throw(cx, object, key, value) {
+            return close_iterator_after_error(cx, &mut iterator_record, error);
+        }
+    }
+}
+
+fn object_from_entries_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let realm = cx.builtin_realm();
+    let object_prototype = {
+        let agent = cx.agent();
+        agent
+            .realm(realm)
+            .and_then(|record| record.intrinsics().object_prototype())
+    }
+    .ok_or_else(|| type_error(cx))?;
+    let object = cx.allocate_ordinary_object_with_prototype(realm, Some(object_prototype))?;
+    let iterable = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    add_entries_from_iterable_to_object(cx, object, iterable)?;
+    Ok(Value::from_object_ref(object))
+}
+
+fn add_value_to_keyed_group(
+    groups: &mut Vec<(PropertyKey, Vec<Value>)>,
+    key: PropertyKey,
+    value: Value,
+) {
+    if let Some((_, values)) = groups
+        .iter_mut()
+        .find(|(existing_key, _)| *existing_key == key)
+    {
+        values.push(value);
+        return;
+    }
+    groups.push((key, vec![value]));
+}
+
+fn object_group_by_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let items = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let callback = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let callback = cx.require_callable_object(callback)?;
+    let mut iterator_record = {
+        let mut bridge = BuiltinIteratorBridge { cx };
+        iterator::get_iterator(&mut bridge, items)?
+    };
+    let mut groups = Vec::new();
+    let mut index = 0_u64;
+
+    loop {
+        if index >= MAX_SAFE_INTEGER_U64 {
+            let error = type_error(cx);
+            return close_iterator_after_error(cx, &mut iterator_record, error);
+        }
+
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            break;
+        };
+
+        let value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let value = match value {
+            Ok(value) => value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let key = match cx.call_to_completion(
+            callback,
+            Value::undefined(),
+            &[value, length_value_u64(index)],
+        ) {
+            Ok(key) => key,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let key = match cx.to_property_key(key) {
+            Ok(key) => key,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        add_value_to_keyed_group(&mut groups, key, value);
+        index += 1;
+    }
+
+    let result = cx.allocate_ordinary_object_with_prototype(cx.builtin_realm(), None)?;
+    for (key, values) in groups {
+        let array = create_array_from_values(cx, &values)?;
+        create_data_property_or_throw(cx, result, key, Value::from_object_ref(array))?;
+    }
+    Ok(Value::from_object_ref(result))
 }
 
 fn object_prevent_extensions_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -12256,7 +12501,9 @@ fn object_seal_builtin<Cx: PublicBuiltinDispatchContext>(
     let Some(object_ref) = value.as_object_ref() else {
         return Ok(value);
     };
-    let _ = cx.set_integrity_level(object_ref, false)?;
+    if !cx.set_integrity_level(object_ref, false)? {
+        return Err(type_error(cx));
+    }
     Ok(Value::from_object_ref(object_ref))
 }
 
@@ -12272,7 +12519,9 @@ fn object_freeze_builtin<Cx: PublicBuiltinDispatchContext>(
     let Some(object_ref) = value.as_object_ref() else {
         return Ok(value);
     };
-    let _ = cx.set_integrity_level(object_ref, true)?;
+    if !cx.set_integrity_level(object_ref, true)? {
+        return Err(type_error(cx));
+    }
     Ok(Value::from_object_ref(object_ref))
 }
 
@@ -12335,8 +12584,6 @@ fn object_is_prototype_of_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let prototype_object =
-        cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
     let Some(mut current) = invocation
         .arguments()
         .first()
@@ -12345,6 +12592,8 @@ fn object_is_prototype_of_builtin<Cx: PublicBuiltinDispatchContext>(
     else {
         return Ok(Value::from_bool(false));
     };
+    let prototype_object =
+        cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
     loop {
         let Some(next) = proxy_get_prototype_of(cx, current)? else {
             return Ok(Value::from_bool(false));
@@ -12372,6 +12621,141 @@ fn object_property_is_enumerable_builtin<Cx: PublicBuiltinDispatchContext>(
         proxy_get_own_property(cx, object_ref, key)?
             .is_some_and(|descriptor| descriptor.enumerable() == Some(true)),
     ))
+}
+
+fn object_define_accessor_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    define_getter: bool,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let callable = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .and_then(Value::as_object_ref)
+        .filter(|object| cx.agent().objects().is_callable(*object))
+        .ok_or_else(|| type_error(cx))?;
+    let key = cx.to_property_key(
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+
+    let mut descriptor = PropertyDescriptor::new();
+    if define_getter {
+        descriptor.set_getter(Value::from_object_ref(callable));
+    } else {
+        descriptor.set_setter(Value::from_object_ref(callable));
+    }
+    descriptor.set_enumerable(true);
+    descriptor.set_configurable(true);
+    define_property_or_throw_builtin(cx, object_ref, key, descriptor)?;
+    Ok(Value::undefined())
+}
+
+fn object_define_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    object_define_accessor_builtin(cx, invocation, true)
+}
+
+fn object_define_setter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    object_define_accessor_builtin(cx, invocation, false)
+}
+
+fn object_lookup_accessor_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    lookup_getter: bool,
+) -> Result<Value, Cx::Error> {
+    let mut object_ref =
+        cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let key = cx.to_property_key(
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+
+    loop {
+        if let Some(descriptor) = proxy_get_own_property(cx, object_ref, key)? {
+            if descriptor.has_get() || descriptor.has_set() {
+                let accessor = if lookup_getter {
+                    descriptor.getter()
+                } else {
+                    descriptor.setter()
+                };
+                return Ok(accessor.unwrap_or(Value::undefined()));
+            }
+            return Ok(Value::undefined());
+        }
+
+        let Some(prototype) = proxy_get_prototype_of(cx, object_ref)? else {
+            return Ok(Value::undefined());
+        };
+        object_ref = prototype;
+    }
+}
+
+fn object_lookup_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    object_lookup_accessor_builtin(cx, invocation, true)
+}
+
+fn object_lookup_setter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    object_lookup_accessor_builtin(cx, invocation, false)
+}
+
+fn object_proto_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    Ok(proxy_get_prototype_of(cx, object_ref)?.map_or(Value::null(), Value::from_object_ref))
+}
+
+fn object_proto_setter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let this_value = invocation.this_value();
+    if this_value.is_undefined() || this_value.is_null() {
+        return Err(type_error(cx));
+    }
+
+    let prototype_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let prototype = if prototype_value.is_null() {
+        None
+    } else if let Some(object) = prototype_value.as_object_ref() {
+        Some(object)
+    } else {
+        return Ok(Value::undefined());
+    };
+
+    let Some(object_ref) = this_value.as_object_ref() else {
+        return Ok(Value::undefined());
+    };
+    if !proxy_set_prototype_of(cx, object_ref, prototype)? {
+        return Err(type_error(cx));
+    }
+    Ok(Value::undefined())
 }
 
 fn object_keys_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -12402,7 +12786,8 @@ fn object_entries_builtin<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let keys = proxy_own_property_keys(cx, object_ref)?;
-    let mut names = Vec::with_capacity(keys.len());
+    let result = create_array_result(cx, keys.len())?;
+    let mut index = 0_u32;
 
     for key in keys {
         if key.is_symbol() {
@@ -12414,23 +12799,18 @@ fn object_entries_builtin<Cx: PublicBuiltinDispatchContext>(
         if descriptor.enumerable() != Some(true) {
             continue;
         }
-        names.push(key);
-    }
-
-    let result = create_array_result(cx, names.len())?;
-    for (index, key) in names.into_iter().enumerate() {
         let entry = create_array_result(cx, 2)?;
         let key_value = property_key_string_value(cx, key);
         let value = get_property_from_object(cx, object_ref, key)?;
         create_data_property_or_throw(cx, entry, PropertyKey::Index(0), key_value)?;
         create_data_property_or_throw(cx, entry, PropertyKey::Index(1), value)?;
-        let index = u32::try_from(index).unwrap_or(u32::MAX);
         create_data_property_or_throw(
             cx,
             result,
             PropertyKey::Index(index),
             Value::from_object_ref(entry),
         )?;
+        index = index.saturating_add(1);
     }
     Ok(Value::from_object_ref(result))
 }
@@ -12448,7 +12828,8 @@ fn object_values_builtin<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let keys = proxy_own_property_keys(cx, object_ref)?;
-    let mut names = Vec::with_capacity(keys.len());
+    let result = create_array_result(cx, keys.len())?;
+    let mut index = 0_u32;
 
     for key in keys {
         if key.is_symbol() {
@@ -12460,14 +12841,9 @@ fn object_values_builtin<Cx: PublicBuiltinDispatchContext>(
         if descriptor.enumerable() != Some(true) {
             continue;
         }
-        names.push(key);
-    }
-
-    let result = create_array_result(cx, names.len())?;
-    for (index, key) in names.into_iter().enumerate() {
         let value = get_property_from_object(cx, object_ref, key)?;
-        let index = u32::try_from(index).unwrap_or(u32::MAX);
         create_data_property_or_throw(cx, result, PropertyKey::Index(index), value)?;
+        index = index.saturating_add(1);
     }
     Ok(Value::from_object_ref(result))
 }
@@ -12500,7 +12876,6 @@ fn object_has_own_property_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
     let key = cx.to_property_key(
         invocation
             .arguments()
@@ -12508,6 +12883,7 @@ fn object_has_own_property_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
     Ok(Value::from_bool(
         proxy_get_own_property(cx, object_ref, key)?.is_some(),
     ))
@@ -12755,52 +13131,42 @@ fn object_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
             let agent = cx.agent();
             agent.objects().is_callable(object_ref)
         };
-        if is_function {
+        if is_array_for_species(cx, object_ref)? {
+            "Array"
+        } else if is_function {
             "Function"
-        } else {
-            let is_array = {
-                let agent = cx.agent();
-                agent
-                    .objects()
-                    .object_header(agent.heap().view(), object_ref)
-                    .is_some_and(|header| header.flags().is_engine_array())
-            };
-            if is_array {
-                "Array"
-            } else if {
-                let agent = cx.agent();
-                agent.objects().is_date_object(object_ref)
-            } {
-                "Date"
-            } else if {
-                let agent = cx.agent();
-                agent.objects().is_regexp_object(object_ref)
-            } {
-                "RegExp"
-            } else if let Some(kind) = {
-                let agent = cx.agent();
-                agent.objects().primitive_wrapper_kind(object_ref)
-            } {
-                match kind {
-                    PrimitiveWrapperKind::String => "String",
-                    PrimitiveWrapperKind::Number => "Number",
-                    PrimitiveWrapperKind::Boolean => "Boolean",
-                    PrimitiveWrapperKind::Symbol => "Symbol",
-                    PrimitiveWrapperKind::BigInt => "BigInt",
-                }
-            } else if {
-                let agent = cx.agent();
-                agent
-                    .objects()
-                    .object_header(agent.heap().view(), object_ref)
-                    .is_some_and(|header| header.flags().is_arguments_object())
-            } {
-                "Arguments"
-            } else if is_error_object(cx, object_ref)? {
-                "Error"
-            } else {
-                "Object"
+        } else if {
+            let agent = cx.agent();
+            agent.objects().is_date_object(object_ref)
+        } {
+            "Date"
+        } else if {
+            let agent = cx.agent();
+            agent.objects().is_regexp_object(object_ref)
+        } {
+            "RegExp"
+        } else if let Some(kind) = {
+            let agent = cx.agent();
+            agent.objects().primitive_wrapper_kind(object_ref)
+        } {
+            match kind {
+                PrimitiveWrapperKind::String => "String",
+                PrimitiveWrapperKind::Number => "Number",
+                PrimitiveWrapperKind::Boolean => "Boolean",
+                PrimitiveWrapperKind::Symbol | PrimitiveWrapperKind::BigInt => "Object",
             }
+        } else if {
+            let agent = cx.agent();
+            agent
+                .objects()
+                .object_header(agent.heap().view(), object_ref)
+                .is_some_and(|header| header.flags().is_arguments_object())
+        } {
+            "Arguments"
+        } else if is_error_object(cx, object_ref)? {
+            "Error"
+        } else {
+            "Object"
         }
     };
     let to_string_tag = {
@@ -12974,6 +13340,89 @@ fn function_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
         .ok_or_else(|| type_error(cx))?;
     let text = cx.function_to_string_text(function)?;
     Ok(string_value(cx, &text))
+}
+
+fn function_symbol_has_instance_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    Ok(Value::from_bool(ordinary_has_instance(
+        cx,
+        invocation.this_value(),
+        value,
+    )?))
+}
+
+fn ordinary_has_instance<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    constructor: Value,
+    value: Value,
+) -> Result<bool, Cx::Error> {
+    let Some(constructor) = constructor.as_object_ref() else {
+        return Ok(false);
+    };
+    let callable = {
+        let agent = cx.agent();
+        agent.objects().is_callable(constructor)
+    };
+    if !callable {
+        return Ok(false);
+    }
+    if let Some(target) = {
+        let agent = cx.agent();
+        bound_function_target(agent, constructor)
+    } {
+        return ordinary_has_instance(cx, Value::from_object_ref(target), value);
+    }
+    let Some(object) = value.as_object_ref() else {
+        return Ok(false);
+    };
+
+    let prototype = {
+        let mut bridge = BuiltinProxyBridge { cx };
+        proxy::get(
+            &mut bridge,
+            constructor,
+            PropertyKey::from_atom(WellKnownAtom::prototype.id()),
+            Value::from_object_ref(constructor),
+        )?
+    }
+    .as_object_ref()
+    .ok_or_else(|| type_error(cx))?;
+
+    let mut current = {
+        let mut bridge = BuiltinProxyBridge { cx };
+        proxy::get_prototype_of(&mut bridge, object)?
+    };
+    while let Some(candidate) = current {
+        if candidate == prototype {
+            return Ok(true);
+        }
+        current = {
+            let mut bridge = BuiltinProxyBridge { cx };
+            proxy::get_prototype_of(&mut bridge, candidate)?
+        };
+    }
+    Ok(false)
+}
+
+fn bound_function_target(agent: &Agent, function: ObjectRef) -> Option<ObjectRef> {
+    let data = agent.objects().function_data(function)?;
+    if data.entry()? != FunctionEntryIdentity::Bound {
+        return None;
+    }
+    let payload = data.gc_payload()?;
+    agent
+        .heap()
+        .view()
+        .function_payload(payload)?
+        .bound()
+        .map(|record| record.target())
 }
 
 fn async_generator_next_builtin<Cx: PublicBuiltinDispatchContext>(

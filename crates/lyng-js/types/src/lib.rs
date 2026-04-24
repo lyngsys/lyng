@@ -537,6 +537,19 @@ const JS3_ARRAY_FLAT_MAP_RAW: u32 = 2_268;
 const JS3_ARRAY_POP_RAW: u32 = 2_269;
 const JS3_ARRAY_PUSH_RAW: u32 = 2_270;
 const JS3_ARRAY_FROM_ASYNC_RAW: u32 = 2_271;
+const JS3_OBJECT_ASSIGN_RAW: u32 = 2_272;
+const JS3_OBJECT_FROM_ENTRIES_RAW: u32 = 2_273;
+const JS3_OBJECT_DEFINE_GETTER_RAW: u32 = 2_274;
+const JS3_OBJECT_DEFINE_SETTER_RAW: u32 = 2_275;
+const JS3_OBJECT_LOOKUP_GETTER_RAW: u32 = 2_276;
+const JS3_OBJECT_LOOKUP_SETTER_RAW: u32 = 2_277;
+const JS3_OBJECT_PROTO_GETTER_RAW: u32 = 2_278;
+const JS3_OBJECT_PROTO_SETTER_RAW: u32 = 2_279;
+const JS3_OBJECT_GROUP_BY_RAW: u32 = 2_280;
+const JS3_ABSTRACT_MODULE_SOURCE_RAW: u32 = 2_281;
+const JS3_ABSTRACT_MODULE_SOURCE_TO_STRING_TAG_GETTER_RAW: u32 = 2_282;
+const JS3_FUNCTION_SYMBOL_HAS_INSTANCE_RAW: u32 = 2_283;
+const JS3_REGEXP_SPECIES_GETTER_RAW: u32 = 2_284;
 const JS3_PROMISE_RAW: u32 = 3_101;
 const JS3_PROMISE_THEN_RAW: u32 = 3_102;
 const JS3_PROMISE_CATCH_RAW: u32 = 3_103;
@@ -974,7 +987,7 @@ pub const JS3_INTERNAL_BUILTIN_NAMESPACE_END: u32 = JS3_INTERNAL_DIRECT_EVAL_RAW
 pub const JS3_CORE_BUILTIN_NAMESPACE_START: u32 = JS3_BOOLEAN_RAW;
 
 /// Last reserved builtin-entry payload for the public core builtin namespace.
-pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_ARRAY_PUSH_RAW;
+pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_REGEXP_SPECIES_GETTER_RAW;
 
 /// First reserved builtin-entry payload for the public completion builtin namespace.
 pub const JS3_COMPLETION_BUILTIN_NAMESPACE_START: u32 = JS3_PROMISE_RAW;
@@ -1629,6 +1642,14 @@ pub fn js3_object_property_is_enumerable_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn js3_object_assign_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_OBJECT_ASSIGN_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn js3_object_keys_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_OBJECT_KEYS_RAW) {
         Some(id) => id,
@@ -1655,6 +1676,94 @@ pub fn js3_object_values_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn js3_object_has_own_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_OBJECT_HAS_OWN_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_object_from_entries_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_OBJECT_FROM_ENTRIES_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_object_group_by_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_OBJECT_GROUP_BY_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_object_define_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_OBJECT_DEFINE_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_object_define_setter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_OBJECT_DEFINE_SETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_object_lookup_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_OBJECT_LOOKUP_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_object_lookup_setter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_OBJECT_LOOKUP_SETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_object_proto_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_OBJECT_PROTO_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_object_proto_setter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_OBJECT_PROTO_SETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_abstract_module_source_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ABSTRACT_MODULE_SOURCE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_abstract_module_source_to_string_tag_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ABSTRACT_MODULE_SOURCE_TO_STRING_TAG_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_function_symbol_has_instance_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_FUNCTION_SYMBOL_HAS_INSTANCE_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }
@@ -2263,6 +2372,14 @@ pub fn js3_regexp_flags_getter_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn js3_regexp_has_indices_getter_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_REGEXP_HAS_INDICES_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_regexp_species_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_REGEXP_SPECIES_GETTER_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }
@@ -7034,7 +7151,7 @@ mod tests {
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_END, 1_036);
         assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_START, 2_001);
-        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_270);
+        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_284);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_START, 3_101);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_END, 3_500);
     }

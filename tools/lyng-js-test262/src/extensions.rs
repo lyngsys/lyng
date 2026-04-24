@@ -11,7 +11,9 @@ use lyng_js_host::{
     TemporalDefaultTimeZoneRequest, TemporalInstant, UnparkAgentRequest, UnparkAgentResult,
 };
 use lyng_js_ops::errors;
-use lyng_js_types::{EmbeddingFunctionId, ObjectRef, PropertyKey, Value};
+use lyng_js_types::{
+    js3_abstract_module_source_builtin, EmbeddingFunctionId, ObjectRef, PropertyKey, Value,
+};
 use lyng_js_vm::{
     EmbeddingFunctionContext, EmbeddingFunctionMetadata, EmbeddingInvocation,
     RealmExtensionInstallation, RealmExtensionProvider, VmError,
@@ -326,6 +328,8 @@ impl RealmExtensionProvider for Test262RealmExtension {
         let create_realm_key = test262_property_key(installation.agent(), "createRealm");
         let detach_key = test262_property_key(installation.agent(), "detachArrayBuffer");
         let gc_key = test262_property_key(installation.agent(), "gc");
+        let abstract_module_source_key =
+            test262_property_key(installation.agent(), "AbstractModuleSource");
 
         installation.define_data_property(
             installation.global_object(),
@@ -371,6 +375,16 @@ impl RealmExtensionProvider for Test262RealmExtension {
             harness,
             gc_key,
             test262_gc_entry(),
+            true,
+            false,
+            true,
+        )?;
+        let abstract_module_source =
+            installation.builtin_constant(js3_abstract_module_source_builtin())?;
+        installation.define_data_property(
+            harness,
+            abstract_module_source_key,
+            abstract_module_source,
             true,
             false,
             true,

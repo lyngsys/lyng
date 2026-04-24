@@ -234,6 +234,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         // Check for get/set accessor
         if self.at_contextual(WellKnownAtom::get) || self.at_contextual(WellKnownAtom::set) {
+            let method_start = self.current_span();
             let is_get = self.at_contextual(WellKnownAtom::get);
             let peek = self.peek();
             // If next token is a property name, it's a getter/setter
@@ -245,7 +246,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 };
                 self.advance(); // eat get/set
                 let (key, computed) = self.parse_property_name();
-                let func_id = self.parse_method_function(FunctionKind::Normal);
+                let func_id = self.parse_method_function_from(FunctionKind::Normal, method_start);
                 let func_span = self.ast().get_function(func_id).span;
                 let func_expr = self.ast_mut().alloc_expr(Expr::FunctionExpression {
                     span: func_span,
@@ -266,6 +267,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         // Check for async method: `async name() {}`
         if self.at_contextual(WellKnownAtom::async_) {
+            let method_start = self.current_span();
             let peek = self.peek();
             if !peek.preceded_by_line_terminator()
                 && (peek.kind == TokenKind::Star || is_property_name_token(peek.kind))
@@ -278,7 +280,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 } else {
                     FunctionKind::Async
                 };
-                let func_id = self.parse_method_function(kind);
+                let func_id = self.parse_method_function_from(kind, method_start);
                 let func_span = self.ast().get_function(func_id).span;
                 let func_expr = self.ast_mut().alloc_expr(Expr::FunctionExpression {
                     span: func_span,
@@ -299,9 +301,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         // Generator method: `* name() {}`
         if self.at(TokenKind::Star) {
+            let method_start = self.current_span();
             self.advance(); // eat `*`
             let (key, computed) = self.parse_property_name();
-            let func_id = self.parse_method_function(FunctionKind::Generator);
+            let func_id = self.parse_method_function_from(FunctionKind::Generator, method_start);
             let func_span = self.ast().get_function(func_id).span;
             let func_expr = self.ast_mut().alloc_expr(Expr::FunctionExpression {
                 span: func_span,
@@ -322,11 +325,17 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         // Regular property or shorthand or method
         let shorthand_token = self.current();
         let shorthand_candidate = self.at_identifier_reference();
+        let key_start = self.current_span();
         let (key, computed) = self.parse_property_name();
 
         // Method shorthand: `name() {}`
         if self.at(TokenKind::LParen) {
-            let func_id = self.parse_method_function(FunctionKind::Normal);
+            let method_start = if computed {
+                key_start
+            } else {
+                self.ast().get_expr(key).span()
+            };
+            let func_id = self.parse_method_function_from(FunctionKind::Normal, method_start);
             let func_span = self.ast().get_function(func_id).span;
             let func_expr = self.ast_mut().alloc_expr(Expr::FunctionExpression {
                 span: func_span,
