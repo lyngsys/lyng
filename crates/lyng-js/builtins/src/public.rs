@@ -13227,6 +13227,181 @@ const PUBLIC_FUNCTION_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     ),
 ];
 
+const PUBLIC_ARRAY_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(
+        js3_array_builtin,
+        BuiltinEntryMetadata::new("Array", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_from_builtin,
+        BuiltinEntryMetadata::new("from", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_from_async_builtin,
+        BuiltinEntryMetadata::new("fromAsync", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_of_builtin,
+        BuiltinEntryMetadata::new("of", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_is_array_builtin,
+        BuiltinEntryMetadata::new("isArray", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_at_builtin,
+        BuiltinEntryMetadata::new("at", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_concat_builtin,
+        BuiltinEntryMetadata::new("concat", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_copy_within_builtin,
+        BuiltinEntryMetadata::new("copyWithin", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_fill_builtin,
+        BuiltinEntryMetadata::new("fill", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_join_builtin,
+        BuiltinEntryMetadata::new("join", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_pop_builtin,
+        BuiltinEntryMetadata::new("pop", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_push_builtin,
+        BuiltinEntryMetadata::new("push", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_shift_builtin,
+        BuiltinEntryMetadata::new("shift", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_unshift_builtin,
+        BuiltinEntryMetadata::new("unshift", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_every_builtin,
+        BuiltinEntryMetadata::new("every", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_filter_builtin,
+        BuiltinEntryMetadata::new("filter", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_flat_builtin,
+        BuiltinEntryMetadata::new("flat", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_flat_map_builtin,
+        BuiltinEntryMetadata::new("flatMap", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_find_builtin,
+        BuiltinEntryMetadata::new("find", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_find_index_builtin,
+        BuiltinEntryMetadata::new("findIndex", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_find_last_builtin,
+        BuiltinEntryMetadata::new("findLast", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_find_last_index_builtin,
+        BuiltinEntryMetadata::new("findLastIndex", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_for_each_builtin,
+        BuiltinEntryMetadata::new("forEach", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_includes_builtin,
+        BuiltinEntryMetadata::new("includes", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_index_of_builtin,
+        BuiltinEntryMetadata::new("indexOf", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_map_builtin,
+        BuiltinEntryMetadata::new("map", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_reduce_builtin,
+        BuiltinEntryMetadata::new("reduce", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_reduce_right_builtin,
+        BuiltinEntryMetadata::new("reduceRight", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_reverse_builtin,
+        BuiltinEntryMetadata::new("reverse", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_slice_builtin,
+        BuiltinEntryMetadata::new("slice", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_some_builtin,
+        BuiltinEntryMetadata::new("some", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_last_index_of_builtin,
+        BuiltinEntryMetadata::new("lastIndexOf", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_sort_builtin,
+        BuiltinEntryMetadata::new("sort", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_splice_builtin,
+        BuiltinEntryMetadata::new("splice", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_to_reversed_builtin,
+        BuiltinEntryMetadata::new("toReversed", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_to_sorted_builtin,
+        BuiltinEntryMetadata::new("toSorted", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_to_spliced_builtin,
+        BuiltinEntryMetadata::new("toSpliced", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_to_string_builtin,
+        BuiltinEntryMetadata::new("toString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_to_locale_string_builtin,
+        BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_values_builtin,
+        BuiltinEntryMetadata::new("values", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_keys_builtin,
+        BuiltinEntryMetadata::new("keys", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_entries_builtin,
+        BuiltinEntryMetadata::new("entries", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_with_builtin,
+        BuiltinEntryMetadata::new("with", 2, false, false),
+    ),
+];
+
 fn public_builtin_metadata_from_rows(
     entry: BuiltinFunctionId,
     rows: &[PublicBuiltinMetadataRow],
@@ -13242,6 +13417,10 @@ fn function_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinE
     public_builtin_metadata_from_rows(entry, PUBLIC_FUNCTION_BUILTIN_METADATA)
 }
 
+fn array_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
+    public_builtin_metadata_from_rows(entry, PUBLIC_ARRAY_BUILTIN_METADATA)
+}
+
 /// Compatibility metadata for the public core builtin namespace.
 #[inline]
 pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
@@ -13249,6 +13428,9 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
         return Some(metadata);
     }
     if let Some(metadata) = function_public_builtin_metadata(entry) {
+        return Some(metadata);
+    }
+    if let Some(metadata) = array_public_builtin_metadata(entry) {
         return Some(metadata);
     }
     if entry == js3_abstract_module_source_builtin() {
@@ -13266,18 +13448,6 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
             false,
             false,
         ));
-    }
-    if entry == js3_array_builtin() {
-        return Some(BuiltinEntryMetadata::new("Array", 1, true, true));
-    }
-    if entry == js3_array_from_builtin() {
-        return Some(BuiltinEntryMetadata::new("from", 1, false, false));
-    }
-    if entry == js3_array_from_async_builtin() {
-        return Some(BuiltinEntryMetadata::new("fromAsync", 1, false, false));
-    }
-    if entry == js3_array_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("of", 0, false, false));
     }
     if entry == js3_map_builtin() {
         return Some(BuiltinEntryMetadata::new("Map", 0, true, true));
@@ -13437,123 +13607,6 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     }
     if entry == js3_uint8_array_builtin() {
         return Some(BuiltinEntryMetadata::new("Uint8Array", 3, true, true));
-    }
-    if entry == js3_array_is_array_builtin() {
-        return Some(BuiltinEntryMetadata::new("isArray", 1, false, false));
-    }
-    if entry == js3_array_at_builtin() {
-        return Some(BuiltinEntryMetadata::new("at", 1, false, false));
-    }
-    if entry == js3_array_concat_builtin() {
-        return Some(BuiltinEntryMetadata::new("concat", 1, false, false));
-    }
-    if entry == js3_array_copy_within_builtin() {
-        return Some(BuiltinEntryMetadata::new("copyWithin", 2, false, false));
-    }
-    if entry == js3_array_fill_builtin() {
-        return Some(BuiltinEntryMetadata::new("fill", 1, false, false));
-    }
-    if entry == js3_array_join_builtin() {
-        return Some(BuiltinEntryMetadata::new("join", 1, false, false));
-    }
-    if entry == js3_array_pop_builtin() {
-        return Some(BuiltinEntryMetadata::new("pop", 0, false, false));
-    }
-    if entry == js3_array_push_builtin() {
-        return Some(BuiltinEntryMetadata::new("push", 1, false, false));
-    }
-    if entry == js3_array_shift_builtin() {
-        return Some(BuiltinEntryMetadata::new("shift", 0, false, false));
-    }
-    if entry == js3_array_unshift_builtin() {
-        return Some(BuiltinEntryMetadata::new("unshift", 1, false, false));
-    }
-    if entry == js3_array_every_builtin() {
-        return Some(BuiltinEntryMetadata::new("every", 1, false, false));
-    }
-    if entry == js3_array_filter_builtin() {
-        return Some(BuiltinEntryMetadata::new("filter", 1, false, false));
-    }
-    if entry == js3_array_flat_builtin() {
-        return Some(BuiltinEntryMetadata::new("flat", 0, false, false));
-    }
-    if entry == js3_array_flat_map_builtin() {
-        return Some(BuiltinEntryMetadata::new("flatMap", 1, false, false));
-    }
-    if entry == js3_array_find_builtin() {
-        return Some(BuiltinEntryMetadata::new("find", 1, false, false));
-    }
-    if entry == js3_array_find_index_builtin() {
-        return Some(BuiltinEntryMetadata::new("findIndex", 1, false, false));
-    }
-    if entry == js3_array_find_last_builtin() {
-        return Some(BuiltinEntryMetadata::new("findLast", 1, false, false));
-    }
-    if entry == js3_array_find_last_index_builtin() {
-        return Some(BuiltinEntryMetadata::new("findLastIndex", 1, false, false));
-    }
-    if entry == js3_array_for_each_builtin() {
-        return Some(BuiltinEntryMetadata::new("forEach", 1, false, false));
-    }
-    if entry == js3_array_includes_builtin() {
-        return Some(BuiltinEntryMetadata::new("includes", 1, false, false));
-    }
-    if entry == js3_array_index_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("indexOf", 1, false, false));
-    }
-    if entry == js3_array_map_builtin() {
-        return Some(BuiltinEntryMetadata::new("map", 1, false, false));
-    }
-    if entry == js3_array_reduce_builtin() {
-        return Some(BuiltinEntryMetadata::new("reduce", 1, false, false));
-    }
-    if entry == js3_array_reduce_right_builtin() {
-        return Some(BuiltinEntryMetadata::new("reduceRight", 1, false, false));
-    }
-    if entry == js3_array_reverse_builtin() {
-        return Some(BuiltinEntryMetadata::new("reverse", 0, false, false));
-    }
-    if entry == js3_array_slice_builtin() {
-        return Some(BuiltinEntryMetadata::new("slice", 2, false, false));
-    }
-    if entry == js3_array_some_builtin() {
-        return Some(BuiltinEntryMetadata::new("some", 1, false, false));
-    }
-    if entry == js3_array_last_index_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("lastIndexOf", 1, false, false));
-    }
-    if entry == js3_array_sort_builtin() {
-        return Some(BuiltinEntryMetadata::new("sort", 1, false, false));
-    }
-    if entry == js3_array_splice_builtin() {
-        return Some(BuiltinEntryMetadata::new("splice", 2, false, false));
-    }
-    if entry == js3_array_to_reversed_builtin() {
-        return Some(BuiltinEntryMetadata::new("toReversed", 0, false, false));
-    }
-    if entry == js3_array_to_sorted_builtin() {
-        return Some(BuiltinEntryMetadata::new("toSorted", 1, false, false));
-    }
-    if entry == js3_array_to_spliced_builtin() {
-        return Some(BuiltinEntryMetadata::new("toSpliced", 2, false, false));
-    }
-    if entry == js3_array_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
-    }
-    if entry == js3_array_to_locale_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
-    }
-    if entry == js3_array_values_builtin() {
-        return Some(BuiltinEntryMetadata::new("values", 0, false, false));
-    }
-    if entry == js3_array_keys_builtin() {
-        return Some(BuiltinEntryMetadata::new("keys", 0, false, false));
-    }
-    if entry == js3_array_entries_builtin() {
-        return Some(BuiltinEntryMetadata::new("entries", 0, false, false));
-    }
-    if entry == js3_array_with_builtin() {
-        return Some(BuiltinEntryMetadata::new("with", 2, false, false));
     }
     if entry == js3_map_get_builtin() {
         return Some(BuiltinEntryMetadata::new("get", 1, false, false));
@@ -15001,6 +15054,190 @@ mod tests {
         assert_eq!(PUBLIC_FUNCTION_BUILTIN_METADATA.len(), expected.len());
         for (entry, metadata) in expected {
             assert_eq!(function_public_builtin_metadata(entry), Some(metadata));
+            assert_eq!(public_builtin_metadata(entry), Some(metadata));
+        }
+    }
+
+    #[test]
+    fn array_public_metadata_table_matches_public_lookup() {
+        let expected = [
+            (
+                js3_array_builtin(),
+                BuiltinEntryMetadata::new("Array", 1, true, true),
+            ),
+            (
+                js3_array_from_builtin(),
+                BuiltinEntryMetadata::new("from", 1, false, false),
+            ),
+            (
+                js3_array_from_async_builtin(),
+                BuiltinEntryMetadata::new("fromAsync", 1, false, false),
+            ),
+            (
+                js3_array_of_builtin(),
+                BuiltinEntryMetadata::new("of", 0, false, false),
+            ),
+            (
+                js3_array_is_array_builtin(),
+                BuiltinEntryMetadata::new("isArray", 1, false, false),
+            ),
+            (
+                js3_array_at_builtin(),
+                BuiltinEntryMetadata::new("at", 1, false, false),
+            ),
+            (
+                js3_array_concat_builtin(),
+                BuiltinEntryMetadata::new("concat", 1, false, false),
+            ),
+            (
+                js3_array_copy_within_builtin(),
+                BuiltinEntryMetadata::new("copyWithin", 2, false, false),
+            ),
+            (
+                js3_array_fill_builtin(),
+                BuiltinEntryMetadata::new("fill", 1, false, false),
+            ),
+            (
+                js3_array_join_builtin(),
+                BuiltinEntryMetadata::new("join", 1, false, false),
+            ),
+            (
+                js3_array_pop_builtin(),
+                BuiltinEntryMetadata::new("pop", 0, false, false),
+            ),
+            (
+                js3_array_push_builtin(),
+                BuiltinEntryMetadata::new("push", 1, false, false),
+            ),
+            (
+                js3_array_shift_builtin(),
+                BuiltinEntryMetadata::new("shift", 0, false, false),
+            ),
+            (
+                js3_array_unshift_builtin(),
+                BuiltinEntryMetadata::new("unshift", 1, false, false),
+            ),
+            (
+                js3_array_every_builtin(),
+                BuiltinEntryMetadata::new("every", 1, false, false),
+            ),
+            (
+                js3_array_filter_builtin(),
+                BuiltinEntryMetadata::new("filter", 1, false, false),
+            ),
+            (
+                js3_array_flat_builtin(),
+                BuiltinEntryMetadata::new("flat", 0, false, false),
+            ),
+            (
+                js3_array_flat_map_builtin(),
+                BuiltinEntryMetadata::new("flatMap", 1, false, false),
+            ),
+            (
+                js3_array_find_builtin(),
+                BuiltinEntryMetadata::new("find", 1, false, false),
+            ),
+            (
+                js3_array_find_index_builtin(),
+                BuiltinEntryMetadata::new("findIndex", 1, false, false),
+            ),
+            (
+                js3_array_find_last_builtin(),
+                BuiltinEntryMetadata::new("findLast", 1, false, false),
+            ),
+            (
+                js3_array_find_last_index_builtin(),
+                BuiltinEntryMetadata::new("findLastIndex", 1, false, false),
+            ),
+            (
+                js3_array_for_each_builtin(),
+                BuiltinEntryMetadata::new("forEach", 1, false, false),
+            ),
+            (
+                js3_array_includes_builtin(),
+                BuiltinEntryMetadata::new("includes", 1, false, false),
+            ),
+            (
+                js3_array_index_of_builtin(),
+                BuiltinEntryMetadata::new("indexOf", 1, false, false),
+            ),
+            (
+                js3_array_map_builtin(),
+                BuiltinEntryMetadata::new("map", 1, false, false),
+            ),
+            (
+                js3_array_reduce_builtin(),
+                BuiltinEntryMetadata::new("reduce", 1, false, false),
+            ),
+            (
+                js3_array_reduce_right_builtin(),
+                BuiltinEntryMetadata::new("reduceRight", 1, false, false),
+            ),
+            (
+                js3_array_reverse_builtin(),
+                BuiltinEntryMetadata::new("reverse", 0, false, false),
+            ),
+            (
+                js3_array_slice_builtin(),
+                BuiltinEntryMetadata::new("slice", 2, false, false),
+            ),
+            (
+                js3_array_some_builtin(),
+                BuiltinEntryMetadata::new("some", 1, false, false),
+            ),
+            (
+                js3_array_last_index_of_builtin(),
+                BuiltinEntryMetadata::new("lastIndexOf", 1, false, false),
+            ),
+            (
+                js3_array_sort_builtin(),
+                BuiltinEntryMetadata::new("sort", 1, false, false),
+            ),
+            (
+                js3_array_splice_builtin(),
+                BuiltinEntryMetadata::new("splice", 2, false, false),
+            ),
+            (
+                js3_array_to_reversed_builtin(),
+                BuiltinEntryMetadata::new("toReversed", 0, false, false),
+            ),
+            (
+                js3_array_to_sorted_builtin(),
+                BuiltinEntryMetadata::new("toSorted", 1, false, false),
+            ),
+            (
+                js3_array_to_spliced_builtin(),
+                BuiltinEntryMetadata::new("toSpliced", 2, false, false),
+            ),
+            (
+                js3_array_to_string_builtin(),
+                BuiltinEntryMetadata::new("toString", 0, false, false),
+            ),
+            (
+                js3_array_to_locale_string_builtin(),
+                BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
+            ),
+            (
+                js3_array_values_builtin(),
+                BuiltinEntryMetadata::new("values", 0, false, false),
+            ),
+            (
+                js3_array_keys_builtin(),
+                BuiltinEntryMetadata::new("keys", 0, false, false),
+            ),
+            (
+                js3_array_entries_builtin(),
+                BuiltinEntryMetadata::new("entries", 0, false, false),
+            ),
+            (
+                js3_array_with_builtin(),
+                BuiltinEntryMetadata::new("with", 2, false, false),
+            ),
+        ];
+
+        assert_eq!(PUBLIC_ARRAY_BUILTIN_METADATA.len(), expected.len());
+        for (entry, metadata) in expected {
+            assert_eq!(array_public_builtin_metadata(entry), Some(metadata));
             assert_eq!(public_builtin_metadata(entry), Some(metadata));
         }
     }
