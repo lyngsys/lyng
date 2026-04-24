@@ -2568,12 +2568,15 @@ impl Vm {
         let object = value
             .as_object_ref()
             .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
-        let to_string = object::get(
+        let to_string = self.get_property_from_object(
             agent,
+            host,
+            registry,
+            caller,
             object,
+            Value::from_object_ref(object),
             PropertyKey::from_atom(WellKnownAtom::toString.id()),
-        )
-        .map_err(VmError::Abrupt)?;
+        )?;
         if let Some(result) = self.call_if_callable_object(
             agent,
             host,
@@ -2589,12 +2592,15 @@ impl Vm {
             }
         }
 
-        let value_of = object::get(
+        let value_of = self.get_property_from_object(
             agent,
+            host,
+            registry,
+            caller,
             object,
+            Value::from_object_ref(object),
             PropertyKey::from_atom(WellKnownAtom::valueOf.id()),
-        )
-        .map_err(VmError::Abrupt)?;
+        )?;
         if let Some(result) = self.call_if_callable_object(
             agent,
             host,

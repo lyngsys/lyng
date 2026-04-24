@@ -130,6 +130,22 @@ impl Vm {
                             self.write_register(frame, a, value)?;
                             self.advance_instruction()?;
                         }
+                        Opcode::Increment | Opcode::Decrement => {
+                            let update_result = self.update_register_value(
+                                agent,
+                                host,
+                                registry,
+                                frame,
+                                b,
+                                opcode == Opcode::Increment,
+                            );
+                            let Some(value) = self.handle_vm_result(agent, update_result)? else {
+                                continue;
+                            };
+                            self.record_feedback_site(frame.code(), frame.instruction_offset());
+                            self.write_register(frame, a, value)?;
+                            self.advance_instruction()?;
+                        }
                         Opcode::GetNamedProperty => {
                             let receiver = self.read_register(frame, b)?;
                             let atom = self.read_atom_constant(frame.code(), u32::from(c))?;
@@ -1476,6 +1492,19 @@ impl Vm {
     fn to_numeric_primitive(&mut self, agent: &mut Agent, value: Value) -> VmResult<Value> {
         read::to_numeric(agent.heap().view(), value)
             .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
+    }
+
+    fn update_register_value(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        register: u16,
+        increment: bool,
+    ) -> VmResult<Value> {
+        let numeric = self.to_numeric_register(agent, host, registry, frame, register)?;
+        self.update_numeric_value(agent, numeric, increment)
     }
 
     pub(super) fn relational_compare(

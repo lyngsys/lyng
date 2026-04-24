@@ -32,10 +32,10 @@ use lyng_js_types::{
     js3_atomics_is_lock_free_builtin, js3_atomics_load_builtin, js3_atomics_notify_builtin,
     js3_atomics_or_builtin, js3_atomics_store_builtin, js3_atomics_sub_builtin,
     js3_atomics_wait_async_builtin, js3_atomics_wait_builtin, js3_atomics_xor_builtin,
-    js3_big_int64_array_builtin, js3_big_uint64_array_builtin, js3_bigint_builtin,
-    js3_bigint_to_string_builtin, js3_bigint_value_of_builtin, js3_boolean_builtin,
-    js3_boolean_to_string_builtin, js3_boolean_value_of_builtin,
-    js3_data_view_buffer_getter_builtin, js3_data_view_builtin,
+    js3_big_int64_array_builtin, js3_big_uint64_array_builtin, js3_bigint_as_int_n_builtin,
+    js3_bigint_as_uint_n_builtin, js3_bigint_builtin, js3_bigint_to_string_builtin,
+    js3_bigint_value_of_builtin, js3_boolean_builtin, js3_boolean_to_string_builtin,
+    js3_boolean_value_of_builtin, js3_data_view_buffer_getter_builtin, js3_data_view_builtin,
     js3_data_view_byte_length_getter_builtin, js3_data_view_byte_offset_getter_builtin,
     js3_data_view_get_float32_builtin, js3_data_view_get_float64_builtin,
     js3_data_view_get_int16_builtin, js3_data_view_get_int32_builtin,
@@ -99,7 +99,7 @@ use lyng_js_types::{
     js3_set_values_builtin, js3_shared_array_buffer_builtin,
     js3_shared_array_buffer_byte_length_getter_builtin, js3_shared_array_buffer_slice_builtin,
     js3_string_builtin, js3_string_char_at_builtin, js3_string_char_code_at_builtin,
-    js3_string_from_char_code_builtin, js3_string_iterator_builtin,
+    js3_string_concat_builtin, js3_string_from_char_code_builtin, js3_string_iterator_builtin,
     js3_string_iterator_next_builtin, js3_string_last_index_of_builtin, js3_string_match_builtin,
     js3_string_pad_end_builtin, js3_string_pad_start_builtin, js3_string_repeat_builtin,
     js3_string_replace_builtin, js3_string_search_builtin, js3_string_slice_builtin,
@@ -384,6 +384,7 @@ pub struct PublicRealmBuiltins {
     string_iterator_next: ObjectRef,
     string_to_string: ObjectRef,
     string_value_of: ObjectRef,
+    string_concat: ObjectRef,
     string_char_at: ObjectRef,
     string_char_code_at: ObjectRef,
     string_from_char_code: ObjectRef,
@@ -439,6 +440,8 @@ pub struct PublicRealmBuiltins {
     math_sqrt: ObjectRef,
     math_trunc: ObjectRef,
     bigint: ObjectRef,
+    bigint_as_int_n: ObjectRef,
+    bigint_as_uint_n: ObjectRef,
     bigint_prototype: ObjectRef,
     bigint_to_string: ObjectRef,
     bigint_value_of: ObjectRef,
@@ -1239,6 +1242,9 @@ impl PublicRealmBuiltins {
         if entry == js3_string_value_of_builtin() {
             return Some(self.string_value_of);
         }
+        if entry == js3_string_concat_builtin() {
+            return Some(self.string_concat);
+        }
         if entry == js3_string_char_at_builtin() {
             return Some(self.string_char_at);
         }
@@ -1391,6 +1397,12 @@ impl PublicRealmBuiltins {
         }
         if entry == js3_bigint_builtin() {
             return Some(self.bigint);
+        }
+        if entry == js3_bigint_as_int_n_builtin() {
+            return Some(self.bigint_as_int_n);
+        }
+        if entry == js3_bigint_as_uint_n_builtin() {
+            return Some(self.bigint_as_uint_n);
         }
         if entry == js3_bigint_to_string_builtin() {
             return Some(self.bigint_to_string);
@@ -4245,6 +4257,17 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_string_value_of_builtin()).unwrap(),
                 None,
             ),
+            string_concat: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_string_concat_builtin(),
+                public_builtin_metadata(js3_string_concat_builtin()).unwrap(),
+                None,
+            ),
             string_char_at: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -4809,6 +4832,28 @@ impl BuiltinCache {
                 js3_bigint_builtin(),
                 public_builtin_metadata(js3_bigint_builtin()).unwrap(),
                 Some(bigint_prototype),
+            ),
+            bigint_as_int_n: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_bigint_as_int_n_builtin(),
+                public_builtin_metadata(js3_bigint_as_int_n_builtin()).unwrap(),
+                None,
+            ),
+            bigint_as_uint_n: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_bigint_as_uint_n_builtin(),
+                public_builtin_metadata(js3_bigint_as_uint_n_builtin()).unwrap(),
+                None,
             ),
             bigint_prototype,
             bigint_to_string: allocate_builtin_function_object(
@@ -6274,6 +6319,8 @@ impl BuiltinCache {
         let has_indices_atom = bootstrap_atoms.has_indices();
         let add_atom = agent.atoms_mut().intern_collectible("add");
         let and_atom = agent.atoms_mut().intern_collectible("and");
+        let as_int_n_atom = agent.atoms_mut().intern_collectible("asIntN");
+        let as_uint_n_atom = agent.atoms_mut().intern_collectible("asUintN");
         let clear_atom = agent.atoms_mut().intern_collectible("clear");
         let compare_exchange_atom = agent.atoms_mut().intern_collectible("compareExchange");
         let delete_atom = agent.atoms_mut().intern_collectible("delete");
@@ -8563,6 +8610,11 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(concat_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_concat_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(char_at_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_string_char_at_builtin()),
                 BuiltinAttributes::new(true, false, true),
@@ -8955,6 +9007,18 @@ impl BuiltinCache {
                 BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
                 BuiltinPropertyValueSpec::Data(math_tag),
                 BuiltinAttributes::new(false, false, true),
+            ),
+        ];
+        let bigint_descriptors = [
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(as_int_n_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_bigint_as_int_n_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(as_uint_n_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_bigint_as_uint_n_builtin()),
+                BuiltinAttributes::new(true, false, true),
             ),
         ];
         let bigint_prototype_descriptors = [
@@ -9840,6 +9904,10 @@ impl BuiltinCache {
                 &math_descriptors,
             ),
             BuiltinDescriptorTable::new(
+                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::BigInt),
+                &bigint_descriptors,
+            ),
+            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::BigIntPrototype),
                 &bigint_prototype_descriptors,
             ),
@@ -10686,6 +10754,9 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if entry == js3_string_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
     }
+    if entry == js3_string_concat_builtin() {
+        return Some(BuiltinEntryMetadata::new("concat", 1, false, false));
+    }
     if entry == js3_string_char_at_builtin() {
         return Some(BuiltinEntryMetadata::new("charAt", 1, false, false));
     }
@@ -10812,7 +10883,7 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
         return Some(BuiltinEntryMetadata::new("toExponential", 1, false, false));
     }
     if entry == js3_number_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
+        return Some(BuiltinEntryMetadata::new("toString", 1, false, false));
     }
     if entry == js3_number_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
@@ -10845,7 +10916,13 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
         return Some(BuiltinEntryMetadata::new("trunc", 1, false, false));
     }
     if entry == js3_bigint_builtin() {
-        return Some(BuiltinEntryMetadata::new("BigInt", 1, false, true));
+        return Some(BuiltinEntryMetadata::new("BigInt", 1, true, true));
+    }
+    if entry == js3_bigint_as_int_n_builtin() {
+        return Some(BuiltinEntryMetadata::new("asIntN", 2, false, false));
+    }
+    if entry == js3_bigint_as_uint_n_builtin() {
+        return Some(BuiltinEntryMetadata::new("asUintN", 2, false, false));
     }
     if entry == js3_bigint_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));

@@ -2301,6 +2301,51 @@ fn script_core_supports_phase6_number_math_and_bigint_basics() {
 }
 
 #[test]
+fn script_core_number_prototype_carries_primitive_data_slot_but_bigint_does_not() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += (Number.prototype.toString() === "0" ? 1 : 0);
+        total += (Number.prototype.valueOf() === 0 ? 2 : 0);
+        try {
+            BigInt.prototype.toString();
+        } catch (error) {
+            total += (error instanceof TypeError ? 4 : 0);
+        }
+        try {
+            BigInt.prototype.valueOf();
+        } catch (error) {
+            total += (error instanceof TypeError ? 8 : 0);
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_number_constructor_distinguishes_absent_and_undefined_arguments() {
+    let result = compile_and_run(
+        r#"
+        let functionDefault = Number();
+        let constructorDefault = new Number().valueOf();
+        let functionUndefined = Number(undefined);
+        let constructorUndefined = new Number(undefined).valueOf();
+        let total = 0;
+        total += (functionDefault === 0 ? 1 : 0);
+        total += (constructorDefault === 0 ? 2 : 0);
+        total += (functionUndefined !== functionUndefined ? 4 : 0);
+        total += (constructorUndefined !== constructorUndefined ? 8 : 0);
+        total += (Number.prototype.toString.length === 1 ? 16 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
 fn script_core_bigint_boxing_exposes_wrapper_identity_and_value_of() {
     let result = compile_and_run(
         r#"
@@ -2314,6 +2359,34 @@ fn script_core_bigint_boxing_exposes_wrapper_identity_and_value_of() {
         total += (boxed.valueOf() === 1n ? 32 : 0);
         total += (!(boxed instanceof Boolean) ? 64 : 0);
         total += (BigInt.prototype !== Boolean.prototype ? 128 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(255));
+}
+
+#[test]
+fn script_core_bigint_width_builtins_wrap_with_toindex_and_tobigint() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += (BigInt.asIntN(2, 3n) === -1n ? 1 : 0);
+        total += (BigInt.asIntN(3, 10n) === 2n ? 2 : 0);
+        total += (BigInt.asUintN(2, -1n) === 3n ? 4 : 0);
+        total += (BigInt.asUintN(8, 0x123n) === 0x23n ? 8 : 0);
+        total += (BigInt.asIntN.length === 2 ? 16 : 0);
+        total += (BigInt.asUintN.length === 2 ? 32 : 0);
+        try {
+            BigInt.asIntN(0n, 0n);
+        } catch (error) {
+            total += (error instanceof TypeError ? 64 : 0);
+        }
+        try {
+            BigInt.asUintN(9007199254740992, 0n);
+        } catch (error) {
+            total += (error instanceof RangeError ? 128 : 0);
+        }
         total;
         "#,
     );
@@ -2348,6 +2421,92 @@ fn script_core_supports_bigint_literals_and_number_radix_poisoning_cases() {
     );
 
     assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_bigint_to_string_uses_lowercase_digits_through_radix_36() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += ((10n).toString(11) === "a" ? 1 : 0);
+        total += ((35n).toString(36) === "z" ? 2 : 0);
+        total += (Number(97n) === 97 ? 4 : 0);
+        total += (String.fromCharCode(Number(97n)) === "a" ? 8 : 0);
+        let loopText = "";
+        for (let i = 10n; i < 13; i++) {
+            loopText += i.toString(36);
+        }
+        total += (loopText === "abc" ? 16 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_bigint_wrapper_ordinary_to_primitive_observes_overridden_methods() {
+    let result = compile_and_run_string(
+        r#"
+        const BigIntToString = BigInt.prototype.toString;
+        const BigIntValueOf = BigInt.prototype.valueOf;
+        let toStringGets = 0;
+        let toStringCalls = 0;
+        let valueOfGets = 0;
+        let valueOfCalls = 0;
+        let toStringFunction = function() {
+            ++toStringCalls;
+            return `${BigIntToString.call(this)}foo`;
+        };
+        let valueOfFunction = function() {
+            ++valueOfCalls;
+            return BigIntValueOf.call(this) * 2n;
+        };
+        function record(thunk) {
+            try {
+                return String(thunk());
+            } catch (error) {
+                return error instanceof TypeError ? "TypeError" : "throw";
+            }
+        }
+        Object.defineProperty(BigInt.prototype, "toString", {
+            get: function() {
+                ++toStringGets;
+                return toStringFunction;
+            },
+        });
+
+        let output = "";
+        output += record(function() { return "" + Object(1n); }) + "|";
+        output += record(function() { return +Object(1n); }) + "|";
+        output += record(function() { return `${Object(1n)}`; }) + "|";
+        output += toStringGets + "," + toStringCalls + "|";
+
+        Object.defineProperty(BigInt.prototype, "valueOf", {
+            get: function() {
+                ++valueOfGets;
+                return valueOfFunction;
+            },
+        });
+
+        output += record(function() { return Object(1n) == 2n; }) + "|";
+        output += record(function() { return Object(1n) + 1n; }) + "|";
+        output += record(function() { return ({ "1foo": 1, "2": 2 })[Object(1n)]; }) + "|";
+        output += toStringGets + "," + toStringCalls + "," + valueOfGets + "," + valueOfCalls + "|";
+
+        toStringFunction = undefined;
+        output += record(function() { return 1 + Object(1n); }) + "|";
+        output += record(function() { return Object(1n) * 1n; }) + "|";
+        output += record(function() { return "".concat(Object(1n)); }) + "|";
+        output += toStringGets + "," + toStringCalls + "," + valueOfGets + "," + valueOfCalls;
+        output;
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "1|TypeError|1foo|1,1|true|3|1|2,2,2,2|TypeError|2|2|3,2,5,5"
+    );
 }
 
 #[test]

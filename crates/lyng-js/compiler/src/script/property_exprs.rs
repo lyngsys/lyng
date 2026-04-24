@@ -26,14 +26,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         current: u16,
         operator: lyng_js_ast::UpdateOp,
     ) -> LoweringResult<u16> {
-        let one = self.alloc_temp()?;
-        self.emit_load_smi(one, 1)?;
         let result = self.alloc_temp()?;
         let opcode = match operator {
-            lyng_js_ast::UpdateOp::Increment => Opcode::Add,
-            lyng_js_ast::UpdateOp::Decrement => Opcode::Sub,
+            lyng_js_ast::UpdateOp::Increment => Opcode::Increment,
+            lyng_js_ast::UpdateOp::Decrement => Opcode::Decrement,
         };
-        self.emit_profiled_binary(opcode, result, current, one)?;
+        self.emit_profiled_update(opcode, result, current)?;
         Ok(result)
     }
 

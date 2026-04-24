@@ -302,6 +302,8 @@ const JS3_NUMBER_VALUE_OF_RAW: u32 = 2_048;
 const JS3_BIGINT_RAW: u32 = 2_049;
 const JS3_BIGINT_TO_STRING_RAW: u32 = 2_050;
 const JS3_BIGINT_VALUE_OF_RAW: u32 = 2_051;
+const JS3_BIGINT_AS_INT_N_RAW: u32 = 2_148;
+const JS3_BIGINT_AS_UINT_N_RAW: u32 = 2_149;
 const JS3_MATH_ABS_RAW: u32 = 2_052;
 const JS3_MATH_FLOOR_RAW: u32 = 2_053;
 const JS3_MATH_MAX_RAW: u32 = 2_054;
@@ -315,6 +317,7 @@ const JS3_NUMBER_TO_EXPONENTIAL_RAW: u32 = 2_061;
 const JS3_STRING_RAW: u32 = 2_062;
 const JS3_STRING_TO_STRING_RAW: u32 = 2_063;
 const JS3_STRING_VALUE_OF_RAW: u32 = 2_064;
+const JS3_STRING_CONCAT_RAW: u32 = 2_150;
 const JS3_REGEXP_RAW: u32 = 2_065;
 const JS3_REGEXP_TO_STRING_RAW: u32 = 2_066;
 const JS3_DATE_RAW: u32 = 2_067;
@@ -835,7 +838,7 @@ pub const JS3_INTERNAL_BUILTIN_NAMESPACE_END: u32 = JS3_INTERNAL_DIRECT_EVAL_RAW
 pub const JS3_CORE_BUILTIN_NAMESPACE_START: u32 = JS3_BOOLEAN_RAW;
 
 /// Last reserved builtin-entry payload for the public core builtin namespace.
-pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_STRING_SEARCH_RAW;
+pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_STRING_CONCAT_RAW;
 
 /// First reserved builtin-entry payload for the public completion builtin namespace.
 pub const JS3_COMPLETION_BUILTIN_NAMESPACE_START: u32 = JS3_PROMISE_RAW;
@@ -1690,6 +1693,14 @@ pub fn js3_string_value_of_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn js3_string_concat_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_STRING_CONCAT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn js3_string_char_at_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_STRING_CHAR_AT_RAW) {
         Some(id) => id,
@@ -2060,6 +2071,22 @@ pub fn js3_bigint_to_string_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn js3_bigint_value_of_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_BIGINT_VALUE_OF_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_bigint_as_int_n_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_BIGINT_AS_INT_N_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_bigint_as_uint_n_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_BIGINT_AS_UINT_N_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }
@@ -5903,7 +5930,7 @@ mod tests {
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_END, 1_036);
         assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_START, 2_001);
-        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_147);
+        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_150);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_START, 3_101);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_END, 3_500);
     }

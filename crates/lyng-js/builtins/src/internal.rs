@@ -291,7 +291,12 @@ impl InternalBuiltinCache {
             );
             let number_prototype = objects.alloc_object(
                 &mut mutator,
-                ObjectAllocation::ordinary(root_shape).with_prototype(Some(object_prototype)),
+                ObjectAllocation::ordinary(root_shape)
+                    .with_prototype(Some(object_prototype))
+                    .with_cold_data(ObjectColdData::Ordinary(
+                        OrdinaryObjectData::PrimitiveWrapper(PrimitiveWrapperKind::Number),
+                    ))
+                    .with_primitive_wrapper_value(Value::from_smi(0)),
                 AllocationLifetime::Default,
             );
             let bigint_prototype = existing_intrinsics.bigint_prototype().unwrap_or_else(|| {
@@ -1170,11 +1175,29 @@ mod tests {
         );
         assert_eq!(
             agent
+                .objects()
+                .primitive_wrapper_kind(builtins.number_prototype()),
+            Some(PrimitiveWrapperKind::Number)
+        );
+        assert_eq!(
+            agent
+                .objects()
+                .primitive_wrapper_value(agent.heap().view(), builtins.number_prototype()),
+            Some(Value::from_smi(0))
+        );
+        assert_eq!(
+            agent
                 .realm(realm.id())
                 .unwrap()
                 .intrinsics()
                 .bigint_prototype(),
             Some(builtins.bigint_prototype())
+        );
+        assert_eq!(
+            agent
+                .objects()
+                .primitive_wrapper_kind(builtins.bigint_prototype()),
+            None
         );
         assert_eq!(
             agent

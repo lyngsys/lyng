@@ -186,6 +186,27 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
+    pub(super) fn emit_profiled_update(
+        &mut self,
+        opcode: Opcode,
+        dest: u16,
+        argument: u16,
+    ) -> LoweringResult<()> {
+        debug_assert!(matches!(opcode, Opcode::Increment | Opcode::Decrement));
+        let instruction_offset = self.builder.emit_abc(
+            opcode,
+            self.encode_register(dest)?,
+            self.encode_register(argument)?,
+            0,
+        );
+        self.builder.add_feedback_site(
+            instruction_offset,
+            FeedbackSiteKind::Arithmetic,
+            FeedbackSiteMetadata::None,
+        );
+        Ok(())
+    }
+
     pub(super) fn emit_load_new_target(&mut self, dest: u16) -> LoweringResult<()> {
         self.builder
             .emit_abx(Opcode::LoadNewTarget, self.encode_register(dest)?, 0);

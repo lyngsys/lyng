@@ -181,6 +181,8 @@ fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::ShiftRight
         | Opcode::UnsignedShiftRight
         | Opcode::Negate
+        | Opcode::Increment
+        | Opcode::Decrement
         | Opcode::Equal
         | Opcode::StrictEqual
         | Opcode::LessThan

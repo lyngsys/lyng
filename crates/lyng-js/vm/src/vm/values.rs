@@ -147,6 +147,34 @@ impl Vm {
         Ok(encode_number(-number))
     }
 
+    pub(super) fn update_numeric_value(
+        &self,
+        agent: &mut Agent,
+        value: Value,
+        increment: bool,
+    ) -> VmResult<Value> {
+        if value.is_bigint() {
+            let (sign, limbs) = bigint_value_parts(agent, value)?;
+            let unit_sign = if increment {
+                BigIntSign::NonNegative
+            } else {
+                BigIntSign::Negative
+            };
+            let (sign, limbs) = bigint_add_signed_parts(sign, &limbs, unit_sign, &[1]);
+            return Ok(alloc_bigint_value(agent, sign, &limbs));
+        }
+
+        let number = value
+            .as_f64()
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let updated = if increment {
+            number + 1.0
+        } else {
+            number - 1.0
+        };
+        Ok(encode_number(updated))
+    }
+
     pub(super) fn mul_values(
         &mut self,
         agent: &mut Agent,
