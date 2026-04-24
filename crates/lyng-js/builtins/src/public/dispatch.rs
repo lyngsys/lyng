@@ -40,19 +40,19 @@ use super::{
     js3_array_fill_builtin, js3_array_filter_builtin, js3_array_find_builtin,
     js3_array_find_index_builtin, js3_array_find_last_builtin, js3_array_find_last_index_builtin,
     js3_array_flat_builtin, js3_array_flat_map_builtin, js3_array_for_each_builtin,
-    js3_array_from_builtin, js3_array_includes_builtin, js3_array_index_of_builtin,
-    js3_array_is_array_builtin, js3_array_iterator_next_builtin, js3_array_join_builtin,
-    js3_array_keys_builtin, js3_array_last_index_of_builtin, js3_array_map_builtin,
-    js3_array_of_builtin, js3_array_pop_builtin, js3_array_push_builtin, js3_array_reduce_builtin,
-    js3_array_reduce_right_builtin, js3_array_reverse_builtin, js3_array_shift_builtin,
-    js3_array_slice_builtin, js3_array_some_builtin, js3_array_sort_builtin,
-    js3_array_species_getter_builtin, js3_array_splice_builtin, js3_array_to_locale_string_builtin,
-    js3_array_to_reversed_builtin, js3_array_to_sorted_builtin, js3_array_to_spliced_builtin,
-    js3_array_to_string_builtin, js3_array_unshift_builtin, js3_array_values_builtin,
-    js3_array_with_builtin, js3_async_function_builtin, js3_async_generator_function_builtin,
-    js3_async_generator_next_builtin, js3_async_generator_return_builtin,
-    js3_async_generator_throw_builtin, js3_atomics_add_builtin, js3_atomics_and_builtin,
-    js3_atomics_compare_exchange_builtin, js3_atomics_exchange_builtin,
+    js3_array_from_async_builtin, js3_array_from_builtin, js3_array_includes_builtin,
+    js3_array_index_of_builtin, js3_array_is_array_builtin, js3_array_iterator_next_builtin,
+    js3_array_join_builtin, js3_array_keys_builtin, js3_array_last_index_of_builtin,
+    js3_array_map_builtin, js3_array_of_builtin, js3_array_pop_builtin, js3_array_push_builtin,
+    js3_array_reduce_builtin, js3_array_reduce_right_builtin, js3_array_reverse_builtin,
+    js3_array_shift_builtin, js3_array_slice_builtin, js3_array_some_builtin,
+    js3_array_sort_builtin, js3_array_species_getter_builtin, js3_array_splice_builtin,
+    js3_array_to_locale_string_builtin, js3_array_to_reversed_builtin, js3_array_to_sorted_builtin,
+    js3_array_to_spliced_builtin, js3_array_to_string_builtin, js3_array_unshift_builtin,
+    js3_array_values_builtin, js3_array_with_builtin, js3_async_function_builtin,
+    js3_async_generator_function_builtin, js3_async_generator_next_builtin,
+    js3_async_generator_return_builtin, js3_async_generator_throw_builtin, js3_atomics_add_builtin,
+    js3_atomics_and_builtin, js3_atomics_compare_exchange_builtin, js3_atomics_exchange_builtin,
     js3_atomics_is_lock_free_builtin, js3_atomics_load_builtin, js3_atomics_notify_builtin,
     js3_atomics_or_builtin, js3_atomics_store_builtin, js3_atomics_sub_builtin,
     js3_atomics_wait_async_builtin, js3_atomics_wait_builtin, js3_atomics_xor_builtin,
@@ -1112,6 +1112,9 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == js3_array_from_builtin() {
         return array_from_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_array_from_async_builtin() {
+        return array_from_async_builtin(context, invocation).map(Some);
     }
     if entry == js3_array_of_builtin() {
         return array_of_builtin(context, invocation).map(Some);
@@ -4288,6 +4291,229 @@ fn array_from_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     set_length_property(cx, array, u64::try_from(values.len()).unwrap_or(u64::MAX))?;
     Ok(Value::from_object_ref(array))
+}
+
+const ARRAY_FROM_ASYNC_DYNAMIC_PARAMETERS: &str =
+    "asyncItems, mapfn, thisArg, iteratorSymbol, asyncIteratorSymbol";
+
+const ARRAY_FROM_ASYNC_DYNAMIC_BODY: &str = r#"
+"use strict";
+
+const MAX_SAFE_LENGTH = 9007199254740991;
+
+function isObject(value) {
+    return value !== null && (typeof value === "object" || typeof value === "function");
+}
+
+function isConstructor(value) {
+    if (!isObject(value)) {
+        return false;
+    }
+    try {
+        Reflect.construct(function() {}, [], value);
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+function getMethod(value, key) {
+    const method = value[key];
+    if (method === undefined || method === null) {
+        return undefined;
+    }
+    if (typeof method !== "function") {
+        throw new TypeError();
+    }
+    return method;
+}
+
+function toLength(value) {
+    let length = Number(value);
+    if (length !== length || length <= 0) {
+        return 0;
+    }
+    if (length === Infinity) {
+        return MAX_SAFE_LENGTH;
+    }
+    length = Math.floor(length);
+    if (length > MAX_SAFE_LENGTH) {
+        return MAX_SAFE_LENGTH;
+    }
+    return length;
+}
+
+function createDataProperty(object, index, value) {
+    Object.defineProperty(object, index, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true
+    });
+}
+
+async function closeIterator(iterator, completion) {
+    const returnMethod = getMethod(iterator, "return");
+    if (returnMethod !== undefined) {
+        let innerResult = returnMethod.call(iterator);
+        if (isObject(innerResult)) {
+            innerResult = await innerResult;
+        }
+        if (!isObject(innerResult)) {
+            throw new TypeError();
+        }
+    }
+    throw completion;
+}
+
+async function collectIterator(iterator, nextMethod, array, mapping, mapfn, thisArg, syncIterator) {
+    let index = 0;
+    while (true) {
+        let next = nextMethod.call(iterator);
+        if (!syncIterator && isObject(next)) {
+            next = await next;
+        }
+        if (!isObject(next)) {
+            throw new TypeError();
+        }
+        if (next.done) {
+            array.length = index;
+            return array;
+        }
+
+        let value = next.value;
+        if (syncIterator && isObject(value)) {
+            try {
+                value = await value;
+            } catch (error) {
+                await closeIterator(iterator, error);
+            }
+        }
+
+        if (index >= MAX_SAFE_LENGTH) {
+            await closeIterator(iterator, new TypeError());
+        }
+
+        let mapped = value;
+        if (mapping) {
+            try {
+                mapped = mapfn.call(thisArg, value, index);
+            } catch (error) {
+                await closeIterator(iterator, error);
+            }
+            if (isObject(mapped)) {
+                try {
+                    mapped = await mapped;
+                } catch (error) {
+                    await closeIterator(iterator, error);
+                }
+            }
+        }
+
+        try {
+            createDataProperty(array, index, mapped);
+        } catch (error) {
+            await closeIterator(iterator, error);
+        }
+        index += 1;
+    }
+}
+
+const mapping = mapfn !== undefined;
+if (mapping && typeof mapfn !== "function") {
+    throw new TypeError();
+}
+if (asyncItems === null || asyncItems === undefined) {
+    throw new TypeError();
+}
+
+const constructor = isConstructor(this);
+let iteratorMethod = getMethod(asyncItems, asyncIteratorSymbol);
+let syncIterator = false;
+if (iteratorMethod === undefined) {
+    iteratorMethod = getMethod(asyncItems, iteratorSymbol);
+    syncIterator = iteratorMethod !== undefined;
+}
+
+if (iteratorMethod !== undefined) {
+    const iterator = iteratorMethod.call(asyncItems);
+    if (!isObject(iterator)) {
+        throw new TypeError();
+    }
+    const nextMethod = getMethod(iterator, "next");
+    if (nextMethod === undefined) {
+        throw new TypeError();
+    }
+    const array = constructor ? Reflect.construct(this, []) : [];
+    return collectIterator(iterator, nextMethod, array, mapping, mapfn, thisArg, syncIterator);
+}
+
+const arrayLike = Object(asyncItems);
+const length = toLength(arrayLike.length);
+const array = constructor ? Reflect.construct(this, [length]) : new Array(length);
+for (let index = 0; index < length; index += 1) {
+    let value = arrayLike[index];
+    if (isObject(value)) {
+        value = await value;
+    }
+    if (mapping) {
+        value = mapfn.call(thisArg, value, index);
+        if (isObject(value)) {
+            value = await value;
+        }
+    }
+    createDataProperty(array, index, value);
+}
+array.length = length;
+return array;
+"#;
+
+fn array_from_async_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let realm = cx.builtin_realm();
+    let function = cx.create_dynamic_function(
+        realm,
+        ARRAY_FROM_ASYNC_DYNAMIC_PARAMETERS,
+        ARRAY_FROM_ASYNC_DYNAMIC_BODY,
+        true,
+        DynamicFunctionKind::Async,
+        None,
+    )?;
+    let iterator_symbol = cx
+        .agent()
+        .well_known_symbol(WellKnownSymbolId::Iterator)
+        .ok_or_else(|| type_error(cx))?;
+    let async_iterator_symbol = cx
+        .agent()
+        .well_known_symbol(WellKnownSymbolId::AsyncIterator)
+        .ok_or_else(|| type_error(cx))?;
+    let mut arguments = Vec::with_capacity(5);
+    arguments.push(
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    );
+    arguments.push(
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    );
+    arguments.push(
+        invocation
+            .arguments()
+            .get(2)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    );
+    arguments.push(Value::from_symbol_ref(iterator_symbol));
+    arguments.push(Value::from_symbol_ref(async_iterator_symbol));
+    cx.call_to_completion(function, invocation.this_value(), &arguments)
 }
 
 fn array_of_builtin<Cx: PublicBuiltinDispatchContext>(

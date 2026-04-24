@@ -4124,6 +4124,32 @@ fn script_core_array_from_closes_iterators_when_mapper_throws() {
 }
 
 #[test]
+fn script_core_array_from_async_has_builtin_function_shape() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        let descriptor = Object.getOwnPropertyDescriptor(Array, "fromAsync");
+        total += typeof Array.fromAsync === "function" ? 1 : 0;
+        total += descriptor && descriptor.writable === true ? 2 : 0;
+        total += descriptor && descriptor.enumerable === false ? 4 : 0;
+        total += descriptor && descriptor.configurable === true ? 8 : 0;
+        total += Array.fromAsync.length === 1 ? 16 : 0;
+        total += Array.fromAsync.name === "fromAsync" ? 32 : 0;
+        total += Object.getPrototypeOf(Array.fromAsync) === Function.prototype ? 64 : 0;
+        total += Object.getOwnPropertyDescriptor(Array.fromAsync, "prototype") === undefined ? 128 : 0;
+        try {
+            new Array.fromAsync();
+        } catch (error) {
+            total += error && error.name === "TypeError" ? 256 : 0;
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(511));
+}
+
+#[test]
 fn script_core_supports_fractional_computed_property_keys() {
     let result = compile_and_run(
         r#"

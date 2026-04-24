@@ -48,7 +48,6 @@ const UNSUPPORTED_FEATURES: &[&str] = &[
     "promise-try",
     "set-methods",
     "promise-with-resolvers",
-    "Array.fromAsync",
     "Atomics.pause",
     "Atomics.waitAsync",
     "upsert",

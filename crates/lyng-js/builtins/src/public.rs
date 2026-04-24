@@ -22,19 +22,19 @@ use lyng_js_types::{
     js3_array_fill_builtin, js3_array_filter_builtin, js3_array_find_builtin,
     js3_array_find_index_builtin, js3_array_find_last_builtin, js3_array_find_last_index_builtin,
     js3_array_flat_builtin, js3_array_flat_map_builtin, js3_array_for_each_builtin,
-    js3_array_from_builtin, js3_array_includes_builtin, js3_array_index_of_builtin,
-    js3_array_is_array_builtin, js3_array_iterator_next_builtin, js3_array_join_builtin,
-    js3_array_keys_builtin, js3_array_last_index_of_builtin, js3_array_map_builtin,
-    js3_array_of_builtin, js3_array_pop_builtin, js3_array_push_builtin, js3_array_reduce_builtin,
-    js3_array_reduce_right_builtin, js3_array_reverse_builtin, js3_array_shift_builtin,
-    js3_array_slice_builtin, js3_array_some_builtin, js3_array_sort_builtin,
-    js3_array_species_getter_builtin, js3_array_splice_builtin, js3_array_to_locale_string_builtin,
-    js3_array_to_reversed_builtin, js3_array_to_sorted_builtin, js3_array_to_spliced_builtin,
-    js3_array_to_string_builtin, js3_array_unshift_builtin, js3_array_values_builtin,
-    js3_array_with_builtin, js3_async_function_builtin, js3_async_generator_function_builtin,
-    js3_async_generator_next_builtin, js3_async_generator_return_builtin,
-    js3_async_generator_throw_builtin, js3_atomics_add_builtin, js3_atomics_and_builtin,
-    js3_atomics_compare_exchange_builtin, js3_atomics_exchange_builtin,
+    js3_array_from_async_builtin, js3_array_from_builtin, js3_array_includes_builtin,
+    js3_array_index_of_builtin, js3_array_is_array_builtin, js3_array_iterator_next_builtin,
+    js3_array_join_builtin, js3_array_keys_builtin, js3_array_last_index_of_builtin,
+    js3_array_map_builtin, js3_array_of_builtin, js3_array_pop_builtin, js3_array_push_builtin,
+    js3_array_reduce_builtin, js3_array_reduce_right_builtin, js3_array_reverse_builtin,
+    js3_array_shift_builtin, js3_array_slice_builtin, js3_array_some_builtin,
+    js3_array_sort_builtin, js3_array_species_getter_builtin, js3_array_splice_builtin,
+    js3_array_to_locale_string_builtin, js3_array_to_reversed_builtin, js3_array_to_sorted_builtin,
+    js3_array_to_spliced_builtin, js3_array_to_string_builtin, js3_array_unshift_builtin,
+    js3_array_values_builtin, js3_array_with_builtin, js3_async_function_builtin,
+    js3_async_generator_function_builtin, js3_async_generator_next_builtin,
+    js3_async_generator_return_builtin, js3_async_generator_throw_builtin, js3_atomics_add_builtin,
+    js3_atomics_and_builtin, js3_atomics_compare_exchange_builtin, js3_atomics_exchange_builtin,
     js3_atomics_is_lock_free_builtin, js3_atomics_load_builtin, js3_atomics_notify_builtin,
     js3_atomics_or_builtin, js3_atomics_store_builtin, js3_atomics_sub_builtin,
     js3_atomics_wait_async_builtin, js3_atomics_wait_builtin, js3_atomics_xor_builtin,
@@ -251,6 +251,7 @@ pub struct PublicRealmBuiltins {
     async_iterator_prototype: ObjectRef,
     array: ObjectRef,
     array_from: ObjectRef,
+    array_from_async: ObjectRef,
     array_of: ObjectRef,
     array_unscopables: ObjectRef,
     map: ObjectRef,
@@ -948,6 +949,9 @@ impl PublicRealmBuiltins {
         }
         if entry == js3_array_from_builtin() {
             return Some(self.array_from);
+        }
+        if entry == js3_array_from_async_builtin() {
+            return Some(self.array_from_async);
         }
         if entry == js3_map_builtin() {
             return Some(self.map);
@@ -3062,6 +3066,17 @@ impl BuiltinCache {
                 object_prototype,
                 js3_array_from_builtin(),
                 public_builtin_metadata(js3_array_from_builtin()).unwrap(),
+                None,
+            ),
+            array_from_async: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_array_from_async_builtin(),
+                public_builtin_metadata(js3_array_from_async_builtin()).unwrap(),
                 None,
             ),
             array_of: allocate_builtin_function_object(
@@ -8189,6 +8204,7 @@ impl BuiltinCache {
         let find_last_atom = agent.atoms_mut().intern_collectible("findLast");
         let find_last_index_atom = agent.atoms_mut().intern_collectible("findLastIndex");
         let from_atom = agent.atoms_mut().intern_collectible("from");
+        let from_async_atom = agent.atoms_mut().intern_collectible("fromAsync");
         let for_each_atom = agent.atoms_mut().intern_collectible("forEach");
         let includes_atom = agent.atoms_mut().intern_collectible("includes");
         let index_of_atom = agent.atoms_mut().intern_collectible("indexOf");
@@ -8625,6 +8641,11 @@ impl BuiltinCache {
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(from_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_array_from_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(from_async_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_from_async_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -12886,6 +12907,9 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     }
     if entry == js3_array_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
+    }
+    if entry == js3_array_from_async_builtin() {
+        return Some(BuiltinEntryMetadata::new("fromAsync", 1, false, false));
     }
     if entry == js3_array_of_builtin() {
         return Some(BuiltinEntryMetadata::new("of", 0, false, false));

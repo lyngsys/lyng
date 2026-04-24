@@ -2495,6 +2495,214 @@ fn evaluate_script_resolves_promise_all_values_in_order() {
 }
 
 #[test]
+fn evaluate_script_array_from_async_resolves_sync_iterable_values() {
+    let unit = compile_test_unit(
+        220,
+        r#"
+            Array.fromAsync([Promise.resolve(1), 2], function(value, index) {
+                return Promise.resolve(value + index + 1);
+            });
+        "#,
+    );
+    let host = TestHost::new();
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .unwrap();
+
+    let promise = result
+        .as_object_ref()
+        .expect("Array.fromAsync should return a promise object");
+    let record = agent
+        .promise_record(promise)
+        .expect("Array.fromAsync promise should remain tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    let values = record
+        .result()
+        .as_object_ref()
+        .expect("Array.fromAsync should fulfill with an array object");
+    assert_eq!(
+        get(agent, values, PropertyKey::from_array_index(0).unwrap()).unwrap(),
+        Value::from_smi(2)
+    );
+    assert_eq!(
+        get(agent, values, PropertyKey::from_array_index(1).unwrap()).unwrap(),
+        Value::from_smi(4)
+    );
+}
+
+#[test]
+fn evaluate_script_array_from_async_uses_intrinsic_iterator_symbols() {
+    let unit = compile_test_unit(
+        220,
+        r#"
+            var originalSymbol = globalThis.Symbol;
+            var fakeIterator = originalSymbol("iterator");
+            var fakeAsyncIterator = originalSymbol("asyncIterator");
+            globalThis.Symbol = {
+                iterator: fakeIterator,
+                asyncIterator: fakeAsyncIterator
+            };
+            var input = {
+                length: 2,
+                0: 5,
+                1: 6
+            };
+            input[fakeIterator] = function() {
+                throw new Error("fake sync iterator should not be used");
+            };
+            input[fakeAsyncIterator] = function() {
+                throw new Error("fake async iterator should not be used");
+            };
+            var result = Array.fromAsync(input);
+            globalThis.Symbol = originalSymbol;
+            result;
+        "#,
+    );
+    let host = TestHost::new();
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .unwrap();
+
+    let promise = result
+        .as_object_ref()
+        .expect("Array.fromAsync should return a promise object");
+    let record = agent
+        .promise_record(promise)
+        .expect("Array.fromAsync promise should remain tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    let values = record
+        .result()
+        .as_object_ref()
+        .expect("Array.fromAsync should fulfill with an array object");
+    assert_eq!(
+        get(agent, values, PropertyKey::from_array_index(0).unwrap()).unwrap(),
+        Value::from_smi(5)
+    );
+    assert_eq!(
+        get(agent, values, PropertyKey::from_array_index(1).unwrap()).unwrap(),
+        Value::from_smi(6)
+    );
+}
+
+#[test]
+fn evaluate_script_array_from_async_preserves_custom_constructor_operation_order() {
+    let unit = compile_test_unit(
+        220,
+        r#"
+            async function main() {
+                var calls = [];
+                function format(key) {
+                    return "A[" + key + "]";
+                }
+                function MyArray() {
+                    calls.push("construct MyArray");
+                    return new Proxy(Object.create(null), {
+                        set(target, key, value) {
+                            calls.push("set " + format(key));
+                            return Reflect.set(target, key, value);
+                        },
+                        defineProperty(target, key, descriptor) {
+                            calls.push("defineProperty " + format(key));
+                            return Reflect.defineProperty(target, key, descriptor);
+                        }
+                    });
+                }
+                await Array.fromAsync.call(MyArray, [1, 2]);
+                return calls.join("|");
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("Array.fromAsync operation-order test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("Array.fromAsync promise should remain tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    let text = record
+        .result()
+        .as_string_ref()
+        .expect("operation order should be returned as a string");
+    assert_eq!(
+        decode_string(agent.heap().view().string_view(text).unwrap()),
+        "construct MyArray|defineProperty A[0]|defineProperty A[1]|set A[length]"
+    );
+}
+
+#[test]
+fn evaluate_script_array_from_async_custom_constructor_uses_custom_sync_iterator() {
+    let unit = compile_test_unit(
+        220,
+        r#"
+            async function main() {
+                function MyArray() {
+                    return [];
+                }
+                var input = [1, 2];
+                input[Symbol.iterator] = function() {
+                    var index = 0;
+                    return {
+                        next() {
+                            index += 1;
+                            if (index === 1) {
+                                return { value: Promise.resolve(10), done: false };
+                            }
+                            if (index === 2) {
+                                return { value: 20, done: false };
+                            }
+                            return { done: true };
+                        }
+                    };
+                };
+                var result = await Array.fromAsync.call(MyArray, input);
+                return result.join(",");
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("Array.fromAsync custom iterator test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("Array.fromAsync promise should remain tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    let text = record
+        .result()
+        .as_string_ref()
+        .expect("custom iterator result should be returned as a string");
+    assert_eq!(
+        decode_string(agent.heap().view().string_view(text).unwrap()),
+        "10,20"
+    );
+}
+
+#[test]
 fn evaluate_script_resolves_promise_all_settled_records() {
     let unit = compile_test_unit(
         221,

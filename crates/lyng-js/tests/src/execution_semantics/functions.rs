@@ -1061,6 +1061,20 @@ fn phase4_functions_evaluate_argument_assignments_left_to_right_and_create_globa
 }
 
 #[test]
+fn phase4_functions_call_default_parameter_function_with_supplied_argument() {
+    let result = compile_and_run(
+        r#"
+        function format(key, objectName = "") {
+            return objectName + "." + key;
+        }
+        format("length", "A") === "A.length" ? 1 : 0;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
 fn phase4_functions_delete_mapped_arguments_elements() {
     let result = compile_and_run(
         r#"

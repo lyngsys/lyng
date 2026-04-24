@@ -536,6 +536,7 @@ const JS3_ARRAY_FLAT_RAW: u32 = 2_267;
 const JS3_ARRAY_FLAT_MAP_RAW: u32 = 2_268;
 const JS3_ARRAY_POP_RAW: u32 = 2_269;
 const JS3_ARRAY_PUSH_RAW: u32 = 2_270;
+const JS3_ARRAY_FROM_ASYNC_RAW: u32 = 2_271;
 const JS3_PROMISE_RAW: u32 = 3_101;
 const JS3_PROMISE_THEN_RAW: u32 = 3_102;
 const JS3_PROMISE_CATCH_RAW: u32 = 3_103;
@@ -3102,6 +3103,14 @@ pub fn js3_array_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn js3_array_from_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_ARRAY_FROM_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_array_from_async_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_ARRAY_FROM_ASYNC_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }

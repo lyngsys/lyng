@@ -132,8 +132,14 @@ impl<'a> Analyzer<'a> {
             captures.sort_unstable_by_key(|b| b.raw());
             captures.dedup();
 
-            let func_scope = self.functions.get(fid).scope_root;
-            let needs_env = !captures.is_empty() || self.scope_tree_needs_env(func_scope);
+            let function = self.functions.get(fid);
+            let func_scope = function.scope_root;
+            let parameter_scope_needs_env = function
+                .param_scope
+                .is_some_and(|scope| self.scope_tree_needs_env(scope));
+            let needs_env = !captures.is_empty()
+                || self.scope_tree_needs_env(func_scope)
+                || parameter_scope_needs_env;
 
             self.functions.get_mut(fid).captures = captures;
             self.functions.get_mut(fid).needs_environment = needs_env;

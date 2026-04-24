@@ -434,12 +434,13 @@ fn inner_function_captures_outer_variable() {
     let atoms = atoms();
     let result = analyze_script(&parsed, &atoms);
 
-    // The var x binding should be marked as captured.
+    // The global var x binding should be marked as captured while staying
+    // on the global-name path.
     let global = result.scope_table.get(ScopeId::new(0));
     let x_binding_id = global.bindings[0];
     let x_binding = result.binding_table.get(x_binding_id);
     assert!(x_binding.is_captured);
-    assert_eq!(x_binding.storage_class, StorageClass::EnvironmentSlot);
+    assert_eq!(x_binding.storage_class, StorageClass::GlobalName);
 }
 
 // ===================================================================
@@ -1080,7 +1081,7 @@ fn uncaptured_local_is_frame_local() {
 
 #[test]
 fn captured_variable_is_environment_slot() {
-    // var x = 1; (function() { x; })
+    // let x = 1; (function() { x; })
     let x_atom = AtomId::from_raw(100);
     let parsed = make_script(|ast| {
         let pat = ast.alloc_pattern(Pattern::Identifier {
@@ -1100,7 +1101,7 @@ fn captured_variable_is_environment_slot() {
         let declarators = ast.alloc_var_declarator_list(&[declarator]);
         let var_decl = ast.alloc_decl(Decl::Variable {
             span: span(),
-            kind: VariableKind::Var,
+            kind: VariableKind::Let,
             declarators,
         });
         let var_stmt = ast.alloc_stmt(Stmt::Declaration {
@@ -1147,7 +1148,7 @@ fn captured_variable_is_environment_slot() {
         .binding_table
         .as_slice()
         .iter()
-        .find(|b| b.name == x_atom && b.kind == DeclarationKind::Var)
+        .find(|b| b.name == x_atom && b.kind == DeclarationKind::Let)
         .unwrap();
     assert!(x_binding.is_captured);
     assert_eq!(x_binding.storage_class, StorageClass::EnvironmentSlot);
@@ -2240,11 +2241,11 @@ fn use_strict_directive_enables_strict() {
 
 #[test]
 fn environment_bindings_get_slot_indices() {
-    // var x = 1; var y = 2; (function() { x; y; })
+    // let x = 1; let y = 2; (function() { x; y; })
     let x_atom = AtomId::from_raw(100);
     let y_atom = AtomId::from_raw(101);
     let parsed = make_script(|ast| {
-        // var x = 1;
+        // let x = 1;
         let pat_x = ast.alloc_pattern(Pattern::Identifier {
             span: span(),
             name: x_atom,
@@ -2262,7 +2263,7 @@ fn environment_bindings_get_slot_indices() {
         let declarators_x = ast.alloc_var_declarator_list(&[decl_x]);
         let var_x = ast.alloc_decl(Decl::Variable {
             span: span(),
-            kind: VariableKind::Var,
+            kind: VariableKind::Let,
             declarators: declarators_x,
         });
         let stmt_x = ast.alloc_stmt(Stmt::Declaration {
@@ -2270,7 +2271,7 @@ fn environment_bindings_get_slot_indices() {
             decl: var_x,
         });
 
-        // var y = 2;
+        // let y = 2;
         let pat_y = ast.alloc_pattern(Pattern::Identifier {
             span: span(),
             name: y_atom,
@@ -2288,7 +2289,7 @@ fn environment_bindings_get_slot_indices() {
         let declarators_y = ast.alloc_var_declarator_list(&[decl_y]);
         let var_y = ast.alloc_decl(Decl::Variable {
             span: span(),
-            kind: VariableKind::Var,
+            kind: VariableKind::Let,
             declarators: declarators_y,
         });
         let stmt_y = ast.alloc_stmt(Stmt::Declaration {
@@ -2342,18 +2343,18 @@ fn environment_bindings_get_slot_indices() {
     let result = analyze_script(&parsed, &atoms);
 
     // Both x and y should have slot indices since they're captured
-    // and stored as EnvironmentSlot.
+    // global lexicals stored as EnvironmentSlot.
     let x_binding = result
         .binding_table
         .as_slice()
         .iter()
-        .find(|b| b.name == x_atom && b.kind == DeclarationKind::Var)
+        .find(|b| b.name == x_atom && b.kind == DeclarationKind::Let)
         .unwrap();
     let y_binding = result
         .binding_table
         .as_slice()
         .iter()
-        .find(|b| b.name == y_atom && b.kind == DeclarationKind::Var)
+        .find(|b| b.name == y_atom && b.kind == DeclarationKind::Let)
         .unwrap();
 
     assert_eq!(x_binding.storage_class, StorageClass::EnvironmentSlot);
