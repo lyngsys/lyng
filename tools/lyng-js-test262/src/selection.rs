@@ -289,22 +289,6 @@ const EXPLICIT_TEST_SKIPS: &[(&str, &str)] = &[
         "built-ins/ArrayBuffer/length-is-too-large-throws.js",
         "runtime abort: oversize ArrayBuffer allocation guard missing",
     ),
-    (
-        "built-ins/Array/prototype/slice/S15.4.4.10_A3_T1.js",
-        "runtime abort: oversize Array.prototype.slice length guard missing",
-    ),
-    (
-        "built-ins/Array/prototype/slice/S15.4.4.10_A3_T2.js",
-        "runtime abort: oversize Array.prototype.slice length guard missing",
-    ),
-    (
-        "built-ins/Array/prototype/slice/length-exceeding-integer-limit.js",
-        "runtime abort: oversize Array.prototype.slice length guard missing",
-    ),
-    (
-        "built-ins/Array/prototype/slice/length-exceeding-integer-limit-proxied-array.js",
-        "runtime abort: oversize Array.prototype.slice length guard missing",
-    ),
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
