@@ -13525,6 +13525,29 @@ const PUBLIC_KEYED_COLLECTION_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     ),
 ];
 
+const PUBLIC_WEAK_REF_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(
+        js3_weak_ref_builtin,
+        BuiltinEntryMetadata::new("WeakRef", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_finalization_registry_builtin,
+        BuiltinEntryMetadata::new("FinalizationRegistry", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_weak_ref_deref_builtin,
+        BuiltinEntryMetadata::new("deref", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_finalization_registry_register_builtin,
+        BuiltinEntryMetadata::new("register", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_finalization_registry_unregister_builtin,
+        BuiltinEntryMetadata::new("unregister", 1, false, false),
+    ),
+];
+
 fn public_builtin_metadata_from_rows(
     entry: BuiltinFunctionId,
     rows: &[PublicBuiltinMetadataRow],
@@ -13550,6 +13573,10 @@ fn keyed_collection_public_builtin_metadata(
     public_builtin_metadata_from_rows(entry, PUBLIC_KEYED_COLLECTION_BUILTIN_METADATA)
 }
 
+fn weak_ref_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
+    public_builtin_metadata_from_rows(entry, PUBLIC_WEAK_REF_BUILTIN_METADATA)
+}
+
 /// Compatibility metadata for the public core builtin namespace.
 #[inline]
 pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
@@ -13563,6 +13590,9 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
         return Some(metadata);
     }
     if let Some(metadata) = keyed_collection_public_builtin_metadata(entry) {
+        return Some(metadata);
+    }
+    if let Some(metadata) = weak_ref_public_builtin_metadata(entry) {
         return Some(metadata);
     }
     if entry == js3_abstract_module_source_builtin() {
@@ -13579,17 +13609,6 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
             0,
             false,
             false,
-        ));
-    }
-    if entry == js3_weak_ref_builtin() {
-        return Some(BuiltinEntryMetadata::new("WeakRef", 1, true, true));
-    }
-    if entry == js3_finalization_registry_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "FinalizationRegistry",
-            1,
-            true,
-            true,
         ));
     }
     if entry == js3_array_buffer_builtin() {
@@ -13727,15 +13746,6 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     }
     if entry == js3_uint8_array_builtin() {
         return Some(BuiltinEntryMetadata::new("Uint8Array", 3, true, true));
-    }
-    if entry == js3_weak_ref_deref_builtin() {
-        return Some(BuiltinEntryMetadata::new("deref", 0, false, false));
-    }
-    if entry == js3_finalization_registry_register_builtin() {
-        return Some(BuiltinEntryMetadata::new("register", 2, false, false));
-    }
-    if entry == js3_finalization_registry_unregister_builtin() {
-        return Some(BuiltinEntryMetadata::new("unregister", 1, false, false));
     }
     if entry == js3_array_buffer_byte_length_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get byteLength", 0, false, false));
@@ -15418,6 +15428,38 @@ mod tests {
                 keyed_collection_public_builtin_metadata(entry),
                 Some(metadata)
             );
+            assert_eq!(public_builtin_metadata(entry), Some(metadata));
+        }
+    }
+
+    #[test]
+    fn weak_ref_public_metadata_table_matches_public_lookup() {
+        let expected = [
+            (
+                js3_weak_ref_builtin(),
+                BuiltinEntryMetadata::new("WeakRef", 1, true, true),
+            ),
+            (
+                js3_finalization_registry_builtin(),
+                BuiltinEntryMetadata::new("FinalizationRegistry", 1, true, true),
+            ),
+            (
+                js3_weak_ref_deref_builtin(),
+                BuiltinEntryMetadata::new("deref", 0, false, false),
+            ),
+            (
+                js3_finalization_registry_register_builtin(),
+                BuiltinEntryMetadata::new("register", 2, false, false),
+            ),
+            (
+                js3_finalization_registry_unregister_builtin(),
+                BuiltinEntryMetadata::new("unregister", 1, false, false),
+            ),
+        ];
+
+        assert_eq!(PUBLIC_WEAK_REF_BUILTIN_METADATA.len(), expected.len());
+        for (entry, metadata) in expected {
+            assert_eq!(weak_ref_public_builtin_metadata(entry), Some(metadata));
             assert_eq!(public_builtin_metadata(entry), Some(metadata));
         }
     }
