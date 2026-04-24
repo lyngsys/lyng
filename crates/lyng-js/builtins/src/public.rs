@@ -12,7 +12,7 @@ use lyng_js_env::Agent;
 use lyng_js_gc::{AllocationLifetime, SymbolFlags};
 use lyng_js_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, ObjectAllocation,
-    ObjectColdData, OrdinaryObjectData, PrimitiveWrapperKind,
+    ObjectColdData, PrimitiveWrapperKind,
 };
 use lyng_js_types::{
     js3_aggregate_error_builtin, js3_array_buffer_builtin,
@@ -45,7 +45,25 @@ use lyng_js_types::{
     js3_data_view_set_int16_builtin, js3_data_view_set_int32_builtin,
     js3_data_view_set_int8_builtin, js3_data_view_set_uint16_builtin,
     js3_data_view_set_uint32_builtin, js3_data_view_set_uint8_builtin, js3_date_builtin,
-    js3_date_get_timezone_offset_builtin, js3_date_now_builtin, js3_date_to_string_builtin,
+    js3_date_get_date_builtin, js3_date_get_day_builtin, js3_date_get_full_year_builtin,
+    js3_date_get_hours_builtin, js3_date_get_milliseconds_builtin, js3_date_get_minutes_builtin,
+    js3_date_get_month_builtin, js3_date_get_seconds_builtin, js3_date_get_time_builtin,
+    js3_date_get_timezone_offset_builtin, js3_date_get_utc_date_builtin,
+    js3_date_get_utc_day_builtin, js3_date_get_utc_full_year_builtin,
+    js3_date_get_utc_hours_builtin, js3_date_get_utc_milliseconds_builtin,
+    js3_date_get_utc_minutes_builtin, js3_date_get_utc_month_builtin,
+    js3_date_get_utc_seconds_builtin, js3_date_now_builtin, js3_date_parse_builtin,
+    js3_date_set_date_builtin, js3_date_set_full_year_builtin, js3_date_set_hours_builtin,
+    js3_date_set_milliseconds_builtin, js3_date_set_minutes_builtin, js3_date_set_month_builtin,
+    js3_date_set_seconds_builtin, js3_date_set_time_builtin, js3_date_set_utc_date_builtin,
+    js3_date_set_utc_full_year_builtin, js3_date_set_utc_hours_builtin,
+    js3_date_set_utc_milliseconds_builtin, js3_date_set_utc_minutes_builtin,
+    js3_date_set_utc_month_builtin, js3_date_set_utc_seconds_builtin,
+    js3_date_to_date_string_builtin, js3_date_to_iso_string_builtin, js3_date_to_json_builtin,
+    js3_date_to_locale_date_string_builtin, js3_date_to_locale_string_builtin,
+    js3_date_to_locale_time_string_builtin, js3_date_to_primitive_builtin,
+    js3_date_to_string_builtin, js3_date_to_temporal_instant_builtin,
+    js3_date_to_time_string_builtin, js3_date_to_utc_string_builtin, js3_date_utc_builtin,
     js3_date_value_of_builtin, js3_decode_uri_builtin, js3_decode_uri_component_builtin,
     js3_encode_uri_builtin, js3_encode_uri_component_builtin, js3_error_builtin,
     js3_error_to_string_builtin, js3_eval_builtin, js3_eval_error_builtin,
@@ -62,11 +80,20 @@ use lyng_js_types::{
     js3_map_entries_builtin, js3_map_for_each_builtin, js3_map_get_builtin, js3_map_has_builtin,
     js3_map_iterator_next_builtin, js3_map_keys_builtin, js3_map_set_builtin,
     js3_map_size_getter_builtin, js3_map_values_builtin, js3_math_abs_builtin,
-    js3_math_floor_builtin, js3_math_max_builtin, js3_math_min_builtin, js3_math_pow_builtin,
-    js3_math_round_builtin, js3_math_sign_builtin, js3_math_sqrt_builtin, js3_math_trunc_builtin,
-    js3_number_builtin, js3_number_is_finite_builtin, js3_number_is_integer_builtin,
-    js3_number_is_nan_builtin, js3_number_is_safe_integer_builtin,
-    js3_number_to_exponential_builtin, js3_number_to_string_builtin, js3_number_value_of_builtin,
+    js3_math_acos_builtin, js3_math_acosh_builtin, js3_math_asin_builtin, js3_math_asinh_builtin,
+    js3_math_atan2_builtin, js3_math_atan_builtin, js3_math_atanh_builtin, js3_math_cbrt_builtin,
+    js3_math_ceil_builtin, js3_math_clz32_builtin, js3_math_cos_builtin, js3_math_cosh_builtin,
+    js3_math_exp_builtin, js3_math_expm1_builtin, js3_math_f16round_builtin,
+    js3_math_floor_builtin, js3_math_fround_builtin, js3_math_hypot_builtin, js3_math_imul_builtin,
+    js3_math_log10_builtin, js3_math_log1p_builtin, js3_math_log2_builtin, js3_math_log_builtin,
+    js3_math_max_builtin, js3_math_min_builtin, js3_math_pow_builtin, js3_math_random_builtin,
+    js3_math_round_builtin, js3_math_sign_builtin, js3_math_sin_builtin, js3_math_sinh_builtin,
+    js3_math_sqrt_builtin, js3_math_sum_precise_builtin, js3_math_tan_builtin,
+    js3_math_tanh_builtin, js3_math_trunc_builtin, js3_number_builtin,
+    js3_number_is_finite_builtin, js3_number_is_integer_builtin, js3_number_is_nan_builtin,
+    js3_number_is_safe_integer_builtin, js3_number_to_exponential_builtin,
+    js3_number_to_fixed_builtin, js3_number_to_locale_string_builtin,
+    js3_number_to_precision_builtin, js3_number_to_string_builtin, js3_number_value_of_builtin,
     js3_object_builtin, js3_object_create_builtin, js3_object_define_properties_builtin,
     js3_object_define_property_builtin, js3_object_entries_builtin, js3_object_freeze_builtin,
     js3_object_get_own_property_descriptor_builtin,
@@ -417,9 +444,53 @@ pub struct PublicRealmBuiltins {
     date: ObjectRef,
     date_prototype: ObjectRef,
     date_now: ObjectRef,
+    date_parse: ObjectRef,
+    date_utc: ObjectRef,
     date_to_string: ObjectRef,
+    date_to_date_string: ObjectRef,
+    date_to_time_string: ObjectRef,
+    date_to_locale_string: ObjectRef,
+    date_to_locale_date_string: ObjectRef,
+    date_to_locale_time_string: ObjectRef,
     date_value_of: ObjectRef,
+    date_get_time: ObjectRef,
+    date_get_full_year: ObjectRef,
+    date_get_utc_full_year: ObjectRef,
+    date_get_month: ObjectRef,
+    date_get_utc_month: ObjectRef,
+    date_get_date: ObjectRef,
+    date_get_utc_date: ObjectRef,
+    date_get_day: ObjectRef,
+    date_get_utc_day: ObjectRef,
+    date_get_hours: ObjectRef,
+    date_get_utc_hours: ObjectRef,
+    date_get_minutes: ObjectRef,
+    date_get_utc_minutes: ObjectRef,
+    date_get_seconds: ObjectRef,
+    date_get_utc_seconds: ObjectRef,
+    date_get_milliseconds: ObjectRef,
+    date_get_utc_milliseconds: ObjectRef,
     date_get_timezone_offset: ObjectRef,
+    date_set_time: ObjectRef,
+    date_set_milliseconds: ObjectRef,
+    date_set_utc_milliseconds: ObjectRef,
+    date_set_seconds: ObjectRef,
+    date_set_utc_seconds: ObjectRef,
+    date_set_minutes: ObjectRef,
+    date_set_utc_minutes: ObjectRef,
+    date_set_hours: ObjectRef,
+    date_set_utc_hours: ObjectRef,
+    date_set_date: ObjectRef,
+    date_set_utc_date: ObjectRef,
+    date_set_month: ObjectRef,
+    date_set_utc_month: ObjectRef,
+    date_set_full_year: ObjectRef,
+    date_set_utc_full_year: ObjectRef,
+    date_to_utc_string: ObjectRef,
+    date_to_iso_string: ObjectRef,
+    date_to_json: ObjectRef,
+    date_to_primitive: ObjectRef,
+    date_to_temporal_instant: ObjectRef,
     number: ObjectRef,
     number_prototype: ObjectRef,
     number_is_finite: ObjectRef,
@@ -427,17 +498,48 @@ pub struct PublicRealmBuiltins {
     number_is_nan: ObjectRef,
     number_is_safe_integer: ObjectRef,
     number_to_exponential: ObjectRef,
+    number_to_fixed: ObjectRef,
+    number_to_locale_string: ObjectRef,
+    number_to_precision: ObjectRef,
     number_to_string: ObjectRef,
     number_value_of: ObjectRef,
     math: ObjectRef,
     math_abs: ObjectRef,
+    math_acos: ObjectRef,
+    math_acosh: ObjectRef,
+    math_asin: ObjectRef,
+    math_asinh: ObjectRef,
+    math_atan: ObjectRef,
+    math_atan2: ObjectRef,
+    math_atanh: ObjectRef,
+    math_cbrt: ObjectRef,
+    math_ceil: ObjectRef,
+    math_clz32: ObjectRef,
+    math_cos: ObjectRef,
+    math_cosh: ObjectRef,
+    math_exp: ObjectRef,
+    math_expm1: ObjectRef,
+    math_f16round: ObjectRef,
     math_floor: ObjectRef,
+    math_fround: ObjectRef,
+    math_hypot: ObjectRef,
+    math_imul: ObjectRef,
+    math_log: ObjectRef,
+    math_log10: ObjectRef,
+    math_log1p: ObjectRef,
+    math_log2: ObjectRef,
     math_max: ObjectRef,
     math_min: ObjectRef,
     math_pow: ObjectRef,
+    math_random: ObjectRef,
     math_round: ObjectRef,
     math_sign: ObjectRef,
+    math_sin: ObjectRef,
+    math_sinh: ObjectRef,
     math_sqrt: ObjectRef,
+    math_sum_precise: ObjectRef,
+    math_tan: ObjectRef,
+    math_tanh: ObjectRef,
     math_trunc: ObjectRef,
     bigint: ObjectRef,
     bigint_as_int_n: ObjectRef,
@@ -1335,14 +1437,146 @@ impl PublicRealmBuiltins {
         if entry == js3_date_now_builtin() {
             return Some(self.date_now);
         }
+        if entry == js3_date_parse_builtin() {
+            return Some(self.date_parse);
+        }
+        if entry == js3_date_utc_builtin() {
+            return Some(self.date_utc);
+        }
         if entry == js3_date_to_string_builtin() {
             return Some(self.date_to_string);
+        }
+        if entry == js3_date_to_date_string_builtin() {
+            return Some(self.date_to_date_string);
+        }
+        if entry == js3_date_to_time_string_builtin() {
+            return Some(self.date_to_time_string);
+        }
+        if entry == js3_date_to_locale_string_builtin() {
+            return Some(self.date_to_locale_string);
+        }
+        if entry == js3_date_to_locale_date_string_builtin() {
+            return Some(self.date_to_locale_date_string);
+        }
+        if entry == js3_date_to_locale_time_string_builtin() {
+            return Some(self.date_to_locale_time_string);
         }
         if entry == js3_date_value_of_builtin() {
             return Some(self.date_value_of);
         }
+        if entry == js3_date_get_time_builtin() {
+            return Some(self.date_get_time);
+        }
+        if entry == js3_date_get_full_year_builtin() {
+            return Some(self.date_get_full_year);
+        }
+        if entry == js3_date_get_utc_full_year_builtin() {
+            return Some(self.date_get_utc_full_year);
+        }
+        if entry == js3_date_get_month_builtin() {
+            return Some(self.date_get_month);
+        }
+        if entry == js3_date_get_utc_month_builtin() {
+            return Some(self.date_get_utc_month);
+        }
+        if entry == js3_date_get_date_builtin() {
+            return Some(self.date_get_date);
+        }
+        if entry == js3_date_get_utc_date_builtin() {
+            return Some(self.date_get_utc_date);
+        }
+        if entry == js3_date_get_day_builtin() {
+            return Some(self.date_get_day);
+        }
+        if entry == js3_date_get_utc_day_builtin() {
+            return Some(self.date_get_utc_day);
+        }
+        if entry == js3_date_get_hours_builtin() {
+            return Some(self.date_get_hours);
+        }
+        if entry == js3_date_get_utc_hours_builtin() {
+            return Some(self.date_get_utc_hours);
+        }
+        if entry == js3_date_get_minutes_builtin() {
+            return Some(self.date_get_minutes);
+        }
+        if entry == js3_date_get_utc_minutes_builtin() {
+            return Some(self.date_get_utc_minutes);
+        }
+        if entry == js3_date_get_seconds_builtin() {
+            return Some(self.date_get_seconds);
+        }
+        if entry == js3_date_get_utc_seconds_builtin() {
+            return Some(self.date_get_utc_seconds);
+        }
+        if entry == js3_date_get_milliseconds_builtin() {
+            return Some(self.date_get_milliseconds);
+        }
+        if entry == js3_date_get_utc_milliseconds_builtin() {
+            return Some(self.date_get_utc_milliseconds);
+        }
         if entry == js3_date_get_timezone_offset_builtin() {
             return Some(self.date_get_timezone_offset);
+        }
+        if entry == js3_date_set_time_builtin() {
+            return Some(self.date_set_time);
+        }
+        if entry == js3_date_set_milliseconds_builtin() {
+            return Some(self.date_set_milliseconds);
+        }
+        if entry == js3_date_set_utc_milliseconds_builtin() {
+            return Some(self.date_set_utc_milliseconds);
+        }
+        if entry == js3_date_set_seconds_builtin() {
+            return Some(self.date_set_seconds);
+        }
+        if entry == js3_date_set_utc_seconds_builtin() {
+            return Some(self.date_set_utc_seconds);
+        }
+        if entry == js3_date_set_minutes_builtin() {
+            return Some(self.date_set_minutes);
+        }
+        if entry == js3_date_set_utc_minutes_builtin() {
+            return Some(self.date_set_utc_minutes);
+        }
+        if entry == js3_date_set_hours_builtin() {
+            return Some(self.date_set_hours);
+        }
+        if entry == js3_date_set_utc_hours_builtin() {
+            return Some(self.date_set_utc_hours);
+        }
+        if entry == js3_date_set_date_builtin() {
+            return Some(self.date_set_date);
+        }
+        if entry == js3_date_set_utc_date_builtin() {
+            return Some(self.date_set_utc_date);
+        }
+        if entry == js3_date_set_month_builtin() {
+            return Some(self.date_set_month);
+        }
+        if entry == js3_date_set_utc_month_builtin() {
+            return Some(self.date_set_utc_month);
+        }
+        if entry == js3_date_set_full_year_builtin() {
+            return Some(self.date_set_full_year);
+        }
+        if entry == js3_date_set_utc_full_year_builtin() {
+            return Some(self.date_set_utc_full_year);
+        }
+        if entry == js3_date_to_utc_string_builtin() {
+            return Some(self.date_to_utc_string);
+        }
+        if entry == js3_date_to_iso_string_builtin() {
+            return Some(self.date_to_iso_string);
+        }
+        if entry == js3_date_to_json_builtin() {
+            return Some(self.date_to_json);
+        }
+        if entry == js3_date_to_primitive_builtin() {
+            return Some(self.date_to_primitive);
+        }
+        if entry == js3_date_to_temporal_instant_builtin() {
+            return Some(self.date_to_temporal_instant);
         }
         if entry == js3_number_builtin() {
             return Some(self.number);
@@ -1362,6 +1596,15 @@ impl PublicRealmBuiltins {
         if entry == js3_number_to_exponential_builtin() {
             return Some(self.number_to_exponential);
         }
+        if entry == js3_number_to_fixed_builtin() {
+            return Some(self.number_to_fixed);
+        }
+        if entry == js3_number_to_locale_string_builtin() {
+            return Some(self.number_to_locale_string);
+        }
+        if entry == js3_number_to_precision_builtin() {
+            return Some(self.number_to_precision);
+        }
         if entry == js3_number_to_string_builtin() {
             return Some(self.number_to_string);
         }
@@ -1371,8 +1614,74 @@ impl PublicRealmBuiltins {
         if entry == js3_math_abs_builtin() {
             return Some(self.math_abs);
         }
+        if entry == js3_math_acos_builtin() {
+            return Some(self.math_acos);
+        }
+        if entry == js3_math_acosh_builtin() {
+            return Some(self.math_acosh);
+        }
+        if entry == js3_math_asin_builtin() {
+            return Some(self.math_asin);
+        }
+        if entry == js3_math_asinh_builtin() {
+            return Some(self.math_asinh);
+        }
+        if entry == js3_math_atan_builtin() {
+            return Some(self.math_atan);
+        }
+        if entry == js3_math_atan2_builtin() {
+            return Some(self.math_atan2);
+        }
+        if entry == js3_math_atanh_builtin() {
+            return Some(self.math_atanh);
+        }
+        if entry == js3_math_cbrt_builtin() {
+            return Some(self.math_cbrt);
+        }
+        if entry == js3_math_ceil_builtin() {
+            return Some(self.math_ceil);
+        }
+        if entry == js3_math_clz32_builtin() {
+            return Some(self.math_clz32);
+        }
+        if entry == js3_math_cos_builtin() {
+            return Some(self.math_cos);
+        }
+        if entry == js3_math_cosh_builtin() {
+            return Some(self.math_cosh);
+        }
+        if entry == js3_math_exp_builtin() {
+            return Some(self.math_exp);
+        }
+        if entry == js3_math_expm1_builtin() {
+            return Some(self.math_expm1);
+        }
+        if entry == js3_math_f16round_builtin() {
+            return Some(self.math_f16round);
+        }
         if entry == js3_math_floor_builtin() {
             return Some(self.math_floor);
+        }
+        if entry == js3_math_fround_builtin() {
+            return Some(self.math_fround);
+        }
+        if entry == js3_math_hypot_builtin() {
+            return Some(self.math_hypot);
+        }
+        if entry == js3_math_imul_builtin() {
+            return Some(self.math_imul);
+        }
+        if entry == js3_math_log_builtin() {
+            return Some(self.math_log);
+        }
+        if entry == js3_math_log10_builtin() {
+            return Some(self.math_log10);
+        }
+        if entry == js3_math_log1p_builtin() {
+            return Some(self.math_log1p);
+        }
+        if entry == js3_math_log2_builtin() {
+            return Some(self.math_log2);
         }
         if entry == js3_math_max_builtin() {
             return Some(self.math_max);
@@ -1383,14 +1692,32 @@ impl PublicRealmBuiltins {
         if entry == js3_math_pow_builtin() {
             return Some(self.math_pow);
         }
+        if entry == js3_math_random_builtin() {
+            return Some(self.math_random);
+        }
         if entry == js3_math_round_builtin() {
             return Some(self.math_round);
         }
         if entry == js3_math_sign_builtin() {
             return Some(self.math_sign);
         }
+        if entry == js3_math_sin_builtin() {
+            return Some(self.math_sin);
+        }
+        if entry == js3_math_sinh_builtin() {
+            return Some(self.math_sinh);
+        }
         if entry == js3_math_sqrt_builtin() {
             return Some(self.math_sqrt);
+        }
+        if entry == js3_math_sum_precise_builtin() {
+            return Some(self.math_sum_precise);
+        }
+        if entry == js3_math_tan_builtin() {
+            return Some(self.math_tan);
+        }
+        if entry == js3_math_tanh_builtin() {
+            return Some(self.math_tanh);
         }
         if entry == js3_math_trunc_builtin() {
             return Some(self.math_trunc);
@@ -1990,12 +2317,7 @@ impl BuiltinCache {
         });
         reparent_builtin_object(agent, regexp_prototype, Some(object_prototype));
         let date_prototype = existing_intrinsics.date_prototype().unwrap_or_else(|| {
-            allocate_builtin_date_object(
-                agent,
-                root_shape,
-                Some(object_prototype),
-                Value::from_f64(f64::NAN),
-            )
+            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
         });
         reparent_builtin_object(agent, date_prototype, Some(object_prototype));
         let number_prototype = internal.number_prototype();
@@ -4600,6 +4922,28 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_date_now_builtin()).unwrap(),
                 None,
             ),
+            date_parse: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_parse_builtin(),
+                public_builtin_metadata(js3_date_parse_builtin()).unwrap(),
+                None,
+            ),
+            date_utc: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_utc_builtin(),
+                public_builtin_metadata(js3_date_utc_builtin()).unwrap(),
+                None,
+            ),
             date_to_string: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -4609,6 +4953,61 @@ impl BuiltinCache {
                 object_prototype,
                 js3_date_to_string_builtin(),
                 public_builtin_metadata(js3_date_to_string_builtin()).unwrap(),
+                None,
+            ),
+            date_to_date_string: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_to_date_string_builtin(),
+                public_builtin_metadata(js3_date_to_date_string_builtin()).unwrap(),
+                None,
+            ),
+            date_to_time_string: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_to_time_string_builtin(),
+                public_builtin_metadata(js3_date_to_time_string_builtin()).unwrap(),
+                None,
+            ),
+            date_to_locale_string: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_to_locale_string_builtin(),
+                public_builtin_metadata(js3_date_to_locale_string_builtin()).unwrap(),
+                None,
+            ),
+            date_to_locale_date_string: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_to_locale_date_string_builtin(),
+                public_builtin_metadata(js3_date_to_locale_date_string_builtin()).unwrap(),
+                None,
+            ),
+            date_to_locale_time_string: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_to_locale_time_string_builtin(),
+                public_builtin_metadata(js3_date_to_locale_time_string_builtin()).unwrap(),
                 None,
             ),
             date_value_of: allocate_builtin_function_object(
@@ -4622,6 +5021,193 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_date_value_of_builtin()).unwrap(),
                 None,
             ),
+            date_get_time: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_time_builtin(),
+                public_builtin_metadata(js3_date_get_time_builtin()).unwrap(),
+                None,
+            ),
+            date_get_full_year: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_full_year_builtin(),
+                public_builtin_metadata(js3_date_get_full_year_builtin()).unwrap(),
+                None,
+            ),
+            date_get_utc_full_year: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_utc_full_year_builtin(),
+                public_builtin_metadata(js3_date_get_utc_full_year_builtin()).unwrap(),
+                None,
+            ),
+            date_get_month: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_month_builtin(),
+                public_builtin_metadata(js3_date_get_month_builtin()).unwrap(),
+                None,
+            ),
+            date_get_utc_month: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_utc_month_builtin(),
+                public_builtin_metadata(js3_date_get_utc_month_builtin()).unwrap(),
+                None,
+            ),
+            date_get_date: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_date_builtin(),
+                public_builtin_metadata(js3_date_get_date_builtin()).unwrap(),
+                None,
+            ),
+            date_get_utc_date: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_utc_date_builtin(),
+                public_builtin_metadata(js3_date_get_utc_date_builtin()).unwrap(),
+                None,
+            ),
+            date_get_day: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_day_builtin(),
+                public_builtin_metadata(js3_date_get_day_builtin()).unwrap(),
+                None,
+            ),
+            date_get_utc_day: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_utc_day_builtin(),
+                public_builtin_metadata(js3_date_get_utc_day_builtin()).unwrap(),
+                None,
+            ),
+            date_get_hours: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_hours_builtin(),
+                public_builtin_metadata(js3_date_get_hours_builtin()).unwrap(),
+                None,
+            ),
+            date_get_utc_hours: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_utc_hours_builtin(),
+                public_builtin_metadata(js3_date_get_utc_hours_builtin()).unwrap(),
+                None,
+            ),
+            date_get_minutes: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_minutes_builtin(),
+                public_builtin_metadata(js3_date_get_minutes_builtin()).unwrap(),
+                None,
+            ),
+            date_get_utc_minutes: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_utc_minutes_builtin(),
+                public_builtin_metadata(js3_date_get_utc_minutes_builtin()).unwrap(),
+                None,
+            ),
+            date_get_seconds: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_seconds_builtin(),
+                public_builtin_metadata(js3_date_get_seconds_builtin()).unwrap(),
+                None,
+            ),
+            date_get_utc_seconds: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_utc_seconds_builtin(),
+                public_builtin_metadata(js3_date_get_utc_seconds_builtin()).unwrap(),
+                None,
+            ),
+            date_get_milliseconds: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_milliseconds_builtin(),
+                public_builtin_metadata(js3_date_get_milliseconds_builtin()).unwrap(),
+                None,
+            ),
+            date_get_utc_milliseconds: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_get_utc_milliseconds_builtin(),
+                public_builtin_metadata(js3_date_get_utc_milliseconds_builtin()).unwrap(),
+                None,
+            ),
             date_get_timezone_offset: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -4631,6 +5217,226 @@ impl BuiltinCache {
                 object_prototype,
                 js3_date_get_timezone_offset_builtin(),
                 public_builtin_metadata(js3_date_get_timezone_offset_builtin()).unwrap(),
+                None,
+            ),
+            date_set_time: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_time_builtin(),
+                public_builtin_metadata(js3_date_set_time_builtin()).unwrap(),
+                None,
+            ),
+            date_set_milliseconds: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_milliseconds_builtin(),
+                public_builtin_metadata(js3_date_set_milliseconds_builtin()).unwrap(),
+                None,
+            ),
+            date_set_utc_milliseconds: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_utc_milliseconds_builtin(),
+                public_builtin_metadata(js3_date_set_utc_milliseconds_builtin()).unwrap(),
+                None,
+            ),
+            date_set_seconds: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_seconds_builtin(),
+                public_builtin_metadata(js3_date_set_seconds_builtin()).unwrap(),
+                None,
+            ),
+            date_set_utc_seconds: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_utc_seconds_builtin(),
+                public_builtin_metadata(js3_date_set_utc_seconds_builtin()).unwrap(),
+                None,
+            ),
+            date_set_minutes: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_minutes_builtin(),
+                public_builtin_metadata(js3_date_set_minutes_builtin()).unwrap(),
+                None,
+            ),
+            date_set_utc_minutes: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_utc_minutes_builtin(),
+                public_builtin_metadata(js3_date_set_utc_minutes_builtin()).unwrap(),
+                None,
+            ),
+            date_set_hours: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_hours_builtin(),
+                public_builtin_metadata(js3_date_set_hours_builtin()).unwrap(),
+                None,
+            ),
+            date_set_utc_hours: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_utc_hours_builtin(),
+                public_builtin_metadata(js3_date_set_utc_hours_builtin()).unwrap(),
+                None,
+            ),
+            date_set_date: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_date_builtin(),
+                public_builtin_metadata(js3_date_set_date_builtin()).unwrap(),
+                None,
+            ),
+            date_set_utc_date: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_utc_date_builtin(),
+                public_builtin_metadata(js3_date_set_utc_date_builtin()).unwrap(),
+                None,
+            ),
+            date_set_month: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_month_builtin(),
+                public_builtin_metadata(js3_date_set_month_builtin()).unwrap(),
+                None,
+            ),
+            date_set_utc_month: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_utc_month_builtin(),
+                public_builtin_metadata(js3_date_set_utc_month_builtin()).unwrap(),
+                None,
+            ),
+            date_set_full_year: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_full_year_builtin(),
+                public_builtin_metadata(js3_date_set_full_year_builtin()).unwrap(),
+                None,
+            ),
+            date_set_utc_full_year: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_set_utc_full_year_builtin(),
+                public_builtin_metadata(js3_date_set_utc_full_year_builtin()).unwrap(),
+                None,
+            ),
+            date_to_utc_string: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_to_utc_string_builtin(),
+                public_builtin_metadata(js3_date_to_utc_string_builtin()).unwrap(),
+                None,
+            ),
+            date_to_iso_string: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_to_iso_string_builtin(),
+                public_builtin_metadata(js3_date_to_iso_string_builtin()).unwrap(),
+                None,
+            ),
+            date_to_json: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_to_json_builtin(),
+                public_builtin_metadata(js3_date_to_json_builtin()).unwrap(),
+                None,
+            ),
+            date_to_primitive: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_to_primitive_builtin(),
+                public_builtin_metadata(js3_date_to_primitive_builtin()).unwrap(),
+                None,
+            ),
+            date_to_temporal_instant: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_date_to_temporal_instant_builtin(),
+                public_builtin_metadata(js3_date_to_temporal_instant_builtin()).unwrap(),
                 None,
             ),
             number: allocate_builtin_function_object(
@@ -4700,6 +5506,39 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_number_to_exponential_builtin()).unwrap(),
                 None,
             ),
+            number_to_fixed: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_number_to_fixed_builtin(),
+                public_builtin_metadata(js3_number_to_fixed_builtin()).unwrap(),
+                None,
+            ),
+            number_to_locale_string: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_number_to_locale_string_builtin(),
+                public_builtin_metadata(js3_number_to_locale_string_builtin()).unwrap(),
+                None,
+            ),
+            number_to_precision: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_number_to_precision_builtin(),
+                public_builtin_metadata(js3_number_to_precision_builtin()).unwrap(),
+                None,
+            ),
             number_to_string: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -4734,6 +5573,171 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_math_abs_builtin()).unwrap(),
                 None,
             ),
+            math_acos: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_acos_builtin(),
+                public_builtin_metadata(js3_math_acos_builtin()).unwrap(),
+                None,
+            ),
+            math_acosh: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_acosh_builtin(),
+                public_builtin_metadata(js3_math_acosh_builtin()).unwrap(),
+                None,
+            ),
+            math_asin: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_asin_builtin(),
+                public_builtin_metadata(js3_math_asin_builtin()).unwrap(),
+                None,
+            ),
+            math_asinh: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_asinh_builtin(),
+                public_builtin_metadata(js3_math_asinh_builtin()).unwrap(),
+                None,
+            ),
+            math_atan: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_atan_builtin(),
+                public_builtin_metadata(js3_math_atan_builtin()).unwrap(),
+                None,
+            ),
+            math_atan2: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_atan2_builtin(),
+                public_builtin_metadata(js3_math_atan2_builtin()).unwrap(),
+                None,
+            ),
+            math_atanh: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_atanh_builtin(),
+                public_builtin_metadata(js3_math_atanh_builtin()).unwrap(),
+                None,
+            ),
+            math_cbrt: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_cbrt_builtin(),
+                public_builtin_metadata(js3_math_cbrt_builtin()).unwrap(),
+                None,
+            ),
+            math_ceil: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_ceil_builtin(),
+                public_builtin_metadata(js3_math_ceil_builtin()).unwrap(),
+                None,
+            ),
+            math_clz32: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_clz32_builtin(),
+                public_builtin_metadata(js3_math_clz32_builtin()).unwrap(),
+                None,
+            ),
+            math_cos: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_cos_builtin(),
+                public_builtin_metadata(js3_math_cos_builtin()).unwrap(),
+                None,
+            ),
+            math_cosh: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_cosh_builtin(),
+                public_builtin_metadata(js3_math_cosh_builtin()).unwrap(),
+                None,
+            ),
+            math_exp: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_exp_builtin(),
+                public_builtin_metadata(js3_math_exp_builtin()).unwrap(),
+                None,
+            ),
+            math_expm1: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_expm1_builtin(),
+                public_builtin_metadata(js3_math_expm1_builtin()).unwrap(),
+                None,
+            ),
+            math_f16round: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_f16round_builtin(),
+                public_builtin_metadata(js3_math_f16round_builtin()).unwrap(),
+                None,
+            ),
             math_floor: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -4743,6 +5747,83 @@ impl BuiltinCache {
                 object_prototype,
                 js3_math_floor_builtin(),
                 public_builtin_metadata(js3_math_floor_builtin()).unwrap(),
+                None,
+            ),
+            math_fround: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_fround_builtin(),
+                public_builtin_metadata(js3_math_fround_builtin()).unwrap(),
+                None,
+            ),
+            math_hypot: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_hypot_builtin(),
+                public_builtin_metadata(js3_math_hypot_builtin()).unwrap(),
+                None,
+            ),
+            math_imul: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_imul_builtin(),
+                public_builtin_metadata(js3_math_imul_builtin()).unwrap(),
+                None,
+            ),
+            math_log: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_log_builtin(),
+                public_builtin_metadata(js3_math_log_builtin()).unwrap(),
+                None,
+            ),
+            math_log10: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_log10_builtin(),
+                public_builtin_metadata(js3_math_log10_builtin()).unwrap(),
+                None,
+            ),
+            math_log1p: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_log1p_builtin(),
+                public_builtin_metadata(js3_math_log1p_builtin()).unwrap(),
+                None,
+            ),
+            math_log2: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_log2_builtin(),
+                public_builtin_metadata(js3_math_log2_builtin()).unwrap(),
                 None,
             ),
             math_max: allocate_builtin_function_object(
@@ -4778,6 +5859,17 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_math_pow_builtin()).unwrap(),
                 None,
             ),
+            math_random: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_random_builtin(),
+                public_builtin_metadata(js3_math_random_builtin()).unwrap(),
+                None,
+            ),
             math_round: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -4800,6 +5892,28 @@ impl BuiltinCache {
                 public_builtin_metadata(js3_math_sign_builtin()).unwrap(),
                 None,
             ),
+            math_sin: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_sin_builtin(),
+                public_builtin_metadata(js3_math_sin_builtin()).unwrap(),
+                None,
+            ),
+            math_sinh: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_sinh_builtin(),
+                public_builtin_metadata(js3_math_sinh_builtin()).unwrap(),
+                None,
+            ),
             math_sqrt: allocate_builtin_function_object(
                 agent,
                 realm,
@@ -4809,6 +5923,39 @@ impl BuiltinCache {
                 object_prototype,
                 js3_math_sqrt_builtin(),
                 public_builtin_metadata(js3_math_sqrt_builtin()).unwrap(),
+                None,
+            ),
+            math_sum_precise: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_sum_precise_builtin(),
+                public_builtin_metadata(js3_math_sum_precise_builtin()).unwrap(),
+                None,
+            ),
+            math_tan: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_tan_builtin(),
+                public_builtin_metadata(js3_math_tan_builtin()).unwrap(),
+                None,
+            ),
+            math_tanh: allocate_builtin_function_object(
+                agent,
+                realm,
+                global_env,
+                root_shape,
+                function_prototype,
+                object_prototype,
+                js3_math_tanh_builtin(),
+                public_builtin_metadata(js3_math_tanh_builtin()).unwrap(),
                 None,
             ),
             math_trunc: allocate_builtin_function_object(
@@ -6206,13 +7353,48 @@ impl BuiltinCache {
             AllocationLifetime::Default,
         ));
         let abs_atom = agent.atoms_mut().intern_collectible("abs");
+        let acos_atom = agent.atoms_mut().intern_collectible("acos");
+        let acosh_atom = agent.atoms_mut().intern_collectible("acosh");
+        let asin_atom = agent.atoms_mut().intern_collectible("asin");
+        let asinh_atom = agent.atoms_mut().intern_collectible("asinh");
+        let atan_atom = agent.atoms_mut().intern_collectible("atan");
+        let atan2_atom = agent.atoms_mut().intern_collectible("atan2");
+        let atanh_atom = agent.atoms_mut().intern_collectible("atanh");
+        let cbrt_atom = agent.atoms_mut().intern_collectible("cbrt");
+        let ceil_atom = agent.atoms_mut().intern_collectible("ceil");
+        let clz32_atom = agent.atoms_mut().intern_collectible("clz32");
         let caller_atom = agent.atoms_mut().intern_collectible("caller");
+        let cos_atom = agent.atoms_mut().intern_collectible("cos");
+        let cosh_atom = agent.atoms_mut().intern_collectible("cosh");
         let escape_atom = agent.atoms_mut().intern_collectible("escape");
         let epsilon_atom = agent.atoms_mut().intern_collectible("EPSILON");
         let e_atom = agent.atoms_mut().intern_collectible("E");
+        let exp_atom = agent.atoms_mut().intern_collectible("exp");
+        let expm1_atom = agent.atoms_mut().intern_collectible("expm1");
+        let f16round_atom = agent.atoms_mut().intern_collectible("f16round");
         let floor_atom = agent.atoms_mut().intern_collectible("floor");
+        let fround_atom = agent.atoms_mut().intern_collectible("fround");
         let global_atom = agent.atoms_mut().intern_collectible("global");
+        let get_date_atom = agent.atoms_mut().intern_collectible("getDate");
+        let get_day_atom = agent.atoms_mut().intern_collectible("getDay");
+        let get_full_year_atom = agent.atoms_mut().intern_collectible("getFullYear");
+        let get_hours_atom = agent.atoms_mut().intern_collectible("getHours");
+        let get_milliseconds_atom = agent.atoms_mut().intern_collectible("getMilliseconds");
+        let get_minutes_atom = agent.atoms_mut().intern_collectible("getMinutes");
+        let get_month_atom = agent.atoms_mut().intern_collectible("getMonth");
+        let get_seconds_atom = agent.atoms_mut().intern_collectible("getSeconds");
+        let get_time_atom = agent.atoms_mut().intern_collectible("getTime");
         let get_timezone_offset_atom = agent.atoms_mut().intern_collectible("getTimezoneOffset");
+        let get_utc_date_atom = agent.atoms_mut().intern_collectible("getUTCDate");
+        let get_utc_day_atom = agent.atoms_mut().intern_collectible("getUTCDay");
+        let get_utc_full_year_atom = agent.atoms_mut().intern_collectible("getUTCFullYear");
+        let get_utc_hours_atom = agent.atoms_mut().intern_collectible("getUTCHours");
+        let get_utc_milliseconds_atom = agent.atoms_mut().intern_collectible("getUTCMilliseconds");
+        let get_utc_minutes_atom = agent.atoms_mut().intern_collectible("getUTCMinutes");
+        let get_utc_month_atom = agent.atoms_mut().intern_collectible("getUTCMonth");
+        let get_utc_seconds_atom = agent.atoms_mut().intern_collectible("getUTCSeconds");
+        let hypot_atom = agent.atoms_mut().intern_collectible("hypot");
+        let imul_atom = agent.atoms_mut().intern_collectible("imul");
         let is_atom = agent.atoms_mut().intern_collectible("is");
         let is_finite_atom = agent.atoms_mut().intern_collectible("isFinite");
         let is_integer_atom = agent.atoms_mut().intern_collectible("isInteger");
@@ -6222,6 +7404,10 @@ impl BuiltinCache {
         let last_index_of_atom = agent.atoms_mut().intern_collectible("lastIndexOf");
         let match_atom = agent.atoms_mut().intern_collectible("match");
         let multiline_atom = agent.atoms_mut().intern_collectible("multiline");
+        let log_atom = agent.atoms_mut().intern_collectible("log");
+        let log10_atom = agent.atoms_mut().intern_collectible("log10");
+        let log1p_atom = agent.atoms_mut().intern_collectible("log1p");
+        let log2_atom = agent.atoms_mut().intern_collectible("log2");
         let ln10_atom = agent.atoms_mut().intern_collectible("LN10");
         let ln2_atom = agent.atoms_mut().intern_collectible("LN2");
         let log10e_atom = agent.atoms_mut().intern_collectible("LOG10E");
@@ -6235,17 +7421,50 @@ impl BuiltinCache {
         let negative_infinity_atom = agent.atoms_mut().intern_collectible("NEGATIVE_INFINITY");
         let pad_end_atom = agent.atoms_mut().intern_collectible("padEnd");
         let pad_start_atom = agent.atoms_mut().intern_collectible("padStart");
+        let parse_atom = agent.atoms_mut().intern_collectible("parse");
+        let parse_float_atom = agent.atoms_mut().intern_collectible("parseFloat");
+        let parse_int_atom = agent.atoms_mut().intern_collectible("parseInt");
         let pi_atom = agent.atoms_mut().intern_collectible("PI");
         let positive_infinity_atom = agent.atoms_mut().intern_collectible("POSITIVE_INFINITY");
         let pow_atom = agent.atoms_mut().intern_collectible("pow");
+        let random_atom = agent.atoms_mut().intern_collectible("random");
         let repeat_atom = agent.atoms_mut().intern_collectible("repeat");
         let replace_atom = agent.atoms_mut().intern_collectible("replace");
         let round_atom = agent.atoms_mut().intern_collectible("round");
         let sign_atom = agent.atoms_mut().intern_collectible("sign");
+        let sin_atom = agent.atoms_mut().intern_collectible("sin");
+        let sinh_atom = agent.atoms_mut().intern_collectible("sinh");
+        let set_date_atom = agent.atoms_mut().intern_collectible("setDate");
+        let set_full_year_atom = agent.atoms_mut().intern_collectible("setFullYear");
+        let set_hours_atom = agent.atoms_mut().intern_collectible("setHours");
+        let set_milliseconds_atom = agent.atoms_mut().intern_collectible("setMilliseconds");
+        let set_minutes_atom = agent.atoms_mut().intern_collectible("setMinutes");
+        let set_month_atom = agent.atoms_mut().intern_collectible("setMonth");
+        let set_seconds_atom = agent.atoms_mut().intern_collectible("setSeconds");
+        let set_time_atom = agent.atoms_mut().intern_collectible("setTime");
+        let set_utc_date_atom = agent.atoms_mut().intern_collectible("setUTCDate");
+        let set_utc_full_year_atom = agent.atoms_mut().intern_collectible("setUTCFullYear");
+        let set_utc_hours_atom = agent.atoms_mut().intern_collectible("setUTCHours");
+        let set_utc_milliseconds_atom = agent.atoms_mut().intern_collectible("setUTCMilliseconds");
+        let set_utc_minutes_atom = agent.atoms_mut().intern_collectible("setUTCMinutes");
+        let set_utc_month_atom = agent.atoms_mut().intern_collectible("setUTCMonth");
+        let set_utc_seconds_atom = agent.atoms_mut().intern_collectible("setUTCSeconds");
         let split_atom = agent.atoms_mut().intern_collectible("split");
         let starts_with_atom = agent.atoms_mut().intern_collectible("startsWith");
         let sticky_atom = agent.atoms_mut().intern_collectible("sticky");
+        let sum_precise_atom = agent.atoms_mut().intern_collectible("sumPrecise");
+        let tan_atom = agent.atoms_mut().intern_collectible("tan");
+        let tanh_atom = agent.atoms_mut().intern_collectible("tanh");
+        let to_date_string_atom = agent.atoms_mut().intern_collectible("toDateString");
+        let to_iso_string_atom = agent.atoms_mut().intern_collectible("toISOString");
+        let to_json_atom = agent.atoms_mut().intern_collectible("toJSON");
+        let to_locale_date_string_atom = agent.atoms_mut().intern_collectible("toLocaleDateString");
+        let to_locale_time_string_atom = agent.atoms_mut().intern_collectible("toLocaleTimeString");
+        let to_temporal_instant_atom = agent.atoms_mut().intern_collectible("toTemporalInstant");
+        let to_time_string_atom = agent.atoms_mut().intern_collectible("toTimeString");
+        let to_utc_string_atom = agent.atoms_mut().intern_collectible("toUTCString");
         let substring_atom = agent.atoms_mut().intern_collectible("substring");
+        let utc_atom = agent.atoms_mut().intern_collectible("UTC");
         let concat_atom = agent.atoms_mut().intern_collectible("concat");
         let copy_within_atom = agent.atoms_mut().intern_collectible("copyWithin");
         let entries_atom = agent.atoms_mut().intern_collectible("entries");
@@ -6349,6 +7568,8 @@ impl BuiltinCache {
         let test_atom = agent.atoms_mut().intern_collectible("test");
         let trunc_atom = agent.atoms_mut().intern_collectible("trunc");
         let to_exponential_atom = agent.atoms_mut().intern_collectible("toExponential");
+        let to_fixed_atom = agent.atoms_mut().intern_collectible("toFixed");
+        let to_precision_atom = agent.atoms_mut().intern_collectible("toPrecision");
         let unicode_atom = agent.atoms_mut().intern_collectible("unicode");
         let arguments_atom = agent.atoms_mut().intern_collectible("arguments");
         let wait_atom = agent.atoms_mut().intern_collectible("wait");
@@ -8801,11 +10022,23 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let date_descriptors = [BuiltinPropertyDescriptor::new(
-            BuiltinPropertyKeySpec::from_atom(now_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_date_now_builtin()),
-            BuiltinAttributes::new(true, false, true),
-        )];
+        let date_descriptors = [
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(now_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_now_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(parse_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_parse_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(utc_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_utc_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+        ];
         let date_prototype_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
@@ -8818,14 +10051,224 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_date_string_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_date_string_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_time_string_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_time_string_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_locale_string_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_locale_string_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_locale_date_string_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_locale_date_string_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_locale_time_string_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_locale_time_string_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::valueOf.id()),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_date_value_of_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_time_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_time_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_full_year_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_full_year_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_utc_full_year_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_full_year_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_month_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_month_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_utc_month_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_month_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_date_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_date_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_utc_date_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_date_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_day_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_day_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_utc_day_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_day_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_hours_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_hours_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_utc_hours_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_hours_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_minutes_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_minutes_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_utc_minutes_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_minutes_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_seconds_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_seconds_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_utc_seconds_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_seconds_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_milliseconds_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_milliseconds_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(get_utc_milliseconds_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_milliseconds_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(get_timezone_offset_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_timezone_offset_builtin()),
                 BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_time_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_time_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_milliseconds_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_milliseconds_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_utc_milliseconds_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_milliseconds_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_seconds_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_seconds_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_utc_seconds_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_seconds_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_minutes_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_minutes_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_utc_minutes_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_minutes_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_hours_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_hours_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_utc_hours_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_hours_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_date_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_date_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_utc_date_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_date_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_month_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_month_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_utc_month_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_month_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_full_year_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_full_year_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_utc_full_year_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_full_year_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_utc_string_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_utc_string_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_iso_string_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_iso_string_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_json_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_json_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_temporal_instant_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_temporal_instant_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToPrimitive),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_primitive_builtin()),
+                BuiltinAttributes::new(false, false, true),
             ),
         ];
         let number_descriptors = [
@@ -8847,6 +10290,16 @@ impl BuiltinCache {
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(is_safe_integer_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_number_is_safe_integer_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(parse_float_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_parse_float_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(parse_int_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_parse_int_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -8902,6 +10355,21 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_fixed_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_number_to_fixed_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_locale_string_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_number_to_locale_string_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_precision_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_number_to_precision_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_number_to_string_builtin()),
                 BuiltinAttributes::new(true, false, true),
@@ -8924,8 +10392,118 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(acos_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_acos_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(acosh_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_acosh_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(asin_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_asin_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(asinh_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_asinh_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(atan_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_atan_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(atan2_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_atan2_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(atanh_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_atanh_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(cbrt_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_cbrt_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(ceil_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_ceil_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(clz32_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_clz32_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(cos_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_cos_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(cosh_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_cosh_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(exp_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_exp_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(expm1_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_expm1_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(f16round_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_f16round_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(floor_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_math_floor_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(fround_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_fround_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(hypot_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_hypot_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(imul_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_imul_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(log_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_log_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(log10_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_log10_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(log1p_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_log1p_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(log2_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_log2_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -8944,6 +10522,11 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(random_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_random_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(round_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_math_round_builtin()),
                 BuiltinAttributes::new(true, false, true),
@@ -8954,8 +10537,33 @@ impl BuiltinCache {
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(sin_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_sin_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(sinh_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_sinh_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(sqrt_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(js3_math_sqrt_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(sum_precise_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_sum_precise_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(tan_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_tan_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(tanh_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(js3_math_tanh_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(
@@ -9183,7 +10791,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let parse_atom = agent.atoms_mut().intern_collectible("parse");
         let stringify_atom = agent.atoms_mut().intern_collectible("stringify");
         let raw_json_atom = agent.atoms_mut().intern_collectible("rawJSON");
         let is_raw_json_atom = agent.atoms_mut().intern_collectible("isRawJSON");
@@ -10847,16 +12454,188 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if entry == js3_date_now_builtin() {
         return Some(BuiltinEntryMetadata::new("now", 0, false, false));
     }
+    if entry == js3_date_parse_builtin() {
+        return Some(BuiltinEntryMetadata::new("parse", 1, false, false));
+    }
+    if entry == js3_date_utc_builtin() {
+        return Some(BuiltinEntryMetadata::new("UTC", 7, false, false));
+    }
     if entry == js3_date_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
+    if entry == js3_date_to_date_string_builtin() {
+        return Some(BuiltinEntryMetadata::new("toDateString", 0, false, false));
+    }
+    if entry == js3_date_to_time_string_builtin() {
+        return Some(BuiltinEntryMetadata::new("toTimeString", 0, false, false));
+    }
+    if entry == js3_date_to_locale_string_builtin() {
+        return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
+    }
+    if entry == js3_date_to_locale_date_string_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "toLocaleDateString",
+            0,
+            false,
+            false,
+        ));
+    }
+    if entry == js3_date_to_locale_time_string_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "toLocaleTimeString",
+            0,
+            false,
+            false,
+        ));
+    }
     if entry == js3_date_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
+    }
+    if entry == js3_date_get_time_builtin() {
+        return Some(BuiltinEntryMetadata::new("getTime", 0, false, false));
+    }
+    if entry == js3_date_get_full_year_builtin() {
+        return Some(BuiltinEntryMetadata::new("getFullYear", 0, false, false));
+    }
+    if entry == js3_date_get_utc_full_year_builtin() {
+        return Some(BuiltinEntryMetadata::new("getUTCFullYear", 0, false, false));
+    }
+    if entry == js3_date_get_month_builtin() {
+        return Some(BuiltinEntryMetadata::new("getMonth", 0, false, false));
+    }
+    if entry == js3_date_get_utc_month_builtin() {
+        return Some(BuiltinEntryMetadata::new("getUTCMonth", 0, false, false));
+    }
+    if entry == js3_date_get_date_builtin() {
+        return Some(BuiltinEntryMetadata::new("getDate", 0, false, false));
+    }
+    if entry == js3_date_get_utc_date_builtin() {
+        return Some(BuiltinEntryMetadata::new("getUTCDate", 0, false, false));
+    }
+    if entry == js3_date_get_day_builtin() {
+        return Some(BuiltinEntryMetadata::new("getDay", 0, false, false));
+    }
+    if entry == js3_date_get_utc_day_builtin() {
+        return Some(BuiltinEntryMetadata::new("getUTCDay", 0, false, false));
+    }
+    if entry == js3_date_get_hours_builtin() {
+        return Some(BuiltinEntryMetadata::new("getHours", 0, false, false));
+    }
+    if entry == js3_date_get_utc_hours_builtin() {
+        return Some(BuiltinEntryMetadata::new("getUTCHours", 0, false, false));
+    }
+    if entry == js3_date_get_minutes_builtin() {
+        return Some(BuiltinEntryMetadata::new("getMinutes", 0, false, false));
+    }
+    if entry == js3_date_get_utc_minutes_builtin() {
+        return Some(BuiltinEntryMetadata::new("getUTCMinutes", 0, false, false));
+    }
+    if entry == js3_date_get_seconds_builtin() {
+        return Some(BuiltinEntryMetadata::new("getSeconds", 0, false, false));
+    }
+    if entry == js3_date_get_utc_seconds_builtin() {
+        return Some(BuiltinEntryMetadata::new("getUTCSeconds", 0, false, false));
+    }
+    if entry == js3_date_get_milliseconds_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "getMilliseconds",
+            0,
+            false,
+            false,
+        ));
+    }
+    if entry == js3_date_get_utc_milliseconds_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "getUTCMilliseconds",
+            0,
+            false,
+            false,
+        ));
     }
     if entry == js3_date_get_timezone_offset_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "getTimezoneOffset",
             0,
+            false,
+            false,
+        ));
+    }
+    if entry == js3_date_set_time_builtin() {
+        return Some(BuiltinEntryMetadata::new("setTime", 1, false, false));
+    }
+    if entry == js3_date_set_milliseconds_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "setMilliseconds",
+            1,
+            false,
+            false,
+        ));
+    }
+    if entry == js3_date_set_utc_milliseconds_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "setUTCMilliseconds",
+            1,
+            false,
+            false,
+        ));
+    }
+    if entry == js3_date_set_seconds_builtin() {
+        return Some(BuiltinEntryMetadata::new("setSeconds", 2, false, false));
+    }
+    if entry == js3_date_set_utc_seconds_builtin() {
+        return Some(BuiltinEntryMetadata::new("setUTCSeconds", 2, false, false));
+    }
+    if entry == js3_date_set_minutes_builtin() {
+        return Some(BuiltinEntryMetadata::new("setMinutes", 3, false, false));
+    }
+    if entry == js3_date_set_utc_minutes_builtin() {
+        return Some(BuiltinEntryMetadata::new("setUTCMinutes", 3, false, false));
+    }
+    if entry == js3_date_set_hours_builtin() {
+        return Some(BuiltinEntryMetadata::new("setHours", 4, false, false));
+    }
+    if entry == js3_date_set_utc_hours_builtin() {
+        return Some(BuiltinEntryMetadata::new("setUTCHours", 4, false, false));
+    }
+    if entry == js3_date_set_date_builtin() {
+        return Some(BuiltinEntryMetadata::new("setDate", 1, false, false));
+    }
+    if entry == js3_date_set_utc_date_builtin() {
+        return Some(BuiltinEntryMetadata::new("setUTCDate", 1, false, false));
+    }
+    if entry == js3_date_set_month_builtin() {
+        return Some(BuiltinEntryMetadata::new("setMonth", 2, false, false));
+    }
+    if entry == js3_date_set_utc_month_builtin() {
+        return Some(BuiltinEntryMetadata::new("setUTCMonth", 2, false, false));
+    }
+    if entry == js3_date_set_full_year_builtin() {
+        return Some(BuiltinEntryMetadata::new("setFullYear", 3, false, false));
+    }
+    if entry == js3_date_set_utc_full_year_builtin() {
+        return Some(BuiltinEntryMetadata::new("setUTCFullYear", 3, false, false));
+    }
+    if entry == js3_date_to_utc_string_builtin() {
+        return Some(BuiltinEntryMetadata::new("toUTCString", 0, false, false));
+    }
+    if entry == js3_date_to_iso_string_builtin() {
+        return Some(BuiltinEntryMetadata::new("toISOString", 0, false, false));
+    }
+    if entry == js3_date_to_json_builtin() {
+        return Some(BuiltinEntryMetadata::new("toJSON", 1, false, false));
+    }
+    if entry == js3_date_to_temporal_instant_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "toTemporalInstant",
+            0,
+            false,
+            false,
+        ));
+    }
+    if entry == js3_date_to_primitive_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "[Symbol.toPrimitive]",
+            1,
             false,
             false,
         ));
@@ -10882,6 +12661,15 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if entry == js3_number_to_exponential_builtin() {
         return Some(BuiltinEntryMetadata::new("toExponential", 1, false, false));
     }
+    if entry == js3_number_to_fixed_builtin() {
+        return Some(BuiltinEntryMetadata::new("toFixed", 1, false, false));
+    }
+    if entry == js3_number_to_locale_string_builtin() {
+        return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
+    }
+    if entry == js3_number_to_precision_builtin() {
+        return Some(BuiltinEntryMetadata::new("toPrecision", 1, false, false));
+    }
     if entry == js3_number_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 1, false, false));
     }
@@ -10891,8 +12679,74 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if entry == js3_math_abs_builtin() {
         return Some(BuiltinEntryMetadata::new("abs", 1, false, false));
     }
+    if entry == js3_math_acos_builtin() {
+        return Some(BuiltinEntryMetadata::new("acos", 1, false, false));
+    }
+    if entry == js3_math_acosh_builtin() {
+        return Some(BuiltinEntryMetadata::new("acosh", 1, false, false));
+    }
+    if entry == js3_math_asin_builtin() {
+        return Some(BuiltinEntryMetadata::new("asin", 1, false, false));
+    }
+    if entry == js3_math_asinh_builtin() {
+        return Some(BuiltinEntryMetadata::new("asinh", 1, false, false));
+    }
+    if entry == js3_math_atan_builtin() {
+        return Some(BuiltinEntryMetadata::new("atan", 1, false, false));
+    }
+    if entry == js3_math_atan2_builtin() {
+        return Some(BuiltinEntryMetadata::new("atan2", 2, false, false));
+    }
+    if entry == js3_math_atanh_builtin() {
+        return Some(BuiltinEntryMetadata::new("atanh", 1, false, false));
+    }
+    if entry == js3_math_cbrt_builtin() {
+        return Some(BuiltinEntryMetadata::new("cbrt", 1, false, false));
+    }
+    if entry == js3_math_ceil_builtin() {
+        return Some(BuiltinEntryMetadata::new("ceil", 1, false, false));
+    }
+    if entry == js3_math_clz32_builtin() {
+        return Some(BuiltinEntryMetadata::new("clz32", 1, false, false));
+    }
+    if entry == js3_math_cos_builtin() {
+        return Some(BuiltinEntryMetadata::new("cos", 1, false, false));
+    }
+    if entry == js3_math_cosh_builtin() {
+        return Some(BuiltinEntryMetadata::new("cosh", 1, false, false));
+    }
+    if entry == js3_math_exp_builtin() {
+        return Some(BuiltinEntryMetadata::new("exp", 1, false, false));
+    }
+    if entry == js3_math_expm1_builtin() {
+        return Some(BuiltinEntryMetadata::new("expm1", 1, false, false));
+    }
+    if entry == js3_math_f16round_builtin() {
+        return Some(BuiltinEntryMetadata::new("f16round", 1, false, false));
+    }
     if entry == js3_math_floor_builtin() {
         return Some(BuiltinEntryMetadata::new("floor", 1, false, false));
+    }
+    if entry == js3_math_fround_builtin() {
+        return Some(BuiltinEntryMetadata::new("fround", 1, false, false));
+    }
+    if entry == js3_math_hypot_builtin() {
+        return Some(BuiltinEntryMetadata::new("hypot", 2, false, false));
+    }
+    if entry == js3_math_imul_builtin() {
+        return Some(BuiltinEntryMetadata::new("imul", 2, false, false));
+    }
+    if entry == js3_math_log_builtin() {
+        return Some(BuiltinEntryMetadata::new("log", 1, false, false));
+    }
+    if entry == js3_math_log10_builtin() {
+        return Some(BuiltinEntryMetadata::new("log10", 1, false, false));
+    }
+    if entry == js3_math_log1p_builtin() {
+        return Some(BuiltinEntryMetadata::new("log1p", 1, false, false));
+    }
+    if entry == js3_math_log2_builtin() {
+        return Some(BuiltinEntryMetadata::new("log2", 1, false, false));
     }
     if entry == js3_math_max_builtin() {
         return Some(BuiltinEntryMetadata::new("max", 2, false, false));
@@ -10903,14 +12757,32 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if entry == js3_math_pow_builtin() {
         return Some(BuiltinEntryMetadata::new("pow", 2, false, false));
     }
+    if entry == js3_math_random_builtin() {
+        return Some(BuiltinEntryMetadata::new("random", 0, false, false));
+    }
     if entry == js3_math_round_builtin() {
         return Some(BuiltinEntryMetadata::new("round", 1, false, false));
     }
     if entry == js3_math_sign_builtin() {
         return Some(BuiltinEntryMetadata::new("sign", 1, false, false));
     }
+    if entry == js3_math_sin_builtin() {
+        return Some(BuiltinEntryMetadata::new("sin", 1, false, false));
+    }
+    if entry == js3_math_sinh_builtin() {
+        return Some(BuiltinEntryMetadata::new("sinh", 1, false, false));
+    }
     if entry == js3_math_sqrt_builtin() {
         return Some(BuiltinEntryMetadata::new("sqrt", 1, false, false));
+    }
+    if entry == js3_math_sum_precise_builtin() {
+        return Some(BuiltinEntryMetadata::new("sumPrecise", 1, false, false));
+    }
+    if entry == js3_math_tan_builtin() {
+        return Some(BuiltinEntryMetadata::new("tan", 1, false, false));
+    }
+    if entry == js3_math_tanh_builtin() {
+        return Some(BuiltinEntryMetadata::new("tanh", 1, false, false));
     }
     if entry == js3_math_trunc_builtin() {
         return Some(BuiltinEntryMetadata::new("trunc", 1, false, false));
@@ -11193,25 +13065,6 @@ pub(crate) fn allocate_builtin_ordinary_object(
         objects.alloc_object(
             &mut mutator,
             ObjectAllocation::ordinary(root_shape).with_prototype(prototype),
-            AllocationLifetime::Default,
-        )
-    })
-}
-
-pub(crate) fn allocate_builtin_date_object(
-    agent: &mut Agent,
-    root_shape: ShapeId,
-    prototype: Option<ObjectRef>,
-    value: Value,
-) -> ObjectRef {
-    agent.with_heap_and_objects(|heap, objects| {
-        let mut mutator = heap.mutator();
-        objects.alloc_object(
-            &mut mutator,
-            ObjectAllocation::ordinary(root_shape)
-                .with_prototype(prototype)
-                .with_date_value(value)
-                .with_cold_data(ObjectColdData::Ordinary(OrdinaryObjectData::Date)),
             AllocationLifetime::Default,
         )
     })

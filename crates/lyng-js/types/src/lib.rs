@@ -313,6 +313,37 @@ const JS3_MATH_ROUND_RAW: u32 = 2_057;
 const JS3_MATH_SIGN_RAW: u32 = 2_058;
 const JS3_MATH_TRUNC_RAW: u32 = 2_059;
 const JS3_MATH_SQRT_RAW: u32 = 2_060;
+const JS3_MATH_ACOS_RAW: u32 = 2_151;
+const JS3_MATH_ACOSH_RAW: u32 = 2_152;
+const JS3_MATH_ASIN_RAW: u32 = 2_153;
+const JS3_MATH_ASINH_RAW: u32 = 2_154;
+const JS3_MATH_ATAN_RAW: u32 = 2_155;
+const JS3_MATH_ATAN2_RAW: u32 = 2_156;
+const JS3_MATH_ATANH_RAW: u32 = 2_157;
+const JS3_MATH_CBRT_RAW: u32 = 2_158;
+const JS3_MATH_CEIL_RAW: u32 = 2_159;
+const JS3_MATH_CLZ32_RAW: u32 = 2_160;
+const JS3_MATH_COS_RAW: u32 = 2_161;
+const JS3_MATH_COSH_RAW: u32 = 2_162;
+const JS3_MATH_EXP_RAW: u32 = 2_163;
+const JS3_MATH_EXPM1_RAW: u32 = 2_164;
+const JS3_MATH_F16ROUND_RAW: u32 = 2_165;
+const JS3_MATH_FROUND_RAW: u32 = 2_166;
+const JS3_MATH_HYPOT_RAW: u32 = 2_167;
+const JS3_MATH_IMUL_RAW: u32 = 2_168;
+const JS3_MATH_LOG_RAW: u32 = 2_169;
+const JS3_MATH_LOG10_RAW: u32 = 2_170;
+const JS3_MATH_LOG1P_RAW: u32 = 2_171;
+const JS3_MATH_LOG2_RAW: u32 = 2_172;
+const JS3_MATH_RANDOM_RAW: u32 = 2_173;
+const JS3_MATH_SIN_RAW: u32 = 2_174;
+const JS3_MATH_SINH_RAW: u32 = 2_175;
+const JS3_MATH_SUM_PRECISE_RAW: u32 = 2_176;
+const JS3_MATH_TAN_RAW: u32 = 2_177;
+const JS3_MATH_TANH_RAW: u32 = 2_178;
+const JS3_NUMBER_TO_FIXED_RAW: u32 = 2_179;
+const JS3_NUMBER_TO_PRECISION_RAW: u32 = 2_180;
+const JS3_NUMBER_TO_LOCALE_STRING_RAW: u32 = 2_181;
 const JS3_NUMBER_TO_EXPONENTIAL_RAW: u32 = 2_061;
 const JS3_STRING_RAW: u32 = 2_062;
 const JS3_STRING_TO_STRING_RAW: u32 = 2_063;
@@ -401,6 +432,49 @@ const JS3_OBJECT_IS_RAW: u32 = 2_144;
 const JS3_DATE_GET_TIMEZONE_OFFSET_RAW: u32 = 2_145;
 const JS3_STRING_FROM_CHAR_CODE_RAW: u32 = 2_146;
 const JS3_STRING_SEARCH_RAW: u32 = 2_147;
+const JS3_DATE_UTC_RAW: u32 = 2_182;
+const JS3_DATE_TO_DATE_STRING_RAW: u32 = 2_183;
+const JS3_DATE_TO_TIME_STRING_RAW: u32 = 2_184;
+const JS3_DATE_TO_LOCALE_STRING_RAW: u32 = 2_185;
+const JS3_DATE_TO_LOCALE_DATE_STRING_RAW: u32 = 2_186;
+const JS3_DATE_TO_LOCALE_TIME_STRING_RAW: u32 = 2_187;
+const JS3_DATE_GET_TIME_RAW: u32 = 2_188;
+const JS3_DATE_GET_FULL_YEAR_RAW: u32 = 2_189;
+const JS3_DATE_GET_UTC_FULL_YEAR_RAW: u32 = 2_190;
+const JS3_DATE_GET_MONTH_RAW: u32 = 2_191;
+const JS3_DATE_GET_UTC_MONTH_RAW: u32 = 2_192;
+const JS3_DATE_GET_DATE_RAW: u32 = 2_193;
+const JS3_DATE_GET_UTC_DATE_RAW: u32 = 2_194;
+const JS3_DATE_GET_DAY_RAW: u32 = 2_195;
+const JS3_DATE_GET_UTC_DAY_RAW: u32 = 2_196;
+const JS3_DATE_GET_HOURS_RAW: u32 = 2_197;
+const JS3_DATE_GET_UTC_HOURS_RAW: u32 = 2_198;
+const JS3_DATE_GET_MINUTES_RAW: u32 = 2_199;
+const JS3_DATE_GET_UTC_MINUTES_RAW: u32 = 2_200;
+const JS3_DATE_GET_SECONDS_RAW: u32 = 2_201;
+const JS3_DATE_GET_UTC_SECONDS_RAW: u32 = 2_202;
+const JS3_DATE_GET_MILLISECONDS_RAW: u32 = 2_203;
+const JS3_DATE_GET_UTC_MILLISECONDS_RAW: u32 = 2_204;
+const JS3_DATE_SET_TIME_RAW: u32 = 2_205;
+const JS3_DATE_SET_MILLISECONDS_RAW: u32 = 2_206;
+const JS3_DATE_SET_UTC_MILLISECONDS_RAW: u32 = 2_207;
+const JS3_DATE_SET_SECONDS_RAW: u32 = 2_208;
+const JS3_DATE_SET_UTC_SECONDS_RAW: u32 = 2_209;
+const JS3_DATE_SET_MINUTES_RAW: u32 = 2_210;
+const JS3_DATE_SET_UTC_MINUTES_RAW: u32 = 2_211;
+const JS3_DATE_SET_HOURS_RAW: u32 = 2_212;
+const JS3_DATE_SET_UTC_HOURS_RAW: u32 = 2_213;
+const JS3_DATE_SET_DATE_RAW: u32 = 2_214;
+const JS3_DATE_SET_UTC_DATE_RAW: u32 = 2_215;
+const JS3_DATE_SET_MONTH_RAW: u32 = 2_216;
+const JS3_DATE_SET_UTC_MONTH_RAW: u32 = 2_217;
+const JS3_DATE_SET_FULL_YEAR_RAW: u32 = 2_218;
+const JS3_DATE_SET_UTC_FULL_YEAR_RAW: u32 = 2_219;
+const JS3_DATE_TO_UTC_STRING_RAW: u32 = 2_220;
+const JS3_DATE_TO_ISO_STRING_RAW: u32 = 2_221;
+const JS3_DATE_TO_JSON_RAW: u32 = 2_222;
+const JS3_DATE_TO_PRIMITIVE_RAW: u32 = 2_223;
+const JS3_DATE_TO_TEMPORAL_INSTANT_RAW: u32 = 2_224;
 const JS3_PROMISE_RAW: u32 = 3_101;
 const JS3_PROMISE_THEN_RAW: u32 = 3_102;
 const JS3_PROMISE_CATCH_RAW: u32 = 3_103;
@@ -838,7 +912,7 @@ pub const JS3_INTERNAL_BUILTIN_NAMESPACE_END: u32 = JS3_INTERNAL_DIRECT_EVAL_RAW
 pub const JS3_CORE_BUILTIN_NAMESPACE_START: u32 = JS3_BOOLEAN_RAW;
 
 /// Last reserved builtin-entry payload for the public core builtin namespace.
-pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_STRING_CONCAT_RAW;
+pub const JS3_CORE_BUILTIN_NAMESPACE_END: u32 = JS3_DATE_TO_TEMPORAL_INSTANT_RAW;
 
 /// First reserved builtin-entry payload for the public completion builtin namespace.
 pub const JS3_COMPLETION_BUILTIN_NAMESPACE_START: u32 = JS3_PROMISE_RAW;
@@ -1669,6 +1743,30 @@ pub fn js3_number_to_exponential_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn js3_number_to_fixed_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_NUMBER_TO_FIXED_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_number_to_locale_string_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_NUMBER_TO_LOCALE_STRING_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_number_to_precision_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_NUMBER_TO_PRECISION_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn js3_string_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_STRING_RAW) {
         Some(id) => id,
@@ -1989,6 +2087,350 @@ pub fn js3_date_get_timezone_offset_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn js3_date_utc_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_UTC_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_to_date_string_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_TO_DATE_STRING_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_to_time_string_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_TO_TIME_STRING_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_to_locale_string_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_TO_LOCALE_STRING_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_to_locale_date_string_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_TO_LOCALE_DATE_STRING_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_to_locale_time_string_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_TO_LOCALE_TIME_STRING_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_time_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_TIME_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_full_year_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_FULL_YEAR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_utc_full_year_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_UTC_FULL_YEAR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_month_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_MONTH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_utc_month_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_UTC_MONTH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_date_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_DATE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_utc_date_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_UTC_DATE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_day_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_DAY_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_utc_day_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_UTC_DAY_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_hours_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_HOURS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_utc_hours_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_UTC_HOURS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_minutes_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_MINUTES_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_utc_minutes_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_UTC_MINUTES_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_seconds_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_SECONDS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_utc_seconds_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_UTC_SECONDS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_milliseconds_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_MILLISECONDS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_get_utc_milliseconds_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_GET_UTC_MILLISECONDS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_time_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_TIME_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_milliseconds_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_MILLISECONDS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_utc_milliseconds_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_UTC_MILLISECONDS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_seconds_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_SECONDS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_utc_seconds_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_UTC_SECONDS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_minutes_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_MINUTES_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_utc_minutes_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_UTC_MINUTES_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_hours_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_HOURS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_utc_hours_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_UTC_HOURS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_date_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_DATE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_utc_date_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_UTC_DATE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_month_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_MONTH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_utc_month_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_UTC_MONTH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_full_year_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_FULL_YEAR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_set_utc_full_year_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_SET_UTC_FULL_YEAR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_to_utc_string_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_TO_UTC_STRING_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_to_iso_string_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_TO_ISO_STRING_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_to_json_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_TO_JSON_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_to_primitive_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_TO_PRIMITIVE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_date_to_temporal_instant_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_DATE_TO_TEMPORAL_INSTANT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn js3_parse_int_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_PARSE_INT_RAW) {
         Some(id) => id,
@@ -2101,8 +2543,184 @@ pub fn js3_math_abs_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn js3_math_acos_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_ACOS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_acosh_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_ACOSH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_asin_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_ASIN_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_asinh_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_ASINH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_atan_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_ATAN_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_atan2_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_ATAN2_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_atanh_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_ATANH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_cbrt_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_CBRT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_ceil_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_CEIL_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_clz32_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_CLZ32_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_cos_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_COS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_cosh_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_COSH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_exp_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_EXP_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_expm1_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_EXPM1_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_f16round_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_F16ROUND_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_fround_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_FROUND_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn js3_math_floor_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_MATH_FLOOR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_hypot_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_HYPOT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_imul_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_IMUL_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_log_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_LOG_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_log10_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_LOG10_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_log1p_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_LOG1P_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_log2_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_LOG2_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }
@@ -2133,6 +2751,14 @@ pub fn js3_math_pow_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn js3_math_random_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_RANDOM_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn js3_math_round_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_MATH_ROUND_RAW) {
         Some(id) => id,
@@ -2149,6 +2775,30 @@ pub fn js3_math_sign_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn js3_math_sin_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_SIN_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_sinh_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_SINH_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_sum_precise_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_SUM_PRECISE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn js3_math_trunc_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_MATH_TRUNC_RAW) {
         Some(id) => id,
@@ -2159,6 +2809,22 @@ pub fn js3_math_trunc_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn js3_math_sqrt_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(JS3_MATH_SQRT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_tan_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_TAN_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn js3_math_tanh_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(JS3_MATH_TANH_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }
@@ -5930,7 +6596,7 @@ mod tests {
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
         assert_eq!(JS3_INTERNAL_BUILTIN_NAMESPACE_END, 1_036);
         assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_START, 2_001);
-        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_150);
+        assert_eq!(JS3_CORE_BUILTIN_NAMESPACE_END, 2_224);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_START, 3_101);
         assert_eq!(JS3_COMPLETION_BUILTIN_NAMESPACE_END, 3_500);
     }

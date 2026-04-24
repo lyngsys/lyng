@@ -22,6 +22,7 @@ use lyng_js_types::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ToPrimitiveHint {
+    Default,
     String,
     Number,
 }
@@ -30,6 +31,7 @@ impl ToPrimitiveHint {
     #[inline]
     pub const fn hint_text(self) -> &'static str {
         match self {
+            Self::Default => "default",
             Self::String => "string",
             Self::Number => "number",
         }
@@ -38,8 +40,10 @@ impl ToPrimitiveHint {
     #[inline]
     pub const fn method_names(self) -> [lyng_js_common::AtomId; 2] {
         match self {
+            Self::Default | Self::Number => {
+                [WellKnownAtom::valueOf.id(), WellKnownAtom::toString.id()]
+            }
             Self::String => [WellKnownAtom::toString.id(), WellKnownAtom::valueOf.id()],
-            Self::Number => [WellKnownAtom::valueOf.id(), WellKnownAtom::toString.id()],
         }
     }
 }
@@ -1135,7 +1139,13 @@ fn get_method<Cx: ToPrimitiveContext>(
     cx.require_callable_object(method).map(Some)
 }
 
-fn ordinary_to_primitive<Cx: ToPrimitiveContext>(
+/// ECMAScript `OrdinaryToPrimitive` for callers that have already selected the
+/// preferred hint and must bypass exotic `@@toPrimitive` dispatch.
+///
+/// # Errors
+/// Returns the caller-provided error type when property lookup, method call, or
+/// primitive extraction fails.
+pub fn ordinary_to_primitive<Cx: ToPrimitiveContext>(
     cx: &mut Cx,
     object: ObjectRef,
     hint: ToPrimitiveHint,

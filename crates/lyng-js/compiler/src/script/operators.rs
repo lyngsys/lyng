@@ -17,7 +17,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let argument_register = self.lower_expr_to_temp(argument)?;
                 let zero = self.alloc_temp()?;
                 self.emit_load_smi(zero, 0)?;
-                self.emit_profiled_binary(Opcode::Add, dest, argument_register, zero)
+                self.emit_profiled_binary(Opcode::Sub, dest, argument_register, zero)
             }
             lyng_js_ast::UnaryOp::Not => {
                 let argument_register = self.lower_expr_to_temp(argument)?;

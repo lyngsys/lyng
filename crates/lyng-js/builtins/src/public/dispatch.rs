@@ -62,7 +62,25 @@ use super::{
     js3_data_view_set_int16_builtin, js3_data_view_set_int32_builtin,
     js3_data_view_set_int8_builtin, js3_data_view_set_uint16_builtin,
     js3_data_view_set_uint32_builtin, js3_data_view_set_uint8_builtin, js3_date_builtin,
-    js3_date_get_timezone_offset_builtin, js3_date_now_builtin, js3_date_to_string_builtin,
+    js3_date_get_date_builtin, js3_date_get_day_builtin, js3_date_get_full_year_builtin,
+    js3_date_get_hours_builtin, js3_date_get_milliseconds_builtin, js3_date_get_minutes_builtin,
+    js3_date_get_month_builtin, js3_date_get_seconds_builtin, js3_date_get_time_builtin,
+    js3_date_get_timezone_offset_builtin, js3_date_get_utc_date_builtin,
+    js3_date_get_utc_day_builtin, js3_date_get_utc_full_year_builtin,
+    js3_date_get_utc_hours_builtin, js3_date_get_utc_milliseconds_builtin,
+    js3_date_get_utc_minutes_builtin, js3_date_get_utc_month_builtin,
+    js3_date_get_utc_seconds_builtin, js3_date_now_builtin, js3_date_parse_builtin,
+    js3_date_set_date_builtin, js3_date_set_full_year_builtin, js3_date_set_hours_builtin,
+    js3_date_set_milliseconds_builtin, js3_date_set_minutes_builtin, js3_date_set_month_builtin,
+    js3_date_set_seconds_builtin, js3_date_set_time_builtin, js3_date_set_utc_date_builtin,
+    js3_date_set_utc_full_year_builtin, js3_date_set_utc_hours_builtin,
+    js3_date_set_utc_milliseconds_builtin, js3_date_set_utc_minutes_builtin,
+    js3_date_set_utc_month_builtin, js3_date_set_utc_seconds_builtin,
+    js3_date_to_date_string_builtin, js3_date_to_iso_string_builtin, js3_date_to_json_builtin,
+    js3_date_to_locale_date_string_builtin, js3_date_to_locale_string_builtin,
+    js3_date_to_locale_time_string_builtin, js3_date_to_primitive_builtin,
+    js3_date_to_string_builtin, js3_date_to_temporal_instant_builtin,
+    js3_date_to_time_string_builtin, js3_date_to_utc_string_builtin, js3_date_utc_builtin,
     js3_date_value_of_builtin, js3_decode_uri_builtin, js3_decode_uri_component_builtin,
     js3_encode_uri_builtin, js3_encode_uri_component_builtin, js3_error_builtin,
     js3_error_to_string_builtin, js3_eval_builtin, js3_eval_error_builtin,
@@ -78,11 +96,20 @@ use super::{
     js3_map_delete_builtin, js3_map_entries_builtin, js3_map_for_each_builtin, js3_map_get_builtin,
     js3_map_has_builtin, js3_map_iterator_next_builtin, js3_map_keys_builtin, js3_map_set_builtin,
     js3_map_size_getter_builtin, js3_map_values_builtin, js3_math_abs_builtin,
-    js3_math_floor_builtin, js3_math_max_builtin, js3_math_min_builtin, js3_math_pow_builtin,
-    js3_math_round_builtin, js3_math_sign_builtin, js3_math_sqrt_builtin, js3_math_trunc_builtin,
-    js3_number_builtin, js3_number_is_finite_builtin, js3_number_is_integer_builtin,
-    js3_number_is_nan_builtin, js3_number_is_safe_integer_builtin,
-    js3_number_to_exponential_builtin, js3_number_to_string_builtin, js3_number_value_of_builtin,
+    js3_math_acos_builtin, js3_math_acosh_builtin, js3_math_asin_builtin, js3_math_asinh_builtin,
+    js3_math_atan2_builtin, js3_math_atan_builtin, js3_math_atanh_builtin, js3_math_cbrt_builtin,
+    js3_math_ceil_builtin, js3_math_clz32_builtin, js3_math_cos_builtin, js3_math_cosh_builtin,
+    js3_math_exp_builtin, js3_math_expm1_builtin, js3_math_f16round_builtin,
+    js3_math_floor_builtin, js3_math_fround_builtin, js3_math_hypot_builtin, js3_math_imul_builtin,
+    js3_math_log10_builtin, js3_math_log1p_builtin, js3_math_log2_builtin, js3_math_log_builtin,
+    js3_math_max_builtin, js3_math_min_builtin, js3_math_pow_builtin, js3_math_random_builtin,
+    js3_math_round_builtin, js3_math_sign_builtin, js3_math_sin_builtin, js3_math_sinh_builtin,
+    js3_math_sqrt_builtin, js3_math_sum_precise_builtin, js3_math_tan_builtin,
+    js3_math_tanh_builtin, js3_math_trunc_builtin, js3_number_builtin,
+    js3_number_is_finite_builtin, js3_number_is_integer_builtin, js3_number_is_nan_builtin,
+    js3_number_is_safe_integer_builtin, js3_number_to_exponential_builtin,
+    js3_number_to_fixed_builtin, js3_number_to_locale_string_builtin,
+    js3_number_to_precision_builtin, js3_number_to_string_builtin, js3_number_value_of_builtin,
     js3_object_builtin, js3_object_create_builtin, js3_object_define_properties_builtin,
     js3_object_define_property_builtin, js3_object_entries_builtin, js3_object_freeze_builtin,
     js3_object_get_own_property_descriptor_builtin,
@@ -1341,14 +1368,171 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_date_now_builtin() {
         return date_now_builtin(context, invocation).map(Some);
     }
+    if entry == js3_date_parse_builtin() {
+        return date_parse_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_date_utc_builtin() {
+        return date_utc_builtin(context, invocation).map(Some);
+    }
     if entry == js3_date_to_string_builtin() {
-        return date_to_string_builtin(context, invocation).map(Some);
+        return date_to_string_builtin(context, invocation, DateStringKind::Full).map(Some);
+    }
+    if entry == js3_date_to_date_string_builtin() {
+        return date_to_string_builtin(context, invocation, DateStringKind::Date).map(Some);
+    }
+    if entry == js3_date_to_time_string_builtin() {
+        return date_to_string_builtin(context, invocation, DateStringKind::Time).map(Some);
+    }
+    if entry == js3_date_to_locale_string_builtin() {
+        return date_to_string_builtin(context, invocation, DateStringKind::Full).map(Some);
+    }
+    if entry == js3_date_to_locale_date_string_builtin() {
+        return date_to_string_builtin(context, invocation, DateStringKind::Date).map(Some);
+    }
+    if entry == js3_date_to_locale_time_string_builtin() {
+        return date_to_string_builtin(context, invocation, DateStringKind::Time).map(Some);
     }
     if entry == js3_date_value_of_builtin() {
         return date_value_of_builtin(context, invocation).map(Some);
     }
+    if entry == js3_date_get_time_builtin() {
+        return date_value_of_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_date_get_full_year_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::FullYear, false)
+            .map(Some);
+    }
+    if entry == js3_date_get_utc_full_year_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::FullYear, true)
+            .map(Some);
+    }
+    if entry == js3_date_get_month_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Month, false)
+            .map(Some);
+    }
+    if entry == js3_date_get_utc_month_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Month, true)
+            .map(Some);
+    }
+    if entry == js3_date_get_date_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Date, false)
+            .map(Some);
+    }
+    if entry == js3_date_get_utc_date_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Date, true)
+            .map(Some);
+    }
+    if entry == js3_date_get_day_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Day, false)
+            .map(Some);
+    }
+    if entry == js3_date_get_utc_day_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Day, true).map(Some);
+    }
+    if entry == js3_date_get_hours_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Hours, false)
+            .map(Some);
+    }
+    if entry == js3_date_get_utc_hours_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Hours, true)
+            .map(Some);
+    }
+    if entry == js3_date_get_minutes_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Minutes, false)
+            .map(Some);
+    }
+    if entry == js3_date_get_utc_minutes_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Minutes, true)
+            .map(Some);
+    }
+    if entry == js3_date_get_seconds_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Seconds, false)
+            .map(Some);
+    }
+    if entry == js3_date_get_utc_seconds_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Seconds, true)
+            .map(Some);
+    }
+    if entry == js3_date_get_milliseconds_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Milliseconds, false)
+            .map(Some);
+    }
+    if entry == js3_date_get_utc_milliseconds_builtin() {
+        return date_get_component_builtin(context, invocation, DateComponent::Milliseconds, true)
+            .map(Some);
+    }
     if entry == js3_date_get_timezone_offset_builtin() {
         return date_get_timezone_offset_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_date_set_time_builtin() {
+        return date_set_time_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_date_set_milliseconds_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Milliseconds, false)
+            .map(Some);
+    }
+    if entry == js3_date_set_utc_milliseconds_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Milliseconds, true)
+            .map(Some);
+    }
+    if entry == js3_date_set_seconds_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Seconds, false)
+            .map(Some);
+    }
+    if entry == js3_date_set_utc_seconds_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Seconds, true)
+            .map(Some);
+    }
+    if entry == js3_date_set_minutes_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Minutes, false)
+            .map(Some);
+    }
+    if entry == js3_date_set_utc_minutes_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Minutes, true)
+            .map(Some);
+    }
+    if entry == js3_date_set_hours_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Hours, false)
+            .map(Some);
+    }
+    if entry == js3_date_set_utc_hours_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Hours, true).map(Some);
+    }
+    if entry == js3_date_set_date_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Date, false).map(Some);
+    }
+    if entry == js3_date_set_utc_date_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Date, true).map(Some);
+    }
+    if entry == js3_date_set_month_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Month, false)
+            .map(Some);
+    }
+    if entry == js3_date_set_utc_month_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::Month, true).map(Some);
+    }
+    if entry == js3_date_set_full_year_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::FullYear, false)
+            .map(Some);
+    }
+    if entry == js3_date_set_utc_full_year_builtin() {
+        return date_set_component_builtin(context, invocation, DateSetKind::FullYear, true)
+            .map(Some);
+    }
+    if entry == js3_date_to_utc_string_builtin() {
+        return date_to_utc_string_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_date_to_iso_string_builtin() {
+        return date_to_iso_string_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_date_to_json_builtin() {
+        return date_to_json_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_date_to_temporal_instant_builtin() {
+        return date_to_temporal_instant_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_date_to_primitive_builtin() {
+        return date_to_primitive_builtin(context, invocation).map(Some);
     }
     if let Some(result) = temporal::dispatch_temporal_builtin(context, entry, invocation)? {
         return Ok(Some(result));
@@ -1371,6 +1555,15 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_number_to_exponential_builtin() {
         return number_to_exponential_builtin(context, invocation).map(Some);
     }
+    if entry == js3_number_to_fixed_builtin() {
+        return number_to_fixed_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_number_to_locale_string_builtin() {
+        return number_to_locale_string_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_number_to_precision_builtin() {
+        return number_to_precision_builtin(context, invocation).map(Some);
+    }
     if entry == js3_number_to_string_builtin() {
         return number_to_string_builtin(context, invocation).map(Some);
     }
@@ -1380,8 +1573,74 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_math_abs_builtin() {
         return math_abs_builtin(context, invocation).map(Some);
     }
+    if entry == js3_math_acos_builtin() {
+        return math_acos_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_acosh_builtin() {
+        return math_acosh_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_asin_builtin() {
+        return math_asin_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_asinh_builtin() {
+        return math_asinh_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_atan_builtin() {
+        return math_atan_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_atan2_builtin() {
+        return math_atan2_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_atanh_builtin() {
+        return math_atanh_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_cbrt_builtin() {
+        return math_cbrt_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_ceil_builtin() {
+        return math_ceil_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_clz32_builtin() {
+        return math_clz32_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_cos_builtin() {
+        return math_cos_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_cosh_builtin() {
+        return math_cosh_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_exp_builtin() {
+        return math_exp_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_expm1_builtin() {
+        return math_expm1_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_f16round_builtin() {
+        return math_f16round_builtin(context, invocation).map(Some);
+    }
     if entry == js3_math_floor_builtin() {
         return math_floor_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_fround_builtin() {
+        return math_fround_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_hypot_builtin() {
+        return math_hypot_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_imul_builtin() {
+        return math_imul_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_log_builtin() {
+        return math_log_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_log10_builtin() {
+        return math_log10_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_log1p_builtin() {
+        return math_log1p_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_log2_builtin() {
+        return math_log2_builtin(context, invocation).map(Some);
     }
     if entry == js3_math_max_builtin() {
         return math_max_builtin(context, invocation).map(Some);
@@ -1392,14 +1651,32 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_math_pow_builtin() {
         return math_pow_builtin(context, invocation).map(Some);
     }
+    if entry == js3_math_random_builtin() {
+        return math_random_builtin(context, invocation).map(Some);
+    }
     if entry == js3_math_round_builtin() {
         return math_round_builtin(context, invocation).map(Some);
     }
     if entry == js3_math_sign_builtin() {
         return math_sign_builtin(context, invocation).map(Some);
     }
+    if entry == js3_math_sin_builtin() {
+        return math_sin_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_sinh_builtin() {
+        return math_sinh_builtin(context, invocation).map(Some);
+    }
     if entry == js3_math_sqrt_builtin() {
         return math_sqrt_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_sum_precise_builtin() {
+        return math_sum_precise_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_tan_builtin() {
+        return math_tan_builtin(context, invocation).map(Some);
+    }
+    if entry == js3_math_tanh_builtin() {
+        return math_tanh_builtin(context, invocation).map(Some);
     }
     if entry == js3_math_trunc_builtin() {
         return math_trunc_builtin(context, invocation).map(Some);
@@ -2209,10 +2486,7 @@ fn date_display_text<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
 ) -> Result<String, Cx::Error> {
-    if value.as_f64().is_some_and(f64::is_nan) {
-        return Ok("Invalid Date".to_owned());
-    }
-    Ok(format!("Date({})", cx.value_to_string_text(value)?))
+    date_format_local(cx, value, DateStringKind::Full)
 }
 
 fn to_int32(number: f64) -> i32 {
@@ -12780,6 +13054,56 @@ fn format_to_exponential(number: f64, fraction_digits: usize) -> Option<String> 
     Some(text)
 }
 
+fn format_to_precision(number: f64, precision: usize) -> Option<String> {
+    if number == 0.0 {
+        if precision == 1 {
+            return Some("0".to_owned());
+        }
+        return Some(format!("0.{}", "0".repeat(precision - 1)));
+    }
+
+    let negative = number.is_sign_negative();
+    let exponential = format_to_exponential(number.abs(), precision - 1)?;
+    let (mantissa, exponent_text) = exponential.split_once('e')?;
+    let exponent = exponent_text.parse::<i32>().ok()?;
+    let signed_exponential = || {
+        if negative {
+            format!("-{exponential}")
+        } else {
+            exponential.clone()
+        }
+    };
+    if exponent < -6 || exponent >= i32::try_from(precision).ok()? {
+        return Some(signed_exponential());
+    }
+
+    let mut digits: String = mantissa.chars().filter(|ch| *ch != '.').collect();
+    while digits.len() < precision {
+        digits.push('0');
+    }
+
+    let mut text = String::new();
+    if negative {
+        text.push('-');
+    }
+    if exponent >= 0 {
+        let integer_digits = usize::try_from(exponent + 1).ok()?;
+        if integer_digits >= digits.len() {
+            text.push_str(&digits);
+            text.push_str(&"0".repeat(integer_digits - digits.len()));
+        } else {
+            text.push_str(&digits[..integer_digits]);
+            text.push('.');
+            text.push_str(&digits[integer_digits..]);
+        }
+    } else {
+        text.push_str("0.");
+        text.push_str(&"0".repeat(usize::try_from(-exponent - 1).ok()?));
+        text.push_str(&digits);
+    }
+    Some(text)
+}
+
 fn number_value(number: f64) -> Value {
     if number == 0.0 && number.is_sign_negative() {
         Value::from_f64(-0.0)
@@ -14835,20 +15159,86 @@ const DATE_MS_PER_DAY: i64 = 24 * DATE_MS_PER_HOUR;
 const DATE_NANOS_PER_MILLISECOND: i128 = 1_000_000;
 const DATE_NANOS_PER_MINUTE: i64 = 60 * 1_000_000_000;
 const DATE_CLIP_LIMIT_MS: f64 = 8_640_000_000_000_000.0;
+const DATE_WEEKDAY_NAMES: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DATE_MONTH_NAMES: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
 
-fn date_component_argument<Cx: PublicBuiltinDispatchContext>(
+#[derive(Clone, Copy, Debug)]
+struct DateParts {
+    year: i32,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+    millisecond: u16,
+    weekday: u8,
+    offset_minutes: i32,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum DateStringKind {
+    Full,
+    Date,
+    Time,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum DateComponent {
+    FullYear,
+    Month,
+    Date,
+    Day,
+    Hours,
+    Minutes,
+    Seconds,
+    Milliseconds,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DateSetKind {
+    Milliseconds,
+    Seconds,
+    Minutes,
+    Hours,
+    Date,
+    Month,
+    FullYear,
+}
+
+fn date_number_argument<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Option<Value>,
-    default: i64,
-) -> Result<Option<i64>, Cx::Error> {
-    let Some(value) = value else {
-        return Ok(Some(default));
-    };
-    let number = to_integer_or_infinity_for_builtin(cx, value)?;
-    if !number.is_finite() || number < i64::MIN as f64 || number > i64::MAX as f64 {
-        return Ok(None);
+    default: f64,
+) -> Result<f64, Cx::Error> {
+    value.map_or(Ok(default), |value| to_number_for_builtin(cx, value))
+}
+
+fn date_finite_integer(value: f64) -> Option<i64> {
+    if !value.is_finite() || value < i64::MIN as f64 || value > i64::MAX as f64 {
+        return None;
     }
-    Ok(Some(number as i64))
+    Some(value.trunc() as i64)
+}
+
+fn date_time_clip_value(time: f64) -> Value {
+    if !time.is_finite() || time.abs() > DATE_CLIP_LIMIT_MS {
+        return Value::from_f64(f64::NAN);
+    }
+    Value::from_f64(time.trunc() + 0.0)
+}
+
+fn date_apply_legacy_year_offset(year: f64) -> f64 {
+    if !year.is_finite() {
+        return year;
+    }
+    let integer = year.trunc();
+    if (0.0..=99.0).contains(&integer) {
+        1900.0 + integer
+    } else {
+        year
+    }
 }
 
 fn date_balance_year_month(year: i64, month: i64) -> Option<(i32, u8)> {
@@ -14858,6 +15248,20 @@ fn date_balance_year_month(year: i64, month: i64) -> Option<(i32, u8)> {
         i32::try_from(balanced_year).ok()?,
         u8::try_from(balanced_month).ok()?,
     ))
+}
+
+fn date_is_leap_year(year: i32) -> bool {
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
+fn date_days_in_month(year: i32, month: u8) -> u8 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if date_is_leap_year(year) => 29,
+        2 => 28,
+        _ => 0,
+    }
 }
 
 fn date_days_from_civil(year: i32, month: u8, day: u8) -> i64 {
@@ -14901,6 +15305,10 @@ fn date_split_time_millis(total_millis: i64) -> (u8, u8, u8, u16) {
     )
 }
 
+fn date_weekday_from_days(days_since_epoch: i64) -> u8 {
+    u8::try_from((days_since_epoch + 4).rem_euclid(7)).unwrap()
+}
+
 fn date_value_epoch_nanoseconds(value: Value) -> Option<i128> {
     let millis = value.as_f64()?;
     if !millis.is_finite() {
@@ -14909,73 +15317,78 @@ fn date_value_epoch_nanoseconds(value: Value) -> Option<i128> {
     Some((millis.trunc() as i128) * DATE_NANOS_PER_MILLISECOND)
 }
 
-fn date_component_time_value<Cx: PublicBuiltinDispatchContext>(
-    cx: &mut Cx,
-    arguments: &[Value],
-) -> Result<Value, Cx::Error> {
-    let Some(mut year) = date_component_argument(cx, arguments.first().copied(), 0)? else {
-        return Ok(Value::from_f64(f64::NAN));
-    };
-    let Some(month) = date_component_argument(cx, arguments.get(1).copied(), 0)? else {
-        return Ok(Value::from_f64(f64::NAN));
-    };
-    let Some(day) = date_component_argument(cx, arguments.get(2).copied(), 1)? else {
-        return Ok(Value::from_f64(f64::NAN));
-    };
-    let Some(hour) = date_component_argument(cx, arguments.get(3).copied(), 0)? else {
-        return Ok(Value::from_f64(f64::NAN));
-    };
-    let Some(minute) = date_component_argument(cx, arguments.get(4).copied(), 0)? else {
-        return Ok(Value::from_f64(f64::NAN));
-    };
-    let Some(second) = date_component_argument(cx, arguments.get(5).copied(), 0)? else {
-        return Ok(Value::from_f64(f64::NAN));
-    };
-    let Some(millisecond) = date_component_argument(cx, arguments.get(6).copied(), 0)? else {
-        return Ok(Value::from_f64(f64::NAN));
-    };
+fn date_make_day(year: f64, month: f64, date: f64) -> Option<i64> {
+    let year = date_finite_integer(year)?;
+    let month = date_finite_integer(month)?;
+    let date = date_finite_integer(date)?;
+    let (year, month) = date_balance_year_month(year, month)?;
+    date_days_from_civil(year, month, 1).checked_add(date - 1)
+}
 
-    if (0..=99).contains(&year) {
-        year += 1900;
+fn date_make_time(hour: f64, minute: f64, second: f64, millisecond: f64) -> Option<f64> {
+    if !hour.is_finite() || !minute.is_finite() || !second.is_finite() || !millisecond.is_finite() {
+        return None;
     }
-    let Some((year, month)) = date_balance_year_month(year, month) else {
+    Some(
+        hour.trunc() * DATE_MS_PER_HOUR as f64
+            + minute.trunc() * DATE_MS_PER_MINUTE as f64
+            + second.trunc() * DATE_MS_PER_SECOND as f64
+            + millisecond.trunc(),
+    )
+}
+
+fn date_make_utc_value(
+    year: f64,
+    month: f64,
+    date: f64,
+    hour: f64,
+    minute: f64,
+    second: f64,
+    millisecond: f64,
+) -> Value {
+    let Some(day) = date_make_day(year, month, date) else {
+        return Value::from_f64(f64::NAN);
+    };
+    let Some(time) = date_make_time(hour, minute, second, millisecond) else {
+        return Value::from_f64(f64::NAN);
+    };
+    date_time_clip_value(day as f64 * DATE_MS_PER_DAY as f64 + time)
+}
+
+fn date_make_local_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    year: f64,
+    month: f64,
+    date: f64,
+    hour: f64,
+    minute: f64,
+    second: f64,
+    millisecond: f64,
+) -> Result<Value, Cx::Error> {
+    let Some(base_day) = date_make_day(year, month, date) else {
         return Ok(Value::from_f64(f64::NAN));
     };
-    let Some(base_days) = date_days_from_civil(year, month, 1).checked_add(day - 1) else {
+    let Some(time) = date_make_time(hour, minute, second, millisecond) else {
         return Ok(Value::from_f64(f64::NAN));
     };
-    let Some(hour_millis) = hour.checked_mul(DATE_MS_PER_HOUR) else {
+    let Some(time_millis) = date_finite_integer(time) else {
         return Ok(Value::from_f64(f64::NAN));
     };
-    let Some(minute_millis) = minute.checked_mul(DATE_MS_PER_MINUTE) else {
+    let Some(day) = base_day.checked_add(time_millis.div_euclid(DATE_MS_PER_DAY)) else {
         return Ok(Value::from_f64(f64::NAN));
     };
-    let Some(second_millis) = second.checked_mul(DATE_MS_PER_SECOND) else {
+    let Some((year, month, day_of_month)) = date_civil_from_days(day) else {
         return Ok(Value::from_f64(f64::NAN));
     };
-    let Some(total_time_millis) = hour_millis
-        .checked_add(minute_millis)
-        .and_then(|value| value.checked_add(second_millis))
-        .and_then(|value| value.checked_add(millisecond))
-    else {
-        return Ok(Value::from_f64(f64::NAN));
-    };
-    let Some(balanced_days) = base_days.checked_add(total_time_millis.div_euclid(DATE_MS_PER_DAY))
-    else {
-        return Ok(Value::from_f64(f64::NAN));
-    };
-    let day_millis = total_time_millis.rem_euclid(DATE_MS_PER_DAY);
-    let Some((year, month, day)) = date_civil_from_days(balanced_days) else {
-        return Ok(Value::from_f64(f64::NAN));
-    };
-    let (hour, minute, second, millisecond) = date_split_time_millis(day_millis);
+    let (hour, minute, second, millisecond) =
+        date_split_time_millis(time_millis.rem_euclid(DATE_MS_PER_DAY));
     let time_zone = cx.temporal_default_time_zone(&TemporalDefaultTimeZoneRequest {})?;
     let instant = cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
         time_zone_id: time_zone.time_zone_id,
         date_time: TemporalCivilDateTime::new(
             year,
             month,
-            day,
+            day_of_month,
             hour,
             minute,
             second,
@@ -14985,17 +15398,545 @@ fn date_component_time_value<Cx: PublicBuiltinDispatchContext>(
         ),
         disambiguation: TemporalDisambiguation::Compatible,
     })?;
-    let epoch_millis = (instant.epoch_nanoseconds / DATE_NANOS_PER_MILLISECOND) as f64;
-    if !epoch_millis.is_finite() || epoch_millis.abs() > DATE_CLIP_LIMIT_MS {
-        return Ok(Value::from_f64(f64::NAN));
+    Ok(date_time_clip_value(
+        (instant.epoch_nanoseconds / DATE_NANOS_PER_MILLISECOND) as f64,
+    ))
+}
+
+fn date_local_time_value_from_arguments<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    arguments: &[Value],
+) -> Result<Value, Cx::Error> {
+    let year = date_apply_legacy_year_offset(date_number_argument(
+        cx,
+        arguments.first().copied(),
+        f64::NAN,
+    )?);
+    let month = date_number_argument(cx, arguments.get(1).copied(), f64::NAN)?;
+    let date = date_number_argument(cx, arguments.get(2).copied(), 1.0)?;
+    let hour = date_number_argument(cx, arguments.get(3).copied(), 0.0)?;
+    let minute = date_number_argument(cx, arguments.get(4).copied(), 0.0)?;
+    let second = date_number_argument(cx, arguments.get(5).copied(), 0.0)?;
+    let millisecond = date_number_argument(cx, arguments.get(6).copied(), 0.0)?;
+    date_make_local_value(cx, year, month, date, hour, minute, second, millisecond)
+}
+
+fn date_utc_time_value_from_arguments<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    arguments: &[Value],
+) -> Result<Value, Cx::Error> {
+    let year = date_apply_legacy_year_offset(date_number_argument(
+        cx,
+        arguments.first().copied(),
+        f64::NAN,
+    )?);
+    let month = date_number_argument(cx, arguments.get(1).copied(), 0.0)?;
+    let date = date_number_argument(cx, arguments.get(2).copied(), 1.0)?;
+    let hour = date_number_argument(cx, arguments.get(3).copied(), 0.0)?;
+    let minute = date_number_argument(cx, arguments.get(4).copied(), 0.0)?;
+    let second = date_number_argument(cx, arguments.get(5).copied(), 0.0)?;
+    let millisecond = date_number_argument(cx, arguments.get(6).copied(), 0.0)?;
+    Ok(date_make_utc_value(
+        year,
+        month,
+        date,
+        hour,
+        minute,
+        second,
+        millisecond,
+    ))
+}
+
+fn date_utc_parts_from_millis(millis: f64) -> Option<DateParts> {
+    let millis = date_finite_integer(millis)?;
+    let day = millis.div_euclid(DATE_MS_PER_DAY);
+    let time = millis.rem_euclid(DATE_MS_PER_DAY);
+    let (year, month, date) = date_civil_from_days(day)?;
+    let (hour, minute, second, millisecond) = date_split_time_millis(time);
+    Some(DateParts {
+        year,
+        month,
+        day: date,
+        hour,
+        minute,
+        second,
+        millisecond,
+        weekday: date_weekday_from_days(day),
+        offset_minutes: 0,
+    })
+}
+
+fn date_local_parts_from_millis<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    millis: f64,
+) -> Result<Option<DateParts>, Cx::Error> {
+    let Some(epoch_nanoseconds) = date_value_epoch_nanoseconds(Value::from_f64(millis)) else {
+        return Ok(None);
+    };
+    let time_zone = cx.temporal_default_time_zone(&TemporalDefaultTimeZoneRequest {})?;
+    let civil_time = cx.temporal_instant_to_civil_time(&TemporalInstantToCivilRequest {
+        time_zone_id: time_zone.time_zone_id,
+        epoch_nanoseconds,
+    })?;
+    let date_time = civil_time.date_time;
+    let day = date_days_from_civil(date_time.year, date_time.month, date_time.day);
+    Ok(Some(DateParts {
+        year: date_time.year,
+        month: date_time.month,
+        day: date_time.day,
+        hour: date_time.hour,
+        minute: date_time.minute,
+        second: date_time.second,
+        millisecond: date_time.millisecond,
+        weekday: date_weekday_from_days(day),
+        offset_minutes: i32::try_from(civil_time.offset_nanoseconds / DATE_NANOS_PER_MINUTE)
+            .unwrap_or(0),
+    }))
+}
+
+fn date_parts_for_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+    utc: bool,
+) -> Result<Option<DateParts>, Cx::Error> {
+    let Some(millis) = value.as_f64().filter(|millis| millis.is_finite()) else {
+        return Ok(None);
+    };
+    if utc {
+        Ok(date_utc_parts_from_millis(millis))
+    } else {
+        date_local_parts_from_millis(cx, millis)
     }
-    Ok(Value::from_f64(epoch_millis))
+}
+
+fn date_format_year_for_date_string(year: i32) -> String {
+    if (0..=9999).contains(&year) {
+        format!("{year:04}")
+    } else if year < 0 && year > -10_000 {
+        format!("-{:04}", year.abs())
+    } else {
+        year.to_string()
+    }
+}
+
+fn date_format_year_for_iso(year: i32) -> String {
+    if (0..=9999).contains(&year) {
+        format!("{year:04}")
+    } else if year < 0 {
+        format!("-{:06}", year.abs())
+    } else {
+        format!("+{year:06}")
+    }
+}
+
+fn date_format_date(parts: DateParts) -> String {
+    format!(
+        "{} {} {:02} {}",
+        DATE_WEEKDAY_NAMES[usize::from(parts.weekday)],
+        DATE_MONTH_NAMES[usize::from(parts.month - 1)],
+        parts.day,
+        date_format_year_for_date_string(parts.year)
+    )
+}
+
+fn date_format_time(parts: DateParts) -> String {
+    let offset = parts.offset_minutes;
+    let sign = if offset < 0 { '-' } else { '+' };
+    let abs_offset = offset.abs();
+    format!(
+        "{:02}:{:02}:{:02} GMT{}{:02}{:02}",
+        parts.hour,
+        parts.minute,
+        parts.second,
+        sign,
+        abs_offset / 60,
+        abs_offset % 60
+    )
+}
+
+fn date_format_local<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+    kind: DateStringKind,
+) -> Result<String, Cx::Error> {
+    let Some(parts) = date_parts_for_value(cx, value, false)? else {
+        return Ok("Invalid Date".to_owned());
+    };
+    Ok(match kind {
+        DateStringKind::Full => format!("{} {}", date_format_date(parts), date_format_time(parts)),
+        DateStringKind::Date => date_format_date(parts),
+        DateStringKind::Time => date_format_time(parts),
+    })
+}
+
+fn date_format_utc(value: Value) -> String {
+    let Some(millis) = value.as_f64().filter(|millis| millis.is_finite()) else {
+        return "Invalid Date".to_owned();
+    };
+    let Some(parts) = date_utc_parts_from_millis(millis) else {
+        return "Invalid Date".to_owned();
+    };
+    format!(
+        "{}, {:02} {} {} {:02}:{:02}:{:02} GMT",
+        DATE_WEEKDAY_NAMES[usize::from(parts.weekday)],
+        parts.day,
+        DATE_MONTH_NAMES[usize::from(parts.month - 1)],
+        date_format_year_for_date_string(parts.year),
+        parts.hour,
+        parts.minute,
+        parts.second
+    )
+}
+
+fn date_format_iso(value: Value) -> Option<String> {
+    let millis = value.as_f64().filter(|millis| millis.is_finite())?;
+    let parts = date_utc_parts_from_millis(millis)?;
+    Some(format!(
+        "{}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        date_format_year_for_iso(parts.year),
+        parts.month,
+        parts.day,
+        parts.hour,
+        parts.minute,
+        parts.second,
+        parts.millisecond
+    ))
+}
+
+fn date_this_object_and_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<(ObjectRef, Value), Cx::Error> {
+    let object = value.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let date_value = {
+        let agent = cx.agent();
+        if !agent.objects().is_date_object(object) {
+            return Err(type_error(cx));
+        }
+        agent.objects().date_value(agent.heap().view(), object)
+    };
+    Ok((object, date_value.ok_or_else(|| type_error(cx))?))
+}
+
+fn date_store_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    object: ObjectRef,
+    value: Value,
+) -> Result<(), Cx::Error> {
+    let stored = cx.agent().with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.set_date_value(&mut mutator, object, value)
+    });
+    if stored {
+        Ok(())
+    } else {
+        Err(type_error(cx))
+    }
+}
+
+fn date_parse_two_digits(bytes: &[u8], index: usize) -> Option<u32> {
+    let tens = *bytes.get(index)?;
+    let ones = *bytes.get(index + 1)?;
+    if !tens.is_ascii_digit() || !ones.is_ascii_digit() {
+        return None;
+    }
+    Some(u32::from(tens - b'0') * 10 + u32::from(ones - b'0'))
+}
+
+fn date_parse_fixed_digits(bytes: &[u8], index: usize, len: usize) -> Option<i32> {
+    let mut value = 0_i32;
+    for offset in 0..len {
+        let byte = *bytes.get(index + offset)?;
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        value = value.checked_mul(10)?.checked_add(i32::from(byte - b'0'))?;
+    }
+    Some(value)
+}
+
+fn date_month_name_index(name: &str) -> Option<u8> {
+    DATE_MONTH_NAMES
+        .iter()
+        .position(|candidate| *candidate == name)
+        .and_then(|index| u8::try_from(index + 1).ok())
+}
+
+fn date_parse_time(text: &str) -> Option<(u32, u32, u32)> {
+    let bytes = text.as_bytes();
+    if bytes.len() != 8 || bytes.get(2) != Some(&b':') || bytes.get(5) != Some(&b':') {
+        return None;
+    }
+    Some((
+        date_parse_two_digits(bytes, 0)?,
+        date_parse_two_digits(bytes, 3)?,
+        date_parse_two_digits(bytes, 6)?,
+    ))
+}
+
+fn date_parse_timezone_offset_colon(text: &str) -> Option<i32> {
+    let bytes = text.as_bytes();
+    if bytes.len() != 6 || bytes.get(3) != Some(&b':') {
+        return None;
+    }
+    let sign = match bytes[0] {
+        b'+' => 1,
+        b'-' => -1,
+        _ => return None,
+    };
+    let hour = i32::try_from(date_parse_two_digits(bytes, 1)?).ok()?;
+    let minute = i32::try_from(date_parse_two_digits(bytes, 4)?).ok()?;
+    if hour > 23 || minute > 59 {
+        return None;
+    }
+    Some(sign * (hour * 60 + minute))
+}
+
+fn date_parse_timezone_offset_compact(text: &str) -> Option<i32> {
+    let bytes = text.as_bytes();
+    if bytes.len() != 5 {
+        return None;
+    }
+    let sign = match bytes[0] {
+        b'+' => 1,
+        b'-' => -1,
+        _ => return None,
+    };
+    let hour = i32::try_from(date_parse_two_digits(bytes, 1)?).ok()?;
+    let minute = i32::try_from(date_parse_two_digits(bytes, 3)?).ok()?;
+    if hour > 23 || minute > 59 {
+        return None;
+    }
+    Some(sign * (hour * 60 + minute))
+}
+
+fn date_validate_iso_date(year: i32, month: u32, day: u32) -> bool {
+    if !(1..=12).contains(&month) {
+        return false;
+    }
+    let Ok(month_u8) = u8::try_from(month) else {
+        return false;
+    };
+    (1..=u32::from(date_days_in_month(year, month_u8))).contains(&day)
+}
+
+fn date_parse_iso_text<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    text: &str,
+) -> Result<Option<Value>, Cx::Error> {
+    let bytes = text.as_bytes();
+    let mut index = 0;
+    let mut sign = 1_i32;
+    let year_digits = match bytes.first().copied() {
+        Some(b'+') => {
+            index = 1;
+            6
+        }
+        Some(b'-') => {
+            index = 1;
+            sign = -1;
+            6
+        }
+        _ => 4,
+    };
+    let Some(mut year) = date_parse_fixed_digits(bytes, index, year_digits) else {
+        return Ok(None);
+    };
+    if sign == -1 && year == 0 && year_digits == 6 {
+        return Ok(None);
+    }
+    year *= sign;
+    index += year_digits;
+
+    let mut month = 1_u32;
+    let mut day = 1_u32;
+    let mut date_only = true;
+    if bytes.get(index) == Some(&b'-') {
+        index += 1;
+        month = date_parse_two_digits(bytes, index).unwrap_or(0);
+        index += 2;
+        if bytes.get(index) == Some(&b'-') {
+            index += 1;
+            day = date_parse_two_digits(bytes, index).unwrap_or(0);
+            index += 2;
+        }
+    }
+    if !date_validate_iso_date(year, month, day) {
+        return Ok(None);
+    }
+
+    let mut hour = 0_u32;
+    let mut minute = 0_u32;
+    let mut second = 0_u32;
+    let mut millisecond = 0_u32;
+    let mut offset_minutes: Option<i32> = None;
+
+    if bytes.get(index) == Some(&b'T') {
+        date_only = false;
+        index += 1;
+        hour = date_parse_two_digits(bytes, index).unwrap_or(u32::MAX);
+        index += 2;
+        if bytes.get(index) != Some(&b':') {
+            return Ok(None);
+        }
+        index += 1;
+        minute = date_parse_two_digits(bytes, index).unwrap_or(u32::MAX);
+        index += 2;
+        if bytes.get(index) == Some(&b':') {
+            index += 1;
+            second = date_parse_two_digits(bytes, index).unwrap_or(u32::MAX);
+            index += 2;
+            if bytes.get(index) == Some(&b'.') {
+                index += 1;
+                let mut scale = 100;
+                while let Some(byte) = bytes.get(index).copied() {
+                    if !byte.is_ascii_digit() {
+                        break;
+                    }
+                    if scale > 0 {
+                        millisecond += u32::from(byte - b'0') * scale;
+                        scale /= 10;
+                    }
+                    index += 1;
+                }
+            }
+        }
+        if hour > 24
+            || minute > 59
+            || second > 59
+            || (hour == 24 && (minute != 0 || second != 0 || millisecond != 0))
+        {
+            return Ok(None);
+        }
+        match bytes.get(index).copied() {
+            Some(b'Z') => {
+                offset_minutes = Some(0);
+                index += 1;
+            }
+            Some(b'+') | Some(b'-') => {
+                let offset_text = &text[index..];
+                offset_minutes = date_parse_timezone_offset_colon(offset_text);
+                if offset_minutes.is_none() {
+                    return Ok(None);
+                }
+                index = text.len();
+            }
+            _ => {}
+        }
+    }
+    if index != text.len() {
+        return Ok(None);
+    }
+
+    let value = if let Some(offset) = offset_minutes {
+        let utc = date_make_utc_value(
+            f64::from(year),
+            f64::from(month - 1),
+            f64::from(day),
+            f64::from(hour),
+            f64::from(minute),
+            f64::from(second),
+            f64::from(millisecond),
+        );
+        let Some(millis) = utc.as_f64().filter(|millis| millis.is_finite()) else {
+            return Ok(Some(Value::from_f64(f64::NAN)));
+        };
+        date_time_clip_value(millis - f64::from(offset) * DATE_MS_PER_MINUTE as f64)
+    } else if date_only {
+        date_make_utc_value(
+            f64::from(year),
+            f64::from(month - 1),
+            f64::from(day),
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        )
+    } else {
+        date_make_local_value(
+            cx,
+            f64::from(year),
+            f64::from(month - 1),
+            f64::from(day),
+            f64::from(hour),
+            f64::from(minute),
+            f64::from(second),
+            f64::from(millisecond),
+        )?
+    };
+    Ok(Some(value))
+}
+
+fn date_parse_utc_string(text: &str) -> Option<Value> {
+    let parts: Vec<_> = text.split_whitespace().collect();
+    if parts.len() != 6 || parts[5] != "GMT" {
+        return None;
+    }
+    let day = parts[1].parse::<u32>().ok()?;
+    let month = date_month_name_index(parts[2])?;
+    let year = parts[3].parse::<i32>().ok()?;
+    let (hour, minute, second) = date_parse_time(parts[4])?;
+    Some(date_make_utc_value(
+        f64::from(year),
+        f64::from(month - 1),
+        f64::from(day),
+        f64::from(hour),
+        f64::from(minute),
+        f64::from(second),
+        0.0,
+    ))
+}
+
+fn date_parse_local_string(text: &str) -> Option<Value> {
+    let parts: Vec<_> = text.split_whitespace().collect();
+    if parts.len() < 6 || !parts[5].starts_with("GMT") {
+        return None;
+    }
+    let month = date_month_name_index(parts[1])?;
+    let day = parts[2].parse::<u32>().ok()?;
+    let year = parts[3].parse::<i32>().ok()?;
+    let (hour, minute, second) = date_parse_time(parts[4])?;
+    let offset = date_parse_timezone_offset_compact(&parts[5][3..])?;
+    let utc = date_make_utc_value(
+        f64::from(year),
+        f64::from(month - 1),
+        f64::from(day),
+        f64::from(hour),
+        f64::from(minute),
+        f64::from(second),
+        0.0,
+    );
+    let millis = utc.as_f64().filter(|millis| millis.is_finite())?;
+    Some(date_time_clip_value(
+        millis - f64::from(offset) * DATE_MS_PER_MINUTE as f64,
+    ))
+}
+
+fn date_parse_text<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    text: &str,
+) -> Result<Value, Cx::Error> {
+    if let Some(value) = date_parse_iso_text(cx, text)? {
+        return Ok(value);
+    }
+    if let Some(value) = date_parse_utc_string(text) {
+        return Ok(value);
+    }
+    if let Some(value) = date_parse_local_string(text) {
+        return Ok(value);
+    }
+    Ok(Value::from_f64(f64::NAN))
 }
 
 fn date_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
+    if invocation.new_target().is_none() {
+        let text = date_display_text(cx, current_time_value())?;
+        return Ok(string_value(cx, &text));
+    }
+
     let realm = cx.builtin_realm();
     let default_prototype = {
         let agent = cx.agent();
@@ -15009,20 +15950,42 @@ fn date_builtin<Cx: PublicBuiltinDispatchContext>(
         current_time_value()
     } else if invocation.arguments().len() == 1 {
         let argument = invocation.arguments()[0];
-        if argument.is_string() {
-            Value::from_f64(f64::NAN)
+        if let Some(object) = argument.as_object_ref() {
+            let date_value = {
+                let agent = cx.agent();
+                agent.objects().date_value(agent.heap().view(), object)
+            };
+            if let Some(date_value) = date_value {
+                date_value
+            } else {
+                let primitive = {
+                    let mut bridge = BuiltinToPrimitiveBridge { cx };
+                    object::to_primitive(&mut bridge, argument, object::ToPrimitiveHint::Default)?
+                };
+                if primitive.is_string() {
+                    let text = cx.value_to_string_text(primitive)?;
+                    date_parse_text(cx, &text)?
+                } else {
+                    let number = {
+                        let agent = cx.agent();
+                        read::to_number(agent.heap().view(), primitive)
+                    };
+                    match number {
+                        Ok(number) => date_time_clip_value(number.as_f64().unwrap_or(f64::NAN)),
+                        Err(_) => return Err(type_error(cx)),
+                    }
+                }
+            }
+        } else if argument.is_string() {
+            let text = cx.value_to_string_text(argument)?;
+            date_parse_text(cx, &text)?
         } else {
-            let mut bridge = BuiltinToPrimitiveBridge { cx };
-            object::to_number(&mut bridge, argument)?
+            let number = to_number_for_builtin(cx, argument)?;
+            date_time_clip_value(number)
         }
     } else {
-        date_component_time_value(cx, invocation.arguments())?
+        date_local_time_value_from_arguments(cx, invocation.arguments())?
     };
-
-    if invocation.new_target().is_none() {
-        let text = date_display_text(cx, time_value)?;
-        return Ok(string_value(cx, &text));
-    }
 
     let prototype =
         cx.ordinary_constructor_prototype(realm, invocation.new_target(), default_prototype)?;
@@ -15038,16 +16001,38 @@ fn date_now_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(current_time_value())
 }
 
+fn date_parse_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let text = cx.value_to_string_text(
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    date_parse_text(cx, &text)
+}
+
+fn date_utc_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    date_utc_time_value_from_arguments(cx, invocation.arguments())
+}
+
 fn date_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
+    kind: DateStringKind,
 ) -> Result<Value, Cx::Error> {
     let value = {
         let agent = cx.agent();
         object::require_date_value(agent, invocation.this_value())
     };
     let value = map_completion(cx, value)?;
-    let text = date_display_text(cx, value)?;
+    let text = date_format_local(cx, value, kind)?;
     Ok(string_value(cx, &text))
 }
 
@@ -15060,6 +16045,33 @@ fn date_value_of_builtin<Cx: PublicBuiltinDispatchContext>(
         object::require_date_value(agent, invocation.this_value())
     };
     map_completion(cx, value)
+}
+
+fn date_get_component_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    component: DateComponent,
+    utc: bool,
+) -> Result<Value, Cx::Error> {
+    let value = {
+        let agent = cx.agent();
+        object::require_date_value(agent, invocation.this_value())
+    };
+    let value = map_completion(cx, value)?;
+    let Some(parts) = date_parts_for_value(cx, value, utc)? else {
+        return Ok(Value::from_f64(f64::NAN));
+    };
+    let value = match component {
+        DateComponent::FullYear => parts.year,
+        DateComponent::Month => i32::from(parts.month - 1),
+        DateComponent::Date => i32::from(parts.day),
+        DateComponent::Day => i32::from(parts.weekday),
+        DateComponent::Hours => i32::from(parts.hour),
+        DateComponent::Minutes => i32::from(parts.minute),
+        DateComponent::Seconds => i32::from(parts.second),
+        DateComponent::Milliseconds => i32::from(parts.millisecond),
+    };
+    Ok(Value::from_smi(value))
 }
 
 fn date_get_timezone_offset_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -15079,9 +16091,215 @@ fn date_get_timezone_offset_builtin<Cx: PublicBuiltinDispatchContext>(
         time_zone_id: time_zone.time_zone_id,
         epoch_nanoseconds,
     })?;
-    Ok(Value::from_f64(
-        -((civil_time.offset_nanoseconds / DATE_NANOS_PER_MINUTE) as f64),
-    ))
+    let offset_minutes = -((civil_time.offset_nanoseconds / DATE_NANOS_PER_MINUTE) as f64);
+    Ok(Value::from_f64(offset_minutes + 0.0))
+}
+
+fn date_set_time_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (object, _) = date_this_object_and_value(cx, invocation.this_value())?;
+    let time = to_number_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let value = date_time_clip_value(time);
+    date_store_value(cx, object, value)?;
+    Ok(value)
+}
+
+fn date_set_component_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    kind: DateSetKind,
+    utc: bool,
+) -> Result<Value, Cx::Error> {
+    let (object, old_value) = date_this_object_and_value(cx, invocation.this_value())?;
+    let old_millis = old_value.as_f64().unwrap_or(f64::NAN);
+    let first = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let first_number = to_number_for_builtin(cx, first)?;
+    let second_number = match invocation.arguments().get(1).copied() {
+        Some(value) => Some(to_number_for_builtin(cx, value)?),
+        None => None,
+    };
+    let third_number = match invocation.arguments().get(2).copied() {
+        Some(value) => Some(to_number_for_builtin(cx, value)?),
+        None => None,
+    };
+    let fourth_number = match invocation.arguments().get(3).copied() {
+        Some(value) => Some(to_number_for_builtin(cx, value)?),
+        None => None,
+    };
+
+    let base_millis = if kind == DateSetKind::FullYear && old_millis.is_nan() {
+        0.0
+    } else {
+        old_millis
+    };
+    if kind != DateSetKind::FullYear && !base_millis.is_finite() {
+        return Ok(Value::from_f64(f64::NAN));
+    }
+    let parts = if utc {
+        date_utc_parts_from_millis(base_millis)
+    } else {
+        date_local_parts_from_millis(cx, base_millis)?
+    };
+    let Some(parts) = parts else {
+        return Ok(Value::from_f64(f64::NAN));
+    };
+
+    let mut year = f64::from(parts.year);
+    let mut month = f64::from(parts.month - 1);
+    let mut date = f64::from(parts.day);
+    let mut hour = f64::from(parts.hour);
+    let mut minute = f64::from(parts.minute);
+    let mut second = f64::from(parts.second);
+    let mut millisecond = f64::from(parts.millisecond);
+
+    match kind {
+        DateSetKind::Milliseconds => {
+            millisecond = first_number;
+        }
+        DateSetKind::Seconds => {
+            second = first_number;
+            millisecond = second_number.unwrap_or(millisecond);
+        }
+        DateSetKind::Minutes => {
+            minute = first_number;
+            second = second_number.unwrap_or(second);
+            millisecond = third_number.unwrap_or(millisecond);
+        }
+        DateSetKind::Hours => {
+            hour = first_number;
+            minute = second_number.unwrap_or(minute);
+            second = third_number.unwrap_or(second);
+            millisecond = fourth_number.unwrap_or(millisecond);
+        }
+        DateSetKind::Date => {
+            date = first_number;
+        }
+        DateSetKind::Month => {
+            month = first_number;
+            date = second_number.unwrap_or(date);
+        }
+        DateSetKind::FullYear => {
+            year = first_number;
+            month = second_number.unwrap_or(month);
+            date = third_number.unwrap_or(date);
+        }
+    }
+
+    let value = if utc {
+        date_make_utc_value(year, month, date, hour, minute, second, millisecond)
+    } else {
+        date_make_local_value(cx, year, month, date, hour, minute, second, millisecond)?
+    };
+    date_store_value(cx, object, value)?;
+    Ok(value)
+}
+
+fn date_to_utc_string_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let value = {
+        let agent = cx.agent();
+        object::require_date_value(agent, invocation.this_value())
+    };
+    let value = map_completion(cx, value)?;
+    Ok(string_value(cx, &date_format_utc(value)))
+}
+
+fn date_to_iso_string_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let value = {
+        let agent = cx.agent();
+        object::require_date_value(agent, invocation.this_value())
+    };
+    let value = map_completion(cx, value)?;
+    let Some(text) = date_format_iso(value) else {
+        return Err(range_error(cx));
+    };
+    Ok(string_value(cx, &text))
+}
+
+fn date_to_json_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = {
+        let realm = cx.builtin_realm();
+        let agent = cx.agent();
+        object::to_object(agent, realm, invocation.this_value())
+    };
+    let object = map_completion(cx, object)?;
+    let primitive = {
+        let mut bridge = BuiltinToPrimitiveBridge { cx };
+        object::to_primitive(
+            &mut bridge,
+            Value::from_object_ref(object),
+            object::ToPrimitiveHint::Number,
+        )?
+    };
+    if primitive.as_f64().is_some_and(|number| !number.is_finite()) {
+        return Ok(Value::null());
+    }
+    let key = {
+        let agent = cx.agent();
+        PropertyKey::from_atom(agent.atoms_mut().intern_collectible("toISOString"))
+    };
+    let method = cx.get_property_value(Value::from_object_ref(object), key)?;
+    let method = cx.require_callable_object(method)?;
+    cx.call_to_completion(method, Value::from_object_ref(object), &[])
+}
+
+fn date_to_temporal_instant_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let value = {
+        let agent = cx.agent();
+        object::require_date_value(agent, invocation.this_value())
+    };
+    let value = map_completion(cx, value)?;
+    let Some(epoch_nanoseconds) = date_value_epoch_nanoseconds(value) else {
+        return Err(range_error(cx));
+    };
+    temporal::create_temporal_instant_object(cx, epoch_nanoseconds)
+}
+
+fn date_to_primitive_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = invocation
+        .this_value()
+        .as_object_ref()
+        .ok_or_else(|| type_error(cx))?;
+    let hint_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let hint = hint_value.as_string_ref().ok_or_else(|| type_error(cx))?;
+    let hint_text = string_ref_text(cx, hint)?;
+    let hint = match hint_text.as_str() {
+        "string" | "default" => object::ToPrimitiveHint::String,
+        "number" => object::ToPrimitiveHint::Number,
+        _ => return Err(type_error(cx)),
+    };
+    object::ordinary_to_primitive(&mut BuiltinToPrimitiveBridge { cx }, object, hint)
 }
 
 fn primitive_wrapper_constructor<Cx: PublicBuiltinDispatchContext>(
@@ -15115,12 +16333,21 @@ fn number_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let number = if let Some(argument) = invocation.arguments().first().copied() {
-        let mut bridge = BuiltinToPrimitiveBridge { cx };
-        let numeric = object::to_numeric(&mut bridge, argument)?;
-        if numeric.is_bigint() {
-            bigint_to_number_value(cx, numeric)?
+        let primitive = {
+            let mut bridge = BuiltinToPrimitiveBridge { cx };
+            object::to_primitive(&mut bridge, argument, object::ToPrimitiveHint::Number)?
+        };
+        if primitive.is_bigint() {
+            bigint_to_number_value(cx, primitive)?
         } else {
-            numeric
+            let number = {
+                let agent = cx.agent();
+                read::to_number(agent.heap().view(), primitive)
+            };
+            match number {
+                Ok(number) => number,
+                Err(_) => return Err(type_error(cx)),
+            }
         }
     } else {
         Value::from_smi(0)
@@ -15193,9 +16420,9 @@ fn number_is_safe_integer_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_bool(result))
 }
 
-fn number_to_exponential_builtin<Cx: PublicBuiltinDispatchContext>(
+fn number_this_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    invocation: BuiltinInvocation<'_>,
+    invocation: &BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let value = {
         let agent = cx.agent();
@@ -15205,47 +16432,121 @@ fn number_to_exponential_builtin<Cx: PublicBuiltinDispatchContext>(
             PrimitiveWrapperKind::Number,
         )
     };
-    let number_value = map_completion(cx, value)?;
-    let number = number_value.as_f64().ok_or_else(|| type_error(cx))?;
+    map_completion(cx, value)
+}
+
+fn number_this_f64<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: &BuiltinInvocation<'_>,
+) -> Result<(Value, f64), Cx::Error> {
+    let value = number_this_value(cx, invocation)?;
+    let number = value.as_f64().ok_or_else(|| type_error(cx))?;
+    Ok((value, number))
+}
+
+fn number_format_digits<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+    min: i32,
+    max: i32,
+) -> Result<usize, Cx::Error> {
+    let digits = to_integer_or_infinity_for_builtin(cx, value)?;
+    if !digits.is_finite() || digits < f64::from(min) || digits > f64::from(max) {
+        return Err(range_error(cx));
+    }
+    usize::try_from(digits as i32).map_err(|_| range_error(cx))
+}
+
+fn number_to_exponential_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (number_value, number) = number_this_f64(cx, &invocation)?;
+    let fraction_digits = match invocation.arguments().first().copied() {
+        None => None,
+        Some(value) if value.is_undefined() => None,
+        Some(value) => Some(to_integer_or_infinity_for_builtin(cx, value)?),
+    };
     if number.is_nan() || number.is_infinite() {
         let text = cx.value_to_string_text(number_value)?;
         return Ok(string_value(cx, &text));
     }
-
-    let fraction_digits = match invocation.arguments().first().copied() {
+    let fraction_digits = match fraction_digits {
         None => None,
-        Some(value) if value.is_undefined() => None,
-        Some(value) => {
-            let digits = argument_to_number(cx, value)?;
-            if !digits.is_finite() || digits != digits.trunc() || !(0.0..=100.0).contains(&digits) {
-                return Err(range_error(cx));
-            }
-            Some(digits as usize)
+        Some(digits) if digits.is_finite() && (0.0..=100.0).contains(&digits) => {
+            Some(usize::try_from(digits as i32).map_err(|_| range_error(cx))?)
         }
+        Some(_) => return Err(range_error(cx)),
     };
+    let normalized = if number == 0.0 { 0.0 } else { number };
     let formatted = if let Some(fraction_digits) = fraction_digits {
-        format_to_exponential(number, fraction_digits).ok_or_else(|| type_error(cx))?
+        format_to_exponential(normalized, fraction_digits).ok_or_else(|| type_error(cx))?
     } else {
-        format!("{number:e}")
+        format!("{normalized:e}")
     };
     let (mantissa, exponent) = formatted.split_once('e').ok_or_else(|| type_error(cx))?;
     let exponent = exponent.parse::<i32>().map_err(|_| type_error(cx))?;
     Ok(string_value(cx, &format!("{mantissa}e{exponent:+}")))
 }
 
+fn number_to_fixed_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (number_value, number) = number_this_f64(cx, &invocation)?;
+    let fraction_digits = match invocation.arguments().first().copied() {
+        None => 0,
+        Some(value) => number_format_digits(cx, value, 0, 100)?,
+    };
+    if number.is_nan() || number.is_infinite() || number.abs() >= 1e21 {
+        let text = cx.value_to_string_text(number_value)?;
+        return Ok(string_value(cx, &text));
+    }
+    let normalized = if number == 0.0 { 0.0 } else { number };
+    Ok(string_value(cx, &format!("{normalized:.fraction_digits$}")))
+}
+
+fn number_to_locale_string_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let value = number_this_value(cx, &invocation)?;
+    let text = cx.value_to_string_text(value)?;
+    Ok(string_value(cx, &text))
+}
+
+fn number_to_precision_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (number_value, number) = number_this_f64(cx, &invocation)?;
+    let Some(precision_value) = invocation.arguments().first().copied() else {
+        let text = cx.value_to_string_text(number_value)?;
+        return Ok(string_value(cx, &text));
+    };
+    if precision_value.is_undefined() {
+        let text = cx.value_to_string_text(number_value)?;
+        return Ok(string_value(cx, &text));
+    }
+
+    let precision_integer = to_integer_or_infinity_for_builtin(cx, precision_value)?;
+    if number.is_nan() || number.is_infinite() {
+        let text = cx.value_to_string_text(number_value)?;
+        return Ok(string_value(cx, &text));
+    }
+    if !precision_integer.is_finite() || !(1.0..=100.0).contains(&precision_integer) {
+        return Err(range_error(cx));
+    }
+    let precision = usize::try_from(precision_integer as i32).map_err(|_| range_error(cx))?;
+    let text = format_to_precision(number, precision).ok_or_else(|| type_error(cx))?;
+    Ok(string_value(cx, &text))
+}
+
 fn number_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let value = {
-        let agent = cx.agent();
-        object::require_primitive_wrapper_value(
-            agent,
-            invocation.this_value(),
-            PrimitiveWrapperKind::Number,
-        )
-    };
-    let number_value = map_completion(cx, value)?;
+    let number_value = number_this_value(cx, &invocation)?;
     let number = number_value.as_f64().ok_or_else(|| type_error(cx))?;
     let radix = radix_argument(
         cx,
@@ -15278,38 +16579,232 @@ fn number_value_of_builtin<Cx: PublicBuiltinDispatchContext>(
     map_completion(cx, value)
 }
 
+fn math_argument(invocation: &BuiltinInvocation<'_>, index: usize) -> Value {
+    invocation
+        .arguments()
+        .get(index)
+        .copied()
+        .unwrap_or(Value::undefined())
+}
+
+fn math_unary_number_builtin<Cx, F>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    op: F,
+) -> Result<Value, Cx::Error>
+where
+    Cx: PublicBuiltinDispatchContext,
+    F: FnOnce(f64) -> f64,
+{
+    let number = argument_to_number(cx, math_argument(&invocation, 0))?;
+    Ok(number_value(op(number)))
+}
+
 fn math_abs_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    Ok(number_value(
-        argument_to_number(
-            cx,
-            invocation
-                .arguments()
-                .first()
-                .copied()
-                .unwrap_or(Value::undefined()),
-        )?
-        .abs(),
+    math_unary_number_builtin(cx, invocation, f64::abs)
+}
+
+fn math_acos_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::acos)
+}
+
+fn math_acosh_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::acosh)
+}
+
+fn math_asin_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::asin)
+}
+
+fn math_asinh_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::asinh)
+}
+
+fn math_atan_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::atan)
+}
+
+fn math_atan2_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let y = argument_to_number(cx, math_argument(&invocation, 0))?;
+    let x = argument_to_number(cx, math_argument(&invocation, 1))?;
+    Ok(number_value(y.atan2(x)))
+}
+
+fn math_atanh_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::atanh)
+}
+
+fn math_cbrt_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::cbrt)
+}
+
+fn math_ceil_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::ceil)
+}
+
+fn math_clz32_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let value = to_uint32_for_builtin(cx, math_argument(&invocation, 0))?;
+    Ok(Value::from_smi(
+        i32::try_from(value.leading_zeros()).expect("leading zero count should fit in i32"),
     ))
+}
+
+fn math_cos_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::cos)
+}
+
+fn math_cosh_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::cosh)
+}
+
+fn math_exp_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::exp)
+}
+
+fn math_expm1_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::exp_m1)
+}
+
+fn math_f16round_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let number = argument_to_number(cx, math_argument(&invocation, 0))?;
+    Ok(number_value(round_to_float16(number)))
 }
 
 fn math_floor_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    Ok(number_value(
-        argument_to_number(
-            cx,
-            invocation
-                .arguments()
-                .first()
-                .copied()
-                .unwrap_or(Value::undefined()),
-        )?
-        .floor(),
-    ))
+    math_unary_number_builtin(cx, invocation, f64::floor)
+}
+
+fn math_fround_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let number = argument_to_number(cx, math_argument(&invocation, 0))?;
+    Ok(number_value(f64::from(number as f32)))
+}
+
+fn math_hypot_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let mut values = Vec::with_capacity(invocation.arguments().len());
+    let mut saw_infinity = false;
+    let mut saw_nan = false;
+    for argument in invocation.arguments() {
+        let number = argument_to_number(cx, *argument)?;
+        if number.is_infinite() {
+            saw_infinity = true;
+        } else if number.is_nan() {
+            saw_nan = true;
+        } else {
+            values.push(number.abs());
+        }
+    }
+    if saw_infinity {
+        return Ok(Value::from_f64(f64::INFINITY));
+    }
+    if saw_nan {
+        return Ok(Value::from_f64(f64::NAN));
+    }
+    let scale = values.iter().copied().fold(0.0_f64, f64::max);
+    if scale == 0.0 {
+        return Ok(Value::from_smi(0));
+    }
+    let scaled_sum = values
+        .iter()
+        .map(|value| {
+            let scaled = *value / scale;
+            scaled * scaled
+        })
+        .sum::<f64>();
+    Ok(number_value(scale * scaled_sum.sqrt()))
+}
+
+fn math_imul_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let left = to_uint32_for_builtin(cx, math_argument(&invocation, 0))?;
+    let right = to_uint32_for_builtin(cx, math_argument(&invocation, 1))?;
+    Ok(Value::from_smi(left.wrapping_mul(right) as i32))
+}
+
+fn math_log_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::ln)
+}
+
+fn math_log10_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::log10)
+}
+
+fn math_log1p_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::ln_1p)
+}
+
+fn math_log2_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::log2)
 }
 
 fn math_max_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -15320,10 +16815,12 @@ fn math_max_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Value::from_f64(f64::NEG_INFINITY));
     }
     let mut result = f64::NEG_INFINITY;
+    let mut saw_nan = false;
     for argument in invocation.arguments() {
         let number = argument_to_number(cx, *argument)?;
         if number.is_nan() {
-            return Ok(Value::from_f64(f64::NAN));
+            saw_nan = true;
+            continue;
         }
         if number > result
             || (number == 0.0
@@ -15333,6 +16830,9 @@ fn math_max_builtin<Cx: PublicBuiltinDispatchContext>(
         {
             result = number;
         }
+    }
+    if saw_nan {
+        return Ok(Value::from_f64(f64::NAN));
     }
     Ok(number_value(result))
 }
@@ -15345,10 +16845,12 @@ fn math_min_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Value::from_f64(f64::INFINITY));
     }
     let mut result = f64::INFINITY;
+    let mut saw_nan = false;
     for argument in invocation.arguments() {
         let number = argument_to_number(cx, *argument)?;
         if number.is_nan() {
-            return Ok(Value::from_f64(f64::NAN));
+            saw_nan = true;
+            continue;
         }
         if number < result
             || (number == 0.0
@@ -15359,6 +16861,9 @@ fn math_min_builtin<Cx: PublicBuiltinDispatchContext>(
             result = number;
         }
     }
+    if saw_nan {
+        return Ok(Value::from_f64(f64::NAN));
+    }
     Ok(number_value(result))
 }
 
@@ -15366,37 +16871,37 @@ fn math_pow_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let base = argument_to_number(
-        cx,
-        invocation
-            .arguments()
-            .first()
-            .copied()
-            .unwrap_or(Value::undefined()),
-    )?;
-    let exponent = argument_to_number(
-        cx,
-        invocation
-            .arguments()
-            .get(1)
-            .copied()
-            .unwrap_or(Value::undefined()),
-    )?;
+    let base = argument_to_number(cx, math_argument(&invocation, 0))?;
+    let exponent = argument_to_number(cx, math_argument(&invocation, 1))?;
+    if exponent.is_nan() || (base.abs() == 1.0 && exponent.is_infinite()) {
+        return Ok(Value::from_f64(f64::NAN));
+    }
     Ok(number_value(base.powf(exponent)))
+}
+
+fn math_random_builtin<Cx: PublicBuiltinDispatchContext>(
+    _cx: &mut Cx,
+    _invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos() as u64)
+        .unwrap_or(0);
+    let mut mixed = seed ^ seed.rotate_left(25) ^ 0x9e37_79b9_7f4a_7c15;
+    mixed ^= mixed >> 30;
+    mixed = mixed.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    mixed ^= mixed >> 27;
+    mixed = mixed.wrapping_mul(0x94d0_49bb_1331_11eb);
+    mixed ^= mixed >> 31;
+    let mantissa = mixed >> 11;
+    Ok(Value::from_f64(mantissa as f64 / ((1_u64 << 53) as f64)))
 }
 
 fn math_round_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let number = argument_to_number(
-        cx,
-        invocation
-            .arguments()
-            .first()
-            .copied()
-            .unwrap_or(Value::undefined()),
-    )?;
+    let number = argument_to_number(cx, math_argument(&invocation, 0))?;
     if !number.is_finite() || number == 0.0 {
         return Ok(number_value(number));
     }
@@ -15415,14 +16920,7 @@ fn math_sign_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let number = argument_to_number(
-        cx,
-        invocation
-            .arguments()
-            .first()
-            .copied()
-            .unwrap_or(Value::undefined()),
-    )?;
+    let number = argument_to_number(cx, math_argument(&invocation, 0))?;
     if number.is_nan() || number == 0.0 {
         return Ok(number_value(number));
     }
@@ -15433,38 +16931,479 @@ fn math_sign_builtin<Cx: PublicBuiltinDispatchContext>(
     }))
 }
 
+fn math_sin_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::sin)
+}
+
+fn math_sinh_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::sinh)
+}
+
 fn math_sqrt_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    Ok(number_value(
-        argument_to_number(
-            cx,
-            invocation
-                .arguments()
-                .first()
-                .copied()
-                .unwrap_or(Value::undefined()),
-        )?
-        .sqrt(),
-    ))
+    math_unary_number_builtin(cx, invocation, f64::sqrt)
+}
+
+fn math_sum_precise_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let iterable = math_argument(&invocation, 0);
+    let mut iterator_record = {
+        let mut bridge = BuiltinIteratorBridge { cx };
+        iterator::get_iterator(&mut bridge, iterable)?
+    };
+    let mut numbers = Vec::new();
+    loop {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            return Ok(number_value(math_sum_precise_numbers(&numbers)));
+        };
+        let value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let value = match value {
+            Ok(value) => value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let Some(number) = value.as_f64() else {
+            let error = type_error(cx);
+            return close_iterator_after_error(cx, &mut iterator_record, error);
+        };
+        numbers.push(number);
+    }
+}
+
+fn math_tan_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::tan)
+}
+
+fn math_tanh_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    math_unary_number_builtin(cx, invocation, f64::tanh)
 }
 
 fn math_trunc_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    Ok(number_value(
-        argument_to_number(
-            cx,
-            invocation
-                .arguments()
-                .first()
-                .copied()
-                .unwrap_or(Value::undefined()),
-        )?
-        .trunc(),
-    ))
+    math_unary_number_builtin(cx, invocation, f64::trunc)
+}
+
+fn round_to_float16(number: f64) -> f64 {
+    if number.is_nan() || number == 0.0 || number.is_infinite() {
+        return number;
+    }
+
+    const MIN_SUBNORMAL: f64 = 5.960_464_477_539_063e-8;
+    const MIN_NORMAL: f64 = 0.000_061_035_156_25;
+    const MAX_FINITE: f64 = 65_504.0;
+    const INFINITY_THRESHOLD: f64 = 65_520.0;
+
+    let negative = number.is_sign_negative();
+    let magnitude = number.abs();
+    let rounded = if magnitude >= INFINITY_THRESHOLD {
+        f64::INFINITY
+    } else if magnitude < MIN_NORMAL {
+        round_ties_to_even(magnitude / MIN_SUBNORMAL) * MIN_SUBNORMAL
+    } else {
+        let exponent = magnitude.log2().floor() as i32;
+        let step = 2.0_f64.powi(exponent - 10);
+        let candidate = round_ties_to_even(magnitude / step) * step;
+        candidate.min(MAX_FINITE)
+    };
+
+    if negative {
+        -rounded
+    } else {
+        rounded
+    }
+}
+
+fn round_ties_to_even(value: f64) -> f64 {
+    let floor = value.floor();
+    let fraction = value - floor;
+    if fraction < 0.5 {
+        floor
+    } else if fraction > 0.5 || (floor as u64) % 2 == 1 {
+        floor + 1.0
+    } else {
+        floor
+    }
+}
+
+fn math_sum_precise_numbers(numbers: &[f64]) -> f64 {
+    let mut saw_nan = false;
+    let mut saw_positive_infinity = false;
+    let mut saw_negative_infinity = false;
+    let mut saw_positive_zero = false;
+    let mut saw_negative_zero = false;
+    let mut finite = Vec::new();
+
+    for number in numbers {
+        if number.is_nan() {
+            saw_nan = true;
+        } else if *number == f64::INFINITY {
+            saw_positive_infinity = true;
+        } else if *number == f64::NEG_INFINITY {
+            saw_negative_infinity = true;
+        } else if *number == 0.0 {
+            if number.is_sign_negative() {
+                saw_negative_zero = true;
+            } else {
+                saw_positive_zero = true;
+            }
+        } else {
+            finite.push(*number);
+        }
+    }
+
+    if saw_nan || (saw_positive_infinity && saw_negative_infinity) {
+        return f64::NAN;
+    }
+    if saw_positive_infinity {
+        return f64::INFINITY;
+    }
+    if saw_negative_infinity {
+        return f64::NEG_INFINITY;
+    }
+    if finite.is_empty() {
+        if saw_positive_zero {
+            return 0.0;
+        }
+        return if saw_negative_zero || numbers.is_empty() {
+            -0.0
+        } else {
+            0.0
+        };
+    }
+
+    let result = math_precise_finite_sum(&finite);
+    if result == 0.0 {
+        0.0
+    } else {
+        result
+    }
+}
+
+fn math_precise_finite_sum(numbers: &[f64]) -> f64 {
+    let mut terms = Vec::with_capacity(numbers.len());
+    let mut min_exponent = 0;
+    for number in numbers {
+        if let Some(term) = MathFiniteTerm::from_f64(*number) {
+            if terms.is_empty() || term.exponent < min_exponent {
+                min_exponent = term.exponent;
+            }
+            terms.push(term);
+        }
+    }
+
+    let mut exact = MathExactSum::default();
+    for term in terms {
+        exact.add_term(
+            term.negative,
+            term.mantissa,
+            usize::try_from(term.exponent - min_exponent)
+                .expect("finite term shift should be non-negative"),
+        );
+    }
+    exact.to_f64(min_exponent)
+}
+
+struct MathFiniteTerm {
+    negative: bool,
+    mantissa: u64,
+    exponent: i32,
+}
+
+impl MathFiniteTerm {
+    fn from_f64(number: f64) -> Option<Self> {
+        let bits = number.to_bits();
+        let negative = (bits >> 63) != 0;
+        let exponent_bits = ((bits >> 52) & 0x7ff) as u16;
+        let fraction = bits & ((1_u64 << 52) - 1);
+        if exponent_bits == 0 {
+            if fraction == 0 {
+                return None;
+            }
+            return Some(Self {
+                negative,
+                mantissa: fraction,
+                exponent: -1074,
+            });
+        }
+
+        Some(Self {
+            negative,
+            mantissa: (1_u64 << 52) | fraction,
+            exponent: i32::from(exponent_bits) - 1075,
+        })
+    }
+}
+
+#[derive(Default)]
+struct MathExactSum {
+    sign: i8,
+    limbs: Vec<u64>,
+}
+
+impl MathExactSum {
+    fn add_term(&mut self, negative: bool, mantissa: u64, shift: usize) {
+        let magnitude = shifted_magnitude(mantissa, shift);
+        if magnitude.is_empty() {
+            return;
+        }
+        let term_sign = if negative { -1 } else { 1 };
+        if self.sign == 0 {
+            self.sign = term_sign;
+            self.limbs = magnitude;
+            return;
+        }
+        if self.sign == term_sign {
+            add_magnitude(&mut self.limbs, &magnitude);
+            return;
+        }
+
+        match compare_magnitude(&self.limbs, &magnitude) {
+            std::cmp::Ordering::Greater => {
+                subtract_magnitude(&mut self.limbs, &magnitude);
+            }
+            std::cmp::Ordering::Less => {
+                let mut replacement = magnitude;
+                subtract_magnitude(&mut replacement, &self.limbs);
+                self.limbs = replacement;
+                self.sign = term_sign;
+            }
+            std::cmp::Ordering::Equal => {
+                self.limbs.clear();
+                self.sign = 0;
+            }
+        }
+    }
+
+    fn to_f64(&self, exponent: i32) -> f64 {
+        if self.sign == 0 {
+            return 0.0;
+        }
+
+        let bit_len = magnitude_bit_len(&self.limbs);
+        let highest_exponent =
+            exponent + i32::try_from(bit_len).expect("bit length should fit") - 1;
+        let magnitude = if highest_exponent < -1022 {
+            round_subnormal_magnitude_to_f64(&self.limbs, exponent)
+        } else {
+            round_normal_magnitude_to_f64(&self.limbs, bit_len, highest_exponent)
+        };
+
+        if self.sign < 0 {
+            -magnitude
+        } else {
+            magnitude
+        }
+    }
+}
+
+fn shifted_magnitude(mantissa: u64, shift: usize) -> Vec<u64> {
+    let limb_shift = shift / 64;
+    let bit_shift = shift % 64;
+    let mut limbs = vec![0; limb_shift];
+    if bit_shift == 0 {
+        limbs.push(mantissa);
+    } else {
+        limbs.push(mantissa << bit_shift);
+        let high = mantissa >> (64 - bit_shift);
+        if high != 0 {
+            limbs.push(high);
+        }
+    }
+    normalize_magnitude(&mut limbs);
+    limbs
+}
+
+fn normalize_magnitude(limbs: &mut Vec<u64>) {
+    while limbs.last().copied() == Some(0) {
+        limbs.pop();
+    }
+}
+
+fn compare_magnitude(left: &[u64], right: &[u64]) -> std::cmp::Ordering {
+    if left.len() != right.len() {
+        return left.len().cmp(&right.len());
+    }
+    for (left_limb, right_limb) in left.iter().zip(right.iter()).rev() {
+        if left_limb != right_limb {
+            return left_limb.cmp(right_limb);
+        }
+    }
+    std::cmp::Ordering::Equal
+}
+
+fn add_magnitude(target: &mut Vec<u64>, addend: &[u64]) {
+    if target.len() < addend.len() {
+        target.resize(addend.len(), 0);
+    }
+    let mut carry = 0_u128;
+    for index in 0..target.len() {
+        let addend_limb = addend.get(index).copied().unwrap_or(0);
+        let sum = u128::from(target[index]) + u128::from(addend_limb) + carry;
+        target[index] = sum as u64;
+        carry = sum >> 64;
+    }
+    if carry != 0 {
+        target.push(carry as u64);
+    }
+}
+
+fn subtract_magnitude(target: &mut Vec<u64>, subtrahend: &[u64]) {
+    let mut borrow = 0_i128;
+    for (index, target_limb) in target.iter_mut().enumerate() {
+        let left = i128::from(*target_limb) - borrow;
+        let right = i128::from(subtrahend.get(index).copied().unwrap_or(0));
+        if left >= right {
+            *target_limb = (left - right) as u64;
+            borrow = 0;
+        } else {
+            *target_limb = ((1_i128 << 64) + left - right) as u64;
+            borrow = 1;
+        }
+    }
+    debug_assert_eq!(borrow, 0);
+    normalize_magnitude(target);
+}
+
+fn magnitude_bit_len(limbs: &[u64]) -> usize {
+    let Some(last) = limbs.last() else {
+        return 0;
+    };
+    (limbs.len() - 1) * 64
+        + usize::try_from(64 - last.leading_zeros()).expect("bit count should fit in usize")
+}
+
+fn round_normal_magnitude_to_f64(limbs: &[u64], bit_len: usize, mut exponent: i32) -> f64 {
+    if exponent > 1023 {
+        return f64::INFINITY;
+    }
+
+    let mut significand = if bit_len > 53 {
+        round_shift_to_u64(limbs, bit_len - 53)
+    } else {
+        magnitude_to_u64(limbs) << (53 - bit_len)
+    };
+    if significand == (1_u64 << 53) {
+        significand >>= 1;
+        exponent += 1;
+    }
+    if exponent > 1023 {
+        return f64::INFINITY;
+    }
+
+    let exponent_bits = u64::try_from(exponent + 1023).expect("normal exponent should fit");
+    let fraction = significand - (1_u64 << 52);
+    f64::from_bits((exponent_bits << 52) | fraction)
+}
+
+fn round_subnormal_magnitude_to_f64(limbs: &[u64], exponent: i32) -> f64 {
+    let scale = exponent + 1074;
+    let fraction = if scale >= 0 {
+        magnitude_to_u64(limbs) << usize::try_from(scale).expect("scale should fit")
+    } else {
+        round_shift_to_u64(
+            limbs,
+            usize::try_from(-scale).expect("right shift should fit"),
+        )
+    };
+    if fraction == 0 {
+        return 0.0;
+    }
+    if fraction >= (1_u64 << 52) {
+        return f64::from_bits(1_u64 << 52);
+    }
+    f64::from_bits(fraction)
+}
+
+fn magnitude_to_u64(limbs: &[u64]) -> u64 {
+    debug_assert!(limbs.iter().skip(1).all(|limb| *limb == 0));
+    limbs.first().copied().unwrap_or(0)
+}
+
+fn round_shift_to_u64(limbs: &[u64], shift: usize) -> u64 {
+    if shift == 0 {
+        return magnitude_to_u64(limbs);
+    }
+
+    let mut quotient = magnitude_shr_to_u64(limbs, shift);
+    let half = magnitude_bit(limbs, shift - 1);
+    let sticky = magnitude_any_bits_below(limbs, shift - 1);
+    if half && (sticky || quotient % 2 == 1) {
+        quotient += 1;
+    }
+    quotient
+}
+
+fn magnitude_shr_to_u64(limbs: &[u64], shift: usize) -> u64 {
+    let limb_shift = shift / 64;
+    let bit_shift = shift % 64;
+    let Some(low) = limbs.get(limb_shift).copied() else {
+        return 0;
+    };
+    let mut result = low >> bit_shift;
+    if bit_shift != 0 {
+        if let Some(high) = limbs.get(limb_shift + 1).copied() {
+            result |= high << (64 - bit_shift);
+        }
+    }
+    result
+}
+
+fn magnitude_bit(limbs: &[u64], bit: usize) -> bool {
+    let limb = bit / 64;
+    let offset = bit % 64;
+    limbs
+        .get(limb)
+        .map(|value| ((value >> offset) & 1) != 0)
+        .unwrap_or(false)
+}
+
+fn magnitude_any_bits_below(limbs: &[u64], bit_count: usize) -> bool {
+    let full_limbs = bit_count / 64;
+    for limb in limbs.iter().take(full_limbs) {
+        if *limb != 0 {
+            return true;
+        }
+    }
+    let remaining_bits = bit_count % 64;
+    if remaining_bits == 0 {
+        return false;
+    }
+    let mask = (1_u64 << remaining_bits) - 1;
+    limbs
+        .get(full_limbs)
+        .map(|limb| (limb & mask) != 0)
+        .unwrap_or(false)
 }
 
 fn bigint_builtin<Cx: PublicBuiltinDispatchContext>(

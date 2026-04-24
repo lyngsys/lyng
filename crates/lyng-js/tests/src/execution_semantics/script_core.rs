@@ -1243,6 +1243,43 @@ fn script_core_date_constructor_has_function_prototype_shape() {
 }
 
 #[test]
+fn script_core_supports_date_conformance_edges() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        try {
+            Date.prototype.getTime();
+        } catch (error) {
+            total += (error instanceof TypeError ? 1 : 0);
+        }
+
+        let offset = new Date(0).getTimezoneOffset();
+        total += (1 / offset === Infinity ? 2 : 0);
+        total += (Date.parse("1970-01-01T00:00:00") === offset * 60000 ? 4 : 0);
+        total += (Date.parse("1970-01-01") === 0 ? 8 : 0);
+
+        let date = new Date(2016, 6, 7, 11, 36, 23, 2);
+        let expected = new Date(-1, 42, 7, 11, 36, 23, 2).getTime();
+        total += (date.getMilliseconds() === 2 ? 16 : 0);
+        total += (date.setFullYear({ valueOf() { return 2; } }) === expected ? 32 : 0);
+        total += (date.getMilliseconds() === 2 ? 64 : 0);
+
+        total += (new Date(123).toISOString() === "1970-01-01T00:00:00.123Z" ? 128 : 0);
+        total += (new Date(123).toTemporalInstant().epochNanoseconds === 123000000n ? 256 : 0);
+        total += (Date.prototype[Symbol.toPrimitive].call({ toString() { return "x"; } }, "default") === "x" ? 512 : 0);
+        try {
+            Date.prototype[Symbol.toPrimitive].call(new Date(0), new String("number"));
+        } catch (error) {
+            total += (error instanceof TypeError ? 1024 : 0);
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(2047));
+}
+
+#[test]
 fn script_core_parse_and_uri_globals_match_phase6_baseline_behavior() {
     let result = compile_and_run(
         r#"
@@ -2298,6 +2335,122 @@ fn script_core_supports_phase6_number_math_and_bigint_basics() {
     );
 
     assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
+fn script_core_unary_plus_uses_to_number_instead_of_addition() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += (+"12345" === 12345 ? 1 : 0);
+        total += (Number(".12345e-3") === 0.00012345 ? 2 : 0);
+        total += (+"-1234567890" === -1234567890 ? 4 : 0);
+        try {
+            +1n;
+        } catch (error) {
+            total += (error instanceof TypeError ? 8 : 0);
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_supports_number_formatting_builtins() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += ((1).toFixed(1) === "1.0" ? 1 : 0);
+        total += (Number.NaN.toFixed(2) === "NaN" ? 2 : 0);
+        total += ((3).toFixed(4) === "3.0000" ? 4 : 0);
+        total += ((1000).toPrecision(3) === "1.00e+3" ? 8 : 0);
+        total += ((7).toPrecision(3) === "7.00" ? 16 : 0);
+        total += ((42).toPrecision() === "42" ? 32 : 0);
+        total += ((Infinity).toPrecision(1000) === "Infinity" ? 64 : 0);
+        total += ((7).toLocaleString() === "7" ? 128 : 0);
+        total += ((-0).toExponential(2) === "0.00e+0" ? 256 : 0);
+        total += (Number.parseInt === parseInt && Number.parseFloat === parseFloat ? 512 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1023));
+}
+
+#[test]
+fn script_core_number_rejects_symbol_arguments() {
+    let result = compile_and_run(
+        r#"
+        let symbol = Symbol("66");
+        let total = 0;
+        try {
+            Number(symbol);
+        } catch (error) {
+            total += (error instanceof TypeError ? 1 : 0);
+        }
+        try {
+            new Number(symbol);
+        } catch (error) {
+            total += (error instanceof TypeError ? 2 : 0);
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_supports_extended_math_builtins() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += (Math.acos.length === 1 && Math.acos(1) === 0 ? 1 : 0);
+        total += (Math.acosh(1) === 0 ? 2 : 0);
+        total += (Math.asin(0) === 0 ? 4 : 0);
+        total += (Math.asinh(0) === 0 ? 8 : 0);
+        total += (Math.atan(0) === 0 ? 16 : 0);
+        total += (Math.atan2.length === 2 && Math.atan2(0, -1) === Math.PI ? 32 : 0);
+        total += (Math.atanh(0) === 0 ? 64 : 0);
+        total += (Math.cbrt(8) === 2 ? 128 : 0);
+        total += (Math.ceil(-0.25) === 0 && 1 / Math.ceil(-0.25) === -Infinity ? 256 : 0);
+        total += (Math.clz32(1) === 31 && Math.clz32(-1) === 0 ? 512 : 0);
+        total += (Math.cos(0) === 1 && Math.cosh(0) === 1 ? 1024 : 0);
+        total += (Math.exp(0) === 1 && Math.expm1(0) === 0 ? 2048 : 0);
+        total += (Math.f16round(0.1) === 0.0999755859375 && Math.f16round(65520) === Infinity ? 4096 : 0);
+        total += (Math.fround(0.1) === 0.10000000149011612 ? 8192 : 0);
+        total += (Math.hypot(3, 4) === 5 && Math.hypot(Infinity, NaN) === Infinity ? 16384 : 0);
+        total += (Math.imul(0xffffffff, 5) === -5 ? 32768 : 0);
+        total += (Math.log(1) === 0 && Math.log10(100) === 2 ? 65536 : 0);
+        total += (Math.log1p(0) === 0 && Math.log2(8) === 3 ? 131072 : 0);
+        let random = Math.random();
+        total += (typeof random === "number" && random >= 0 && random < 1 ? 262144 : 0);
+        total += (Math.sin(0) === 0 && Math.sinh(0) === 0 ? 524288 : 0);
+        total += (Math.tan(0) === 0 && Math.tanh(0) === 0 ? 1048576 : 0);
+        let calls = 0;
+        let coercible = { valueOf: function() { calls += 1; } };
+        Math.max(NaN, coercible);
+        Math.min(NaN, coercible);
+        total += (calls === 2 ? 2097152 : 0);
+        total += (
+            Math.pow(1, NaN) !== Math.pow(1, NaN) &&
+            Math.pow(-1, Infinity) !== Math.pow(-1, Infinity)
+                ? 4194304
+                : 0
+        );
+        total += (Math.sumPrecise([1e30, 0.1, -1e30]) === 0.1 ? 8388608 : 0);
+        total += (
+            Math.sumPrecise([1e308, 1e308, 0.1, 0.1, 1e30, 0.1, -1e30, -1e308, -1e308]) === 0.30000000000000004
+                ? 16777216
+                : 0
+        );
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(33_554_431));
 }
 
 #[test]

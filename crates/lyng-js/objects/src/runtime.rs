@@ -754,6 +754,26 @@ impl ObjectRuntime {
             .flatten()
     }
 
+    pub fn set_date_value(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        value: Value,
+    ) -> bool {
+        if !self.is_date_object(id) {
+            return false;
+        }
+        let payload = match heap
+            .view()
+            .object(id)
+            .and_then(|record| record.ordinary_payload())
+        {
+            Some(payload) => payload,
+            None => return false,
+        };
+        heap.mut_store_value(lyng_js_gc::ValueStoreTarget::ValueCell(payload), value)
+    }
+
     pub fn is_temporal_object_kind(&self, id: ObjectRef, kind: TemporalObjectKind) -> bool {
         matches!(
             self.object_metadata(id).map(|metadata| &metadata.cold),

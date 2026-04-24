@@ -952,6 +952,14 @@ fn allocate_temporal_instant_object<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_object_ref(object))
 }
 
+pub(super) fn create_temporal_instant_object<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    epoch_nanoseconds: i128,
+) -> Result<Value, Cx::Error> {
+    let prototype = current_temporal_instant_prototype(cx)?;
+    allocate_temporal_instant_object(cx, prototype, epoch_nanoseconds)
+}
+
 fn temporal_instant_from_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
