@@ -1715,6 +1715,13 @@ fn temporal_exact_time_unit_order(unit: TemporalBuiltinDurationExactUnit) -> u8 
     }
 }
 
+fn temporal_exact_time_largest_unit_includes(
+    largest_unit: TemporalBuiltinDurationExactUnit,
+    component_unit: TemporalBuiltinDurationExactUnit,
+) -> bool {
+    temporal_exact_time_unit_order(largest_unit) <= temporal_exact_time_unit_order(component_unit)
+}
+
 fn temporal_exact_time_unit_nanoseconds(unit: TemporalBuiltinDurationExactUnit) -> i128 {
     match unit {
         TemporalBuiltinDurationExactUnit::Hour => TEMPORAL_NANOS_PER_HOUR,
@@ -1962,27 +1969,42 @@ fn temporal_duration_from_nanoseconds_with_largest_unit<Cx: PublicBuiltinDispatc
         remainder %= unit;
         i64::try_from(value).map_err(|_| range_error(cx))
     };
-    let hours = if temporal_exact_time_unit_order(largest_unit) <= 0 {
+    let hours = if temporal_exact_time_largest_unit_includes(
+        largest_unit,
+        TemporalBuiltinDurationExactUnit::Hour,
+    ) {
         part(TEMPORAL_NANOS_PER_HOUR)?
     } else {
         0
     };
-    let minutes = if temporal_exact_time_unit_order(largest_unit) <= 1 {
+    let minutes = if temporal_exact_time_largest_unit_includes(
+        largest_unit,
+        TemporalBuiltinDurationExactUnit::Minute,
+    ) {
         part(TEMPORAL_NANOS_PER_MINUTE)?
     } else {
         0
     };
-    let seconds = if temporal_exact_time_unit_order(largest_unit) <= 2 {
+    let seconds = if temporal_exact_time_largest_unit_includes(
+        largest_unit,
+        TemporalBuiltinDurationExactUnit::Second,
+    ) {
         part(TEMPORAL_NANOS_PER_SECOND)?
     } else {
         0
     };
-    let milliseconds = if temporal_exact_time_unit_order(largest_unit) <= 3 {
+    let milliseconds = if temporal_exact_time_largest_unit_includes(
+        largest_unit,
+        TemporalBuiltinDurationExactUnit::Millisecond,
+    ) {
         part(TEMPORAL_NANOS_PER_MILLISECOND)?
     } else {
         0
     };
-    let microseconds = if temporal_exact_time_unit_order(largest_unit) <= 4 {
+    let microseconds = if temporal_exact_time_largest_unit_includes(
+        largest_unit,
+        TemporalBuiltinDurationExactUnit::Microsecond,
+    ) {
         part(TEMPORAL_NANOS_PER_MICROSECOND)?
     } else {
         0
