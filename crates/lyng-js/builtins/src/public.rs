@@ -13160,6 +13160,73 @@ const PUBLIC_OBJECT_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     ),
 ];
 
+const PUBLIC_FUNCTION_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(
+        js3_function_builtin,
+        BuiltinEntryMetadata::new("Function", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_function_prototype_builtin,
+        BuiltinEntryMetadata::new("", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_function_call_builtin,
+        BuiltinEntryMetadata::new("call", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_function_apply_builtin,
+        BuiltinEntryMetadata::new("apply", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_function_bind_builtin,
+        BuiltinEntryMetadata::new("bind", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_function_to_string_builtin,
+        BuiltinEntryMetadata::new("toString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_function_symbol_has_instance_builtin,
+        BuiltinEntryMetadata::new("[Symbol.hasInstance]", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_function_builtin,
+        BuiltinEntryMetadata::new("AsyncFunction", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_generator_function_builtin,
+        BuiltinEntryMetadata::new("AsyncGeneratorFunction", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_generator_next_builtin,
+        BuiltinEntryMetadata::new("next", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_generator_return_builtin,
+        BuiltinEntryMetadata::new("return", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_generator_throw_builtin,
+        BuiltinEntryMetadata::new("throw", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_generator_function_builtin,
+        BuiltinEntryMetadata::new("GeneratorFunction", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_generator_next_builtin,
+        BuiltinEntryMetadata::new("next", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_generator_return_builtin,
+        BuiltinEntryMetadata::new("return", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_generator_throw_builtin,
+        BuiltinEntryMetadata::new("throw", 1, false, false),
+    ),
+];
+
 fn public_builtin_metadata_from_rows(
     entry: BuiltinFunctionId,
     rows: &[PublicBuiltinMetadataRow],
@@ -13171,10 +13238,17 @@ fn object_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEnt
     public_builtin_metadata_from_rows(entry, PUBLIC_OBJECT_BUILTIN_METADATA)
 }
 
+fn function_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
+    public_builtin_metadata_from_rows(entry, PUBLIC_FUNCTION_BUILTIN_METADATA)
+}
+
 /// Compatibility metadata for the public core builtin namespace.
 #[inline]
 pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
     if let Some(metadata) = object_public_builtin_metadata(entry) {
+        return Some(metadata);
+    }
+    if let Some(metadata) = function_public_builtin_metadata(entry) {
         return Some(metadata);
     }
     if entry == js3_abstract_module_source_builtin() {
@@ -13192,69 +13266,6 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
             false,
             false,
         ));
-    }
-    if entry == js3_function_builtin() {
-        return Some(BuiltinEntryMetadata::new("Function", 1, true, true));
-    }
-    if entry == js3_function_prototype_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 0, false, false));
-    }
-    if entry == js3_function_call_builtin() {
-        return Some(BuiltinEntryMetadata::new("call", 1, false, false));
-    }
-    if entry == js3_function_apply_builtin() {
-        return Some(BuiltinEntryMetadata::new("apply", 2, false, false));
-    }
-    if entry == js3_function_bind_builtin() {
-        return Some(BuiltinEntryMetadata::new("bind", 1, false, false));
-    }
-    if entry == js3_function_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
-    }
-    if entry == js3_function_symbol_has_instance_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "[Symbol.hasInstance]",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_async_function_builtin() {
-        return Some(BuiltinEntryMetadata::new("AsyncFunction", 1, true, true));
-    }
-    if entry == js3_async_generator_function_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "AsyncGeneratorFunction",
-            1,
-            true,
-            true,
-        ));
-    }
-    if entry == js3_async_generator_next_builtin() {
-        return Some(BuiltinEntryMetadata::new("next", 1, false, false));
-    }
-    if entry == js3_async_generator_return_builtin() {
-        return Some(BuiltinEntryMetadata::new("return", 1, false, false));
-    }
-    if entry == js3_async_generator_throw_builtin() {
-        return Some(BuiltinEntryMetadata::new("throw", 1, false, false));
-    }
-    if entry == js3_generator_function_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "GeneratorFunction",
-            1,
-            true,
-            true,
-        ));
-    }
-    if entry == js3_generator_next_builtin() {
-        return Some(BuiltinEntryMetadata::new("next", 1, false, false));
-    }
-    if entry == js3_generator_return_builtin() {
-        return Some(BuiltinEntryMetadata::new("return", 1, false, false));
-    }
-    if entry == js3_generator_throw_builtin() {
-        return Some(BuiltinEntryMetadata::new("throw", 1, false, false));
     }
     if entry == js3_array_builtin() {
         return Some(BuiltinEntryMetadata::new("Array", 1, true, true));
@@ -14914,6 +14925,82 @@ mod tests {
         assert_eq!(PUBLIC_OBJECT_BUILTIN_METADATA.len(), expected.len());
         for (entry, metadata) in expected {
             assert_eq!(object_public_builtin_metadata(entry), Some(metadata));
+            assert_eq!(public_builtin_metadata(entry), Some(metadata));
+        }
+    }
+
+    #[test]
+    fn function_public_metadata_table_matches_public_lookup() {
+        let expected = [
+            (
+                js3_function_builtin(),
+                BuiltinEntryMetadata::new("Function", 1, true, true),
+            ),
+            (
+                js3_function_prototype_builtin(),
+                BuiltinEntryMetadata::new("", 0, false, false),
+            ),
+            (
+                js3_function_call_builtin(),
+                BuiltinEntryMetadata::new("call", 1, false, false),
+            ),
+            (
+                js3_function_apply_builtin(),
+                BuiltinEntryMetadata::new("apply", 2, false, false),
+            ),
+            (
+                js3_function_bind_builtin(),
+                BuiltinEntryMetadata::new("bind", 1, false, false),
+            ),
+            (
+                js3_function_to_string_builtin(),
+                BuiltinEntryMetadata::new("toString", 0, false, false),
+            ),
+            (
+                js3_function_symbol_has_instance_builtin(),
+                BuiltinEntryMetadata::new("[Symbol.hasInstance]", 1, false, false),
+            ),
+            (
+                js3_async_function_builtin(),
+                BuiltinEntryMetadata::new("AsyncFunction", 1, true, true),
+            ),
+            (
+                js3_async_generator_function_builtin(),
+                BuiltinEntryMetadata::new("AsyncGeneratorFunction", 1, true, true),
+            ),
+            (
+                js3_async_generator_next_builtin(),
+                BuiltinEntryMetadata::new("next", 1, false, false),
+            ),
+            (
+                js3_async_generator_return_builtin(),
+                BuiltinEntryMetadata::new("return", 1, false, false),
+            ),
+            (
+                js3_async_generator_throw_builtin(),
+                BuiltinEntryMetadata::new("throw", 1, false, false),
+            ),
+            (
+                js3_generator_function_builtin(),
+                BuiltinEntryMetadata::new("GeneratorFunction", 1, true, true),
+            ),
+            (
+                js3_generator_next_builtin(),
+                BuiltinEntryMetadata::new("next", 1, false, false),
+            ),
+            (
+                js3_generator_return_builtin(),
+                BuiltinEntryMetadata::new("return", 1, false, false),
+            ),
+            (
+                js3_generator_throw_builtin(),
+                BuiltinEntryMetadata::new("throw", 1, false, false),
+            ),
+        ];
+
+        assert_eq!(PUBLIC_FUNCTION_BUILTIN_METADATA.len(), expected.len());
+        for (entry, metadata) in expected {
+            assert_eq!(function_public_builtin_metadata(entry), Some(metadata));
             assert_eq!(public_builtin_metadata(entry), Some(metadata));
         }
     }
