@@ -1,0 +1,46 @@
+---
+import { getCollection } from 'astro:content';
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+);
+
+const dateFormatter = new Intl.DateTimeFormat('en', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Blog',
+    description: 'Design notes and progress reports from the Lyng team.',
+  }}
+>
+  <p>
+    Design notes, progress reports, and the occasional war story.
+    Subscribe via <a href="/rss.xml">RSS</a>.
+  </p>
+
+  {
+    posts.length === 0 ? (
+      <p><em>No posts yet — check back soon.</em></p>
+    ) : (
+      <ul class="blog-list">
+        {posts.map((post) => (
+          <li>
+            <h2>
+              <a href={`/blog/${post.id}/`}>{post.data.title}</a>
+            </h2>
+            <time datetime={post.data.pubDate.toISOString()}>
+              {dateFormatter.format(post.data.pubDate)}
+            </time>
+            <p>{post.data.description}</p>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</StarlightPage>

@@ -8,3 +8,8 @@
 /crates/js3/fuzz/corpus
 .dogcats/config.local.toml
 .dogcats/.issues.lock
+
+# Astro site (lyngsys.github.io/lyng/)
+/site/node_modules
+/site/dist
+/site/.astro

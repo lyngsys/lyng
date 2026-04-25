@@ -1,0 +1,40 @@
+---
+title: Lyng
+description: Browser and runtime infrastructure, written in Rust.
+template: splash
+hero:
+  tagline: Browser and runtime infrastructure, written in Rust. A JavaScript engine, an HTML parser, and the pieces in between.
+  actions:
+    - text: Read the docs
+      link: /lyng-js/overview/
+      icon: right-arrow
+      variant: primary
+    - text: Visit the blog
+      link: /blog/
+      icon: external
+    - text: Source on GitHub
+      link: https://github.com/lyngsys/lyng
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="Lyng JS" icon="seti:javascript">
+    A bytecode JavaScript engine that targets ECMA-262 — compiler, VM,
+    runtime primitives, and a growing builtin library.
+  </Card>
+  <Card title="HTML Parser" icon="seti:html">
+    A WHATWG-compliant HTML parser with an arena-backed DOM, designed to
+    plug into a larger browser stack.
+  </Card>
+  <Card title="Open development" icon="open-book">
+    Design notes, progress reports, and engineering posts published as we
+    go. Subscribe to the <a href="/blog/">blog</a> or its <a href="/rss.xml">RSS feed</a>.
+  </Card>
+  <Card title="Built in Rust" icon="rocket">
+    A Cargo workspace organized around small, focused crates with clear
+    boundaries between parsing, compilation, and runtime.
+  </Card>
+</CardGrid>
