@@ -1,4 +1,6 @@
 use super::*;
+use lyng_js_objects::{ObjectKind, PrimitiveWrapperKind};
+use lyng_js_types::{ObjectRef, StringRef};
 use std::fmt::Write as _;
 
 pub(super) fn dispatch_json_builtin<Cx: PublicBuiltinDispatchContext>(
