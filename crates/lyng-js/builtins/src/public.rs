@@ -1166,24 +1166,6 @@ impl BuiltinCache {
         let f16round_atom = agent.atoms_mut().intern_collectible("f16round");
         let floor_atom = agent.atoms_mut().intern_collectible("floor");
         let fround_atom = agent.atoms_mut().intern_collectible("fround");
-        let get_date_atom = agent.atoms_mut().intern_collectible("getDate");
-        let get_day_atom = agent.atoms_mut().intern_collectible("getDay");
-        let get_full_year_atom = agent.atoms_mut().intern_collectible("getFullYear");
-        let get_hours_atom = agent.atoms_mut().intern_collectible("getHours");
-        let get_milliseconds_atom = agent.atoms_mut().intern_collectible("getMilliseconds");
-        let get_minutes_atom = agent.atoms_mut().intern_collectible("getMinutes");
-        let get_month_atom = agent.atoms_mut().intern_collectible("getMonth");
-        let get_seconds_atom = agent.atoms_mut().intern_collectible("getSeconds");
-        let get_time_atom = agent.atoms_mut().intern_collectible("getTime");
-        let get_timezone_offset_atom = agent.atoms_mut().intern_collectible("getTimezoneOffset");
-        let get_utc_date_atom = agent.atoms_mut().intern_collectible("getUTCDate");
-        let get_utc_day_atom = agent.atoms_mut().intern_collectible("getUTCDay");
-        let get_utc_full_year_atom = agent.atoms_mut().intern_collectible("getUTCFullYear");
-        let get_utc_hours_atom = agent.atoms_mut().intern_collectible("getUTCHours");
-        let get_utc_milliseconds_atom = agent.atoms_mut().intern_collectible("getUTCMilliseconds");
-        let get_utc_minutes_atom = agent.atoms_mut().intern_collectible("getUTCMinutes");
-        let get_utc_month_atom = agent.atoms_mut().intern_collectible("getUTCMonth");
-        let get_utc_seconds_atom = agent.atoms_mut().intern_collectible("getUTCSeconds");
         let hypot_atom = agent.atoms_mut().intern_collectible("hypot");
         let imul_atom = agent.atoms_mut().intern_collectible("imul");
         let is_finite_atom = agent.atoms_mut().intern_collectible("isFinite");
@@ -1206,7 +1188,6 @@ impl BuiltinCache {
         let min_safe_integer_atom = agent.atoms_mut().intern_collectible("MIN_SAFE_INTEGER");
         let min_value_atom = agent.atoms_mut().intern_collectible("MIN_VALUE");
         let negative_infinity_atom = agent.atoms_mut().intern_collectible("NEGATIVE_INFINITY");
-        let parse_atom = agent.atoms_mut().intern_collectible("parse");
         let parse_float_atom = agent.atoms_mut().intern_collectible("parseFloat");
         let parse_int_atom = agent.atoms_mut().intern_collectible("parseInt");
         let pi_atom = agent.atoms_mut().intern_collectible("PI");
@@ -1217,33 +1198,9 @@ impl BuiltinCache {
         let sign_atom = agent.atoms_mut().intern_collectible("sign");
         let sin_atom = agent.atoms_mut().intern_collectible("sin");
         let sinh_atom = agent.atoms_mut().intern_collectible("sinh");
-        let set_date_atom = agent.atoms_mut().intern_collectible("setDate");
-        let set_full_year_atom = agent.atoms_mut().intern_collectible("setFullYear");
-        let set_hours_atom = agent.atoms_mut().intern_collectible("setHours");
-        let set_milliseconds_atom = agent.atoms_mut().intern_collectible("setMilliseconds");
-        let set_minutes_atom = agent.atoms_mut().intern_collectible("setMinutes");
-        let set_month_atom = agent.atoms_mut().intern_collectible("setMonth");
-        let set_seconds_atom = agent.atoms_mut().intern_collectible("setSeconds");
-        let set_time_atom = agent.atoms_mut().intern_collectible("setTime");
-        let set_utc_date_atom = agent.atoms_mut().intern_collectible("setUTCDate");
-        let set_utc_full_year_atom = agent.atoms_mut().intern_collectible("setUTCFullYear");
-        let set_utc_hours_atom = agent.atoms_mut().intern_collectible("setUTCHours");
-        let set_utc_milliseconds_atom = agent.atoms_mut().intern_collectible("setUTCMilliseconds");
-        let set_utc_minutes_atom = agent.atoms_mut().intern_collectible("setUTCMinutes");
-        let set_utc_month_atom = agent.atoms_mut().intern_collectible("setUTCMonth");
-        let set_utc_seconds_atom = agent.atoms_mut().intern_collectible("setUTCSeconds");
         let sum_precise_atom = agent.atoms_mut().intern_collectible("sumPrecise");
         let tan_atom = agent.atoms_mut().intern_collectible("tan");
         let tanh_atom = agent.atoms_mut().intern_collectible("tanh");
-        let to_date_string_atom = agent.atoms_mut().intern_collectible("toDateString");
-        let to_iso_string_atom = agent.atoms_mut().intern_collectible("toISOString");
-        let to_json_atom = agent.atoms_mut().intern_collectible("toJSON");
-        let to_locale_date_string_atom = agent.atoms_mut().intern_collectible("toLocaleDateString");
-        let to_locale_time_string_atom = agent.atoms_mut().intern_collectible("toLocaleTimeString");
-        let to_temporal_instant_atom = agent.atoms_mut().intern_collectible("toTemporalInstant");
-        let to_time_string_atom = agent.atoms_mut().intern_collectible("toTimeString");
-        let to_utc_string_atom = agent.atoms_mut().intern_collectible("toUTCString");
-        let utc_atom = agent.atoms_mut().intern_collectible("UTC");
         let copy_within_atom = agent.atoms_mut().intern_collectible("copyWithin");
         let entries_atom = agent.atoms_mut().intern_collectible("entries");
         let every_atom = agent.atoms_mut().intern_collectible("every");
@@ -1298,7 +1255,6 @@ impl BuiltinCache {
         let is_lock_free_atom = agent.atoms_mut().intern_collectible("isLockFree");
         let load_atom = agent.atoms_mut().intern_collectible("load");
         let notify_atom = agent.atoms_mut().intern_collectible("notify");
-        let now_atom = agent.atoms_mut().intern_collectible("now");
         let or_atom = agent.atoms_mut().intern_collectible("or");
         let set_atom = agent.atoms_mut().intern_collectible("set");
         let set_float32_atom = agent.atoms_mut().intern_collectible("setFloat32");
@@ -2793,255 +2749,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let date_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(now_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_now_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(parse_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_parse_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(utc_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_utc_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-        ];
-        let date_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.date)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_date_string_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_date_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_time_string_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_time_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_locale_string_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_locale_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_locale_date_string_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_locale_date_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_locale_time_string_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_locale_time_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::valueOf.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_value_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_time_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_time_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_full_year_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_full_year_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_utc_full_year_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_full_year_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_month_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_month_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_utc_month_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_month_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_date_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_date_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_utc_date_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_date_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_day_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_day_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_utc_day_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_day_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_hours_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_hours_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_utc_hours_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_hours_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_minutes_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_minutes_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_utc_minutes_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_minutes_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_seconds_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_seconds_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_utc_seconds_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_seconds_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_milliseconds_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_milliseconds_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_utc_milliseconds_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_utc_milliseconds_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_timezone_offset_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_get_timezone_offset_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_time_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_time_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_milliseconds_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_milliseconds_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_utc_milliseconds_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_milliseconds_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_seconds_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_seconds_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_utc_seconds_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_seconds_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_minutes_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_minutes_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_utc_minutes_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_minutes_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_hours_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_hours_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_utc_hours_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_hours_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_date_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_date_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_utc_date_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_date_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_month_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_month_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_utc_month_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_month_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_full_year_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_full_year_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_utc_full_year_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_set_utc_full_year_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_utc_string_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_utc_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_iso_string_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_iso_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_json_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_json_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_temporal_instant_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_temporal_instant_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToPrimitive),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_date_to_primitive_builtin()),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
         let number_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(is_finite_atom),
@@ -3930,14 +3637,6 @@ impl BuiltinCache {
                 &uint8_array_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Date),
-                &date_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::DatePrototype),
-                &date_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Number),
                 &number_descriptors,
             ),
@@ -4032,6 +3731,10 @@ impl BuiltinCache {
             return None;
         }
         if families::install_regexp_family_descriptors(agent, self, realm, &builtins).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_date_family_descriptors(agent, self, realm, &builtins).is_err() {
             self.public.remove(&realm);
             return None;
         }

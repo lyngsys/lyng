@@ -29,7 +29,7 @@ pub(super) use binary_data::{binary_data_builtin_object, install_binary_data_fam
 pub(super) use collections::{
     collection_builtin_object, install_collection_family, install_collection_family_descriptors,
 };
-pub(super) use date::{date_builtin_object, install_date_family};
+pub(super) use date::{date_builtin_object, install_date_family, install_date_family_descriptors};
 pub(super) use errors::{
     error_builtin_object, install_error_family, install_error_family_descriptors,
 };

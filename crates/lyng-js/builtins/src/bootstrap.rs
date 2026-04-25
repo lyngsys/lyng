@@ -794,7 +794,9 @@ mod tests {
     use lyng_js_host::NoopHostHooks;
     use lyng_js_types::{
         js3_array_from_async_builtin, js3_array_iterator_next_builtin,
-        js3_array_species_getter_builtin, js3_array_values_builtin, js3_error_to_string_builtin,
+        js3_array_species_getter_builtin, js3_array_values_builtin, js3_date_get_time_builtin,
+        js3_date_now_builtin, js3_date_set_full_year_builtin, js3_date_to_primitive_builtin,
+        js3_date_to_string_builtin, js3_error_to_string_builtin,
         js3_iterator_prototype_iterator_builtin, js3_json_parse_builtin, js3_json_raw_json_builtin,
         js3_map_iterator_next_builtin, js3_map_size_getter_builtin, js3_proxy_revocable_builtin,
         js3_reflect_get_builtin, js3_regexp_escape_builtin, js3_regexp_exec_builtin,
@@ -2105,6 +2107,114 @@ mod tests {
         assert_eq!(global.setter(), Some(Value::undefined()));
         assert_eq!(global.enumerable(), Some(false));
         assert_eq!(global.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_date_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let date = intrinsics.date().expect("Date intrinsic should exist");
+        let date_prototype = intrinsics
+            .date_prototype()
+            .expect("Date.prototype intrinsic should exist");
+
+        let constructor_atom = WellKnownAtom::constructor.id();
+        let now_atom = agent.atoms_mut().intern_collectible("now");
+        let get_time_atom = agent.atoms_mut().intern_collectible("getTime");
+        let set_full_year_atom = agent.atoms_mut().intern_collectible("setFullYear");
+        let to_primitive_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::ToPrimitive)
+            .expect("Symbol.toPrimitive should exist");
+
+        let now = cache
+            .builtin_constant(agent, artifacts.realm(), js3_date_now_builtin())
+            .expect("Date.now builtin should resolve");
+        let to_string = cache
+            .builtin_constant(agent, artifacts.realm(), js3_date_to_string_builtin())
+            .expect("Date.prototype.toString builtin should resolve");
+        let get_time = cache
+            .builtin_constant(agent, artifacts.realm(), js3_date_get_time_builtin())
+            .expect("Date.prototype.getTime builtin should resolve");
+        let set_full_year = cache
+            .builtin_constant(agent, artifacts.realm(), js3_date_set_full_year_builtin())
+            .expect("Date.prototype.setFullYear builtin should resolve");
+        let to_primitive = cache
+            .builtin_constant(agent, artifacts.realm(), js3_date_to_primitive_builtin())
+            .expect("Date.prototype[Symbol.toPrimitive] builtin should resolve");
+
+        let now_descriptor =
+            own_descriptor(agent, date, PropertyKey::from_atom(now_atom), "Date.now");
+        assert_eq!(now_descriptor.value(), Some(now));
+        assert_eq!(now_descriptor.writable(), Some(true));
+        assert_eq!(now_descriptor.enumerable(), Some(false));
+        assert_eq!(now_descriptor.configurable(), Some(true));
+
+        let constructor = own_descriptor(
+            agent,
+            date_prototype,
+            PropertyKey::from_atom(constructor_atom),
+            "Date.prototype.constructor",
+        );
+        assert_eq!(constructor.value(), Some(Value::from_object_ref(date)));
+        assert_eq!(constructor.writable(), Some(true));
+        assert_eq!(constructor.enumerable(), Some(false));
+        assert_eq!(constructor.configurable(), Some(true));
+
+        let to_string_descriptor = own_descriptor(
+            agent,
+            date_prototype,
+            PropertyKey::from_atom(WellKnownAtom::toString.id()),
+            "Date.prototype.toString",
+        );
+        assert_eq!(to_string_descriptor.value(), Some(to_string));
+        assert_eq!(to_string_descriptor.writable(), Some(true));
+        assert_eq!(to_string_descriptor.enumerable(), Some(false));
+        assert_eq!(to_string_descriptor.configurable(), Some(true));
+
+        let get_time_descriptor = own_descriptor(
+            agent,
+            date_prototype,
+            PropertyKey::from_atom(get_time_atom),
+            "Date.prototype.getTime",
+        );
+        assert_eq!(get_time_descriptor.value(), Some(get_time));
+        assert_eq!(get_time_descriptor.writable(), Some(true));
+        assert_eq!(get_time_descriptor.enumerable(), Some(false));
+        assert_eq!(get_time_descriptor.configurable(), Some(true));
+
+        let set_full_year_descriptor = own_descriptor(
+            agent,
+            date_prototype,
+            PropertyKey::from_atom(set_full_year_atom),
+            "Date.prototype.setFullYear",
+        );
+        assert_eq!(set_full_year_descriptor.value(), Some(set_full_year));
+        assert_eq!(set_full_year_descriptor.writable(), Some(true));
+        assert_eq!(set_full_year_descriptor.enumerable(), Some(false));
+        assert_eq!(set_full_year_descriptor.configurable(), Some(true));
+
+        let to_primitive_descriptor = own_descriptor(
+            agent,
+            date_prototype,
+            PropertyKey::from_symbol(to_primitive_symbol),
+            "Date.prototype[Symbol.toPrimitive]",
+        );
+        assert_eq!(to_primitive_descriptor.value(), Some(to_primitive));
+        assert_eq!(to_primitive_descriptor.writable(), Some(false));
+        assert_eq!(to_primitive_descriptor.enumerable(), Some(false));
+        assert_eq!(to_primitive_descriptor.configurable(), Some(true));
     }
 
     #[test]
