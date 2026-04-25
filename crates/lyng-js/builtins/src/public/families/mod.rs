@@ -3,6 +3,7 @@ mod collections;
 mod date;
 mod functions;
 mod json;
+mod object_reflection;
 mod objects;
 mod regexp;
 mod strings;
@@ -16,6 +17,7 @@ pub(super) use collections::install_collection_family;
 pub(super) use date::install_date_family;
 pub(super) use functions::install_function_family;
 pub(super) use json::install_json_family;
+pub(super) use object_reflection::install_object_reflection_family;
 pub(super) use objects::install_object_family;
 pub(super) use regexp::install_regexp_family;
 pub(super) use strings::install_string_family;
@@ -392,4 +394,29 @@ pub(super) struct JsonFamilyBuiltins {
     pub(super) json_stringify: ObjectRef,
     pub(super) json_raw_json: ObjectRef,
     pub(super) json_is_raw_json: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct ObjectReflectionFamilyObjects {
+    pub(super) reflect: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct ObjectReflectionFamilyBuiltins {
+    pub(super) reflect: ObjectRef,
+    pub(super) reflect_apply: ObjectRef,
+    pub(super) reflect_construct: ObjectRef,
+    pub(super) reflect_define_property: ObjectRef,
+    pub(super) reflect_delete_property: ObjectRef,
+    pub(super) reflect_get: ObjectRef,
+    pub(super) reflect_get_own_property_descriptor: ObjectRef,
+    pub(super) reflect_get_prototype_of: ObjectRef,
+    pub(super) reflect_has: ObjectRef,
+    pub(super) reflect_is_extensible: ObjectRef,
+    pub(super) reflect_own_keys: ObjectRef,
+    pub(super) reflect_prevent_extensions: ObjectRef,
+    pub(super) reflect_set: ObjectRef,
+    pub(super) reflect_set_prototype_of: ObjectRef,
+    pub(super) proxy: ObjectRef,
+    pub(super) proxy_revocable: ObjectRef,
 }
