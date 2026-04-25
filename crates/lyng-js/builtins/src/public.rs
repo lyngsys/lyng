@@ -1002,113 +1002,11 @@ impl PublicRealmBuiltins {
         if let Some(object) = families::array_builtin_object(&self, entry) {
             return Some(object);
         }
-        if entry == js3_map_builtin() {
-            return Some(self.map);
-        }
-        if entry == js3_set_builtin() {
-            return Some(self.set);
-        }
-        if entry == js3_weak_map_builtin() {
-            return Some(self.weak_map);
-        }
-        if entry == js3_weak_set_builtin() {
-            return Some(self.weak_set);
-        }
-        if entry == js3_weak_ref_builtin() {
-            return Some(self.weak_ref);
-        }
-        if entry == js3_finalization_registry_builtin() {
-            return Some(self.finalization_registry);
+        if let Some(object) = families::collection_builtin_object(&self, entry) {
+            return Some(object);
         }
         if let Some(object) = families::binary_data_builtin_object(&self, entry) {
             return Some(object);
-        }
-        if entry == js3_map_get_builtin() {
-            return Some(self.map_get);
-        }
-        if entry == js3_map_set_builtin() {
-            return Some(self.map_set);
-        }
-        if entry == js3_map_has_builtin() {
-            return Some(self.map_has);
-        }
-        if entry == js3_map_delete_builtin() {
-            return Some(self.map_delete);
-        }
-        if entry == js3_map_clear_builtin() {
-            return Some(self.map_clear);
-        }
-        if entry == js3_map_entries_builtin() {
-            return Some(self.map_entries);
-        }
-        if entry == js3_map_values_builtin() {
-            return Some(self.map_values);
-        }
-        if entry == js3_map_keys_builtin() {
-            return Some(self.map_keys);
-        }
-        if entry == js3_map_for_each_builtin() {
-            return Some(self.map_for_each);
-        }
-        if entry == js3_map_size_getter_builtin() {
-            return Some(self.map_size_getter);
-        }
-        if entry == js3_set_add_builtin() {
-            return Some(self.set_add);
-        }
-        if entry == js3_set_has_builtin() {
-            return Some(self.set_has);
-        }
-        if entry == js3_set_delete_builtin() {
-            return Some(self.set_delete);
-        }
-        if entry == js3_set_clear_builtin() {
-            return Some(self.set_clear);
-        }
-        if entry == js3_set_entries_builtin() {
-            return Some(self.set_entries);
-        }
-        if entry == js3_set_values_builtin() {
-            return Some(self.set_values);
-        }
-        if entry == js3_set_keys_builtin() {
-            return Some(self.set_keys);
-        }
-        if entry == js3_set_for_each_builtin() {
-            return Some(self.set_for_each);
-        }
-        if entry == js3_set_size_getter_builtin() {
-            return Some(self.set_size_getter);
-        }
-        if entry == js3_weak_map_get_builtin() {
-            return Some(self.weak_map_get);
-        }
-        if entry == js3_weak_map_set_builtin() {
-            return Some(self.weak_map_set);
-        }
-        if entry == js3_weak_map_has_builtin() {
-            return Some(self.weak_map_has);
-        }
-        if entry == js3_weak_map_delete_builtin() {
-            return Some(self.weak_map_delete);
-        }
-        if entry == js3_weak_set_add_builtin() {
-            return Some(self.weak_set_add);
-        }
-        if entry == js3_weak_set_has_builtin() {
-            return Some(self.weak_set_has);
-        }
-        if entry == js3_weak_set_delete_builtin() {
-            return Some(self.weak_set_delete);
-        }
-        if entry == js3_weak_ref_deref_builtin() {
-            return Some(self.weak_ref_deref);
-        }
-        if entry == js3_finalization_registry_register_builtin() {
-            return Some(self.finalization_registry_register);
-        }
-        if entry == js3_finalization_registry_unregister_builtin() {
-            return Some(self.finalization_registry_unregister);
         }
         if entry == js3_iterator_prototype_iterator_builtin() {
             return Some(self.iterator_prototype_iterator);

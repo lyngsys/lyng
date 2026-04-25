@@ -21,7 +21,7 @@ use lyng_js_types::{BuiltinFunctionId, EnvironmentRef, ObjectRef, RealmRef, Shap
 
 pub(super) use arrays::{array_builtin_object, install_array_family};
 pub(super) use binary_data::{binary_data_builtin_object, install_binary_data_family};
-pub(super) use collections::install_collection_family;
+pub(super) use collections::{collection_builtin_object, install_collection_family};
 pub(super) use date::install_date_family;
 pub(super) use errors::install_error_family;
 pub(super) use functions::install_function_family;

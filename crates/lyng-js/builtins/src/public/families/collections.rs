@@ -14,8 +14,10 @@ use lyng_js_types::{
     js3_weak_map_builtin, js3_weak_map_delete_builtin, js3_weak_map_get_builtin,
     js3_weak_map_has_builtin, js3_weak_map_set_builtin, js3_weak_ref_builtin,
     js3_weak_ref_deref_builtin, js3_weak_set_add_builtin, js3_weak_set_builtin,
-    js3_weak_set_delete_builtin, js3_weak_set_has_builtin,
+    js3_weak_set_delete_builtin, js3_weak_set_has_builtin, BuiltinFunctionId, ObjectRef,
 };
+
+use crate::public::PublicRealmBuiltins;
 
 #[allow(clippy::too_many_lines)]
 pub(in crate::public) fn install_collection_family(
@@ -131,4 +133,58 @@ pub(in crate::public) fn install_collection_family(
         weak_ref_prototype: prototypes.weak_ref_prototype,
         finalization_registry_prototype: prototypes.finalization_registry_prototype,
     }
+}
+
+pub(in crate::public) fn collection_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_map_builtin(), builtins.map),
+        (js3_set_builtin(), builtins.set),
+        (js3_weak_map_builtin(), builtins.weak_map),
+        (js3_weak_set_builtin(), builtins.weak_set),
+        (js3_weak_ref_builtin(), builtins.weak_ref),
+        (
+            js3_finalization_registry_builtin(),
+            builtins.finalization_registry,
+        ),
+        (js3_map_get_builtin(), builtins.map_get),
+        (js3_map_set_builtin(), builtins.map_set),
+        (js3_map_has_builtin(), builtins.map_has),
+        (js3_map_delete_builtin(), builtins.map_delete),
+        (js3_map_clear_builtin(), builtins.map_clear),
+        (js3_map_entries_builtin(), builtins.map_entries),
+        (js3_map_values_builtin(), builtins.map_values),
+        (js3_map_keys_builtin(), builtins.map_keys),
+        (js3_map_for_each_builtin(), builtins.map_for_each),
+        (js3_map_size_getter_builtin(), builtins.map_size_getter),
+        (js3_set_add_builtin(), builtins.set_add),
+        (js3_set_has_builtin(), builtins.set_has),
+        (js3_set_delete_builtin(), builtins.set_delete),
+        (js3_set_clear_builtin(), builtins.set_clear),
+        (js3_set_entries_builtin(), builtins.set_entries),
+        (js3_set_values_builtin(), builtins.set_values),
+        (js3_set_keys_builtin(), builtins.set_keys),
+        (js3_set_for_each_builtin(), builtins.set_for_each),
+        (js3_set_size_getter_builtin(), builtins.set_size_getter),
+        (js3_weak_map_get_builtin(), builtins.weak_map_get),
+        (js3_weak_map_set_builtin(), builtins.weak_map_set),
+        (js3_weak_map_has_builtin(), builtins.weak_map_has),
+        (js3_weak_map_delete_builtin(), builtins.weak_map_delete),
+        (js3_weak_set_add_builtin(), builtins.weak_set_add),
+        (js3_weak_set_has_builtin(), builtins.weak_set_has),
+        (js3_weak_set_delete_builtin(), builtins.weak_set_delete),
+        (js3_weak_ref_deref_builtin(), builtins.weak_ref_deref),
+        (
+            js3_finalization_registry_register_builtin(),
+            builtins.finalization_registry_register,
+        ),
+        (
+            js3_finalization_registry_unregister_builtin(),
+            builtins.finalization_registry_unregister,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
 }
