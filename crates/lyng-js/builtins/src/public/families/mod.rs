@@ -2,6 +2,7 @@ mod arrays;
 mod collections;
 mod date;
 mod functions;
+mod json;
 mod objects;
 mod regexp;
 mod strings;
@@ -14,6 +15,7 @@ pub(super) use arrays::install_array_family;
 pub(super) use collections::install_collection_family;
 pub(super) use date::install_date_family;
 pub(super) use functions::install_function_family;
+pub(super) use json::install_json_family;
 pub(super) use objects::install_object_family;
 pub(super) use regexp::install_regexp_family;
 pub(super) use strings::install_string_family;
@@ -376,4 +378,18 @@ pub(super) struct DateFamilyBuiltins {
     pub(super) date_to_json: ObjectRef,
     pub(super) date_to_primitive: ObjectRef,
     pub(super) date_to_temporal_instant: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct JsonFamilyObjects {
+    pub(super) json: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct JsonFamilyBuiltins {
+    pub(super) json: ObjectRef,
+    pub(super) json_parse: ObjectRef,
+    pub(super) json_stringify: ObjectRef,
+    pub(super) json_raw_json: ObjectRef,
+    pub(super) json_is_raw_json: ObjectRef,
 }
