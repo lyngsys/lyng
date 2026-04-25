@@ -113,7 +113,8 @@ lyng-js-compiler / lyng-js-vm / lyng-js-builtins
   - abstract operations have a single owner
   - builtin code calls shared abstract operations rather than reimplementing them
   - internal methods are centralized instead of scattered across match arms in unrelated modules
-  - the centralized internal-method path is designed to admit later Proxy interception without rewrite
+  - proxy-observable object operations route through `lyng-js-ops::object` context APIs
+    rather than caller-selected ordinary/proxy helper paths
 
 ## Runtime Pipeline
 
@@ -185,6 +186,9 @@ Slow paths are acceptable. Hidden fast-path penalties are not.
 - The parser and compiler do not own runtime values.
 - The VM does not own semantics that belong in `lyng-js-ops`, `lyng-js-env`, or `lyng-js-objects`.
 - Builtins do not own duplicated abstract operations.
+- VM and builtin paths that can trigger proxy traps implement an object-operation context and
+  call `lyng-js-ops::object`; direct `lyng-js-objects` internal-method access is reserved for
+  proven ordinary-only/bootstrap paths.
 
 ## Documentation Precedence
 

@@ -197,6 +197,8 @@ expensive.
 - access to the current realm and agent
 - allocation helpers for ordinary objects, strings, symbols, and errors
 - access to shared abstract operations in `lyng-js-ops`
+- an object-operation context for proxy-observable operations rather than ad hoc
+  `lyng-js-objects` internal-method access
 - descriptor-install helpers used by bootstrap paths
 - a narrow dynamic-function compilation hook needed by the `Function` constructor
 
@@ -460,6 +462,9 @@ Phase 5 non-negotiables:
 - bootstrap is cold and may use table-driven descriptors freely
 - builtin call dispatch in hot code paths uses compact builtin entry IDs, not string-keyed lookups
 - builtin implementations call shared abstract operations rather than duplicating coercion or object semantics
+- builtin implementations route `Get`, `Set`, `HasProperty`, `GetOwnProperty`,
+  `DefineOwnProperty`, prototype operations, and own-key collection through
+  `lyng-js-ops::object` when proxy traps are observable
 - global and intrinsic lookup during bootstrap are typed and direct, not stringly
 - later builtin families extend the same registration and creation helpers instead of inventing parallel installers
 

@@ -23,6 +23,9 @@ Crate boundaries are architectural boundaries.
   belong elsewhere
 - `lyng-js-builtins` installs and implements builtin objects, but should call shared
   abstract operations and object helpers rather than duplicating semantics
+- `lyng-js-ops::object` is the public semantic surface for proxy-observable object
+  operations such as `Get`, `Set`, `HasProperty`, `GetOwnProperty`,
+  `DefineOwnProperty`, prototype operations, and own-key collection
 - conformance embeddings such as `lyng-js-test262` own `$262`, helper catalogs, and
   runner/report policy; engine crates only expose generic embedding hooks
 
@@ -31,6 +34,8 @@ Rejected patterns:
 - duplicating coercion logic in builtins and VM handlers
 - hiding environment logic inside compiler or VM code
 - property semantics implemented one way in objects and another in reflect or builtin helpers
+- choosing ordinary-object and proxy-object paths at VM or builtin call sites when an
+  `ObjectOpsContext` can select the right path inside `lyng-js-ops`
 
 ## API Ownership
 
@@ -40,6 +45,8 @@ Public APIs should be stable and intentional.
 - avoid `usize` as a cross-crate semantic type when a dedicated typed ID should exist
 - prefer explicit structs over loose tuples in public APIs
 - make ownership obvious in type names and function signatures
+- keep raw object-storage/internal-method helpers private or clearly named as
+  ordinary-only/bootstrap-only when bypassing the proxy-aware object operation surface
 
 If an API is intentionally temporary, that must be documented in the owning phase file.
 

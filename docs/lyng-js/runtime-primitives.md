@@ -690,13 +690,18 @@ Phase 2 scaffolding organizes `lyng-js-ops` by family with `pure`, `read`, and `
 modules so later object-aware helpers can grow without collapsing back into one monolithic crate
 surface.
 
-### Future Layering Rule
+### Object Operation Layering Rule
 
-When later phases add object-aware abstract operations:
+Object-aware abstract operations now live above the primitive helpers:
 
-- new `lyng-js-ops` modules may depend on `lyng-js-env` and `lyng-js-objects`
+- `lyng-js-ops` modules may depend on `lyng-js-env` and `lyng-js-objects`
 - `lyng-js-objects` exposes low-level internal methods and descriptor primitives
 - `lyng-js-objects` must not depend back on `lyng-js-ops`
+- proxy-observable object operations such as `Get`, `Set`, `HasProperty`,
+  `GetOwnProperty`, `DefineOwnProperty`, prototype operations, and own-key collection
+  are owned by `lyng-js-ops::object`
+- VM and builtin callers provide an object-operation context when a trap may need
+  call, coercion, descriptor, or error behavior
 
 This keeps the crate DAG acyclic while preserving one semantic owner for ECMA-262 operations.
 
@@ -719,7 +724,7 @@ This document intentionally does not specify:
 
 - ordinary object instance layout beyond the handle and key contracts already frozen
 - environment-record storage beyond the handle and GC contracts already frozen
-- object-aware abstract operations such as `Get`, `Set`, or `Call`
+- callable/construct abstract operations such as `Call` or `Construct`
 - weak-reference and finalization machinery
 - ropes, substring views, external strings, or small-bigint specialization
 
