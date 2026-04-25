@@ -3,6 +3,7 @@ mod collections;
 mod date;
 mod functions;
 mod json;
+mod modules;
 mod object_reflection;
 mod objects;
 mod regexp;
@@ -17,6 +18,7 @@ pub(super) use collections::install_collection_family;
 pub(super) use date::install_date_family;
 pub(super) use functions::install_function_family;
 pub(super) use json::install_json_family;
+pub(super) use modules::install_module_family;
 pub(super) use object_reflection::install_object_reflection_family;
 pub(super) use objects::install_object_family;
 pub(super) use regexp::install_regexp_family;
@@ -419,4 +421,17 @@ pub(super) struct ObjectReflectionFamilyBuiltins {
     pub(super) reflect_set_prototype_of: ObjectRef,
     pub(super) proxy: ObjectRef,
     pub(super) proxy_revocable: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct ModuleFamilyPrototypes {
+    pub(super) abstract_module_source_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct ModuleFamilyBuiltins {
+    pub(super) abstract_module_source: ObjectRef,
+    pub(super) abstract_module_source_prototype: ObjectRef,
+    pub(super) abstract_module_source_to_string_tag_getter: ObjectRef,
 }

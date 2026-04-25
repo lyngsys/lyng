@@ -2724,6 +2724,13 @@ impl BuiltinCache {
             family_context,
             families::ObjectReflectionFamilyObjects { reflect },
         );
+        let module_family = families::install_module_family(
+            agent,
+            family_context,
+            families::ModuleFamilyPrototypes {
+                abstract_module_source_prototype,
+            },
+        );
 
         let builtins = PublicRealmBuiltins {
             object: object_family.object,
@@ -4765,30 +4772,10 @@ impl BuiltinCache {
             reflect_set_prototype_of: object_reflection_family.reflect_set_prototype_of,
             proxy: object_reflection_family.proxy,
             proxy_revocable: object_reflection_family.proxy_revocable,
-            abstract_module_source: allocate_builtin_function_object(
-                agent,
-                realm,
-                global_env,
-                root_shape,
-                function_prototype,
-                object_prototype,
-                js3_abstract_module_source_builtin(),
-                public_builtin_metadata(js3_abstract_module_source_builtin()).unwrap(),
-                Some(abstract_module_source_prototype),
-            ),
-            abstract_module_source_prototype,
-            abstract_module_source_to_string_tag_getter: allocate_builtin_function_object(
-                agent,
-                realm,
-                global_env,
-                root_shape,
-                function_prototype,
-                object_prototype,
-                js3_abstract_module_source_to_string_tag_getter_builtin(),
-                public_builtin_metadata(js3_abstract_module_source_to_string_tag_getter_builtin())
-                    .unwrap(),
-                None,
-            ),
+            abstract_module_source: module_family.abstract_module_source,
+            abstract_module_source_prototype: module_family.abstract_module_source_prototype,
+            abstract_module_source_to_string_tag_getter: module_family
+                .abstract_module_source_to_string_tag_getter,
             error,
             error_prototype,
             error_to_string: allocate_builtin_function_object(
