@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use lyng_js_builtins::{
     bootstrap_realm, BootstrapArtifacts, BootstrapMode, BootstrapRequest, BuiltinCache,
-    DynamicFunctionKind,
 };
 use lyng_js_bytecode::{
     ArgumentsMode, BytecodeEnvironmentBinding, BytecodeFunction, BytecodeFunctionId, CallRange,
@@ -12,7 +11,8 @@ use lyng_js_bytecode::{
 };
 use lyng_js_common::{AtomId, Diagnostic, SourceId, WellKnownAtom};
 use lyng_js_compiler::{
-    compile_module, CompiledModuleUnit, ModuleImportKind as CompiledModuleImportKind,
+    compile_module, dynamic::DynamicFunctionCacheKey, CompiledModuleUnit,
+    ModuleImportKind as CompiledModuleImportKind,
 };
 use lyng_js_env::{
     Agent, EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
@@ -50,6 +50,7 @@ mod bytecode_calls;
 mod call;
 mod direct_eval_env;
 mod dispatch;
+mod dynamic_compilation;
 mod exceptions;
 mod feedback;
 mod generators;
@@ -137,15 +138,6 @@ struct TemplateCacheKey {
     realm: RealmRef,
     code: CodeRef,
     site: u32,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct DynamicFunctionCacheKey {
-    realm: RealmRef,
-    kind: DynamicFunctionKind,
-    parameters_source: Box<str>,
-    body_source: Box<str>,
-    strict_caller: bool,
 }
 
 /// Runtime state for one compiler-planned loop-iteration lexical environment.

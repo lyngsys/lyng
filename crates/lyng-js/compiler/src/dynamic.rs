@@ -150,6 +150,21 @@ pub fn analyze_dynamic_script(
     source_text: &str,
     mode: DynamicScriptAnalysisMode,
 ) -> Result<DynamicScriptAnalysis, DynamicCompilationError> {
+    let analysis = analyze_dynamic_script_with_diagnostics(atoms, source_id, source_text, mode)?;
+    if analysis.sema.diagnostics.has_errors() {
+        return Err(DynamicCompilationError::new(
+            DynamicCompilationStage::Semantic,
+        ));
+    }
+    Ok(analysis)
+}
+
+pub fn analyze_dynamic_script_with_diagnostics(
+    atoms: &mut AtomTable,
+    source_id: SourceId,
+    source_text: &str,
+    mode: DynamicScriptAnalysisMode,
+) -> Result<DynamicScriptAnalysis, DynamicCompilationError> {
     let parsed = match mode {
         DynamicScriptAnalysisMode::Script => parse_script(atoms, source_id, source_text),
         DynamicScriptAnalysisMode::InitialStrict(initial_strict)
@@ -169,11 +184,6 @@ pub fn analyze_dynamic_script(
             analyze_script(&parsed, atoms)
         }
     };
-    if sema.diagnostics.has_errors() {
-        return Err(DynamicCompilationError::new(
-            DynamicCompilationStage::Semantic,
-        ));
-    }
 
     Ok(DynamicScriptAnalysis { parsed, sema })
 }

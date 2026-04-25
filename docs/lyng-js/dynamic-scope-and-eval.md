@@ -2,7 +2,7 @@
 
 This document describes the JS3 contract for dynamic scope, `eval`, and the shared
 dynamic-compilation entrypoints. The same ownership and lowering boundaries are used by the
-current compiler, VM, builtin bootstrap, and the active `6H` conformance tail.
+current compiler, VM, builtin bootstrap, and conformance work.
 
 This note is intentionally narrow. It is about the interaction between otherwise-fast
 register- or slot-based execution and the slow paths introduced by:
@@ -10,7 +10,8 @@ register- or slot-based execution and the slow paths introduced by:
 - direct `eval`
 - indirect `eval`
 - `with`
-- dynamic compilation services reused by the `Function` constructor and later eval closure
+- dynamic compilation services reused by the `Function` constructor, direct eval, indirect
+  eval, and harness script evaluation
 
 Related notes:
 
@@ -48,12 +49,20 @@ Consumers include:
 - the Phase 5 `Function` constructor compilation hook
 - indirect `eval`
 - direct `eval`
+- harness `evalScript` / script-source evaluation
 
 Rules:
 
+- `lyng_js_compiler::dynamic` owns parse-goal selection, source wrapping, sema mode,
+  diagnostics, compile plumbing, and cache-key policy
+- `vm/dynamic_compilation.rs` owns VM state: installed-code caching, caller frame
+  inspection, caller lexical/private environment discovery, direct-eval declaration
+  validation, and execution
+- builtin dispatch calls the VM dynamic-compilation service; it does not inline parse,
+  analysis, or compile policy
 - the service reuses the normal parse -> sema -> compile -> install pipeline
-- the service returns installable compiled units or installed `CodeRef` values through one
-  typed API family; it does not bypass bytecode ownership
+- the service returns installable compiled units through one typed API family; it does not
+  bypass bytecode ownership
 - parse goal, target realm, strictness mode, and dynamic-scope mode are explicit inputs
 - host code may supply source text or resolution context, but it does not own compilation
   caching or semantic policy
@@ -77,6 +86,11 @@ Cache-key requirements:
   - global-only
   - direct-eval environment-sensitive
   - other later-sensitive modes if private environments or equivalent features affect visibility
+
+Implementation rule:
+
+- compiler dynamic APIs define the key and compile result shape; the VM owns the installed-code
+  cache because `CodeRef` allocation, realm execution, and frame-sensitive state are VM-owned
 
 Additional direct-eval rule:
 
@@ -180,16 +194,17 @@ Rules:
 
 ## Current Status
 
-- the `Function` constructor already uses the shared dynamic-compilation service
+- the `Function` constructor, indirect eval, direct eval, and harness script evaluation enter
+  through the shared compiler dynamic API and VM dynamic-compilation service
 - compiler and VM lowering already rely on this poisoning and environment-materialization model
-- the active `6H` work closes direct `eval`, indirect `eval`, and `with` conformance on top
-  of this existing contract rather than replacing it
+- eval and `with` conformance work should extend this contract rather than adding another
+  parse/sema/compile flow in builtin dispatch or VM call sites
 
 ## Invariants
 
 - direct `eval` and `with` are slow paths by explicit design
 - dynamic compilation reuses the normal compiler pipeline
-- dynamic compilation owns a cache from the start
+- dynamic compilation owns a cache contract from the start
 - direct eval cache entries are caller-sensitive
 - indirect eval cache entries are realm-global-sensitive, not caller-local-sensitive
 - dynamic-scope semantics do not move ownership of environments or name resolution into the VM

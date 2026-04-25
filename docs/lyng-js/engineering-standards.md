@@ -21,6 +21,9 @@ Crate boundaries are architectural boundaries.
 - `lyng-js-env` owns realms, environments, execution contexts, and jobs
 - `lyng-js-vm` executes bytecode; it does not become the backup home for semantics that
   belong elsewhere
+- `lyng-js-compiler::dynamic` owns dynamic source parse/sema/compile policy; VM dynamic
+  compilation owns installed-code caching, caller-sensitive frame/environment discovery, and
+  execution
 - `lyng-js-builtins` installs and implements builtin objects, but should call shared
   abstract operations and object helpers rather than duplicating semantics
 - `lyng-js-ops::object` is the public semantic surface for proxy-observable object
@@ -36,6 +39,8 @@ Rejected patterns:
 - property semantics implemented one way in objects and another in reflect or builtin helpers
 - choosing ordinary-object and proxy-object paths at VM or builtin call sites when an
   `ObjectOpsContext` can select the right path inside `lyng-js-ops`
+- implementing Function-constructor or eval parse/sema/compile flows inside builtin dispatch
+  instead of the shared dynamic-compilation service
 
 ## API Ownership
 
