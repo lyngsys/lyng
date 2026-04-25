@@ -67,6 +67,25 @@ Phase 5 freezes a multi-pass bootstrap:
 The bootstrap code may be cold and table-driven, but the final object graph must not depend
 on deferred string-keyed lookups or "fix it later" mutation spread across unrelated modules.
 
+## Family Installer Model
+
+Public realm bootstrap is moving toward typed family installers under
+`crates/lyng-js/builtins/src/public/families/`.
+
+Rules:
+
+- `ensure_public_realm_builtins` owns realm-level ordering and cross-family dependencies
+- family modules own allocation of their constructors, prototypes, and methods once the
+  required shared prototype handles are available
+- object and function family allocation live in `public/families/objects.rs` and
+  `public/families/functions.rs`; later families should follow the same boundary
+- family installers use the shared builtin allocation helpers and `public_builtin_metadata`
+  rather than hand-maintaining separate metadata
+- descriptor installation remains table-driven through the shared installer path
+
+This keeps bootstrap order explicit while making each family small enough to review against
+its metadata and dispatch owner.
+
 ## Post-Core Snapshot Compatibility
 
 Phase 5 still assumes live table-driven bootstrap on realm creation. Startup snapshotting is

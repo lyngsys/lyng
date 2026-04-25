@@ -26,6 +26,8 @@ Crate boundaries are architectural boundaries.
   execution
 - `lyng-js-builtins` installs and implements builtin objects, but should call shared
   abstract operations and object helpers rather than duplicating semantics
+- public builtin bootstrap allocation should live in family installers under
+  `public/families/`; `public.rs` should remain orchestration plus shared bootstrap helpers
 - `lyng-js-ops::object` is the public semantic surface for proxy-observable object
   operations such as `Get`, `Set`, `HasProperty`, `GetOwnProperty`,
   `DefineOwnProperty`, prototype operations, and own-key collection
