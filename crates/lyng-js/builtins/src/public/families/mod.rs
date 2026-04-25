@@ -7,6 +7,7 @@ mod json;
 mod modules;
 mod object_reflection;
 mod objects;
+mod primitives;
 mod regexp;
 mod strings;
 
@@ -23,6 +24,7 @@ pub(super) use json::install_json_family;
 pub(super) use modules::install_module_family;
 pub(super) use object_reflection::install_object_reflection_family;
 pub(super) use objects::install_object_family;
+pub(super) use primitives::install_primitive_family;
 pub(super) use regexp::install_regexp_family;
 pub(super) use strings::install_string_family;
 
@@ -400,6 +402,93 @@ pub(super) struct DateFamilyBuiltins {
     pub(super) date_to_json: ObjectRef,
     pub(super) date_to_primitive: ObjectRef,
     pub(super) date_to_temporal_instant: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct PrimitiveFamilyPrototypes {
+    pub(super) number_prototype: ObjectRef,
+    pub(super) bigint_prototype: ObjectRef,
+    pub(super) boolean_prototype: ObjectRef,
+    pub(super) symbol_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct PrimitiveFamilyObjects {
+    pub(super) math: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct PrimitiveFamilyBuiltins {
+    pub(super) number: ObjectRef,
+    pub(super) number_prototype: ObjectRef,
+    pub(super) number_is_finite: ObjectRef,
+    pub(super) number_is_integer: ObjectRef,
+    pub(super) number_is_nan: ObjectRef,
+    pub(super) number_is_safe_integer: ObjectRef,
+    pub(super) number_to_exponential: ObjectRef,
+    pub(super) number_to_fixed: ObjectRef,
+    pub(super) number_to_locale_string: ObjectRef,
+    pub(super) number_to_precision: ObjectRef,
+    pub(super) number_to_string: ObjectRef,
+    pub(super) number_value_of: ObjectRef,
+    pub(super) math: ObjectRef,
+    pub(super) math_abs: ObjectRef,
+    pub(super) math_acos: ObjectRef,
+    pub(super) math_acosh: ObjectRef,
+    pub(super) math_asin: ObjectRef,
+    pub(super) math_asinh: ObjectRef,
+    pub(super) math_atan: ObjectRef,
+    pub(super) math_atan2: ObjectRef,
+    pub(super) math_atanh: ObjectRef,
+    pub(super) math_cbrt: ObjectRef,
+    pub(super) math_ceil: ObjectRef,
+    pub(super) math_clz32: ObjectRef,
+    pub(super) math_cos: ObjectRef,
+    pub(super) math_cosh: ObjectRef,
+    pub(super) math_exp: ObjectRef,
+    pub(super) math_expm1: ObjectRef,
+    pub(super) math_f16round: ObjectRef,
+    pub(super) math_floor: ObjectRef,
+    pub(super) math_fround: ObjectRef,
+    pub(super) math_hypot: ObjectRef,
+    pub(super) math_imul: ObjectRef,
+    pub(super) math_log: ObjectRef,
+    pub(super) math_log10: ObjectRef,
+    pub(super) math_log1p: ObjectRef,
+    pub(super) math_log2: ObjectRef,
+    pub(super) math_max: ObjectRef,
+    pub(super) math_min: ObjectRef,
+    pub(super) math_pow: ObjectRef,
+    pub(super) math_random: ObjectRef,
+    pub(super) math_round: ObjectRef,
+    pub(super) math_sign: ObjectRef,
+    pub(super) math_sin: ObjectRef,
+    pub(super) math_sinh: ObjectRef,
+    pub(super) math_sqrt: ObjectRef,
+    pub(super) math_sum_precise: ObjectRef,
+    pub(super) math_tan: ObjectRef,
+    pub(super) math_tanh: ObjectRef,
+    pub(super) math_trunc: ObjectRef,
+    pub(super) bigint: ObjectRef,
+    pub(super) bigint_as_int_n: ObjectRef,
+    pub(super) bigint_as_uint_n: ObjectRef,
+    pub(super) bigint_prototype: ObjectRef,
+    pub(super) bigint_to_string: ObjectRef,
+    pub(super) bigint_value_of: ObjectRef,
+    pub(super) boolean: ObjectRef,
+    pub(super) boolean_prototype: ObjectRef,
+    pub(super) boolean_to_string: ObjectRef,
+    pub(super) boolean_value_of: ObjectRef,
+    pub(super) symbol: ObjectRef,
+    pub(super) symbol_prototype: ObjectRef,
+    pub(super) symbol_for: ObjectRef,
+    pub(super) symbol_key_for: ObjectRef,
+    pub(super) symbol_to_string: ObjectRef,
+    pub(super) symbol_value_of: ObjectRef,
+    pub(super) symbol_to_primitive: ObjectRef,
+    pub(super) array_species_getter: ObjectRef,
+    pub(super) symbol_description_getter: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]
