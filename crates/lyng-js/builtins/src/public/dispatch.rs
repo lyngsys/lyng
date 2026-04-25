@@ -225,6 +225,13 @@ use super::{
     js3_weak_set_delete_builtin, js3_weak_set_has_builtin,
 };
 
+/// VM and host services required by public builtin dispatch.
+///
+/// Methods that return `Result` report failures through the implementing
+/// context's error channel. That error type is intentionally owned by the
+/// embedding VM so dispatch helpers can propagate both ECMAScript abrupt
+/// completions and host/VM failures without coupling this crate to VM internals.
+#[allow(clippy::missing_errors_doc)]
 pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
     fn agent(&mut self) -> &mut Agent;
 
@@ -458,6 +465,15 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
     ) -> Result<String, Self::Error>;
 }
 
+/// Dispatches a public builtin by builtin ID.
+///
+/// Returns `Ok(None)` when `entry` is not owned by the public builtin dispatcher.
+///
+/// # Errors
+///
+/// Propagates errors reported by the active dispatch context, including abrupt
+/// ECMAScript completions and host or VM failures surfaced through
+/// [`PublicBuiltinDispatchContext::Error`].
 pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
     entry: BuiltinFunctionId,
