@@ -8,7 +8,7 @@ use super::{
     reference_error, type_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_env::{DisposalCapabilityKind, PromiseState};
+use lyng_js_env::{DisposalCapabilityKind, PromiseState, RealmRecord};
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::ObjectAllocation;
 use lyng_js_ops::errors;
@@ -150,7 +150,7 @@ fn create_disposal_stack_object<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(|record| record.root_shape())
+        .and_then(RealmRecord::root_shape)
         .ok_or_else(|| type_error(cx))?;
     let payload = disposal_capability_payload_value(capability);
     let object = cx.agent().with_heap_and_objects(|heap, objects| {
@@ -199,9 +199,8 @@ fn require_disposal_stack_receiver<Cx: PublicBuiltinDispatchContext>(
         .agent()
         .disposal_capability_id_for_object(object)
         .ok_or_else(|| type_error(cx))?;
-    let record = match cx.agent().disposal_capability(capability) {
-        Some(record) => record,
-        None => return Err(type_error(cx)),
+    let Some(record) = cx.agent().disposal_capability(capability) else {
+        return Err(type_error(cx));
     };
     if record.kind() != kind {
         return Err(type_error(cx));
@@ -446,7 +445,7 @@ fn continue_async_disposal<Cx: PublicBuiltinDispatchContext>(
             .cloned()
             .ok_or_else(|| type_error(cx))?;
         match promise_record.state() {
-            PromiseState::Fulfilled => continue,
+            PromiseState::Fulfilled => {}
             PromiseState::Rejected => {
                 let pending =
                     append_disposal_error(cx, operation.pending_error(), promise_record.result())?;
@@ -592,16 +591,13 @@ fn dispose_scope_async_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
-    let (_, capability, record) = match require_disposal_scope_receiver(cx, scope) {
-        Ok(record) => record,
-        Err(_) => {
-            let reject = promise_capability_reject(cx, promise_capability)?;
-            let reason = errors::throw_type_error(cx.agent())
-                .thrown_value()
-                .unwrap_or(Value::undefined());
-            let _ = cx.call_to_completion(reject, Value::undefined(), &[reason])?;
-            return Ok(Value::from_object_ref(promise));
-        }
+    let Ok((_, capability, record)) = require_disposal_scope_receiver(cx, scope) else {
+        let reject = promise_capability_reject(cx, promise_capability)?;
+        let reason = errors::throw_type_error(cx.agent())
+            .thrown_value()
+            .unwrap_or(Value::undefined());
+        let _ = cx.call_to_completion(reject, Value::undefined(), &[reason])?;
+        return Ok(Value::from_object_ref(promise));
     };
     if record.is_disposed() {
         let resolve = promise_capability_resolve(cx, promise_capability)?;
@@ -875,16 +871,13 @@ fn async_disposable_stack_dispose_async_builtin<Cx: PublicBuiltinDispatchContext
     let promise_constructor = promise_default_constructor(cx)?;
     let promise_capability = new_promise_capability(cx, promise_constructor)?;
     let promise = promise_capability_promise(cx, promise_capability)?;
-    let receiver = match invocation.this_value().as_object_ref() {
-        Some(receiver) => receiver,
-        None => {
-            let reject = promise_capability_reject(cx, promise_capability)?;
-            let reason = errors::throw_type_error(cx.agent())
-                .thrown_value()
-                .unwrap_or(Value::undefined());
-            let _ = cx.call_to_completion(reject, Value::undefined(), &[reason])?;
-            return Ok(Value::from_object_ref(promise));
-        }
+    let Some(receiver) = invocation.this_value().as_object_ref() else {
+        let reject = promise_capability_reject(cx, promise_capability)?;
+        let reason = errors::throw_type_error(cx.agent())
+            .thrown_value()
+            .unwrap_or(Value::undefined());
+        let _ = cx.call_to_completion(reject, Value::undefined(), &[reason])?;
+        return Ok(Value::from_object_ref(promise));
     };
     let Some(capability) = cx.agent().disposal_capability_id_for_object(receiver) else {
         let reject = promise_capability_reject(cx, promise_capability)?;
@@ -930,13 +923,11 @@ fn async_disposal_resume_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let callee = cx.callee_object();
-    let record = match cx.agent().async_disposal_resume(callee) {
-        Some(record) => record,
-        None => return Err(type_error(cx)),
+    let Some(record) = cx.agent().async_disposal_resume(callee) else {
+        return Err(type_error(cx));
     };
-    let operation = match cx.agent().async_disposal_operation(record.operation()) {
-        Some(operation) => operation,
-        None => return Ok(Value::undefined()),
+    let Some(operation) = cx.agent().async_disposal_operation(record.operation()) else {
+        return Ok(Value::undefined());
     };
     if operation.completed() || !operation.waiting() {
         return Ok(Value::undefined());
