@@ -950,64 +950,7 @@ impl BuiltinCache {
                 intrinsics: &existing_intrinsics,
             },
         );
-        let family_context = scaffolding.cx;
-        let object_family = families::install_object_family(agent, family_context);
-        let function_family =
-            families::install_function_family(agent, family_context, scaffolding.function);
-        let iterator_family =
-            families::install_iterator_family(agent, family_context, scaffolding.iterator);
-        let collection_family =
-            families::install_collection_family(agent, family_context, scaffolding.collection);
-        let binary_data_family =
-            families::install_binary_data_family(agent, family_context, scaffolding.binary_data);
-        let array_family = families::install_array_family(agent, family_context, scaffolding.array);
-        let string_family =
-            families::install_string_family(agent, family_context, scaffolding.string);
-        let regexp_family =
-            families::install_regexp_family(agent, family_context, scaffolding.regexp);
-        let date_family = families::install_date_family(agent, family_context, scaffolding.date);
-        let primitive_family = families::install_primitive_family(
-            agent,
-            family_context,
-            scaffolding.primitive,
-            scaffolding.primitive_objects,
-        );
-        let json_family = families::install_json_family(agent, family_context, scaffolding.json);
-        let object_reflection_family = families::install_object_reflection_family(
-            agent,
-            family_context,
-            scaffolding.object_reflection,
-        );
-        let module_family =
-            families::install_module_family(agent, family_context, scaffolding.module);
-        let error_family = families::install_error_family(agent, family_context, scaffolding.error);
-        let promise_disposal_family = families::install_promise_disposal_family(
-            agent,
-            family_context,
-            scaffolding.promise_disposal,
-        );
-        let global_function_family =
-            families::install_global_function_family(agent, family_context);
-
-        let builtins = families::InstalledBuiltinFamilies {
-            object: object_family,
-            function: function_family,
-            iterator: iterator_family,
-            collection: collection_family,
-            binary_data: binary_data_family,
-            array: array_family,
-            string: string_family,
-            regexp: regexp_family,
-            date: date_family,
-            primitive: primitive_family,
-            json: json_family,
-            object_reflection: object_reflection_family,
-            module: module_family,
-            error: error_family,
-            promise_disposal: promise_disposal_family,
-            global_function: global_function_family,
-        }
-        .public_realm_builtins();
+        let builtins = families::install_public_builtin_families(agent, &scaffolding);
         families::link_installed_family_prototypes(agent, &builtins);
         if !families::install_public_realm_intrinsics(
             agent,
@@ -1023,7 +966,7 @@ impl BuiltinCache {
             realm_record.global_object(),
             Some(builtins.object_prototype),
         );
-        if temporal::install_temporal_public_objects(
+        temporal::install_temporal_public_objects(
             agent,
             realm,
             global_env,
@@ -1031,70 +974,9 @@ impl BuiltinCache {
             builtins.function_prototype,
             builtins.object_prototype,
             realm_record.global_object(),
-        )
-        .is_none()
-        {
-            return None;
-        }
-        families::install_module_family_descriptors(agent, &builtins);
-
+        )?;
         self.public.insert(realm, builtins);
-        if families::install_object_family_descriptors(agent, self, realm, &builtins).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_function_family_descriptors(agent, self, realm, &builtins).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_array_family_descriptors(agent, self, realm, &builtins).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_collection_family_descriptors(agent, self, realm, &builtins).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_iterator_family_descriptors(agent, self, realm, &builtins).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_object_reflection_family_descriptors(agent, self, realm).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_json_family_descriptors(agent, self, realm).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_error_family_descriptors(agent, self, realm, &builtins).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_string_family_descriptors(agent, self, realm, &builtins).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_regexp_family_descriptors(agent, self, realm, &builtins).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_date_family_descriptors(agent, self, realm, &builtins).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_primitive_family_descriptors(agent, self, realm, &builtins).is_err() {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_promise_disposal_family_descriptors(agent, self, realm, &builtins)
-            .is_err()
-        {
-            self.public.remove(&realm);
-            return None;
-        }
-        if families::install_binary_data_family_descriptors(agent, self, realm, &builtins).is_err()
-        {
+        if families::install_public_family_descriptors(agent, self, realm, &builtins).is_err() {
             self.public.remove(&realm);
             return None;
         }

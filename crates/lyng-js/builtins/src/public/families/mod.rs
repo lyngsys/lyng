@@ -18,59 +18,119 @@ mod regexp;
 mod scaffolding;
 mod strings;
 
-use crate::public::{allocate_builtin_function_object, public_builtin_metadata};
+use crate::bootstrap::BuiltinBootstrapError;
+use crate::public::{
+    allocate_builtin_function_object, public_builtin_metadata, BuiltinCache, PublicRealmBuiltins,
+};
 use lyng_js_env::Agent;
 use lyng_js_types::{BuiltinFunctionId, EnvironmentRef, ObjectRef, RealmRef, ShapeId};
 
-pub(super) use arrays::{
-    array_builtin_object, install_array_family, install_array_family_descriptors,
-};
-pub(super) use binary_data::{
-    binary_data_builtin_object, install_binary_data_family, install_binary_data_family_descriptors,
-};
-pub(super) use collections::{
-    collection_builtin_object, install_collection_family, install_collection_family_descriptors,
-};
-pub(super) use date::{date_builtin_object, install_date_family, install_date_family_descriptors};
-pub(super) use errors::{
-    error_builtin_object, install_error_family, install_error_family_descriptors,
-};
-pub(super) use functions::{
-    function_builtin_object, install_function_family, install_function_family_descriptors,
-};
-pub(super) use globals::{global_function_builtin_object, install_global_function_family};
+pub(super) use arrays::array_builtin_object;
+pub(super) use binary_data::binary_data_builtin_object;
+pub(super) use collections::collection_builtin_object;
+pub(super) use date::date_builtin_object;
+pub(super) use errors::error_builtin_object;
+pub(super) use functions::function_builtin_object;
+pub(super) use globals::global_function_builtin_object;
 pub(super) use installed::{
     install_public_realm_intrinsics, link_installed_family_prototypes, InstalledBuiltinFamilies,
     PublicRealmPrototypeHandles,
 };
-pub(super) use iterators::{
-    install_iterator_family, install_iterator_family_descriptors, iterator_builtin_object,
+pub(super) use iterators::iterator_builtin_object;
+pub(super) use json::json_builtin_object;
+pub(super) use modules::module_builtin_object;
+pub(super) use object_reflection::object_reflection_builtin_object;
+pub(super) use objects::object_builtin_object;
+pub(super) use primitives::primitive_builtin_object;
+pub(super) use promises::promise_disposal_builtin_object;
+pub(super) use regexp::regexp_builtin_object;
+pub(super) use scaffolding::{
+    allocate_public_realm_scaffolding, PublicRealmScaffolding, ScaffoldingRequest,
 };
-pub(super) use json::{install_json_family, install_json_family_descriptors, json_builtin_object};
-pub(super) use modules::{
-    install_module_family, install_module_family_descriptors, module_builtin_object,
-};
-pub(super) use object_reflection::{
-    install_object_reflection_family, install_object_reflection_family_descriptors,
-    object_reflection_builtin_object,
-};
-pub(super) use objects::{
-    install_object_family, install_object_family_descriptors, object_builtin_object,
-};
-pub(super) use primitives::{
-    install_primitive_family, install_primitive_family_descriptors, primitive_builtin_object,
-};
-pub(super) use promises::{
-    install_promise_disposal_family, install_promise_disposal_family_descriptors,
-    promise_disposal_builtin_object,
-};
-pub(super) use regexp::{
-    install_regexp_family, install_regexp_family_descriptors, regexp_builtin_object,
-};
-pub(super) use scaffolding::{allocate_public_realm_scaffolding, ScaffoldingRequest};
-pub(super) use strings::{
-    install_string_family, install_string_family_descriptors, string_builtin_object,
-};
+pub(super) use strings::string_builtin_object;
+
+pub(super) fn install_public_builtin_families(
+    agent: &mut Agent,
+    scaffolding: &PublicRealmScaffolding,
+) -> PublicRealmBuiltins {
+    let family_context = scaffolding.cx;
+    let object_family = objects::install_object_family(agent, family_context);
+    let function_family =
+        functions::install_function_family(agent, family_context, scaffolding.function);
+    let iterator_family =
+        iterators::install_iterator_family(agent, family_context, scaffolding.iterator);
+    let collection_family =
+        collections::install_collection_family(agent, family_context, scaffolding.collection);
+    let binary_data_family =
+        binary_data::install_binary_data_family(agent, family_context, scaffolding.binary_data);
+    let array_family = arrays::install_array_family(agent, family_context, scaffolding.array);
+    let string_family = strings::install_string_family(agent, family_context, scaffolding.string);
+    let regexp_family = regexp::install_regexp_family(agent, family_context, scaffolding.regexp);
+    let date_family = date::install_date_family(agent, family_context, scaffolding.date);
+    let primitive_family = primitives::install_primitive_family(
+        agent,
+        family_context,
+        scaffolding.primitive,
+        scaffolding.primitive_objects,
+    );
+    let json_family = json::install_json_family(agent, family_context, scaffolding.json);
+    let object_reflection_family = object_reflection::install_object_reflection_family(
+        agent,
+        family_context,
+        scaffolding.object_reflection,
+    );
+    let module_family = modules::install_module_family(agent, family_context, scaffolding.module);
+    let error_family = errors::install_error_family(agent, family_context, scaffolding.error);
+    let promise_disposal_family = promises::install_promise_disposal_family(
+        agent,
+        family_context,
+        scaffolding.promise_disposal,
+    );
+    let global_function_family = globals::install_global_function_family(agent, family_context);
+
+    InstalledBuiltinFamilies {
+        object: object_family,
+        function: function_family,
+        iterator: iterator_family,
+        collection: collection_family,
+        binary_data: binary_data_family,
+        array: array_family,
+        string: string_family,
+        regexp: regexp_family,
+        date: date_family,
+        primitive: primitive_family,
+        json: json_family,
+        object_reflection: object_reflection_family,
+        module: module_family,
+        error: error_family,
+        promise_disposal: promise_disposal_family,
+        global_function: global_function_family,
+    }
+    .public_realm_builtins()
+}
+
+pub(super) fn install_public_family_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    builtins: &PublicRealmBuiltins,
+) -> Result<(), BuiltinBootstrapError> {
+    modules::install_module_family_descriptors(agent, builtins);
+    objects::install_object_family_descriptors(agent, cache, realm, builtins)?;
+    functions::install_function_family_descriptors(agent, cache, realm, builtins)?;
+    arrays::install_array_family_descriptors(agent, cache, realm, builtins)?;
+    collections::install_collection_family_descriptors(agent, cache, realm, builtins)?;
+    iterators::install_iterator_family_descriptors(agent, cache, realm, builtins)?;
+    object_reflection::install_object_reflection_family_descriptors(agent, cache, realm)?;
+    json::install_json_family_descriptors(agent, cache, realm)?;
+    errors::install_error_family_descriptors(agent, cache, realm, builtins)?;
+    strings::install_string_family_descriptors(agent, cache, realm, builtins)?;
+    regexp::install_regexp_family_descriptors(agent, cache, realm, builtins)?;
+    date::install_date_family_descriptors(agent, cache, realm, builtins)?;
+    primitives::install_primitive_family_descriptors(agent, cache, realm, builtins)?;
+    promises::install_promise_disposal_family_descriptors(agent, cache, realm, builtins)?;
+    binary_data::install_binary_data_family_descriptors(agent, cache, realm, builtins)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct FamilyInstallContext {
