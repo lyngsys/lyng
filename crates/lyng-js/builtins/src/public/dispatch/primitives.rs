@@ -42,16 +42,16 @@ fn dispatch_number_builtin<Cx: PublicBuiltinDispatchContext>(
         return number_builtin(context, invocation).map(Some);
     }
     if entry == super::js3_number_is_finite_builtin() {
-        return number_is_finite_builtin(context, invocation).map(Some);
+        return Ok(Some(number_is_finite_builtin(invocation)));
     }
     if entry == super::js3_number_is_integer_builtin() {
-        return number_is_integer_builtin(context, invocation).map(Some);
+        return Ok(Some(number_is_integer_builtin(invocation)));
     }
     if entry == super::js3_number_is_nan_builtin() {
-        return number_is_nan_builtin(context, invocation).map(Some);
+        return Ok(Some(number_is_nan_builtin(invocation)));
     }
     if entry == super::js3_number_is_safe_integer_builtin() {
-        return number_is_safe_integer_builtin(context, invocation).map(Some);
+        return Ok(Some(number_is_safe_integer_builtin(invocation)));
     }
     if entry == super::js3_number_to_exponential_builtin() {
         return number_to_exponential_builtin(context, invocation).map(Some);
@@ -180,7 +180,7 @@ fn dispatch_math_advanced_builtin<Cx: PublicBuiltinDispatchContext>(
         return math_pow_builtin(context, invocation).map(Some);
     }
     if entry == super::js3_math_random_builtin() {
-        return math_random_builtin(context, invocation).map(Some);
+        return Ok(Some(math_random_builtin()));
     }
     if entry == super::js3_math_round_builtin() {
         return math_round_builtin(context, invocation).map(Some);
@@ -338,49 +338,37 @@ fn number_builtin<Cx: PublicBuiltinDispatchContext>(
     primitive_wrapper_constructor(cx, realm, prototype, PrimitiveWrapperKind::Number, number)
 }
 
-fn number_is_finite_builtin<Cx: PublicBuiltinDispatchContext>(
-    _cx: &mut Cx,
-    invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
+fn number_is_finite_builtin(invocation: BuiltinInvocation<'_>) -> Value {
     let result = invocation
         .arguments()
         .first()
         .copied()
         .and_then(Value::as_f64)
         .is_some_and(f64::is_finite);
-    Ok(Value::from_bool(result))
+    Value::from_bool(result)
 }
 
-fn number_is_integer_builtin<Cx: PublicBuiltinDispatchContext>(
-    _cx: &mut Cx,
-    invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
+fn number_is_integer_builtin(invocation: BuiltinInvocation<'_>) -> Value {
     let result = invocation
         .arguments()
         .first()
         .copied()
         .and_then(Value::as_f64)
         .is_some_and(is_integral_number);
-    Ok(Value::from_bool(result))
+    Value::from_bool(result)
 }
 
-fn number_is_nan_builtin<Cx: PublicBuiltinDispatchContext>(
-    _cx: &mut Cx,
-    invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
+fn number_is_nan_builtin(invocation: BuiltinInvocation<'_>) -> Value {
     let result = invocation
         .arguments()
         .first()
         .copied()
         .and_then(Value::as_f64)
         .is_some_and(f64::is_nan);
-    Ok(Value::from_bool(result))
+    Value::from_bool(result)
 }
 
-fn number_is_safe_integer_builtin<Cx: PublicBuiltinDispatchContext>(
-    _cx: &mut Cx,
-    invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
+fn number_is_safe_integer_builtin(invocation: BuiltinInvocation<'_>) -> Value {
     let result = invocation
         .arguments()
         .first()
@@ -389,7 +377,7 @@ fn number_is_safe_integer_builtin<Cx: PublicBuiltinDispatchContext>(
         .is_some_and(|number| {
             is_integral_number(number) && number.abs() <= 9_007_199_254_740_991.0
         });
-    Ok(Value::from_bool(result))
+    Value::from_bool(result)
 }
 
 fn number_this_value<Cx: PublicBuiltinDispatchContext>(
@@ -839,6 +827,10 @@ fn math_min_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(number_value(result))
 }
 
+#[allow(
+    clippy::float_cmp,
+    reason = "Math.pow has an exact |base| == 1 infinite-exponent special case."
+)]
 fn math_pow_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -851,10 +843,7 @@ fn math_pow_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(number_value(base.powf(exponent)))
 }
 
-fn math_random_builtin<Cx: PublicBuiltinDispatchContext>(
-    _cx: &mut Cx,
-    _invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
+fn math_random_builtin() -> Value {
     let seed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos() as u64)
@@ -866,9 +855,13 @@ fn math_random_builtin<Cx: PublicBuiltinDispatchContext>(
     mixed = mixed.wrapping_mul(0x94d0_49bb_1331_11eb);
     mixed ^= mixed >> 31;
     let mantissa = mixed >> 11;
-    Ok(Value::from_f64(mantissa as f64 / ((1_u64 << 53) as f64)))
+    Value::from_f64(mantissa as f64 / ((1_u64 << 53) as f64))
 }
 
+#[allow(
+    clippy::manual_range_contains,
+    reason = "Math.round needs the exact [-0.5, 0) interval to preserve negative zero."
+)]
 fn math_round_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -987,14 +980,14 @@ fn math_trunc_builtin<Cx: PublicBuiltinDispatchContext>(
 }
 
 fn round_to_float16(number: f64) -> f64 {
-    if number.is_nan() || number == 0.0 || number.is_infinite() {
-        return number;
-    }
-
     const MIN_SUBNORMAL: f64 = 5.960_464_477_539_063e-8;
     const MIN_NORMAL: f64 = 0.000_061_035_156_25;
     const MAX_FINITE: f64 = 65_504.0;
     const INFINITY_THRESHOLD: f64 = 65_520.0;
+
+    if number.is_nan() || number == 0.0 || number.is_infinite() {
+        return number;
+    }
 
     let negative = number.is_sign_negative();
     let magnitude = number.abs();
@@ -1239,10 +1232,10 @@ fn add_magnitude(target: &mut Vec<u64>, addend: &[u64]) {
         target.resize(addend.len(), 0);
     }
     let mut carry = 0_u128;
-    for index in 0..target.len() {
+    for (index, target_limb) in target.iter_mut().enumerate() {
         let addend_limb = addend.get(index).copied().unwrap_or(0);
-        let sum = u128::from(target[index]) + u128::from(addend_limb) + carry;
-        target[index] = sum as u64;
+        let sum = u128::from(*target_limb) + u128::from(addend_limb) + carry;
+        *target_limb = sum as u64;
         carry = sum >> 64;
     }
     if carry != 0 {
