@@ -79,6 +79,8 @@ Rules:
   required shared prototype handles are available
 - family modules own their `BuiltinFunctionId -> ObjectRef` lookup tables; the realm-level
   lookup only orchestrates family queries
+- `public/families/installed.rs` owns aggregation from installed family handles back into
+  `PublicRealmBuiltins`
 - object and function family allocation live in `public/families/objects.rs` and
   `public/families/functions.rs`; later families should follow the same boundary
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
