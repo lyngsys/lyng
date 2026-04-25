@@ -1910,6 +1910,256 @@ const PUBLIC_PRIMITIVE_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     ),
 ];
 
+const PUBLIC_MODULE_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(
+        js3_abstract_module_source_builtin,
+        BuiltinEntryMetadata::new("AbstractModuleSource", 0, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_abstract_module_source_to_string_tag_getter_builtin,
+        BuiltinEntryMetadata::new("get [Symbol.toStringTag]", 0, false, false),
+    ),
+];
+
+const PUBLIC_LANGUAGE_SUPPORT_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(
+        js3_error_builtin,
+        BuiltinEntryMetadata::new("Error", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_error_to_string_builtin,
+        BuiltinEntryMetadata::new("toString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_eval_error_builtin,
+        BuiltinEntryMetadata::new("EvalError", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_range_error_builtin,
+        BuiltinEntryMetadata::new("RangeError", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reference_error_builtin,
+        BuiltinEntryMetadata::new("ReferenceError", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_syntax_error_builtin,
+        BuiltinEntryMetadata::new("SyntaxError", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_type_error_builtin,
+        BuiltinEntryMetadata::new("TypeError", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_uri_error_builtin,
+        BuiltinEntryMetadata::new("URIError", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_aggregate_error_builtin,
+        BuiltinEntryMetadata::new("AggregateError", 2, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_suppressed_error_builtin,
+        BuiltinEntryMetadata::new("SuppressedError", 3, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_eval_builtin,
+        BuiltinEntryMetadata::new("eval", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_builtin,
+        BuiltinEntryMetadata::new("Promise", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_disposable_stack_builtin,
+        BuiltinEntryMetadata::new("DisposableStack", 0, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_disposable_stack_use_builtin,
+        BuiltinEntryMetadata::new("use", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_disposable_stack_adopt_builtin,
+        BuiltinEntryMetadata::new("adopt", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_disposable_stack_defer_builtin,
+        BuiltinEntryMetadata::new("defer", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_disposable_stack_move_builtin,
+        BuiltinEntryMetadata::new("move", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_disposable_stack_disposed_getter_builtin,
+        BuiltinEntryMetadata::new("get disposed", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_disposable_stack_dispose_builtin,
+        BuiltinEntryMetadata::new("dispose", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_disposable_stack_builtin,
+        BuiltinEntryMetadata::new("AsyncDisposableStack", 0, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_disposable_stack_use_builtin,
+        BuiltinEntryMetadata::new("use", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_disposable_stack_adopt_builtin,
+        BuiltinEntryMetadata::new("adopt", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_disposable_stack_defer_builtin,
+        BuiltinEntryMetadata::new("defer", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_disposable_stack_move_builtin,
+        BuiltinEntryMetadata::new("move", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_disposable_stack_disposed_getter_builtin,
+        BuiltinEntryMetadata::new("get disposed", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_disposable_stack_dispose_async_builtin,
+        BuiltinEntryMetadata::new("disposeAsync", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_async_disposal_resume_builtin,
+        BuiltinEntryMetadata::new("", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_create_sync_disposal_scope_builtin,
+        BuiltinEntryMetadata::new("", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_create_async_disposal_scope_builtin,
+        BuiltinEntryMetadata::new("", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_add_sync_disposable_resource_builtin,
+        BuiltinEntryMetadata::new("", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_add_async_disposable_resource_builtin,
+        BuiltinEntryMetadata::new("", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_dispose_scope_builtin,
+        BuiltinEntryMetadata::new("", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_dispose_scope_async_builtin,
+        BuiltinEntryMetadata::new("", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_then_builtin,
+        BuiltinEntryMetadata::new("then", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_catch_builtin,
+        BuiltinEntryMetadata::new("catch", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_finally_builtin,
+        BuiltinEntryMetadata::new("finally", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_finally_function_builtin,
+        BuiltinEntryMetadata::new("", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_resolve_builtin,
+        BuiltinEntryMetadata::new("resolve", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_reject_builtin,
+        BuiltinEntryMetadata::new("reject", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_all_builtin,
+        BuiltinEntryMetadata::new("all", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_all_settled_builtin,
+        BuiltinEntryMetadata::new("allSettled", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_race_builtin,
+        BuiltinEntryMetadata::new("race", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_any_builtin,
+        BuiltinEntryMetadata::new("any", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_species_getter_builtin,
+        BuiltinEntryMetadata::new("get [Symbol.species]", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_capability_executor_builtin,
+        BuiltinEntryMetadata::new("", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_resolve_function_builtin,
+        BuiltinEntryMetadata::new("", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_reject_function_builtin,
+        BuiltinEntryMetadata::new("", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_all_resolve_element_builtin,
+        BuiltinEntryMetadata::new("", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_all_settled_resolve_element_builtin,
+        BuiltinEntryMetadata::new("", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_all_settled_reject_element_builtin,
+        BuiltinEntryMetadata::new("", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_promise_any_reject_element_builtin,
+        BuiltinEntryMetadata::new("", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_parse_int_builtin,
+        BuiltinEntryMetadata::new("parseInt", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_parse_float_builtin,
+        BuiltinEntryMetadata::new("parseFloat", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_is_nan_builtin,
+        BuiltinEntryMetadata::new("isNaN", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_is_finite_builtin,
+        BuiltinEntryMetadata::new("isFinite", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_encode_uri_builtin,
+        BuiltinEntryMetadata::new("encodeURI", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_encode_uri_component_builtin,
+        BuiltinEntryMetadata::new("encodeURIComponent", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_decode_uri_builtin,
+        BuiltinEntryMetadata::new("decodeURI", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_decode_uri_component_builtin,
+        BuiltinEntryMetadata::new("decodeURIComponent", 1, false, false),
+    ),
+];
+
 fn public_builtin_metadata_from_rows(
     entry: BuiltinFunctionId,
     rows: &[PublicBuiltinMetadataRow],
@@ -1965,6 +2215,16 @@ fn primitive_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<Builtin
     public_builtin_metadata_from_rows(entry, PUBLIC_PRIMITIVE_BUILTIN_METADATA)
 }
 
+fn module_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
+    public_builtin_metadata_from_rows(entry, PUBLIC_MODULE_BUILTIN_METADATA)
+}
+
+fn language_support_public_builtin_metadata(
+    entry: BuiltinFunctionId,
+) -> Option<BuiltinEntryMetadata> {
+    public_builtin_metadata_from_rows(entry, PUBLIC_LANGUAGE_SUPPORT_BUILTIN_METADATA)
+}
+
 /// Compatibility metadata for the public core builtin namespace.
 #[inline]
 pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
@@ -1983,21 +2243,8 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if let Some(metadata) = weak_ref_public_builtin_metadata(entry) {
         return Some(metadata);
     }
-    if entry == js3_abstract_module_source_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "AbstractModuleSource",
-            0,
-            true,
-            true,
-        ));
-    }
-    if entry == js3_abstract_module_source_to_string_tag_getter_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "get [Symbol.toStringTag]",
-            0,
-            false,
-            false,
-        ));
+    if let Some(metadata) = module_public_builtin_metadata(entry) {
+        return Some(metadata);
     }
     if let Some(metadata) = binary_data_public_builtin_metadata(entry) {
         return Some(metadata);
@@ -2020,202 +2267,8 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if let Some(metadata) = primitive_public_builtin_metadata(entry) {
         return Some(metadata);
     }
-    if entry == js3_error_builtin() {
-        return Some(BuiltinEntryMetadata::new("Error", 1, true, true));
-    }
-    if entry == js3_error_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
-    }
-    if entry == js3_eval_error_builtin() {
-        return Some(BuiltinEntryMetadata::new("EvalError", 1, true, true));
-    }
-    if entry == js3_range_error_builtin() {
-        return Some(BuiltinEntryMetadata::new("RangeError", 1, true, true));
-    }
-    if entry == js3_reference_error_builtin() {
-        return Some(BuiltinEntryMetadata::new("ReferenceError", 1, true, true));
-    }
-    if entry == js3_syntax_error_builtin() {
-        return Some(BuiltinEntryMetadata::new("SyntaxError", 1, true, true));
-    }
-    if entry == js3_type_error_builtin() {
-        return Some(BuiltinEntryMetadata::new("TypeError", 1, true, true));
-    }
-    if entry == js3_uri_error_builtin() {
-        return Some(BuiltinEntryMetadata::new("URIError", 1, true, true));
-    }
-    if entry == js3_aggregate_error_builtin() {
-        return Some(BuiltinEntryMetadata::new("AggregateError", 2, true, true));
-    }
-    if entry == js3_suppressed_error_builtin() {
-        return Some(BuiltinEntryMetadata::new("SuppressedError", 3, true, true));
-    }
-    if entry == js3_eval_builtin() {
-        return Some(BuiltinEntryMetadata::new("eval", 1, false, false));
-    }
-    if entry == js3_promise_builtin() {
-        return Some(BuiltinEntryMetadata::new("Promise", 1, true, true));
-    }
-    if entry == js3_disposable_stack_builtin() {
-        return Some(BuiltinEntryMetadata::new("DisposableStack", 0, true, true));
-    }
-    if entry == js3_disposable_stack_use_builtin() {
-        return Some(BuiltinEntryMetadata::new("use", 1, false, false));
-    }
-    if entry == js3_disposable_stack_adopt_builtin() {
-        return Some(BuiltinEntryMetadata::new("adopt", 2, false, false));
-    }
-    if entry == js3_disposable_stack_defer_builtin() {
-        return Some(BuiltinEntryMetadata::new("defer", 1, false, false));
-    }
-    if entry == js3_disposable_stack_move_builtin() {
-        return Some(BuiltinEntryMetadata::new("move", 0, false, false));
-    }
-    if entry == js3_disposable_stack_disposed_getter_builtin() {
-        return Some(BuiltinEntryMetadata::new("get disposed", 0, false, false));
-    }
-    if entry == js3_disposable_stack_dispose_builtin() {
-        return Some(BuiltinEntryMetadata::new("dispose", 0, false, false));
-    }
-    if entry == js3_async_disposable_stack_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "AsyncDisposableStack",
-            0,
-            true,
-            true,
-        ));
-    }
-    if entry == js3_async_disposable_stack_use_builtin() {
-        return Some(BuiltinEntryMetadata::new("use", 1, false, false));
-    }
-    if entry == js3_async_disposable_stack_adopt_builtin() {
-        return Some(BuiltinEntryMetadata::new("adopt", 2, false, false));
-    }
-    if entry == js3_async_disposable_stack_defer_builtin() {
-        return Some(BuiltinEntryMetadata::new("defer", 1, false, false));
-    }
-    if entry == js3_async_disposable_stack_move_builtin() {
-        return Some(BuiltinEntryMetadata::new("move", 0, false, false));
-    }
-    if entry == js3_async_disposable_stack_disposed_getter_builtin() {
-        return Some(BuiltinEntryMetadata::new("get disposed", 0, false, false));
-    }
-    if entry == js3_async_disposable_stack_dispose_async_builtin() {
-        return Some(BuiltinEntryMetadata::new("disposeAsync", 0, false, false));
-    }
-    if entry == js3_async_disposal_resume_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 1, false, false));
-    }
-    if entry == js3_create_sync_disposal_scope_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 0, false, false));
-    }
-    if entry == js3_create_async_disposal_scope_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 0, false, false));
-    }
-    if entry == js3_add_sync_disposable_resource_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 2, false, false));
-    }
-    if entry == js3_add_async_disposable_resource_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 2, false, false));
-    }
-    if entry == js3_dispose_scope_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 1, false, false));
-    }
-    if entry == js3_dispose_scope_async_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 1, false, false));
-    }
-    if entry == js3_promise_then_builtin() {
-        return Some(BuiltinEntryMetadata::new("then", 2, false, false));
-    }
-    if entry == js3_promise_catch_builtin() {
-        return Some(BuiltinEntryMetadata::new("catch", 1, false, false));
-    }
-    if entry == js3_promise_finally_builtin() {
-        return Some(BuiltinEntryMetadata::new("finally", 1, false, false));
-    }
-    if entry == js3_promise_finally_function_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 1, false, false));
-    }
-    if entry == js3_promise_resolve_builtin() {
-        return Some(BuiltinEntryMetadata::new("resolve", 1, false, false));
-    }
-    if entry == js3_promise_reject_builtin() {
-        return Some(BuiltinEntryMetadata::new("reject", 1, false, false));
-    }
-    if entry == js3_promise_all_builtin() {
-        return Some(BuiltinEntryMetadata::new("all", 1, false, false));
-    }
-    if entry == js3_promise_all_settled_builtin() {
-        return Some(BuiltinEntryMetadata::new("allSettled", 1, false, false));
-    }
-    if entry == js3_promise_race_builtin() {
-        return Some(BuiltinEntryMetadata::new("race", 1, false, false));
-    }
-    if entry == js3_promise_any_builtin() {
-        return Some(BuiltinEntryMetadata::new("any", 1, false, false));
-    }
-    if entry == js3_promise_species_getter_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "get [Symbol.species]",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_promise_capability_executor_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 2, false, false));
-    }
-    if entry == js3_promise_resolve_function_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 1, false, false));
-    }
-    if entry == js3_promise_reject_function_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 1, false, false));
-    }
-    if entry == js3_promise_all_resolve_element_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 1, false, false));
-    }
-    if entry == js3_promise_all_settled_resolve_element_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 1, false, false));
-    }
-    if entry == js3_promise_all_settled_reject_element_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 1, false, false));
-    }
-    if entry == js3_promise_any_reject_element_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 1, false, false));
-    }
-    if entry == js3_parse_int_builtin() {
-        return Some(BuiltinEntryMetadata::new("parseInt", 2, false, false));
-    }
-    if entry == js3_parse_float_builtin() {
-        return Some(BuiltinEntryMetadata::new("parseFloat", 1, false, false));
-    }
-    if entry == js3_is_nan_builtin() {
-        return Some(BuiltinEntryMetadata::new("isNaN", 1, false, false));
-    }
-    if entry == js3_is_finite_builtin() {
-        return Some(BuiltinEntryMetadata::new("isFinite", 1, false, false));
-    }
-    if entry == js3_encode_uri_builtin() {
-        return Some(BuiltinEntryMetadata::new("encodeURI", 1, false, false));
-    }
-    if entry == js3_encode_uri_component_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "encodeURIComponent",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_decode_uri_builtin() {
-        return Some(BuiltinEntryMetadata::new("decodeURI", 1, false, false));
-    }
-    if entry == js3_decode_uri_component_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "decodeURIComponent",
-            1,
-            false,
-            false,
-        ));
+    if let Some(metadata) = language_support_public_builtin_metadata(entry) {
+        return Some(metadata);
     }
     None
 }
@@ -4000,6 +4053,280 @@ mod tests {
         assert_eq!(PUBLIC_PRIMITIVE_BUILTIN_METADATA.len(), expected.len());
         for (entry, metadata) in expected {
             assert_eq!(primitive_public_builtin_metadata(entry), Some(metadata));
+            assert_eq!(public_builtin_metadata(entry), Some(metadata));
+        }
+    }
+
+    #[test]
+    fn module_public_metadata_table_matches_public_lookup() {
+        let expected = [
+            (
+                js3_abstract_module_source_builtin(),
+                BuiltinEntryMetadata::new("AbstractModuleSource", 0, true, true),
+            ),
+            (
+                js3_abstract_module_source_to_string_tag_getter_builtin(),
+                BuiltinEntryMetadata::new("get [Symbol.toStringTag]", 0, false, false),
+            ),
+        ];
+
+        assert_eq!(PUBLIC_MODULE_BUILTIN_METADATA.len(), expected.len());
+        for (entry, metadata) in expected {
+            assert_eq!(module_public_builtin_metadata(entry), Some(metadata));
+            assert_eq!(public_builtin_metadata(entry), Some(metadata));
+        }
+    }
+
+    #[test]
+    fn language_support_public_metadata_table_matches_public_lookup() {
+        let expected = [
+            (
+                js3_error_builtin(),
+                BuiltinEntryMetadata::new("Error", 1, true, true),
+            ),
+            (
+                js3_error_to_string_builtin(),
+                BuiltinEntryMetadata::new("toString", 0, false, false),
+            ),
+            (
+                js3_eval_error_builtin(),
+                BuiltinEntryMetadata::new("EvalError", 1, true, true),
+            ),
+            (
+                js3_range_error_builtin(),
+                BuiltinEntryMetadata::new("RangeError", 1, true, true),
+            ),
+            (
+                js3_reference_error_builtin(),
+                BuiltinEntryMetadata::new("ReferenceError", 1, true, true),
+            ),
+            (
+                js3_syntax_error_builtin(),
+                BuiltinEntryMetadata::new("SyntaxError", 1, true, true),
+            ),
+            (
+                js3_type_error_builtin(),
+                BuiltinEntryMetadata::new("TypeError", 1, true, true),
+            ),
+            (
+                js3_uri_error_builtin(),
+                BuiltinEntryMetadata::new("URIError", 1, true, true),
+            ),
+            (
+                js3_aggregate_error_builtin(),
+                BuiltinEntryMetadata::new("AggregateError", 2, true, true),
+            ),
+            (
+                js3_suppressed_error_builtin(),
+                BuiltinEntryMetadata::new("SuppressedError", 3, true, true),
+            ),
+            (
+                js3_eval_builtin(),
+                BuiltinEntryMetadata::new("eval", 1, false, false),
+            ),
+            (
+                js3_promise_builtin(),
+                BuiltinEntryMetadata::new("Promise", 1, true, true),
+            ),
+            (
+                js3_disposable_stack_builtin(),
+                BuiltinEntryMetadata::new("DisposableStack", 0, true, true),
+            ),
+            (
+                js3_disposable_stack_use_builtin(),
+                BuiltinEntryMetadata::new("use", 1, false, false),
+            ),
+            (
+                js3_disposable_stack_adopt_builtin(),
+                BuiltinEntryMetadata::new("adopt", 2, false, false),
+            ),
+            (
+                js3_disposable_stack_defer_builtin(),
+                BuiltinEntryMetadata::new("defer", 1, false, false),
+            ),
+            (
+                js3_disposable_stack_move_builtin(),
+                BuiltinEntryMetadata::new("move", 0, false, false),
+            ),
+            (
+                js3_disposable_stack_disposed_getter_builtin(),
+                BuiltinEntryMetadata::new("get disposed", 0, false, false),
+            ),
+            (
+                js3_disposable_stack_dispose_builtin(),
+                BuiltinEntryMetadata::new("dispose", 0, false, false),
+            ),
+            (
+                js3_async_disposable_stack_builtin(),
+                BuiltinEntryMetadata::new("AsyncDisposableStack", 0, true, true),
+            ),
+            (
+                js3_async_disposable_stack_use_builtin(),
+                BuiltinEntryMetadata::new("use", 1, false, false),
+            ),
+            (
+                js3_async_disposable_stack_adopt_builtin(),
+                BuiltinEntryMetadata::new("adopt", 2, false, false),
+            ),
+            (
+                js3_async_disposable_stack_defer_builtin(),
+                BuiltinEntryMetadata::new("defer", 1, false, false),
+            ),
+            (
+                js3_async_disposable_stack_move_builtin(),
+                BuiltinEntryMetadata::new("move", 0, false, false),
+            ),
+            (
+                js3_async_disposable_stack_disposed_getter_builtin(),
+                BuiltinEntryMetadata::new("get disposed", 0, false, false),
+            ),
+            (
+                js3_async_disposable_stack_dispose_async_builtin(),
+                BuiltinEntryMetadata::new("disposeAsync", 0, false, false),
+            ),
+            (
+                js3_async_disposal_resume_builtin(),
+                BuiltinEntryMetadata::new("", 1, false, false),
+            ),
+            (
+                js3_create_sync_disposal_scope_builtin(),
+                BuiltinEntryMetadata::new("", 0, false, false),
+            ),
+            (
+                js3_create_async_disposal_scope_builtin(),
+                BuiltinEntryMetadata::new("", 0, false, false),
+            ),
+            (
+                js3_add_sync_disposable_resource_builtin(),
+                BuiltinEntryMetadata::new("", 2, false, false),
+            ),
+            (
+                js3_add_async_disposable_resource_builtin(),
+                BuiltinEntryMetadata::new("", 2, false, false),
+            ),
+            (
+                js3_dispose_scope_builtin(),
+                BuiltinEntryMetadata::new("", 1, false, false),
+            ),
+            (
+                js3_dispose_scope_async_builtin(),
+                BuiltinEntryMetadata::new("", 1, false, false),
+            ),
+            (
+                js3_promise_then_builtin(),
+                BuiltinEntryMetadata::new("then", 2, false, false),
+            ),
+            (
+                js3_promise_catch_builtin(),
+                BuiltinEntryMetadata::new("catch", 1, false, false),
+            ),
+            (
+                js3_promise_finally_builtin(),
+                BuiltinEntryMetadata::new("finally", 1, false, false),
+            ),
+            (
+                js3_promise_finally_function_builtin(),
+                BuiltinEntryMetadata::new("", 1, false, false),
+            ),
+            (
+                js3_promise_resolve_builtin(),
+                BuiltinEntryMetadata::new("resolve", 1, false, false),
+            ),
+            (
+                js3_promise_reject_builtin(),
+                BuiltinEntryMetadata::new("reject", 1, false, false),
+            ),
+            (
+                js3_promise_all_builtin(),
+                BuiltinEntryMetadata::new("all", 1, false, false),
+            ),
+            (
+                js3_promise_all_settled_builtin(),
+                BuiltinEntryMetadata::new("allSettled", 1, false, false),
+            ),
+            (
+                js3_promise_race_builtin(),
+                BuiltinEntryMetadata::new("race", 1, false, false),
+            ),
+            (
+                js3_promise_any_builtin(),
+                BuiltinEntryMetadata::new("any", 1, false, false),
+            ),
+            (
+                js3_promise_species_getter_builtin(),
+                BuiltinEntryMetadata::new("get [Symbol.species]", 0, false, false),
+            ),
+            (
+                js3_promise_capability_executor_builtin(),
+                BuiltinEntryMetadata::new("", 2, false, false),
+            ),
+            (
+                js3_promise_resolve_function_builtin(),
+                BuiltinEntryMetadata::new("", 1, false, false),
+            ),
+            (
+                js3_promise_reject_function_builtin(),
+                BuiltinEntryMetadata::new("", 1, false, false),
+            ),
+            (
+                js3_promise_all_resolve_element_builtin(),
+                BuiltinEntryMetadata::new("", 1, false, false),
+            ),
+            (
+                js3_promise_all_settled_resolve_element_builtin(),
+                BuiltinEntryMetadata::new("", 1, false, false),
+            ),
+            (
+                js3_promise_all_settled_reject_element_builtin(),
+                BuiltinEntryMetadata::new("", 1, false, false),
+            ),
+            (
+                js3_promise_any_reject_element_builtin(),
+                BuiltinEntryMetadata::new("", 1, false, false),
+            ),
+            (
+                js3_parse_int_builtin(),
+                BuiltinEntryMetadata::new("parseInt", 2, false, false),
+            ),
+            (
+                js3_parse_float_builtin(),
+                BuiltinEntryMetadata::new("parseFloat", 1, false, false),
+            ),
+            (
+                js3_is_nan_builtin(),
+                BuiltinEntryMetadata::new("isNaN", 1, false, false),
+            ),
+            (
+                js3_is_finite_builtin(),
+                BuiltinEntryMetadata::new("isFinite", 1, false, false),
+            ),
+            (
+                js3_encode_uri_builtin(),
+                BuiltinEntryMetadata::new("encodeURI", 1, false, false),
+            ),
+            (
+                js3_encode_uri_component_builtin(),
+                BuiltinEntryMetadata::new("encodeURIComponent", 1, false, false),
+            ),
+            (
+                js3_decode_uri_builtin(),
+                BuiltinEntryMetadata::new("decodeURI", 1, false, false),
+            ),
+            (
+                js3_decode_uri_component_builtin(),
+                BuiltinEntryMetadata::new("decodeURIComponent", 1, false, false),
+            ),
+        ];
+
+        assert_eq!(
+            PUBLIC_LANGUAGE_SUPPORT_BUILTIN_METADATA.len(),
+            expected.len()
+        );
+        for (entry, metadata) in expected {
+            assert_eq!(
+                language_support_public_builtin_metadata(entry),
+                Some(metadata)
+            );
             assert_eq!(public_builtin_metadata(entry), Some(metadata));
         }
     }
