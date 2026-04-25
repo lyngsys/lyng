@@ -27,7 +27,10 @@ pub(super) use date::{date_builtin_object, install_date_family};
 pub(super) use errors::{error_builtin_object, install_error_family};
 pub(super) use functions::{function_builtin_object, install_function_family};
 pub(super) use globals::{global_function_builtin_object, install_global_function_family};
-pub(super) use installed::InstalledBuiltinFamilies;
+pub(super) use installed::{
+    install_public_realm_intrinsics, link_installed_family_prototypes, InstalledBuiltinFamilies,
+    PublicRealmPrototypeHandles,
+};
 pub(super) use iterators::{install_iterator_family, iterator_builtin_object};
 pub(super) use json::{install_json_family, json_builtin_object};
 pub(super) use modules::{install_module_family, module_builtin_object};
