@@ -1107,6 +1107,89 @@ const PUBLIC_BINARY_DATA_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     ),
 ];
 
+const PUBLIC_OBJECT_REFLECTION_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(
+        js3_json_parse_builtin,
+        BuiltinEntryMetadata::new("parse", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_json_stringify_builtin,
+        BuiltinEntryMetadata::new("stringify", 3, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_json_raw_json_builtin,
+        BuiltinEntryMetadata::new("rawJSON", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_json_is_raw_json_builtin,
+        BuiltinEntryMetadata::new("isRawJSON", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_apply_builtin,
+        BuiltinEntryMetadata::new("apply", 3, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_construct_builtin,
+        BuiltinEntryMetadata::new("construct", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_define_property_builtin,
+        BuiltinEntryMetadata::new("defineProperty", 3, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_delete_property_builtin,
+        BuiltinEntryMetadata::new("deleteProperty", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_get_builtin,
+        BuiltinEntryMetadata::new("get", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_get_own_property_descriptor_builtin,
+        BuiltinEntryMetadata::new("getOwnPropertyDescriptor", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_get_prototype_of_builtin,
+        BuiltinEntryMetadata::new("getPrototypeOf", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_has_builtin,
+        BuiltinEntryMetadata::new("has", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_is_extensible_builtin,
+        BuiltinEntryMetadata::new("isExtensible", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_own_keys_builtin,
+        BuiltinEntryMetadata::new("ownKeys", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_prevent_extensions_builtin,
+        BuiltinEntryMetadata::new("preventExtensions", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_set_builtin,
+        BuiltinEntryMetadata::new("set", 3, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_reflect_set_prototype_of_builtin,
+        BuiltinEntryMetadata::new("setPrototypeOf", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_proxy_builtin,
+        BuiltinEntryMetadata::new("Proxy", 2, true, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_proxy_revocable_builtin,
+        BuiltinEntryMetadata::new("revocable", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_proxy_revoke_builtin,
+        BuiltinEntryMetadata::new("", 0, false, false),
+    ),
+];
+
 fn public_builtin_metadata_from_rows(
     entry: BuiltinFunctionId,
     rows: &[PublicBuiltinMetadataRow],
@@ -1138,6 +1221,12 @@ fn weak_ref_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinE
 
 fn binary_data_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
     public_builtin_metadata_from_rows(entry, PUBLIC_BINARY_DATA_BUILTIN_METADATA)
+}
+
+fn object_reflection_public_builtin_metadata(
+    entry: BuiltinFunctionId,
+) -> Option<BuiltinEntryMetadata> {
+    public_builtin_metadata_from_rows(entry, PUBLIC_OBJECT_REFLECTION_BUILTIN_METADATA)
 }
 
 /// Compatibility metadata for the public core builtin namespace.
@@ -1177,75 +1266,8 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if let Some(metadata) = binary_data_public_builtin_metadata(entry) {
         return Some(metadata);
     }
-    if entry == js3_json_parse_builtin() {
-        return Some(BuiltinEntryMetadata::new("parse", 2, false, false));
-    }
-    if entry == js3_json_stringify_builtin() {
-        return Some(BuiltinEntryMetadata::new("stringify", 3, false, false));
-    }
-    if entry == js3_json_raw_json_builtin() {
-        return Some(BuiltinEntryMetadata::new("rawJSON", 1, false, false));
-    }
-    if entry == js3_json_is_raw_json_builtin() {
-        return Some(BuiltinEntryMetadata::new("isRawJSON", 1, false, false));
-    }
-    if entry == js3_reflect_apply_builtin() {
-        return Some(BuiltinEntryMetadata::new("apply", 3, false, false));
-    }
-    if entry == js3_reflect_construct_builtin() {
-        return Some(BuiltinEntryMetadata::new("construct", 2, false, false));
-    }
-    if entry == js3_reflect_define_property_builtin() {
-        return Some(BuiltinEntryMetadata::new("defineProperty", 3, false, false));
-    }
-    if entry == js3_reflect_delete_property_builtin() {
-        return Some(BuiltinEntryMetadata::new("deleteProperty", 2, false, false));
-    }
-    if entry == js3_reflect_get_builtin() {
-        return Some(BuiltinEntryMetadata::new("get", 2, false, false));
-    }
-    if entry == js3_reflect_get_own_property_descriptor_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "getOwnPropertyDescriptor",
-            2,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_reflect_get_prototype_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("getPrototypeOf", 1, false, false));
-    }
-    if entry == js3_reflect_has_builtin() {
-        return Some(BuiltinEntryMetadata::new("has", 2, false, false));
-    }
-    if entry == js3_reflect_is_extensible_builtin() {
-        return Some(BuiltinEntryMetadata::new("isExtensible", 1, false, false));
-    }
-    if entry == js3_reflect_own_keys_builtin() {
-        return Some(BuiltinEntryMetadata::new("ownKeys", 1, false, false));
-    }
-    if entry == js3_reflect_prevent_extensions_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "preventExtensions",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_reflect_set_builtin() {
-        return Some(BuiltinEntryMetadata::new("set", 3, false, false));
-    }
-    if entry == js3_reflect_set_prototype_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("setPrototypeOf", 2, false, false));
-    }
-    if entry == js3_proxy_builtin() {
-        return Some(BuiltinEntryMetadata::new("Proxy", 2, true, false));
-    }
-    if entry == js3_proxy_revocable_builtin() {
-        return Some(BuiltinEntryMetadata::new("revocable", 2, false, false));
-    }
-    if entry == js3_proxy_revoke_builtin() {
-        return Some(BuiltinEntryMetadata::new("", 0, false, false));
+    if let Some(metadata) = object_reflection_public_builtin_metadata(entry) {
+        return Some(metadata);
     }
     if entry == js3_iterator_prototype_iterator_builtin() {
         return Some(BuiltinEntryMetadata::new(
@@ -3007,6 +3029,104 @@ mod tests {
         assert_eq!(PUBLIC_BINARY_DATA_BUILTIN_METADATA.len(), expected.len());
         for (entry, metadata) in expected {
             assert_eq!(binary_data_public_builtin_metadata(entry), Some(metadata));
+            assert_eq!(public_builtin_metadata(entry), Some(metadata));
+        }
+    }
+
+    #[test]
+    fn object_reflection_public_metadata_table_matches_public_lookup() {
+        let expected = [
+            (
+                js3_json_parse_builtin(),
+                BuiltinEntryMetadata::new("parse", 2, false, false),
+            ),
+            (
+                js3_json_stringify_builtin(),
+                BuiltinEntryMetadata::new("stringify", 3, false, false),
+            ),
+            (
+                js3_json_raw_json_builtin(),
+                BuiltinEntryMetadata::new("rawJSON", 1, false, false),
+            ),
+            (
+                js3_json_is_raw_json_builtin(),
+                BuiltinEntryMetadata::new("isRawJSON", 1, false, false),
+            ),
+            (
+                js3_reflect_apply_builtin(),
+                BuiltinEntryMetadata::new("apply", 3, false, false),
+            ),
+            (
+                js3_reflect_construct_builtin(),
+                BuiltinEntryMetadata::new("construct", 2, false, false),
+            ),
+            (
+                js3_reflect_define_property_builtin(),
+                BuiltinEntryMetadata::new("defineProperty", 3, false, false),
+            ),
+            (
+                js3_reflect_delete_property_builtin(),
+                BuiltinEntryMetadata::new("deleteProperty", 2, false, false),
+            ),
+            (
+                js3_reflect_get_builtin(),
+                BuiltinEntryMetadata::new("get", 2, false, false),
+            ),
+            (
+                js3_reflect_get_own_property_descriptor_builtin(),
+                BuiltinEntryMetadata::new("getOwnPropertyDescriptor", 2, false, false),
+            ),
+            (
+                js3_reflect_get_prototype_of_builtin(),
+                BuiltinEntryMetadata::new("getPrototypeOf", 1, false, false),
+            ),
+            (
+                js3_reflect_has_builtin(),
+                BuiltinEntryMetadata::new("has", 2, false, false),
+            ),
+            (
+                js3_reflect_is_extensible_builtin(),
+                BuiltinEntryMetadata::new("isExtensible", 1, false, false),
+            ),
+            (
+                js3_reflect_own_keys_builtin(),
+                BuiltinEntryMetadata::new("ownKeys", 1, false, false),
+            ),
+            (
+                js3_reflect_prevent_extensions_builtin(),
+                BuiltinEntryMetadata::new("preventExtensions", 1, false, false),
+            ),
+            (
+                js3_reflect_set_builtin(),
+                BuiltinEntryMetadata::new("set", 3, false, false),
+            ),
+            (
+                js3_reflect_set_prototype_of_builtin(),
+                BuiltinEntryMetadata::new("setPrototypeOf", 2, false, false),
+            ),
+            (
+                js3_proxy_builtin(),
+                BuiltinEntryMetadata::new("Proxy", 2, true, false),
+            ),
+            (
+                js3_proxy_revocable_builtin(),
+                BuiltinEntryMetadata::new("revocable", 2, false, false),
+            ),
+            (
+                js3_proxy_revoke_builtin(),
+                BuiltinEntryMetadata::new("", 0, false, false),
+            ),
+        ];
+
+        assert_eq!(
+            PUBLIC_OBJECT_REFLECTION_BUILTIN_METADATA.len(),
+            expected.len()
+        );
+        for (entry, metadata) in expected {
+            assert_eq!(
+                object_reflection_public_builtin_metadata(entry),
+                Some(metadata)
+            );
             assert_eq!(public_builtin_metadata(entry), Some(metadata));
         }
     }
