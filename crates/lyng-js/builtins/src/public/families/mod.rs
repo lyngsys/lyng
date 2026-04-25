@@ -2,6 +2,7 @@ mod arrays;
 mod binary_data;
 mod collections;
 mod date;
+mod descriptors;
 mod errors;
 mod functions;
 mod globals;
@@ -26,7 +27,9 @@ pub(super) use binary_data::{binary_data_builtin_object, install_binary_data_fam
 pub(super) use collections::{collection_builtin_object, install_collection_family};
 pub(super) use date::{date_builtin_object, install_date_family};
 pub(super) use errors::{error_builtin_object, install_error_family};
-pub(super) use functions::{function_builtin_object, install_function_family};
+pub(super) use functions::{
+    function_builtin_object, install_function_family, install_function_family_descriptors,
+};
 pub(super) use globals::{global_function_builtin_object, install_global_function_family};
 pub(super) use installed::{
     install_public_realm_intrinsics, link_installed_family_prototypes, InstalledBuiltinFamilies,

@@ -91,6 +91,8 @@ Rules:
 - the Object family owns its own constructor and prototype descriptor installation in
   `public/families/objects.rs`; later descriptor extraction should follow that owner-local
   installer shape while still using the shared descriptor installer
+- the Function family owns `Function.prototype`, async function, generator function, generator,
+  and async generator descriptor installation in `public/families/functions.rs`
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

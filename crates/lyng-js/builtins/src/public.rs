@@ -85,12 +85,11 @@ use lyng_js_types::{
     js3_function_symbol_has_instance_builtin, js3_function_to_string_builtin,
     js3_generator_function_builtin, js3_generator_next_builtin, js3_generator_return_builtin,
     js3_generator_throw_builtin, js3_int16_array_builtin, js3_int32_array_builtin,
-    js3_int8_array_builtin, js3_internal_throw_type_error_builtin, js3_is_finite_builtin,
-    js3_is_nan_builtin, js3_iterator_prototype_iterator_builtin, js3_json_is_raw_json_builtin,
-    js3_json_parse_builtin, js3_json_raw_json_builtin, js3_json_stringify_builtin, js3_map_builtin,
-    js3_map_clear_builtin, js3_map_delete_builtin, js3_map_entries_builtin,
-    js3_map_for_each_builtin, js3_map_get_builtin, js3_map_has_builtin,
-    js3_map_iterator_next_builtin, js3_map_keys_builtin, js3_map_set_builtin,
+    js3_int8_array_builtin, js3_is_finite_builtin, js3_is_nan_builtin,
+    js3_iterator_prototype_iterator_builtin, js3_json_is_raw_json_builtin, js3_json_parse_builtin,
+    js3_json_raw_json_builtin, js3_json_stringify_builtin, js3_map_builtin, js3_map_clear_builtin,
+    js3_map_delete_builtin, js3_map_entries_builtin, js3_map_for_each_builtin, js3_map_get_builtin,
+    js3_map_has_builtin, js3_map_iterator_next_builtin, js3_map_keys_builtin, js3_map_set_builtin,
     js3_map_size_getter_builtin, js3_map_values_builtin, js3_math_abs_builtin,
     js3_math_acos_builtin, js3_math_acosh_builtin, js3_math_asin_builtin, js3_math_asinh_builtin,
     js3_math_atan2_builtin, js3_math_atan_builtin, js3_math_atanh_builtin, js3_math_cbrt_builtin,
@@ -1134,31 +1133,6 @@ impl BuiltinCache {
             Some(bootstrap_atoms.atomics()),
             AllocationLifetime::Default,
         ));
-        let generator_function_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "GeneratorFunction",
-            None,
-            AllocationLifetime::Default,
-        ));
-        let async_function_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "AsyncFunction",
-            None,
-            AllocationLifetime::Default,
-        ));
-        let async_generator_function_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "AsyncGeneratorFunction",
-            None,
-            AllocationLifetime::Default,
-        ));
-        let generator_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Generator",
-            None,
-            AllocationLifetime::Default,
-        ));
-        let async_generator_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "AsyncGenerator",
-            None,
-            AllocationLifetime::Default,
-        ));
         let async_iterator_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "AsyncIterator",
             None,
@@ -1289,7 +1263,6 @@ impl BuiltinCache {
         let cbrt_atom = agent.atoms_mut().intern_collectible("cbrt");
         let ceil_atom = agent.atoms_mut().intern_collectible("ceil");
         let clz32_atom = agent.atoms_mut().intern_collectible("clz32");
-        let caller_atom = agent.atoms_mut().intern_collectible("caller");
         let cos_atom = agent.atoms_mut().intern_collectible("cos");
         let cosh_atom = agent.atoms_mut().intern_collectible("cosh");
         let escape_atom = agent.atoms_mut().intern_collectible("escape");
@@ -1436,7 +1409,6 @@ impl BuiltinCache {
         let reduce_right_atom = agent.atoms_mut().intern_collectible("reduceRight");
         let reverse_atom = agent.atoms_mut().intern_collectible("reverse");
         let some_atom = agent.atoms_mut().intern_collectible("some");
-        let throw_atom = agent.atoms_mut().intern_collectible("throw");
         let at_atom = agent.atoms_mut().intern_collectible("at");
         let slice_atom = agent.atoms_mut().intern_collectible("slice");
         let buffer_atom = agent.atoms_mut().intern_collectible("buffer");
@@ -1509,182 +1481,9 @@ impl BuiltinCache {
         let to_fixed_atom = agent.atoms_mut().intern_collectible("toFixed");
         let to_precision_atom = agent.atoms_mut().intern_collectible("toPrecision");
         let unicode_atom = agent.atoms_mut().intern_collectible("unicode");
-        let arguments_atom = agent.atoms_mut().intern_collectible("arguments");
         let wait_atom = agent.atoms_mut().intern_collectible("wait");
         let wait_async_atom = agent.atoms_mut().intern_collectible("waitAsync");
         let xor_atom = agent.atoms_mut().intern_collectible("xor");
-        let function_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.function)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::call.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_function_call_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::apply.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_function_apply_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::bind.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_function_bind_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_function_to_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::HasInstance),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    js3_function_symbol_has_instance_builtin(),
-                ),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(caller_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_internal_throw_type_error_builtin()),
-                    set: Some(js3_internal_throw_type_error_builtin()),
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(arguments_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_internal_throw_type_error_builtin()),
-                    set: Some(js3_internal_throw_type_error_builtin()),
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let generator_function_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.generator_function)),
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::prototype.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(
-                    builtins.generator_prototype,
-                )),
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(generator_function_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let async_function_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.async_function)),
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(async_function_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let async_generator_function_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(
-                    builtins.async_generator_function,
-                )),
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::prototype.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(
-                    builtins.async_generator_prototype,
-                )),
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(async_generator_function_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let generator_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(
-                    builtins.generator_function_prototype,
-                )),
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(next_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_generator_next_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::r#return.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_generator_return_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(throw_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_generator_throw_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_iterator_prototype_iterator_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(generator_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let async_generator_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(
-                    builtins.async_generator_function_prototype,
-                )),
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(next_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_async_generator_next_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::r#return.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_async_generator_return_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(throw_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_async_generator_throw_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::AsyncIterator),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(
-                    builtins.async_iterator_method,
-                )),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(async_generator_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
         let array_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(from_atom),
@@ -5384,30 +5183,6 @@ impl BuiltinCache {
         ];
         let tables = [
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::FunctionPrototype),
-                &function_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::AsyncFunctionPrototype),
-                &async_function_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::AsyncGeneratorFunctionPrototype),
-                &async_generator_function_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::GeneratorFunctionPrototype),
-                &generator_function_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::GeneratorPrototype),
-                &generator_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::AsyncGeneratorPrototype),
-                &async_generator_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Array),
                 &array_descriptors,
             ),
@@ -5750,6 +5525,10 @@ impl BuiltinCache {
         ];
         self.public.insert(realm, builtins);
         if families::install_object_family_descriptors(agent, self, realm, &builtins).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_function_family_descriptors(agent, self, realm, &builtins).is_err() {
             self.public.remove(&realm);
             return None;
         }

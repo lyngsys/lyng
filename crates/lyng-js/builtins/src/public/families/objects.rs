@@ -1,10 +1,11 @@
+use super::descriptors::{
+    accessor_atom_property, builtin_function_atom_property, data_atom_property,
+    readonly_builtin_attributes, writable_builtin_attributes,
+};
 use super::{install_public_builtin_function, FamilyInstallContext, ObjectFamilyBuiltins};
 use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
-use crate::{
-    BuiltinAttributes, BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic,
-    BuiltinPropertyDescriptor, BuiltinPropertyKeySpec, BuiltinPropertyValueSpec,
-};
+use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
 use lyng_js_types::{
@@ -333,6 +334,7 @@ fn install_object_prototype_descriptors(
         data_atom_property(
             WellKnownAtom::constructor.id(),
             Value::from_object_ref(builtins.object),
+            writable_builtin_attributes(),
         ),
         builtin_function_atom_property(atoms.define_getter, js3_object_define_getter_builtin()),
         builtin_function_atom_property(atoms.define_setter, js3_object_define_setter_builtin()),
@@ -359,11 +361,11 @@ fn install_object_prototype_descriptors(
             bootstrap_atoms.property_is_enumerable(),
             js3_object_property_is_enumerable_builtin(),
         ),
-        accessor_property(
-            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::__proto__.id()),
+        accessor_atom_property(
+            WellKnownAtom::__proto__.id(),
             Some(js3_object_proto_getter_builtin()),
             Some(js3_object_proto_setter_builtin()),
-            BuiltinAttributes::new(false, false, true),
+            readonly_builtin_attributes(),
         ),
     ];
     install_descriptor_tables(
@@ -375,53 +377,6 @@ fn install_object_prototype_descriptors(
             &descriptors,
         )],
     )
-}
-
-fn builtin_function_property(
-    key: BuiltinPropertyKeySpec,
-    entry: BuiltinFunctionId,
-) -> BuiltinPropertyDescriptor {
-    BuiltinPropertyDescriptor::new(
-        key,
-        BuiltinPropertyValueSpec::BuiltinFunction(entry),
-        writable_builtin_attributes(),
-    )
-}
-
-fn builtin_function_atom_property(
-    atom: AtomId,
-    entry: BuiltinFunctionId,
-) -> BuiltinPropertyDescriptor {
-    builtin_function_property(BuiltinPropertyKeySpec::from_atom(atom), entry)
-}
-
-fn data_property(key: BuiltinPropertyKeySpec, value: Value) -> BuiltinPropertyDescriptor {
-    BuiltinPropertyDescriptor::new(
-        key,
-        BuiltinPropertyValueSpec::Data(value),
-        writable_builtin_attributes(),
-    )
-}
-
-fn data_atom_property(atom: AtomId, value: Value) -> BuiltinPropertyDescriptor {
-    data_property(BuiltinPropertyKeySpec::from_atom(atom), value)
-}
-
-fn accessor_property(
-    key: BuiltinPropertyKeySpec,
-    get: Option<BuiltinFunctionId>,
-    set: Option<BuiltinFunctionId>,
-    attributes: BuiltinAttributes,
-) -> BuiltinPropertyDescriptor {
-    BuiltinPropertyDescriptor::new(
-        key,
-        BuiltinPropertyValueSpec::Accessor { get, set },
-        attributes,
-    )
-}
-
-const fn writable_builtin_attributes() -> BuiltinAttributes {
-    BuiltinAttributes::new(true, false, true)
 }
 
 #[derive(Clone, Copy, Debug)]
