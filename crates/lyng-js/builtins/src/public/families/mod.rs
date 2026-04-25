@@ -2,6 +2,7 @@ mod arrays;
 mod collections;
 mod functions;
 mod objects;
+mod strings;
 
 use crate::public::{allocate_builtin_function_object, public_builtin_metadata};
 use lyng_js_env::Agent;
@@ -11,6 +12,7 @@ pub(super) use arrays::install_array_family;
 pub(super) use collections::install_collection_family;
 pub(super) use functions::install_function_family;
 pub(super) use objects::install_object_family;
+pub(super) use strings::install_string_family;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct FamilyInstallContext {
@@ -228,4 +230,55 @@ pub(super) struct ArrayFamilyBuiltins {
     pub(super) array_entries: ObjectRef,
     pub(super) array_with: ObjectRef,
     pub(super) array_iterator_next: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct StringFamilyPrototypes {
+    pub(super) string_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct StringFamilyBuiltins {
+    pub(super) string: ObjectRef,
+    pub(super) string_prototype: ObjectRef,
+    pub(super) string_iterator: ObjectRef,
+    pub(super) string_iterator_next: ObjectRef,
+    pub(super) string_to_string: ObjectRef,
+    pub(super) string_value_of: ObjectRef,
+    pub(super) string_concat: ObjectRef,
+    pub(super) string_char_at: ObjectRef,
+    pub(super) string_char_code_at: ObjectRef,
+    pub(super) string_from_char_code: ObjectRef,
+    pub(super) string_from_code_point: ObjectRef,
+    pub(super) string_raw: ObjectRef,
+    pub(super) string_at: ObjectRef,
+    pub(super) string_code_point_at: ObjectRef,
+    pub(super) string_ends_with: ObjectRef,
+    pub(super) string_includes: ObjectRef,
+    pub(super) string_index_of: ObjectRef,
+    pub(super) string_is_well_formed: ObjectRef,
+    pub(super) string_locale_compare: ObjectRef,
+    pub(super) string_match: ObjectRef,
+    pub(super) string_match_all: ObjectRef,
+    pub(super) string_normalize: ObjectRef,
+    pub(super) string_last_index_of: ObjectRef,
+    pub(super) string_pad_end: ObjectRef,
+    pub(super) string_pad_start: ObjectRef,
+    pub(super) string_repeat: ObjectRef,
+    pub(super) string_replace: ObjectRef,
+    pub(super) string_replace_all: ObjectRef,
+    pub(super) string_search: ObjectRef,
+    pub(super) string_split: ObjectRef,
+    pub(super) string_slice: ObjectRef,
+    pub(super) string_substring: ObjectRef,
+    pub(super) string_starts_with: ObjectRef,
+    pub(super) string_to_locale_lower_case: ObjectRef,
+    pub(super) string_to_locale_upper_case: ObjectRef,
+    pub(super) string_to_lower_case: ObjectRef,
+    pub(super) string_to_upper_case: ObjectRef,
+    pub(super) string_to_well_formed: ObjectRef,
+    pub(super) string_trim: ObjectRef,
+    pub(super) string_trim_end: ObjectRef,
+    pub(super) string_trim_start: ObjectRef,
 }
