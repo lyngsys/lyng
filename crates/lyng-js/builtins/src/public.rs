@@ -1014,65 +1014,8 @@ impl PublicRealmBuiltins {
         if let Some(object) = families::string_builtin_object(&self, entry) {
             return Some(object);
         }
-        if entry == js3_regexp_builtin() {
-            return Some(self.regexp);
-        }
-        if entry == js3_regexp_escape_builtin() {
-            return Some(self.regexp_escape);
-        }
-        if entry == js3_regexp_to_string_builtin() {
-            return Some(self.regexp_to_string);
-        }
-        if entry == js3_regexp_exec_builtin() {
-            return Some(self.regexp_exec);
-        }
-        if entry == js3_regexp_test_builtin() {
-            return Some(self.regexp_test);
-        }
-        if entry == js3_regexp_global_getter_builtin() {
-            return Some(self.regexp_global_getter);
-        }
-        if entry == js3_regexp_ignore_case_getter_builtin() {
-            return Some(self.regexp_ignore_case_getter);
-        }
-        if entry == js3_regexp_multiline_getter_builtin() {
-            return Some(self.regexp_multiline_getter);
-        }
-        if entry == js3_regexp_dot_all_getter_builtin() {
-            return Some(self.regexp_dot_all_getter);
-        }
-        if entry == js3_regexp_unicode_getter_builtin() {
-            return Some(self.regexp_unicode_getter);
-        }
-        if entry == js3_regexp_sticky_getter_builtin() {
-            return Some(self.regexp_sticky_getter);
-        }
-        if entry == js3_regexp_source_getter_builtin() {
-            return Some(self.regexp_source_getter);
-        }
-        if entry == js3_regexp_flags_getter_builtin() {
-            return Some(self.regexp_flags_getter);
-        }
-        if entry == js3_regexp_has_indices_getter_builtin() {
-            return Some(self.regexp_has_indices_getter);
-        }
-        if entry == js3_regexp_species_getter_builtin() {
-            return Some(self.regexp_species_getter);
-        }
-        if entry == js3_regexp_symbol_match_builtin() {
-            return Some(self.regexp_symbol_match);
-        }
-        if entry == js3_regexp_symbol_replace_builtin() {
-            return Some(self.regexp_symbol_replace);
-        }
-        if entry == js3_regexp_symbol_search_builtin() {
-            return Some(self.regexp_symbol_search);
-        }
-        if entry == js3_regexp_symbol_split_builtin() {
-            return Some(self.regexp_symbol_split);
-        }
-        if entry == js3_regexp_symbol_match_all_builtin() {
-            return Some(self.regexp_symbol_match_all);
+        if let Some(object) = families::regexp_builtin_object(&self, entry) {
+            return Some(object);
         }
         if entry == js3_date_builtin() {
             return Some(self.date);

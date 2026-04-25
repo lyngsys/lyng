@@ -33,7 +33,7 @@ pub(super) use object_reflection::install_object_reflection_family;
 pub(super) use objects::install_object_family;
 pub(super) use primitives::install_primitive_family;
 pub(super) use promises::install_promise_disposal_family;
-pub(super) use regexp::install_regexp_family;
+pub(super) use regexp::{install_regexp_family, regexp_builtin_object};
 pub(super) use strings::{install_string_family, string_builtin_object};
 
 #[derive(Clone, Copy, Debug)]

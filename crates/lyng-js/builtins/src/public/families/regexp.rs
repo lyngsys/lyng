@@ -12,8 +12,10 @@ use lyng_js_types::{
     js3_regexp_symbol_match_all_builtin, js3_regexp_symbol_match_builtin,
     js3_regexp_symbol_replace_builtin, js3_regexp_symbol_search_builtin,
     js3_regexp_symbol_split_builtin, js3_regexp_test_builtin, js3_regexp_to_string_builtin,
-    js3_regexp_unicode_getter_builtin, ObjectRef,
+    js3_regexp_unicode_getter_builtin, BuiltinFunctionId, ObjectRef,
 };
+
+use crate::public::PublicRealmBuiltins;
 
 pub(in crate::public) fn install_regexp_family(
     agent: &mut Agent,
@@ -66,6 +68,81 @@ pub(in crate::public) fn install_regexp_family(
         regexp_symbol_split: symbol_methods.split,
         regexp_symbol_match_all: symbol_methods.match_all,
     }
+}
+
+pub(in crate::public) fn regexp_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_regexp_builtin(), builtins.regexp),
+        (js3_regexp_escape_builtin(), builtins.regexp_escape),
+        (js3_regexp_to_string_builtin(), builtins.regexp_to_string),
+        (js3_regexp_exec_builtin(), builtins.regexp_exec),
+        (js3_regexp_test_builtin(), builtins.regexp_test),
+        (
+            js3_regexp_global_getter_builtin(),
+            builtins.regexp_global_getter,
+        ),
+        (
+            js3_regexp_ignore_case_getter_builtin(),
+            builtins.regexp_ignore_case_getter,
+        ),
+        (
+            js3_regexp_multiline_getter_builtin(),
+            builtins.regexp_multiline_getter,
+        ),
+        (
+            js3_regexp_dot_all_getter_builtin(),
+            builtins.regexp_dot_all_getter,
+        ),
+        (
+            js3_regexp_unicode_getter_builtin(),
+            builtins.regexp_unicode_getter,
+        ),
+        (
+            js3_regexp_sticky_getter_builtin(),
+            builtins.regexp_sticky_getter,
+        ),
+        (
+            js3_regexp_source_getter_builtin(),
+            builtins.regexp_source_getter,
+        ),
+        (
+            js3_regexp_flags_getter_builtin(),
+            builtins.regexp_flags_getter,
+        ),
+        (
+            js3_regexp_has_indices_getter_builtin(),
+            builtins.regexp_has_indices_getter,
+        ),
+        (
+            js3_regexp_species_getter_builtin(),
+            builtins.regexp_species_getter,
+        ),
+        (
+            js3_regexp_symbol_match_builtin(),
+            builtins.regexp_symbol_match,
+        ),
+        (
+            js3_regexp_symbol_replace_builtin(),
+            builtins.regexp_symbol_replace,
+        ),
+        (
+            js3_regexp_symbol_search_builtin(),
+            builtins.regexp_symbol_search,
+        ),
+        (
+            js3_regexp_symbol_split_builtin(),
+            builtins.regexp_symbol_split,
+        ),
+        (
+            js3_regexp_symbol_match_all_builtin(),
+            builtins.regexp_symbol_match_all,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
 }
 
 #[derive(Clone, Copy, Debug)]
