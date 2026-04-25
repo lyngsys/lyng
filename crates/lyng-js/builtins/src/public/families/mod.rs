@@ -1,3 +1,4 @@
+mod arrays;
 mod collections;
 mod functions;
 mod objects;
@@ -6,6 +7,7 @@ use crate::public::{allocate_builtin_function_object, public_builtin_metadata};
 use lyng_js_env::Agent;
 use lyng_js_types::{BuiltinFunctionId, EnvironmentRef, ObjectRef, RealmRef, ShapeId};
 
+pub(super) use arrays::install_array_family;
 pub(super) use collections::install_collection_family;
 pub(super) use functions::install_function_family;
 pub(super) use objects::install_object_family;
@@ -170,4 +172,60 @@ pub(super) struct CollectionFamilyBuiltins {
     pub(super) weak_set_prototype: ObjectRef,
     pub(super) weak_ref_prototype: ObjectRef,
     pub(super) finalization_registry_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct ArrayFamilyPrototypes {
+    pub(super) array_prototype: ObjectRef,
+    pub(super) array_unscopables: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct ArrayFamilyBuiltins {
+    pub(super) array: ObjectRef,
+    pub(super) array_from: ObjectRef,
+    pub(super) array_from_async: ObjectRef,
+    pub(super) array_of: ObjectRef,
+    pub(super) array_unscopables: ObjectRef,
+    pub(super) array_is_array: ObjectRef,
+    pub(super) array_at: ObjectRef,
+    pub(super) array_concat: ObjectRef,
+    pub(super) array_copy_within: ObjectRef,
+    pub(super) array_fill: ObjectRef,
+    pub(super) array_flat: ObjectRef,
+    pub(super) array_flat_map: ObjectRef,
+    pub(super) array_join: ObjectRef,
+    pub(super) array_pop: ObjectRef,
+    pub(super) array_push: ObjectRef,
+    pub(super) array_shift: ObjectRef,
+    pub(super) array_unshift: ObjectRef,
+    pub(super) array_every: ObjectRef,
+    pub(super) array_filter: ObjectRef,
+    pub(super) array_find: ObjectRef,
+    pub(super) array_find_index: ObjectRef,
+    pub(super) array_find_last: ObjectRef,
+    pub(super) array_find_last_index: ObjectRef,
+    pub(super) array_for_each: ObjectRef,
+    pub(super) array_includes: ObjectRef,
+    pub(super) array_index_of: ObjectRef,
+    pub(super) array_map: ObjectRef,
+    pub(super) array_reduce: ObjectRef,
+    pub(super) array_reduce_right: ObjectRef,
+    pub(super) array_reverse: ObjectRef,
+    pub(super) array_slice: ObjectRef,
+    pub(super) array_some: ObjectRef,
+    pub(super) array_last_index_of: ObjectRef,
+    pub(super) array_sort: ObjectRef,
+    pub(super) array_splice: ObjectRef,
+    pub(super) array_to_reversed: ObjectRef,
+    pub(super) array_to_sorted: ObjectRef,
+    pub(super) array_to_spliced: ObjectRef,
+    pub(super) array_to_string: ObjectRef,
+    pub(super) array_to_locale_string: ObjectRef,
+    pub(super) array_values: ObjectRef,
+    pub(super) array_keys: ObjectRef,
+    pub(super) array_entries: ObjectRef,
+    pub(super) array_with: ObjectRef,
+    pub(super) array_iterator_next: ObjectRef,
 }
