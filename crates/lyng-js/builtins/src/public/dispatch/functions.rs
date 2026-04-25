@@ -1,7 +1,4 @@
-use super::{
-    function_constructor_source, string_value, type_error, BuiltinProxyBridge,
-    PublicBuiltinDispatchContext,
-};
+use super::{string_value, type_error, BuiltinProxyBridge, PublicBuiltinDispatchContext};
 use crate::{BuiltinInvocation, DynamicFunctionKind};
 use lyng_js_common::WellKnownAtom;
 use lyng_js_env::Agent;
@@ -93,6 +90,25 @@ fn dispatch_generator_builtin<Cx: PublicBuiltinDispatchContext>(
         return generator_throw_builtin(context, invocation).map(Some);
     }
     Ok(None)
+}
+
+fn function_constructor_source<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    arguments: &[Value],
+) -> Result<(String, String), Cx::Error> {
+    if arguments.is_empty() {
+        return Ok((String::new(), String::new()));
+    }
+    let body_index = arguments.len().saturating_sub(1);
+    let mut parameters = String::new();
+    for (index, value) in arguments[..body_index].iter().copied().enumerate() {
+        if index != 0 {
+            parameters.push(',');
+        }
+        parameters.push_str(&cx.value_to_string_text(value)?);
+    }
+    let body = cx.value_to_string_text(arguments[body_index])?;
+    Ok((parameters, body))
 }
 
 fn function_builtin<Cx: PublicBuiltinDispatchContext>(
