@@ -1321,7 +1321,6 @@ impl BuiltinCache {
         let get_utc_seconds_atom = agent.atoms_mut().intern_collectible("getUTCSeconds");
         let hypot_atom = agent.atoms_mut().intern_collectible("hypot");
         let imul_atom = agent.atoms_mut().intern_collectible("imul");
-        let is_atom = agent.atoms_mut().intern_collectible("is");
         let is_finite_atom = agent.atoms_mut().intern_collectible("isFinite");
         let is_integer_atom = agent.atoms_mut().intern_collectible("isInteger");
         let is_nan_atom = agent.atoms_mut().intern_collectible("isNaN");
@@ -1426,7 +1425,6 @@ impl BuiltinCache {
         let trim_end_atom = agent.atoms_mut().intern_collectible("trimEnd");
         let trim_start_atom = agent.atoms_mut().intern_collectible("trimStart");
         let is_array_atom = agent.atoms_mut().intern_collectible("isArray");
-        let has_own_atom = agent.atoms_mut().intern_collectible("hasOwn");
         let join_atom = agent.atoms_mut().intern_collectible("join");
         let keys_atom = agent.atoms_mut().intern_collectible("keys");
         let map_atom = agent.atoms_mut().intern_collectible("map");
@@ -1457,13 +1455,6 @@ impl BuiltinCache {
         let unshift_atom = agent.atoms_mut().intern_collectible("unshift");
         let values_atom = agent.atoms_mut().intern_collectible("values");
         let with_atom = agent.atoms_mut().intern_collectible("with");
-        let assign_atom = agent.atoms_mut().intern_collectible("assign");
-        let from_entries_atom = agent.atoms_mut().intern_collectible("fromEntries");
-        let group_by_atom = agent.atoms_mut().intern_collectible("groupBy");
-        let define_getter_atom = agent.atoms_mut().intern_collectible("__defineGetter__");
-        let define_setter_atom = agent.atoms_mut().intern_collectible("__defineSetter__");
-        let lookup_getter_atom = agent.atoms_mut().intern_collectible("__lookupGetter__");
-        let lookup_setter_atom = agent.atoms_mut().intern_collectible("__lookupSetter__");
         let sqrt1_2_atom = agent.atoms_mut().intern_collectible("SQRT1_2");
         let sqrt2_atom = agent.atoms_mut().intern_collectible("SQRT2");
         let sqrt_atom = agent.atoms_mut().intern_collectible("sqrt");
@@ -1472,15 +1463,6 @@ impl BuiltinCache {
         let from_char_code_atom = agent.atoms_mut().intern_collectible("fromCharCode");
         let dot_all_atom = agent.atoms_mut().intern_collectible("dotAll");
         let exec_atom = agent.atoms_mut().intern_collectible("exec");
-        let get_own_property_names_atom =
-            agent.atoms_mut().intern_collectible("getOwnPropertyNames");
-        let get_own_property_descriptors_atom = agent
-            .atoms_mut()
-            .intern_collectible("getOwnPropertyDescriptors");
-        let get_own_property_symbols_atom = agent
-            .atoms_mut()
-            .intern_collectible("getOwnPropertySymbols");
-        let define_properties_atom = agent.atoms_mut().intern_collectible("defineProperties");
         let get_float32_atom = agent.atoms_mut().intern_collectible("getFloat32");
         let get_float64_atom = agent.atoms_mut().intern_collectible("getFloat64");
         let get_int16_atom = agent.atoms_mut().intern_collectible("getInt16");
@@ -1531,198 +1513,6 @@ impl BuiltinCache {
         let wait_atom = agent.atoms_mut().intern_collectible("wait");
         let wait_async_atom = agent.atoms_mut().intern_collectible("waitAsync");
         let xor_atom = agent.atoms_mut().intern_collectible("xor");
-        let object_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(assign_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_assign_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.create()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_create_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.get_prototype_of()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_get_prototype_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.set_prototype_of()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_set_prototype_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.get_own_property_descriptor()),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    js3_object_get_own_property_descriptor_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_own_property_descriptors_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    js3_object_get_own_property_descriptors_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_own_property_names_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    js3_object_get_own_property_names_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_own_property_symbols_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    js3_object_get_own_property_symbols_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(define_properties_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_define_properties_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.define_property()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_define_property_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(from_entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_from_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(group_by_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_group_by_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.prevent_extensions()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_prevent_extensions_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.is_extensible()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_is_extensible_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(is_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_is_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.seal()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_seal_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.freeze()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_freeze_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.is_sealed()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_is_sealed_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.is_frozen()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_is_frozen_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(has_own_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_has_own_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-        ];
-        let object_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.object)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(define_getter_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_define_getter_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(define_setter_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_define_setter_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_locale_string_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_to_locale_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_to_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::valueOf.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_value_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.has_own_property()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_has_own_property_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(lookup_getter_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_lookup_getter_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(lookup_setter_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_lookup_setter_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.is_prototype_of()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_object_is_prototype_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.property_is_enumerable()),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    js3_object_property_is_enumerable_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::__proto__.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_object_proto_getter_builtin()),
-                    set: Some(js3_object_proto_setter_builtin()),
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
         let function_prototype_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
@@ -5594,14 +5384,6 @@ impl BuiltinCache {
         ];
         let tables = [
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Object),
-                &object_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ObjectPrototype),
-                &object_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::FunctionPrototype),
                 &function_prototype_descriptors,
             ),
@@ -5967,6 +5749,10 @@ impl BuiltinCache {
             ),
         ];
         self.public.insert(realm, builtins);
+        if families::install_object_family_descriptors(agent, self, realm, &builtins).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
         if install_descriptor_tables(agent, self, realm, &tables).is_err() {
             self.public.remove(&realm);
             return None;

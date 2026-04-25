@@ -88,6 +88,9 @@ Rules:
   `PublicRealmBuiltins`
 - object and function family allocation live in `public/families/objects.rs` and
   `public/families/functions.rs`; later families should follow the same boundary
+- the Object family owns its own constructor and prototype descriptor installation in
+  `public/families/objects.rs`; later descriptor extraction should follow that owner-local
+  installer shape while still using the shared descriptor installer
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

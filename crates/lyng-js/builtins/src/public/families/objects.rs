@@ -1,5 +1,11 @@
 use super::{install_public_builtin_function, FamilyInstallContext, ObjectFamilyBuiltins};
-use crate::public::PublicRealmBuiltins;
+use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::public::{BuiltinCache, PublicRealmBuiltins};
+use crate::{
+    BuiltinAttributes, BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic,
+    BuiltinPropertyDescriptor, BuiltinPropertyKeySpec, BuiltinPropertyValueSpec,
+};
+use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
 use lyng_js_types::{
     js3_object_assign_builtin, js3_object_builtin, js3_object_create_builtin,
@@ -17,7 +23,7 @@ use lyng_js_types::{
     js3_object_proto_getter_builtin, js3_object_proto_setter_builtin, js3_object_seal_builtin,
     js3_object_set_prototype_of_builtin, js3_object_to_locale_string_builtin,
     js3_object_to_string_builtin, js3_object_value_of_builtin, js3_object_values_builtin,
-    BuiltinFunctionId, ObjectRef,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -228,6 +234,239 @@ pub(in crate::public) fn install_object_family(
             js3_object_has_own_builtin(),
             None,
         ),
+    }
+}
+
+pub(in crate::public) fn install_object_family_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    builtins: &PublicRealmBuiltins,
+) -> Result<(), BuiltinBootstrapError> {
+    let atoms = ObjectDescriptorAtoms::new(agent);
+    install_object_constructor_descriptors(agent, cache, realm, &atoms)?;
+    install_object_prototype_descriptors(agent, cache, realm, builtins, &atoms)
+}
+
+fn install_object_constructor_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    atoms: &ObjectDescriptorAtoms,
+) -> Result<(), BuiltinBootstrapError> {
+    let bootstrap_atoms = agent.bootstrap_atoms();
+    let descriptors = [
+        builtin_function_atom_property(atoms.assign, js3_object_assign_builtin()),
+        builtin_function_atom_property(bootstrap_atoms.create(), js3_object_create_builtin()),
+        builtin_function_atom_property(
+            bootstrap_atoms.get_prototype_of(),
+            js3_object_get_prototype_of_builtin(),
+        ),
+        builtin_function_atom_property(
+            bootstrap_atoms.set_prototype_of(),
+            js3_object_set_prototype_of_builtin(),
+        ),
+        builtin_function_atom_property(
+            bootstrap_atoms.get_own_property_descriptor(),
+            js3_object_get_own_property_descriptor_builtin(),
+        ),
+        builtin_function_atom_property(
+            atoms.get_own_property_descriptors,
+            js3_object_get_own_property_descriptors_builtin(),
+        ),
+        builtin_function_atom_property(
+            atoms.get_own_property_names,
+            js3_object_get_own_property_names_builtin(),
+        ),
+        builtin_function_atom_property(
+            atoms.get_own_property_symbols,
+            js3_object_get_own_property_symbols_builtin(),
+        ),
+        builtin_function_atom_property(
+            atoms.define_properties,
+            js3_object_define_properties_builtin(),
+        ),
+        builtin_function_atom_property(
+            bootstrap_atoms.define_property(),
+            js3_object_define_property_builtin(),
+        ),
+        builtin_function_atom_property(atoms.from_entries, js3_object_from_entries_builtin()),
+        builtin_function_atom_property(atoms.group_by, js3_object_group_by_builtin()),
+        builtin_function_atom_property(
+            bootstrap_atoms.prevent_extensions(),
+            js3_object_prevent_extensions_builtin(),
+        ),
+        builtin_function_atom_property(
+            bootstrap_atoms.is_extensible(),
+            js3_object_is_extensible_builtin(),
+        ),
+        builtin_function_atom_property(atoms.is, js3_object_is_builtin()),
+        builtin_function_atom_property(bootstrap_atoms.seal(), js3_object_seal_builtin()),
+        builtin_function_atom_property(bootstrap_atoms.freeze(), js3_object_freeze_builtin()),
+        builtin_function_atom_property(bootstrap_atoms.is_sealed(), js3_object_is_sealed_builtin()),
+        builtin_function_atom_property(bootstrap_atoms.is_frozen(), js3_object_is_frozen_builtin()),
+        builtin_function_atom_property(atoms.keys, js3_object_keys_builtin()),
+        builtin_function_atom_property(atoms.entries, js3_object_entries_builtin()),
+        builtin_function_atom_property(atoms.values, js3_object_values_builtin()),
+        builtin_function_atom_property(atoms.has_own, js3_object_has_own_builtin()),
+    ];
+    install_descriptor_tables(
+        agent,
+        cache,
+        realm,
+        &[BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Object),
+            &descriptors,
+        )],
+    )
+}
+
+fn install_object_prototype_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    builtins: &PublicRealmBuiltins,
+    atoms: &ObjectDescriptorAtoms,
+) -> Result<(), BuiltinBootstrapError> {
+    let bootstrap_atoms = agent.bootstrap_atoms();
+    let descriptors = [
+        data_atom_property(
+            WellKnownAtom::constructor.id(),
+            Value::from_object_ref(builtins.object),
+        ),
+        builtin_function_atom_property(atoms.define_getter, js3_object_define_getter_builtin()),
+        builtin_function_atom_property(atoms.define_setter, js3_object_define_setter_builtin()),
+        builtin_function_atom_property(
+            atoms.to_locale_string,
+            js3_object_to_locale_string_builtin(),
+        ),
+        builtin_function_atom_property(
+            WellKnownAtom::toString.id(),
+            js3_object_to_string_builtin(),
+        ),
+        builtin_function_atom_property(WellKnownAtom::valueOf.id(), js3_object_value_of_builtin()),
+        builtin_function_atom_property(
+            bootstrap_atoms.has_own_property(),
+            js3_object_has_own_property_builtin(),
+        ),
+        builtin_function_atom_property(atoms.lookup_getter, js3_object_lookup_getter_builtin()),
+        builtin_function_atom_property(atoms.lookup_setter, js3_object_lookup_setter_builtin()),
+        builtin_function_atom_property(
+            bootstrap_atoms.is_prototype_of(),
+            js3_object_is_prototype_of_builtin(),
+        ),
+        builtin_function_atom_property(
+            bootstrap_atoms.property_is_enumerable(),
+            js3_object_property_is_enumerable_builtin(),
+        ),
+        accessor_property(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::__proto__.id()),
+            Some(js3_object_proto_getter_builtin()),
+            Some(js3_object_proto_setter_builtin()),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    install_descriptor_tables(
+        agent,
+        cache,
+        realm,
+        &[BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ObjectPrototype),
+            &descriptors,
+        )],
+    )
+}
+
+fn builtin_function_property(
+    key: BuiltinPropertyKeySpec,
+    entry: BuiltinFunctionId,
+) -> BuiltinPropertyDescriptor {
+    BuiltinPropertyDescriptor::new(
+        key,
+        BuiltinPropertyValueSpec::BuiltinFunction(entry),
+        writable_builtin_attributes(),
+    )
+}
+
+fn builtin_function_atom_property(
+    atom: AtomId,
+    entry: BuiltinFunctionId,
+) -> BuiltinPropertyDescriptor {
+    builtin_function_property(BuiltinPropertyKeySpec::from_atom(atom), entry)
+}
+
+fn data_property(key: BuiltinPropertyKeySpec, value: Value) -> BuiltinPropertyDescriptor {
+    BuiltinPropertyDescriptor::new(
+        key,
+        BuiltinPropertyValueSpec::Data(value),
+        writable_builtin_attributes(),
+    )
+}
+
+fn data_atom_property(atom: AtomId, value: Value) -> BuiltinPropertyDescriptor {
+    data_property(BuiltinPropertyKeySpec::from_atom(atom), value)
+}
+
+fn accessor_property(
+    key: BuiltinPropertyKeySpec,
+    get: Option<BuiltinFunctionId>,
+    set: Option<BuiltinFunctionId>,
+    attributes: BuiltinAttributes,
+) -> BuiltinPropertyDescriptor {
+    BuiltinPropertyDescriptor::new(
+        key,
+        BuiltinPropertyValueSpec::Accessor { get, set },
+        attributes,
+    )
+}
+
+const fn writable_builtin_attributes() -> BuiltinAttributes {
+    BuiltinAttributes::new(true, false, true)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ObjectDescriptorAtoms {
+    assign: AtomId,
+    define_getter: AtomId,
+    define_properties: AtomId,
+    define_setter: AtomId,
+    entries: AtomId,
+    from_entries: AtomId,
+    get_own_property_descriptors: AtomId,
+    get_own_property_names: AtomId,
+    get_own_property_symbols: AtomId,
+    group_by: AtomId,
+    has_own: AtomId,
+    is: AtomId,
+    keys: AtomId,
+    lookup_getter: AtomId,
+    lookup_setter: AtomId,
+    to_locale_string: AtomId,
+    values: AtomId,
+}
+
+impl ObjectDescriptorAtoms {
+    fn new(agent: &mut Agent) -> Self {
+        let atoms = agent.atoms_mut();
+        Self {
+            assign: atoms.intern_collectible("assign"),
+            define_getter: atoms.intern_collectible("__defineGetter__"),
+            define_properties: atoms.intern_collectible("defineProperties"),
+            define_setter: atoms.intern_collectible("__defineSetter__"),
+            entries: atoms.intern_collectible("entries"),
+            from_entries: atoms.intern_collectible("fromEntries"),
+            get_own_property_descriptors: atoms.intern_collectible("getOwnPropertyDescriptors"),
+            get_own_property_names: atoms.intern_collectible("getOwnPropertyNames"),
+            get_own_property_symbols: atoms.intern_collectible("getOwnPropertySymbols"),
+            group_by: atoms.intern_collectible("groupBy"),
+            has_own: atoms.intern_collectible("hasOwn"),
+            is: atoms.intern_collectible("is"),
+            keys: atoms.intern_collectible("keys"),
+            lookup_getter: atoms.intern_collectible("__lookupGetter__"),
+            lookup_setter: atoms.intern_collectible("__lookupSetter__"),
+            to_locale_string: atoms.intern_collectible("toLocaleString"),
+            values: atoms.intern_collectible("values"),
+        }
     }
 }
 
