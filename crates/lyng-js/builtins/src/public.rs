@@ -1026,50 +1026,8 @@ impl PublicRealmBuiltins {
         if let Some(object) = families::json_builtin_object(&self, entry) {
             return Some(object);
         }
-        if entry == lyng_js_types::js3_reflect_apply_builtin() {
-            return Some(self.reflect_apply);
-        }
-        if entry == lyng_js_types::js3_reflect_construct_builtin() {
-            return Some(self.reflect_construct);
-        }
-        if entry == lyng_js_types::js3_reflect_define_property_builtin() {
-            return Some(self.reflect_define_property);
-        }
-        if entry == lyng_js_types::js3_reflect_delete_property_builtin() {
-            return Some(self.reflect_delete_property);
-        }
-        if entry == lyng_js_types::js3_reflect_get_builtin() {
-            return Some(self.reflect_get);
-        }
-        if entry == lyng_js_types::js3_reflect_get_own_property_descriptor_builtin() {
-            return Some(self.reflect_get_own_property_descriptor);
-        }
-        if entry == lyng_js_types::js3_reflect_get_prototype_of_builtin() {
-            return Some(self.reflect_get_prototype_of);
-        }
-        if entry == lyng_js_types::js3_reflect_has_builtin() {
-            return Some(self.reflect_has);
-        }
-        if entry == lyng_js_types::js3_reflect_is_extensible_builtin() {
-            return Some(self.reflect_is_extensible);
-        }
-        if entry == lyng_js_types::js3_reflect_own_keys_builtin() {
-            return Some(self.reflect_own_keys);
-        }
-        if entry == lyng_js_types::js3_reflect_prevent_extensions_builtin() {
-            return Some(self.reflect_prevent_extensions);
-        }
-        if entry == lyng_js_types::js3_reflect_set_builtin() {
-            return Some(self.reflect_set);
-        }
-        if entry == lyng_js_types::js3_reflect_set_prototype_of_builtin() {
-            return Some(self.reflect_set_prototype_of);
-        }
-        if entry == lyng_js_types::js3_proxy_builtin() {
-            return Some(self.proxy);
-        }
-        if entry == lyng_js_types::js3_proxy_revocable_builtin() {
-            return Some(self.proxy_revocable);
+        if let Some(object) = families::object_reflection_builtin_object(&self, entry) {
+            return Some(object);
         }
         if entry == js3_abstract_module_source_builtin() {
             return Some(self.abstract_module_source);

@@ -29,7 +29,9 @@ pub(super) use globals::install_global_function_family;
 pub(super) use iterators::{install_iterator_family, iterator_builtin_object};
 pub(super) use json::{install_json_family, json_builtin_object};
 pub(super) use modules::install_module_family;
-pub(super) use object_reflection::install_object_reflection_family;
+pub(super) use object_reflection::{
+    install_object_reflection_family, object_reflection_builtin_object,
+};
 pub(super) use objects::install_object_family;
 pub(super) use primitives::{install_primitive_family, primitive_builtin_object};
 pub(super) use promises::install_promise_disposal_family;
