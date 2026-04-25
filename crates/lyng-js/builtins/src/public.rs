@@ -1041,26 +1041,7 @@ impl BuiltinCache {
         {
             return None;
         }
-        define_builtin_data_property(
-            agent,
-            builtins.abstract_module_source_prototype,
-            PropertyKey::from_atom(WellKnownAtom::constructor.id()),
-            Value::from_object_ref(builtins.abstract_module_source),
-            true,
-            false,
-            true,
-        );
-        if let Some(to_string_tag) = agent.well_known_symbol(WellKnownSymbolId::ToStringTag) {
-            define_builtin_accessor_property(
-                agent,
-                builtins.abstract_module_source_prototype,
-                PropertyKey::from_symbol(to_string_tag),
-                Some(builtins.abstract_module_source_to_string_tag_getter),
-                None,
-                false,
-                true,
-            );
-        }
+        families::install_module_family_descriptors(agent, &builtins);
 
         let bootstrap_atoms = agent.bootstrap_atoms();
         let empty_string = Value::from_string_ref(agent.alloc_runtime_string(
@@ -6172,7 +6153,7 @@ pub(crate) fn allocate_builtin_function_object(
     function
 }
 
-fn define_builtin_data_property(
+pub(in crate::public) fn define_builtin_data_property(
     agent: &mut Agent,
     object: ObjectRef,
     key: PropertyKey,
@@ -6202,7 +6183,7 @@ fn define_builtin_data_property(
     );
 }
 
-fn define_builtin_accessor_property(
+pub(in crate::public) fn define_builtin_accessor_property(
     agent: &mut Agent,
     object: ObjectRef,
     key: PropertyKey,

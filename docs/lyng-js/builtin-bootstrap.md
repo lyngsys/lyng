@@ -77,6 +77,8 @@ Rules:
 - `ensure_public_realm_builtins` owns realm-level ordering and cross-family dependencies
 - family modules own allocation of their constructors, prototypes, and methods once the
   required shared prototype handles are available
+- family-specific post-link descriptor patches, such as `AbstractModuleSource.prototype`,
+  belong in the family module instead of in the realm orchestrator
 - family modules own their `BuiltinFunctionId -> ObjectRef` lookup tables; the realm-level
   lookup only orchestrates family queries
 - `public/families/scaffolding.rs` owns the public realm skeleton allocation pass: core

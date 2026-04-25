@@ -34,7 +34,9 @@ pub(super) use installed::{
 };
 pub(super) use iterators::{install_iterator_family, iterator_builtin_object};
 pub(super) use json::{install_json_family, json_builtin_object};
-pub(super) use modules::{install_module_family, module_builtin_object};
+pub(super) use modules::{
+    install_module_family, install_module_family_descriptors, module_builtin_object,
+};
 pub(super) use object_reflection::{
     install_object_reflection_family, object_reflection_builtin_object,
 };
