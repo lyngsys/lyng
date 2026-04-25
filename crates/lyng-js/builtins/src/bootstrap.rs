@@ -795,10 +795,10 @@ mod tests {
     use lyng_js_types::{
         js3_array_from_async_builtin, js3_array_iterator_next_builtin,
         js3_array_species_getter_builtin, js3_array_values_builtin, js3_error_to_string_builtin,
-        js3_iterator_prototype_iterator_builtin, js3_map_iterator_next_builtin,
-        js3_map_size_getter_builtin, js3_proxy_revocable_builtin, js3_reflect_get_builtin,
-        js3_set_iterator_next_builtin, js3_set_values_builtin, js3_symbol_to_primitive_builtin,
-        js3_weak_ref_deref_builtin, PropertyKey, Value,
+        js3_iterator_prototype_iterator_builtin, js3_json_parse_builtin, js3_json_raw_json_builtin,
+        js3_map_iterator_next_builtin, js3_map_size_getter_builtin, js3_proxy_revocable_builtin,
+        js3_reflect_get_builtin, js3_set_iterator_next_builtin, js3_set_values_builtin,
+        js3_symbol_to_primitive_builtin, js3_weak_ref_deref_builtin, PropertyKey, Value,
     };
 
     fn own_descriptor(
@@ -1797,6 +1797,72 @@ mod tests {
         assert_eq!(proxy_revocable_descriptor.writable(), Some(true));
         assert_eq!(proxy_revocable_descriptor.enumerable(), Some(false));
         assert_eq!(proxy_revocable_descriptor.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_json_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let json = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics()
+            .json()
+            .expect("JSON intrinsic should exist");
+
+        let parse_atom = agent.atoms_mut().intern_collectible("parse");
+        let raw_json_atom = agent.atoms_mut().intern_collectible("rawJSON");
+        let to_string_tag_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::ToStringTag)
+            .expect("Symbol.toStringTag should exist");
+
+        let json_parse = cache
+            .builtin_constant(agent, artifacts.realm(), js3_json_parse_builtin())
+            .expect("JSON.parse builtin should resolve");
+        let json_raw_json = cache
+            .builtin_constant(agent, artifacts.realm(), js3_json_raw_json_builtin())
+            .expect("JSON.rawJSON builtin should resolve");
+
+        let parse = own_descriptor(
+            agent,
+            json,
+            PropertyKey::from_atom(parse_atom),
+            "JSON.parse",
+        );
+        assert_eq!(parse.value(), Some(json_parse));
+        assert_eq!(parse.writable(), Some(true));
+        assert_eq!(parse.enumerable(), Some(false));
+        assert_eq!(parse.configurable(), Some(true));
+
+        let raw_json = own_descriptor(
+            agent,
+            json,
+            PropertyKey::from_atom(raw_json_atom),
+            "JSON.rawJSON",
+        );
+        assert_eq!(raw_json.value(), Some(json_raw_json));
+        assert_eq!(raw_json.writable(), Some(true));
+        assert_eq!(raw_json.enumerable(), Some(false));
+        assert_eq!(raw_json.configurable(), Some(true));
+
+        let json_tag = own_descriptor(
+            agent,
+            json,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "JSON[Symbol.toStringTag]",
+        );
+        assert!(json_tag.value().and_then(Value::as_string_ref).is_some());
+        assert_eq!(json_tag.writable(), Some(false));
+        assert_eq!(json_tag.enumerable(), Some(false));
+        assert_eq!(json_tag.configurable(), Some(true));
     }
 
     #[test]

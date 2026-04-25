@@ -4029,41 +4029,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let stringify_atom = agent.atoms_mut().intern_collectible("stringify");
-        let raw_json_atom = agent.atoms_mut().intern_collectible("rawJSON");
-        let is_raw_json_atom = agent.atoms_mut().intern_collectible("isRawJSON");
-        let json_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "JSON",
-            Some(bootstrap_atoms.json()),
-            AllocationLifetime::Default,
-        ));
-        let json_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(parse_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_json_parse_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(stringify_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_json_stringify_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(raw_json_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_json_raw_json_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(is_raw_json_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_json_is_raw_json_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(json_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
         let error_prototype_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
@@ -4543,10 +4508,6 @@ impl BuiltinCache {
                 &symbol_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Json),
-                &json_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ErrorPrototype),
                 &error_prototype_descriptors,
             ),
@@ -4633,6 +4594,10 @@ impl BuiltinCache {
             return None;
         }
         if families::install_object_reflection_family_descriptors(agent, self, realm).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_json_family_descriptors(agent, self, realm).is_err() {
             self.public.remove(&realm);
             return None;
         }

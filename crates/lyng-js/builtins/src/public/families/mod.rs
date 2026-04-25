@@ -42,7 +42,7 @@ pub(super) use installed::{
 pub(super) use iterators::{
     install_iterator_family, install_iterator_family_descriptors, iterator_builtin_object,
 };
-pub(super) use json::{install_json_family, json_builtin_object};
+pub(super) use json::{install_json_family, install_json_family_descriptors, json_builtin_object};
 pub(super) use modules::{
     install_module_family, install_module_family_descriptors, module_builtin_object,
 };
