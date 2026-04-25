@@ -114,6 +114,8 @@ Rules:
   `public/families/primitives.rs`
 - the promise/disposal family owns Promise, DisposableStack, and AsyncDisposableStack descriptor
   installation in `public/families/promises.rs`
+- the binary-data family owns ArrayBuffer, SharedArrayBuffer, Atomics, DataView, TypedArray, and
+  concrete typed-array descriptor installation in `public/families/binary_data.rs`
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

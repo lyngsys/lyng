@@ -793,17 +793,19 @@ mod tests {
     use lyng_js_gc::AllocationLifetime;
     use lyng_js_host::NoopHostHooks;
     use lyng_js_types::{
-        js3_array_from_async_builtin, js3_array_iterator_next_builtin,
-        js3_array_species_getter_builtin, js3_array_values_builtin,
-        js3_async_disposable_stack_dispose_async_builtin, js3_bigint_as_int_n_builtin,
-        js3_bigint_to_string_builtin, js3_boolean_to_string_builtin, js3_date_get_time_builtin,
-        js3_date_now_builtin, js3_date_set_full_year_builtin, js3_date_to_primitive_builtin,
-        js3_date_to_string_builtin, js3_disposable_stack_dispose_builtin,
-        js3_disposable_stack_disposed_getter_builtin, js3_disposable_stack_use_builtin,
-        js3_error_to_string_builtin, js3_iterator_prototype_iterator_builtin,
-        js3_json_parse_builtin, js3_json_raw_json_builtin, js3_map_iterator_next_builtin,
-        js3_map_size_getter_builtin, js3_math_abs_builtin, js3_number_is_finite_builtin,
-        js3_number_to_string_builtin, js3_promise_resolve_builtin,
+        js3_array_buffer_byte_length_getter_builtin, js3_array_buffer_is_view_builtin,
+        js3_array_buffer_slice_builtin, js3_array_from_async_builtin,
+        js3_array_iterator_next_builtin, js3_array_species_getter_builtin,
+        js3_array_values_builtin, js3_async_disposable_stack_dispose_async_builtin,
+        js3_atomics_add_builtin, js3_bigint_as_int_n_builtin, js3_bigint_to_string_builtin,
+        js3_boolean_to_string_builtin, js3_data_view_buffer_getter_builtin,
+        js3_data_view_get_uint8_builtin, js3_date_get_time_builtin, js3_date_now_builtin,
+        js3_date_set_full_year_builtin, js3_date_to_primitive_builtin, js3_date_to_string_builtin,
+        js3_disposable_stack_dispose_builtin, js3_disposable_stack_disposed_getter_builtin,
+        js3_disposable_stack_use_builtin, js3_error_to_string_builtin,
+        js3_iterator_prototype_iterator_builtin, js3_json_parse_builtin, js3_json_raw_json_builtin,
+        js3_map_iterator_next_builtin, js3_map_size_getter_builtin, js3_math_abs_builtin,
+        js3_number_is_finite_builtin, js3_number_to_string_builtin, js3_promise_resolve_builtin,
         js3_promise_species_getter_builtin, js3_promise_then_builtin, js3_proxy_revocable_builtin,
         js3_reflect_get_builtin, js3_regexp_escape_builtin, js3_regexp_exec_builtin,
         js3_regexp_global_getter_builtin, js3_regexp_species_getter_builtin,
@@ -811,7 +813,9 @@ mod tests {
         js3_string_from_char_code_builtin, js3_string_iterator_builtin,
         js3_string_iterator_next_builtin, js3_string_trim_builtin,
         js3_symbol_description_getter_builtin, js3_symbol_for_builtin,
-        js3_symbol_to_primitive_builtin, js3_weak_ref_deref_builtin, PropertyKey, Value,
+        js3_symbol_to_primitive_builtin, js3_typed_array_from_builtin,
+        js3_typed_array_to_string_tag_getter_builtin, js3_uint8_array_buffer_getter_builtin,
+        js3_uint8_array_values_builtin, js3_weak_ref_deref_builtin, PropertyKey, Value,
     };
 
     fn own_descriptor(
@@ -2427,6 +2431,312 @@ mod tests {
         assert_eq!(description.setter(), Some(Value::undefined()));
         assert_eq!(description.enumerable(), Some(false));
         assert_eq!(description.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_binary_data_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let array_buffer = intrinsics
+            .array_buffer()
+            .expect("ArrayBuffer intrinsic should exist");
+        let array_buffer_prototype = intrinsics
+            .array_buffer_prototype()
+            .expect("ArrayBuffer.prototype intrinsic should exist");
+        let atomics = intrinsics
+            .atomics()
+            .expect("Atomics intrinsic should exist");
+        let data_view_prototype = intrinsics
+            .data_view_prototype()
+            .expect("DataView.prototype intrinsic should exist");
+        let typed_array = intrinsics
+            .typed_array()
+            .expect("%TypedArray% intrinsic should exist");
+        let typed_array_prototype = intrinsics
+            .typed_array_prototype()
+            .expect("%TypedArray%.prototype intrinsic should exist");
+        let uint8_array = intrinsics
+            .uint8_array()
+            .expect("Uint8Array intrinsic should exist");
+        let uint8_array_prototype = intrinsics
+            .uint8_array_prototype()
+            .expect("Uint8Array.prototype intrinsic should exist");
+
+        let is_view_atom = agent.atoms_mut().intern_collectible("isView");
+        let byte_length_atom = agent.atoms_mut().intern_collectible("byteLength");
+        let slice_atom = agent.atoms_mut().intern_collectible("slice");
+        let add_atom = agent.atoms_mut().intern_collectible("add");
+        let buffer_atom = agent.atoms_mut().intern_collectible("buffer");
+        let get_uint8_atom = agent.atoms_mut().intern_collectible("getUint8");
+        let from_atom = agent.atoms_mut().intern_collectible("from");
+        let bytes_per_element_atom = agent.atoms_mut().intern_collectible("BYTES_PER_ELEMENT");
+        let values_atom = agent.atoms_mut().intern_collectible("values");
+        let species_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Species)
+            .expect("Symbol.species should exist");
+        let iterator_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Iterator)
+            .expect("Symbol.iterator should exist");
+        let to_string_tag_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::ToStringTag)
+            .expect("Symbol.toStringTag should exist");
+
+        let array_buffer_is_view = cache
+            .builtin_constant(agent, artifacts.realm(), js3_array_buffer_is_view_builtin())
+            .expect("ArrayBuffer.isView builtin should resolve");
+        let array_buffer_species_getter = cache
+            .builtin_constant(agent, artifacts.realm(), js3_array_species_getter_builtin())
+            .expect("ArrayBuffer[Symbol.species] getter should resolve");
+        let array_buffer_byte_length_getter = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_array_buffer_byte_length_getter_builtin(),
+            )
+            .expect("ArrayBuffer.prototype.byteLength getter should resolve");
+        let array_buffer_slice = cache
+            .builtin_constant(agent, artifacts.realm(), js3_array_buffer_slice_builtin())
+            .expect("ArrayBuffer.prototype.slice builtin should resolve");
+        let atomics_add = cache
+            .builtin_constant(agent, artifacts.realm(), js3_atomics_add_builtin())
+            .expect("Atomics.add builtin should resolve");
+        let data_view_buffer_getter = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_data_view_buffer_getter_builtin(),
+            )
+            .expect("DataView.prototype.buffer getter should resolve");
+        let data_view_get_uint8 = cache
+            .builtin_constant(agent, artifacts.realm(), js3_data_view_get_uint8_builtin())
+            .expect("DataView.prototype.getUint8 builtin should resolve");
+        let typed_array_from = cache
+            .builtin_constant(agent, artifacts.realm(), js3_typed_array_from_builtin())
+            .expect("%TypedArray%.from builtin should resolve");
+        let typed_array_to_string_tag_getter = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_typed_array_to_string_tag_getter_builtin(),
+            )
+            .expect("%TypedArray%.prototype[Symbol.toStringTag] getter should resolve");
+        let uint8_array_buffer_getter = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_uint8_array_buffer_getter_builtin(),
+            )
+            .expect("Uint8Array.prototype.buffer getter should resolve");
+        let uint8_array_values = cache
+            .builtin_constant(agent, artifacts.realm(), js3_uint8_array_values_builtin())
+            .expect("Uint8Array.prototype.values builtin should resolve");
+
+        let is_view = own_descriptor(
+            agent,
+            array_buffer,
+            PropertyKey::from_atom(is_view_atom),
+            "ArrayBuffer.isView",
+        );
+        assert_eq!(is_view.value(), Some(array_buffer_is_view));
+        assert_eq!(is_view.writable(), Some(true));
+        assert_eq!(is_view.enumerable(), Some(false));
+        assert_eq!(is_view.configurable(), Some(true));
+
+        let array_buffer_species = own_descriptor(
+            agent,
+            array_buffer,
+            PropertyKey::from_symbol(species_symbol),
+            "ArrayBuffer[Symbol.species]",
+        );
+        assert_eq!(
+            array_buffer_species.getter(),
+            Some(array_buffer_species_getter)
+        );
+        assert_eq!(array_buffer_species.setter(), Some(Value::undefined()));
+        assert_eq!(array_buffer_species.enumerable(), Some(false));
+        assert_eq!(array_buffer_species.configurable(), Some(true));
+
+        let array_buffer_constructor = own_descriptor(
+            agent,
+            array_buffer_prototype,
+            PropertyKey::from_atom(WellKnownAtom::constructor.id()),
+            "ArrayBuffer.prototype.constructor",
+        );
+        assert_eq!(
+            array_buffer_constructor.value(),
+            Some(Value::from_object_ref(array_buffer))
+        );
+
+        let array_buffer_byte_length = own_descriptor(
+            agent,
+            array_buffer_prototype,
+            PropertyKey::from_atom(byte_length_atom),
+            "ArrayBuffer.prototype.byteLength",
+        );
+        assert_eq!(
+            array_buffer_byte_length.getter(),
+            Some(array_buffer_byte_length_getter)
+        );
+        assert_eq!(array_buffer_byte_length.setter(), Some(Value::undefined()));
+
+        let array_buffer_slice_descriptor = own_descriptor(
+            agent,
+            array_buffer_prototype,
+            PropertyKey::from_atom(slice_atom),
+            "ArrayBuffer.prototype.slice",
+        );
+        assert_eq!(
+            array_buffer_slice_descriptor.value(),
+            Some(array_buffer_slice)
+        );
+
+        let array_buffer_tag = own_descriptor(
+            agent,
+            array_buffer_prototype,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "ArrayBuffer.prototype[Symbol.toStringTag]",
+        );
+        assert!(array_buffer_tag
+            .value()
+            .and_then(Value::as_string_ref)
+            .is_some());
+        assert_eq!(array_buffer_tag.writable(), Some(false));
+        assert_eq!(array_buffer_tag.enumerable(), Some(false));
+        assert_eq!(array_buffer_tag.configurable(), Some(true));
+
+        let atomics_add_descriptor = own_descriptor(
+            agent,
+            atomics,
+            PropertyKey::from_atom(add_atom),
+            "Atomics.add",
+        );
+        assert_eq!(atomics_add_descriptor.value(), Some(atomics_add));
+        assert_eq!(atomics_add_descriptor.writable(), Some(true));
+        assert_eq!(atomics_add_descriptor.enumerable(), Some(false));
+        assert_eq!(atomics_add_descriptor.configurable(), Some(true));
+
+        let atomics_tag = own_descriptor(
+            agent,
+            atomics,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "Atomics[Symbol.toStringTag]",
+        );
+        assert!(atomics_tag.value().and_then(Value::as_string_ref).is_some());
+        assert_eq!(atomics_tag.writable(), Some(false));
+
+        let data_view_buffer = own_descriptor(
+            agent,
+            data_view_prototype,
+            PropertyKey::from_atom(buffer_atom),
+            "DataView.prototype.buffer",
+        );
+        assert_eq!(data_view_buffer.getter(), Some(data_view_buffer_getter));
+        assert_eq!(data_view_buffer.setter(), Some(Value::undefined()));
+
+        let data_view_get_uint8_descriptor = own_descriptor(
+            agent,
+            data_view_prototype,
+            PropertyKey::from_atom(get_uint8_atom),
+            "DataView.prototype.getUint8",
+        );
+        assert_eq!(
+            data_view_get_uint8_descriptor.value(),
+            Some(data_view_get_uint8)
+        );
+
+        let typed_array_from_descriptor = own_descriptor(
+            agent,
+            typed_array,
+            PropertyKey::from_atom(from_atom),
+            "%TypedArray%.from",
+        );
+        assert_eq!(typed_array_from_descriptor.value(), Some(typed_array_from));
+
+        let typed_array_species = own_descriptor(
+            agent,
+            typed_array,
+            PropertyKey::from_symbol(species_symbol),
+            "%TypedArray%[Symbol.species]",
+        );
+        assert_eq!(
+            typed_array_species.getter(),
+            Some(array_buffer_species_getter)
+        );
+        assert_eq!(typed_array_species.setter(), Some(Value::undefined()));
+
+        let typed_array_tag = own_descriptor(
+            agent,
+            typed_array_prototype,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "%TypedArray%.prototype[Symbol.toStringTag]",
+        );
+        assert_eq!(
+            typed_array_tag.getter(),
+            Some(typed_array_to_string_tag_getter)
+        );
+        assert_eq!(typed_array_tag.setter(), Some(Value::undefined()));
+
+        let bytes_per_element = own_descriptor(
+            agent,
+            uint8_array,
+            PropertyKey::from_atom(bytes_per_element_atom),
+            "Uint8Array.BYTES_PER_ELEMENT",
+        );
+        assert_eq!(bytes_per_element.value(), Some(Value::from_smi(1)));
+        assert_eq!(bytes_per_element.writable(), Some(false));
+        assert_eq!(bytes_per_element.enumerable(), Some(false));
+        assert_eq!(bytes_per_element.configurable(), Some(false));
+
+        let uint8_array_constructor = own_descriptor(
+            agent,
+            uint8_array_prototype,
+            PropertyKey::from_atom(WellKnownAtom::constructor.id()),
+            "Uint8Array.prototype.constructor",
+        );
+        assert_eq!(
+            uint8_array_constructor.value(),
+            Some(Value::from_object_ref(uint8_array))
+        );
+
+        let uint8_array_buffer = own_descriptor(
+            agent,
+            uint8_array_prototype,
+            PropertyKey::from_atom(buffer_atom),
+            "Uint8Array.prototype.buffer",
+        );
+        assert_eq!(uint8_array_buffer.getter(), Some(uint8_array_buffer_getter));
+        assert_eq!(uint8_array_buffer.setter(), Some(Value::undefined()));
+
+        let uint8_array_values_descriptor = own_descriptor(
+            agent,
+            uint8_array_prototype,
+            PropertyKey::from_atom(values_atom),
+            "Uint8Array.prototype.values",
+        );
+        assert_eq!(
+            uint8_array_values_descriptor.value(),
+            Some(uint8_array_values)
+        );
+
+        let uint8_array_iterator = own_descriptor(
+            agent,
+            uint8_array_prototype,
+            PropertyKey::from_symbol(iterator_symbol),
+            "Uint8Array.prototype[Symbol.iterator]",
+        );
+        assert_eq!(uint8_array_iterator.value(), Some(uint8_array_values));
     }
 
     #[test]

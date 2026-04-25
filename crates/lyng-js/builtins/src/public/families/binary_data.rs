@@ -2,10 +2,19 @@ use super::{
     install_public_builtin_function, install_public_ordinary_object, BinaryDataFamilyBuiltins,
     BinaryDataFamilyPrototypes, FamilyInstallContext,
 };
+use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::public::{BuiltinCache, PublicRealmBuiltins};
+use crate::{
+    BuiltinAttributes, BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic,
+    BuiltinPropertyDescriptor, BuiltinPropertyKeySpec, BuiltinPropertyValueSpec,
+};
+use lyng_js_common::WellKnownAtom;
 use lyng_js_env::Agent;
+use lyng_js_gc::AllocationLifetime;
 use lyng_js_types::{
     js3_array_buffer_builtin, js3_array_buffer_byte_length_getter_builtin,
-    js3_array_buffer_is_view_builtin, js3_array_buffer_slice_builtin, js3_atomics_add_builtin,
+    js3_array_buffer_is_view_builtin, js3_array_buffer_slice_builtin,
+    js3_array_species_getter_builtin, js3_array_to_string_builtin, js3_atomics_add_builtin,
     js3_atomics_and_builtin, js3_atomics_compare_exchange_builtin, js3_atomics_exchange_builtin,
     js3_atomics_is_lock_free_builtin, js3_atomics_load_builtin, js3_atomics_notify_builtin,
     js3_atomics_or_builtin, js3_atomics_store_builtin, js3_atomics_sub_builtin,
@@ -42,9 +51,8 @@ use lyng_js_types::{
     js3_uint8_array_keys_builtin, js3_uint8_array_length_getter_builtin,
     js3_uint8_array_set_builtin, js3_uint8_array_slice_builtin, js3_uint8_array_subarray_builtin,
     js3_uint8_array_values_builtin, js3_uint8_clamped_array_builtin, BuiltinFunctionId, ObjectRef,
+    RealmRef, Value, WellKnownSymbolId,
 };
-
-use crate::public::PublicRealmBuiltins;
 
 #[allow(clippy::too_many_lines)]
 pub(in crate::public) fn install_binary_data_family(
@@ -445,6 +453,1752 @@ pub(in crate::public) fn binary_data_builtin_object(
         return Some(builtins.typed_array_to_string_tag_getter);
     }
     None
+}
+
+#[allow(clippy::too_many_lines)]
+pub(in crate::public) fn install_binary_data_family_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    builtins: &PublicRealmBuiltins,
+) -> Result<(), BuiltinBootstrapError> {
+    let bootstrap_atoms = agent.bootstrap_atoms();
+    let array_buffer_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "ArrayBuffer",
+        Some(bootstrap_atoms.array_buffer()),
+        AllocationLifetime::Default,
+    ));
+    let shared_array_buffer_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "SharedArrayBuffer",
+        Some(bootstrap_atoms.shared_array_buffer()),
+        AllocationLifetime::Default,
+    ));
+    let data_view_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "DataView",
+        Some(bootstrap_atoms.data_view()),
+        AllocationLifetime::Default,
+    ));
+    let atomics_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "Atomics",
+        Some(bootstrap_atoms.atomics()),
+        AllocationLifetime::Default,
+    ));
+    let int8_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "Int8Array",
+        Some(bootstrap_atoms.int8_array()),
+        AllocationLifetime::Default,
+    ));
+    let int16_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "Int16Array",
+        Some(bootstrap_atoms.int16_array()),
+        AllocationLifetime::Default,
+    ));
+    let int32_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "Int32Array",
+        Some(bootstrap_atoms.int32_array()),
+        AllocationLifetime::Default,
+    ));
+    let float32_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "Float32Array",
+        Some(bootstrap_atoms.float32_array()),
+        AllocationLifetime::Default,
+    ));
+    let float64_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "Float64Array",
+        Some(bootstrap_atoms.float64_array()),
+        AllocationLifetime::Default,
+    ));
+    let big_int64_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "BigInt64Array",
+        Some(bootstrap_atoms.big_int64_array()),
+        AllocationLifetime::Default,
+    ));
+    let big_uint64_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "BigUint64Array",
+        Some(bootstrap_atoms.big_uint64_array()),
+        AllocationLifetime::Default,
+    ));
+    let uint32_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "Uint32Array",
+        Some(bootstrap_atoms.uint32_array()),
+        AllocationLifetime::Default,
+    ));
+    let uint16_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "Uint16Array",
+        Some(bootstrap_atoms.uint16_array()),
+        AllocationLifetime::Default,
+    ));
+    let uint8_clamped_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "Uint8ClampedArray",
+        Some(bootstrap_atoms.uint8_clamped_array()),
+        AllocationLifetime::Default,
+    ));
+    let uint8_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
+        "Uint8Array",
+        Some(bootstrap_atoms.uint8_array()),
+        AllocationLifetime::Default,
+    ));
+    let last_index_of_atom = agent.atoms_mut().intern_collectible("lastIndexOf");
+    let copy_within_atom = agent.atoms_mut().intern_collectible("copyWithin");
+    let entries_atom = agent.atoms_mut().intern_collectible("entries");
+    let every_atom = agent.atoms_mut().intern_collectible("every");
+    let fill_atom = agent.atoms_mut().intern_collectible("fill");
+    let filter_atom = agent.atoms_mut().intern_collectible("filter");
+    let find_atom = agent.atoms_mut().intern_collectible("find");
+    let find_index_atom = agent.atoms_mut().intern_collectible("findIndex");
+    let find_last_atom = agent.atoms_mut().intern_collectible("findLast");
+    let find_last_index_atom = agent.atoms_mut().intern_collectible("findLastIndex");
+    let from_atom = agent.atoms_mut().intern_collectible("from");
+    let for_each_atom = agent.atoms_mut().intern_collectible("forEach");
+    let includes_atom = agent.atoms_mut().intern_collectible("includes");
+    let index_of_atom = agent.atoms_mut().intern_collectible("indexOf");
+    let join_atom = agent.atoms_mut().intern_collectible("join");
+    let keys_atom = agent.atoms_mut().intern_collectible("keys");
+    let map_atom = agent.atoms_mut().intern_collectible("map");
+    let of_atom = agent.atoms_mut().intern_collectible("of");
+    let reduce_atom = agent.atoms_mut().intern_collectible("reduce");
+    let reduce_right_atom = agent.atoms_mut().intern_collectible("reduceRight");
+    let reverse_atom = agent.atoms_mut().intern_collectible("reverse");
+    let some_atom = agent.atoms_mut().intern_collectible("some");
+    let at_atom = agent.atoms_mut().intern_collectible("at");
+    let slice_atom = agent.atoms_mut().intern_collectible("slice");
+    let buffer_atom = agent.atoms_mut().intern_collectible("buffer");
+    let byte_length_atom = agent.atoms_mut().intern_collectible("byteLength");
+    let byte_offset_atom = agent.atoms_mut().intern_collectible("byteOffset");
+    let bytes_per_element_atom = agent.atoms_mut().intern_collectible("BYTES_PER_ELEMENT");
+    let is_view_atom = agent.atoms_mut().intern_collectible("isView");
+    let sort_atom = agent.atoms_mut().intern_collectible("sort");
+    let to_locale_string_atom = agent.atoms_mut().intern_collectible("toLocaleString");
+    let to_reversed_atom = agent.atoms_mut().intern_collectible("toReversed");
+    let to_sorted_atom = agent.atoms_mut().intern_collectible("toSorted");
+    let values_atom = agent.atoms_mut().intern_collectible("values");
+    let with_atom = agent.atoms_mut().intern_collectible("with");
+    let get_float32_atom = agent.atoms_mut().intern_collectible("getFloat32");
+    let get_float64_atom = agent.atoms_mut().intern_collectible("getFloat64");
+    let get_int16_atom = agent.atoms_mut().intern_collectible("getInt16");
+    let get_int32_atom = agent.atoms_mut().intern_collectible("getInt32");
+    let get_int8_atom = agent.atoms_mut().intern_collectible("getInt8");
+    let get_uint16_atom = agent.atoms_mut().intern_collectible("getUint16");
+    let get_uint32_atom = agent.atoms_mut().intern_collectible("getUint32");
+    let get_uint8_atom = agent.atoms_mut().intern_collectible("getUint8");
+    let add_atom = agent.atoms_mut().intern_collectible("add");
+    let and_atom = agent.atoms_mut().intern_collectible("and");
+    let compare_exchange_atom = agent.atoms_mut().intern_collectible("compareExchange");
+    let exchange_atom = agent.atoms_mut().intern_collectible("exchange");
+    let is_lock_free_atom = agent.atoms_mut().intern_collectible("isLockFree");
+    let load_atom = agent.atoms_mut().intern_collectible("load");
+    let notify_atom = agent.atoms_mut().intern_collectible("notify");
+    let or_atom = agent.atoms_mut().intern_collectible("or");
+    let set_atom = agent.atoms_mut().intern_collectible("set");
+    let set_float32_atom = agent.atoms_mut().intern_collectible("setFloat32");
+    let set_float64_atom = agent.atoms_mut().intern_collectible("setFloat64");
+    let set_int16_atom = agent.atoms_mut().intern_collectible("setInt16");
+    let set_int32_atom = agent.atoms_mut().intern_collectible("setInt32");
+    let set_int8_atom = agent.atoms_mut().intern_collectible("setInt8");
+    let set_uint16_atom = agent.atoms_mut().intern_collectible("setUint16");
+    let set_uint32_atom = agent.atoms_mut().intern_collectible("setUint32");
+    let set_uint8_atom = agent.atoms_mut().intern_collectible("setUint8");
+    let store_atom = agent.atoms_mut().intern_collectible("store");
+    let sub_atom = agent.atoms_mut().intern_collectible("sub");
+    let subarray_atom = agent.atoms_mut().intern_collectible("subarray");
+    let wait_atom = agent.atoms_mut().intern_collectible("wait");
+    let wait_async_atom = agent.atoms_mut().intern_collectible("waitAsync");
+    let xor_atom = agent.atoms_mut().intern_collectible("xor");
+    let array_buffer_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(is_view_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_array_buffer_is_view_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Species),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_array_species_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let shared_array_buffer_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Species),
+        BuiltinPropertyValueSpec::Accessor {
+            get: Some(js3_array_species_getter_builtin()),
+            set: None,
+        },
+        BuiltinAttributes::new(false, false, true),
+    )];
+    let array_buffer_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.array_buffer)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_array_buffer_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_array_buffer_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(array_buffer_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let shared_array_buffer_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.shared_array_buffer)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_shared_array_buffer_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_shared_array_buffer_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(shared_array_buffer_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let atomics_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(add_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_add_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(and_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_and_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(compare_exchange_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_compare_exchange_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(exchange_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_exchange_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(is_lock_free_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_is_lock_free_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(load_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_load_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(notify_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_notify_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(or_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_or_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(store_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_store_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(sub_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_sub_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(wait_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_wait_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(wait_async_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_wait_async_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(xor_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_atomics_xor_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(atomics_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let data_view_descriptors: [BuiltinPropertyDescriptor; 0] = [];
+    let data_view_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.data_view)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_data_view_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_data_view_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_data_view_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(get_float32_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_get_float32_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(get_float64_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_get_float64_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(get_int16_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_get_int16_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(get_int32_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_get_int32_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(get_int8_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_get_int8_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(get_uint16_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_get_uint16_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(get_uint32_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_get_uint32_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(get_uint8_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_get_uint8_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_float32_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_set_float32_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_float64_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_set_float64_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_int16_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_set_int16_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_int32_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_set_int32_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_int8_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_set_int8_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_uint16_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_set_uint16_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_uint32_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_set_uint32_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_uint8_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_set_uint8_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(data_view_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let typed_array_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(from_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_from_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(of_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_of_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Species),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_array_species_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let typed_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.typed_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(copy_within_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_copy_within_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(every_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_every_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(fill_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_fill_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(filter_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_filter_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(includes_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_includes_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(index_of_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_index_of_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(for_each_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_for_each_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(join_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_join_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(map_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_map_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(some_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_some_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(find_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_find_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(find_index_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_find_index_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(find_last_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_find_last_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(find_last_index_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_find_last_index_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(last_index_of_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_last_index_of_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(reduce_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_reduce_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(reduce_right_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_reduce_right_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(reverse_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_reverse_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(sort_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_sort_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(to_reversed_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_to_reversed_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(to_sorted_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_to_sorted_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(with_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_with_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(at_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_at_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_array_to_string_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(to_locale_string_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_to_locale_string_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_typed_array_to_string_tag_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let int8_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let int8_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.int8_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(int8_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let int16_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(2)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let int16_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.int16_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(2)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(int16_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let int32_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let int32_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.int32_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(int32_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let float32_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let float32_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.float32_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(float32_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let float64_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let float64_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.float64_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(float64_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let big_int64_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let big_int64_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.big_int64_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(big_int64_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let big_uint64_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let big_uint64_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.big_uint64_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(big_uint64_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let uint32_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let uint32_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.uint32_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(uint32_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let uint16_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(2)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let uint16_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.uint16_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(2)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(uint16_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let uint8_clamped_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let uint8_clamped_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.uint8_clamped_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(uint8_clamped_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let uint8_array_descriptors = [BuiltinPropertyDescriptor::new(
+        BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+        BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
+        BuiltinAttributes::new(false, false, false),
+    )];
+    let uint8_array_prototype_descriptors = [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.uint8_array)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(buffer_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_buffer_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_length_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_byte_offset_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
+            BuiltinPropertyValueSpec::Accessor {
+                get: Some(js3_uint8_array_length_getter_builtin()),
+                set: None,
+            },
+            BuiltinAttributes::new(false, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(values_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(keys_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_keys_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(entries_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_entries_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_set_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(slice_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_slice_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(subarray_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_subarray_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
+            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_values_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
+            BuiltinPropertyValueSpec::Data(uint8_array_tag),
+            BuiltinAttributes::new(false, false, true),
+        ),
+    ];
+    let tables = [
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ArrayBuffer),
+            &array_buffer_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ArrayBufferPrototype),
+            &array_buffer_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::SharedArrayBuffer),
+            &shared_array_buffer_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::SharedArrayBufferPrototype),
+            &shared_array_buffer_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Atomics),
+            &atomics_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::DataView),
+            &data_view_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::DataViewPrototype),
+            &data_view_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::TypedArray),
+            &typed_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::TypedArrayPrototype),
+            &typed_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Int8Array),
+            &int8_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Int8ArrayPrototype),
+            &int8_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Int16Array),
+            &int16_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Int16ArrayPrototype),
+            &int16_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Int32Array),
+            &int32_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Int32ArrayPrototype),
+            &int32_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Float32Array),
+            &float32_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Float32ArrayPrototype),
+            &float32_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Float64Array),
+            &float64_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Float64ArrayPrototype),
+            &float64_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::BigInt64Array),
+            &big_int64_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::BigInt64ArrayPrototype),
+            &big_int64_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::BigUint64Array),
+            &big_uint64_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::BigUint64ArrayPrototype),
+            &big_uint64_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Uint32Array),
+            &uint32_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Uint32ArrayPrototype),
+            &uint32_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Uint16Array),
+            &uint16_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Uint16ArrayPrototype),
+            &uint16_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Uint8ClampedArray),
+            &uint8_clamped_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Uint8ClampedArrayPrototype),
+            &uint8_clamped_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Uint8Array),
+            &uint8_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Uint8ArrayPrototype),
+            &uint8_array_prototype_descriptors,
+        ),
+    ];
+    install_descriptor_tables(agent, cache, realm, &tables)
 }
 
 #[derive(Clone, Copy, Debug)]
