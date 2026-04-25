@@ -1008,14 +1008,8 @@ impl PublicRealmBuiltins {
         if let Some(object) = families::binary_data_builtin_object(&self, entry) {
             return Some(object);
         }
-        if entry == js3_iterator_prototype_iterator_builtin() {
-            return Some(self.iterator_prototype_iterator);
-        }
-        if entry == js3_map_iterator_next_builtin() {
-            return Some(self.map_iterator_next);
-        }
-        if entry == js3_set_iterator_next_builtin() {
-            return Some(self.set_iterator_next);
+        if let Some(object) = families::iterator_builtin_object(&self, entry) {
+            return Some(object);
         }
         if entry == js3_string_builtin() {
             return Some(self.string);

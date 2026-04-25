@@ -26,7 +26,7 @@ pub(super) use date::install_date_family;
 pub(super) use errors::install_error_family;
 pub(super) use functions::install_function_family;
 pub(super) use globals::install_global_function_family;
-pub(super) use iterators::install_iterator_family;
+pub(super) use iterators::{install_iterator_family, iterator_builtin_object};
 pub(super) use json::install_json_family;
 pub(super) use modules::install_module_family;
 pub(super) use object_reflection::install_object_reflection_family;
