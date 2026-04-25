@@ -2,6 +2,7 @@ mod arrays;
 mod collections;
 mod functions;
 mod objects;
+mod regexp;
 mod strings;
 
 use crate::public::{allocate_builtin_function_object, public_builtin_metadata};
@@ -12,6 +13,7 @@ pub(super) use arrays::install_array_family;
 pub(super) use collections::install_collection_family;
 pub(super) use functions::install_function_family;
 pub(super) use objects::install_object_family;
+pub(super) use regexp::install_regexp_family;
 pub(super) use strings::install_string_family;
 
 #[derive(Clone, Copy, Debug)]
@@ -281,4 +283,35 @@ pub(super) struct StringFamilyBuiltins {
     pub(super) string_trim: ObjectRef,
     pub(super) string_trim_end: ObjectRef,
     pub(super) string_trim_start: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct RegExpFamilyPrototypes {
+    pub(super) regexp_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct RegExpFamilyBuiltins {
+    pub(super) regexp: ObjectRef,
+    pub(super) regexp_escape: ObjectRef,
+    pub(super) regexp_prototype: ObjectRef,
+    pub(super) regexp_to_string: ObjectRef,
+    pub(super) regexp_exec: ObjectRef,
+    pub(super) regexp_test: ObjectRef,
+    pub(super) regexp_global_getter: ObjectRef,
+    pub(super) regexp_ignore_case_getter: ObjectRef,
+    pub(super) regexp_multiline_getter: ObjectRef,
+    pub(super) regexp_dot_all_getter: ObjectRef,
+    pub(super) regexp_unicode_getter: ObjectRef,
+    pub(super) regexp_sticky_getter: ObjectRef,
+    pub(super) regexp_source_getter: ObjectRef,
+    pub(super) regexp_flags_getter: ObjectRef,
+    pub(super) regexp_has_indices_getter: ObjectRef,
+    pub(super) regexp_species_getter: ObjectRef,
+    pub(super) regexp_symbol_match: ObjectRef,
+    pub(super) regexp_symbol_replace: ObjectRef,
+    pub(super) regexp_symbol_search: ObjectRef,
+    pub(super) regexp_symbol_split: ObjectRef,
+    pub(super) regexp_symbol_match_all: ObjectRef,
 }
