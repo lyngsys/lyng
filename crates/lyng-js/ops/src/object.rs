@@ -5,7 +5,7 @@ use crate::{
         parse_string_to_bigint,
     },
     errors::{internal_method_error, throw_range_error, throw_syntax_error, throw_type_error},
-    read,
+    proxy, read,
 };
 use lyng_js_common::WellKnownAtom;
 use lyng_js_env::Agent;
@@ -85,6 +85,153 @@ pub trait ToPrimitiveContext {
     ) -> Result<Option<Value>, Self::Error> {
         Ok(None)
     }
+}
+
+pub trait ObjectOpsContext: proxy::ProxyTrapContext {}
+
+impl<Cx: proxy::ProxyTrapContext> ObjectOpsContext for Cx {}
+
+/// ECMAScript `HasProperty` over a proxy-aware object operations context.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn has_property_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+    key: PropertyKey,
+) -> Result<bool, Cx::Error> {
+    proxy::has_property(context, object, key)
+}
+
+/// ECMAScript `Get` over a proxy-aware object operations context.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn get_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+    key: PropertyKey,
+) -> Result<Value, Cx::Error> {
+    get_with_receiver_in_context(context, object, key, Value::from_object_ref(object))
+}
+
+/// ECMAScript `Get` over a proxy-aware object operations context with an explicit receiver.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn get_with_receiver_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+    key: PropertyKey,
+    receiver: Value,
+) -> Result<Value, Cx::Error> {
+    proxy::get(context, object, key, receiver)
+}
+
+/// ECMAScript `Set` over a proxy-aware object operations context.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn set_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+    key: PropertyKey,
+    value: Value,
+    lifetime: AllocationLifetime,
+) -> Result<bool, Cx::Error> {
+    set_with_receiver_in_context(
+        context,
+        object,
+        key,
+        value,
+        Value::from_object_ref(object),
+        lifetime,
+    )
+}
+
+/// ECMAScript `Set` over a proxy-aware object operations context with an explicit receiver.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn set_with_receiver_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+    key: PropertyKey,
+    value: Value,
+    receiver: Value,
+    lifetime: AllocationLifetime,
+) -> Result<bool, Cx::Error> {
+    proxy::set(context, object, key, value, receiver, lifetime)
+}
+
+/// ECMAScript `GetOwnProperty` over a proxy-aware object operations context.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn get_own_property_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+    key: PropertyKey,
+) -> Result<Option<PropertyDescriptor>, Cx::Error> {
+    proxy::get_own_property(context, object, key)
+}
+
+/// ECMAScript `DefineOwnProperty` over a proxy-aware object operations context.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn define_property_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+    key: PropertyKey,
+    descriptor: PropertyDescriptor,
+    lifetime: AllocationLifetime,
+) -> Result<bool, Cx::Error> {
+    proxy::define_property(context, object, key, descriptor, lifetime)
+}
+
+/// ECMAScript `OwnPropertyKeys` over a proxy-aware object operations context.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn own_property_keys_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+) -> Result<Vec<PropertyKey>, Cx::Error> {
+    proxy::own_property_keys(context, object)
+}
+
+/// ECMAScript `GetPrototypeOf` over a proxy-aware object operations context.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn get_prototype_of_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+) -> Result<Option<ObjectRef>, Cx::Error> {
+    proxy::get_prototype_of(context, object)
+}
+
+/// ECMAScript `SetPrototypeOf` over a proxy-aware object operations context.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn set_prototype_of_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+    prototype: Option<ObjectRef>,
+) -> Result<bool, Cx::Error> {
+    proxy::set_prototype_of(context, object, prototype)
 }
 
 /// ECMAScript `ToObject` over the shared wrapper substrate.

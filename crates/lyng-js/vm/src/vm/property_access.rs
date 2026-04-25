@@ -126,7 +126,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         key: PropertyKey,
         receiver: Value,
     ) -> Result<Value, Self::Error> {
-        self.vm.get_property_from_object(
+        self.vm.get_property_from_object_ordinary(
             self.agent,
             self.host,
             self.registry,
@@ -154,7 +154,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         receiver: Value,
         _lifetime: AllocationLifetime,
     ) -> Result<bool, Self::Error> {
-        self.vm.set_property_on_object(
+        self.vm.set_property_on_object_ordinary(
             self.agent,
             self.host,
             self.registry,
@@ -634,16 +634,30 @@ impl Vm {
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<Value> {
-        if agent.objects().is_proxy_object(object) {
-            let mut bridge = VmProxyBridge {
+        object::get_with_receiver_in_context(
+            &mut VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
                 frame: caller,
-            };
-            return proxy::get(&mut bridge, object, key, receiver);
-        }
+            },
+            object,
+            key,
+            receiver,
+        )
+    }
+
+    fn get_property_from_object_ordinary(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        object: ObjectRef,
+        receiver: Value,
+        key: PropertyKey,
+    ) -> VmResult<Value> {
         if let Some(index) = key.as_index() {
             if let Some(result) = self.mapped_arguments_get(agent, object, index) {
                 return result;
@@ -780,25 +794,35 @@ impl Vm {
         object: ObjectRef,
         receiver: Value,
         key: PropertyKey,
-        mut value: Value,
+        value: Value,
     ) -> VmResult<bool> {
-        if agent.objects().is_proxy_object(object) {
-            let mut bridge = VmProxyBridge {
+        object::set_with_receiver_in_context(
+            &mut VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
                 frame: caller,
-            };
-            return proxy::set(
-                &mut bridge,
-                object,
-                key,
-                value,
-                receiver,
-                AllocationLifetime::Default,
-            );
-        }
+            },
+            object,
+            key,
+            value,
+            receiver,
+            AllocationLifetime::Default,
+        )
+    }
+
+    fn set_property_on_object_ordinary(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        object: ObjectRef,
+        receiver: Value,
+        key: PropertyKey,
+        mut value: Value,
+    ) -> VmResult<bool> {
         if agent.objects().typed_array(object).is_some() {
             if key.as_index().is_some() {
                 return self
