@@ -3,6 +3,7 @@ mod collections;
 mod date;
 mod errors;
 mod functions;
+mod globals;
 mod json;
 mod modules;
 mod object_reflection;
@@ -20,6 +21,7 @@ pub(super) use collections::install_collection_family;
 pub(super) use date::install_date_family;
 pub(super) use errors::install_error_family;
 pub(super) use functions::install_function_family;
+pub(super) use globals::install_global_function_family;
 pub(super) use json::install_json_family;
 pub(super) use modules::install_module_family;
 pub(super) use object_reflection::install_object_reflection_family;
@@ -578,4 +580,17 @@ pub(super) struct ErrorFamilyBuiltins {
     pub(super) aggregate_error_prototype: ObjectRef,
     pub(super) suppressed_error: ObjectRef,
     pub(super) suppressed_error_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct GlobalFunctionFamilyBuiltins {
+    pub(super) eval: ObjectRef,
+    pub(super) parse_int: ObjectRef,
+    pub(super) parse_float: ObjectRef,
+    pub(super) is_nan: ObjectRef,
+    pub(super) is_finite: ObjectRef,
+    pub(super) encode_uri: ObjectRef,
+    pub(super) encode_uri_component: ObjectRef,
+    pub(super) decode_uri: ObjectRef,
+    pub(super) decode_uri_component: ObjectRef,
 }
