@@ -1866,6 +1866,106 @@ mod tests {
     }
 
     #[test]
+    fn shared_bootstrap_installs_error_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let error = intrinsics.error().expect("Error intrinsic should exist");
+        let error_prototype = intrinsics
+            .error_prototype()
+            .expect("Error.prototype intrinsic should exist");
+        let type_error = intrinsics
+            .type_error()
+            .expect("TypeError intrinsic should exist");
+        let type_error_prototype = intrinsics
+            .type_error_prototype()
+            .expect("TypeError.prototype intrinsic should exist");
+
+        let constructor_atom = WellKnownAtom::constructor.id();
+        let name_atom = WellKnownAtom::name.id();
+        let message_atom = agent.bootstrap_atoms().message();
+        let to_string_atom = WellKnownAtom::toString.id();
+        let error_to_string = cache
+            .builtin_constant(agent, artifacts.realm(), js3_error_to_string_builtin())
+            .expect("Error.prototype.toString builtin should resolve");
+
+        let error_constructor = own_descriptor(
+            agent,
+            error_prototype,
+            PropertyKey::from_atom(constructor_atom),
+            "Error.prototype.constructor",
+        );
+        assert_eq!(
+            error_constructor.value(),
+            Some(Value::from_object_ref(error))
+        );
+        assert_eq!(error_constructor.writable(), Some(true));
+        assert_eq!(error_constructor.enumerable(), Some(false));
+        assert_eq!(error_constructor.configurable(), Some(true));
+
+        let error_to_string_descriptor = own_descriptor(
+            agent,
+            error_prototype,
+            PropertyKey::from_atom(to_string_atom),
+            "Error.prototype.toString",
+        );
+        assert_eq!(error_to_string_descriptor.value(), Some(error_to_string));
+        assert_eq!(error_to_string_descriptor.writable(), Some(true));
+        assert_eq!(error_to_string_descriptor.enumerable(), Some(false));
+        assert_eq!(error_to_string_descriptor.configurable(), Some(true));
+
+        let error_name = own_descriptor(
+            agent,
+            error_prototype,
+            PropertyKey::from_atom(name_atom),
+            "Error.prototype.name",
+        );
+        assert!(error_name.value().and_then(Value::as_string_ref).is_some());
+        assert_eq!(error_name.writable(), Some(true));
+        assert_eq!(error_name.enumerable(), Some(false));
+        assert_eq!(error_name.configurable(), Some(true));
+
+        let type_error_constructor = own_descriptor(
+            agent,
+            type_error_prototype,
+            PropertyKey::from_atom(constructor_atom),
+            "TypeError.prototype.constructor",
+        );
+        assert_eq!(
+            type_error_constructor.value(),
+            Some(Value::from_object_ref(type_error))
+        );
+        assert_eq!(type_error_constructor.writable(), Some(true));
+        assert_eq!(type_error_constructor.enumerable(), Some(false));
+        assert_eq!(type_error_constructor.configurable(), Some(true));
+
+        let type_error_message = own_descriptor(
+            agent,
+            type_error_prototype,
+            PropertyKey::from_atom(message_atom),
+            "TypeError.prototype.message",
+        );
+        assert!(type_error_message
+            .value()
+            .and_then(Value::as_string_ref)
+            .is_some());
+        assert_eq!(type_error_message.writable(), Some(true));
+        assert_eq!(type_error_message.enumerable(), Some(false));
+        assert_eq!(type_error_message.configurable(), Some(true));
+    }
+
+    #[test]
     fn shared_bootstrap_supports_selected_realm_shells() {
         let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
         let agent = runtime.root_agent_mut();

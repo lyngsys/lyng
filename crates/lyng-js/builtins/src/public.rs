@@ -11,7 +11,7 @@ use crate::{
     BuiltinAttributes, BuiltinDescriptorTable, BuiltinEntryMetadata, BuiltinInstallTarget,
     BuiltinIntrinsic, BuiltinPropertyDescriptor, BuiltinPropertyKeySpec, BuiltinPropertyValueSpec,
 };
-use lyng_js_common::{AtomId, WellKnownAtom};
+use lyng_js_common::WellKnownAtom;
 use lyng_js_env::Agent;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::{
@@ -1043,39 +1043,9 @@ impl BuiltinCache {
         families::install_module_family_descriptors(agent, &builtins);
 
         let bootstrap_atoms = agent.bootstrap_atoms();
-        let empty_string = Value::from_string_ref(agent.alloc_runtime_string(
-            "",
-            Some(WellKnownAtom::Empty.id()),
-            AllocationLifetime::Default,
-        ));
         let bigint_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "BigInt",
             Some(bootstrap_atoms.bigint()),
-            AllocationLifetime::Default,
-        ));
-        let error_name = Value::from_string_ref(agent.alloc_runtime_string(
-            "Error",
-            Some(bootstrap_atoms.error()),
-            AllocationLifetime::Default,
-        ));
-        let eval_error_name = Value::from_string_ref(agent.alloc_runtime_string(
-            "EvalError",
-            Some(bootstrap_atoms.eval_error()),
-            AllocationLifetime::Default,
-        ));
-        let range_error_name = Value::from_string_ref(agent.alloc_runtime_string(
-            "RangeError",
-            Some(bootstrap_atoms.range_error()),
-            AllocationLifetime::Default,
-        ));
-        let reference_error_name = Value::from_string_ref(agent.alloc_runtime_string(
-            "ReferenceError",
-            Some(bootstrap_atoms.reference_error()),
-            AllocationLifetime::Default,
-        ));
-        let syntax_error_name = Value::from_string_ref(agent.alloc_runtime_string(
-            "SyntaxError",
-            Some(bootstrap_atoms.syntax_error()),
             AllocationLifetime::Default,
         ));
         let math_tag = Value::from_string_ref(agent.alloc_runtime_string(
@@ -1166,27 +1136,6 @@ impl BuiltinCache {
         let string_iterator_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "String Iterator",
             None,
-            AllocationLifetime::Default,
-        ));
-        let type_error_name = Value::from_string_ref(agent.alloc_runtime_string(
-            "TypeError",
-            Some(bootstrap_atoms.type_error()),
-            AllocationLifetime::Default,
-        ));
-        let uri_error_name = Value::from_string_ref(agent.alloc_runtime_string(
-            "URIError",
-            Some(bootstrap_atoms.uri_error()),
-            AllocationLifetime::Default,
-        ));
-        let aggregate_error_name = Value::from_string_ref(agent.alloc_runtime_string(
-            "AggregateError",
-            Some(bootstrap_atoms.aggregate_error()),
-            AllocationLifetime::Default,
-        ));
-        let suppressed_error_name_atom = agent.atoms_mut().intern_collectible("SuppressedError");
-        let suppressed_error_name = Value::from_string_ref(agent.alloc_runtime_string(
-            "SuppressedError",
-            Some(suppressed_error_name_atom),
             AllocationLifetime::Default,
         ));
         let disposable_stack_tag_atom = agent.atoms_mut().intern_collectible("DisposableStack");
@@ -4029,76 +3978,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let error_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.error)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_error_to_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::name.id()),
-                BuiltinPropertyValueSpec::Data(error_name),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.message()),
-                BuiltinPropertyValueSpec::Data(empty_string),
-                BuiltinAttributes::new(true, false, true),
-            ),
-        ];
-        let eval_error_prototype_descriptors = native_error_prototype_descriptors(
-            builtins.eval_error,
-            bootstrap_atoms.message(),
-            empty_string,
-            eval_error_name,
-        );
-        let range_error_prototype_descriptors = native_error_prototype_descriptors(
-            builtins.range_error,
-            bootstrap_atoms.message(),
-            empty_string,
-            range_error_name,
-        );
-        let reference_error_prototype_descriptors = native_error_prototype_descriptors(
-            builtins.reference_error,
-            bootstrap_atoms.message(),
-            empty_string,
-            reference_error_name,
-        );
-        let syntax_error_prototype_descriptors = native_error_prototype_descriptors(
-            builtins.syntax_error,
-            bootstrap_atoms.message(),
-            empty_string,
-            syntax_error_name,
-        );
-        let type_error_prototype_descriptors = native_error_prototype_descriptors(
-            builtins.type_error,
-            bootstrap_atoms.message(),
-            empty_string,
-            type_error_name,
-        );
-        let uri_error_prototype_descriptors = native_error_prototype_descriptors(
-            builtins.uri_error,
-            bootstrap_atoms.message(),
-            empty_string,
-            uri_error_name,
-        );
-        let aggregate_error_prototype_descriptors = native_error_prototype_descriptors(
-            builtins.aggregate_error,
-            bootstrap_atoms.message(),
-            empty_string,
-            aggregate_error_name,
-        );
-        let suppressed_error_prototype_descriptors = native_error_prototype_descriptors(
-            builtins.suppressed_error,
-            bootstrap_atoms.message(),
-            empty_string,
-            suppressed_error_name,
-        );
         let promise_tag_atom = agent.atoms_mut().intern_collectible("Promise");
         let promise_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "Promise",
@@ -4187,12 +4066,6 @@ impl BuiltinCache {
                 BuiltinPropertyValueSpec::Data(promise_tag),
                 BuiltinAttributes::new(false, false, true),
             ),
-        ];
-        let suppressed_error_descriptors = [];
-        let suppressed_error_prototype_descriptors = [
-            suppressed_error_prototype_descriptors[0],
-            suppressed_error_prototype_descriptors[1],
-            suppressed_error_prototype_descriptors[2],
         ];
         let disposable_stack_descriptors = [];
         let disposable_stack_prototype_descriptors = [
@@ -4508,46 +4381,6 @@ impl BuiltinCache {
                 &symbol_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ErrorPrototype),
-                &error_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::EvalErrorPrototype),
-                &eval_error_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::RangeErrorPrototype),
-                &range_error_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ReferenceErrorPrototype),
-                &reference_error_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::SyntaxErrorPrototype),
-                &syntax_error_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::TypeErrorPrototype),
-                &type_error_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::UriErrorPrototype),
-                &uri_error_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::AggregateErrorPrototype),
-                &aggregate_error_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::SuppressedError),
-                &suppressed_error_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::SuppressedErrorPrototype),
-                &suppressed_error_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Promise),
                 &promise_descriptors,
             ),
@@ -4598,6 +4431,10 @@ impl BuiltinCache {
             return None;
         }
         if families::install_json_family_descriptors(agent, self, realm).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_error_family_descriptors(agent, self, realm, &builtins).is_err() {
             self.public.remove(&realm);
             return None;
         }
@@ -4656,31 +4493,6 @@ pub(in crate::public) fn reparent_builtin_object(
     let _ = agent.with_heap_and_objects(|heap, objects| {
         objects.set_prototype(&mut heap.mutator(), object, prototype)
     });
-}
-
-fn native_error_prototype_descriptors(
-    constructor: ObjectRef,
-    message_atom: AtomId,
-    empty_string: Value,
-    name: Value,
-) -> [BuiltinPropertyDescriptor; 3] {
-    [
-        BuiltinPropertyDescriptor::new(
-            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-            BuiltinPropertyValueSpec::Data(Value::from_object_ref(constructor)),
-            BuiltinAttributes::new(true, false, true),
-        ),
-        BuiltinPropertyDescriptor::new(
-            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::name.id()),
-            BuiltinPropertyValueSpec::Data(name),
-            BuiltinAttributes::new(true, false, true),
-        ),
-        BuiltinPropertyDescriptor::new(
-            BuiltinPropertyKeySpec::from_atom(message_atom),
-            BuiltinPropertyValueSpec::Data(empty_string),
-            BuiltinAttributes::new(true, false, true),
-        ),
-    ]
 }
 
 #[cfg(test)]

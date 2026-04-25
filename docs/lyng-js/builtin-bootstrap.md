@@ -102,6 +102,8 @@ Rules:
 - the object-reflection family owns Reflect and Proxy descriptor installation in
   `public/families/object_reflection.rs`
 - the JSON family owns JSON object descriptor installation in `public/families/json.rs`
+- the Error family owns Error and native-error prototype descriptor installation in
+  `public/families/errors.rs`
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

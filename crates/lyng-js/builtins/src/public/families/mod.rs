@@ -30,7 +30,9 @@ pub(super) use collections::{
     collection_builtin_object, install_collection_family, install_collection_family_descriptors,
 };
 pub(super) use date::{date_builtin_object, install_date_family};
-pub(super) use errors::{error_builtin_object, install_error_family};
+pub(super) use errors::{
+    error_builtin_object, install_error_family, install_error_family_descriptors,
+};
 pub(super) use functions::{
     function_builtin_object, install_function_family, install_function_family_descriptors,
 };
