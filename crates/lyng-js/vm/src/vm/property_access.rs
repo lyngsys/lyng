@@ -1,6 +1,6 @@
 use super::*;
 use crate::vm::values::encode_number;
-use lyng_js_objects::{InternalMethodError, TypedArrayElementKind};
+use lyng_js_objects::TypedArrayElementKind;
 use lyng_js_ops::{
     errors, number_to_string,
     object::{self, ToPrimitiveContext},
@@ -63,15 +63,6 @@ fn canonical_numeric_index_string(text: &str) -> Option<f64> {
 
 fn typed_array_numeric_atom_index(agent: &Agent, key: PropertyKey) -> Option<f64> {
     canonical_numeric_index_string(agent.atoms().resolve(key.as_atom()?))
-}
-
-fn map_internal_method_error(agent: &mut Agent, error: InternalMethodError) -> VmError {
-    let abrupt = match error {
-        InternalMethodError::RangeError => errors::throw_range_error(agent),
-        InternalMethodError::ReferenceError => errors::throw_reference_error(agent),
-        _ => errors::throw_type_error(agent),
-    };
-    VmError::Abrupt(abrupt)
 }
 
 struct VmToPrimitiveBridge<'a> {
@@ -230,7 +221,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
     ) -> Result<PropertyDescriptor, Self::Error> {
         let mut descriptor = PropertyDescriptor::new();
 
-        if proxy::has_property(
+        if object::has_property_in_context(
             self,
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::enumerable.id()),
@@ -243,7 +234,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
                 read::to_boolean(self.agent.heap().view(), enumerable).map_err(VmError::Abrupt)?,
             );
         }
-        if proxy::has_property(
+        if object::has_property_in_context(
             self,
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::configurable.id()),
@@ -257,7 +248,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
                     .map_err(VmError::Abrupt)?,
             );
         }
-        if proxy::has_property(
+        if object::has_property_in_context(
             self,
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::value.id()),
@@ -268,7 +259,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             )?;
             descriptor.set_value(value);
         }
-        if proxy::has_property(
+        if object::has_property_in_context(
             self,
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::writable.id()),
@@ -281,7 +272,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
                 read::to_boolean(self.agent.heap().view(), writable).map_err(VmError::Abrupt)?,
             );
         }
-        if proxy::has_property(
+        if object::has_property_in_context(
             self,
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::get.id()),
@@ -299,7 +290,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             }
             descriptor.set_getter(getter);
         }
-        if proxy::has_property(
+        if object::has_property_in_context(
             self,
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::set.id()),
@@ -560,8 +551,16 @@ impl Vm {
 
         if !excluded_keys.is_undefined() {
             let excluded_object = self.to_object_for_value(agent, frame.realm(), excluded_keys)?;
-            let excluded_values =
-                object::own_property_keys(agent, excluded_object).map_err(VmError::Abrupt)?;
+            let excluded_values = object::own_property_keys_in_context(
+                &mut VmProxyBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                },
+                excluded_object,
+            )?;
             for excluded_index in excluded_values {
                 if excluded_index.as_index().is_none() {
                     continue;
@@ -585,13 +584,31 @@ impl Vm {
             }
         }
 
-        let keys = object::own_property_keys(agent, source).map_err(VmError::Abrupt)?;
+        let keys = object::own_property_keys_in_context(
+            &mut VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame,
+            },
+            source,
+        )?;
         for key in keys {
             if excluded.contains(&key) {
                 continue;
             }
-            let Some(descriptor) =
-                object::get_own_property(agent, source, key).map_err(VmError::Abrupt)?
+            let Some(descriptor) = object::get_own_property_in_context(
+                &mut VmProxyBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                },
+                source,
+                key,
+            )?
             else {
                 continue;
             };
@@ -956,21 +973,17 @@ impl Vm {
         if key.as_index().is_some() && agent.objects().typed_array(receiver).is_some() {
             return self.set_typed_array_index(agent, host, registry, caller, receiver, key, value);
         }
-        let receiver_descriptor = if agent.objects().is_proxy_object(receiver) {
-            proxy::get_own_property(
-                &mut VmProxyBridge {
-                    vm: self,
-                    agent,
-                    host,
-                    registry,
-                    frame: caller,
-                },
-                receiver,
-                key,
-            )?
-        } else {
-            object::get_own_property(agent, receiver, key).map_err(VmError::Abrupt)?
-        };
+        let receiver_descriptor = object::get_own_property_in_context(
+            &mut VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame: caller,
+            },
+            receiver,
+            key,
+        )?;
         if let Some(receiver_descriptor) = receiver_descriptor {
             if receiver_descriptor.has_get() || receiver_descriptor.has_set() {
                 return Ok(false);
@@ -980,42 +993,7 @@ impl Vm {
             }
             let mut update = PropertyDescriptor::new();
             update.set_value(value);
-            if agent.objects().is_proxy_object(receiver) {
-                return proxy::define_property(
-                    &mut VmProxyBridge {
-                        vm: self,
-                        agent,
-                        host,
-                        registry,
-                        frame: caller,
-                    },
-                    receiver,
-                    key,
-                    update,
-                    AllocationLifetime::Default,
-                );
-            }
-            let defined = agent.with_heap_and_objects(|heap, objects| {
-                let mut mutator = heap.mutator();
-                objects.define_own_property(
-                    &mut mutator,
-                    receiver,
-                    key,
-                    update,
-                    AllocationLifetime::Default,
-                )
-            });
-            let _ = defined.map_err(|error| map_internal_method_error(agent, error))?;
-            return Ok(true);
-        }
-
-        let mut descriptor = PropertyDescriptor::new();
-        descriptor.set_value(value);
-        descriptor.set_writable(true);
-        descriptor.set_enumerable(true);
-        descriptor.set_configurable(true);
-        if agent.objects().is_proxy_object(receiver) {
-            return proxy::define_property(
+            let defined = object::define_property_in_context(
                 &mut VmProxyBridge {
                     vm: self,
                     agent,
@@ -1025,22 +1003,30 @@ impl Vm {
                 },
                 receiver,
                 key,
-                descriptor,
+                update,
                 AllocationLifetime::Default,
-            );
+            )?;
+            return Ok(defined);
         }
-        let defined = agent.with_heap_and_objects(|heap, objects| {
-            let mut mutator = heap.mutator();
-            objects.define_own_property(
-                &mut mutator,
-                receiver,
-                key,
-                descriptor,
-                AllocationLifetime::Default,
-            )
-        });
-        let defined = defined.map_err(|error| map_internal_method_error(agent, error))?;
-        Ok(defined)
+
+        let mut descriptor = PropertyDescriptor::new();
+        descriptor.set_value(value);
+        descriptor.set_writable(true);
+        descriptor.set_enumerable(true);
+        descriptor.set_configurable(true);
+        object::define_property_in_context(
+            &mut VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame: caller,
+            },
+            receiver,
+            key,
+            descriptor,
+            AllocationLifetime::Default,
+        )
     }
 
     fn set_typed_array_index(

@@ -53,7 +53,7 @@ impl Vm {
                 registry,
                 frame,
             };
-            proxy::has_property(&mut bridge, binding_object, key)?
+            object::has_property_in_context(&mut bridge, binding_object, key)?
         };
         if !found {
             return Ok(false);
@@ -110,7 +110,7 @@ impl Vm {
                 registry,
                 frame,
             };
-            proxy::has_property(&mut bridge, binding_object, key)?
+            object::has_property_in_context(&mut bridge, binding_object, key)?
         };
         if !still_exists {
             if strict {
@@ -150,7 +150,7 @@ impl Vm {
                 registry,
                 frame,
             };
-            proxy::has_property(&mut bridge, binding_object, key)?
+            object::has_property_in_context(&mut bridge, binding_object, key)?
         };
         if !still_exists && strict {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));

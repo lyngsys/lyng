@@ -402,17 +402,17 @@ impl Vm {
         };
 
         while let Some(object) = current {
-            let own_keys = proxy::own_property_keys(&mut bridge, object)?;
+            let own_keys = object::own_property_keys_in_context(&mut bridge, object)?;
             for key in own_keys {
                 if key.is_symbol() || !visited.insert(key) {
                     continue;
                 }
-                let descriptor = proxy::get_own_property(&mut bridge, object, key)?;
+                let descriptor = object::get_own_property_in_context(&mut bridge, object, key)?;
                 if descriptor.is_some_and(|descriptor| descriptor.enumerable() == Some(true)) {
                     keys.push((object, key));
                 }
             }
-            current = proxy::get_prototype_of(&mut bridge, object)?;
+            current = object::get_prototype_of_in_context(&mut bridge, object)?;
         }
 
         Ok(ForInEnumerator::new(keys))

@@ -2198,9 +2198,10 @@ impl Vm {
         if !proxy::prevent_extensions(&mut bridge, object_ref)? {
             return Ok(false);
         }
-        let keys = proxy::own_property_keys(&mut bridge, object_ref)?;
+        let keys = object::own_property_keys_in_context(&mut bridge, object_ref)?;
         for key in keys {
-            let Some(current) = proxy::get_own_property(&mut bridge, object_ref, key)? else {
+            let Some(current) = object::get_own_property_in_context(&mut bridge, object_ref, key)?
+            else {
                 continue;
             };
             let mut descriptor = PropertyDescriptor::new();
@@ -2210,7 +2211,7 @@ impl Vm {
             if freeze && is_data_descriptor {
                 descriptor.set_writable(false);
             }
-            if !proxy::define_property(
+            if !object::define_property_in_context(
                 &mut bridge,
                 object_ref,
                 key,
@@ -2242,9 +2243,11 @@ impl Vm {
         if proxy::is_extensible(&mut bridge, object_ref)? {
             return Ok(false);
         }
-        let keys = proxy::own_property_keys(&mut bridge, object_ref)?;
+        let keys = object::own_property_keys_in_context(&mut bridge, object_ref)?;
         for key in keys {
-            let Some(descriptor) = proxy::get_own_property(&mut bridge, object_ref, key)? else {
+            let Some(descriptor) =
+                object::get_own_property_in_context(&mut bridge, object_ref, key)?
+            else {
                 continue;
             };
             if descriptor.configurable() != Some(false) {
@@ -2747,7 +2750,7 @@ impl Vm {
             registry,
             frame: caller,
         };
-        let prototype = proxy::get(
+        let prototype = object::get_with_receiver_in_context(
             &mut bridge,
             constructor,
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),
@@ -2756,12 +2759,12 @@ impl Vm {
         .as_object_ref()
         .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(bridge.agent)))?;
 
-        let mut current = proxy::get_prototype_of(&mut bridge, object)?;
+        let mut current = object::get_prototype_of_in_context(&mut bridge, object)?;
         while let Some(candidate) = current {
             if candidate == prototype {
                 return Ok(Value::from_bool(true));
             }
-            current = proxy::get_prototype_of(&mut bridge, candidate)?;
+            current = object::get_prototype_of_in_context(&mut bridge, candidate)?;
         }
 
         Ok(Value::from_bool(false))

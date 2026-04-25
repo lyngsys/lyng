@@ -5,7 +5,7 @@ use super::values::{
 use super::*;
 use crate::vm::property_access::ToPrimitiveHint;
 use crate::vm::property_access::VmProxyBridge;
-use lyng_js_ops::{errors, object, proxy, read};
+use lyng_js_ops::{errors, object, read};
 use lyng_js_types::{AbruptCompletion, PropertyKey};
 
 impl Vm {
@@ -112,7 +112,7 @@ impl Vm {
                                     registry,
                                     frame,
                                 };
-                                proxy::has_property(&mut bridge, object, key)
+                                object::has_property_in_context(&mut bridge, object, key)
                             };
                             let Some(has_property) = self.handle_vm_result(agent, has_property)?
                             else {

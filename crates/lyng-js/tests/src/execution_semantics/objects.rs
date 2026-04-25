@@ -927,6 +927,58 @@ fn phase6_proxy_routes_script_and_object_operations_through_traps() {
 }
 
 #[test]
+fn phase6_object_spread_uses_proxy_aware_copy_data_properties() {
+    let result = compile_and_run_string(
+        r#"
+        let log = [];
+        let proxy = new Proxy({}, {
+            ownKeys(target) {
+                log.push("ownKeys");
+                return ["visible", "hidden", "missing"];
+            },
+            getOwnPropertyDescriptor(target, key) {
+                log.push("getOwnPropertyDescriptor:" + key);
+                if (key === "visible") {
+                    return {
+                        value: 1,
+                        writable: true,
+                        enumerable: true,
+                        configurable: true
+                    };
+                }
+                if (key === "hidden") {
+                    return {
+                        value: 2,
+                        writable: true,
+                        enumerable: false,
+                        configurable: true
+                    };
+                }
+                return undefined;
+            },
+            get(target, key, receiver) {
+                log.push("get:" + key);
+                return 9;
+            }
+        });
+
+        let copy = { ...proxy };
+        [
+            copy.visible,
+            "hidden" in copy,
+            "missing" in copy,
+            log.join("|")
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "9:false:false:ownKeys|getOwnPropertyDescriptor:visible|get:visible|getOwnPropertyDescriptor:hidden|getOwnPropertyDescriptor:missing"
+    );
+}
+
+#[test]
 fn phase6_proxy_set_trap_from_prototype_receives_original_receiver() {
     let result = compile_and_run(
         r#"
