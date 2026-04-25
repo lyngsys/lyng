@@ -796,8 +796,9 @@ mod tests {
         js3_array_from_async_builtin, js3_array_iterator_next_builtin,
         js3_array_species_getter_builtin, js3_array_values_builtin, js3_error_to_string_builtin,
         js3_iterator_prototype_iterator_builtin, js3_map_iterator_next_builtin,
-        js3_map_size_getter_builtin, js3_set_iterator_next_builtin, js3_set_values_builtin,
-        js3_symbol_to_primitive_builtin, js3_weak_ref_deref_builtin, PropertyKey, Value,
+        js3_map_size_getter_builtin, js3_proxy_revocable_builtin, js3_reflect_get_builtin,
+        js3_set_iterator_next_builtin, js3_set_values_builtin, js3_symbol_to_primitive_builtin,
+        js3_weak_ref_deref_builtin, PropertyKey, Value,
     };
 
     fn own_descriptor(
@@ -1728,6 +1729,74 @@ mod tests {
         assert_eq!(set_tag.writable(), Some(false));
         assert_eq!(set_tag.enumerable(), Some(false));
         assert_eq!(set_tag.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_object_reflection_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let reflect = intrinsics
+            .reflect()
+            .expect("Reflect intrinsic should exist");
+        let proxy = intrinsics.proxy().expect("Proxy intrinsic should exist");
+
+        let get_atom = agent.atoms_mut().intern_collectible("get");
+        let revocable_atom = agent.atoms_mut().intern_collectible("revocable");
+        let to_string_tag_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::ToStringTag)
+            .expect("Symbol.toStringTag should exist");
+
+        let reflect_get = cache
+            .builtin_constant(agent, artifacts.realm(), js3_reflect_get_builtin())
+            .expect("Reflect.get builtin should resolve");
+        let proxy_revocable = cache
+            .builtin_constant(agent, artifacts.realm(), js3_proxy_revocable_builtin())
+            .expect("Proxy.revocable builtin should resolve");
+
+        let reflect_get_descriptor = own_descriptor(
+            agent,
+            reflect,
+            PropertyKey::from_atom(get_atom),
+            "Reflect.get",
+        );
+        assert_eq!(reflect_get_descriptor.value(), Some(reflect_get));
+        assert_eq!(reflect_get_descriptor.writable(), Some(true));
+        assert_eq!(reflect_get_descriptor.enumerable(), Some(false));
+        assert_eq!(reflect_get_descriptor.configurable(), Some(true));
+
+        let reflect_tag = own_descriptor(
+            agent,
+            reflect,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "Reflect[Symbol.toStringTag]",
+        );
+        assert!(reflect_tag.value().and_then(Value::as_string_ref).is_some());
+        assert_eq!(reflect_tag.writable(), Some(false));
+        assert_eq!(reflect_tag.enumerable(), Some(false));
+        assert_eq!(reflect_tag.configurable(), Some(true));
+
+        let proxy_revocable_descriptor = own_descriptor(
+            agent,
+            proxy,
+            PropertyKey::from_atom(revocable_atom),
+            "Proxy.revocable",
+        );
+        assert_eq!(proxy_revocable_descriptor.value(), Some(proxy_revocable));
+        assert_eq!(proxy_revocable_descriptor.writable(), Some(true));
+        assert_eq!(proxy_revocable_descriptor.enumerable(), Some(false));
+        assert_eq!(proxy_revocable_descriptor.configurable(), Some(true));
     }
 
     #[test]

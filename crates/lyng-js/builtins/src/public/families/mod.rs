@@ -47,7 +47,8 @@ pub(super) use modules::{
     install_module_family, install_module_family_descriptors, module_builtin_object,
 };
 pub(super) use object_reflection::{
-    install_object_reflection_family, object_reflection_builtin_object,
+    install_object_reflection_family, install_object_reflection_family_descriptors,
+    object_reflection_builtin_object,
 };
 pub(super) use objects::{
     install_object_family, install_object_family_descriptors, object_builtin_object,

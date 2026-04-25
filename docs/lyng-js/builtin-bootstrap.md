@@ -99,6 +99,8 @@ Rules:
   FinalizationRegistry descriptor installation in `public/families/collections.rs`
 - the Iterator family owns Iterator, AsyncIterator, Map Iterator, and Set Iterator
   prototype descriptor installation in `public/families/iterators.rs`
+- the object-reflection family owns Reflect and Proxy descriptor installation in
+  `public/families/object_reflection.rs`
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

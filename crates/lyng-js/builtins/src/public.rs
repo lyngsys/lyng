@@ -4032,30 +4032,9 @@ impl BuiltinCache {
         let stringify_atom = agent.atoms_mut().intern_collectible("stringify");
         let raw_json_atom = agent.atoms_mut().intern_collectible("rawJSON");
         let is_raw_json_atom = agent.atoms_mut().intern_collectible("isRawJSON");
-        let apply_atom = agent.atoms_mut().intern_collectible("apply");
-        let construct_atom = agent.atoms_mut().intern_collectible("construct");
-        let define_property_atom = agent.atoms_mut().intern_collectible("defineProperty");
-        let delete_property_atom = agent.atoms_mut().intern_collectible("deleteProperty");
-        let get_atom = agent.atoms_mut().intern_collectible("get");
-        let get_own_property_descriptor_atom = agent
-            .atoms_mut()
-            .intern_collectible("getOwnPropertyDescriptor");
-        let get_prototype_of_atom = agent.atoms_mut().intern_collectible("getPrototypeOf");
-        let has_atom = agent.atoms_mut().intern_collectible("has");
-        let is_extensible_atom = agent.atoms_mut().intern_collectible("isExtensible");
-        let own_keys_atom = agent.atoms_mut().intern_collectible("ownKeys");
-        let prevent_extensions_atom = agent.atoms_mut().intern_collectible("preventExtensions");
-        let revocable_atom = agent.atoms_mut().intern_collectible("revocable");
-        let set_atom = agent.atoms_mut().intern_collectible("set");
-        let set_prototype_of_atom = agent.atoms_mut().intern_collectible("setPrototypeOf");
         let json_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "JSON",
             Some(bootstrap_atoms.json()),
-            AllocationLifetime::Default,
-        ));
-        let reflect_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Reflect",
-            None,
             AllocationLifetime::Default,
         ));
         let json_descriptors = [
@@ -4085,103 +4064,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let reflect_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(apply_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_reflect_apply_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(construct_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_reflect_construct_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(define_property_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_reflect_define_property_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(delete_property_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_reflect_delete_property_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::js3_reflect_get_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_own_property_descriptor_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_reflect_get_own_property_descriptor_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_prototype_of_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_reflect_get_prototype_of_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(has_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::js3_reflect_has_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(is_extensible_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_reflect_is_extensible_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(own_keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_reflect_own_keys_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(prevent_extensions_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_reflect_prevent_extensions_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::js3_reflect_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_prototype_of_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_reflect_set_prototype_of_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(reflect_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let proxy_descriptors = [BuiltinPropertyDescriptor::new(
-            BuiltinPropertyKeySpec::from_atom(revocable_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::js3_proxy_revocable_builtin()),
-            BuiltinAttributes::new(true, false, true),
-        )];
         let error_prototype_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
@@ -4665,14 +4547,6 @@ impl BuiltinCache {
                 &json_descriptors,
             ),
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Reflect),
-                &reflect_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Proxy),
-                &proxy_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ErrorPrototype),
                 &error_prototype_descriptors,
             ),
@@ -4755,6 +4629,10 @@ impl BuiltinCache {
             return None;
         }
         if families::install_iterator_family_descriptors(agent, self, realm, &builtins).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_object_reflection_family_descriptors(agent, self, realm).is_err() {
             self.public.remove(&realm);
             return None;
         }
