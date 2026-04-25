@@ -1,5 +1,6 @@
 mod arrays;
 mod collections;
+mod date;
 mod functions;
 mod objects;
 mod regexp;
@@ -11,6 +12,7 @@ use lyng_js_types::{BuiltinFunctionId, EnvironmentRef, ObjectRef, RealmRef, Shap
 
 pub(super) use arrays::install_array_family;
 pub(super) use collections::install_collection_family;
+pub(super) use date::install_date_family;
 pub(super) use functions::install_function_family;
 pub(super) use objects::install_object_family;
 pub(super) use regexp::install_regexp_family;
@@ -314,4 +316,64 @@ pub(super) struct RegExpFamilyBuiltins {
     pub(super) regexp_symbol_search: ObjectRef,
     pub(super) regexp_symbol_split: ObjectRef,
     pub(super) regexp_symbol_match_all: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct DateFamilyPrototypes {
+    pub(super) date_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct DateFamilyBuiltins {
+    pub(super) date: ObjectRef,
+    pub(super) date_prototype: ObjectRef,
+    pub(super) date_now: ObjectRef,
+    pub(super) date_parse: ObjectRef,
+    pub(super) date_utc: ObjectRef,
+    pub(super) date_to_string: ObjectRef,
+    pub(super) date_to_date_string: ObjectRef,
+    pub(super) date_to_time_string: ObjectRef,
+    pub(super) date_to_locale_string: ObjectRef,
+    pub(super) date_to_locale_date_string: ObjectRef,
+    pub(super) date_to_locale_time_string: ObjectRef,
+    pub(super) date_value_of: ObjectRef,
+    pub(super) date_get_time: ObjectRef,
+    pub(super) date_get_full_year: ObjectRef,
+    pub(super) date_get_utc_full_year: ObjectRef,
+    pub(super) date_get_month: ObjectRef,
+    pub(super) date_get_utc_month: ObjectRef,
+    pub(super) date_get_date: ObjectRef,
+    pub(super) date_get_utc_date: ObjectRef,
+    pub(super) date_get_day: ObjectRef,
+    pub(super) date_get_utc_day: ObjectRef,
+    pub(super) date_get_hours: ObjectRef,
+    pub(super) date_get_utc_hours: ObjectRef,
+    pub(super) date_get_minutes: ObjectRef,
+    pub(super) date_get_utc_minutes: ObjectRef,
+    pub(super) date_get_seconds: ObjectRef,
+    pub(super) date_get_utc_seconds: ObjectRef,
+    pub(super) date_get_milliseconds: ObjectRef,
+    pub(super) date_get_utc_milliseconds: ObjectRef,
+    pub(super) date_get_timezone_offset: ObjectRef,
+    pub(super) date_set_time: ObjectRef,
+    pub(super) date_set_milliseconds: ObjectRef,
+    pub(super) date_set_utc_milliseconds: ObjectRef,
+    pub(super) date_set_seconds: ObjectRef,
+    pub(super) date_set_utc_seconds: ObjectRef,
+    pub(super) date_set_minutes: ObjectRef,
+    pub(super) date_set_utc_minutes: ObjectRef,
+    pub(super) date_set_hours: ObjectRef,
+    pub(super) date_set_utc_hours: ObjectRef,
+    pub(super) date_set_date: ObjectRef,
+    pub(super) date_set_utc_date: ObjectRef,
+    pub(super) date_set_month: ObjectRef,
+    pub(super) date_set_utc_month: ObjectRef,
+    pub(super) date_set_full_year: ObjectRef,
+    pub(super) date_set_utc_full_year: ObjectRef,
+    pub(super) date_to_utc_string: ObjectRef,
+    pub(super) date_to_iso_string: ObjectRef,
+    pub(super) date_to_json: ObjectRef,
+    pub(super) date_to_primitive: ObjectRef,
+    pub(super) date_to_temporal_instant: ObjectRef,
 }
