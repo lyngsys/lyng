@@ -1,11 +1,13 @@
 use super::{
-    allocate_iterator_object, close_iterator_after_error, create_array_result,
-    create_iterator_result_value, get_property_from_object, iterator_slot_value_for_builtin,
-    length_value, length_value_u64, map_completion, set_iterator_slot_value_for_builtin,
-    set_property_on_object, type_error, ArrayIterationKind, BuiltinIteratorBridge,
-    PublicBuiltinDispatchContext, MAP_ITERATOR_INDEX_SLOT, MAP_ITERATOR_KIND_SLOT,
-    MAP_ITERATOR_TARGET_SLOT, SET_ITERATOR_INDEX_SLOT, SET_ITERATOR_KIND_SLOT,
-    SET_ITERATOR_TARGET_SLOT,
+    close_iterator_after_error, create_array_result, get_property_from_object,
+    iterators::{
+        allocate_iterator_object, create_iterator_result_value, iterator_slot_value_for_builtin,
+        set_iterator_slot_value_for_builtin, ArrayIterationKind, MAP_ITERATOR_INDEX_SLOT,
+        MAP_ITERATOR_KIND_SLOT, MAP_ITERATOR_TARGET_SLOT, SET_ITERATOR_INDEX_SLOT,
+        SET_ITERATOR_KIND_SLOT, SET_ITERATOR_TARGET_SLOT,
+    },
+    length_value, length_value_u64, map_completion, set_property_on_object, type_error,
+    BuiltinIteratorBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use lyng_js_gc::{AllocationLifetime, WeakHeapRef};

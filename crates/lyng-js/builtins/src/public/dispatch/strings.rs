@@ -1,4 +1,7 @@
-use super::PublicBuiltinDispatchContext;
+use super::{
+    iterators::{string_iterator_builtin, string_iterator_next_builtin},
+    PublicBuiltinDispatchContext,
+};
 use crate::BuiltinInvocation;
 use lyng_js_types::{BuiltinFunctionId, Value};
 
@@ -48,10 +51,10 @@ fn dispatch_string_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
     if entry == super::js3_string_iterator_builtin() {
-        return super::string_iterator_builtin(context, invocation).map(Some);
+        return string_iterator_builtin(context, invocation).map(Some);
     }
     if entry == super::js3_string_iterator_next_builtin() {
-        return super::string_iterator_next_builtin(context, invocation).map(Some);
+        return string_iterator_next_builtin(context, invocation).map(Some);
     }
     Ok(None)
 }

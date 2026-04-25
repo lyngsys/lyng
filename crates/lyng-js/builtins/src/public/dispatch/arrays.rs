@@ -1,4 +1,7 @@
-use super::{ArrayIterationKind, PublicBuiltinDispatchContext};
+use super::{
+    iterators::{array_iterator_factory_builtin, array_iterator_next_builtin, ArrayIterationKind},
+    PublicBuiltinDispatchContext,
+};
 use crate::BuiltinInvocation;
 use lyng_js_types::{BuiltinFunctionId, Value};
 
@@ -169,27 +172,19 @@ fn dispatch_array_copying_builtin<Cx: PublicBuiltinDispatchContext>(
         return super::array_to_locale_string_builtin(context, invocation).map(Some);
     }
     if entry == super::js3_array_values_builtin() {
-        return super::array_iterator_factory_builtin(
-            context,
-            invocation,
-            ArrayIterationKind::Value,
-        )
-        .map(Some);
+        return array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Value)
+            .map(Some);
     }
     if entry == super::js3_array_keys_builtin() {
-        return super::array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Key)
+        return array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Key)
             .map(Some);
     }
     if entry == super::js3_array_entries_builtin() {
-        return super::array_iterator_factory_builtin(
-            context,
-            invocation,
-            ArrayIterationKind::Entry,
-        )
-        .map(Some);
+        return array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Entry)
+            .map(Some);
     }
     if entry == super::js3_array_iterator_next_builtin() {
-        return super::array_iterator_next_builtin(context, invocation).map(Some);
+        return array_iterator_next_builtin(context, invocation).map(Some);
     }
     if entry == super::js3_array_with_builtin() {
         return super::array_with_builtin(context, invocation).map(Some);
