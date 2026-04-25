@@ -1452,6 +1452,205 @@ const PUBLIC_REGEXP_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     ),
 ];
 
+const PUBLIC_DATE_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(
+        js3_date_builtin,
+        BuiltinEntryMetadata::new("Date", 7, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_now_builtin,
+        BuiltinEntryMetadata::new("now", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_parse_builtin,
+        BuiltinEntryMetadata::new("parse", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_utc_builtin,
+        BuiltinEntryMetadata::new("UTC", 7, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_string_builtin,
+        BuiltinEntryMetadata::new("toString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_date_string_builtin,
+        BuiltinEntryMetadata::new("toDateString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_time_string_builtin,
+        BuiltinEntryMetadata::new("toTimeString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_locale_string_builtin,
+        BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_locale_date_string_builtin,
+        BuiltinEntryMetadata::new("toLocaleDateString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_locale_time_string_builtin,
+        BuiltinEntryMetadata::new("toLocaleTimeString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_value_of_builtin,
+        BuiltinEntryMetadata::new("valueOf", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_time_builtin,
+        BuiltinEntryMetadata::new("getTime", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_full_year_builtin,
+        BuiltinEntryMetadata::new("getFullYear", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_utc_full_year_builtin,
+        BuiltinEntryMetadata::new("getUTCFullYear", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_month_builtin,
+        BuiltinEntryMetadata::new("getMonth", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_utc_month_builtin,
+        BuiltinEntryMetadata::new("getUTCMonth", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_date_builtin,
+        BuiltinEntryMetadata::new("getDate", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_utc_date_builtin,
+        BuiltinEntryMetadata::new("getUTCDate", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_day_builtin,
+        BuiltinEntryMetadata::new("getDay", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_utc_day_builtin,
+        BuiltinEntryMetadata::new("getUTCDay", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_hours_builtin,
+        BuiltinEntryMetadata::new("getHours", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_utc_hours_builtin,
+        BuiltinEntryMetadata::new("getUTCHours", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_minutes_builtin,
+        BuiltinEntryMetadata::new("getMinutes", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_utc_minutes_builtin,
+        BuiltinEntryMetadata::new("getUTCMinutes", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_seconds_builtin,
+        BuiltinEntryMetadata::new("getSeconds", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_utc_seconds_builtin,
+        BuiltinEntryMetadata::new("getUTCSeconds", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_milliseconds_builtin,
+        BuiltinEntryMetadata::new("getMilliseconds", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_utc_milliseconds_builtin,
+        BuiltinEntryMetadata::new("getUTCMilliseconds", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_get_timezone_offset_builtin,
+        BuiltinEntryMetadata::new("getTimezoneOffset", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_time_builtin,
+        BuiltinEntryMetadata::new("setTime", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_milliseconds_builtin,
+        BuiltinEntryMetadata::new("setMilliseconds", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_utc_milliseconds_builtin,
+        BuiltinEntryMetadata::new("setUTCMilliseconds", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_seconds_builtin,
+        BuiltinEntryMetadata::new("setSeconds", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_utc_seconds_builtin,
+        BuiltinEntryMetadata::new("setUTCSeconds", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_minutes_builtin,
+        BuiltinEntryMetadata::new("setMinutes", 3, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_utc_minutes_builtin,
+        BuiltinEntryMetadata::new("setUTCMinutes", 3, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_hours_builtin,
+        BuiltinEntryMetadata::new("setHours", 4, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_utc_hours_builtin,
+        BuiltinEntryMetadata::new("setUTCHours", 4, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_date_builtin,
+        BuiltinEntryMetadata::new("setDate", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_utc_date_builtin,
+        BuiltinEntryMetadata::new("setUTCDate", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_month_builtin,
+        BuiltinEntryMetadata::new("setMonth", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_utc_month_builtin,
+        BuiltinEntryMetadata::new("setUTCMonth", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_full_year_builtin,
+        BuiltinEntryMetadata::new("setFullYear", 3, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_set_utc_full_year_builtin,
+        BuiltinEntryMetadata::new("setUTCFullYear", 3, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_utc_string_builtin,
+        BuiltinEntryMetadata::new("toUTCString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_iso_string_builtin,
+        BuiltinEntryMetadata::new("toISOString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_json_builtin,
+        BuiltinEntryMetadata::new("toJSON", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_temporal_instant_builtin,
+        BuiltinEntryMetadata::new("toTemporalInstant", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_date_to_primitive_builtin,
+        BuiltinEntryMetadata::new("[Symbol.toPrimitive]", 1, false, false),
+    ),
+];
+
 fn public_builtin_metadata_from_rows(
     entry: BuiltinFunctionId,
     rows: &[PublicBuiltinMetadataRow],
@@ -1497,6 +1696,10 @@ fn text_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntry
 
 fn regexp_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
     public_builtin_metadata_from_rows(entry, PUBLIC_REGEXP_BUILTIN_METADATA)
+}
+
+fn date_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
+    public_builtin_metadata_from_rows(entry, PUBLIC_DATE_BUILTIN_METADATA)
 }
 
 /// Compatibility metadata for the public core builtin namespace.
@@ -1545,197 +1748,8 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if let Some(metadata) = regexp_public_builtin_metadata(entry) {
         return Some(metadata);
     }
-    if entry == js3_date_builtin() {
-        return Some(BuiltinEntryMetadata::new("Date", 7, true, true));
-    }
-    if entry == js3_date_now_builtin() {
-        return Some(BuiltinEntryMetadata::new("now", 0, false, false));
-    }
-    if entry == js3_date_parse_builtin() {
-        return Some(BuiltinEntryMetadata::new("parse", 1, false, false));
-    }
-    if entry == js3_date_utc_builtin() {
-        return Some(BuiltinEntryMetadata::new("UTC", 7, false, false));
-    }
-    if entry == js3_date_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
-    }
-    if entry == js3_date_to_date_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toDateString", 0, false, false));
-    }
-    if entry == js3_date_to_time_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toTimeString", 0, false, false));
-    }
-    if entry == js3_date_to_locale_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
-    }
-    if entry == js3_date_to_locale_date_string_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "toLocaleDateString",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_date_to_locale_time_string_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "toLocaleTimeString",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_date_value_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
-    }
-    if entry == js3_date_get_time_builtin() {
-        return Some(BuiltinEntryMetadata::new("getTime", 0, false, false));
-    }
-    if entry == js3_date_get_full_year_builtin() {
-        return Some(BuiltinEntryMetadata::new("getFullYear", 0, false, false));
-    }
-    if entry == js3_date_get_utc_full_year_builtin() {
-        return Some(BuiltinEntryMetadata::new("getUTCFullYear", 0, false, false));
-    }
-    if entry == js3_date_get_month_builtin() {
-        return Some(BuiltinEntryMetadata::new("getMonth", 0, false, false));
-    }
-    if entry == js3_date_get_utc_month_builtin() {
-        return Some(BuiltinEntryMetadata::new("getUTCMonth", 0, false, false));
-    }
-    if entry == js3_date_get_date_builtin() {
-        return Some(BuiltinEntryMetadata::new("getDate", 0, false, false));
-    }
-    if entry == js3_date_get_utc_date_builtin() {
-        return Some(BuiltinEntryMetadata::new("getUTCDate", 0, false, false));
-    }
-    if entry == js3_date_get_day_builtin() {
-        return Some(BuiltinEntryMetadata::new("getDay", 0, false, false));
-    }
-    if entry == js3_date_get_utc_day_builtin() {
-        return Some(BuiltinEntryMetadata::new("getUTCDay", 0, false, false));
-    }
-    if entry == js3_date_get_hours_builtin() {
-        return Some(BuiltinEntryMetadata::new("getHours", 0, false, false));
-    }
-    if entry == js3_date_get_utc_hours_builtin() {
-        return Some(BuiltinEntryMetadata::new("getUTCHours", 0, false, false));
-    }
-    if entry == js3_date_get_minutes_builtin() {
-        return Some(BuiltinEntryMetadata::new("getMinutes", 0, false, false));
-    }
-    if entry == js3_date_get_utc_minutes_builtin() {
-        return Some(BuiltinEntryMetadata::new("getUTCMinutes", 0, false, false));
-    }
-    if entry == js3_date_get_seconds_builtin() {
-        return Some(BuiltinEntryMetadata::new("getSeconds", 0, false, false));
-    }
-    if entry == js3_date_get_utc_seconds_builtin() {
-        return Some(BuiltinEntryMetadata::new("getUTCSeconds", 0, false, false));
-    }
-    if entry == js3_date_get_milliseconds_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "getMilliseconds",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_date_get_utc_milliseconds_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "getUTCMilliseconds",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_date_get_timezone_offset_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "getTimezoneOffset",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_date_set_time_builtin() {
-        return Some(BuiltinEntryMetadata::new("setTime", 1, false, false));
-    }
-    if entry == js3_date_set_milliseconds_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "setMilliseconds",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_date_set_utc_milliseconds_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "setUTCMilliseconds",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_date_set_seconds_builtin() {
-        return Some(BuiltinEntryMetadata::new("setSeconds", 2, false, false));
-    }
-    if entry == js3_date_set_utc_seconds_builtin() {
-        return Some(BuiltinEntryMetadata::new("setUTCSeconds", 2, false, false));
-    }
-    if entry == js3_date_set_minutes_builtin() {
-        return Some(BuiltinEntryMetadata::new("setMinutes", 3, false, false));
-    }
-    if entry == js3_date_set_utc_minutes_builtin() {
-        return Some(BuiltinEntryMetadata::new("setUTCMinutes", 3, false, false));
-    }
-    if entry == js3_date_set_hours_builtin() {
-        return Some(BuiltinEntryMetadata::new("setHours", 4, false, false));
-    }
-    if entry == js3_date_set_utc_hours_builtin() {
-        return Some(BuiltinEntryMetadata::new("setUTCHours", 4, false, false));
-    }
-    if entry == js3_date_set_date_builtin() {
-        return Some(BuiltinEntryMetadata::new("setDate", 1, false, false));
-    }
-    if entry == js3_date_set_utc_date_builtin() {
-        return Some(BuiltinEntryMetadata::new("setUTCDate", 1, false, false));
-    }
-    if entry == js3_date_set_month_builtin() {
-        return Some(BuiltinEntryMetadata::new("setMonth", 2, false, false));
-    }
-    if entry == js3_date_set_utc_month_builtin() {
-        return Some(BuiltinEntryMetadata::new("setUTCMonth", 2, false, false));
-    }
-    if entry == js3_date_set_full_year_builtin() {
-        return Some(BuiltinEntryMetadata::new("setFullYear", 3, false, false));
-    }
-    if entry == js3_date_set_utc_full_year_builtin() {
-        return Some(BuiltinEntryMetadata::new("setUTCFullYear", 3, false, false));
-    }
-    if entry == js3_date_to_utc_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toUTCString", 0, false, false));
-    }
-    if entry == js3_date_to_iso_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toISOString", 0, false, false));
-    }
-    if entry == js3_date_to_json_builtin() {
-        return Some(BuiltinEntryMetadata::new("toJSON", 1, false, false));
-    }
-    if entry == js3_date_to_temporal_instant_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "toTemporalInstant",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_date_to_primitive_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "[Symbol.toPrimitive]",
-            1,
-            false,
-            false,
-        ));
+    if let Some(metadata) = date_public_builtin_metadata(entry) {
+        return Some(metadata);
     }
     if let Some(metadata) = temporal::temporal_builtin_metadata(entry) {
         return Some(metadata);
@@ -3451,6 +3465,214 @@ mod tests {
         assert_eq!(PUBLIC_REGEXP_BUILTIN_METADATA.len(), expected.len());
         for (entry, metadata) in expected {
             assert_eq!(regexp_public_builtin_metadata(entry), Some(metadata));
+            assert_eq!(public_builtin_metadata(entry), Some(metadata));
+        }
+    }
+
+    #[test]
+    fn date_public_metadata_table_matches_public_lookup() {
+        let expected = [
+            (
+                js3_date_builtin(),
+                BuiltinEntryMetadata::new("Date", 7, true, true),
+            ),
+            (
+                js3_date_now_builtin(),
+                BuiltinEntryMetadata::new("now", 0, false, false),
+            ),
+            (
+                js3_date_parse_builtin(),
+                BuiltinEntryMetadata::new("parse", 1, false, false),
+            ),
+            (
+                js3_date_utc_builtin(),
+                BuiltinEntryMetadata::new("UTC", 7, false, false),
+            ),
+            (
+                js3_date_to_string_builtin(),
+                BuiltinEntryMetadata::new("toString", 0, false, false),
+            ),
+            (
+                js3_date_to_date_string_builtin(),
+                BuiltinEntryMetadata::new("toDateString", 0, false, false),
+            ),
+            (
+                js3_date_to_time_string_builtin(),
+                BuiltinEntryMetadata::new("toTimeString", 0, false, false),
+            ),
+            (
+                js3_date_to_locale_string_builtin(),
+                BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
+            ),
+            (
+                js3_date_to_locale_date_string_builtin(),
+                BuiltinEntryMetadata::new("toLocaleDateString", 0, false, false),
+            ),
+            (
+                js3_date_to_locale_time_string_builtin(),
+                BuiltinEntryMetadata::new("toLocaleTimeString", 0, false, false),
+            ),
+            (
+                js3_date_value_of_builtin(),
+                BuiltinEntryMetadata::new("valueOf", 0, false, false),
+            ),
+            (
+                js3_date_get_time_builtin(),
+                BuiltinEntryMetadata::new("getTime", 0, false, false),
+            ),
+            (
+                js3_date_get_full_year_builtin(),
+                BuiltinEntryMetadata::new("getFullYear", 0, false, false),
+            ),
+            (
+                js3_date_get_utc_full_year_builtin(),
+                BuiltinEntryMetadata::new("getUTCFullYear", 0, false, false),
+            ),
+            (
+                js3_date_get_month_builtin(),
+                BuiltinEntryMetadata::new("getMonth", 0, false, false),
+            ),
+            (
+                js3_date_get_utc_month_builtin(),
+                BuiltinEntryMetadata::new("getUTCMonth", 0, false, false),
+            ),
+            (
+                js3_date_get_date_builtin(),
+                BuiltinEntryMetadata::new("getDate", 0, false, false),
+            ),
+            (
+                js3_date_get_utc_date_builtin(),
+                BuiltinEntryMetadata::new("getUTCDate", 0, false, false),
+            ),
+            (
+                js3_date_get_day_builtin(),
+                BuiltinEntryMetadata::new("getDay", 0, false, false),
+            ),
+            (
+                js3_date_get_utc_day_builtin(),
+                BuiltinEntryMetadata::new("getUTCDay", 0, false, false),
+            ),
+            (
+                js3_date_get_hours_builtin(),
+                BuiltinEntryMetadata::new("getHours", 0, false, false),
+            ),
+            (
+                js3_date_get_utc_hours_builtin(),
+                BuiltinEntryMetadata::new("getUTCHours", 0, false, false),
+            ),
+            (
+                js3_date_get_minutes_builtin(),
+                BuiltinEntryMetadata::new("getMinutes", 0, false, false),
+            ),
+            (
+                js3_date_get_utc_minutes_builtin(),
+                BuiltinEntryMetadata::new("getUTCMinutes", 0, false, false),
+            ),
+            (
+                js3_date_get_seconds_builtin(),
+                BuiltinEntryMetadata::new("getSeconds", 0, false, false),
+            ),
+            (
+                js3_date_get_utc_seconds_builtin(),
+                BuiltinEntryMetadata::new("getUTCSeconds", 0, false, false),
+            ),
+            (
+                js3_date_get_milliseconds_builtin(),
+                BuiltinEntryMetadata::new("getMilliseconds", 0, false, false),
+            ),
+            (
+                js3_date_get_utc_milliseconds_builtin(),
+                BuiltinEntryMetadata::new("getUTCMilliseconds", 0, false, false),
+            ),
+            (
+                js3_date_get_timezone_offset_builtin(),
+                BuiltinEntryMetadata::new("getTimezoneOffset", 0, false, false),
+            ),
+            (
+                js3_date_set_time_builtin(),
+                BuiltinEntryMetadata::new("setTime", 1, false, false),
+            ),
+            (
+                js3_date_set_milliseconds_builtin(),
+                BuiltinEntryMetadata::new("setMilliseconds", 1, false, false),
+            ),
+            (
+                js3_date_set_utc_milliseconds_builtin(),
+                BuiltinEntryMetadata::new("setUTCMilliseconds", 1, false, false),
+            ),
+            (
+                js3_date_set_seconds_builtin(),
+                BuiltinEntryMetadata::new("setSeconds", 2, false, false),
+            ),
+            (
+                js3_date_set_utc_seconds_builtin(),
+                BuiltinEntryMetadata::new("setUTCSeconds", 2, false, false),
+            ),
+            (
+                js3_date_set_minutes_builtin(),
+                BuiltinEntryMetadata::new("setMinutes", 3, false, false),
+            ),
+            (
+                js3_date_set_utc_minutes_builtin(),
+                BuiltinEntryMetadata::new("setUTCMinutes", 3, false, false),
+            ),
+            (
+                js3_date_set_hours_builtin(),
+                BuiltinEntryMetadata::new("setHours", 4, false, false),
+            ),
+            (
+                js3_date_set_utc_hours_builtin(),
+                BuiltinEntryMetadata::new("setUTCHours", 4, false, false),
+            ),
+            (
+                js3_date_set_date_builtin(),
+                BuiltinEntryMetadata::new("setDate", 1, false, false),
+            ),
+            (
+                js3_date_set_utc_date_builtin(),
+                BuiltinEntryMetadata::new("setUTCDate", 1, false, false),
+            ),
+            (
+                js3_date_set_month_builtin(),
+                BuiltinEntryMetadata::new("setMonth", 2, false, false),
+            ),
+            (
+                js3_date_set_utc_month_builtin(),
+                BuiltinEntryMetadata::new("setUTCMonth", 2, false, false),
+            ),
+            (
+                js3_date_set_full_year_builtin(),
+                BuiltinEntryMetadata::new("setFullYear", 3, false, false),
+            ),
+            (
+                js3_date_set_utc_full_year_builtin(),
+                BuiltinEntryMetadata::new("setUTCFullYear", 3, false, false),
+            ),
+            (
+                js3_date_to_utc_string_builtin(),
+                BuiltinEntryMetadata::new("toUTCString", 0, false, false),
+            ),
+            (
+                js3_date_to_iso_string_builtin(),
+                BuiltinEntryMetadata::new("toISOString", 0, false, false),
+            ),
+            (
+                js3_date_to_json_builtin(),
+                BuiltinEntryMetadata::new("toJSON", 1, false, false),
+            ),
+            (
+                js3_date_to_temporal_instant_builtin(),
+                BuiltinEntryMetadata::new("toTemporalInstant", 0, false, false),
+            ),
+            (
+                js3_date_to_primitive_builtin(),
+                BuiltinEntryMetadata::new("[Symbol.toPrimitive]", 1, false, false),
+            ),
+        ];
+
+        assert_eq!(PUBLIC_DATE_BUILTIN_METADATA.len(), expected.len());
+        for (entry, metadata) in expected {
+            assert_eq!(date_public_builtin_metadata(entry), Some(metadata));
             assert_eq!(public_builtin_metadata(entry), Some(metadata));
         }
     }
