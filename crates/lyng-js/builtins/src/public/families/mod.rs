@@ -58,7 +58,10 @@ pub(super) use objects::{
 pub(super) use primitives::{
     install_primitive_family, install_primitive_family_descriptors, primitive_builtin_object,
 };
-pub(super) use promises::{install_promise_disposal_family, promise_disposal_builtin_object};
+pub(super) use promises::{
+    install_promise_disposal_family, install_promise_disposal_family_descriptors,
+    promise_disposal_builtin_object,
+};
 pub(super) use regexp::{
     install_regexp_family, install_regexp_family_descriptors, regexp_builtin_object,
 };

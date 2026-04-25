@@ -1118,19 +1118,6 @@ impl BuiltinCache {
             Some(bootstrap_atoms.uint8_array()),
             AllocationLifetime::Default,
         ));
-        let disposable_stack_tag_atom = agent.atoms_mut().intern_collectible("DisposableStack");
-        let disposable_stack_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "DisposableStack",
-            Some(disposable_stack_tag_atom),
-            AllocationLifetime::Default,
-        ));
-        let async_disposable_stack_tag_atom =
-            agent.atoms_mut().intern_collectible("AsyncDisposableStack");
-        let async_disposable_stack_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "AsyncDisposableStack",
-            Some(async_disposable_stack_tag_atom),
-            AllocationLifetime::Default,
-        ));
         let last_index_of_atom = agent.atoms_mut().intern_collectible("lastIndexOf");
         let copy_within_atom = agent.atoms_mut().intern_collectible("copyWithin");
         let entries_atom = agent.atoms_mut().intern_collectible("entries");
@@ -2671,223 +2658,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let promise_tag_atom = agent.atoms_mut().intern_collectible("Promise");
-        let promise_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Promise",
-            Some(promise_tag_atom),
-            AllocationLifetime::Default,
-        ));
-        let promise_all_atom = agent.atoms_mut().intern_collectible("all");
-        let promise_all_settled_atom = agent.atoms_mut().intern_collectible("allSettled");
-        let promise_any_atom = agent.atoms_mut().intern_collectible("any");
-        let promise_resolve_atom = agent.atoms_mut().intern_collectible("resolve");
-        let promise_reject_atom = agent.atoms_mut().intern_collectible("reject");
-        let promise_then_atom = agent.atoms_mut().intern_collectible("then");
-        let promise_catch_atom = agent.atoms_mut().intern_collectible("catch");
-        let promise_race_atom = agent.atoms_mut().intern_collectible("race");
-        let promise_finally_atom = agent.atoms_mut().intern_collectible("finally");
-        let adopt_atom = agent.atoms_mut().intern_collectible("adopt");
-        let defer_atom = agent.atoms_mut().intern_collectible("defer");
-        let dispose_atom = agent.atoms_mut().intern_collectible("dispose");
-        let dispose_async_atom = agent.atoms_mut().intern_collectible("disposeAsync");
-        let disposed_atom = agent.atoms_mut().intern_collectible("disposed");
-        let move_atom = agent.atoms_mut().intern_collectible("move");
-        let use_atom = agent.atoms_mut().intern_collectible("use");
-        let promise_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(promise_resolve_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_promise_resolve_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(promise_reject_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_promise_reject_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(promise_all_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_promise_all_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(promise_all_settled_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_promise_all_settled_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(promise_race_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_promise_race_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(promise_any_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_promise_any_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Species),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_promise_species_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let promise_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.promise)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(promise_then_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_promise_then_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(promise_catch_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_promise_catch_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(promise_finally_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_promise_finally_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(promise_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let disposable_stack_descriptors = [];
-        let disposable_stack_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.disposable_stack)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(use_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_disposable_stack_use_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(adopt_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_disposable_stack_adopt_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(defer_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_disposable_stack_defer_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(move_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_disposable_stack_move_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(disposed_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(lyng_js_types::js3_disposable_stack_disposed_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(dispose_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_disposable_stack_dispose_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Dispose),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_disposable_stack_dispose_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(disposable_stack_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let async_disposable_stack_descriptors = [];
-        let async_disposable_stack_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(
-                    builtins.async_disposable_stack,
-                )),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(use_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_async_disposable_stack_use_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(adopt_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_async_disposable_stack_adopt_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(defer_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_async_disposable_stack_defer_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(move_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_async_disposable_stack_move_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(disposed_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(lyng_js_types::js3_async_disposable_stack_disposed_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(dispose_async_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_async_disposable_stack_dispose_async_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::AsyncDispose),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    lyng_js_types::js3_async_disposable_stack_dispose_async_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(async_disposable_stack_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
         let tables = [
             BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ArrayBuffer),
@@ -3013,30 +2783,6 @@ impl BuiltinCache {
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Uint8ArrayPrototype),
                 &uint8_array_prototype_descriptors,
             ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Promise),
-                &promise_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::PromisePrototype),
-                &promise_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::DisposableStack),
-                &disposable_stack_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::DisposableStackPrototype),
-                &disposable_stack_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::AsyncDisposableStack),
-                &async_disposable_stack_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::AsyncDisposableStackPrototype),
-                &async_disposable_stack_prototype_descriptors,
-            ),
         ];
         self.public.insert(realm, builtins);
         if families::install_object_family_descriptors(agent, self, realm, &builtins).is_err() {
@@ -3084,6 +2830,12 @@ impl BuiltinCache {
             return None;
         }
         if families::install_primitive_family_descriptors(agent, self, realm, &builtins).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_promise_disposal_family_descriptors(agent, self, realm, &builtins)
+            .is_err()
+        {
             self.public.remove(&realm);
             return None;
         }

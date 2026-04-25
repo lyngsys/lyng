@@ -112,6 +112,8 @@ Rules:
   `public/families/date.rs`
 - the primitive family owns Number, Math, BigInt, Boolean, and Symbol descriptor installation in
   `public/families/primitives.rs`
+- the promise/disposal family owns Promise, DisposableStack, and AsyncDisposableStack descriptor
+  installation in `public/families/promises.rs`
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

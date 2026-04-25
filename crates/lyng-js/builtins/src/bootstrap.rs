@@ -794,13 +794,17 @@ mod tests {
     use lyng_js_host::NoopHostHooks;
     use lyng_js_types::{
         js3_array_from_async_builtin, js3_array_iterator_next_builtin,
-        js3_array_species_getter_builtin, js3_array_values_builtin, js3_bigint_as_int_n_builtin,
+        js3_array_species_getter_builtin, js3_array_values_builtin,
+        js3_async_disposable_stack_dispose_async_builtin, js3_bigint_as_int_n_builtin,
         js3_bigint_to_string_builtin, js3_boolean_to_string_builtin, js3_date_get_time_builtin,
         js3_date_now_builtin, js3_date_set_full_year_builtin, js3_date_to_primitive_builtin,
-        js3_date_to_string_builtin, js3_error_to_string_builtin,
-        js3_iterator_prototype_iterator_builtin, js3_json_parse_builtin, js3_json_raw_json_builtin,
-        js3_map_iterator_next_builtin, js3_map_size_getter_builtin, js3_math_abs_builtin,
-        js3_number_is_finite_builtin, js3_number_to_string_builtin, js3_proxy_revocable_builtin,
+        js3_date_to_string_builtin, js3_disposable_stack_dispose_builtin,
+        js3_disposable_stack_disposed_getter_builtin, js3_disposable_stack_use_builtin,
+        js3_error_to_string_builtin, js3_iterator_prototype_iterator_builtin,
+        js3_json_parse_builtin, js3_json_raw_json_builtin, js3_map_iterator_next_builtin,
+        js3_map_size_getter_builtin, js3_math_abs_builtin, js3_number_is_finite_builtin,
+        js3_number_to_string_builtin, js3_promise_resolve_builtin,
+        js3_promise_species_getter_builtin, js3_promise_then_builtin, js3_proxy_revocable_builtin,
         js3_reflect_get_builtin, js3_regexp_escape_builtin, js3_regexp_exec_builtin,
         js3_regexp_global_getter_builtin, js3_regexp_species_getter_builtin,
         js3_regexp_symbol_match_builtin, js3_set_iterator_next_builtin, js3_set_values_builtin,
@@ -2423,6 +2427,210 @@ mod tests {
         assert_eq!(description.setter(), Some(Value::undefined()));
         assert_eq!(description.enumerable(), Some(false));
         assert_eq!(description.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_promise_disposal_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let promise = intrinsics
+            .promise()
+            .expect("Promise intrinsic should exist");
+        let promise_prototype = intrinsics
+            .promise_prototype()
+            .expect("Promise.prototype intrinsic should exist");
+        let disposable_stack = intrinsics
+            .disposable_stack()
+            .expect("DisposableStack intrinsic should exist");
+        let disposable_stack_prototype = intrinsics
+            .disposable_stack_prototype()
+            .expect("DisposableStack.prototype intrinsic should exist");
+        let async_disposable_stack = intrinsics
+            .async_disposable_stack()
+            .expect("AsyncDisposableStack intrinsic should exist");
+        let async_disposable_stack_prototype = intrinsics
+            .async_disposable_stack_prototype()
+            .expect("AsyncDisposableStack.prototype intrinsic should exist");
+
+        let resolve_atom = agent.atoms_mut().intern_collectible("resolve");
+        let then_atom = agent.atoms_mut().intern_collectible("then");
+        let use_atom = agent.atoms_mut().intern_collectible("use");
+        let disposed_atom = agent.atoms_mut().intern_collectible("disposed");
+        let dispose_async_atom = agent.atoms_mut().intern_collectible("disposeAsync");
+        let species_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Species)
+            .expect("Symbol.species should exist");
+        let dispose_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Dispose)
+            .expect("Symbol.dispose should exist");
+        let async_dispose_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::AsyncDispose)
+            .expect("Symbol.asyncDispose should exist");
+        let to_string_tag_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::ToStringTag)
+            .expect("Symbol.toStringTag should exist");
+
+        let promise_resolve = cache
+            .builtin_constant(agent, artifacts.realm(), js3_promise_resolve_builtin())
+            .expect("Promise.resolve builtin should resolve");
+        let promise_species_getter = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_promise_species_getter_builtin(),
+            )
+            .expect("Promise[Symbol.species] getter should resolve");
+        let promise_then = cache
+            .builtin_constant(agent, artifacts.realm(), js3_promise_then_builtin())
+            .expect("Promise.prototype.then builtin should resolve");
+        let disposable_use = cache
+            .builtin_constant(agent, artifacts.realm(), js3_disposable_stack_use_builtin())
+            .expect("DisposableStack.prototype.use builtin should resolve");
+        let disposable_disposed_getter = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_disposable_stack_disposed_getter_builtin(),
+            )
+            .expect("DisposableStack.prototype.disposed getter should resolve");
+        let disposable_dispose = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_disposable_stack_dispose_builtin(),
+            )
+            .expect("DisposableStack.prototype.dispose builtin should resolve");
+        let async_dispose = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_async_disposable_stack_dispose_async_builtin(),
+            )
+            .expect("AsyncDisposableStack.prototype.disposeAsync builtin should resolve");
+
+        let resolve = own_descriptor(
+            agent,
+            promise,
+            PropertyKey::from_atom(resolve_atom),
+            "Promise.resolve",
+        );
+        assert_eq!(resolve.value(), Some(promise_resolve));
+        assert_eq!(resolve.writable(), Some(true));
+        assert_eq!(resolve.enumerable(), Some(false));
+        assert_eq!(resolve.configurable(), Some(true));
+
+        let species = own_descriptor(
+            agent,
+            promise,
+            PropertyKey::from_symbol(species_symbol),
+            "Promise[Symbol.species]",
+        );
+        assert_eq!(species.getter(), Some(promise_species_getter));
+        assert_eq!(species.setter(), Some(Value::undefined()));
+        assert_eq!(species.enumerable(), Some(false));
+        assert_eq!(species.configurable(), Some(true));
+
+        let then = own_descriptor(
+            agent,
+            promise_prototype,
+            PropertyKey::from_atom(then_atom),
+            "Promise.prototype.then",
+        );
+        assert_eq!(then.value(), Some(promise_then));
+
+        let promise_tag = own_descriptor(
+            agent,
+            promise_prototype,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "Promise.prototype[Symbol.toStringTag]",
+        );
+        assert!(promise_tag.value().and_then(Value::as_string_ref).is_some());
+        assert_eq!(promise_tag.writable(), Some(false));
+        assert_eq!(promise_tag.enumerable(), Some(false));
+        assert_eq!(promise_tag.configurable(), Some(true));
+
+        let stack_constructor = own_descriptor(
+            agent,
+            disposable_stack_prototype,
+            PropertyKey::from_atom(WellKnownAtom::constructor.id()),
+            "DisposableStack.prototype.constructor",
+        );
+        assert_eq!(
+            stack_constructor.value(),
+            Some(Value::from_object_ref(disposable_stack))
+        );
+
+        let stack_use = own_descriptor(
+            agent,
+            disposable_stack_prototype,
+            PropertyKey::from_atom(use_atom),
+            "DisposableStack.prototype.use",
+        );
+        assert_eq!(stack_use.value(), Some(disposable_use));
+
+        let stack_disposed = own_descriptor(
+            agent,
+            disposable_stack_prototype,
+            PropertyKey::from_atom(disposed_atom),
+            "DisposableStack.prototype.disposed",
+        );
+        assert_eq!(stack_disposed.getter(), Some(disposable_disposed_getter));
+        assert_eq!(stack_disposed.setter(), Some(Value::undefined()));
+        assert_eq!(stack_disposed.enumerable(), Some(false));
+        assert_eq!(stack_disposed.configurable(), Some(true));
+
+        let stack_dispose_symbol = own_descriptor(
+            agent,
+            disposable_stack_prototype,
+            PropertyKey::from_symbol(dispose_symbol),
+            "DisposableStack.prototype[Symbol.dispose]",
+        );
+        assert_eq!(stack_dispose_symbol.value(), Some(disposable_dispose));
+        assert_eq!(stack_dispose_symbol.writable(), Some(true));
+        assert_eq!(stack_dispose_symbol.enumerable(), Some(false));
+        assert_eq!(stack_dispose_symbol.configurable(), Some(true));
+
+        let async_stack_constructor = own_descriptor(
+            agent,
+            async_disposable_stack_prototype,
+            PropertyKey::from_atom(WellKnownAtom::constructor.id()),
+            "AsyncDisposableStack.prototype.constructor",
+        );
+        assert_eq!(
+            async_stack_constructor.value(),
+            Some(Value::from_object_ref(async_disposable_stack))
+        );
+
+        let async_stack_dispose = own_descriptor(
+            agent,
+            async_disposable_stack_prototype,
+            PropertyKey::from_atom(dispose_async_atom),
+            "AsyncDisposableStack.prototype.disposeAsync",
+        );
+        assert_eq!(async_stack_dispose.value(), Some(async_dispose));
+
+        let async_stack_dispose_symbol = own_descriptor(
+            agent,
+            async_disposable_stack_prototype,
+            PropertyKey::from_symbol(async_dispose_symbol),
+            "AsyncDisposableStack.prototype[Symbol.asyncDispose]",
+        );
+        assert_eq!(async_stack_dispose_symbol.value(), Some(async_dispose));
+        assert_eq!(async_stack_dispose_symbol.writable(), Some(true));
+        assert_eq!(async_stack_dispose_symbol.enumerable(), Some(false));
+        assert_eq!(async_stack_dispose_symbol.configurable(), Some(true));
     }
 
     #[test]
