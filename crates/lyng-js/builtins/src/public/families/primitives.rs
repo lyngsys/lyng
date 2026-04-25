@@ -2,6 +2,7 @@ use super::{
     install_public_builtin_function, FamilyInstallContext, PrimitiveFamilyBuiltins,
     PrimitiveFamilyObjects, PrimitiveFamilyPrototypes,
 };
+use crate::public::PublicRealmBuiltins;
 use lyng_js_env::Agent;
 use lyng_js_types::{
     js3_array_species_getter_builtin, js3_bigint_as_int_n_builtin, js3_bigint_as_uint_n_builtin,
@@ -23,7 +24,7 @@ use lyng_js_types::{
     js3_number_to_precision_builtin, js3_number_to_string_builtin, js3_number_value_of_builtin,
     js3_symbol_builtin, js3_symbol_description_getter_builtin, js3_symbol_for_builtin,
     js3_symbol_key_for_builtin, js3_symbol_to_primitive_builtin, js3_symbol_to_string_builtin,
-    js3_symbol_value_of_builtin, ObjectRef,
+    js3_symbol_value_of_builtin, BuiltinFunctionId, ObjectRef,
 };
 
 pub(in crate::public) fn install_primitive_family(
@@ -119,6 +120,173 @@ pub(in crate::public) fn install_primitive_family(
             None,
         ),
     }
+}
+
+pub(in crate::public) fn primitive_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    if let Some(object) = number_builtin_object(builtins, entry) {
+        return Some(object);
+    }
+    if let Some(object) = math_builtin_object(builtins, entry) {
+        return Some(object);
+    }
+    if let Some(object) = bigint_builtin_object(builtins, entry) {
+        return Some(object);
+    }
+    if let Some(object) = boolean_builtin_object(builtins, entry) {
+        return Some(object);
+    }
+    if let Some(object) = symbol_builtin_object(builtins, entry) {
+        return Some(object);
+    }
+    primitive_accessor_builtin_object(builtins, entry)
+}
+
+fn number_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_number_builtin(), builtins.number),
+        (js3_number_is_finite_builtin(), builtins.number_is_finite),
+        (js3_number_is_integer_builtin(), builtins.number_is_integer),
+        (js3_number_is_nan_builtin(), builtins.number_is_nan),
+        (
+            js3_number_is_safe_integer_builtin(),
+            builtins.number_is_safe_integer,
+        ),
+        (
+            js3_number_to_exponential_builtin(),
+            builtins.number_to_exponential,
+        ),
+        (js3_number_to_fixed_builtin(), builtins.number_to_fixed),
+        (
+            js3_number_to_locale_string_builtin(),
+            builtins.number_to_locale_string,
+        ),
+        (
+            js3_number_to_precision_builtin(),
+            builtins.number_to_precision,
+        ),
+        (js3_number_to_string_builtin(), builtins.number_to_string),
+        (js3_number_value_of_builtin(), builtins.number_value_of),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn math_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_math_abs_builtin(), builtins.math_abs),
+        (js3_math_acos_builtin(), builtins.math_acos),
+        (js3_math_acosh_builtin(), builtins.math_acosh),
+        (js3_math_asin_builtin(), builtins.math_asin),
+        (js3_math_asinh_builtin(), builtins.math_asinh),
+        (js3_math_atan_builtin(), builtins.math_atan),
+        (js3_math_atan2_builtin(), builtins.math_atan2),
+        (js3_math_atanh_builtin(), builtins.math_atanh),
+        (js3_math_cbrt_builtin(), builtins.math_cbrt),
+        (js3_math_ceil_builtin(), builtins.math_ceil),
+        (js3_math_clz32_builtin(), builtins.math_clz32),
+        (js3_math_cos_builtin(), builtins.math_cos),
+        (js3_math_cosh_builtin(), builtins.math_cosh),
+        (js3_math_exp_builtin(), builtins.math_exp),
+        (js3_math_expm1_builtin(), builtins.math_expm1),
+        (js3_math_f16round_builtin(), builtins.math_f16round),
+        (js3_math_floor_builtin(), builtins.math_floor),
+        (js3_math_fround_builtin(), builtins.math_fround),
+        (js3_math_hypot_builtin(), builtins.math_hypot),
+        (js3_math_imul_builtin(), builtins.math_imul),
+        (js3_math_log_builtin(), builtins.math_log),
+        (js3_math_log10_builtin(), builtins.math_log10),
+        (js3_math_log1p_builtin(), builtins.math_log1p),
+        (js3_math_log2_builtin(), builtins.math_log2),
+        (js3_math_max_builtin(), builtins.math_max),
+        (js3_math_min_builtin(), builtins.math_min),
+        (js3_math_pow_builtin(), builtins.math_pow),
+        (js3_math_random_builtin(), builtins.math_random),
+        (js3_math_round_builtin(), builtins.math_round),
+        (js3_math_sign_builtin(), builtins.math_sign),
+        (js3_math_sin_builtin(), builtins.math_sin),
+        (js3_math_sinh_builtin(), builtins.math_sinh),
+        (js3_math_sqrt_builtin(), builtins.math_sqrt),
+        (js3_math_sum_precise_builtin(), builtins.math_sum_precise),
+        (js3_math_tan_builtin(), builtins.math_tan),
+        (js3_math_tanh_builtin(), builtins.math_tanh),
+        (js3_math_trunc_builtin(), builtins.math_trunc),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn bigint_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_bigint_builtin(), builtins.bigint),
+        (js3_bigint_as_int_n_builtin(), builtins.bigint_as_int_n),
+        (js3_bigint_as_uint_n_builtin(), builtins.bigint_as_uint_n),
+        (js3_bigint_to_string_builtin(), builtins.bigint_to_string),
+        (js3_bigint_value_of_builtin(), builtins.bigint_value_of),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn boolean_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_boolean_builtin(), builtins.boolean),
+        (js3_boolean_to_string_builtin(), builtins.boolean_to_string),
+        (js3_boolean_value_of_builtin(), builtins.boolean_value_of),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn symbol_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_symbol_builtin(), builtins.symbol),
+        (js3_symbol_for_builtin(), builtins.symbol_for),
+        (js3_symbol_key_for_builtin(), builtins.symbol_key_for),
+        (js3_symbol_to_string_builtin(), builtins.symbol_to_string),
+        (js3_symbol_value_of_builtin(), builtins.symbol_value_of),
+        (
+            js3_symbol_to_primitive_builtin(),
+            builtins.symbol_to_primitive,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn primitive_accessor_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (
+            js3_array_species_getter_builtin(),
+            builtins.array_species_getter,
+        ),
+        (
+            js3_symbol_description_getter_builtin(),
+            builtins.symbol_description_getter,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
 }
 
 #[derive(Clone, Copy, Debug)]
