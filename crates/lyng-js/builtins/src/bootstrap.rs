@@ -231,8 +231,7 @@ fn default_global_descriptors(
             BuiltinPropertyValueSpec::Data(
                 intrinsics
                     .json()
-                    .map(Value::from_object_ref)
-                    .unwrap_or(Value::undefined()),
+                    .map_or(Value::undefined(), Value::from_object_ref),
             ),
             BuiltinAttributes::new(true, false, true),
         ),
@@ -385,8 +384,7 @@ fn default_global_descriptors(
             BuiltinPropertyValueSpec::Data(
                 intrinsics
                     .math()
-                    .map(Value::from_object_ref)
-                    .unwrap_or(Value::undefined()),
+                    .map_or(Value::undefined(), Value::from_object_ref),
             ),
             BuiltinAttributes::new(true, false, true),
         ),
@@ -415,8 +413,7 @@ fn default_global_descriptors(
             BuiltinPropertyValueSpec::Data(
                 intrinsics
                     .reflect()
-                    .map(Value::from_object_ref)
-                    .unwrap_or(Value::undefined()),
+                    .map_or(Value::undefined(), Value::from_object_ref),
             ),
             BuiltinAttributes::new(true, false, true),
         ),

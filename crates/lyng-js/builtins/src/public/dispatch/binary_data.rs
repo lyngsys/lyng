@@ -523,9 +523,7 @@ fn typed_array_storage_bits_to_value(
         TypedArrayElementKind::Float64 => Value::from_f64(f64::from_bits(bits)),
         TypedArrayElementKind::Uint32 => {
             let value = bits as u32;
-            i32::try_from(value)
-                .map(Value::from_smi)
-                .unwrap_or_else(|_| Value::from_f64(f64::from(value)))
+            i32::try_from(value).map_or_else(|_| Value::from_f64(f64::from(value)), Value::from_smi)
         }
         TypedArrayElementKind::Uint16 => Value::from_smi(i32::from(bits as u16)),
         TypedArrayElementKind::Uint8Clamped | TypedArrayElementKind::Uint8 => {
@@ -1019,9 +1017,9 @@ fn typed_array_read_element_value(
     record: TypedArrayObjectData,
     index: usize,
 ) -> Value {
-    typed_array_read_storage_bits(agent, record, index)
-        .map(|bits| typed_array_storage_bits_to_value(agent, record.kind(), bits))
-        .unwrap_or(Value::undefined())
+    typed_array_read_storage_bits(agent, record, index).map_or(Value::undefined(), |bits| {
+        typed_array_storage_bits_to_value(agent, record.kind(), bits)
+    })
 }
 
 fn typed_array_constructor_receiver<Cx: PublicBuiltinDispatchContext>(

@@ -304,8 +304,7 @@ fn current_time_value() -> Value {
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
-        .map(|duration| duration.as_millis() as f64)
-        .unwrap_or(f64::NAN);
+        .map_or(f64::NAN, |duration| duration.as_millis() as f64);
     Value::from_f64(millis)
 }
 

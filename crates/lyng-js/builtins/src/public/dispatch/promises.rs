@@ -1045,8 +1045,7 @@ fn reaction_handler_for_value<Cx: PublicBuiltinDispatchContext>(
     value
         .as_object_ref()
         .filter(|object| cx.agent().objects().is_callable(*object))
-        .map(PromiseReactionHandler::Callable)
-        .unwrap_or(fallback)
+        .map_or(fallback, PromiseReactionHandler::Callable)
 }
 
 pub(super) fn promise_default_constructor<Cx: PublicBuiltinDispatchContext>(
@@ -1301,11 +1300,11 @@ fn promise_resolving_function_builtin<Cx: PublicBuiltinDispatchContext>(
             .map_err(|abrupt| cx.abrupt(abrupt))?;
         return Ok(Value::undefined());
     };
+    let fallback_realm = cx.builtin_realm();
     let realm = cx
         .agent()
         .promise_record(promise_object)
-        .map(lyng_js_env::PromiseRecord::realm)
-        .unwrap_or(cx.builtin_realm());
+        .map_or(fallback_realm, lyng_js_env::PromiseRecord::realm);
     promise::enqueue_thenable_job(cx.agent(), realm, promise_object, thenable, then);
     Ok(Value::undefined())
 }

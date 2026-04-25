@@ -1356,8 +1356,7 @@ fn magnitude_bit(limbs: &[u64], bit: usize) -> bool {
     let offset = bit % 64;
     limbs
         .get(limb)
-        .map(|value| ((value >> offset) & 1) != 0)
-        .unwrap_or(false)
+        .is_some_and(|value| ((value >> offset) & 1) != 0)
 }
 
 fn magnitude_any_bits_below(limbs: &[u64], bit_count: usize) -> bool {
@@ -1372,10 +1371,7 @@ fn magnitude_any_bits_below(limbs: &[u64], bit_count: usize) -> bool {
         return false;
     }
     let mask = (1_u64 << remaining_bits) - 1;
-    limbs
-        .get(full_limbs)
-        .map(|limb| (limb & mask) != 0)
-        .unwrap_or(false)
+    limbs.get(full_limbs).is_some_and(|limb| (limb & mask) != 0)
 }
 
 fn bigint_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1855,8 +1851,7 @@ fn symbol_description_getter_builtin<Cx: PublicBuiltinDispatchContext>(
         heap_view
             .symbol_view(symbol)
             .and_then(lyng_js_gc::PrimitiveSymbolView::description)
-            .map(Value::from_string_ref)
-            .unwrap_or(Value::undefined())
+            .map_or(Value::undefined(), Value::from_string_ref)
     };
     Ok(description)
 }

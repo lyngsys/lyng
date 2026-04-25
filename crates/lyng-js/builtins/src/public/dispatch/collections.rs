@@ -1164,14 +1164,13 @@ fn weak_ref_deref_builtin<Cx: PublicBuiltinDispatchContext>(
         .agent()
         .weak_ref_target(object)
         .ok_or_else(|| type_error(cx))?
-        .map(|target| {
+        .map_or(Value::undefined(), |target| {
             cx.agent().keep_weak_target_alive(target);
             match target {
                 WeakHeapRef::Object(object) => Value::from_object_ref(object),
                 WeakHeapRef::Symbol(symbol) => Value::from_symbol_ref(symbol),
             }
-        })
-        .unwrap_or(Value::undefined());
+        });
     Ok(target)
 }
 

@@ -1219,38 +1219,44 @@ pub(super) fn object_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
             "Array"
         } else if is_function {
             "Function"
-        } else if {
-            let agent = cx.agent();
-            agent.objects().is_date_object(object_ref)
-        } {
-            "Date"
-        } else if {
-            let agent = cx.agent();
-            agent.objects().is_regexp_object(object_ref)
-        } {
-            "RegExp"
-        } else if let Some(kind) = {
-            let agent = cx.agent();
-            agent.objects().primitive_wrapper_kind(object_ref)
-        } {
-            match kind {
-                PrimitiveWrapperKind::String => "String",
-                PrimitiveWrapperKind::Number => "Number",
-                PrimitiveWrapperKind::Boolean => "Boolean",
-                PrimitiveWrapperKind::Symbol | PrimitiveWrapperKind::BigInt => "Object",
-            }
-        } else if {
-            let agent = cx.agent();
-            agent
-                .objects()
-                .object_header(agent.heap().view(), object_ref)
-                .is_some_and(|header| header.flags().is_arguments_object())
-        } {
-            "Arguments"
-        } else if is_error_object(cx, object_ref)? {
-            "Error"
         } else {
-            "Object"
+            let is_date = {
+                let agent = cx.agent();
+                agent.objects().is_date_object(object_ref)
+            };
+            let is_regexp = {
+                let agent = cx.agent();
+                agent.objects().is_regexp_object(object_ref)
+            };
+            let primitive_wrapper_kind = {
+                let agent = cx.agent();
+                agent.objects().primitive_wrapper_kind(object_ref)
+            };
+            let is_arguments = {
+                let agent = cx.agent();
+                agent
+                    .objects()
+                    .object_header(agent.heap().view(), object_ref)
+                    .is_some_and(|header| header.flags().is_arguments_object())
+            };
+            if is_date {
+                "Date"
+            } else if is_regexp {
+                "RegExp"
+            } else if let Some(kind) = primitive_wrapper_kind {
+                match kind {
+                    PrimitiveWrapperKind::String => "String",
+                    PrimitiveWrapperKind::Number => "Number",
+                    PrimitiveWrapperKind::Boolean => "Boolean",
+                    PrimitiveWrapperKind::Symbol | PrimitiveWrapperKind::BigInt => "Object",
+                }
+            } else if is_arguments {
+                "Arguments"
+            } else if is_error_object(cx, object_ref)? {
+                "Error"
+            } else {
+                "Object"
+            }
         }
     };
     let to_string_tag = {

@@ -118,9 +118,7 @@ fn dispatch_disposal_scope_builtin<Cx: PublicBuiltinDispatchContext>(
 }
 
 fn disposal_capability_payload_value(id: lyng_js_env::DisposalCapabilityId) -> Value {
-    i32::try_from(id.get())
-        .map(Value::from_smi)
-        .unwrap_or_else(|_| Value::from_f64(f64::from(id.get())))
+    i32::try_from(id.get()).map_or_else(|_| Value::from_f64(f64::from(id.get())), Value::from_smi)
 }
 
 fn disposal_stack_default_prototype<Cx: PublicBuiltinDispatchContext>(
