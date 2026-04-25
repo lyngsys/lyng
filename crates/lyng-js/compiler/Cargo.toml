@@ -10,7 +10,7 @@ lyng-js-sema = { workspace = true }
 lyng-js-env = { workspace = true }
 lyng-js-bytecode = { workspace = true }
 lyng-js-host = { workspace = true }
+lyng-js-parser = { workspace = true }
 lyng-js-types = { workspace = true }
 
 [dev-dependencies]
-lyng-js-parser = { workspace = true }
