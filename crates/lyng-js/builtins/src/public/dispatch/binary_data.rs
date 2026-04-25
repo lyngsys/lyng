@@ -401,7 +401,9 @@ fn allocate_array_buffer_family_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent.realm(realm).and_then(|record| record.root_shape())
+        agent
+            .realm(realm)
+            .and_then(lyng_js_env::RealmRecord::root_shape)
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
@@ -461,7 +463,9 @@ fn allocate_data_view_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent.realm(realm).and_then(|record| record.root_shape())
+        agent
+            .realm(realm)
+            .and_then(lyng_js_env::RealmRecord::root_shape)
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
@@ -627,7 +631,9 @@ fn allocate_typed_array_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent.realm(realm).and_then(|record| record.root_shape())
+        agent
+            .realm(realm)
+            .and_then(lyng_js_env::RealmRecord::root_shape)
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
@@ -802,44 +808,27 @@ fn typed_array_default_prototype<Cx: PublicBuiltinDispatchContext>(
     realm: RealmRef,
     kind: TypedArrayElementKind,
 ) -> Result<ObjectRef, Cx::Error> {
+    let getter: fn(lyng_js_env::Intrinsics) -> Option<ObjectRef> = match kind {
+        TypedArrayElementKind::Int8 => lyng_js_env::Intrinsics::int8_array_prototype,
+        TypedArrayElementKind::Int16 => lyng_js_env::Intrinsics::int16_array_prototype,
+        TypedArrayElementKind::Int32 => lyng_js_env::Intrinsics::int32_array_prototype,
+        TypedArrayElementKind::Float32 => lyng_js_env::Intrinsics::float32_array_prototype,
+        TypedArrayElementKind::Float64 => lyng_js_env::Intrinsics::float64_array_prototype,
+        TypedArrayElementKind::BigInt64 => lyng_js_env::Intrinsics::big_int64_array_prototype,
+        TypedArrayElementKind::BigUint64 => lyng_js_env::Intrinsics::big_uint64_array_prototype,
+        TypedArrayElementKind::Uint32 => lyng_js_env::Intrinsics::uint32_array_prototype,
+        TypedArrayElementKind::Uint16 => lyng_js_env::Intrinsics::uint16_array_prototype,
+        TypedArrayElementKind::Uint8Clamped => {
+            lyng_js_env::Intrinsics::uint8_clamped_array_prototype
+        }
+        TypedArrayElementKind::Uint8 => lyng_js_env::Intrinsics::uint8_array_prototype,
+    };
     let prototype = {
         let agent = cx.agent();
-        let intrinsics = agent.realm(realm).map(|record| record.intrinsics());
-        match kind {
-            TypedArrayElementKind::Int8 => {
-                intrinsics.and_then(|intrinsics| intrinsics.int8_array_prototype())
-            }
-            TypedArrayElementKind::Int16 => {
-                intrinsics.and_then(|intrinsics| intrinsics.int16_array_prototype())
-            }
-            TypedArrayElementKind::Int32 => {
-                intrinsics.and_then(|intrinsics| intrinsics.int32_array_prototype())
-            }
-            TypedArrayElementKind::Float32 => {
-                intrinsics.and_then(|intrinsics| intrinsics.float32_array_prototype())
-            }
-            TypedArrayElementKind::Float64 => {
-                intrinsics.and_then(|intrinsics| intrinsics.float64_array_prototype())
-            }
-            TypedArrayElementKind::BigInt64 => {
-                intrinsics.and_then(|intrinsics| intrinsics.big_int64_array_prototype())
-            }
-            TypedArrayElementKind::BigUint64 => {
-                intrinsics.and_then(|intrinsics| intrinsics.big_uint64_array_prototype())
-            }
-            TypedArrayElementKind::Uint32 => {
-                intrinsics.and_then(|intrinsics| intrinsics.uint32_array_prototype())
-            }
-            TypedArrayElementKind::Uint16 => {
-                intrinsics.and_then(|intrinsics| intrinsics.uint16_array_prototype())
-            }
-            TypedArrayElementKind::Uint8Clamped => {
-                intrinsics.and_then(|intrinsics| intrinsics.uint8_clamped_array_prototype())
-            }
-            TypedArrayElementKind::Uint8 => {
-                intrinsics.and_then(|intrinsics| intrinsics.uint8_array_prototype())
-            }
-        }
+        agent
+            .realm(realm)
+            .map(lyng_js_env::RealmRecord::intrinsics)
+            .and_then(getter)
     };
     prototype.ok_or_else(|| type_error(cx))
 }
@@ -849,44 +838,25 @@ fn typed_array_default_constructor<Cx: PublicBuiltinDispatchContext>(
     realm: RealmRef,
     kind: TypedArrayElementKind,
 ) -> Result<ObjectRef, Cx::Error> {
+    let getter: fn(lyng_js_env::Intrinsics) -> Option<ObjectRef> = match kind {
+        TypedArrayElementKind::Int8 => lyng_js_env::Intrinsics::int8_array,
+        TypedArrayElementKind::Int16 => lyng_js_env::Intrinsics::int16_array,
+        TypedArrayElementKind::Int32 => lyng_js_env::Intrinsics::int32_array,
+        TypedArrayElementKind::Float32 => lyng_js_env::Intrinsics::float32_array,
+        TypedArrayElementKind::Float64 => lyng_js_env::Intrinsics::float64_array,
+        TypedArrayElementKind::BigInt64 => lyng_js_env::Intrinsics::big_int64_array,
+        TypedArrayElementKind::BigUint64 => lyng_js_env::Intrinsics::big_uint64_array,
+        TypedArrayElementKind::Uint32 => lyng_js_env::Intrinsics::uint32_array,
+        TypedArrayElementKind::Uint16 => lyng_js_env::Intrinsics::uint16_array,
+        TypedArrayElementKind::Uint8Clamped => lyng_js_env::Intrinsics::uint8_clamped_array,
+        TypedArrayElementKind::Uint8 => lyng_js_env::Intrinsics::uint8_array,
+    };
     let constructor = {
         let agent = cx.agent();
-        let intrinsics = agent.realm(realm).map(|record| record.intrinsics());
-        match kind {
-            TypedArrayElementKind::Int8 => {
-                intrinsics.and_then(|intrinsics| intrinsics.int8_array())
-            }
-            TypedArrayElementKind::Int16 => {
-                intrinsics.and_then(|intrinsics| intrinsics.int16_array())
-            }
-            TypedArrayElementKind::Int32 => {
-                intrinsics.and_then(|intrinsics| intrinsics.int32_array())
-            }
-            TypedArrayElementKind::Float32 => {
-                intrinsics.and_then(|intrinsics| intrinsics.float32_array())
-            }
-            TypedArrayElementKind::Float64 => {
-                intrinsics.and_then(|intrinsics| intrinsics.float64_array())
-            }
-            TypedArrayElementKind::BigInt64 => {
-                intrinsics.and_then(|intrinsics| intrinsics.big_int64_array())
-            }
-            TypedArrayElementKind::BigUint64 => {
-                intrinsics.and_then(|intrinsics| intrinsics.big_uint64_array())
-            }
-            TypedArrayElementKind::Uint32 => {
-                intrinsics.and_then(|intrinsics| intrinsics.uint32_array())
-            }
-            TypedArrayElementKind::Uint16 => {
-                intrinsics.and_then(|intrinsics| intrinsics.uint16_array())
-            }
-            TypedArrayElementKind::Uint8Clamped => {
-                intrinsics.and_then(|intrinsics| intrinsics.uint8_clamped_array())
-            }
-            TypedArrayElementKind::Uint8 => {
-                intrinsics.and_then(|intrinsics| intrinsics.uint8_array())
-            }
-        }
+        agent
+            .realm(realm)
+            .map(lyng_js_env::RealmRecord::intrinsics)
+            .and_then(getter)
     };
     constructor.ok_or_else(|| type_error(cx))
 }
