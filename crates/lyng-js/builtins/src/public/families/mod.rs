@@ -2,7 +2,9 @@ mod collections;
 mod functions;
 mod objects;
 
-use lyng_js_types::{EnvironmentRef, ObjectRef, RealmRef, ShapeId};
+use crate::public::{allocate_builtin_function_object, public_builtin_metadata};
+use lyng_js_env::Agent;
+use lyng_js_types::{BuiltinFunctionId, EnvironmentRef, ObjectRef, RealmRef, ShapeId};
 
 pub(super) use collections::install_collection_family;
 pub(super) use functions::install_function_family;
@@ -15,6 +17,27 @@ pub(super) struct FamilyInstallContext {
     pub(super) root_shape: ShapeId,
     pub(super) function_prototype: ObjectRef,
     pub(super) object_prototype: ObjectRef,
+}
+
+pub(super) fn install_public_builtin_function(
+    agent: &mut Agent,
+    cx: FamilyInstallContext,
+    entry: BuiltinFunctionId,
+    prototype_object: Option<ObjectRef>,
+) -> ObjectRef {
+    let metadata =
+        public_builtin_metadata(entry).expect("family installer entry must have public metadata");
+    allocate_builtin_function_object(
+        agent,
+        cx.realm,
+        cx.global_env,
+        cx.root_shape,
+        cx.function_prototype,
+        cx.object_prototype,
+        entry,
+        metadata,
+        prototype_object,
+    )
 }
 
 #[derive(Clone, Copy, Debug)]
