@@ -1,6 +1,7 @@
 use super::{
     install_public_builtin_function, DateFamilyBuiltins, DateFamilyPrototypes, FamilyInstallContext,
 };
+use crate::public::PublicRealmBuiltins;
 use lyng_js_env::Agent;
 use lyng_js_types::{
     js3_date_builtin, js3_date_get_date_builtin, js3_date_get_day_builtin,
@@ -22,7 +23,7 @@ use lyng_js_types::{
     js3_date_to_locale_time_string_builtin, js3_date_to_primitive_builtin,
     js3_date_to_string_builtin, js3_date_to_temporal_instant_builtin,
     js3_date_to_time_string_builtin, js3_date_to_utc_string_builtin, js3_date_utc_builtin,
-    js3_date_value_of_builtin, ObjectRef,
+    js3_date_value_of_builtin, BuiltinFunctionId, ObjectRef,
 };
 
 pub(in crate::public) fn install_date_family(
@@ -93,6 +94,199 @@ pub(in crate::public) fn install_date_family(
         date_to_primitive: conversions.to_primitive,
         date_to_temporal_instant: conversions.to_temporal_instant,
     }
+}
+
+pub(in crate::public) fn date_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    if let Some(object) = date_static_builtin_object(builtins, entry) {
+        return Some(object);
+    }
+    if let Some(object) = date_format_builtin_object(builtins, entry) {
+        return Some(object);
+    }
+    if let Some(object) = date_getter_builtin_object(builtins, entry) {
+        return Some(object);
+    }
+    if let Some(object) = date_setter_builtin_object(builtins, entry) {
+        return Some(object);
+    }
+    date_conversion_builtin_object(builtins, entry)
+}
+
+fn date_static_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_date_builtin(), builtins.date),
+        (js3_date_now_builtin(), builtins.date_now),
+        (js3_date_parse_builtin(), builtins.date_parse),
+        (js3_date_utc_builtin(), builtins.date_utc),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn date_format_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_date_to_string_builtin(), builtins.date_to_string),
+        (
+            js3_date_to_date_string_builtin(),
+            builtins.date_to_date_string,
+        ),
+        (
+            js3_date_to_time_string_builtin(),
+            builtins.date_to_time_string,
+        ),
+        (
+            js3_date_to_locale_string_builtin(),
+            builtins.date_to_locale_string,
+        ),
+        (
+            js3_date_to_locale_date_string_builtin(),
+            builtins.date_to_locale_date_string,
+        ),
+        (
+            js3_date_to_locale_time_string_builtin(),
+            builtins.date_to_locale_time_string,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn date_getter_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_date_get_time_builtin(), builtins.date_get_time),
+        (
+            js3_date_get_full_year_builtin(),
+            builtins.date_get_full_year,
+        ),
+        (
+            js3_date_get_utc_full_year_builtin(),
+            builtins.date_get_utc_full_year,
+        ),
+        (js3_date_get_month_builtin(), builtins.date_get_month),
+        (
+            js3_date_get_utc_month_builtin(),
+            builtins.date_get_utc_month,
+        ),
+        (js3_date_get_date_builtin(), builtins.date_get_date),
+        (js3_date_get_utc_date_builtin(), builtins.date_get_utc_date),
+        (js3_date_get_day_builtin(), builtins.date_get_day),
+        (js3_date_get_utc_day_builtin(), builtins.date_get_utc_day),
+        (js3_date_get_hours_builtin(), builtins.date_get_hours),
+        (
+            js3_date_get_utc_hours_builtin(),
+            builtins.date_get_utc_hours,
+        ),
+        (js3_date_get_minutes_builtin(), builtins.date_get_minutes),
+        (
+            js3_date_get_utc_minutes_builtin(),
+            builtins.date_get_utc_minutes,
+        ),
+        (js3_date_get_seconds_builtin(), builtins.date_get_seconds),
+        (
+            js3_date_get_utc_seconds_builtin(),
+            builtins.date_get_utc_seconds,
+        ),
+        (
+            js3_date_get_milliseconds_builtin(),
+            builtins.date_get_milliseconds,
+        ),
+        (
+            js3_date_get_utc_milliseconds_builtin(),
+            builtins.date_get_utc_milliseconds,
+        ),
+        (
+            js3_date_get_timezone_offset_builtin(),
+            builtins.date_get_timezone_offset,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn date_setter_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_date_set_time_builtin(), builtins.date_set_time),
+        (
+            js3_date_set_milliseconds_builtin(),
+            builtins.date_set_milliseconds,
+        ),
+        (
+            js3_date_set_utc_milliseconds_builtin(),
+            builtins.date_set_utc_milliseconds,
+        ),
+        (js3_date_set_seconds_builtin(), builtins.date_set_seconds),
+        (
+            js3_date_set_utc_seconds_builtin(),
+            builtins.date_set_utc_seconds,
+        ),
+        (js3_date_set_minutes_builtin(), builtins.date_set_minutes),
+        (
+            js3_date_set_utc_minutes_builtin(),
+            builtins.date_set_utc_minutes,
+        ),
+        (js3_date_set_hours_builtin(), builtins.date_set_hours),
+        (
+            js3_date_set_utc_hours_builtin(),
+            builtins.date_set_utc_hours,
+        ),
+        (js3_date_set_date_builtin(), builtins.date_set_date),
+        (js3_date_set_utc_date_builtin(), builtins.date_set_utc_date),
+        (js3_date_set_month_builtin(), builtins.date_set_month),
+        (
+            js3_date_set_utc_month_builtin(),
+            builtins.date_set_utc_month,
+        ),
+        (
+            js3_date_set_full_year_builtin(),
+            builtins.date_set_full_year,
+        ),
+        (
+            js3_date_set_utc_full_year_builtin(),
+            builtins.date_set_utc_full_year,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn date_conversion_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_date_value_of_builtin(), builtins.date_value_of),
+        (
+            js3_date_to_utc_string_builtin(),
+            builtins.date_to_utc_string,
+        ),
+        (
+            js3_date_to_iso_string_builtin(),
+            builtins.date_to_iso_string,
+        ),
+        (js3_date_to_json_builtin(), builtins.date_to_json),
+        (js3_date_to_primitive_builtin(), builtins.date_to_primitive),
+        (
+            js3_date_to_temporal_instant_builtin(),
+            builtins.date_to_temporal_instant,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
 }
 
 #[derive(Clone, Copy, Debug)]
