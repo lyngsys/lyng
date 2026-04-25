@@ -3135,7 +3135,7 @@ fn proxy_get_prototype_of<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: ObjectRef,
 ) -> Result<Option<ObjectRef>, Cx::Error> {
-    proxy::get_prototype_of(&mut BuiltinProxyBridge { cx }, object_ref)
+    object::get_prototype_of_in_context(&mut BuiltinProxyBridge { cx }, object_ref)
 }
 
 fn proxy_set_prototype_of<Cx: PublicBuiltinDispatchContext>(
@@ -3143,7 +3143,7 @@ fn proxy_set_prototype_of<Cx: PublicBuiltinDispatchContext>(
     object_ref: ObjectRef,
     prototype: Option<ObjectRef>,
 ) -> Result<bool, Cx::Error> {
-    proxy::set_prototype_of(&mut BuiltinProxyBridge { cx }, object_ref, prototype)
+    object::set_prototype_of_in_context(&mut BuiltinProxyBridge { cx }, object_ref, prototype)
 }
 
 fn proxy_get_own_property<Cx: PublicBuiltinDispatchContext>(
@@ -3151,7 +3151,7 @@ fn proxy_get_own_property<Cx: PublicBuiltinDispatchContext>(
     object_ref: ObjectRef,
     key: PropertyKey,
 ) -> Result<Option<PropertyDescriptor>, Cx::Error> {
-    proxy::get_own_property(&mut BuiltinProxyBridge { cx }, object_ref, key)
+    object::get_own_property_in_context(&mut BuiltinProxyBridge { cx }, object_ref, key)
 }
 
 fn proxy_define_property<Cx: PublicBuiltinDispatchContext>(
@@ -3161,7 +3161,7 @@ fn proxy_define_property<Cx: PublicBuiltinDispatchContext>(
     descriptor: PropertyDescriptor,
     lifetime: AllocationLifetime,
 ) -> Result<bool, Cx::Error> {
-    proxy::define_property(
+    object::define_property_in_context(
         &mut BuiltinProxyBridge { cx },
         object_ref,
         key,
@@ -3175,14 +3175,14 @@ fn proxy_has_property<Cx: PublicBuiltinDispatchContext>(
     object_ref: ObjectRef,
     key: PropertyKey,
 ) -> Result<bool, Cx::Error> {
-    proxy::has_property(&mut BuiltinProxyBridge { cx }, object_ref, key)
+    object::has_property_in_context(&mut BuiltinProxyBridge { cx }, object_ref, key)
 }
 
 fn proxy_own_property_keys<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: ObjectRef,
 ) -> Result<Vec<PropertyKey>, Cx::Error> {
-    proxy::own_property_keys(&mut BuiltinProxyBridge { cx }, object_ref)
+    object::own_property_keys_in_context(&mut BuiltinProxyBridge { cx }, object_ref)
 }
 
 fn proxy_is_extensible<Cx: PublicBuiltinDispatchContext>(
@@ -12990,7 +12990,7 @@ fn ordinary_has_instance<Cx: PublicBuiltinDispatchContext>(
 
     let prototype = {
         let mut bridge = BuiltinProxyBridge { cx };
-        proxy::get(
+        object::get_with_receiver_in_context(
             &mut bridge,
             constructor,
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),
@@ -13002,7 +13002,7 @@ fn ordinary_has_instance<Cx: PublicBuiltinDispatchContext>(
 
     let mut current = {
         let mut bridge = BuiltinProxyBridge { cx };
-        proxy::get_prototype_of(&mut bridge, object)?
+        object::get_prototype_of_in_context(&mut bridge, object)?
     };
     while let Some(candidate) = current {
         if candidate == prototype {
@@ -13010,7 +13010,7 @@ fn ordinary_has_instance<Cx: PublicBuiltinDispatchContext>(
         }
         current = {
             let mut bridge = BuiltinProxyBridge { cx };
-            proxy::get_prototype_of(&mut bridge, candidate)?
+            object::get_prototype_of_in_context(&mut bridge, candidate)?
         };
     }
     Ok(false)
