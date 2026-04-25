@@ -79,6 +79,9 @@ Rules:
   required shared prototype handles are available
 - family modules own their `BuiltinFunctionId -> ObjectRef` lookup tables; the realm-level
   lookup only orchestrates family queries
+- `public/families/scaffolding.rs` owns the public realm skeleton allocation pass: core
+  `Object`/`Function` prototypes, reused internal prototypes, namespace shells, and the
+  prototype handle set passed into family installers and realm intrinsics
 - `public/families/installed.rs` owns aggregation from installed family handles back into
   `PublicRealmBuiltins`
 - object and function family allocation live in `public/families/objects.rs` and
@@ -122,6 +125,8 @@ Phase 5 requires a skeleton-allocation pass for at least:
 Rules:
 
 - skeleton allocation creates objects with the correct coarse kind and placeholder internal links
+- skeleton allocation lives in `public/families/scaffolding.rs`; `ensure_public_realm_builtins`
+  should call that owner and then orchestrate family installation, not allocate family shells inline
 - `Function.prototype` is itself allocated as a callable builtin function object, not as an
   ordinary prototype shell
 - prototype and constructor references are patched during the link pass, not by ad hoc late mutation

@@ -14,6 +14,7 @@ mod objects;
 mod primitives;
 mod promises;
 mod regexp;
+mod scaffolding;
 mod strings;
 
 use crate::public::{allocate_builtin_function_object, public_builtin_metadata};
@@ -41,6 +42,7 @@ pub(super) use objects::{install_object_family, object_builtin_object};
 pub(super) use primitives::{install_primitive_family, primitive_builtin_object};
 pub(super) use promises::{install_promise_disposal_family, promise_disposal_builtin_object};
 pub(super) use regexp::{install_regexp_family, regexp_builtin_object};
+pub(super) use scaffolding::{allocate_public_realm_scaffolding, ScaffoldingRequest};
 pub(super) use strings::{install_string_family, string_builtin_object};
 
 #[derive(Clone, Copy, Debug)]

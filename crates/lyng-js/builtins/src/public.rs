@@ -13,10 +13,10 @@ use crate::{
 };
 use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, SymbolFlags};
+use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, ObjectAllocation,
-    ObjectColdData, ObjectFlags, PrimitiveWrapperKind,
+    ObjectColdData, PrimitiveWrapperKind,
 };
 use lyng_js_types::{
     js3_abstract_module_source_builtin, js3_abstract_module_source_to_string_tag_getter_builtin,
@@ -945,486 +945,51 @@ impl BuiltinCache {
         let root_shape = realm_record.root_shape()?;
         let global_env = realm_record.global_env();
         let existing_intrinsics = realm_record.intrinsics();
-        let object_prototype = allocate_builtin_ordinary_object(agent, root_shape, None);
-        let _ = agent
-            .objects_mut()
-            .insert_flags(object_prototype, ObjectFlags::IMMUTABLE_PROTOTYPE);
-        let function_prototype = allocate_builtin_function_object(
+        let scaffolding = families::allocate_public_realm_scaffolding(
             agent,
-            realm,
-            global_env,
-            root_shape,
-            object_prototype,
-            object_prototype,
-            js3_function_prototype_builtin(),
-            public_builtin_metadata(js3_function_prototype_builtin()).unwrap(),
-            None,
+            families::ScaffoldingRequest {
+                realm,
+                global_env,
+                root_shape,
+                internal,
+                intrinsics: &existing_intrinsics,
+            },
         );
-        if let Some(throw_type_error) =
-            internal.builtin_object(js3_internal_throw_type_error_builtin())
-        {
-            reparent_builtin_object(agent, throw_type_error, Some(function_prototype));
-        }
-        let async_function_prototype = existing_intrinsics
-            .async_function_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(function_prototype))
-            });
-        reparent_builtin_object(agent, async_function_prototype, Some(function_prototype));
-        let async_generator_function_prototype = existing_intrinsics
-            .async_generator_function_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(function_prototype))
-            });
-        reparent_builtin_object(
-            agent,
-            async_generator_function_prototype,
-            Some(function_prototype),
-        );
-        let generator_function_prototype = existing_intrinsics
-            .generator_function_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(function_prototype))
-            });
-        reparent_builtin_object(
-            agent,
-            generator_function_prototype,
-            Some(function_prototype),
-        );
-        let boolean_prototype = existing_intrinsics
-            .boolean_prototype()
-            .filter(|object| {
-                agent.objects().primitive_wrapper_kind(*object)
-                    == Some(PrimitiveWrapperKind::Boolean)
-            })
-            .unwrap_or_else(|| {
-                allocate_builtin_primitive_wrapper_object(
-                    agent,
-                    root_shape,
-                    Some(object_prototype),
-                    PrimitiveWrapperKind::Boolean,
-                    Value::from_bool(false),
-                )
-            });
-        reparent_builtin_object(agent, boolean_prototype, Some(object_prototype));
-        let symbol_prototype = existing_intrinsics
-            .symbol_prototype()
-            .filter(|object| {
-                agent.objects().primitive_wrapper_kind(*object)
-                    == Some(PrimitiveWrapperKind::Symbol)
-            })
-            .unwrap_or_else(|| {
-                let symbol = agent.heap_mut().mutator().alloc_symbol(
-                    None,
-                    SymbolFlags::ordinary(),
-                    AllocationLifetime::Default,
-                );
-                allocate_builtin_primitive_wrapper_object(
-                    agent,
-                    root_shape,
-                    Some(object_prototype),
-                    PrimitiveWrapperKind::Symbol,
-                    Value::from_symbol_ref(symbol),
-                )
-            });
-        reparent_builtin_object(agent, symbol_prototype, Some(object_prototype));
-        let array_prototype = internal.array_prototype();
-        reparent_builtin_object(agent, array_prototype, Some(object_prototype));
-        let array_unscopables = allocate_builtin_ordinary_object(agent, root_shape, None);
-        let map_prototype = existing_intrinsics.map_prototype().unwrap_or_else(|| {
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-        });
-        reparent_builtin_object(agent, map_prototype, Some(object_prototype));
-        let set_prototype = existing_intrinsics.set_prototype().unwrap_or_else(|| {
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-        });
-        reparent_builtin_object(agent, set_prototype, Some(object_prototype));
-        let weak_map_prototype = existing_intrinsics.weak_map_prototype().unwrap_or_else(|| {
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-        });
-        reparent_builtin_object(agent, weak_map_prototype, Some(object_prototype));
-        let weak_set_prototype = existing_intrinsics.weak_set_prototype().unwrap_or_else(|| {
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-        });
-        reparent_builtin_object(agent, weak_set_prototype, Some(object_prototype));
-        let weak_ref_prototype = existing_intrinsics.weak_ref_prototype().unwrap_or_else(|| {
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-        });
-        reparent_builtin_object(agent, weak_ref_prototype, Some(object_prototype));
-        let finalization_registry_prototype = existing_intrinsics
-            .finalization_registry_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(
-            agent,
-            finalization_registry_prototype,
-            Some(object_prototype),
-        );
-        let array_buffer_prototype =
-            existing_intrinsics
-                .array_buffer_prototype()
-                .unwrap_or_else(|| {
-                    allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-                });
-        reparent_builtin_object(agent, array_buffer_prototype, Some(object_prototype));
-        let shared_array_buffer_prototype = existing_intrinsics
-            .shared_array_buffer_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(agent, shared_array_buffer_prototype, Some(object_prototype));
-        let data_view_prototype = existing_intrinsics
-            .data_view_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(agent, data_view_prototype, Some(object_prototype));
-        let typed_array_prototype =
-            existing_intrinsics
-                .typed_array_prototype()
-                .unwrap_or_else(|| {
-                    allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-                });
-        reparent_builtin_object(agent, typed_array_prototype, Some(object_prototype));
-        let int8_array_prototype =
-            existing_intrinsics
-                .int8_array_prototype()
-                .unwrap_or_else(|| {
-                    allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-                });
-        reparent_builtin_object(agent, int8_array_prototype, Some(typed_array_prototype));
-        let int16_array_prototype =
-            existing_intrinsics
-                .int16_array_prototype()
-                .unwrap_or_else(|| {
-                    allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-                });
-        reparent_builtin_object(agent, int16_array_prototype, Some(typed_array_prototype));
-        let int32_array_prototype =
-            existing_intrinsics
-                .int32_array_prototype()
-                .unwrap_or_else(|| {
-                    allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-                });
-        reparent_builtin_object(agent, int32_array_prototype, Some(typed_array_prototype));
-        let float32_array_prototype = existing_intrinsics
-            .float32_array_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(agent, float32_array_prototype, Some(typed_array_prototype));
-        let float64_array_prototype = existing_intrinsics
-            .float64_array_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(agent, float64_array_prototype, Some(typed_array_prototype));
-        let big_int64_array_prototype = existing_intrinsics
-            .big_int64_array_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(
-            agent,
-            big_int64_array_prototype,
-            Some(typed_array_prototype),
-        );
-        let big_uint64_array_prototype = existing_intrinsics
-            .big_uint64_array_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(
-            agent,
-            big_uint64_array_prototype,
-            Some(typed_array_prototype),
-        );
-        let uint32_array_prototype =
-            existing_intrinsics
-                .uint32_array_prototype()
-                .unwrap_or_else(|| {
-                    allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-                });
-        reparent_builtin_object(agent, uint32_array_prototype, Some(typed_array_prototype));
-        let uint16_array_prototype =
-            existing_intrinsics
-                .uint16_array_prototype()
-                .unwrap_or_else(|| {
-                    allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-                });
-        reparent_builtin_object(agent, uint16_array_prototype, Some(typed_array_prototype));
-        let uint8_clamped_array_prototype = existing_intrinsics
-            .uint8_clamped_array_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(
-            agent,
-            uint8_clamped_array_prototype,
-            Some(typed_array_prototype),
-        );
-        let uint8_array_prototype =
-            existing_intrinsics
-                .uint8_array_prototype()
-                .unwrap_or_else(|| {
-                    allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-                });
-        reparent_builtin_object(agent, uint8_array_prototype, Some(typed_array_prototype));
-        let iterator_prototype = existing_intrinsics.iterator_prototype().unwrap_or_else(|| {
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-        });
-        reparent_builtin_object(agent, iterator_prototype, Some(object_prototype));
-        let async_iterator_prototype = existing_intrinsics
-            .async_iterator_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(agent, async_iterator_prototype, Some(object_prototype));
-        let generator_prototype = existing_intrinsics
-            .generator_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(iterator_prototype))
-            });
-        reparent_builtin_object(agent, generator_prototype, Some(iterator_prototype));
-        let async_generator_prototype = existing_intrinsics
-            .async_generator_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(async_iterator_prototype))
-            });
-        reparent_builtin_object(
-            agent,
-            async_generator_prototype,
-            Some(async_iterator_prototype),
-        );
-        let async_from_sync_iterator_prototype = existing_intrinsics
-            .async_from_sync_iterator_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(async_iterator_prototype))
-            });
-        reparent_builtin_object(
-            agent,
-            async_from_sync_iterator_prototype,
-            Some(async_iterator_prototype),
-        );
-        let array_iterator_prototype = existing_intrinsics
-            .array_iterator_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(iterator_prototype))
-            });
-        reparent_builtin_object(agent, array_iterator_prototype, Some(iterator_prototype));
-        let map_iterator_prototype =
-            existing_intrinsics
-                .map_iterator_prototype()
-                .unwrap_or_else(|| {
-                    allocate_builtin_ordinary_object(agent, root_shape, Some(iterator_prototype))
-                });
-        reparent_builtin_object(agent, map_iterator_prototype, Some(iterator_prototype));
-        let set_iterator_prototype =
-            existing_intrinsics
-                .set_iterator_prototype()
-                .unwrap_or_else(|| {
-                    allocate_builtin_ordinary_object(agent, root_shape, Some(iterator_prototype))
-                });
-        reparent_builtin_object(agent, set_iterator_prototype, Some(iterator_prototype));
-        let string_prototype = internal.string_prototype();
-        reparent_builtin_object(agent, string_prototype, Some(object_prototype));
-        let string_iterator_prototype = existing_intrinsics
-            .string_iterator_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(iterator_prototype))
-            });
-        reparent_builtin_object(agent, string_iterator_prototype, Some(iterator_prototype));
-        let regexp_prototype = existing_intrinsics.regexp_prototype().unwrap_or_else(|| {
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-        });
-        reparent_builtin_object(agent, regexp_prototype, Some(object_prototype));
-        let date_prototype = existing_intrinsics.date_prototype().unwrap_or_else(|| {
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-        });
-        reparent_builtin_object(agent, date_prototype, Some(object_prototype));
-        let number_prototype = internal.number_prototype();
-        let bigint_prototype = internal.bigint_prototype();
-        reparent_builtin_object(agent, number_prototype, Some(object_prototype));
-        reparent_builtin_object(agent, bigint_prototype, Some(object_prototype));
-        let math = allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype));
-        let json = allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype));
-        let reflect = allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype));
-        let abstract_module_source_prototype =
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype));
-
-        let error_prototype =
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype));
-        let eval_error_prototype =
-            allocate_builtin_ordinary_object(agent, root_shape, Some(error_prototype));
-        let range_error_prototype =
-            allocate_builtin_ordinary_object(agent, root_shape, Some(error_prototype));
-        let reference_error_prototype =
-            allocate_builtin_ordinary_object(agent, root_shape, Some(error_prototype));
-        let syntax_error_prototype =
-            allocate_builtin_ordinary_object(agent, root_shape, Some(error_prototype));
-        let type_error_prototype =
-            allocate_builtin_ordinary_object(agent, root_shape, Some(error_prototype));
-        let uri_error_prototype =
-            allocate_builtin_ordinary_object(agent, root_shape, Some(error_prototype));
-        let aggregate_error_prototype =
-            allocate_builtin_ordinary_object(agent, root_shape, Some(error_prototype));
-        let suppressed_error_prototype =
-            allocate_builtin_ordinary_object(agent, root_shape, Some(error_prototype));
-        let promise_prototype = existing_intrinsics.promise_prototype().unwrap_or_else(|| {
-            allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-        });
-        reparent_builtin_object(agent, promise_prototype, Some(object_prototype));
-        let disposable_stack_prototype = existing_intrinsics
-            .disposable_stack_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(agent, disposable_stack_prototype, Some(object_prototype));
-        let async_disposable_stack_prototype = existing_intrinsics
-            .async_disposable_stack_prototype()
-            .unwrap_or_else(|| {
-                allocate_builtin_ordinary_object(agent, root_shape, Some(object_prototype))
-            });
-        reparent_builtin_object(
-            agent,
-            async_disposable_stack_prototype,
-            Some(object_prototype),
-        );
-
-        let family_context = families::FamilyInstallContext {
-            realm,
-            global_env,
-            root_shape,
-            function_prototype,
-            object_prototype,
-        };
+        let family_context = scaffolding.cx;
         let object_family = families::install_object_family(agent, family_context);
-        let function_family = families::install_function_family(
-            agent,
-            family_context,
-            families::FunctionFamilyPrototypes {
-                async_function_prototype,
-                async_generator_function_prototype,
-                async_generator_prototype,
-                generator_function_prototype,
-                generator_prototype,
-            },
-        );
-        let iterator_family = families::install_iterator_family(
-            agent,
-            family_context,
-            families::IteratorFamilyPrototypes {
-                async_iterator_prototype,
-            },
-        );
-        let collection_family = families::install_collection_family(
-            agent,
-            family_context,
-            families::CollectionFamilyPrototypes {
-                map_prototype,
-                set_prototype,
-                weak_map_prototype,
-                weak_set_prototype,
-                weak_ref_prototype,
-                finalization_registry_prototype,
-            },
-        );
-        let binary_data_family = families::install_binary_data_family(
-            agent,
-            family_context,
-            families::BinaryDataFamilyPrototypes {
-                array_buffer_prototype,
-                shared_array_buffer_prototype,
-                data_view_prototype,
-                typed_array_prototype,
-                int8_array_prototype,
-                int16_array_prototype,
-                int32_array_prototype,
-                float32_array_prototype,
-                float64_array_prototype,
-                big_int64_array_prototype,
-                big_uint64_array_prototype,
-                uint32_array_prototype,
-                uint16_array_prototype,
-                uint8_clamped_array_prototype,
-                uint8_array_prototype,
-            },
-        );
-        let array_family = families::install_array_family(
-            agent,
-            family_context,
-            families::ArrayFamilyPrototypes {
-                array_prototype,
-                array_unscopables,
-            },
-        );
-        let string_family = families::install_string_family(
-            agent,
-            family_context,
-            families::StringFamilyPrototypes { string_prototype },
-        );
-        let regexp_family = families::install_regexp_family(
-            agent,
-            family_context,
-            families::RegExpFamilyPrototypes { regexp_prototype },
-        );
-        let date_family = families::install_date_family(
-            agent,
-            family_context,
-            families::DateFamilyPrototypes { date_prototype },
-        );
+        let function_family =
+            families::install_function_family(agent, family_context, scaffolding.function);
+        let iterator_family =
+            families::install_iterator_family(agent, family_context, scaffolding.iterator);
+        let collection_family =
+            families::install_collection_family(agent, family_context, scaffolding.collection);
+        let binary_data_family =
+            families::install_binary_data_family(agent, family_context, scaffolding.binary_data);
+        let array_family = families::install_array_family(agent, family_context, scaffolding.array);
+        let string_family =
+            families::install_string_family(agent, family_context, scaffolding.string);
+        let regexp_family =
+            families::install_regexp_family(agent, family_context, scaffolding.regexp);
+        let date_family = families::install_date_family(agent, family_context, scaffolding.date);
         let primitive_family = families::install_primitive_family(
             agent,
             family_context,
-            families::PrimitiveFamilyPrototypes {
-                number_prototype,
-                bigint_prototype,
-                boolean_prototype,
-                symbol_prototype,
-            },
-            families::PrimitiveFamilyObjects { math },
+            scaffolding.primitive,
+            scaffolding.primitive_objects,
         );
-        let json_family = families::install_json_family(
-            agent,
-            family_context,
-            families::JsonFamilyObjects { json },
-        );
+        let json_family = families::install_json_family(agent, family_context, scaffolding.json);
         let object_reflection_family = families::install_object_reflection_family(
             agent,
             family_context,
-            families::ObjectReflectionFamilyObjects { reflect },
+            scaffolding.object_reflection,
         );
-        let module_family = families::install_module_family(
-            agent,
-            family_context,
-            families::ModuleFamilyPrototypes {
-                abstract_module_source_prototype,
-            },
-        );
-        let error_family = families::install_error_family(
-            agent,
-            family_context,
-            families::ErrorFamilyPrototypes {
-                error_prototype,
-                eval_error_prototype,
-                range_error_prototype,
-                reference_error_prototype,
-                syntax_error_prototype,
-                type_error_prototype,
-                uri_error_prototype,
-                aggregate_error_prototype,
-                suppressed_error_prototype,
-            },
-        );
+        let module_family =
+            families::install_module_family(agent, family_context, scaffolding.module);
+        let error_family = families::install_error_family(agent, family_context, scaffolding.error);
         let promise_disposal_family = families::install_promise_disposal_family(
             agent,
             family_context,
-            families::PromiseDisposalFamilyPrototypes {
-                promise_prototype,
-                disposable_stack_prototype,
-                async_disposable_stack_prototype,
-            },
+            scaffolding.promise_disposal,
         );
         let global_function_family =
             families::install_global_function_family(agent, family_context);
@@ -1449,42 +1014,12 @@ impl BuiltinCache {
         }
         .public_realm_builtins();
         families::link_installed_family_prototypes(agent, &builtins);
-        let prototype_handles = families::PublicRealmPrototypeHandles {
-            array_prototype,
-            map_prototype,
-            map_iterator_prototype,
-            set_prototype,
-            set_iterator_prototype,
-            weak_map_prototype,
-            weak_set_prototype,
-            weak_ref_prototype,
-            finalization_registry_prototype,
-            array_buffer_prototype,
-            shared_array_buffer_prototype,
-            data_view_prototype,
-            typed_array_prototype,
-            int8_array_prototype,
-            int16_array_prototype,
-            int32_array_prototype,
-            float32_array_prototype,
-            float64_array_prototype,
-            big_int64_array_prototype,
-            big_uint64_array_prototype,
-            uint32_array_prototype,
-            uint16_array_prototype,
-            uint8_clamped_array_prototype,
-            uint8_array_prototype,
-            iterator_prototype,
-            async_from_sync_iterator_prototype,
-            array_iterator_prototype,
-            string_iterator_prototype,
-        };
         if !families::install_public_realm_intrinsics(
             agent,
             realm,
             &existing_intrinsics,
             &builtins,
-            &prototype_handles,
+            &scaffolding.intrinsics,
         ) {
             return None;
         }
