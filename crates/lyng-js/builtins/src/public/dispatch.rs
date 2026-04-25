@@ -1,3 +1,4 @@
+mod arrays;
 mod collections;
 mod functions;
 mod objects;
@@ -581,6 +582,9 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if let Some(result) = collections::dispatch_collection_builtin(context, entry, invocation)? {
         return Ok(Some(result));
     }
+    if let Some(result) = arrays::dispatch_array_builtin(context, entry, invocation)? {
+        return Ok(Some(result));
+    }
     if entry == js3_array_buffer_builtin() {
         return array_buffer_builtin(context, invocation).map(Some);
     }
@@ -988,143 +992,8 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
         )
         .map(Some);
     }
-    if entry == js3_array_builtin() {
-        return array_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_from_builtin() {
-        return array_from_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_from_async_builtin() {
-        return array_from_async_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_of_builtin() {
-        return array_of_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_is_array_builtin() {
-        return array_is_array_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_at_builtin() {
-        return array_at_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_concat_builtin() {
-        return array_concat_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_copy_within_builtin() {
-        return array_copy_within_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_fill_builtin() {
-        return array_fill_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_join_builtin() {
-        return array_join_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_pop_builtin() {
-        return array_pop_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_push_builtin() {
-        return array_push_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_shift_builtin() {
-        return array_shift_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_unshift_builtin() {
-        return array_unshift_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_every_builtin() {
-        return array_every_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_filter_builtin() {
-        return array_filter_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_flat_builtin() {
-        return array_flat_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_flat_map_builtin() {
-        return array_flat_map_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_find_builtin() {
-        return array_find_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_find_index_builtin() {
-        return array_find_index_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_find_last_builtin() {
-        return array_find_last_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_find_last_index_builtin() {
-        return array_find_last_index_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_for_each_builtin() {
-        return array_for_each_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_includes_builtin() {
-        return array_includes_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_index_of_builtin() {
-        return array_index_of_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_map_builtin() {
-        return array_map_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_reduce_builtin() {
-        return array_reduce_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_reduce_right_builtin() {
-        return array_reduce_right_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_reverse_builtin() {
-        return array_reverse_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_slice_builtin() {
-        return array_slice_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_some_builtin() {
-        return array_some_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_last_index_of_builtin() {
-        return array_last_index_of_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_sort_builtin() {
-        return array_sort_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_splice_builtin() {
-        return array_splice_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_to_reversed_builtin() {
-        return array_to_reversed_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_to_sorted_builtin() {
-        return array_to_sorted_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_to_spliced_builtin() {
-        return array_to_spliced_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_to_string_builtin() {
-        return array_to_string_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_to_locale_string_builtin() {
-        return array_to_locale_string_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_values_builtin() {
-        return array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Value)
-            .map(Some);
-    }
-    if entry == js3_array_keys_builtin() {
-        return array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Key)
-            .map(Some);
-    }
-    if entry == js3_array_entries_builtin() {
-        return array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Entry)
-            .map(Some);
-    }
-    if entry == js3_array_with_builtin() {
-        return array_with_builtin(context, invocation).map(Some);
-    }
     if entry == js3_iterator_prototype_iterator_builtin() {
         return iterator_prototype_iterator_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_iterator_next_builtin() {
-        return array_iterator_next_builtin(context, invocation).map(Some);
     }
     if entry == js3_string_builtin() {
         return string_builtin(context, invocation).map(Some);
@@ -1670,9 +1539,6 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == js3_symbol_to_primitive_builtin() {
         return symbol_to_primitive_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_array_species_getter_builtin() {
-        return array_species_getter_builtin(context, invocation).map(Some);
     }
     if entry == js3_symbol_description_getter_builtin() {
         return symbol_description_getter_builtin(context, invocation).map(Some);
