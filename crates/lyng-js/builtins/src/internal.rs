@@ -782,6 +782,11 @@ pub fn internal_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntr
 }
 
 /// Narrow VM-side bridge for executing the reserved JS3-internal builtin namespace.
+///
+/// Methods that return `Result` use the implementing context's error channel.
+/// That keeps internal helper dispatch independent from VM error storage while
+/// still allowing abrupt completions and VM failures to propagate uniformly.
+#[allow(clippy::missing_errors_doc)]
 pub trait InternalBuiltinDispatchContext {
     type Error;
 
@@ -952,6 +957,13 @@ pub trait InternalBuiltinDispatchContext {
 }
 
 /// Dispatches one reserved JS3-internal builtin entry through the builtins-owned bridge.
+///
+/// Returns `Ok(None)` when `entry` is not part of the reserved internal builtin
+/// namespace.
+///
+/// # Errors
+///
+/// Propagates errors from the selected [`InternalBuiltinDispatchContext`] hook.
 pub fn dispatch_internal_builtin<Cx: InternalBuiltinDispatchContext>(
     context: &mut Cx,
     entry: BuiltinFunctionId,
