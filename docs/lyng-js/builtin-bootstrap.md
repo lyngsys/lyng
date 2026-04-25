@@ -104,6 +104,8 @@ Rules:
 - the JSON family owns JSON object descriptor installation in `public/families/json.rs`
 - the Error family owns Error and native-error prototype descriptor installation in
   `public/families/errors.rs`
+- the String family owns String constructor, String prototype, and String Iterator prototype
+  descriptor installation in `public/families/strings.rs`
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

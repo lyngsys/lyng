@@ -1133,11 +1133,6 @@ impl BuiltinCache {
             Some(bootstrap_atoms.uint8_array()),
             AllocationLifetime::Default,
         ));
-        let string_iterator_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "String Iterator",
-            None,
-            AllocationLifetime::Default,
-        ));
         let disposable_stack_tag_atom = agent.atoms_mut().intern_collectible("DisposableStack");
         let disposable_stack_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "DisposableStack",
@@ -1199,8 +1194,6 @@ impl BuiltinCache {
         let is_safe_integer_atom = agent.atoms_mut().intern_collectible("isSafeInteger");
         let ignore_case_atom = agent.atoms_mut().intern_collectible("ignoreCase");
         let last_index_of_atom = agent.atoms_mut().intern_collectible("lastIndexOf");
-        let match_atom = agent.atoms_mut().intern_collectible("match");
-        let match_all_atom = agent.atoms_mut().intern_collectible("matchAll");
         let multiline_atom = agent.atoms_mut().intern_collectible("multiline");
         let log_atom = agent.atoms_mut().intern_collectible("log");
         let log10_atom = agent.atoms_mut().intern_collectible("log10");
@@ -1217,8 +1210,6 @@ impl BuiltinCache {
         let min_safe_integer_atom = agent.atoms_mut().intern_collectible("MIN_SAFE_INTEGER");
         let min_value_atom = agent.atoms_mut().intern_collectible("MIN_VALUE");
         let negative_infinity_atom = agent.atoms_mut().intern_collectible("NEGATIVE_INFINITY");
-        let pad_end_atom = agent.atoms_mut().intern_collectible("padEnd");
-        let pad_start_atom = agent.atoms_mut().intern_collectible("padStart");
         let parse_atom = agent.atoms_mut().intern_collectible("parse");
         let parse_float_atom = agent.atoms_mut().intern_collectible("parseFloat");
         let parse_int_atom = agent.atoms_mut().intern_collectible("parseInt");
@@ -1226,8 +1217,6 @@ impl BuiltinCache {
         let positive_infinity_atom = agent.atoms_mut().intern_collectible("POSITIVE_INFINITY");
         let pow_atom = agent.atoms_mut().intern_collectible("pow");
         let random_atom = agent.atoms_mut().intern_collectible("random");
-        let repeat_atom = agent.atoms_mut().intern_collectible("repeat");
-        let replace_atom = agent.atoms_mut().intern_collectible("replace");
         let round_atom = agent.atoms_mut().intern_collectible("round");
         let sign_atom = agent.atoms_mut().intern_collectible("sign");
         let sin_atom = agent.atoms_mut().intern_collectible("sin");
@@ -1247,8 +1236,6 @@ impl BuiltinCache {
         let set_utc_minutes_atom = agent.atoms_mut().intern_collectible("setUTCMinutes");
         let set_utc_month_atom = agent.atoms_mut().intern_collectible("setUTCMonth");
         let set_utc_seconds_atom = agent.atoms_mut().intern_collectible("setUTCSeconds");
-        let split_atom = agent.atoms_mut().intern_collectible("split");
-        let starts_with_atom = agent.atoms_mut().intern_collectible("startsWith");
         let sticky_atom = agent.atoms_mut().intern_collectible("sticky");
         let sum_precise_atom = agent.atoms_mut().intern_collectible("sumPrecise");
         let tan_atom = agent.atoms_mut().intern_collectible("tan");
@@ -1261,9 +1248,7 @@ impl BuiltinCache {
         let to_temporal_instant_atom = agent.atoms_mut().intern_collectible("toTemporalInstant");
         let to_time_string_atom = agent.atoms_mut().intern_collectible("toTimeString");
         let to_utc_string_atom = agent.atoms_mut().intern_collectible("toUTCString");
-        let substring_atom = agent.atoms_mut().intern_collectible("substring");
         let utc_atom = agent.atoms_mut().intern_collectible("UTC");
-        let concat_atom = agent.atoms_mut().intern_collectible("concat");
         let copy_within_atom = agent.atoms_mut().intern_collectible("copyWithin");
         let entries_atom = agent.atoms_mut().intern_collectible("entries");
         let every_atom = agent.atoms_mut().intern_collectible("every");
@@ -1277,26 +1262,9 @@ impl BuiltinCache {
         let for_each_atom = agent.atoms_mut().intern_collectible("forEach");
         let includes_atom = agent.atoms_mut().intern_collectible("includes");
         let index_of_atom = agent.atoms_mut().intern_collectible("indexOf");
-        let from_code_point_atom = agent.atoms_mut().intern_collectible("fromCodePoint");
-        let raw_atom = agent.atoms_mut().intern_collectible("raw");
-        let code_point_at_atom = agent.atoms_mut().intern_collectible("codePointAt");
-        let ends_with_atom = agent.atoms_mut().intern_collectible("endsWith");
-        let is_well_formed_atom = agent.atoms_mut().intern_collectible("isWellFormed");
-        let locale_compare_atom = agent.atoms_mut().intern_collectible("localeCompare");
-        let normalize_atom = agent.atoms_mut().intern_collectible("normalize");
-        let replace_all_atom = agent.atoms_mut().intern_collectible("replaceAll");
-        let to_locale_lower_case_atom = agent.atoms_mut().intern_collectible("toLocaleLowerCase");
-        let to_locale_upper_case_atom = agent.atoms_mut().intern_collectible("toLocaleUpperCase");
-        let to_lower_case_atom = agent.atoms_mut().intern_collectible("toLowerCase");
-        let to_upper_case_atom = agent.atoms_mut().intern_collectible("toUpperCase");
-        let to_well_formed_atom = agent.atoms_mut().intern_collectible("toWellFormed");
-        let trim_atom = agent.atoms_mut().intern_collectible("trim");
-        let trim_end_atom = agent.atoms_mut().intern_collectible("trimEnd");
-        let trim_start_atom = agent.atoms_mut().intern_collectible("trimStart");
         let join_atom = agent.atoms_mut().intern_collectible("join");
         let keys_atom = agent.atoms_mut().intern_collectible("keys");
         let map_atom = agent.atoms_mut().intern_collectible("map");
-        let next_atom = agent.atoms_mut().intern_collectible("next");
         let of_atom = agent.atoms_mut().intern_collectible("of");
         let reduce_atom = agent.atoms_mut().intern_collectible("reduce");
         let reduce_right_atom = agent.atoms_mut().intern_collectible("reduceRight");
@@ -1310,7 +1278,6 @@ impl BuiltinCache {
         let bytes_per_element_atom = agent.atoms_mut().intern_collectible("BYTES_PER_ELEMENT");
         let is_view_atom = agent.atoms_mut().intern_collectible("isView");
         let sort_atom = agent.atoms_mut().intern_collectible("sort");
-        let search_atom = agent.atoms_mut().intern_collectible("search");
         let to_locale_string_atom = agent.atoms_mut().intern_collectible("toLocaleString");
         let to_reversed_atom = agent.atoms_mut().intern_collectible("toReversed");
         let to_sorted_atom = agent.atoms_mut().intern_collectible("toSorted");
@@ -1319,9 +1286,6 @@ impl BuiltinCache {
         let sqrt1_2_atom = agent.atoms_mut().intern_collectible("SQRT1_2");
         let sqrt2_atom = agent.atoms_mut().intern_collectible("SQRT2");
         let sqrt_atom = agent.atoms_mut().intern_collectible("sqrt");
-        let char_at_atom = agent.atoms_mut().intern_collectible("charAt");
-        let char_code_at_atom = agent.atoms_mut().intern_collectible("charCodeAt");
-        let from_char_code_atom = agent.atoms_mut().intern_collectible("fromCharCode");
         let dot_all_atom = agent.atoms_mut().intern_collectible("dotAll");
         let exec_atom = agent.atoms_mut().intern_collectible("exec");
         let get_float32_atom = agent.atoms_mut().intern_collectible("getFloat32");
@@ -2839,217 +2803,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let string_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(from_char_code_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_from_char_code_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(from_code_point_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_from_code_point_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(raw_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_raw_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-        ];
-        let string_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.string)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_to_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::valueOf.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_value_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(concat_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_concat_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(char_at_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_char_at_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(char_code_at_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_char_code_at_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(at_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_at_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(code_point_at_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_code_point_at_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(ends_with_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_ends_with_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(includes_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_includes_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(index_of_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_index_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(is_well_formed_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_is_well_formed_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(locale_compare_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_locale_compare_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(match_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_match_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(match_all_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_match_all_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(normalize_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_normalize_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(last_index_of_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_last_index_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(pad_end_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_pad_end_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(pad_start_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_pad_start_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(repeat_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_repeat_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(replace_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_replace_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(replace_all_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_replace_all_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(search_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_search_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(split_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_split_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(substring_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_substring_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(starts_with_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_starts_with_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_locale_lower_case_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_to_locale_lower_case_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_locale_upper_case_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_to_locale_upper_case_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_lower_case_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_to_lower_case_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_upper_case_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_to_upper_case_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_well_formed_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_to_well_formed_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(trim_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_trim_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(trim_end_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_trim_end_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(trim_start_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_trim_start_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_iterator_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-        ];
-        let string_iterator_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(next_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_string_iterator_next_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(string_iterator_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
         let regexp_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(escape_atom),
@@ -4321,18 +4074,6 @@ impl BuiltinCache {
                 &uint8_array_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::String),
-                &string_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::StringPrototype),
-                &string_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::StringIteratorPrototype),
-                &string_iterator_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::RegExp),
                 &regexp_descriptors,
             ),
@@ -4435,6 +4176,10 @@ impl BuiltinCache {
             return None;
         }
         if families::install_error_family_descriptors(agent, self, realm, &builtins).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_string_family_descriptors(agent, self, realm, &builtins).is_err() {
             self.public.remove(&realm);
             return None;
         }

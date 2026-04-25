@@ -798,7 +798,9 @@ mod tests {
         js3_iterator_prototype_iterator_builtin, js3_json_parse_builtin, js3_json_raw_json_builtin,
         js3_map_iterator_next_builtin, js3_map_size_getter_builtin, js3_proxy_revocable_builtin,
         js3_reflect_get_builtin, js3_set_iterator_next_builtin, js3_set_values_builtin,
-        js3_symbol_to_primitive_builtin, js3_weak_ref_deref_builtin, PropertyKey, Value,
+        js3_string_from_char_code_builtin, js3_string_iterator_builtin,
+        js3_string_iterator_next_builtin, js3_string_trim_builtin, js3_symbol_to_primitive_builtin,
+        js3_weak_ref_deref_builtin, PropertyKey, Value,
     };
 
     fn own_descriptor(
@@ -1863,6 +1865,125 @@ mod tests {
         assert_eq!(json_tag.writable(), Some(false));
         assert_eq!(json_tag.enumerable(), Some(false));
         assert_eq!(json_tag.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_string_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let string = intrinsics.string().expect("String intrinsic should exist");
+        let string_prototype = intrinsics
+            .string_prototype()
+            .expect("String.prototype intrinsic should exist");
+        let string_iterator_prototype = intrinsics
+            .string_iterator_prototype()
+            .expect("String Iterator prototype intrinsic should exist");
+
+        let constructor_atom = WellKnownAtom::constructor.id();
+        let from_char_code_atom = agent.atoms_mut().intern_collectible("fromCharCode");
+        let trim_atom = agent.atoms_mut().intern_collectible("trim");
+        let next_atom = agent.atoms_mut().intern_collectible("next");
+        let iterator_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Iterator)
+            .expect("Symbol.iterator should exist");
+        let to_string_tag_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::ToStringTag)
+            .expect("Symbol.toStringTag should exist");
+
+        let from_char_code = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_string_from_char_code_builtin(),
+            )
+            .expect("String.fromCharCode builtin should resolve");
+        let trim = cache
+            .builtin_constant(agent, artifacts.realm(), js3_string_trim_builtin())
+            .expect("String.prototype.trim builtin should resolve");
+        let iterator = cache
+            .builtin_constant(agent, artifacts.realm(), js3_string_iterator_builtin())
+            .expect("String.prototype[Symbol.iterator] builtin should resolve");
+        let iterator_next = cache
+            .builtin_constant(agent, artifacts.realm(), js3_string_iterator_next_builtin())
+            .expect("String Iterator next builtin should resolve");
+
+        let from_char_code_descriptor = own_descriptor(
+            agent,
+            string,
+            PropertyKey::from_atom(from_char_code_atom),
+            "String.fromCharCode",
+        );
+        assert_eq!(from_char_code_descriptor.value(), Some(from_char_code));
+        assert_eq!(from_char_code_descriptor.writable(), Some(true));
+        assert_eq!(from_char_code_descriptor.enumerable(), Some(false));
+        assert_eq!(from_char_code_descriptor.configurable(), Some(true));
+
+        let constructor = own_descriptor(
+            agent,
+            string_prototype,
+            PropertyKey::from_atom(constructor_atom),
+            "String.prototype.constructor",
+        );
+        assert_eq!(constructor.value(), Some(Value::from_object_ref(string)));
+        assert_eq!(constructor.writable(), Some(true));
+        assert_eq!(constructor.enumerable(), Some(false));
+        assert_eq!(constructor.configurable(), Some(true));
+
+        let trim_descriptor = own_descriptor(
+            agent,
+            string_prototype,
+            PropertyKey::from_atom(trim_atom),
+            "String.prototype.trim",
+        );
+        assert_eq!(trim_descriptor.value(), Some(trim));
+        assert_eq!(trim_descriptor.writable(), Some(true));
+        assert_eq!(trim_descriptor.enumerable(), Some(false));
+        assert_eq!(trim_descriptor.configurable(), Some(true));
+
+        let iterator_descriptor = own_descriptor(
+            agent,
+            string_prototype,
+            PropertyKey::from_symbol(iterator_symbol),
+            "String.prototype[Symbol.iterator]",
+        );
+        assert_eq!(iterator_descriptor.value(), Some(iterator));
+        assert_eq!(iterator_descriptor.writable(), Some(true));
+        assert_eq!(iterator_descriptor.enumerable(), Some(false));
+        assert_eq!(iterator_descriptor.configurable(), Some(true));
+
+        let next = own_descriptor(
+            agent,
+            string_iterator_prototype,
+            PropertyKey::from_atom(next_atom),
+            "String Iterator prototype.next",
+        );
+        assert_eq!(next.value(), Some(iterator_next));
+        assert_eq!(next.writable(), Some(true));
+        assert_eq!(next.enumerable(), Some(false));
+        assert_eq!(next.configurable(), Some(true));
+
+        let tag = own_descriptor(
+            agent,
+            string_iterator_prototype,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "String Iterator prototype[Symbol.toStringTag]",
+        );
+        assert!(tag.value().and_then(Value::as_string_ref).is_some());
+        assert_eq!(tag.writable(), Some(false));
+        assert_eq!(tag.enumerable(), Some(false));
+        assert_eq!(tag.configurable(), Some(true));
     }
 
     #[test]
