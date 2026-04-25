@@ -1,4 +1,5 @@
 mod arrays;
+mod binary_data;
 mod collections;
 mod date;
 mod errors;
@@ -19,6 +20,7 @@ use lyng_js_env::Agent;
 use lyng_js_types::{BuiltinFunctionId, EnvironmentRef, ObjectRef, RealmRef, ShapeId};
 
 pub(super) use arrays::install_array_family;
+pub(super) use binary_data::install_binary_data_family;
 pub(super) use collections::install_collection_family;
 pub(super) use date::install_date_family;
 pub(super) use errors::install_error_family;
@@ -113,6 +115,14 @@ fn allocate_public_builtin_function(
         metadata,
         prototype_object,
     )
+}
+
+pub(super) fn install_public_ordinary_object(
+    agent: &mut Agent,
+    cx: FamilyInstallContext,
+    prototype: Option<ObjectRef>,
+) -> ObjectRef {
+    crate::public::allocate_builtin_ordinary_object(agent, cx.root_shape, prototype)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -260,6 +270,136 @@ pub(super) struct CollectionFamilyBuiltins {
     pub(super) weak_set_prototype: ObjectRef,
     pub(super) weak_ref_prototype: ObjectRef,
     pub(super) finalization_registry_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct BinaryDataFamilyPrototypes {
+    pub(super) array_buffer_prototype: ObjectRef,
+    pub(super) shared_array_buffer_prototype: ObjectRef,
+    pub(super) data_view_prototype: ObjectRef,
+    pub(super) typed_array_prototype: ObjectRef,
+    pub(super) int8_array_prototype: ObjectRef,
+    pub(super) int16_array_prototype: ObjectRef,
+    pub(super) int32_array_prototype: ObjectRef,
+    pub(super) float32_array_prototype: ObjectRef,
+    pub(super) float64_array_prototype: ObjectRef,
+    pub(super) big_int64_array_prototype: ObjectRef,
+    pub(super) big_uint64_array_prototype: ObjectRef,
+    pub(super) uint32_array_prototype: ObjectRef,
+    pub(super) uint16_array_prototype: ObjectRef,
+    pub(super) uint8_clamped_array_prototype: ObjectRef,
+    pub(super) uint8_array_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct BinaryDataFamilyBuiltins {
+    pub(super) array_buffer: ObjectRef,
+    pub(super) shared_array_buffer: ObjectRef,
+    pub(super) atomics: ObjectRef,
+    pub(super) array_buffer_is_view: ObjectRef,
+    pub(super) data_view: ObjectRef,
+    pub(super) typed_array: ObjectRef,
+    pub(super) typed_array_from: ObjectRef,
+    pub(super) typed_array_of: ObjectRef,
+    pub(super) int8_array: ObjectRef,
+    pub(super) int16_array: ObjectRef,
+    pub(super) int32_array: ObjectRef,
+    pub(super) float32_array: ObjectRef,
+    pub(super) float64_array: ObjectRef,
+    pub(super) big_int64_array: ObjectRef,
+    pub(super) big_uint64_array: ObjectRef,
+    pub(super) uint32_array: ObjectRef,
+    pub(super) uint16_array: ObjectRef,
+    pub(super) uint8_clamped_array: ObjectRef,
+    pub(super) uint8_array: ObjectRef,
+    pub(super) array_buffer_prototype: ObjectRef,
+    pub(super) shared_array_buffer_prototype: ObjectRef,
+    pub(super) array_buffer_byte_length_getter: ObjectRef,
+    pub(super) array_buffer_slice: ObjectRef,
+    pub(super) shared_array_buffer_byte_length_getter: ObjectRef,
+    pub(super) shared_array_buffer_slice: ObjectRef,
+    pub(super) atomics_load: ObjectRef,
+    pub(super) atomics_store: ObjectRef,
+    pub(super) atomics_add: ObjectRef,
+    pub(super) atomics_sub: ObjectRef,
+    pub(super) atomics_and: ObjectRef,
+    pub(super) atomics_or: ObjectRef,
+    pub(super) atomics_xor: ObjectRef,
+    pub(super) atomics_exchange: ObjectRef,
+    pub(super) atomics_compare_exchange: ObjectRef,
+    pub(super) atomics_notify: ObjectRef,
+    pub(super) atomics_wait: ObjectRef,
+    pub(super) atomics_wait_async: ObjectRef,
+    pub(super) atomics_is_lock_free: ObjectRef,
+    pub(super) data_view_prototype: ObjectRef,
+    pub(super) data_view_buffer_getter: ObjectRef,
+    pub(super) data_view_byte_length_getter: ObjectRef,
+    pub(super) data_view_byte_offset_getter: ObjectRef,
+    pub(super) data_view_get_float32: ObjectRef,
+    pub(super) data_view_get_float64: ObjectRef,
+    pub(super) data_view_get_int16: ObjectRef,
+    pub(super) data_view_get_int32: ObjectRef,
+    pub(super) data_view_get_int8: ObjectRef,
+    pub(super) data_view_get_uint16: ObjectRef,
+    pub(super) data_view_get_uint32: ObjectRef,
+    pub(super) data_view_get_uint8: ObjectRef,
+    pub(super) data_view_set_float32: ObjectRef,
+    pub(super) data_view_set_float64: ObjectRef,
+    pub(super) data_view_set_int16: ObjectRef,
+    pub(super) data_view_set_int32: ObjectRef,
+    pub(super) data_view_set_int8: ObjectRef,
+    pub(super) data_view_set_uint16: ObjectRef,
+    pub(super) data_view_set_uint32: ObjectRef,
+    pub(super) data_view_set_uint8: ObjectRef,
+    pub(super) typed_array_prototype: ObjectRef,
+    pub(super) int8_array_prototype: ObjectRef,
+    pub(super) int16_array_prototype: ObjectRef,
+    pub(super) int32_array_prototype: ObjectRef,
+    pub(super) float32_array_prototype: ObjectRef,
+    pub(super) float64_array_prototype: ObjectRef,
+    pub(super) big_int64_array_prototype: ObjectRef,
+    pub(super) big_uint64_array_prototype: ObjectRef,
+    pub(super) uint32_array_prototype: ObjectRef,
+    pub(super) uint16_array_prototype: ObjectRef,
+    pub(super) uint8_clamped_array_prototype: ObjectRef,
+    pub(super) uint8_array_prototype: ObjectRef,
+    pub(super) uint8_array_buffer_getter: ObjectRef,
+    pub(super) uint8_array_byte_length_getter: ObjectRef,
+    pub(super) uint8_array_byte_offset_getter: ObjectRef,
+    pub(super) uint8_array_length_getter: ObjectRef,
+    pub(super) uint8_array_values: ObjectRef,
+    pub(super) uint8_array_keys: ObjectRef,
+    pub(super) uint8_array_entries: ObjectRef,
+    pub(super) uint8_array_set: ObjectRef,
+    pub(super) uint8_array_slice: ObjectRef,
+    pub(super) uint8_array_subarray: ObjectRef,
+    pub(super) typed_array_every: ObjectRef,
+    pub(super) typed_array_some: ObjectRef,
+    pub(super) typed_array_find: ObjectRef,
+    pub(super) typed_array_find_index: ObjectRef,
+    pub(super) typed_array_find_last: ObjectRef,
+    pub(super) typed_array_find_last_index: ObjectRef,
+    pub(super) typed_array_fill: ObjectRef,
+    pub(super) typed_array_copy_within: ObjectRef,
+    pub(super) typed_array_filter: ObjectRef,
+    pub(super) typed_array_for_each: ObjectRef,
+    pub(super) typed_array_includes: ObjectRef,
+    pub(super) typed_array_index_of: ObjectRef,
+    pub(super) typed_array_join: ObjectRef,
+    pub(super) typed_array_last_index_of: ObjectRef,
+    pub(super) typed_array_map: ObjectRef,
+    pub(super) typed_array_reduce: ObjectRef,
+    pub(super) typed_array_reduce_right: ObjectRef,
+    pub(super) typed_array_reverse: ObjectRef,
+    pub(super) typed_array_sort: ObjectRef,
+    pub(super) typed_array_to_locale_string: ObjectRef,
+    pub(super) typed_array_to_string: ObjectRef,
+    pub(super) typed_array_to_reversed: ObjectRef,
+    pub(super) typed_array_to_sorted: ObjectRef,
+    pub(super) typed_array_with: ObjectRef,
+    pub(super) typed_array_at: ObjectRef,
+    pub(super) typed_array_to_string_tag_getter: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]
