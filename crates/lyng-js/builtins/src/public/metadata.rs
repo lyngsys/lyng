@@ -1651,6 +1651,265 @@ const PUBLIC_DATE_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     ),
 ];
 
+const PUBLIC_PRIMITIVE_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(
+        js3_number_builtin,
+        BuiltinEntryMetadata::new("Number", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_number_is_finite_builtin,
+        BuiltinEntryMetadata::new("isFinite", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_number_is_integer_builtin,
+        BuiltinEntryMetadata::new("isInteger", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_number_is_nan_builtin,
+        BuiltinEntryMetadata::new("isNaN", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_number_is_safe_integer_builtin,
+        BuiltinEntryMetadata::new("isSafeInteger", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_number_to_exponential_builtin,
+        BuiltinEntryMetadata::new("toExponential", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_number_to_fixed_builtin,
+        BuiltinEntryMetadata::new("toFixed", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_number_to_locale_string_builtin,
+        BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_number_to_precision_builtin,
+        BuiltinEntryMetadata::new("toPrecision", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_number_to_string_builtin,
+        BuiltinEntryMetadata::new("toString", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_number_value_of_builtin,
+        BuiltinEntryMetadata::new("valueOf", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_abs_builtin,
+        BuiltinEntryMetadata::new("abs", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_acos_builtin,
+        BuiltinEntryMetadata::new("acos", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_acosh_builtin,
+        BuiltinEntryMetadata::new("acosh", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_asin_builtin,
+        BuiltinEntryMetadata::new("asin", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_asinh_builtin,
+        BuiltinEntryMetadata::new("asinh", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_atan_builtin,
+        BuiltinEntryMetadata::new("atan", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_atan2_builtin,
+        BuiltinEntryMetadata::new("atan2", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_atanh_builtin,
+        BuiltinEntryMetadata::new("atanh", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_cbrt_builtin,
+        BuiltinEntryMetadata::new("cbrt", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_ceil_builtin,
+        BuiltinEntryMetadata::new("ceil", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_clz32_builtin,
+        BuiltinEntryMetadata::new("clz32", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_cos_builtin,
+        BuiltinEntryMetadata::new("cos", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_cosh_builtin,
+        BuiltinEntryMetadata::new("cosh", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_exp_builtin,
+        BuiltinEntryMetadata::new("exp", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_expm1_builtin,
+        BuiltinEntryMetadata::new("expm1", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_f16round_builtin,
+        BuiltinEntryMetadata::new("f16round", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_floor_builtin,
+        BuiltinEntryMetadata::new("floor", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_fround_builtin,
+        BuiltinEntryMetadata::new("fround", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_hypot_builtin,
+        BuiltinEntryMetadata::new("hypot", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_imul_builtin,
+        BuiltinEntryMetadata::new("imul", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_log_builtin,
+        BuiltinEntryMetadata::new("log", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_log10_builtin,
+        BuiltinEntryMetadata::new("log10", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_log1p_builtin,
+        BuiltinEntryMetadata::new("log1p", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_log2_builtin,
+        BuiltinEntryMetadata::new("log2", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_max_builtin,
+        BuiltinEntryMetadata::new("max", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_min_builtin,
+        BuiltinEntryMetadata::new("min", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_pow_builtin,
+        BuiltinEntryMetadata::new("pow", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_random_builtin,
+        BuiltinEntryMetadata::new("random", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_round_builtin,
+        BuiltinEntryMetadata::new("round", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_sign_builtin,
+        BuiltinEntryMetadata::new("sign", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_sin_builtin,
+        BuiltinEntryMetadata::new("sin", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_sinh_builtin,
+        BuiltinEntryMetadata::new("sinh", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_sqrt_builtin,
+        BuiltinEntryMetadata::new("sqrt", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_sum_precise_builtin,
+        BuiltinEntryMetadata::new("sumPrecise", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_tan_builtin,
+        BuiltinEntryMetadata::new("tan", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_tanh_builtin,
+        BuiltinEntryMetadata::new("tanh", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_math_trunc_builtin,
+        BuiltinEntryMetadata::new("trunc", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_bigint_builtin,
+        BuiltinEntryMetadata::new("BigInt", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_bigint_as_int_n_builtin,
+        BuiltinEntryMetadata::new("asIntN", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_bigint_as_uint_n_builtin,
+        BuiltinEntryMetadata::new("asUintN", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_bigint_to_string_builtin,
+        BuiltinEntryMetadata::new("toString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_bigint_value_of_builtin,
+        BuiltinEntryMetadata::new("valueOf", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_boolean_builtin,
+        BuiltinEntryMetadata::new("Boolean", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_boolean_to_string_builtin,
+        BuiltinEntryMetadata::new("toString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_boolean_value_of_builtin,
+        BuiltinEntryMetadata::new("valueOf", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_symbol_builtin,
+        BuiltinEntryMetadata::new("Symbol", 0, false, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_symbol_for_builtin,
+        BuiltinEntryMetadata::new("for", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_symbol_key_for_builtin,
+        BuiltinEntryMetadata::new("keyFor", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_symbol_to_string_builtin,
+        BuiltinEntryMetadata::new("toString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_symbol_value_of_builtin,
+        BuiltinEntryMetadata::new("valueOf", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_symbol_to_primitive_builtin,
+        BuiltinEntryMetadata::new("[Symbol.toPrimitive]", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_species_getter_builtin,
+        BuiltinEntryMetadata::new("get [Symbol.species]", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_symbol_description_getter_builtin,
+        BuiltinEntryMetadata::new("get description", 0, false, false),
+    ),
+];
+
 fn public_builtin_metadata_from_rows(
     entry: BuiltinFunctionId,
     rows: &[PublicBuiltinMetadataRow],
@@ -1700,6 +1959,10 @@ fn regexp_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEnt
 
 fn date_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
     public_builtin_metadata_from_rows(entry, PUBLIC_DATE_BUILTIN_METADATA)
+}
+
+fn primitive_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
+    public_builtin_metadata_from_rows(entry, PUBLIC_PRIMITIVE_BUILTIN_METADATA)
 }
 
 /// Compatibility metadata for the public core builtin namespace.
@@ -1754,212 +2017,8 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if let Some(metadata) = temporal::temporal_builtin_metadata(entry) {
         return Some(metadata);
     }
-    if entry == js3_number_builtin() {
-        return Some(BuiltinEntryMetadata::new("Number", 1, true, true));
-    }
-    if entry == js3_number_is_finite_builtin() {
-        return Some(BuiltinEntryMetadata::new("isFinite", 1, false, false));
-    }
-    if entry == js3_number_is_integer_builtin() {
-        return Some(BuiltinEntryMetadata::new("isInteger", 1, false, false));
-    }
-    if entry == js3_number_is_nan_builtin() {
-        return Some(BuiltinEntryMetadata::new("isNaN", 1, false, false));
-    }
-    if entry == js3_number_is_safe_integer_builtin() {
-        return Some(BuiltinEntryMetadata::new("isSafeInteger", 1, false, false));
-    }
-    if entry == js3_number_to_exponential_builtin() {
-        return Some(BuiltinEntryMetadata::new("toExponential", 1, false, false));
-    }
-    if entry == js3_number_to_fixed_builtin() {
-        return Some(BuiltinEntryMetadata::new("toFixed", 1, false, false));
-    }
-    if entry == js3_number_to_locale_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
-    }
-    if entry == js3_number_to_precision_builtin() {
-        return Some(BuiltinEntryMetadata::new("toPrecision", 1, false, false));
-    }
-    if entry == js3_number_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 1, false, false));
-    }
-    if entry == js3_number_value_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
-    }
-    if entry == js3_math_abs_builtin() {
-        return Some(BuiltinEntryMetadata::new("abs", 1, false, false));
-    }
-    if entry == js3_math_acos_builtin() {
-        return Some(BuiltinEntryMetadata::new("acos", 1, false, false));
-    }
-    if entry == js3_math_acosh_builtin() {
-        return Some(BuiltinEntryMetadata::new("acosh", 1, false, false));
-    }
-    if entry == js3_math_asin_builtin() {
-        return Some(BuiltinEntryMetadata::new("asin", 1, false, false));
-    }
-    if entry == js3_math_asinh_builtin() {
-        return Some(BuiltinEntryMetadata::new("asinh", 1, false, false));
-    }
-    if entry == js3_math_atan_builtin() {
-        return Some(BuiltinEntryMetadata::new("atan", 1, false, false));
-    }
-    if entry == js3_math_atan2_builtin() {
-        return Some(BuiltinEntryMetadata::new("atan2", 2, false, false));
-    }
-    if entry == js3_math_atanh_builtin() {
-        return Some(BuiltinEntryMetadata::new("atanh", 1, false, false));
-    }
-    if entry == js3_math_cbrt_builtin() {
-        return Some(BuiltinEntryMetadata::new("cbrt", 1, false, false));
-    }
-    if entry == js3_math_ceil_builtin() {
-        return Some(BuiltinEntryMetadata::new("ceil", 1, false, false));
-    }
-    if entry == js3_math_clz32_builtin() {
-        return Some(BuiltinEntryMetadata::new("clz32", 1, false, false));
-    }
-    if entry == js3_math_cos_builtin() {
-        return Some(BuiltinEntryMetadata::new("cos", 1, false, false));
-    }
-    if entry == js3_math_cosh_builtin() {
-        return Some(BuiltinEntryMetadata::new("cosh", 1, false, false));
-    }
-    if entry == js3_math_exp_builtin() {
-        return Some(BuiltinEntryMetadata::new("exp", 1, false, false));
-    }
-    if entry == js3_math_expm1_builtin() {
-        return Some(BuiltinEntryMetadata::new("expm1", 1, false, false));
-    }
-    if entry == js3_math_f16round_builtin() {
-        return Some(BuiltinEntryMetadata::new("f16round", 1, false, false));
-    }
-    if entry == js3_math_floor_builtin() {
-        return Some(BuiltinEntryMetadata::new("floor", 1, false, false));
-    }
-    if entry == js3_math_fround_builtin() {
-        return Some(BuiltinEntryMetadata::new("fround", 1, false, false));
-    }
-    if entry == js3_math_hypot_builtin() {
-        return Some(BuiltinEntryMetadata::new("hypot", 2, false, false));
-    }
-    if entry == js3_math_imul_builtin() {
-        return Some(BuiltinEntryMetadata::new("imul", 2, false, false));
-    }
-    if entry == js3_math_log_builtin() {
-        return Some(BuiltinEntryMetadata::new("log", 1, false, false));
-    }
-    if entry == js3_math_log10_builtin() {
-        return Some(BuiltinEntryMetadata::new("log10", 1, false, false));
-    }
-    if entry == js3_math_log1p_builtin() {
-        return Some(BuiltinEntryMetadata::new("log1p", 1, false, false));
-    }
-    if entry == js3_math_log2_builtin() {
-        return Some(BuiltinEntryMetadata::new("log2", 1, false, false));
-    }
-    if entry == js3_math_max_builtin() {
-        return Some(BuiltinEntryMetadata::new("max", 2, false, false));
-    }
-    if entry == js3_math_min_builtin() {
-        return Some(BuiltinEntryMetadata::new("min", 2, false, false));
-    }
-    if entry == js3_math_pow_builtin() {
-        return Some(BuiltinEntryMetadata::new("pow", 2, false, false));
-    }
-    if entry == js3_math_random_builtin() {
-        return Some(BuiltinEntryMetadata::new("random", 0, false, false));
-    }
-    if entry == js3_math_round_builtin() {
-        return Some(BuiltinEntryMetadata::new("round", 1, false, false));
-    }
-    if entry == js3_math_sign_builtin() {
-        return Some(BuiltinEntryMetadata::new("sign", 1, false, false));
-    }
-    if entry == js3_math_sin_builtin() {
-        return Some(BuiltinEntryMetadata::new("sin", 1, false, false));
-    }
-    if entry == js3_math_sinh_builtin() {
-        return Some(BuiltinEntryMetadata::new("sinh", 1, false, false));
-    }
-    if entry == js3_math_sqrt_builtin() {
-        return Some(BuiltinEntryMetadata::new("sqrt", 1, false, false));
-    }
-    if entry == js3_math_sum_precise_builtin() {
-        return Some(BuiltinEntryMetadata::new("sumPrecise", 1, false, false));
-    }
-    if entry == js3_math_tan_builtin() {
-        return Some(BuiltinEntryMetadata::new("tan", 1, false, false));
-    }
-    if entry == js3_math_tanh_builtin() {
-        return Some(BuiltinEntryMetadata::new("tanh", 1, false, false));
-    }
-    if entry == js3_math_trunc_builtin() {
-        return Some(BuiltinEntryMetadata::new("trunc", 1, false, false));
-    }
-    if entry == js3_bigint_builtin() {
-        return Some(BuiltinEntryMetadata::new("BigInt", 1, true, true));
-    }
-    if entry == js3_bigint_as_int_n_builtin() {
-        return Some(BuiltinEntryMetadata::new("asIntN", 2, false, false));
-    }
-    if entry == js3_bigint_as_uint_n_builtin() {
-        return Some(BuiltinEntryMetadata::new("asUintN", 2, false, false));
-    }
-    if entry == js3_bigint_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
-    }
-    if entry == js3_bigint_value_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
-    }
-    if entry == js3_boolean_builtin() {
-        return Some(BuiltinEntryMetadata::new("Boolean", 1, true, true));
-    }
-    if entry == js3_boolean_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
-    }
-    if entry == js3_boolean_value_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
-    }
-    if entry == js3_symbol_builtin() {
-        return Some(BuiltinEntryMetadata::new("Symbol", 0, false, true));
-    }
-    if entry == js3_symbol_for_builtin() {
-        return Some(BuiltinEntryMetadata::new("for", 1, false, false));
-    }
-    if entry == js3_symbol_key_for_builtin() {
-        return Some(BuiltinEntryMetadata::new("keyFor", 1, false, false));
-    }
-    if entry == js3_symbol_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
-    }
-    if entry == js3_symbol_value_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
-    }
-    if entry == js3_symbol_to_primitive_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "[Symbol.toPrimitive]",
-            1,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_array_species_getter_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "get [Symbol.species]",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_symbol_description_getter_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "get description",
-            0,
-            false,
-            false,
-        ));
+    if let Some(metadata) = primitive_public_builtin_metadata(entry) {
+        return Some(metadata);
     }
     if entry == js3_error_builtin() {
         return Some(BuiltinEntryMetadata::new("Error", 1, true, true));
@@ -3673,6 +3732,274 @@ mod tests {
         assert_eq!(PUBLIC_DATE_BUILTIN_METADATA.len(), expected.len());
         for (entry, metadata) in expected {
             assert_eq!(date_public_builtin_metadata(entry), Some(metadata));
+            assert_eq!(public_builtin_metadata(entry), Some(metadata));
+        }
+    }
+
+    #[test]
+    fn primitive_public_metadata_table_matches_public_lookup() {
+        let expected = [
+            (
+                js3_number_builtin(),
+                BuiltinEntryMetadata::new("Number", 1, true, true),
+            ),
+            (
+                js3_number_is_finite_builtin(),
+                BuiltinEntryMetadata::new("isFinite", 1, false, false),
+            ),
+            (
+                js3_number_is_integer_builtin(),
+                BuiltinEntryMetadata::new("isInteger", 1, false, false),
+            ),
+            (
+                js3_number_is_nan_builtin(),
+                BuiltinEntryMetadata::new("isNaN", 1, false, false),
+            ),
+            (
+                js3_number_is_safe_integer_builtin(),
+                BuiltinEntryMetadata::new("isSafeInteger", 1, false, false),
+            ),
+            (
+                js3_number_to_exponential_builtin(),
+                BuiltinEntryMetadata::new("toExponential", 1, false, false),
+            ),
+            (
+                js3_number_to_fixed_builtin(),
+                BuiltinEntryMetadata::new("toFixed", 1, false, false),
+            ),
+            (
+                js3_number_to_locale_string_builtin(),
+                BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
+            ),
+            (
+                js3_number_to_precision_builtin(),
+                BuiltinEntryMetadata::new("toPrecision", 1, false, false),
+            ),
+            (
+                js3_number_to_string_builtin(),
+                BuiltinEntryMetadata::new("toString", 1, false, false),
+            ),
+            (
+                js3_number_value_of_builtin(),
+                BuiltinEntryMetadata::new("valueOf", 0, false, false),
+            ),
+            (
+                js3_math_abs_builtin(),
+                BuiltinEntryMetadata::new("abs", 1, false, false),
+            ),
+            (
+                js3_math_acos_builtin(),
+                BuiltinEntryMetadata::new("acos", 1, false, false),
+            ),
+            (
+                js3_math_acosh_builtin(),
+                BuiltinEntryMetadata::new("acosh", 1, false, false),
+            ),
+            (
+                js3_math_asin_builtin(),
+                BuiltinEntryMetadata::new("asin", 1, false, false),
+            ),
+            (
+                js3_math_asinh_builtin(),
+                BuiltinEntryMetadata::new("asinh", 1, false, false),
+            ),
+            (
+                js3_math_atan_builtin(),
+                BuiltinEntryMetadata::new("atan", 1, false, false),
+            ),
+            (
+                js3_math_atan2_builtin(),
+                BuiltinEntryMetadata::new("atan2", 2, false, false),
+            ),
+            (
+                js3_math_atanh_builtin(),
+                BuiltinEntryMetadata::new("atanh", 1, false, false),
+            ),
+            (
+                js3_math_cbrt_builtin(),
+                BuiltinEntryMetadata::new("cbrt", 1, false, false),
+            ),
+            (
+                js3_math_ceil_builtin(),
+                BuiltinEntryMetadata::new("ceil", 1, false, false),
+            ),
+            (
+                js3_math_clz32_builtin(),
+                BuiltinEntryMetadata::new("clz32", 1, false, false),
+            ),
+            (
+                js3_math_cos_builtin(),
+                BuiltinEntryMetadata::new("cos", 1, false, false),
+            ),
+            (
+                js3_math_cosh_builtin(),
+                BuiltinEntryMetadata::new("cosh", 1, false, false),
+            ),
+            (
+                js3_math_exp_builtin(),
+                BuiltinEntryMetadata::new("exp", 1, false, false),
+            ),
+            (
+                js3_math_expm1_builtin(),
+                BuiltinEntryMetadata::new("expm1", 1, false, false),
+            ),
+            (
+                js3_math_f16round_builtin(),
+                BuiltinEntryMetadata::new("f16round", 1, false, false),
+            ),
+            (
+                js3_math_floor_builtin(),
+                BuiltinEntryMetadata::new("floor", 1, false, false),
+            ),
+            (
+                js3_math_fround_builtin(),
+                BuiltinEntryMetadata::new("fround", 1, false, false),
+            ),
+            (
+                js3_math_hypot_builtin(),
+                BuiltinEntryMetadata::new("hypot", 2, false, false),
+            ),
+            (
+                js3_math_imul_builtin(),
+                BuiltinEntryMetadata::new("imul", 2, false, false),
+            ),
+            (
+                js3_math_log_builtin(),
+                BuiltinEntryMetadata::new("log", 1, false, false),
+            ),
+            (
+                js3_math_log10_builtin(),
+                BuiltinEntryMetadata::new("log10", 1, false, false),
+            ),
+            (
+                js3_math_log1p_builtin(),
+                BuiltinEntryMetadata::new("log1p", 1, false, false),
+            ),
+            (
+                js3_math_log2_builtin(),
+                BuiltinEntryMetadata::new("log2", 1, false, false),
+            ),
+            (
+                js3_math_max_builtin(),
+                BuiltinEntryMetadata::new("max", 2, false, false),
+            ),
+            (
+                js3_math_min_builtin(),
+                BuiltinEntryMetadata::new("min", 2, false, false),
+            ),
+            (
+                js3_math_pow_builtin(),
+                BuiltinEntryMetadata::new("pow", 2, false, false),
+            ),
+            (
+                js3_math_random_builtin(),
+                BuiltinEntryMetadata::new("random", 0, false, false),
+            ),
+            (
+                js3_math_round_builtin(),
+                BuiltinEntryMetadata::new("round", 1, false, false),
+            ),
+            (
+                js3_math_sign_builtin(),
+                BuiltinEntryMetadata::new("sign", 1, false, false),
+            ),
+            (
+                js3_math_sin_builtin(),
+                BuiltinEntryMetadata::new("sin", 1, false, false),
+            ),
+            (
+                js3_math_sinh_builtin(),
+                BuiltinEntryMetadata::new("sinh", 1, false, false),
+            ),
+            (
+                js3_math_sqrt_builtin(),
+                BuiltinEntryMetadata::new("sqrt", 1, false, false),
+            ),
+            (
+                js3_math_sum_precise_builtin(),
+                BuiltinEntryMetadata::new("sumPrecise", 1, false, false),
+            ),
+            (
+                js3_math_tan_builtin(),
+                BuiltinEntryMetadata::new("tan", 1, false, false),
+            ),
+            (
+                js3_math_tanh_builtin(),
+                BuiltinEntryMetadata::new("tanh", 1, false, false),
+            ),
+            (
+                js3_math_trunc_builtin(),
+                BuiltinEntryMetadata::new("trunc", 1, false, false),
+            ),
+            (
+                js3_bigint_builtin(),
+                BuiltinEntryMetadata::new("BigInt", 1, true, true),
+            ),
+            (
+                js3_bigint_as_int_n_builtin(),
+                BuiltinEntryMetadata::new("asIntN", 2, false, false),
+            ),
+            (
+                js3_bigint_as_uint_n_builtin(),
+                BuiltinEntryMetadata::new("asUintN", 2, false, false),
+            ),
+            (
+                js3_bigint_to_string_builtin(),
+                BuiltinEntryMetadata::new("toString", 0, false, false),
+            ),
+            (
+                js3_bigint_value_of_builtin(),
+                BuiltinEntryMetadata::new("valueOf", 0, false, false),
+            ),
+            (
+                js3_boolean_builtin(),
+                BuiltinEntryMetadata::new("Boolean", 1, true, true),
+            ),
+            (
+                js3_boolean_to_string_builtin(),
+                BuiltinEntryMetadata::new("toString", 0, false, false),
+            ),
+            (
+                js3_boolean_value_of_builtin(),
+                BuiltinEntryMetadata::new("valueOf", 0, false, false),
+            ),
+            (
+                js3_symbol_builtin(),
+                BuiltinEntryMetadata::new("Symbol", 0, false, true),
+            ),
+            (
+                js3_symbol_for_builtin(),
+                BuiltinEntryMetadata::new("for", 1, false, false),
+            ),
+            (
+                js3_symbol_key_for_builtin(),
+                BuiltinEntryMetadata::new("keyFor", 1, false, false),
+            ),
+            (
+                js3_symbol_to_string_builtin(),
+                BuiltinEntryMetadata::new("toString", 0, false, false),
+            ),
+            (
+                js3_symbol_value_of_builtin(),
+                BuiltinEntryMetadata::new("valueOf", 0, false, false),
+            ),
+            (
+                js3_symbol_to_primitive_builtin(),
+                BuiltinEntryMetadata::new("[Symbol.toPrimitive]", 1, false, false),
+            ),
+            (
+                js3_array_species_getter_builtin(),
+                BuiltinEntryMetadata::new("get [Symbol.species]", 0, false, false),
+            ),
+            (
+                js3_symbol_description_getter_builtin(),
+                BuiltinEntryMetadata::new("get description", 0, false, false),
+            ),
+        ];
+
+        assert_eq!(PUBLIC_PRIMITIVE_BUILTIN_METADATA.len(), expected.len());
+        for (entry, metadata) in expected {
+            assert_eq!(primitive_public_builtin_metadata(entry), Some(metadata));
             assert_eq!(public_builtin_metadata(entry), Some(metadata));
         }
     }
