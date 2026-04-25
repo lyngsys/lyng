@@ -120,7 +120,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<u16> {
         let quasis = self.ast().templates().get_quasis(template).to_vec();
         let callee = self.alloc_temp()?;
-        self.emit_load_builtin(callee, js3_internal_get_template_object_builtin())?;
+        self.emit_load_builtin(callee, internal_get_template_object_builtin())?;
         let this_value = self.alloc_temp()?;
         self.emit_load_undefined(this_value)?;
 
@@ -166,7 +166,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         value: u16,
     ) -> LoweringResult<u16> {
         let callee = self.alloc_temp()?;
-        self.emit_load_builtin(callee, js3_internal_template_to_string_builtin())?;
+        self.emit_load_builtin(callee, internal_template_to_string_builtin())?;
         let this_value = self.alloc_temp()?;
         self.emit_load_undefined(this_value)?;
         let arguments = [value];

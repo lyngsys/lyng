@@ -9,8 +9,8 @@ use lyng_js_objects::{
 };
 use lyng_js_ops::{errors, iterator, object, proxy, read};
 use lyng_js_types::{
-    js3_object_to_string_builtin, AbruptCompletion, BuiltinFunctionId, ObjectRef,
-    PropertyDescriptor, PropertyKey, RealmRef, StringRef, Value, WellKnownSymbolId,
+    object_to_string_builtin, AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyDescriptor,
+    PropertyKey, RealmRef, StringRef, Value, WellKnownSymbolId,
 };
 
 pub(super) struct BuiltinToPrimitiveBridge<'a, Cx: PublicBuiltinDispatchContext> {
@@ -68,7 +68,7 @@ impl<Cx: PublicBuiltinDispatchContext> object::ToPrimitiveContext
     ) -> Result<Option<Value>, Self::Error> {
         if method_name != WellKnownAtom::toString.id()
             || builtin_function_entry(self.cx.agent(), method_object)
-                != Some(js3_object_to_string_builtin())
+                != Some(object_to_string_builtin())
             || !is_engine_array(self.cx, object)
         {
             return Ok(None);

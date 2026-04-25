@@ -38,7 +38,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         direct_eval_arguments.push(callee_register);
         direct_eval_arguments.extend(argument_values.registers);
         let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
-            js3_internal_direct_eval_builtin(),
+            internal_direct_eval_builtin(),
             &direct_eval_arguments,
             self.ast().get_expr(expr_id).span(),
             dest,
@@ -69,7 +69,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
         let callee_register = self.lower_expr_to_temp(callee)?;
         let builtin_eval = self.alloc_temp()?;
-        self.emit_load_builtin(builtin_eval, js3_eval_builtin())?;
+        self.emit_load_builtin(builtin_eval, eval_builtin())?;
         let is_builtin_eval = self.alloc_temp()?;
         self.emit_profiled_binary(
             Opcode::StrictEqual,
@@ -87,7 +87,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         direct_eval_arguments.push(callee_register);
         direct_eval_arguments.extend(argument_values.registers.iter().copied());
         let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
-            js3_internal_direct_eval_builtin(),
+            internal_direct_eval_builtin(),
             &direct_eval_arguments,
             self.ast().get_expr(expr_id).span(),
             direct_eval_result,
@@ -440,7 +440,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.emit_load_smi(depth, class_depth)?;
                 let callee_register = self.alloc_temp()?;
                 self.emit_internal_builtin_call_into(
-                    js3_internal_private_field_get_builtin(),
+                    internal_private_field_get_builtin(),
                     &[receiver, descriptor, depth],
                     self.ast().get_expr(callee).span(),
                     callee_register,
@@ -544,7 +544,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let argument_values = self.lower_call_arguments(arguments)?;
         let span = self.ast().get_expr(expr_id).span();
         let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
-            js3_internal_construct_super_builtin(),
+            internal_construct_super_builtin(),
             &argument_values.registers,
             span,
             dest,

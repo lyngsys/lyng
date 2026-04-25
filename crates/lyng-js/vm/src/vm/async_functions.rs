@@ -7,7 +7,7 @@ use lyng_js_env::{
 };
 use lyng_js_ops::{errors, object};
 use lyng_js_types::{
-    js3_promise_reject_function_builtin, js3_promise_resolve_function_builtin, AbruptCompletion,
+    promise_reject_function_builtin, promise_resolve_function_builtin, AbruptCompletion,
     PropertyKey, SuspendedExecutionRef, Value,
 };
 
@@ -282,13 +282,10 @@ impl Vm {
         let resolve = self.allocate_builtin_function_object(
             agent,
             realm,
-            js3_promise_resolve_function_builtin(),
+            promise_resolve_function_builtin(),
         )?;
-        let reject = self.allocate_builtin_function_object(
-            agent,
-            realm,
-            js3_promise_reject_function_builtin(),
-        )?;
+        let reject =
+            self.allocate_builtin_function_object(agent, realm, promise_reject_function_builtin())?;
         let _ = agent.set_promise_capability_resolve(capability, resolve);
         let _ = agent.set_promise_capability_reject(capability, reject);
         let _ = agent.alloc_promise_resolving_function(

@@ -12,9 +12,8 @@ use crate::{BuiltinDescriptorTable, BuiltinEntryMetadata, BuiltinInstallTarget, 
 use lyng_js_common::AtomId;
 use lyng_js_env::Agent;
 use lyng_js_types::{
-    js3_iterator_prototype_iterator_builtin, js3_map_iterator_next_builtin,
-    js3_set_iterator_next_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
-    WellKnownSymbolId,
+    iterator_prototype_iterator_builtin, map_iterator_next_builtin, set_iterator_next_builtin,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
 };
 
 pub(in crate::public) fn install_iterator_family(
@@ -27,26 +26,26 @@ pub(in crate::public) fn install_iterator_family(
         iterator_prototype_iterator: install_public_builtin_function(
             agent,
             cx,
-            js3_iterator_prototype_iterator_builtin(),
+            iterator_prototype_iterator_builtin(),
             None,
         ),
         async_iterator_method: install_public_builtin_function_with_metadata(
             agent,
             cx,
-            js3_iterator_prototype_iterator_builtin(),
+            iterator_prototype_iterator_builtin(),
             BuiltinEntryMetadata::new("[Symbol.asyncIterator]", 0, false, false),
             None,
         ),
         map_iterator_next: install_public_builtin_function(
             agent,
             cx,
-            js3_map_iterator_next_builtin(),
+            map_iterator_next_builtin(),
             None,
         ),
         set_iterator_next: install_public_builtin_function(
             agent,
             cx,
-            js3_set_iterator_next_builtin(),
+            set_iterator_next_builtin(),
             None,
         ),
     }
@@ -58,11 +57,11 @@ pub(in crate::public) fn iterator_builtin_object(
 ) -> Option<ObjectRef> {
     [
         (
-            js3_iterator_prototype_iterator_builtin(),
+            iterator_prototype_iterator_builtin(),
             builtins.iterator_prototype_iterator,
         ),
-        (js3_map_iterator_next_builtin(), builtins.map_iterator_next),
-        (js3_set_iterator_next_builtin(), builtins.set_iterator_next),
+        (map_iterator_next_builtin(), builtins.map_iterator_next),
+        (set_iterator_next_builtin(), builtins.set_iterator_next),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -81,7 +80,7 @@ pub(in crate::public) fn install_iterator_family_descriptors(
 
     let iterator_prototype_descriptors = [builtin_function_symbol_property(
         WellKnownSymbolId::Iterator,
-        js3_iterator_prototype_iterator_builtin(),
+        iterator_prototype_iterator_builtin(),
         writable_builtin_attributes(),
     )];
     let async_iterator_prototype_descriptors = [
@@ -97,7 +96,7 @@ pub(in crate::public) fn install_iterator_family_descriptors(
         ),
     ];
     let map_iterator_prototype_descriptors = [
-        builtin_function_atom_property(atoms.next, js3_map_iterator_next_builtin()),
+        builtin_function_atom_property(atoms.next, map_iterator_next_builtin()),
         data_symbol_property(
             WellKnownSymbolId::ToStringTag,
             map_iterator_tag,
@@ -105,7 +104,7 @@ pub(in crate::public) fn install_iterator_family_descriptors(
         ),
     ];
     let set_iterator_prototype_descriptors = [
-        builtin_function_atom_property(atoms.next, js3_set_iterator_next_builtin()),
+        builtin_function_atom_property(atoms.next, set_iterator_next_builtin()),
         data_symbol_property(
             WellKnownSymbolId::ToStringTag,
             set_iterator_tag,

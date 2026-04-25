@@ -38,16 +38,16 @@ fn dispatch_date_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_date_builtin() {
+    if entry == super::date_builtin() {
         return date_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_date_now_builtin() {
+    if entry == super::date_now_builtin() {
         return date_now_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_date_parse_builtin() {
+    if entry == super::date_parse_builtin() {
         return date_parse_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_date_utc_builtin() {
+    if entry == super::date_utc_builtin() {
         return date_utc_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -58,22 +58,22 @@ fn dispatch_date_format_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_date_to_string_builtin() {
+    if entry == super::date_to_string_builtin() {
         return date_to_string_builtin(context, invocation, DateStringKind::Full).map(Some);
     }
-    if entry == super::js3_date_to_date_string_builtin() {
+    if entry == super::date_to_date_string_builtin() {
         return date_to_string_builtin(context, invocation, DateStringKind::Date).map(Some);
     }
-    if entry == super::js3_date_to_time_string_builtin() {
+    if entry == super::date_to_time_string_builtin() {
         return date_to_string_builtin(context, invocation, DateStringKind::Time).map(Some);
     }
-    if entry == super::js3_date_to_locale_string_builtin() {
+    if entry == super::date_to_locale_string_builtin() {
         return date_to_string_builtin(context, invocation, DateStringKind::Full).map(Some);
     }
-    if entry == super::js3_date_to_locale_date_string_builtin() {
+    if entry == super::date_to_locale_date_string_builtin() {
         return date_to_string_builtin(context, invocation, DateStringKind::Date).map(Some);
     }
-    if entry == super::js3_date_to_locale_time_string_builtin() {
+    if entry == super::date_to_locale_time_string_builtin() {
         return date_to_string_builtin(context, invocation, DateStringKind::Time).map(Some);
     }
     Ok(None)
@@ -84,22 +84,22 @@ fn dispatch_date_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_date_value_of_builtin() || entry == super::js3_date_get_time_builtin() {
+    if entry == super::date_value_of_builtin() || entry == super::date_get_time_builtin() {
         return date_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_date_get_full_year_builtin() {
+    if entry == super::date_get_full_year_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::FullYear, false)
             .map(Some);
     }
-    if entry == super::js3_date_get_utc_full_year_builtin() {
+    if entry == super::date_get_utc_full_year_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::FullYear, true)
             .map(Some);
     }
-    if entry == super::js3_date_get_month_builtin() {
+    if entry == super::date_get_month_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Month, false)
             .map(Some);
     }
-    if entry == super::js3_date_get_utc_month_builtin() {
+    if entry == super::date_get_utc_month_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Month, true)
             .map(Some);
     }
@@ -111,26 +111,26 @@ fn dispatch_date_getter_part_two<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_date_get_date_builtin() {
+    if entry == super::date_get_date_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Date, false)
             .map(Some);
     }
-    if entry == super::js3_date_get_utc_date_builtin() {
+    if entry == super::date_get_utc_date_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Date, true)
             .map(Some);
     }
-    if entry == super::js3_date_get_day_builtin() {
+    if entry == super::date_get_day_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Day, false)
             .map(Some);
     }
-    if entry == super::js3_date_get_utc_day_builtin() {
+    if entry == super::date_get_utc_day_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Day, true).map(Some);
     }
-    if entry == super::js3_date_get_hours_builtin() {
+    if entry == super::date_get_hours_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Hours, false)
             .map(Some);
     }
-    if entry == super::js3_date_get_utc_hours_builtin() {
+    if entry == super::date_get_utc_hours_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Hours, true)
             .map(Some);
     }
@@ -142,31 +142,31 @@ fn dispatch_date_getter_part_three<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_date_get_minutes_builtin() {
+    if entry == super::date_get_minutes_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Minutes, false)
             .map(Some);
     }
-    if entry == super::js3_date_get_utc_minutes_builtin() {
+    if entry == super::date_get_utc_minutes_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Minutes, true)
             .map(Some);
     }
-    if entry == super::js3_date_get_seconds_builtin() {
+    if entry == super::date_get_seconds_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Seconds, false)
             .map(Some);
     }
-    if entry == super::js3_date_get_utc_seconds_builtin() {
+    if entry == super::date_get_utc_seconds_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Seconds, true)
             .map(Some);
     }
-    if entry == super::js3_date_get_milliseconds_builtin() {
+    if entry == super::date_get_milliseconds_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Milliseconds, false)
             .map(Some);
     }
-    if entry == super::js3_date_get_utc_milliseconds_builtin() {
+    if entry == super::date_get_utc_milliseconds_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::Milliseconds, true)
             .map(Some);
     }
-    if entry == super::js3_date_get_timezone_offset_builtin() {
+    if entry == super::date_get_timezone_offset_builtin() {
         return date_get_timezone_offset_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -177,22 +177,22 @@ fn dispatch_date_setter_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_date_set_time_builtin() {
+    if entry == super::date_set_time_builtin() {
         return date_set_time_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_date_set_milliseconds_builtin() {
+    if entry == super::date_set_milliseconds_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Milliseconds, false)
             .map(Some);
     }
-    if entry == super::js3_date_set_utc_milliseconds_builtin() {
+    if entry == super::date_set_utc_milliseconds_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Milliseconds, true)
             .map(Some);
     }
-    if entry == super::js3_date_set_seconds_builtin() {
+    if entry == super::date_set_seconds_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Seconds, false)
             .map(Some);
     }
-    if entry == super::js3_date_set_utc_seconds_builtin() {
+    if entry == super::date_set_utc_seconds_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Seconds, true)
             .map(Some);
     }
@@ -204,25 +204,25 @@ fn dispatch_date_setter_part_two<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_date_set_minutes_builtin() {
+    if entry == super::date_set_minutes_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Minutes, false)
             .map(Some);
     }
-    if entry == super::js3_date_set_utc_minutes_builtin() {
+    if entry == super::date_set_utc_minutes_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Minutes, true)
             .map(Some);
     }
-    if entry == super::js3_date_set_hours_builtin() {
+    if entry == super::date_set_hours_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Hours, false)
             .map(Some);
     }
-    if entry == super::js3_date_set_utc_hours_builtin() {
+    if entry == super::date_set_utc_hours_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Hours, true).map(Some);
     }
-    if entry == super::js3_date_set_date_builtin() {
+    if entry == super::date_set_date_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Date, false).map(Some);
     }
-    if entry == super::js3_date_set_utc_date_builtin() {
+    if entry == super::date_set_utc_date_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Date, true).map(Some);
     }
     dispatch_date_setter_part_three(context, entry, invocation)
@@ -233,18 +233,18 @@ fn dispatch_date_setter_part_three<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_date_set_month_builtin() {
+    if entry == super::date_set_month_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Month, false)
             .map(Some);
     }
-    if entry == super::js3_date_set_utc_month_builtin() {
+    if entry == super::date_set_utc_month_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::Month, true).map(Some);
     }
-    if entry == super::js3_date_set_full_year_builtin() {
+    if entry == super::date_set_full_year_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::FullYear, false)
             .map(Some);
     }
-    if entry == super::js3_date_set_utc_full_year_builtin() {
+    if entry == super::date_set_utc_full_year_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::FullYear, true)
             .map(Some);
     }
@@ -256,19 +256,19 @@ fn dispatch_date_conversion_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_date_to_utc_string_builtin() {
+    if entry == super::date_to_utc_string_builtin() {
         return date_to_utc_string_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_date_to_iso_string_builtin() {
+    if entry == super::date_to_iso_string_builtin() {
         return date_to_iso_string_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_date_to_json_builtin() {
+    if entry == super::date_to_json_builtin() {
         return date_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_date_to_temporal_instant_builtin() {
+    if entry == super::date_to_temporal_instant_builtin() {
         return date_to_temporal_instant_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_date_to_primitive_builtin() {
+    if entry == super::date_to_primitive_builtin() {
         return date_to_primitive_builtin(context, invocation).map(Some);
     }
     Ok(None)

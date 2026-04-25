@@ -130,7 +130,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.emit_profiled_binary(Opcode::In, dest, left_register, right_register)
             }
             BinaryOp::Instanceof => self.lower_internal_binary_builtin(
-                js3_internal_instance_of_builtin(),
+                internal_instance_of_builtin(),
                 left,
                 right,
                 dest,

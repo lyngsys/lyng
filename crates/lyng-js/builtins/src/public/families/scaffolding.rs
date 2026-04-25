@@ -15,8 +15,8 @@ use lyng_js_env::{Agent, Intrinsics};
 use lyng_js_gc::{AllocationLifetime, SymbolFlags};
 use lyng_js_objects::{ObjectFlags, PrimitiveWrapperKind};
 use lyng_js_types::{
-    js3_function_prototype_builtin, js3_internal_throw_type_error_builtin, EnvironmentRef,
-    ObjectRef, RealmRef, ShapeId, Value,
+    function_prototype_builtin, internal_throw_type_error_builtin, EnvironmentRef, ObjectRef,
+    RealmRef, ShapeId, Value,
 };
 
 #[derive(Clone, Copy)]
@@ -149,13 +149,13 @@ fn allocate_root_objects(agent: &mut Agent, request: ScaffoldingRequest<'_>) -> 
         request.root_shape,
         object_prototype,
         object_prototype,
-        js3_function_prototype_builtin(),
-        public_builtin_metadata(js3_function_prototype_builtin()).unwrap(),
+        function_prototype_builtin(),
+        public_builtin_metadata(function_prototype_builtin()).unwrap(),
         None,
     );
     if let Some(throw_type_error) = request
         .internal
-        .builtin_object(js3_internal_throw_type_error_builtin())
+        .builtin_object(internal_throw_type_error_builtin())
     {
         reparent_builtin_object(agent, throw_type_error, Some(function_prototype));
     }

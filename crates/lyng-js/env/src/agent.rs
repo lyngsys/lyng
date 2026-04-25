@@ -25,7 +25,7 @@ use lyng_js_gc::{
 use lyng_js_host::{ImportMetaProperties, ModuleKey};
 use lyng_js_objects::ObjectAllocation;
 use lyng_js_types::{
-    js3_internal_finalization_registry_cleanup_job_builtin, BackingStoreRef, ObjectRef, StringRef,
+    internal_finalization_registry_cleanup_job_builtin, BackingStoreRef, ObjectRef, StringRef,
     SymbolRef, Value, WellKnownSymbolId,
 };
 use std::{
@@ -1492,7 +1492,7 @@ impl Agent {
             .and_then(|callback| self.objects.function_data(callback))
             .and_then(|data| data.realm());
         let _ = self.enqueue_job_with_payload(
-            HostJobKind::Native(js3_internal_finalization_registry_cleanup_job_builtin()),
+            HostJobKind::Native(internal_finalization_registry_cleanup_job_builtin()),
             ExecutableId::Builtin,
             RuntimeJobPayload::FinalizationCleanup { registry },
             realm,

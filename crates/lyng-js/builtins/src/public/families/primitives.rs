@@ -15,26 +15,23 @@ use crate::{
 use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
 use lyng_js_types::{
-    js3_array_species_getter_builtin, js3_bigint_as_int_n_builtin, js3_bigint_as_uint_n_builtin,
-    js3_bigint_builtin, js3_bigint_to_string_builtin, js3_bigint_value_of_builtin,
-    js3_boolean_builtin, js3_boolean_to_string_builtin, js3_boolean_value_of_builtin,
-    js3_math_abs_builtin, js3_math_acos_builtin, js3_math_acosh_builtin, js3_math_asin_builtin,
-    js3_math_asinh_builtin, js3_math_atan2_builtin, js3_math_atan_builtin, js3_math_atanh_builtin,
-    js3_math_cbrt_builtin, js3_math_ceil_builtin, js3_math_clz32_builtin, js3_math_cos_builtin,
-    js3_math_cosh_builtin, js3_math_exp_builtin, js3_math_expm1_builtin, js3_math_f16round_builtin,
-    js3_math_floor_builtin, js3_math_fround_builtin, js3_math_hypot_builtin, js3_math_imul_builtin,
-    js3_math_log10_builtin, js3_math_log1p_builtin, js3_math_log2_builtin, js3_math_log_builtin,
-    js3_math_max_builtin, js3_math_min_builtin, js3_math_pow_builtin, js3_math_random_builtin,
-    js3_math_round_builtin, js3_math_sign_builtin, js3_math_sin_builtin, js3_math_sinh_builtin,
-    js3_math_sqrt_builtin, js3_math_sum_precise_builtin, js3_math_tan_builtin,
-    js3_math_tanh_builtin, js3_math_trunc_builtin, js3_number_builtin,
-    js3_number_is_finite_builtin, js3_number_is_integer_builtin, js3_number_is_nan_builtin,
-    js3_number_is_safe_integer_builtin, js3_number_to_exponential_builtin,
-    js3_number_to_fixed_builtin, js3_number_to_locale_string_builtin,
-    js3_number_to_precision_builtin, js3_number_to_string_builtin, js3_number_value_of_builtin,
-    js3_parse_float_builtin, js3_parse_int_builtin, js3_symbol_builtin,
-    js3_symbol_description_getter_builtin, js3_symbol_for_builtin, js3_symbol_key_for_builtin,
-    js3_symbol_to_primitive_builtin, js3_symbol_to_string_builtin, js3_symbol_value_of_builtin,
+    array_species_getter_builtin, bigint_as_int_n_builtin, bigint_as_uint_n_builtin,
+    bigint_builtin, bigint_to_string_builtin, bigint_value_of_builtin, boolean_builtin,
+    boolean_to_string_builtin, boolean_value_of_builtin, math_abs_builtin, math_acos_builtin,
+    math_acosh_builtin, math_asin_builtin, math_asinh_builtin, math_atan2_builtin,
+    math_atan_builtin, math_atanh_builtin, math_cbrt_builtin, math_ceil_builtin,
+    math_clz32_builtin, math_cos_builtin, math_cosh_builtin, math_exp_builtin, math_expm1_builtin,
+    math_f16round_builtin, math_floor_builtin, math_fround_builtin, math_hypot_builtin,
+    math_imul_builtin, math_log10_builtin, math_log1p_builtin, math_log2_builtin, math_log_builtin,
+    math_max_builtin, math_min_builtin, math_pow_builtin, math_random_builtin, math_round_builtin,
+    math_sign_builtin, math_sin_builtin, math_sinh_builtin, math_sqrt_builtin,
+    math_sum_precise_builtin, math_tan_builtin, math_tanh_builtin, math_trunc_builtin,
+    number_builtin, number_is_finite_builtin, number_is_integer_builtin, number_is_nan_builtin,
+    number_is_safe_integer_builtin, number_to_exponential_builtin, number_to_fixed_builtin,
+    number_to_locale_string_builtin, number_to_precision_builtin, number_to_string_builtin,
+    number_value_of_builtin, parse_float_builtin, parse_int_builtin, symbol_builtin,
+    symbol_description_getter_builtin, symbol_for_builtin, symbol_key_for_builtin,
+    symbol_to_primitive_builtin, symbol_to_string_builtin, symbol_value_of_builtin,
     BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
 };
 
@@ -121,13 +118,13 @@ pub(in crate::public) fn install_primitive_family(
         array_species_getter: install_public_builtin_function(
             agent,
             cx,
-            js3_array_species_getter_builtin(),
+            array_species_getter_builtin(),
             None,
         ),
         symbol_description_getter: install_public_builtin_function(
             agent,
             cx,
-            js3_symbol_description_getter_builtin(),
+            symbol_description_getter_builtin(),
             None,
         ),
     }
@@ -160,29 +157,26 @@ fn number_builtin_object(
     entry: BuiltinFunctionId,
 ) -> Option<ObjectRef> {
     [
-        (js3_number_builtin(), builtins.number),
-        (js3_number_is_finite_builtin(), builtins.number_is_finite),
-        (js3_number_is_integer_builtin(), builtins.number_is_integer),
-        (js3_number_is_nan_builtin(), builtins.number_is_nan),
+        (number_builtin(), builtins.number),
+        (number_is_finite_builtin(), builtins.number_is_finite),
+        (number_is_integer_builtin(), builtins.number_is_integer),
+        (number_is_nan_builtin(), builtins.number_is_nan),
         (
-            js3_number_is_safe_integer_builtin(),
+            number_is_safe_integer_builtin(),
             builtins.number_is_safe_integer,
         ),
         (
-            js3_number_to_exponential_builtin(),
+            number_to_exponential_builtin(),
             builtins.number_to_exponential,
         ),
-        (js3_number_to_fixed_builtin(), builtins.number_to_fixed),
+        (number_to_fixed_builtin(), builtins.number_to_fixed),
         (
-            js3_number_to_locale_string_builtin(),
+            number_to_locale_string_builtin(),
             builtins.number_to_locale_string,
         ),
-        (
-            js3_number_to_precision_builtin(),
-            builtins.number_to_precision,
-        ),
-        (js3_number_to_string_builtin(), builtins.number_to_string),
-        (js3_number_value_of_builtin(), builtins.number_value_of),
+        (number_to_precision_builtin(), builtins.number_to_precision),
+        (number_to_string_builtin(), builtins.number_to_string),
+        (number_value_of_builtin(), builtins.number_value_of),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -193,43 +187,43 @@ fn math_builtin_object(
     entry: BuiltinFunctionId,
 ) -> Option<ObjectRef> {
     [
-        (js3_math_abs_builtin(), builtins.math_abs),
-        (js3_math_acos_builtin(), builtins.math_acos),
-        (js3_math_acosh_builtin(), builtins.math_acosh),
-        (js3_math_asin_builtin(), builtins.math_asin),
-        (js3_math_asinh_builtin(), builtins.math_asinh),
-        (js3_math_atan_builtin(), builtins.math_atan),
-        (js3_math_atan2_builtin(), builtins.math_atan2),
-        (js3_math_atanh_builtin(), builtins.math_atanh),
-        (js3_math_cbrt_builtin(), builtins.math_cbrt),
-        (js3_math_ceil_builtin(), builtins.math_ceil),
-        (js3_math_clz32_builtin(), builtins.math_clz32),
-        (js3_math_cos_builtin(), builtins.math_cos),
-        (js3_math_cosh_builtin(), builtins.math_cosh),
-        (js3_math_exp_builtin(), builtins.math_exp),
-        (js3_math_expm1_builtin(), builtins.math_expm1),
-        (js3_math_f16round_builtin(), builtins.math_f16round),
-        (js3_math_floor_builtin(), builtins.math_floor),
-        (js3_math_fround_builtin(), builtins.math_fround),
-        (js3_math_hypot_builtin(), builtins.math_hypot),
-        (js3_math_imul_builtin(), builtins.math_imul),
-        (js3_math_log_builtin(), builtins.math_log),
-        (js3_math_log10_builtin(), builtins.math_log10),
-        (js3_math_log1p_builtin(), builtins.math_log1p),
-        (js3_math_log2_builtin(), builtins.math_log2),
-        (js3_math_max_builtin(), builtins.math_max),
-        (js3_math_min_builtin(), builtins.math_min),
-        (js3_math_pow_builtin(), builtins.math_pow),
-        (js3_math_random_builtin(), builtins.math_random),
-        (js3_math_round_builtin(), builtins.math_round),
-        (js3_math_sign_builtin(), builtins.math_sign),
-        (js3_math_sin_builtin(), builtins.math_sin),
-        (js3_math_sinh_builtin(), builtins.math_sinh),
-        (js3_math_sqrt_builtin(), builtins.math_sqrt),
-        (js3_math_sum_precise_builtin(), builtins.math_sum_precise),
-        (js3_math_tan_builtin(), builtins.math_tan),
-        (js3_math_tanh_builtin(), builtins.math_tanh),
-        (js3_math_trunc_builtin(), builtins.math_trunc),
+        (math_abs_builtin(), builtins.math_abs),
+        (math_acos_builtin(), builtins.math_acos),
+        (math_acosh_builtin(), builtins.math_acosh),
+        (math_asin_builtin(), builtins.math_asin),
+        (math_asinh_builtin(), builtins.math_asinh),
+        (math_atan_builtin(), builtins.math_atan),
+        (math_atan2_builtin(), builtins.math_atan2),
+        (math_atanh_builtin(), builtins.math_atanh),
+        (math_cbrt_builtin(), builtins.math_cbrt),
+        (math_ceil_builtin(), builtins.math_ceil),
+        (math_clz32_builtin(), builtins.math_clz32),
+        (math_cos_builtin(), builtins.math_cos),
+        (math_cosh_builtin(), builtins.math_cosh),
+        (math_exp_builtin(), builtins.math_exp),
+        (math_expm1_builtin(), builtins.math_expm1),
+        (math_f16round_builtin(), builtins.math_f16round),
+        (math_floor_builtin(), builtins.math_floor),
+        (math_fround_builtin(), builtins.math_fround),
+        (math_hypot_builtin(), builtins.math_hypot),
+        (math_imul_builtin(), builtins.math_imul),
+        (math_log_builtin(), builtins.math_log),
+        (math_log10_builtin(), builtins.math_log10),
+        (math_log1p_builtin(), builtins.math_log1p),
+        (math_log2_builtin(), builtins.math_log2),
+        (math_max_builtin(), builtins.math_max),
+        (math_min_builtin(), builtins.math_min),
+        (math_pow_builtin(), builtins.math_pow),
+        (math_random_builtin(), builtins.math_random),
+        (math_round_builtin(), builtins.math_round),
+        (math_sign_builtin(), builtins.math_sign),
+        (math_sin_builtin(), builtins.math_sin),
+        (math_sinh_builtin(), builtins.math_sinh),
+        (math_sqrt_builtin(), builtins.math_sqrt),
+        (math_sum_precise_builtin(), builtins.math_sum_precise),
+        (math_tan_builtin(), builtins.math_tan),
+        (math_tanh_builtin(), builtins.math_tanh),
+        (math_trunc_builtin(), builtins.math_trunc),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -240,11 +234,11 @@ fn bigint_builtin_object(
     entry: BuiltinFunctionId,
 ) -> Option<ObjectRef> {
     [
-        (js3_bigint_builtin(), builtins.bigint),
-        (js3_bigint_as_int_n_builtin(), builtins.bigint_as_int_n),
-        (js3_bigint_as_uint_n_builtin(), builtins.bigint_as_uint_n),
-        (js3_bigint_to_string_builtin(), builtins.bigint_to_string),
-        (js3_bigint_value_of_builtin(), builtins.bigint_value_of),
+        (bigint_builtin(), builtins.bigint),
+        (bigint_as_int_n_builtin(), builtins.bigint_as_int_n),
+        (bigint_as_uint_n_builtin(), builtins.bigint_as_uint_n),
+        (bigint_to_string_builtin(), builtins.bigint_to_string),
+        (bigint_value_of_builtin(), builtins.bigint_value_of),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -255,9 +249,9 @@ fn boolean_builtin_object(
     entry: BuiltinFunctionId,
 ) -> Option<ObjectRef> {
     [
-        (js3_boolean_builtin(), builtins.boolean),
-        (js3_boolean_to_string_builtin(), builtins.boolean_to_string),
-        (js3_boolean_value_of_builtin(), builtins.boolean_value_of),
+        (boolean_builtin(), builtins.boolean),
+        (boolean_to_string_builtin(), builtins.boolean_to_string),
+        (boolean_value_of_builtin(), builtins.boolean_value_of),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -268,15 +262,12 @@ fn symbol_builtin_object(
     entry: BuiltinFunctionId,
 ) -> Option<ObjectRef> {
     [
-        (js3_symbol_builtin(), builtins.symbol),
-        (js3_symbol_for_builtin(), builtins.symbol_for),
-        (js3_symbol_key_for_builtin(), builtins.symbol_key_for),
-        (js3_symbol_to_string_builtin(), builtins.symbol_to_string),
-        (js3_symbol_value_of_builtin(), builtins.symbol_value_of),
-        (
-            js3_symbol_to_primitive_builtin(),
-            builtins.symbol_to_primitive,
-        ),
+        (symbol_builtin(), builtins.symbol),
+        (symbol_for_builtin(), builtins.symbol_for),
+        (symbol_key_for_builtin(), builtins.symbol_key_for),
+        (symbol_to_string_builtin(), builtins.symbol_to_string),
+        (symbol_value_of_builtin(), builtins.symbol_value_of),
+        (symbol_to_primitive_builtin(), builtins.symbol_to_primitive),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -288,11 +279,11 @@ fn primitive_accessor_builtin_object(
 ) -> Option<ObjectRef> {
     [
         (
-            js3_array_species_getter_builtin(),
+            array_species_getter_builtin(),
             builtins.array_species_getter,
         ),
         (
-            js3_symbol_description_getter_builtin(),
+            symbol_description_getter_builtin(),
             builtins.symbol_description_getter,
         ),
     ]
@@ -498,11 +489,8 @@ fn install_bigint_prototype_descriptors(
             Value::from_object_ref(bigint),
             writable_builtin_attributes(),
         ),
-        builtin_function_atom_property(
-            WellKnownAtom::toString.id(),
-            js3_bigint_to_string_builtin(),
-        ),
-        builtin_function_atom_property(WellKnownAtom::valueOf.id(), js3_bigint_value_of_builtin()),
+        builtin_function_atom_property(WellKnownAtom::toString.id(), bigint_to_string_builtin()),
+        builtin_function_atom_property(WellKnownAtom::valueOf.id(), bigint_value_of_builtin()),
         data_symbol_property(
             WellKnownSymbolId::ToStringTag,
             bigint_tag,
@@ -530,11 +518,8 @@ fn install_boolean_prototype_descriptors(
             Value::from_object_ref(boolean),
             writable_builtin_attributes(),
         ),
-        builtin_function_atom_property(
-            WellKnownAtom::toString.id(),
-            js3_boolean_to_string_builtin(),
-        ),
-        builtin_function_atom_property(WellKnownAtom::valueOf.id(), js3_boolean_value_of_builtin()),
+        builtin_function_atom_property(WellKnownAtom::toString.id(), boolean_to_string_builtin()),
+        builtin_function_atom_property(WellKnownAtom::valueOf.id(), boolean_value_of_builtin()),
     ];
     install_intrinsic_descriptor_table(
         agent,
@@ -578,14 +563,11 @@ fn install_symbol_prototype_descriptors(
             Value::from_object_ref(symbol),
             writable_builtin_attributes(),
         ),
-        builtin_function_atom_property(
-            WellKnownAtom::toString.id(),
-            js3_symbol_to_string_builtin(),
-        ),
-        builtin_function_atom_property(WellKnownAtom::valueOf.id(), js3_symbol_value_of_builtin()),
+        builtin_function_atom_property(WellKnownAtom::toString.id(), symbol_to_string_builtin()),
+        builtin_function_atom_property(WellKnownAtom::valueOf.id(), symbol_value_of_builtin()),
         builtin_function_symbol_property(
             WellKnownSymbolId::ToPrimitive,
-            js3_symbol_to_primitive_builtin(),
+            symbol_to_primitive_builtin(),
             readonly_builtin_attributes(),
         ),
         data_symbol_property(
@@ -595,7 +577,7 @@ fn install_symbol_prototype_descriptors(
         ),
         accessor_atom_property(
             atoms.description,
-            Some(js3_symbol_description_getter_builtin()),
+            Some(symbol_description_getter_builtin()),
             None,
             readonly_builtin_attributes(),
         ),
@@ -799,12 +781,12 @@ fn number_static_method_specs(
     atoms: &PrimitiveDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 6] {
     [
-        (atoms.is_finite, js3_number_is_finite_builtin()),
-        (atoms.is_integer, js3_number_is_integer_builtin()),
-        (atoms.is_nan, js3_number_is_nan_builtin()),
-        (atoms.is_safe_integer, js3_number_is_safe_integer_builtin()),
-        (atoms.parse_float, js3_parse_float_builtin()),
-        (atoms.parse_int, js3_parse_int_builtin()),
+        (atoms.is_finite, number_is_finite_builtin()),
+        (atoms.is_integer, number_is_integer_builtin()),
+        (atoms.is_nan, number_is_nan_builtin()),
+        (atoms.is_safe_integer, number_is_safe_integer_builtin()),
+        (atoms.parse_float, parse_float_builtin()),
+        (atoms.parse_int, parse_int_builtin()),
     ]
 }
 
@@ -812,57 +794,54 @@ fn number_prototype_method_specs(
     atoms: &PrimitiveDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 6] {
     [
-        (atoms.to_exponential, js3_number_to_exponential_builtin()),
-        (atoms.to_fixed, js3_number_to_fixed_builtin()),
-        (
-            atoms.to_locale_string,
-            js3_number_to_locale_string_builtin(),
-        ),
-        (atoms.to_precision, js3_number_to_precision_builtin()),
-        (WellKnownAtom::toString.id(), js3_number_to_string_builtin()),
-        (WellKnownAtom::valueOf.id(), js3_number_value_of_builtin()),
+        (atoms.to_exponential, number_to_exponential_builtin()),
+        (atoms.to_fixed, number_to_fixed_builtin()),
+        (atoms.to_locale_string, number_to_locale_string_builtin()),
+        (atoms.to_precision, number_to_precision_builtin()),
+        (WellKnownAtom::toString.id(), number_to_string_builtin()),
+        (WellKnownAtom::valueOf.id(), number_value_of_builtin()),
     ]
 }
 
 fn math_method_specs(atoms: &PrimitiveDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 37] {
     [
-        (atoms.abs, js3_math_abs_builtin()),
-        (atoms.acos, js3_math_acos_builtin()),
-        (atoms.acosh, js3_math_acosh_builtin()),
-        (atoms.asin, js3_math_asin_builtin()),
-        (atoms.asinh, js3_math_asinh_builtin()),
-        (atoms.atan, js3_math_atan_builtin()),
-        (atoms.atan2, js3_math_atan2_builtin()),
-        (atoms.atanh, js3_math_atanh_builtin()),
-        (atoms.cbrt, js3_math_cbrt_builtin()),
-        (atoms.ceil, js3_math_ceil_builtin()),
-        (atoms.clz32, js3_math_clz32_builtin()),
-        (atoms.cos, js3_math_cos_builtin()),
-        (atoms.cosh, js3_math_cosh_builtin()),
-        (atoms.exp, js3_math_exp_builtin()),
-        (atoms.expm1, js3_math_expm1_builtin()),
-        (atoms.f16round, js3_math_f16round_builtin()),
-        (atoms.floor, js3_math_floor_builtin()),
-        (atoms.fround, js3_math_fround_builtin()),
-        (atoms.hypot, js3_math_hypot_builtin()),
-        (atoms.imul, js3_math_imul_builtin()),
-        (atoms.log, js3_math_log_builtin()),
-        (atoms.log10, js3_math_log10_builtin()),
-        (atoms.log1p, js3_math_log1p_builtin()),
-        (atoms.log2, js3_math_log2_builtin()),
-        (atoms.max, js3_math_max_builtin()),
-        (atoms.min, js3_math_min_builtin()),
-        (atoms.pow, js3_math_pow_builtin()),
-        (atoms.random, js3_math_random_builtin()),
-        (atoms.round, js3_math_round_builtin()),
-        (atoms.sign, js3_math_sign_builtin()),
-        (atoms.sin, js3_math_sin_builtin()),
-        (atoms.sinh, js3_math_sinh_builtin()),
-        (atoms.sqrt, js3_math_sqrt_builtin()),
-        (atoms.sum_precise, js3_math_sum_precise_builtin()),
-        (atoms.tan, js3_math_tan_builtin()),
-        (atoms.tanh, js3_math_tanh_builtin()),
-        (atoms.trunc, js3_math_trunc_builtin()),
+        (atoms.abs, math_abs_builtin()),
+        (atoms.acos, math_acos_builtin()),
+        (atoms.acosh, math_acosh_builtin()),
+        (atoms.asin, math_asin_builtin()),
+        (atoms.asinh, math_asinh_builtin()),
+        (atoms.atan, math_atan_builtin()),
+        (atoms.atan2, math_atan2_builtin()),
+        (atoms.atanh, math_atanh_builtin()),
+        (atoms.cbrt, math_cbrt_builtin()),
+        (atoms.ceil, math_ceil_builtin()),
+        (atoms.clz32, math_clz32_builtin()),
+        (atoms.cos, math_cos_builtin()),
+        (atoms.cosh, math_cosh_builtin()),
+        (atoms.exp, math_exp_builtin()),
+        (atoms.expm1, math_expm1_builtin()),
+        (atoms.f16round, math_f16round_builtin()),
+        (atoms.floor, math_floor_builtin()),
+        (atoms.fround, math_fround_builtin()),
+        (atoms.hypot, math_hypot_builtin()),
+        (atoms.imul, math_imul_builtin()),
+        (atoms.log, math_log_builtin()),
+        (atoms.log10, math_log10_builtin()),
+        (atoms.log1p, math_log1p_builtin()),
+        (atoms.log2, math_log2_builtin()),
+        (atoms.max, math_max_builtin()),
+        (atoms.min, math_min_builtin()),
+        (atoms.pow, math_pow_builtin()),
+        (atoms.random, math_random_builtin()),
+        (atoms.round, math_round_builtin()),
+        (atoms.sign, math_sign_builtin()),
+        (atoms.sin, math_sin_builtin()),
+        (atoms.sinh, math_sinh_builtin()),
+        (atoms.sqrt, math_sqrt_builtin()),
+        (atoms.sum_precise, math_sum_precise_builtin()),
+        (atoms.tan, math_tan_builtin()),
+        (atoms.tanh, math_tanh_builtin()),
+        (atoms.trunc, math_trunc_builtin()),
     ]
 }
 
@@ -870,8 +849,8 @@ fn bigint_static_method_specs(
     atoms: &PrimitiveDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 2] {
     [
-        (atoms.as_int_n, js3_bigint_as_int_n_builtin()),
-        (atoms.as_uint_n, js3_bigint_as_uint_n_builtin()),
+        (atoms.as_int_n, bigint_as_int_n_builtin()),
+        (atoms.as_uint_n, bigint_as_uint_n_builtin()),
     ]
 }
 
@@ -879,8 +858,8 @@ fn symbol_static_method_specs(
     atoms: &PrimitiveDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 2] {
     [
-        (WellKnownAtom::r#for.id(), js3_symbol_for_builtin()),
-        (atoms.key_for, js3_symbol_key_for_builtin()),
+        (WellKnownAtom::r#for.id(), symbol_for_builtin()),
+        (atoms.key_for, symbol_key_for_builtin()),
     ]
 }
 
@@ -941,43 +920,38 @@ fn install_number_family(
     prototype: ObjectRef,
 ) -> NumberBuiltins {
     NumberBuiltins {
-        number: install_public_builtin_function(agent, cx, js3_number_builtin(), Some(prototype)),
+        number: install_public_builtin_function(agent, cx, number_builtin(), Some(prototype)),
         prototype,
-        is_finite: install_public_builtin_function(agent, cx, js3_number_is_finite_builtin(), None),
-        is_integer: install_public_builtin_function(
-            agent,
-            cx,
-            js3_number_is_integer_builtin(),
-            None,
-        ),
-        is_nan: install_public_builtin_function(agent, cx, js3_number_is_nan_builtin(), None),
+        is_finite: install_public_builtin_function(agent, cx, number_is_finite_builtin(), None),
+        is_integer: install_public_builtin_function(agent, cx, number_is_integer_builtin(), None),
+        is_nan: install_public_builtin_function(agent, cx, number_is_nan_builtin(), None),
         is_safe_integer: install_public_builtin_function(
             agent,
             cx,
-            js3_number_is_safe_integer_builtin(),
+            number_is_safe_integer_builtin(),
             None,
         ),
         to_exponential: install_public_builtin_function(
             agent,
             cx,
-            js3_number_to_exponential_builtin(),
+            number_to_exponential_builtin(),
             None,
         ),
-        to_fixed: install_public_builtin_function(agent, cx, js3_number_to_fixed_builtin(), None),
+        to_fixed: install_public_builtin_function(agent, cx, number_to_fixed_builtin(), None),
         to_locale_string: install_public_builtin_function(
             agent,
             cx,
-            js3_number_to_locale_string_builtin(),
+            number_to_locale_string_builtin(),
             None,
         ),
         to_precision: install_public_builtin_function(
             agent,
             cx,
-            js3_number_to_precision_builtin(),
+            number_to_precision_builtin(),
             None,
         ),
-        to_string: install_public_builtin_function(agent, cx, js3_number_to_string_builtin(), None),
-        value_of: install_public_builtin_function(agent, cx, js3_number_value_of_builtin(), None),
+        to_string: install_public_builtin_function(agent, cx, number_to_string_builtin(), None),
+        value_of: install_public_builtin_function(agent, cx, number_value_of_builtin(), None),
     }
 }
 
@@ -1031,48 +1005,43 @@ fn install_math_family(
 ) -> MathBuiltins {
     MathBuiltins {
         math,
-        abs: install_public_builtin_function(agent, cx, js3_math_abs_builtin(), None),
-        acos: install_public_builtin_function(agent, cx, js3_math_acos_builtin(), None),
-        acosh: install_public_builtin_function(agent, cx, js3_math_acosh_builtin(), None),
-        asin: install_public_builtin_function(agent, cx, js3_math_asin_builtin(), None),
-        asinh: install_public_builtin_function(agent, cx, js3_math_asinh_builtin(), None),
-        atan: install_public_builtin_function(agent, cx, js3_math_atan_builtin(), None),
-        atan2: install_public_builtin_function(agent, cx, js3_math_atan2_builtin(), None),
-        atanh: install_public_builtin_function(agent, cx, js3_math_atanh_builtin(), None),
-        cbrt: install_public_builtin_function(agent, cx, js3_math_cbrt_builtin(), None),
-        ceil: install_public_builtin_function(agent, cx, js3_math_ceil_builtin(), None),
-        clz32: install_public_builtin_function(agent, cx, js3_math_clz32_builtin(), None),
-        cos: install_public_builtin_function(agent, cx, js3_math_cos_builtin(), None),
-        cosh: install_public_builtin_function(agent, cx, js3_math_cosh_builtin(), None),
-        exp: install_public_builtin_function(agent, cx, js3_math_exp_builtin(), None),
-        expm1: install_public_builtin_function(agent, cx, js3_math_expm1_builtin(), None),
-        f16round: install_public_builtin_function(agent, cx, js3_math_f16round_builtin(), None),
-        floor: install_public_builtin_function(agent, cx, js3_math_floor_builtin(), None),
-        fround: install_public_builtin_function(agent, cx, js3_math_fround_builtin(), None),
-        hypot: install_public_builtin_function(agent, cx, js3_math_hypot_builtin(), None),
-        imul: install_public_builtin_function(agent, cx, js3_math_imul_builtin(), None),
-        log: install_public_builtin_function(agent, cx, js3_math_log_builtin(), None),
-        log10: install_public_builtin_function(agent, cx, js3_math_log10_builtin(), None),
-        log1p: install_public_builtin_function(agent, cx, js3_math_log1p_builtin(), None),
-        log2: install_public_builtin_function(agent, cx, js3_math_log2_builtin(), None),
-        max: install_public_builtin_function(agent, cx, js3_math_max_builtin(), None),
-        min: install_public_builtin_function(agent, cx, js3_math_min_builtin(), None),
-        pow: install_public_builtin_function(agent, cx, js3_math_pow_builtin(), None),
-        random: install_public_builtin_function(agent, cx, js3_math_random_builtin(), None),
-        round: install_public_builtin_function(agent, cx, js3_math_round_builtin(), None),
-        sign: install_public_builtin_function(agent, cx, js3_math_sign_builtin(), None),
-        sin: install_public_builtin_function(agent, cx, js3_math_sin_builtin(), None),
-        sinh: install_public_builtin_function(agent, cx, js3_math_sinh_builtin(), None),
-        sqrt: install_public_builtin_function(agent, cx, js3_math_sqrt_builtin(), None),
-        sum_precise: install_public_builtin_function(
-            agent,
-            cx,
-            js3_math_sum_precise_builtin(),
-            None,
-        ),
-        tan: install_public_builtin_function(agent, cx, js3_math_tan_builtin(), None),
-        tanh: install_public_builtin_function(agent, cx, js3_math_tanh_builtin(), None),
-        trunc: install_public_builtin_function(agent, cx, js3_math_trunc_builtin(), None),
+        abs: install_public_builtin_function(agent, cx, math_abs_builtin(), None),
+        acos: install_public_builtin_function(agent, cx, math_acos_builtin(), None),
+        acosh: install_public_builtin_function(agent, cx, math_acosh_builtin(), None),
+        asin: install_public_builtin_function(agent, cx, math_asin_builtin(), None),
+        asinh: install_public_builtin_function(agent, cx, math_asinh_builtin(), None),
+        atan: install_public_builtin_function(agent, cx, math_atan_builtin(), None),
+        atan2: install_public_builtin_function(agent, cx, math_atan2_builtin(), None),
+        atanh: install_public_builtin_function(agent, cx, math_atanh_builtin(), None),
+        cbrt: install_public_builtin_function(agent, cx, math_cbrt_builtin(), None),
+        ceil: install_public_builtin_function(agent, cx, math_ceil_builtin(), None),
+        clz32: install_public_builtin_function(agent, cx, math_clz32_builtin(), None),
+        cos: install_public_builtin_function(agent, cx, math_cos_builtin(), None),
+        cosh: install_public_builtin_function(agent, cx, math_cosh_builtin(), None),
+        exp: install_public_builtin_function(agent, cx, math_exp_builtin(), None),
+        expm1: install_public_builtin_function(agent, cx, math_expm1_builtin(), None),
+        f16round: install_public_builtin_function(agent, cx, math_f16round_builtin(), None),
+        floor: install_public_builtin_function(agent, cx, math_floor_builtin(), None),
+        fround: install_public_builtin_function(agent, cx, math_fround_builtin(), None),
+        hypot: install_public_builtin_function(agent, cx, math_hypot_builtin(), None),
+        imul: install_public_builtin_function(agent, cx, math_imul_builtin(), None),
+        log: install_public_builtin_function(agent, cx, math_log_builtin(), None),
+        log10: install_public_builtin_function(agent, cx, math_log10_builtin(), None),
+        log1p: install_public_builtin_function(agent, cx, math_log1p_builtin(), None),
+        log2: install_public_builtin_function(agent, cx, math_log2_builtin(), None),
+        max: install_public_builtin_function(agent, cx, math_max_builtin(), None),
+        min: install_public_builtin_function(agent, cx, math_min_builtin(), None),
+        pow: install_public_builtin_function(agent, cx, math_pow_builtin(), None),
+        random: install_public_builtin_function(agent, cx, math_random_builtin(), None),
+        round: install_public_builtin_function(agent, cx, math_round_builtin(), None),
+        sign: install_public_builtin_function(agent, cx, math_sign_builtin(), None),
+        sin: install_public_builtin_function(agent, cx, math_sin_builtin(), None),
+        sinh: install_public_builtin_function(agent, cx, math_sinh_builtin(), None),
+        sqrt: install_public_builtin_function(agent, cx, math_sqrt_builtin(), None),
+        sum_precise: install_public_builtin_function(agent, cx, math_sum_precise_builtin(), None),
+        tan: install_public_builtin_function(agent, cx, math_tan_builtin(), None),
+        tanh: install_public_builtin_function(agent, cx, math_tanh_builtin(), None),
+        trunc: install_public_builtin_function(agent, cx, math_trunc_builtin(), None),
     }
 }
 
@@ -1092,12 +1061,12 @@ fn install_bigint_family(
     prototype: ObjectRef,
 ) -> BigIntBuiltins {
     BigIntBuiltins {
-        bigint: install_public_builtin_function(agent, cx, js3_bigint_builtin(), Some(prototype)),
-        as_int_n: install_public_builtin_function(agent, cx, js3_bigint_as_int_n_builtin(), None),
-        as_uint_n: install_public_builtin_function(agent, cx, js3_bigint_as_uint_n_builtin(), None),
+        bigint: install_public_builtin_function(agent, cx, bigint_builtin(), Some(prototype)),
+        as_int_n: install_public_builtin_function(agent, cx, bigint_as_int_n_builtin(), None),
+        as_uint_n: install_public_builtin_function(agent, cx, bigint_as_uint_n_builtin(), None),
         prototype,
-        to_string: install_public_builtin_function(agent, cx, js3_bigint_to_string_builtin(), None),
-        value_of: install_public_builtin_function(agent, cx, js3_bigint_value_of_builtin(), None),
+        to_string: install_public_builtin_function(agent, cx, bigint_to_string_builtin(), None),
+        value_of: install_public_builtin_function(agent, cx, bigint_value_of_builtin(), None),
     }
 }
 
@@ -1115,15 +1084,10 @@ fn install_boolean_family(
     prototype: ObjectRef,
 ) -> BooleanBuiltins {
     BooleanBuiltins {
-        boolean: install_public_builtin_function(agent, cx, js3_boolean_builtin(), Some(prototype)),
+        boolean: install_public_builtin_function(agent, cx, boolean_builtin(), Some(prototype)),
         prototype,
-        to_string: install_public_builtin_function(
-            agent,
-            cx,
-            js3_boolean_to_string_builtin(),
-            None,
-        ),
-        value_of: install_public_builtin_function(agent, cx, js3_boolean_value_of_builtin(), None),
+        to_string: install_public_builtin_function(agent, cx, boolean_to_string_builtin(), None),
+        value_of: install_public_builtin_function(agent, cx, boolean_value_of_builtin(), None),
     }
 }
 
@@ -1144,16 +1108,16 @@ fn install_symbol_family(
     prototype: ObjectRef,
 ) -> SymbolBuiltins {
     SymbolBuiltins {
-        symbol: install_public_builtin_function(agent, cx, js3_symbol_builtin(), Some(prototype)),
+        symbol: install_public_builtin_function(agent, cx, symbol_builtin(), Some(prototype)),
         prototype,
-        symbol_for: install_public_builtin_function(agent, cx, js3_symbol_for_builtin(), None),
-        key_for: install_public_builtin_function(agent, cx, js3_symbol_key_for_builtin(), None),
-        to_string: install_public_builtin_function(agent, cx, js3_symbol_to_string_builtin(), None),
-        value_of: install_public_builtin_function(agent, cx, js3_symbol_value_of_builtin(), None),
+        symbol_for: install_public_builtin_function(agent, cx, symbol_for_builtin(), None),
+        key_for: install_public_builtin_function(agent, cx, symbol_key_for_builtin(), None),
+        to_string: install_public_builtin_function(agent, cx, symbol_to_string_builtin(), None),
+        value_of: install_public_builtin_function(agent, cx, symbol_value_of_builtin(), None),
         to_primitive: install_public_builtin_function(
             agent,
             cx,
-            js3_symbol_to_primitive_builtin(),
+            symbol_to_primitive_builtin(),
             None,
         ),
     }

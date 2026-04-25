@@ -564,7 +564,7 @@ mod tests {
     use lyng_js_objects::{FunctionObjectData, ObjectColdData};
     use lyng_js_parser::parse_script;
     use lyng_js_sema::analyze_script;
-    use lyng_js_types::js3_eval_builtin;
+    use lyng_js_types::eval_builtin;
 
     #[test]
     fn prepared_bytecode_call_threads_private_env_into_execution_context() {
@@ -717,7 +717,7 @@ mod tests {
             .expect("prepared runtime closure frame should resolve eval");
         let builtin_eval = vm
             .builtin_cache
-            .builtin_constant(agent, realm.id(), js3_eval_builtin())
+            .builtin_constant(agent, realm.id(), eval_builtin())
             .expect("eval builtin should be installed");
 
         assert_eq!(eval_value, builtin_eval);

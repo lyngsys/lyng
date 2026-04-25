@@ -15,16 +15,14 @@ use crate::{
 use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
 use lyng_js_types::{
-    js3_regexp_builtin, js3_regexp_dot_all_getter_builtin, js3_regexp_escape_builtin,
-    js3_regexp_exec_builtin, js3_regexp_flags_getter_builtin, js3_regexp_global_getter_builtin,
-    js3_regexp_has_indices_getter_builtin, js3_regexp_ignore_case_getter_builtin,
-    js3_regexp_multiline_getter_builtin, js3_regexp_source_getter_builtin,
-    js3_regexp_species_getter_builtin, js3_regexp_sticky_getter_builtin,
-    js3_regexp_symbol_match_all_builtin, js3_regexp_symbol_match_builtin,
-    js3_regexp_symbol_replace_builtin, js3_regexp_symbol_search_builtin,
-    js3_regexp_symbol_split_builtin, js3_regexp_test_builtin, js3_regexp_to_string_builtin,
-    js3_regexp_unicode_getter_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
-    WellKnownSymbolId,
+    regexp_builtin, regexp_dot_all_getter_builtin, regexp_escape_builtin, regexp_exec_builtin,
+    regexp_flags_getter_builtin, regexp_global_getter_builtin, regexp_has_indices_getter_builtin,
+    regexp_ignore_case_getter_builtin, regexp_multiline_getter_builtin,
+    regexp_source_getter_builtin, regexp_species_getter_builtin, regexp_sticky_getter_builtin,
+    regexp_symbol_match_all_builtin, regexp_symbol_match_builtin, regexp_symbol_replace_builtin,
+    regexp_symbol_search_builtin, regexp_symbol_split_builtin, regexp_test_builtin,
+    regexp_to_string_builtin, regexp_unicode_getter_builtin, BuiltinFunctionId, ObjectRef,
+    RealmRef, Value, WellKnownSymbolId,
 };
 
 pub(in crate::public) fn install_regexp_family(
@@ -39,24 +37,19 @@ pub(in crate::public) fn install_regexp_family(
         regexp: install_public_builtin_function(
             agent,
             cx,
-            js3_regexp_builtin(),
+            regexp_builtin(),
             Some(prototypes.regexp_prototype),
         ),
-        regexp_escape: install_public_builtin_function(
-            agent,
-            cx,
-            js3_regexp_escape_builtin(),
-            None,
-        ),
+        regexp_escape: install_public_builtin_function(agent, cx, regexp_escape_builtin(), None),
         regexp_prototype: prototypes.regexp_prototype,
         regexp_to_string: install_public_builtin_function(
             agent,
             cx,
-            js3_regexp_to_string_builtin(),
+            regexp_to_string_builtin(),
             None,
         ),
-        regexp_exec: install_public_builtin_function(agent, cx, js3_regexp_exec_builtin(), None),
-        regexp_test: install_public_builtin_function(agent, cx, js3_regexp_test_builtin(), None),
+        regexp_exec: install_public_builtin_function(agent, cx, regexp_exec_builtin(), None),
+        regexp_test: install_public_builtin_function(agent, cx, regexp_test_builtin(), None),
         regexp_global_getter: flag_accessors.global,
         regexp_ignore_case_getter: flag_accessors.ignore_case,
         regexp_multiline_getter: flag_accessors.multiline,
@@ -69,7 +62,7 @@ pub(in crate::public) fn install_regexp_family(
         regexp_species_getter: install_public_builtin_function(
             agent,
             cx,
-            js3_regexp_species_getter_builtin(),
+            regexp_species_getter_builtin(),
             None,
         ),
         regexp_symbol_match: symbol_methods.match_method,
@@ -85,69 +78,60 @@ pub(in crate::public) fn regexp_builtin_object(
     entry: BuiltinFunctionId,
 ) -> Option<ObjectRef> {
     [
-        (js3_regexp_builtin(), builtins.regexp),
-        (js3_regexp_escape_builtin(), builtins.regexp_escape),
-        (js3_regexp_to_string_builtin(), builtins.regexp_to_string),
-        (js3_regexp_exec_builtin(), builtins.regexp_exec),
-        (js3_regexp_test_builtin(), builtins.regexp_test),
+        (regexp_builtin(), builtins.regexp),
+        (regexp_escape_builtin(), builtins.regexp_escape),
+        (regexp_to_string_builtin(), builtins.regexp_to_string),
+        (regexp_exec_builtin(), builtins.regexp_exec),
+        (regexp_test_builtin(), builtins.regexp_test),
         (
-            js3_regexp_global_getter_builtin(),
+            regexp_global_getter_builtin(),
             builtins.regexp_global_getter,
         ),
         (
-            js3_regexp_ignore_case_getter_builtin(),
+            regexp_ignore_case_getter_builtin(),
             builtins.regexp_ignore_case_getter,
         ),
         (
-            js3_regexp_multiline_getter_builtin(),
+            regexp_multiline_getter_builtin(),
             builtins.regexp_multiline_getter,
         ),
         (
-            js3_regexp_dot_all_getter_builtin(),
+            regexp_dot_all_getter_builtin(),
             builtins.regexp_dot_all_getter,
         ),
         (
-            js3_regexp_unicode_getter_builtin(),
+            regexp_unicode_getter_builtin(),
             builtins.regexp_unicode_getter,
         ),
         (
-            js3_regexp_sticky_getter_builtin(),
+            regexp_sticky_getter_builtin(),
             builtins.regexp_sticky_getter,
         ),
         (
-            js3_regexp_source_getter_builtin(),
+            regexp_source_getter_builtin(),
             builtins.regexp_source_getter,
         ),
+        (regexp_flags_getter_builtin(), builtins.regexp_flags_getter),
         (
-            js3_regexp_flags_getter_builtin(),
-            builtins.regexp_flags_getter,
-        ),
-        (
-            js3_regexp_has_indices_getter_builtin(),
+            regexp_has_indices_getter_builtin(),
             builtins.regexp_has_indices_getter,
         ),
         (
-            js3_regexp_species_getter_builtin(),
+            regexp_species_getter_builtin(),
             builtins.regexp_species_getter,
         ),
+        (regexp_symbol_match_builtin(), builtins.regexp_symbol_match),
         (
-            js3_regexp_symbol_match_builtin(),
-            builtins.regexp_symbol_match,
-        ),
-        (
-            js3_regexp_symbol_replace_builtin(),
+            regexp_symbol_replace_builtin(),
             builtins.regexp_symbol_replace,
         ),
         (
-            js3_regexp_symbol_search_builtin(),
+            regexp_symbol_search_builtin(),
             builtins.regexp_symbol_search,
         ),
+        (regexp_symbol_split_builtin(), builtins.regexp_symbol_split),
         (
-            js3_regexp_symbol_split_builtin(),
-            builtins.regexp_symbol_split,
-        ),
-        (
-            js3_regexp_symbol_match_all_builtin(),
+            regexp_symbol_match_all_builtin(),
             builtins.regexp_symbol_match_all,
         ),
     ]
@@ -173,53 +157,28 @@ fn install_regexp_flag_accessors(
     cx: FamilyInstallContext,
 ) -> RegExpFlagAccessors {
     RegExpFlagAccessors {
-        global: install_public_builtin_function(
-            agent,
-            cx,
-            js3_regexp_global_getter_builtin(),
-            None,
-        ),
+        global: install_public_builtin_function(agent, cx, regexp_global_getter_builtin(), None),
         ignore_case: install_public_builtin_function(
             agent,
             cx,
-            js3_regexp_ignore_case_getter_builtin(),
+            regexp_ignore_case_getter_builtin(),
             None,
         ),
         multiline: install_public_builtin_function(
             agent,
             cx,
-            js3_regexp_multiline_getter_builtin(),
+            regexp_multiline_getter_builtin(),
             None,
         ),
-        dot_all: install_public_builtin_function(
-            agent,
-            cx,
-            js3_regexp_dot_all_getter_builtin(),
-            None,
-        ),
-        unicode: install_public_builtin_function(
-            agent,
-            cx,
-            js3_regexp_unicode_getter_builtin(),
-            None,
-        ),
-        sticky: install_public_builtin_function(
-            agent,
-            cx,
-            js3_regexp_sticky_getter_builtin(),
-            None,
-        ),
-        source: install_public_builtin_function(
-            agent,
-            cx,
-            js3_regexp_source_getter_builtin(),
-            None,
-        ),
-        flags: install_public_builtin_function(agent, cx, js3_regexp_flags_getter_builtin(), None),
+        dot_all: install_public_builtin_function(agent, cx, regexp_dot_all_getter_builtin(), None),
+        unicode: install_public_builtin_function(agent, cx, regexp_unicode_getter_builtin(), None),
+        sticky: install_public_builtin_function(agent, cx, regexp_sticky_getter_builtin(), None),
+        source: install_public_builtin_function(agent, cx, regexp_source_getter_builtin(), None),
+        flags: install_public_builtin_function(agent, cx, regexp_flags_getter_builtin(), None),
         has_indices: install_public_builtin_function(
             agent,
             cx,
-            js3_regexp_has_indices_getter_builtin(),
+            regexp_has_indices_getter_builtin(),
             None,
         ),
     }
@@ -242,26 +201,16 @@ fn install_regexp_symbol_methods(
         match_method: install_public_builtin_function(
             agent,
             cx,
-            js3_regexp_symbol_match_builtin(),
+            regexp_symbol_match_builtin(),
             None,
         ),
-        replace: install_public_builtin_function(
-            agent,
-            cx,
-            js3_regexp_symbol_replace_builtin(),
-            None,
-        ),
-        search: install_public_builtin_function(
-            agent,
-            cx,
-            js3_regexp_symbol_search_builtin(),
-            None,
-        ),
-        split: install_public_builtin_function(agent, cx, js3_regexp_symbol_split_builtin(), None),
+        replace: install_public_builtin_function(agent, cx, regexp_symbol_replace_builtin(), None),
+        search: install_public_builtin_function(agent, cx, regexp_symbol_search_builtin(), None),
+        split: install_public_builtin_function(agent, cx, regexp_symbol_split_builtin(), None),
         match_all: install_public_builtin_function(
             agent,
             cx,
-            js3_regexp_symbol_match_all_builtin(),
+            regexp_symbol_match_all_builtin(),
             None,
         ),
     }
@@ -285,10 +234,10 @@ fn install_regexp_constructor_descriptors(
     atoms: RegExpDescriptorAtoms,
 ) -> Result<(), BuiltinBootstrapError> {
     let descriptors = [
-        builtin_function_atom_property(atoms.escape, js3_regexp_escape_builtin()),
+        builtin_function_atom_property(atoms.escape, regexp_escape_builtin()),
         accessor_symbol_property(
             WellKnownSymbolId::Species,
-            Some(js3_regexp_species_getter_builtin()),
+            Some(regexp_species_getter_builtin()),
             None,
             readonly_builtin_attributes(),
         ),
@@ -407,27 +356,21 @@ fn regexp_prototype_atom_method_specs(
     atoms: RegExpDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 3] {
     [
-        (atoms.exec, js3_regexp_exec_builtin()),
-        (atoms.test, js3_regexp_test_builtin()),
-        (WellKnownAtom::toString.id(), js3_regexp_to_string_builtin()),
+        (atoms.exec, regexp_exec_builtin()),
+        (atoms.test, regexp_test_builtin()),
+        (WellKnownAtom::toString.id(), regexp_to_string_builtin()),
     ]
 }
 
 fn regexp_prototype_symbol_method_specs() -> [(WellKnownSymbolId, BuiltinFunctionId); 5] {
     [
-        (WellKnownSymbolId::Match, js3_regexp_symbol_match_builtin()),
-        (
-            WellKnownSymbolId::Replace,
-            js3_regexp_symbol_replace_builtin(),
-        ),
-        (
-            WellKnownSymbolId::Search,
-            js3_regexp_symbol_search_builtin(),
-        ),
-        (WellKnownSymbolId::Split, js3_regexp_symbol_split_builtin()),
+        (WellKnownSymbolId::Match, regexp_symbol_match_builtin()),
+        (WellKnownSymbolId::Replace, regexp_symbol_replace_builtin()),
+        (WellKnownSymbolId::Search, regexp_symbol_search_builtin()),
+        (WellKnownSymbolId::Split, regexp_symbol_split_builtin()),
         (
             WellKnownSymbolId::MatchAll,
-            js3_regexp_symbol_match_all_builtin(),
+            regexp_symbol_match_all_builtin(),
         ),
     ]
 }
@@ -436,14 +379,14 @@ fn regexp_prototype_accessor_specs(
     atoms: RegExpDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 9] {
     [
-        (atoms.source, js3_regexp_source_getter_builtin()),
-        (atoms.flags, js3_regexp_flags_getter_builtin()),
-        (atoms.has_indices, js3_regexp_has_indices_getter_builtin()),
-        (atoms.global, js3_regexp_global_getter_builtin()),
-        (atoms.ignore_case, js3_regexp_ignore_case_getter_builtin()),
-        (atoms.multiline, js3_regexp_multiline_getter_builtin()),
-        (atoms.dot_all, js3_regexp_dot_all_getter_builtin()),
-        (atoms.unicode, js3_regexp_unicode_getter_builtin()),
-        (atoms.sticky, js3_regexp_sticky_getter_builtin()),
+        (atoms.source, regexp_source_getter_builtin()),
+        (atoms.flags, regexp_flags_getter_builtin()),
+        (atoms.has_indices, regexp_has_indices_getter_builtin()),
+        (atoms.global, regexp_global_getter_builtin()),
+        (atoms.ignore_case, regexp_ignore_case_getter_builtin()),
+        (atoms.multiline, regexp_multiline_getter_builtin()),
+        (atoms.dot_all, regexp_dot_all_getter_builtin()),
+        (atoms.unicode, regexp_unicode_getter_builtin()),
+        (atoms.sticky, regexp_sticky_getter_builtin()),
     ]
 }

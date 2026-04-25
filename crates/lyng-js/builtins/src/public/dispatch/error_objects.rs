@@ -13,34 +13,34 @@ pub(super) fn dispatch_error_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_error_builtin() {
+    if entry == super::error_builtin() {
         return error_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_error_to_string_builtin() {
+    if entry == super::error_to_string_builtin() {
         return error_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_eval_error_builtin() {
+    if entry == super::eval_error_builtin() {
         return eval_error_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_range_error_builtin() {
+    if entry == super::range_error_builtin() {
         return range_error_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_reference_error_builtin() {
+    if entry == super::reference_error_builtin() {
         return reference_error_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_syntax_error_builtin() {
+    if entry == super::syntax_error_builtin() {
         return syntax_error_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_type_error_builtin() {
+    if entry == super::type_error_builtin() {
         return type_error_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_uri_error_builtin() {
+    if entry == super::uri_error_builtin() {
         return uri_error_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_aggregate_error_builtin() {
+    if entry == super::aggregate_error_builtin() {
         return aggregate_error_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_suppressed_error_builtin() {
+    if entry == lyng_js_types::suppressed_error_builtin() {
         return suppressed_error_builtin(context, invocation).map(Some);
     }
     Ok(None)

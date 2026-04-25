@@ -7,22 +7,19 @@ use lyng_js_common::WellKnownAtom;
 use lyng_js_env::{Agent, RealmBootstrapState, RealmRecord};
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_types::{
-    js3_aggregate_error_builtin, js3_array_buffer_builtin, js3_array_builtin,
-    js3_big_int64_array_builtin, js3_big_uint64_array_builtin, js3_bigint_builtin,
-    js3_boolean_builtin, js3_data_view_builtin, js3_date_builtin, js3_decode_uri_builtin,
-    js3_decode_uri_component_builtin, js3_encode_uri_builtin, js3_encode_uri_component_builtin,
-    js3_error_builtin, js3_eval_builtin, js3_eval_error_builtin, js3_finalization_registry_builtin,
-    js3_float32_array_builtin, js3_float64_array_builtin, js3_function_builtin,
-    js3_int16_array_builtin, js3_int32_array_builtin, js3_int8_array_builtin,
-    js3_is_finite_builtin, js3_is_nan_builtin, js3_map_builtin, js3_number_builtin,
-    js3_object_builtin, js3_parse_float_builtin, js3_parse_int_builtin, js3_promise_builtin,
-    js3_range_error_builtin, js3_reference_error_builtin, js3_regexp_builtin, js3_set_builtin,
-    js3_shared_array_buffer_builtin, js3_string_builtin, js3_symbol_builtin,
-    js3_syntax_error_builtin, js3_type_error_builtin, js3_typed_array_builtin,
-    js3_uint16_array_builtin, js3_uint32_array_builtin, js3_uint8_array_builtin,
-    js3_uint8_clamped_array_builtin, js3_uri_error_builtin, js3_weak_map_builtin,
-    js3_weak_ref_builtin, js3_weak_set_builtin, EnvironmentRef, ObjectRef, PropertyDescriptor,
-    PropertyKey, RealmRef, Value, WellKnownSymbolId,
+    aggregate_error_builtin, array_buffer_builtin, array_builtin, big_int64_array_builtin,
+    big_uint64_array_builtin, bigint_builtin, boolean_builtin, data_view_builtin, date_builtin,
+    decode_uri_builtin, decode_uri_component_builtin, encode_uri_builtin,
+    encode_uri_component_builtin, error_builtin, eval_builtin, eval_error_builtin,
+    finalization_registry_builtin, float32_array_builtin, float64_array_builtin, function_builtin,
+    int16_array_builtin, int32_array_builtin, int8_array_builtin, is_finite_builtin,
+    is_nan_builtin, map_builtin, number_builtin, object_builtin, parse_float_builtin,
+    parse_int_builtin, promise_builtin, range_error_builtin, reference_error_builtin,
+    regexp_builtin, set_builtin, shared_array_buffer_builtin, string_builtin, symbol_builtin,
+    syntax_error_builtin, type_error_builtin, typed_array_builtin, uint16_array_builtin,
+    uint32_array_builtin, uint8_array_builtin, uint8_clamped_array_builtin, uri_error_builtin,
+    weak_map_builtin, weak_ref_builtin, weak_set_builtin, EnvironmentRef, ObjectRef,
+    PropertyDescriptor, PropertyKey, RealmRef, Value, WellKnownSymbolId,
 };
 
 /// Realm-bootstrap mode for the shared JS3 bootstrap path.
@@ -223,7 +220,7 @@ fn default_global_descriptors(
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.object()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_object_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(object_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
@@ -237,72 +234,72 @@ fn default_global_descriptors(
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.function()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_function_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(function_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.map()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_map_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(map_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.set()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_set_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(set_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.weak_map()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_map_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(weak_map_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.weak_set()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_set_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(weak_set_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.weak_ref()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_ref_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(weak_ref_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.finalization_registry()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_finalization_registry_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(finalization_registry_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.string()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_string_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(string_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.regexp()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(regexp_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.date()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_date_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(date_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.array_buffer()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_array_buffer_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(array_buffer_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.shared_array_buffer()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_shared_array_buffer_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(shared_array_buffer_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.data_view()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_data_view_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(data_view_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
@@ -316,67 +313,67 @@ fn default_global_descriptors(
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.typed_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_typed_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(typed_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.int8_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_int8_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(int8_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.int16_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_int16_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(int16_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.int32_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_int32_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(int32_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.uint32_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint32_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(uint32_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.float32_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_float32_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(float32_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.float64_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_float64_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(float64_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.big_int64_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_big_int64_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(big_int64_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.big_uint64_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_big_uint64_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(big_uint64_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.uint16_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint16_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(uint16_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.uint8_clamped_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_clamped_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(uint8_clamped_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.uint8_array()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_uint8_array_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.number()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_number_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(number_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
@@ -390,22 +387,22 @@ fn default_global_descriptors(
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.bigint()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_bigint_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(bigint_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.boolean()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_boolean_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(boolean_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.symbol()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_symbol_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(symbol_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.promise()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_promise_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(promise_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
@@ -419,109 +416,109 @@ fn default_global_descriptors(
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(proxy_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::js3_proxy_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::proxy_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.aggregate_error()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_aggregate_error_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(aggregate_error_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(suppressed_error_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::js3_suppressed_error_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::suppressed_error_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(disposable_stack_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::js3_disposable_stack_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::disposable_stack_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(async_disposable_stack_atom),
             BuiltinPropertyValueSpec::BuiltinFunction(
-                lyng_js_types::js3_async_disposable_stack_builtin(),
+                lyng_js_types::async_disposable_stack_builtin(),
             ),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(WellKnownAtom::eval.id()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_eval_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(eval_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.error()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_error_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(error_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.eval_error()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_eval_error_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(eval_error_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.range_error()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_range_error_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(range_error_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.reference_error()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_reference_error_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(reference_error_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.syntax_error()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_syntax_error_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(syntax_error_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.type_error()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_type_error_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(type_error_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.uri_error()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_uri_error_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(uri_error_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.parse_int()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_parse_int_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(parse_int_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.parse_float()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_parse_float_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(parse_float_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.is_nan()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_is_nan_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(is_nan_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.is_finite()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_is_finite_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(is_finite_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.decode_uri()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_decode_uri_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(decode_uri_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.decode_uri_component()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_decode_uri_component_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(decode_uri_component_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.encode_uri()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_encode_uri_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(encode_uri_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.encode_uri_component()),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_encode_uri_component_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(encode_uri_component_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
     ]
@@ -790,29 +787,26 @@ mod tests {
     use lyng_js_gc::AllocationLifetime;
     use lyng_js_host::NoopHostHooks;
     use lyng_js_types::{
-        js3_array_buffer_byte_length_getter_builtin, js3_array_buffer_is_view_builtin,
-        js3_array_buffer_slice_builtin, js3_array_from_async_builtin,
-        js3_array_iterator_next_builtin, js3_array_species_getter_builtin,
-        js3_array_values_builtin, js3_async_disposable_stack_dispose_async_builtin,
-        js3_atomics_add_builtin, js3_bigint_as_int_n_builtin, js3_bigint_to_string_builtin,
-        js3_boolean_to_string_builtin, js3_data_view_buffer_getter_builtin,
-        js3_data_view_get_uint8_builtin, js3_date_get_time_builtin, js3_date_now_builtin,
-        js3_date_set_full_year_builtin, js3_date_to_primitive_builtin, js3_date_to_string_builtin,
-        js3_disposable_stack_dispose_builtin, js3_disposable_stack_disposed_getter_builtin,
-        js3_disposable_stack_use_builtin, js3_error_to_string_builtin,
-        js3_iterator_prototype_iterator_builtin, js3_json_parse_builtin, js3_json_raw_json_builtin,
-        js3_map_iterator_next_builtin, js3_map_size_getter_builtin, js3_math_abs_builtin,
-        js3_number_is_finite_builtin, js3_number_to_string_builtin, js3_promise_resolve_builtin,
-        js3_promise_species_getter_builtin, js3_promise_then_builtin, js3_proxy_revocable_builtin,
-        js3_reflect_get_builtin, js3_regexp_escape_builtin, js3_regexp_exec_builtin,
-        js3_regexp_global_getter_builtin, js3_regexp_species_getter_builtin,
-        js3_regexp_symbol_match_builtin, js3_set_iterator_next_builtin, js3_set_values_builtin,
-        js3_string_from_char_code_builtin, js3_string_iterator_builtin,
-        js3_string_iterator_next_builtin, js3_string_trim_builtin,
-        js3_symbol_description_getter_builtin, js3_symbol_for_builtin,
-        js3_symbol_to_primitive_builtin, js3_typed_array_from_builtin,
-        js3_typed_array_to_string_tag_getter_builtin, js3_uint8_array_buffer_getter_builtin,
-        js3_uint8_array_values_builtin, js3_weak_ref_deref_builtin, PropertyKey, Value,
+        array_buffer_byte_length_getter_builtin, array_buffer_is_view_builtin,
+        array_buffer_slice_builtin, array_from_async_builtin, array_iterator_next_builtin,
+        array_species_getter_builtin, array_values_builtin,
+        async_disposable_stack_dispose_async_builtin, atomics_add_builtin, bigint_as_int_n_builtin,
+        bigint_to_string_builtin, boolean_to_string_builtin, data_view_buffer_getter_builtin,
+        data_view_get_uint8_builtin, date_get_time_builtin, date_now_builtin,
+        date_set_full_year_builtin, date_to_primitive_builtin, date_to_string_builtin,
+        disposable_stack_dispose_builtin, disposable_stack_disposed_getter_builtin,
+        disposable_stack_use_builtin, error_to_string_builtin, iterator_prototype_iterator_builtin,
+        json_parse_builtin, json_raw_json_builtin, map_iterator_next_builtin,
+        map_size_getter_builtin, math_abs_builtin, number_is_finite_builtin,
+        number_to_string_builtin, promise_resolve_builtin, promise_species_getter_builtin,
+        promise_then_builtin, proxy_revocable_builtin, reflect_get_builtin, regexp_escape_builtin,
+        regexp_exec_builtin, regexp_global_getter_builtin, regexp_species_getter_builtin,
+        regexp_symbol_match_builtin, set_iterator_next_builtin, set_values_builtin,
+        string_from_char_code_builtin, string_iterator_builtin, string_iterator_next_builtin,
+        string_trim_builtin, symbol_description_getter_builtin, symbol_for_builtin,
+        symbol_to_primitive_builtin, typed_array_from_builtin,
+        typed_array_to_string_tag_getter_builtin, uint8_array_buffer_getter_builtin,
+        uint8_array_values_builtin, weak_ref_deref_builtin, PropertyKey, Value,
     };
 
     fn own_descriptor(
@@ -1422,16 +1416,16 @@ mod tests {
             .expect("Symbol.unscopables should exist");
 
         let from_async_value = cache
-            .builtin_constant(agent, artifacts.realm(), js3_array_from_async_builtin())
+            .builtin_constant(agent, artifacts.realm(), array_from_async_builtin())
             .expect("Array.fromAsync builtin should resolve");
         let species_getter = cache
-            .builtin_constant(agent, artifacts.realm(), js3_array_species_getter_builtin())
+            .builtin_constant(agent, artifacts.realm(), array_species_getter_builtin())
             .expect("Array @@species getter should resolve");
         let values_value = cache
-            .builtin_constant(agent, artifacts.realm(), js3_array_values_builtin())
+            .builtin_constant(agent, artifacts.realm(), array_values_builtin())
             .expect("Array.prototype.values builtin should resolve");
         let iterator_next = cache
-            .builtin_constant(agent, artifacts.realm(), js3_array_iterator_next_builtin())
+            .builtin_constant(agent, artifacts.realm(), array_iterator_next_builtin())
             .expect("Array Iterator next builtin should resolve");
 
         let from_async = own_descriptor(
@@ -1550,16 +1544,16 @@ mod tests {
             .expect("Symbol.species should exist");
 
         let species_getter = cache
-            .builtin_constant(agent, artifacts.realm(), js3_array_species_getter_builtin())
+            .builtin_constant(agent, artifacts.realm(), array_species_getter_builtin())
             .expect("collection @@species getter should resolve");
         let map_size_getter = cache
-            .builtin_constant(agent, artifacts.realm(), js3_map_size_getter_builtin())
+            .builtin_constant(agent, artifacts.realm(), map_size_getter_builtin())
             .expect("Map.prototype.size getter should resolve");
         let set_values = cache
-            .builtin_constant(agent, artifacts.realm(), js3_set_values_builtin())
+            .builtin_constant(agent, artifacts.realm(), set_values_builtin())
             .expect("Set.prototype.values builtin should resolve");
         let weak_ref_deref = cache
-            .builtin_constant(agent, artifacts.realm(), js3_weak_ref_deref_builtin())
+            .builtin_constant(agent, artifacts.realm(), weak_ref_deref_builtin())
             .expect("WeakRef.prototype.deref builtin should resolve");
 
         let map_species = own_descriptor(
@@ -1651,14 +1645,14 @@ mod tests {
             .builtin_constant(
                 agent,
                 artifacts.realm(),
-                js3_iterator_prototype_iterator_builtin(),
+                iterator_prototype_iterator_builtin(),
             )
             .expect("Iterator.prototype[Symbol.iterator] builtin should resolve");
         let map_iterator_next = cache
-            .builtin_constant(agent, artifacts.realm(), js3_map_iterator_next_builtin())
+            .builtin_constant(agent, artifacts.realm(), map_iterator_next_builtin())
             .expect("Map Iterator next builtin should resolve");
         let set_iterator_next = cache
-            .builtin_constant(agent, artifacts.realm(), js3_set_iterator_next_builtin())
+            .builtin_constant(agent, artifacts.realm(), set_iterator_next_builtin())
             .expect("Set Iterator next builtin should resolve");
 
         let iterator = own_descriptor(
@@ -1773,10 +1767,10 @@ mod tests {
             .expect("Symbol.toStringTag should exist");
 
         let reflect_get = cache
-            .builtin_constant(agent, artifacts.realm(), js3_reflect_get_builtin())
+            .builtin_constant(agent, artifacts.realm(), reflect_get_builtin())
             .expect("Reflect.get builtin should resolve");
         let proxy_revocable = cache
-            .builtin_constant(agent, artifacts.realm(), js3_proxy_revocable_builtin())
+            .builtin_constant(agent, artifacts.realm(), proxy_revocable_builtin())
             .expect("Proxy.revocable builtin should resolve");
 
         let reflect_get_descriptor = own_descriptor(
@@ -1839,10 +1833,10 @@ mod tests {
             .expect("Symbol.toStringTag should exist");
 
         let json_parse = cache
-            .builtin_constant(agent, artifacts.realm(), js3_json_parse_builtin())
+            .builtin_constant(agent, artifacts.realm(), json_parse_builtin())
             .expect("JSON.parse builtin should resolve");
         let json_raw_json = cache
-            .builtin_constant(agent, artifacts.realm(), js3_json_raw_json_builtin())
+            .builtin_constant(agent, artifacts.realm(), json_raw_json_builtin())
             .expect("JSON.rawJSON builtin should resolve");
 
         let parse = own_descriptor(
@@ -1915,20 +1909,16 @@ mod tests {
             .expect("Symbol.toStringTag should exist");
 
         let from_char_code = cache
-            .builtin_constant(
-                agent,
-                artifacts.realm(),
-                js3_string_from_char_code_builtin(),
-            )
+            .builtin_constant(agent, artifacts.realm(), string_from_char_code_builtin())
             .expect("String.fromCharCode builtin should resolve");
         let trim = cache
-            .builtin_constant(agent, artifacts.realm(), js3_string_trim_builtin())
+            .builtin_constant(agent, artifacts.realm(), string_trim_builtin())
             .expect("String.prototype.trim builtin should resolve");
         let iterator = cache
-            .builtin_constant(agent, artifacts.realm(), js3_string_iterator_builtin())
+            .builtin_constant(agent, artifacts.realm(), string_iterator_builtin())
             .expect("String.prototype[Symbol.iterator] builtin should resolve");
         let iterator_next = cache
-            .builtin_constant(agent, artifacts.realm(), js3_string_iterator_next_builtin())
+            .builtin_constant(agent, artifacts.realm(), string_iterator_next_builtin())
             .expect("String Iterator next builtin should resolve");
 
         let from_char_code_descriptor = own_descriptor(
@@ -2031,23 +2021,19 @@ mod tests {
             .expect("Symbol.match should exist");
 
         let escape = cache
-            .builtin_constant(agent, artifacts.realm(), js3_regexp_escape_builtin())
+            .builtin_constant(agent, artifacts.realm(), regexp_escape_builtin())
             .expect("RegExp.escape builtin should resolve");
         let species_getter = cache
-            .builtin_constant(
-                agent,
-                artifacts.realm(),
-                js3_regexp_species_getter_builtin(),
-            )
+            .builtin_constant(agent, artifacts.realm(), regexp_species_getter_builtin())
             .expect("RegExp @@species getter should resolve");
         let exec = cache
-            .builtin_constant(agent, artifacts.realm(), js3_regexp_exec_builtin())
+            .builtin_constant(agent, artifacts.realm(), regexp_exec_builtin())
             .expect("RegExp.prototype.exec builtin should resolve");
         let symbol_match = cache
-            .builtin_constant(agent, artifacts.realm(), js3_regexp_symbol_match_builtin())
+            .builtin_constant(agent, artifacts.realm(), regexp_symbol_match_builtin())
             .expect("RegExp.prototype[Symbol.match] builtin should resolve");
         let global_getter = cache
-            .builtin_constant(agent, artifacts.realm(), js3_regexp_global_getter_builtin())
+            .builtin_constant(agent, artifacts.realm(), regexp_global_getter_builtin())
             .expect("RegExp.prototype.global getter should resolve");
 
         let escape_descriptor = own_descriptor(
@@ -2147,19 +2133,19 @@ mod tests {
             .expect("Symbol.toPrimitive should exist");
 
         let now = cache
-            .builtin_constant(agent, artifacts.realm(), js3_date_now_builtin())
+            .builtin_constant(agent, artifacts.realm(), date_now_builtin())
             .expect("Date.now builtin should resolve");
         let to_string = cache
-            .builtin_constant(agent, artifacts.realm(), js3_date_to_string_builtin())
+            .builtin_constant(agent, artifacts.realm(), date_to_string_builtin())
             .expect("Date.prototype.toString builtin should resolve");
         let get_time = cache
-            .builtin_constant(agent, artifacts.realm(), js3_date_get_time_builtin())
+            .builtin_constant(agent, artifacts.realm(), date_get_time_builtin())
             .expect("Date.prototype.getTime builtin should resolve");
         let set_full_year = cache
-            .builtin_constant(agent, artifacts.realm(), js3_date_set_full_year_builtin())
+            .builtin_constant(agent, artifacts.realm(), date_set_full_year_builtin())
             .expect("Date.prototype.setFullYear builtin should resolve");
         let to_primitive = cache
-            .builtin_constant(agent, artifacts.realm(), js3_date_to_primitive_builtin())
+            .builtin_constant(agent, artifacts.realm(), date_to_primitive_builtin())
             .expect("Date.prototype[Symbol.toPrimitive] builtin should resolve");
 
         let now_descriptor =
@@ -2273,34 +2259,34 @@ mod tests {
             .expect("Symbol.hasInstance should exist");
 
         let number_is_finite = cache
-            .builtin_constant(agent, artifacts.realm(), js3_number_is_finite_builtin())
+            .builtin_constant(agent, artifacts.realm(), number_is_finite_builtin())
             .expect("Number.isFinite builtin should resolve");
         let number_to_string = cache
-            .builtin_constant(agent, artifacts.realm(), js3_number_to_string_builtin())
+            .builtin_constant(agent, artifacts.realm(), number_to_string_builtin())
             .expect("Number.prototype.toString builtin should resolve");
         let math_abs = cache
-            .builtin_constant(agent, artifacts.realm(), js3_math_abs_builtin())
+            .builtin_constant(agent, artifacts.realm(), math_abs_builtin())
             .expect("Math.abs builtin should resolve");
         let bigint_as_int_n = cache
-            .builtin_constant(agent, artifacts.realm(), js3_bigint_as_int_n_builtin())
+            .builtin_constant(agent, artifacts.realm(), bigint_as_int_n_builtin())
             .expect("BigInt.asIntN builtin should resolve");
         let bigint_to_string = cache
-            .builtin_constant(agent, artifacts.realm(), js3_bigint_to_string_builtin())
+            .builtin_constant(agent, artifacts.realm(), bigint_to_string_builtin())
             .expect("BigInt.prototype.toString builtin should resolve");
         let boolean_to_string = cache
-            .builtin_constant(agent, artifacts.realm(), js3_boolean_to_string_builtin())
+            .builtin_constant(agent, artifacts.realm(), boolean_to_string_builtin())
             .expect("Boolean.prototype.toString builtin should resolve");
         let symbol_for = cache
-            .builtin_constant(agent, artifacts.realm(), js3_symbol_for_builtin())
+            .builtin_constant(agent, artifacts.realm(), symbol_for_builtin())
             .expect("Symbol.for builtin should resolve");
         let symbol_to_primitive = cache
-            .builtin_constant(agent, artifacts.realm(), js3_symbol_to_primitive_builtin())
+            .builtin_constant(agent, artifacts.realm(), symbol_to_primitive_builtin())
             .expect("Symbol.prototype[Symbol.toPrimitive] builtin should resolve");
         let symbol_description_getter = cache
             .builtin_constant(
                 agent,
                 artifacts.realm(),
-                js3_symbol_description_getter_builtin(),
+                symbol_description_getter_builtin(),
             )
             .expect("Symbol.prototype.description getter should resolve");
 
@@ -2491,53 +2477,49 @@ mod tests {
             .expect("Symbol.toStringTag should exist");
 
         let array_buffer_is_view = cache
-            .builtin_constant(agent, artifacts.realm(), js3_array_buffer_is_view_builtin())
+            .builtin_constant(agent, artifacts.realm(), array_buffer_is_view_builtin())
             .expect("ArrayBuffer.isView builtin should resolve");
         let array_buffer_species_getter = cache
-            .builtin_constant(agent, artifacts.realm(), js3_array_species_getter_builtin())
+            .builtin_constant(agent, artifacts.realm(), array_species_getter_builtin())
             .expect("ArrayBuffer[Symbol.species] getter should resolve");
         let array_buffer_byte_length_getter = cache
             .builtin_constant(
                 agent,
                 artifacts.realm(),
-                js3_array_buffer_byte_length_getter_builtin(),
+                array_buffer_byte_length_getter_builtin(),
             )
             .expect("ArrayBuffer.prototype.byteLength getter should resolve");
         let array_buffer_slice = cache
-            .builtin_constant(agent, artifacts.realm(), js3_array_buffer_slice_builtin())
+            .builtin_constant(agent, artifacts.realm(), array_buffer_slice_builtin())
             .expect("ArrayBuffer.prototype.slice builtin should resolve");
         let atomics_add = cache
-            .builtin_constant(agent, artifacts.realm(), js3_atomics_add_builtin())
+            .builtin_constant(agent, artifacts.realm(), atomics_add_builtin())
             .expect("Atomics.add builtin should resolve");
         let data_view_buffer_getter = cache
-            .builtin_constant(
-                agent,
-                artifacts.realm(),
-                js3_data_view_buffer_getter_builtin(),
-            )
+            .builtin_constant(agent, artifacts.realm(), data_view_buffer_getter_builtin())
             .expect("DataView.prototype.buffer getter should resolve");
         let data_view_get_uint8 = cache
-            .builtin_constant(agent, artifacts.realm(), js3_data_view_get_uint8_builtin())
+            .builtin_constant(agent, artifacts.realm(), data_view_get_uint8_builtin())
             .expect("DataView.prototype.getUint8 builtin should resolve");
         let typed_array_from = cache
-            .builtin_constant(agent, artifacts.realm(), js3_typed_array_from_builtin())
+            .builtin_constant(agent, artifacts.realm(), typed_array_from_builtin())
             .expect("%TypedArray%.from builtin should resolve");
         let typed_array_to_string_tag_getter = cache
             .builtin_constant(
                 agent,
                 artifacts.realm(),
-                js3_typed_array_to_string_tag_getter_builtin(),
+                typed_array_to_string_tag_getter_builtin(),
             )
             .expect("%TypedArray%.prototype[Symbol.toStringTag] getter should resolve");
         let uint8_array_buffer_getter = cache
             .builtin_constant(
                 agent,
                 artifacts.realm(),
-                js3_uint8_array_buffer_getter_builtin(),
+                uint8_array_buffer_getter_builtin(),
             )
             .expect("Uint8Array.prototype.buffer getter should resolve");
         let uint8_array_values = cache
-            .builtin_constant(agent, artifacts.realm(), js3_uint8_array_values_builtin())
+            .builtin_constant(agent, artifacts.realm(), uint8_array_values_builtin())
             .expect("Uint8Array.prototype.values builtin should resolve");
 
         let is_view = own_descriptor(
@@ -2790,40 +2772,32 @@ mod tests {
             .expect("Symbol.toStringTag should exist");
 
         let promise_resolve = cache
-            .builtin_constant(agent, artifacts.realm(), js3_promise_resolve_builtin())
+            .builtin_constant(agent, artifacts.realm(), promise_resolve_builtin())
             .expect("Promise.resolve builtin should resolve");
         let promise_species_getter = cache
-            .builtin_constant(
-                agent,
-                artifacts.realm(),
-                js3_promise_species_getter_builtin(),
-            )
+            .builtin_constant(agent, artifacts.realm(), promise_species_getter_builtin())
             .expect("Promise[Symbol.species] getter should resolve");
         let promise_then = cache
-            .builtin_constant(agent, artifacts.realm(), js3_promise_then_builtin())
+            .builtin_constant(agent, artifacts.realm(), promise_then_builtin())
             .expect("Promise.prototype.then builtin should resolve");
         let disposable_use = cache
-            .builtin_constant(agent, artifacts.realm(), js3_disposable_stack_use_builtin())
+            .builtin_constant(agent, artifacts.realm(), disposable_stack_use_builtin())
             .expect("DisposableStack.prototype.use builtin should resolve");
         let disposable_disposed_getter = cache
             .builtin_constant(
                 agent,
                 artifacts.realm(),
-                js3_disposable_stack_disposed_getter_builtin(),
+                disposable_stack_disposed_getter_builtin(),
             )
             .expect("DisposableStack.prototype.disposed getter should resolve");
         let disposable_dispose = cache
-            .builtin_constant(
-                agent,
-                artifacts.realm(),
-                js3_disposable_stack_dispose_builtin(),
-            )
+            .builtin_constant(agent, artifacts.realm(), disposable_stack_dispose_builtin())
             .expect("DisposableStack.prototype.dispose builtin should resolve");
         let async_dispose = cache
             .builtin_constant(
                 agent,
                 artifacts.realm(),
-                js3_async_disposable_stack_dispose_async_builtin(),
+                async_disposable_stack_dispose_async_builtin(),
             )
             .expect("AsyncDisposableStack.prototype.disposeAsync builtin should resolve");
 
@@ -2972,7 +2946,7 @@ mod tests {
         let message_atom = agent.bootstrap_atoms().message();
         let to_string_atom = WellKnownAtom::toString.id();
         let error_to_string = cache
-            .builtin_constant(agent, artifacts.realm(), js3_error_to_string_builtin())
+            .builtin_constant(agent, artifacts.realm(), error_to_string_builtin())
             .expect("Error.prototype.toString builtin should resolve");
 
         let error_constructor = own_descriptor(
@@ -3119,8 +3093,8 @@ mod tests {
         let descriptors = [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(accessor_name),
             BuiltinPropertyValueSpec::Accessor {
-                get: Some(js3_symbol_to_primitive_builtin()),
-                set: Some(js3_error_to_string_builtin()),
+                get: Some(symbol_to_primitive_builtin()),
+                set: Some(error_to_string_builtin()),
             },
             BuiltinAttributes::new(false, true, true),
         )];
@@ -3142,10 +3116,10 @@ mod tests {
             .unwrap()
             .expect("accessor descriptor should be installed");
         let getter = cache
-            .builtin_constant(agent, artifacts.realm(), js3_symbol_to_primitive_builtin())
+            .builtin_constant(agent, artifacts.realm(), symbol_to_primitive_builtin())
             .expect("getter builtin constant should resolve");
         let setter = cache
-            .builtin_constant(agent, artifacts.realm(), js3_error_to_string_builtin())
+            .builtin_constant(agent, artifacts.realm(), error_to_string_builtin())
             .expect("setter builtin constant should resolve");
 
         assert_eq!(property.value(), None);

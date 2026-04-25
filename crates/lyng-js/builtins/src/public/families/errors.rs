@@ -12,10 +12,9 @@ use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
 use lyng_js_types::{
-    js3_aggregate_error_builtin, js3_error_builtin, js3_error_to_string_builtin,
-    js3_eval_error_builtin, js3_range_error_builtin, js3_reference_error_builtin,
-    js3_suppressed_error_builtin, js3_syntax_error_builtin, js3_type_error_builtin,
-    js3_uri_error_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
+    aggregate_error_builtin, error_builtin, error_to_string_builtin, eval_error_builtin,
+    range_error_builtin, reference_error_builtin, suppressed_error_builtin, syntax_error_builtin,
+    type_error_builtin, uri_error_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
 };
 
 pub(in crate::public) fn install_error_family(
@@ -26,7 +25,7 @@ pub(in crate::public) fn install_error_family(
     let error = install_public_builtin_function(
         agent,
         cx,
-        js3_error_builtin(),
+        error_builtin(),
         Some(prototypes.error_prototype),
     );
 
@@ -36,14 +35,14 @@ pub(in crate::public) fn install_error_family(
         error_to_string: install_public_builtin_function(
             agent,
             cx,
-            js3_error_to_string_builtin(),
+            error_to_string_builtin(),
             None,
         ),
         eval_error: install_error_constructor(
             agent,
             cx,
             error,
-            js3_eval_error_builtin(),
+            eval_error_builtin(),
             prototypes.eval_error_prototype,
         ),
         eval_error_prototype: prototypes.eval_error_prototype,
@@ -51,7 +50,7 @@ pub(in crate::public) fn install_error_family(
             agent,
             cx,
             error,
-            js3_range_error_builtin(),
+            range_error_builtin(),
             prototypes.range_error_prototype,
         ),
         range_error_prototype: prototypes.range_error_prototype,
@@ -59,7 +58,7 @@ pub(in crate::public) fn install_error_family(
             agent,
             cx,
             error,
-            js3_reference_error_builtin(),
+            reference_error_builtin(),
             prototypes.reference_error_prototype,
         ),
         reference_error_prototype: prototypes.reference_error_prototype,
@@ -67,7 +66,7 @@ pub(in crate::public) fn install_error_family(
             agent,
             cx,
             error,
-            js3_syntax_error_builtin(),
+            syntax_error_builtin(),
             prototypes.syntax_error_prototype,
         ),
         syntax_error_prototype: prototypes.syntax_error_prototype,
@@ -75,7 +74,7 @@ pub(in crate::public) fn install_error_family(
             agent,
             cx,
             error,
-            js3_type_error_builtin(),
+            type_error_builtin(),
             prototypes.type_error_prototype,
         ),
         type_error_prototype: prototypes.type_error_prototype,
@@ -83,7 +82,7 @@ pub(in crate::public) fn install_error_family(
             agent,
             cx,
             error,
-            js3_uri_error_builtin(),
+            uri_error_builtin(),
             prototypes.uri_error_prototype,
         ),
         uri_error_prototype: prototypes.uri_error_prototype,
@@ -91,7 +90,7 @@ pub(in crate::public) fn install_error_family(
             agent,
             cx,
             error,
-            js3_aggregate_error_builtin(),
+            aggregate_error_builtin(),
             prototypes.aggregate_error_prototype,
         ),
         aggregate_error_prototype: prototypes.aggregate_error_prototype,
@@ -99,7 +98,7 @@ pub(in crate::public) fn install_error_family(
             agent,
             cx,
             error,
-            js3_suppressed_error_builtin(),
+            suppressed_error_builtin(),
             prototypes.suppressed_error_prototype,
         ),
         suppressed_error_prototype: prototypes.suppressed_error_prototype,
@@ -111,16 +110,16 @@ pub(in crate::public) fn error_builtin_object(
     entry: BuiltinFunctionId,
 ) -> Option<ObjectRef> {
     [
-        (js3_error_builtin(), builtins.error),
-        (js3_error_to_string_builtin(), builtins.error_to_string),
-        (js3_eval_error_builtin(), builtins.eval_error),
-        (js3_range_error_builtin(), builtins.range_error),
-        (js3_reference_error_builtin(), builtins.reference_error),
-        (js3_syntax_error_builtin(), builtins.syntax_error),
-        (js3_type_error_builtin(), builtins.type_error),
-        (js3_uri_error_builtin(), builtins.uri_error),
-        (js3_aggregate_error_builtin(), builtins.aggregate_error),
-        (js3_suppressed_error_builtin(), builtins.suppressed_error),
+        (error_builtin(), builtins.error),
+        (error_to_string_builtin(), builtins.error_to_string),
+        (eval_error_builtin(), builtins.eval_error),
+        (range_error_builtin(), builtins.range_error),
+        (reference_error_builtin(), builtins.reference_error),
+        (syntax_error_builtin(), builtins.syntax_error),
+        (type_error_builtin(), builtins.type_error),
+        (uri_error_builtin(), builtins.uri_error),
+        (aggregate_error_builtin(), builtins.aggregate_error),
+        (suppressed_error_builtin(), builtins.suppressed_error),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -171,7 +170,7 @@ fn install_error_prototype_descriptors(
             Value::from_object_ref(error),
             writable_builtin_attributes(),
         ),
-        builtin_function_atom_property(WellKnownAtom::toString.id(), js3_error_to_string_builtin()),
+        builtin_function_atom_property(WellKnownAtom::toString.id(), error_to_string_builtin()),
         data_atom_property(
             WellKnownAtom::name.id(),
             values.error_name,

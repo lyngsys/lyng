@@ -12,7 +12,7 @@ use lyng_js_host::{
 };
 use lyng_js_ops::errors;
 use lyng_js_types::{
-    js3_abstract_module_source_builtin, EmbeddingFunctionId, ObjectRef, PropertyKey, Value,
+    abstract_module_source_builtin, EmbeddingFunctionId, ObjectRef, PropertyKey, Value,
 };
 use lyng_js_vm::{
     EmbeddingFunctionContext, EmbeddingFunctionMetadata, EmbeddingInvocation,
@@ -380,7 +380,7 @@ impl RealmExtensionProvider for Test262RealmExtension {
             true,
         )?;
         let abstract_module_source =
-            installation.builtin_constant(js3_abstract_module_source_builtin())?;
+            installation.builtin_constant(abstract_module_source_builtin())?;
         installation.define_data_property(
             harness,
             abstract_module_source_key,

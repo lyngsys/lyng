@@ -12,14 +12,12 @@ use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_js_common::AtomId;
 use lyng_js_env::Agent;
 use lyng_js_types::{
-    js3_proxy_builtin, js3_proxy_revocable_builtin, js3_reflect_apply_builtin,
-    js3_reflect_construct_builtin, js3_reflect_define_property_builtin,
-    js3_reflect_delete_property_builtin, js3_reflect_get_builtin,
-    js3_reflect_get_own_property_descriptor_builtin, js3_reflect_get_prototype_of_builtin,
-    js3_reflect_has_builtin, js3_reflect_is_extensible_builtin, js3_reflect_own_keys_builtin,
-    js3_reflect_prevent_extensions_builtin, js3_reflect_set_builtin,
-    js3_reflect_set_prototype_of_builtin, BuiltinFunctionId, ObjectRef, RealmRef,
-    WellKnownSymbolId,
+    proxy_builtin, proxy_revocable_builtin, reflect_apply_builtin, reflect_construct_builtin,
+    reflect_define_property_builtin, reflect_delete_property_builtin, reflect_get_builtin,
+    reflect_get_own_property_descriptor_builtin, reflect_get_prototype_of_builtin,
+    reflect_has_builtin, reflect_is_extensible_builtin, reflect_own_keys_builtin,
+    reflect_prevent_extensions_builtin, reflect_set_builtin, reflect_set_prototype_of_builtin,
+    BuiltinFunctionId, ObjectRef, RealmRef, WellKnownSymbolId,
 };
 
 pub(in crate::public) fn install_object_reflection_family(
@@ -29,74 +27,69 @@ pub(in crate::public) fn install_object_reflection_family(
 ) -> ObjectReflectionFamilyBuiltins {
     ObjectReflectionFamilyBuiltins {
         reflect: objects.reflect,
-        reflect_apply: install_public_builtin_function(
-            agent,
-            cx,
-            js3_reflect_apply_builtin(),
-            None,
-        ),
+        reflect_apply: install_public_builtin_function(agent, cx, reflect_apply_builtin(), None),
         reflect_construct: install_public_builtin_function(
             agent,
             cx,
-            js3_reflect_construct_builtin(),
+            reflect_construct_builtin(),
             None,
         ),
         reflect_define_property: install_public_builtin_function(
             agent,
             cx,
-            js3_reflect_define_property_builtin(),
+            reflect_define_property_builtin(),
             None,
         ),
         reflect_delete_property: install_public_builtin_function(
             agent,
             cx,
-            js3_reflect_delete_property_builtin(),
+            reflect_delete_property_builtin(),
             None,
         ),
-        reflect_get: install_public_builtin_function(agent, cx, js3_reflect_get_builtin(), None),
+        reflect_get: install_public_builtin_function(agent, cx, reflect_get_builtin(), None),
         reflect_get_own_property_descriptor: install_public_builtin_function(
             agent,
             cx,
-            js3_reflect_get_own_property_descriptor_builtin(),
+            reflect_get_own_property_descriptor_builtin(),
             None,
         ),
         reflect_get_prototype_of: install_public_builtin_function(
             agent,
             cx,
-            js3_reflect_get_prototype_of_builtin(),
+            reflect_get_prototype_of_builtin(),
             None,
         ),
-        reflect_has: install_public_builtin_function(agent, cx, js3_reflect_has_builtin(), None),
+        reflect_has: install_public_builtin_function(agent, cx, reflect_has_builtin(), None),
         reflect_is_extensible: install_public_builtin_function(
             agent,
             cx,
-            js3_reflect_is_extensible_builtin(),
+            reflect_is_extensible_builtin(),
             None,
         ),
         reflect_own_keys: install_public_builtin_function(
             agent,
             cx,
-            js3_reflect_own_keys_builtin(),
+            reflect_own_keys_builtin(),
             None,
         ),
         reflect_prevent_extensions: install_public_builtin_function(
             agent,
             cx,
-            js3_reflect_prevent_extensions_builtin(),
+            reflect_prevent_extensions_builtin(),
             None,
         ),
-        reflect_set: install_public_builtin_function(agent, cx, js3_reflect_set_builtin(), None),
+        reflect_set: install_public_builtin_function(agent, cx, reflect_set_builtin(), None),
         reflect_set_prototype_of: install_public_builtin_function(
             agent,
             cx,
-            js3_reflect_set_prototype_of_builtin(),
+            reflect_set_prototype_of_builtin(),
             None,
         ),
-        proxy: install_public_builtin_function(agent, cx, js3_proxy_builtin(), None),
+        proxy: install_public_builtin_function(agent, cx, proxy_builtin(), None),
         proxy_revocable: install_public_builtin_function(
             agent,
             cx,
-            js3_proxy_revocable_builtin(),
+            proxy_revocable_builtin(),
             None,
         ),
     }
@@ -107,42 +100,42 @@ pub(in crate::public) fn object_reflection_builtin_object(
     entry: BuiltinFunctionId,
 ) -> Option<ObjectRef> {
     [
-        (js3_reflect_apply_builtin(), builtins.reflect_apply),
-        (js3_reflect_construct_builtin(), builtins.reflect_construct),
+        (reflect_apply_builtin(), builtins.reflect_apply),
+        (reflect_construct_builtin(), builtins.reflect_construct),
         (
-            js3_reflect_define_property_builtin(),
+            reflect_define_property_builtin(),
             builtins.reflect_define_property,
         ),
         (
-            js3_reflect_delete_property_builtin(),
+            reflect_delete_property_builtin(),
             builtins.reflect_delete_property,
         ),
-        (js3_reflect_get_builtin(), builtins.reflect_get),
+        (reflect_get_builtin(), builtins.reflect_get),
         (
-            js3_reflect_get_own_property_descriptor_builtin(),
+            reflect_get_own_property_descriptor_builtin(),
             builtins.reflect_get_own_property_descriptor,
         ),
         (
-            js3_reflect_get_prototype_of_builtin(),
+            reflect_get_prototype_of_builtin(),
             builtins.reflect_get_prototype_of,
         ),
-        (js3_reflect_has_builtin(), builtins.reflect_has),
+        (reflect_has_builtin(), builtins.reflect_has),
         (
-            js3_reflect_is_extensible_builtin(),
+            reflect_is_extensible_builtin(),
             builtins.reflect_is_extensible,
         ),
-        (js3_reflect_own_keys_builtin(), builtins.reflect_own_keys),
+        (reflect_own_keys_builtin(), builtins.reflect_own_keys),
         (
-            js3_reflect_prevent_extensions_builtin(),
+            reflect_prevent_extensions_builtin(),
             builtins.reflect_prevent_extensions,
         ),
-        (js3_reflect_set_builtin(), builtins.reflect_set),
+        (reflect_set_builtin(), builtins.reflect_set),
         (
-            js3_reflect_set_prototype_of_builtin(),
+            reflect_set_prototype_of_builtin(),
             builtins.reflect_set_prototype_of,
         ),
-        (js3_proxy_builtin(), builtins.proxy),
-        (js3_proxy_revocable_builtin(), builtins.proxy_revocable),
+        (proxy_builtin(), builtins.proxy),
+        (proxy_revocable_builtin(), builtins.proxy_revocable),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -157,37 +150,25 @@ pub(in crate::public) fn install_object_reflection_family_descriptors(
     let reflect_tag = descriptor_tag(agent, "Reflect");
 
     let reflect_descriptors = [
-        builtin_function_atom_property(atoms.apply, js3_reflect_apply_builtin()),
-        builtin_function_atom_property(atoms.construct, js3_reflect_construct_builtin()),
-        builtin_function_atom_property(
-            atoms.define_property,
-            js3_reflect_define_property_builtin(),
-        ),
-        builtin_function_atom_property(
-            atoms.delete_property,
-            js3_reflect_delete_property_builtin(),
-        ),
-        builtin_function_atom_property(atoms.get, js3_reflect_get_builtin()),
+        builtin_function_atom_property(atoms.apply, reflect_apply_builtin()),
+        builtin_function_atom_property(atoms.construct, reflect_construct_builtin()),
+        builtin_function_atom_property(atoms.define_property, reflect_define_property_builtin()),
+        builtin_function_atom_property(atoms.delete_property, reflect_delete_property_builtin()),
+        builtin_function_atom_property(atoms.get, reflect_get_builtin()),
         builtin_function_atom_property(
             atoms.get_own_property_descriptor,
-            js3_reflect_get_own_property_descriptor_builtin(),
+            reflect_get_own_property_descriptor_builtin(),
         ),
-        builtin_function_atom_property(
-            atoms.get_prototype_of,
-            js3_reflect_get_prototype_of_builtin(),
-        ),
-        builtin_function_atom_property(atoms.has, js3_reflect_has_builtin()),
-        builtin_function_atom_property(atoms.is_extensible, js3_reflect_is_extensible_builtin()),
-        builtin_function_atom_property(atoms.own_keys, js3_reflect_own_keys_builtin()),
+        builtin_function_atom_property(atoms.get_prototype_of, reflect_get_prototype_of_builtin()),
+        builtin_function_atom_property(atoms.has, reflect_has_builtin()),
+        builtin_function_atom_property(atoms.is_extensible, reflect_is_extensible_builtin()),
+        builtin_function_atom_property(atoms.own_keys, reflect_own_keys_builtin()),
         builtin_function_atom_property(
             atoms.prevent_extensions,
-            js3_reflect_prevent_extensions_builtin(),
+            reflect_prevent_extensions_builtin(),
         ),
-        builtin_function_atom_property(atoms.set, js3_reflect_set_builtin()),
-        builtin_function_atom_property(
-            atoms.set_prototype_of,
-            js3_reflect_set_prototype_of_builtin(),
-        ),
+        builtin_function_atom_property(atoms.set, reflect_set_builtin()),
+        builtin_function_atom_property(atoms.set_prototype_of, reflect_set_prototype_of_builtin()),
         data_symbol_property(
             WellKnownSymbolId::ToStringTag,
             reflect_tag,
@@ -196,7 +177,7 @@ pub(in crate::public) fn install_object_reflection_family_descriptors(
     ];
     let proxy_descriptors = [builtin_function_atom_property(
         atoms.revocable,
-        js3_proxy_revocable_builtin(),
+        proxy_revocable_builtin(),
     )];
     let tables = [
         BuiltinDescriptorTable::new(

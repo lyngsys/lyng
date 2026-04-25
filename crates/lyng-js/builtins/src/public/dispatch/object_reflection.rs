@@ -28,43 +28,43 @@ fn dispatch_reflect_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::js3_reflect_apply_builtin() {
+    if entry == lyng_js_types::reflect_apply_builtin() {
         return reflect_apply_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_construct_builtin() {
+    if entry == lyng_js_types::reflect_construct_builtin() {
         return reflect_construct_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_define_property_builtin() {
+    if entry == lyng_js_types::reflect_define_property_builtin() {
         return reflect_define_property_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_delete_property_builtin() {
+    if entry == lyng_js_types::reflect_delete_property_builtin() {
         return reflect_delete_property_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_get_builtin() {
+    if entry == lyng_js_types::reflect_get_builtin() {
         return reflect_get_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_get_own_property_descriptor_builtin() {
+    if entry == lyng_js_types::reflect_get_own_property_descriptor_builtin() {
         return reflect_get_own_property_descriptor_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_get_prototype_of_builtin() {
+    if entry == lyng_js_types::reflect_get_prototype_of_builtin() {
         return reflect_get_prototype_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_has_builtin() {
+    if entry == lyng_js_types::reflect_has_builtin() {
         return reflect_has_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_is_extensible_builtin() {
+    if entry == lyng_js_types::reflect_is_extensible_builtin() {
         return reflect_is_extensible_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_own_keys_builtin() {
+    if entry == lyng_js_types::reflect_own_keys_builtin() {
         return reflect_own_keys_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_prevent_extensions_builtin() {
+    if entry == lyng_js_types::reflect_prevent_extensions_builtin() {
         return reflect_prevent_extensions_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_set_builtin() {
+    if entry == lyng_js_types::reflect_set_builtin() {
         return reflect_set_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_reflect_set_prototype_of_builtin() {
+    if entry == lyng_js_types::reflect_set_prototype_of_builtin() {
         return reflect_set_prototype_of_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -75,13 +75,13 @@ fn dispatch_proxy_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::js3_proxy_builtin() {
+    if entry == lyng_js_types::proxy_builtin() {
         return proxy_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_proxy_revocable_builtin() {
+    if entry == lyng_js_types::proxy_revocable_builtin() {
         return proxy_revocable_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_proxy_revoke_builtin() {
+    if entry == lyng_js_types::proxy_revoke_builtin() {
         return proxy_revoke_builtin(context).map(Some);
     }
     Ok(None)
@@ -106,7 +106,7 @@ fn proxy_revocable_builtin<Cx: PublicBuiltinDispatchContext>(
     let handler = require_proxy_argument_object(cx, invocation, 1)?;
     let realm = cx.builtin_realm();
     let proxy = allocate_proxy_object(cx, realm, target, handler)?;
-    let revoke = cx.allocate_builtin_function(lyng_js_types::js3_proxy_revoke_builtin())?;
+    let revoke = cx.allocate_builtin_function(lyng_js_types::proxy_revoke_builtin())?;
     let object_prototype = {
         let agent = cx.agent();
         agent

@@ -35,25 +35,25 @@ fn dispatch_disposal_stack_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::js3_disposable_stack_builtin() {
+    if entry == lyng_js_types::disposable_stack_builtin() {
         return disposable_stack_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_disposable_stack_use_builtin() {
+    if entry == lyng_js_types::disposable_stack_use_builtin() {
         return disposable_stack_use_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_disposable_stack_adopt_builtin() {
+    if entry == lyng_js_types::disposable_stack_adopt_builtin() {
         return disposable_stack_adopt_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_disposable_stack_defer_builtin() {
+    if entry == lyng_js_types::disposable_stack_defer_builtin() {
         return disposable_stack_defer_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_disposable_stack_move_builtin() {
+    if entry == lyng_js_types::disposable_stack_move_builtin() {
         return disposable_stack_move_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_disposable_stack_disposed_getter_builtin() {
+    if entry == lyng_js_types::disposable_stack_disposed_getter_builtin() {
         return disposable_stack_disposed_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_disposable_stack_dispose_builtin() {
+    if entry == lyng_js_types::disposable_stack_dispose_builtin() {
         return disposal_stack_dispose_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -64,28 +64,28 @@ fn dispatch_async_disposal_stack_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::js3_async_disposable_stack_builtin() {
+    if entry == lyng_js_types::async_disposable_stack_builtin() {
         return async_disposable_stack_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_async_disposable_stack_use_builtin() {
+    if entry == lyng_js_types::async_disposable_stack_use_builtin() {
         return async_disposable_stack_use_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_async_disposable_stack_adopt_builtin() {
+    if entry == lyng_js_types::async_disposable_stack_adopt_builtin() {
         return async_disposable_stack_adopt_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_async_disposable_stack_defer_builtin() {
+    if entry == lyng_js_types::async_disposable_stack_defer_builtin() {
         return async_disposable_stack_defer_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_async_disposable_stack_move_builtin() {
+    if entry == lyng_js_types::async_disposable_stack_move_builtin() {
         return async_disposable_stack_move_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_async_disposable_stack_disposed_getter_builtin() {
+    if entry == lyng_js_types::async_disposable_stack_disposed_getter_builtin() {
         return async_disposable_stack_disposed_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_async_disposable_stack_dispose_async_builtin() {
+    if entry == lyng_js_types::async_disposable_stack_dispose_async_builtin() {
         return async_disposable_stack_dispose_async_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_async_disposal_resume_builtin() {
+    if entry == lyng_js_types::async_disposal_resume_builtin() {
         return async_disposal_resume_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -96,22 +96,22 @@ fn dispatch_disposal_scope_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::js3_create_sync_disposal_scope_builtin() {
+    if entry == lyng_js_types::create_sync_disposal_scope_builtin() {
         return create_disposal_scope_builtin(context, DisposalCapabilityKind::Sync).map(Some);
     }
-    if entry == lyng_js_types::js3_create_async_disposal_scope_builtin() {
+    if entry == lyng_js_types::create_async_disposal_scope_builtin() {
         return create_disposal_scope_builtin(context, DisposalCapabilityKind::Async).map(Some);
     }
-    if entry == lyng_js_types::js3_add_sync_disposable_resource_builtin() {
+    if entry == lyng_js_types::add_sync_disposable_resource_builtin() {
         return add_disposal_scope_resource_builtin(context, invocation, false).map(Some);
     }
-    if entry == lyng_js_types::js3_add_async_disposable_resource_builtin() {
+    if entry == lyng_js_types::add_async_disposable_resource_builtin() {
         return add_disposal_scope_resource_builtin(context, invocation, true).map(Some);
     }
-    if entry == lyng_js_types::js3_dispose_scope_builtin() {
+    if entry == lyng_js_types::dispose_scope_builtin() {
         return dispose_scope_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_dispose_scope_async_builtin() {
+    if entry == lyng_js_types::dispose_scope_async_builtin() {
         return dispose_scope_async_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -365,8 +365,7 @@ fn allocate_async_disposal_resume_function<Cx: PublicBuiltinDispatchContext>(
     operation: lyng_js_env::AsyncDisposalOperationId,
     reject: bool,
 ) -> Result<ObjectRef, Cx::Error> {
-    let function =
-        cx.allocate_builtin_function(lyng_js_types::js3_async_disposal_resume_builtin())?;
+    let function = cx.allocate_builtin_function(lyng_js_types::async_disposal_resume_builtin())?;
     let _ = cx.agent().alloc_async_disposal_resume(
         function,
         lyng_js_env::AsyncDisposalResumeRecord::new(operation, reject),

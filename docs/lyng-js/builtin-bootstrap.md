@@ -285,7 +285,7 @@ the crate that implements the builtin bodies.
 Phase 5 keeps builtin entry identities in one `BuiltinFunctionId` space, but the space is
 partitioned by contract.
 
-- reserved JS3-internal helper namespace
+- reserved internal helper namespace
   - owned in `lyng-js-types`
   - currently `1_001..=1_012`
   - used only for lowering helpers and runtime template support still emitted by the compiler or VM
@@ -306,7 +306,7 @@ Rules:
 - namespace membership, not call site, determines whether an entry is internal helper,
   spec-visible builtin, or harness extension
 - new spec builtins extend the public Phase 5 namespace; they do not reuse or rename
-  `js3_internal_*` entries
+  `internal_*` entries
 - harness helpers remain a post-bootstrap extension layer even when they share descriptor
   installation machinery with spec builtins
 

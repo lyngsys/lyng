@@ -1,12 +1,9 @@
 use super::{
     close_iterator_after_error, create_array_from_values, create_data_property_or_throw,
-    define_data_property_with_attrs, js3_promise_all_resolve_element_builtin,
-    js3_promise_all_settled_reject_element_builtin,
-    js3_promise_all_settled_resolve_element_builtin, js3_promise_any_reject_element_builtin,
-    js3_promise_capability_executor_builtin, js3_promise_finally_function_builtin,
-    js3_promise_reject_function_builtin, js3_promise_resolve_function_builtin, map_completion,
-    property_key_from_text, require_constructor_object, string_value, type_error,
-    BuiltinIteratorBridge, PublicBuiltinDispatchContext,
+    define_data_property_with_attrs, map_completion, promise_all_resolve_element_builtin,
+    promise_all_settled_reject_element_builtin, promise_all_settled_resolve_element_builtin,
+    promise_any_reject_element_builtin, property_key_from_text, require_constructor_object,
+    string_value, type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use lyng_js_common::WellKnownAtom;
@@ -39,28 +36,28 @@ fn dispatch_promise_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_promise_builtin() {
+    if entry == super::promise_builtin() {
         return promise_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_resolve_builtin() {
+    if entry == super::promise_resolve_builtin() {
         return promise_resolve_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_reject_builtin() {
+    if entry == super::promise_reject_builtin() {
         return promise_reject_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_all_builtin() {
+    if entry == super::promise_all_builtin() {
         return promise_all_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_all_settled_builtin() {
+    if entry == super::promise_all_settled_builtin() {
         return promise_all_settled_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_race_builtin() {
+    if entry == super::promise_race_builtin() {
         return promise_race_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_any_builtin() {
+    if entry == super::promise_any_builtin() {
         return promise_any_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_species_getter_builtin() {
+    if entry == super::promise_species_getter_builtin() {
         return promise_species_getter_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -71,13 +68,13 @@ fn dispatch_promise_prototype_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_promise_then_builtin() {
+    if entry == super::promise_then_builtin() {
         return promise_then_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_catch_builtin() {
+    if entry == super::promise_catch_builtin() {
         return promise_catch_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_finally_builtin() {
+    if entry == super::promise_finally_builtin() {
         return promise_finally_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -88,19 +85,19 @@ fn dispatch_promise_internal_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_promise_capability_executor_builtin() {
+    if entry == super::promise_capability_executor_builtin() {
         return promise_capability_executor_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_resolve_function_builtin() {
+    if entry == super::promise_resolve_function_builtin() {
         return promise_resolve_function_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_reject_function_builtin() {
+    if entry == super::promise_reject_function_builtin() {
         return promise_reject_function_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_finally_function_builtin() {
+    if entry == super::promise_finally_function_builtin() {
         return promise_finally_function_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_promise_all_resolve_element_builtin() {
+    if entry == super::promise_all_resolve_element_builtin() {
         return promise_combinator_element_builtin(
             context,
             invocation,
@@ -108,7 +105,7 @@ fn dispatch_promise_internal_builtin<Cx: PublicBuiltinDispatchContext>(
         )
         .map(Some);
     }
-    if entry == super::js3_promise_all_settled_resolve_element_builtin() {
+    if entry == super::promise_all_settled_resolve_element_builtin() {
         return promise_combinator_element_builtin(
             context,
             invocation,
@@ -116,7 +113,7 @@ fn dispatch_promise_internal_builtin<Cx: PublicBuiltinDispatchContext>(
         )
         .map(Some);
     }
-    if entry == super::js3_promise_all_settled_reject_element_builtin() {
+    if entry == super::promise_all_settled_reject_element_builtin() {
         return promise_combinator_element_builtin(
             context,
             invocation,
@@ -124,7 +121,7 @@ fn dispatch_promise_internal_builtin<Cx: PublicBuiltinDispatchContext>(
         )
         .map(Some);
     }
-    if entry == super::js3_promise_any_reject_element_builtin() {
+    if entry == super::promise_any_reject_element_builtin() {
         return promise_combinator_element_builtin(
             context,
             invocation,
@@ -160,8 +157,8 @@ fn promise_builtin<Cx: PublicBuiltinDispatchContext>(
     let _ = cx
         .agent()
         .set_promise_capability_promise(capability, promise_object);
-    let resolve = cx.allocate_builtin_function(js3_promise_resolve_function_builtin())?;
-    let reject = cx.allocate_builtin_function(js3_promise_reject_function_builtin())?;
+    let resolve = cx.allocate_builtin_function(super::promise_resolve_function_builtin())?;
+    let reject = cx.allocate_builtin_function(super::promise_reject_function_builtin())?;
     let _ = cx
         .agent()
         .set_promise_capability_resolve(capability, resolve);
@@ -906,7 +903,7 @@ fn allocate_promise_finally_function<Cx: PublicBuiltinDispatchContext>(
     on_finally: ObjectRef,
     constructor: ObjectRef,
 ) -> Result<ObjectRef, Cx::Error> {
-    let function = cx.allocate_builtin_function(js3_promise_finally_function_builtin())?;
+    let function = cx.allocate_builtin_function(super::promise_finally_function_builtin())?;
     let _ = cx.agent().alloc_promise_finally_function(
         function,
         PromiseFinallyFunctionRecord::new(kind, on_finally, constructor),
@@ -931,14 +928,14 @@ fn allocate_promise_combinator_element<Cx: PublicBuiltinDispatchContext>(
 
 fn promise_combinator_element_entry(kind: PromiseCombinatorElementKind) -> BuiltinFunctionId {
     match kind {
-        PromiseCombinatorElementKind::AllResolve => js3_promise_all_resolve_element_builtin(),
+        PromiseCombinatorElementKind::AllResolve => promise_all_resolve_element_builtin(),
         PromiseCombinatorElementKind::AllSettledResolve => {
-            js3_promise_all_settled_resolve_element_builtin()
+            promise_all_settled_resolve_element_builtin()
         }
         PromiseCombinatorElementKind::AllSettledReject => {
-            js3_promise_all_settled_reject_element_builtin()
+            promise_all_settled_reject_element_builtin()
         }
-        PromiseCombinatorElementKind::AnyReject => js3_promise_any_reject_element_builtin(),
+        PromiseCombinatorElementKind::AnyReject => promise_any_reject_element_builtin(),
     }
 }
 
@@ -1094,7 +1091,7 @@ pub(super) fn new_promise_capability<Cx: PublicBuiltinDispatchContext>(
     constructor: ObjectRef,
 ) -> Result<lyng_js_env::PromiseCapabilityId, Cx::Error> {
     let capability = cx.agent().alloc_promise_capability();
-    let executor = cx.allocate_builtin_function(js3_promise_capability_executor_builtin())?;
+    let executor = cx.allocate_builtin_function(super::promise_capability_executor_builtin())?;
     let _ = cx.agent().alloc_promise_resolving_function(
         executor,
         lyng_js_env::PromiseResolvingFunctionRecord::new(

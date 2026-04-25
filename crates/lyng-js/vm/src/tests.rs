@@ -28,9 +28,8 @@ use lyng_js_ops::object::{create_data_property, get};
 use lyng_js_parser::{parse_module, parse_script};
 use lyng_js_sema::{analyze_module, analyze_script};
 use lyng_js_types::{
-    js3_function_builtin, js3_internal_function_call_builtin, js3_symbol_builtin, CodeRef,
-    EmbeddingFunctionId, EnvironmentRef, FeedbackSlotId, NativeFunctionId, ObjectRef, PropertyKey,
-    RealmRef, Value,
+    function_builtin, internal_function_call_builtin, symbol_builtin, CodeRef, EmbeddingFunctionId,
+    EnvironmentRef, FeedbackSlotId, NativeFunctionId, ObjectRef, PropertyKey, RealmRef, Value,
 };
 use std::mem::size_of;
 use std::num::NonZeroU32;
@@ -8178,7 +8177,7 @@ fn load_const_supports_reserved_internal_builtin_constants() {
     .with_kind(BytecodeFunctionKind::Script)
     .with_register_counts(1, 0)
     .with_constants(vec![ConstantValue::Builtin(
-        js3_internal_function_call_builtin(),
+        internal_function_call_builtin(),
     )])
     .with_instructions(vec![
         Instruction::abx(Opcode::LoadConst, 0, 0),
@@ -8202,7 +8201,7 @@ fn load_const_supports_reserved_internal_builtin_constants() {
     assert_eq!(
         function_data.entry(),
         Some(FunctionEntryIdentity::Native(NativeFunctionId::builtin(
-            js3_internal_function_call_builtin()
+            internal_function_call_builtin()
         )))
     );
 }
@@ -8220,7 +8219,7 @@ fn load_const_supports_phase5_public_builtin_constants() {
     )
     .with_kind(BytecodeFunctionKind::Script)
     .with_register_counts(1, 0)
-    .with_constants(vec![ConstantValue::Builtin(js3_symbol_builtin())])
+    .with_constants(vec![ConstantValue::Builtin(symbol_builtin())])
     .with_instructions(vec![
         Instruction::abx(Opcode::LoadConst, 0, 0),
         Instruction::ax(Opcode::Return, 0),
@@ -8243,7 +8242,7 @@ fn load_const_supports_phase5_public_builtin_constants() {
     assert_eq!(
         function_data.entry(),
         Some(FunctionEntryIdentity::Native(NativeFunctionId::builtin(
-            js3_symbol_builtin(),
+            symbol_builtin(),
         )))
     );
 }
@@ -8261,7 +8260,7 @@ fn load_const_supports_phase5_function_builtin_constants() {
     )
     .with_kind(BytecodeFunctionKind::Script)
     .with_register_counts(1, 0)
-    .with_constants(vec![ConstantValue::Builtin(js3_function_builtin())])
+    .with_constants(vec![ConstantValue::Builtin(function_builtin())])
     .with_instructions(vec![
         Instruction::abx(Opcode::LoadConst, 0, 0),
         Instruction::ax(Opcode::Return, 0),
@@ -8284,7 +8283,7 @@ fn load_const_supports_phase5_function_builtin_constants() {
     assert_eq!(
         function_data.entry(),
         Some(FunctionEntryIdentity::Native(NativeFunctionId::builtin(
-            js3_function_builtin(),
+            function_builtin(),
         )))
     );
 }

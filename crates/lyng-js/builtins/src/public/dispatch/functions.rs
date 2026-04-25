@@ -25,16 +25,16 @@ fn dispatch_function_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_function_builtin() {
+    if entry == super::function_builtin() {
         return function_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_async_function_builtin() {
+    if entry == super::async_function_builtin() {
         return async_function_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_generator_function_builtin() {
+    if entry == super::generator_function_builtin() {
         return generator_function_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_async_generator_function_builtin() {
+    if entry == super::async_generator_function_builtin() {
         return async_generator_function_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -45,22 +45,22 @@ fn dispatch_function_prototype_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_function_prototype_builtin() {
+    if entry == super::function_prototype_builtin() {
         return function_prototype_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_function_call_builtin() {
+    if entry == super::function_call_builtin() {
         return function_call_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_function_apply_builtin() {
+    if entry == super::function_apply_builtin() {
         return function_apply_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_function_bind_builtin() {
+    if entry == super::function_bind_builtin() {
         return function_bind_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_function_to_string_builtin() {
+    if entry == super::function_to_string_builtin() {
         return function_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_function_symbol_has_instance_builtin() {
+    if entry == super::function_symbol_has_instance_builtin() {
         return function_symbol_has_instance_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -71,22 +71,22 @@ fn dispatch_generator_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_async_generator_next_builtin() {
+    if entry == super::async_generator_next_builtin() {
         return async_generator_next_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_async_generator_return_builtin() {
+    if entry == super::async_generator_return_builtin() {
         return async_generator_return_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_async_generator_throw_builtin() {
+    if entry == super::async_generator_throw_builtin() {
         return async_generator_throw_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_generator_next_builtin() {
+    if entry == super::generator_next_builtin() {
         return generator_next_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_generator_return_builtin() {
+    if entry == super::generator_return_builtin() {
         return generator_return_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_generator_throw_builtin() {
+    if entry == super::generator_throw_builtin() {
         return generator_throw_builtin(context, invocation).map(Some);
     }
     Ok(None)

@@ -29,8 +29,8 @@ use lyng_js_ops::object::ToPrimitiveHint;
 use lyng_js_ops::{errors, object, proxy, read};
 use lyng_js_parser::parse_script;
 use lyng_js_types::{
-    js3_eval_builtin, js3_internal_dynamic_import_builtin, js3_internal_import_meta_builtin,
-    js3_object_to_string_builtin, js3_promise_capability_executor_builtin, AbruptCompletion,
+    eval_builtin, internal_dynamic_import_builtin, internal_import_meta_builtin,
+    object_to_string_builtin, promise_capability_executor_builtin, AbruptCompletion,
     BuiltinFunctionId, EmbeddingFunctionId, PropertyDescriptor, PropertyKey, RealmRef,
     WellKnownSymbolId,
 };
@@ -294,10 +294,10 @@ impl Vm {
         let Some(entry) = Self::builtin_entry(agent, callee_object) else {
             return Ok(None);
         };
-        if entry == js3_internal_import_meta_builtin() {
+        if entry == internal_import_meta_builtin() {
             return self.import_meta_builtin(agent, caller_frame).map(Some);
         }
-        if entry == js3_internal_dynamic_import_builtin() {
+        if entry == internal_dynamic_import_builtin() {
             return self
                 .dynamic_import_builtin(agent, host, registry, caller_frame, arguments)
                 .map(Some);
@@ -489,7 +489,7 @@ impl Vm {
         let executor = self.allocate_builtin_function_object(
             agent,
             caller_frame.realm(),
-            js3_promise_capability_executor_builtin(),
+            promise_capability_executor_builtin(),
         )?;
         let _ = agent.alloc_promise_resolving_function(
             executor,
@@ -2560,7 +2560,7 @@ impl object::ToPrimitiveContext for VmBuiltinDispatch<'_, '_, '_> {
         let Some(entry) = Vm::builtin_entry(self.agent, method_object) else {
             return Ok(None);
         };
-        if method_name != WellKnownAtom::toString.id() || entry != js3_object_to_string_builtin() {
+        if method_name != WellKnownAtom::toString.id() || entry != object_to_string_builtin() {
             return Ok(None);
         }
 
@@ -2907,7 +2907,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         let builtin_eval = self
             .vm
             .builtin_cache
-            .builtin_constant(self.agent, self.caller_frame.realm(), js3_eval_builtin())
+            .builtin_constant(self.agent, self.caller_frame.realm(), eval_builtin())
             .and_then(Value::as_object_ref)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(self.agent)))?;
         if target != builtin_eval {

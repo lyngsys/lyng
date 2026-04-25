@@ -39,22 +39,22 @@ fn dispatch_collection_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_map_builtin() {
+    if entry == super::map_builtin() {
         return map_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_set_builtin() {
+    if entry == super::set_builtin() {
         return set_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_weak_map_builtin() {
+    if entry == super::weak_map_builtin() {
         return weak_map_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_weak_set_builtin() {
+    if entry == super::weak_set_builtin() {
         return weak_set_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_weak_ref_builtin() {
+    if entry == super::weak_ref_builtin() {
         return weak_ref_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_finalization_registry_builtin() {
+    if entry == super::finalization_registry_builtin() {
         return finalization_registry_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -65,40 +65,40 @@ fn dispatch_map_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_map_get_builtin() {
+    if entry == super::map_get_builtin() {
         return map_get_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_map_set_builtin() {
+    if entry == super::map_set_builtin() {
         return map_set_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_map_has_builtin() {
+    if entry == super::map_has_builtin() {
         return map_has_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_map_delete_builtin() {
+    if entry == super::map_delete_builtin() {
         return map_delete_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_map_clear_builtin() {
+    if entry == super::map_clear_builtin() {
         return map_clear_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_map_entries_builtin() {
+    if entry == super::map_entries_builtin() {
         return map_iterator_factory_builtin(context, invocation, ArrayIterationKind::Entry)
             .map(Some);
     }
-    if entry == super::js3_map_values_builtin() {
+    if entry == super::map_values_builtin() {
         return map_iterator_factory_builtin(context, invocation, ArrayIterationKind::Value)
             .map(Some);
     }
-    if entry == super::js3_map_keys_builtin() {
+    if entry == super::map_keys_builtin() {
         return map_iterator_factory_builtin(context, invocation, ArrayIterationKind::Key)
             .map(Some);
     }
-    if entry == super::js3_map_for_each_builtin() {
+    if entry == super::map_for_each_builtin() {
         return map_for_each_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_map_size_getter_builtin() {
+    if entry == super::map_size_getter_builtin() {
         return map_size_getter_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_map_iterator_next_builtin() {
+    if entry == super::map_iterator_next_builtin() {
         return map_iterator_next_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -109,37 +109,37 @@ fn dispatch_set_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_set_add_builtin() {
+    if entry == super::set_add_builtin() {
         return set_add_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_set_has_builtin() {
+    if entry == super::set_has_builtin() {
         return set_has_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_set_delete_builtin() {
+    if entry == super::set_delete_builtin() {
         return set_delete_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_set_clear_builtin() {
+    if entry == super::set_clear_builtin() {
         return set_clear_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_set_entries_builtin() {
+    if entry == super::set_entries_builtin() {
         return set_iterator_factory_builtin(context, invocation, ArrayIterationKind::Entry)
             .map(Some);
     }
-    if entry == super::js3_set_values_builtin() {
+    if entry == super::set_values_builtin() {
         return set_iterator_factory_builtin(context, invocation, ArrayIterationKind::Value)
             .map(Some);
     }
-    if entry == super::js3_set_keys_builtin() {
+    if entry == super::set_keys_builtin() {
         return set_iterator_factory_builtin(context, invocation, ArrayIterationKind::Key)
             .map(Some);
     }
-    if entry == super::js3_set_for_each_builtin() {
+    if entry == super::set_for_each_builtin() {
         return set_for_each_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_set_size_getter_builtin() {
+    if entry == super::set_size_getter_builtin() {
         return set_size_getter_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_set_iterator_next_builtin() {
+    if entry == super::set_iterator_next_builtin() {
         return set_iterator_next_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -150,34 +150,34 @@ fn dispatch_weak_collection_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_weak_map_get_builtin() {
+    if entry == super::weak_map_get_builtin() {
         return weak_map_get_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_weak_map_set_builtin() {
+    if entry == super::weak_map_set_builtin() {
         return weak_map_set_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_weak_map_has_builtin() {
+    if entry == super::weak_map_has_builtin() {
         return weak_map_has_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_weak_map_delete_builtin() {
+    if entry == super::weak_map_delete_builtin() {
         return weak_map_delete_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_weak_set_add_builtin() {
+    if entry == super::weak_set_add_builtin() {
         return weak_set_add_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_weak_set_has_builtin() {
+    if entry == super::weak_set_has_builtin() {
         return weak_set_has_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_weak_set_delete_builtin() {
+    if entry == super::weak_set_delete_builtin() {
         return weak_set_delete_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_weak_ref_deref_builtin() {
+    if entry == super::weak_ref_deref_builtin() {
         return weak_ref_deref_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_finalization_registry_register_builtin() {
+    if entry == super::finalization_registry_register_builtin() {
         return finalization_registry_register_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_finalization_registry_unregister_builtin() {
+    if entry == super::finalization_registry_unregister_builtin() {
         return finalization_registry_unregister_builtin(context, invocation).map(Some);
     }
     Ok(None)

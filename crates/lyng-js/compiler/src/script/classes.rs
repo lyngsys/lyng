@@ -1,6 +1,6 @@
 use super::state::ClassInstanceElementPlan;
 use super::*;
-use lyng_js_types::js3_internal_construct_super_spread_builtin;
+use lyng_js_types::internal_construct_super_spread_builtin;
 
 #[derive(Clone, Copy)]
 enum StaticPublicFieldKey {
@@ -376,21 +376,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     match kind {
                         lyng_js_ast::MethodKind::Method => {
                             self.emit_internal_builtin_call(
-                                js3_internal_define_method_property_builtin(),
+                                internal_define_method_property_builtin(),
                                 &[target, key_register, method],
                                 span,
                             )?;
                         }
                         lyng_js_ast::MethodKind::Get => {
                             self.emit_internal_builtin_call(
-                                js3_internal_define_class_getter_property_builtin(),
+                                internal_define_class_getter_property_builtin(),
                                 &[target, key_register, method],
                                 span,
                             )?;
                         }
                         lyng_js_ast::MethodKind::Set => {
                             self.emit_internal_builtin_call(
-                                js3_internal_define_class_setter_property_builtin(),
+                                internal_define_class_setter_property_builtin(),
                                 &[target, key_register, method],
                                 span,
                             )?;
@@ -725,13 +725,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Some(value) => {
                 self.emit_move(arguments + 5, value)?;
                 self.emit_internal_builtin_call_from_argument_range(
-                    js3_internal_define_private_field_builtin(),
+                    internal_define_private_field_builtin(),
                     CallRange::new(arguments, 6),
                     span,
                 )
             }
             None => self.emit_internal_builtin_call_from_argument_range(
-                js3_internal_define_private_field_builtin(),
+                internal_define_private_field_builtin(),
                 CallRange::new(arguments, 5),
                 span,
             ),
@@ -777,7 +777,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.emit_move(arguments + 2, value_register)?;
         }
         self.emit_internal_builtin_call_from_argument_range(
-            js3_internal_private_field_init_builtin(),
+            internal_private_field_init_builtin(),
             CallRange::new(arguments, PrivateElementInitializerScratch::ARGUMENT_COUNT),
             span,
         )
@@ -942,7 +942,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let rest_arguments = synthetic.alloc_temp()?;
                 synthetic.emit_load_env_slot(rest_arguments, 0, 0)?;
                 synthetic.emit_internal_builtin_call_into(
-                    js3_internal_construct_super_spread_builtin(),
+                    internal_construct_super_spread_builtin(),
                     &[rest_arguments],
                     class_span,
                     this_register,
@@ -1061,7 +1061,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         self.emit_load_smi(field_index, field_index_smi)?;
                         let key_register = self.alloc_temp()?;
                         self.emit_internal_builtin_call_into(
-                            js3_internal_get_instance_field_key_builtin(),
+                            internal_get_instance_field_key_builtin(),
                             &[callee, field_index],
                             self.ast().get_expr(key).span(),
                             key_register,
@@ -1238,7 +1238,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .map_err(|_| LoweringError::UnsupportedExpression { expr: expr_id })?;
         self.emit_load_smi(depth, depth_smi)?;
         self.emit_internal_builtin_call_into(
-            js3_internal_private_field_get_builtin(),
+            internal_private_field_get_builtin(),
             &[receiver, descriptor, depth],
             span,
             dest,
@@ -1265,7 +1265,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.emit_load_smi(depth, depth_smi)?;
         let span = self.ast().get_expr(object).span();
         self.emit_internal_builtin_call_into(
-            js3_internal_private_has_builtin(),
+            internal_private_has_builtin(),
             &[receiver, descriptor, depth],
             span,
             dest,
@@ -1295,7 +1295,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             })?;
         self.emit_load_smi(field_index_register, field_index_smi)?;
         self.emit_internal_builtin_call(
-            js3_internal_install_instance_field_key_builtin(),
+            internal_install_instance_field_key_builtin(),
             &[class_object, field_index_register, key_value],
             span,
         )
@@ -1308,7 +1308,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         span: Span,
     ) -> LoweringResult<()> {
         self.emit_internal_builtin_call(
-            js3_internal_set_function_home_object_builtin(),
+            internal_set_function_home_object_builtin(),
             &[function, home_object],
             span,
         )
@@ -1324,7 +1324,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             let needs_private_env = self.alloc_temp()?;
             self.emit_load_bool(needs_private_env, context.has_private_entries)?;
             self.emit_internal_builtin_call(
-                js3_internal_bind_function_private_env_builtin(),
+                internal_bind_function_private_env_builtin(),
                 &[
                     function,
                     context.class_object,
@@ -1352,7 +1352,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
         if !super_is_literal_null {
             self.emit_internal_builtin_call(
-                js3_object_set_prototype_of_builtin(),
+                object_set_prototype_of_builtin(),
                 &[class_object, super_value],
                 super_span,
             )?;
@@ -1363,7 +1363,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 WellKnownAtom::prototype.id(),
             )?;
             self.emit_internal_builtin_call(
-                js3_object_set_prototype_of_builtin(),
+                object_set_prototype_of_builtin(),
                 &[prototype, super_prototype],
                 super_span,
             )?;
@@ -1373,7 +1373,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let null_value = self.alloc_temp()?;
         self.emit_load_null(null_value)?;
         self.emit_internal_builtin_call(
-            js3_object_set_prototype_of_builtin(),
+            object_set_prototype_of_builtin(),
             &[prototype, null_value],
             super_span,
         )

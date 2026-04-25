@@ -3,7 +3,7 @@
 //! Ownership: `lyng_js_builtins` owns builtin registration tables, descriptor
 //! table shapes, bootstrap entrypoint surfaces, and builtin call contracts. It
 //! owns the public core builtin namespace, while the reserved
-//! `js3_internal_*` builtin IDs remain a separate lowering-helper lane bridged
+//! `internal_*` builtin IDs remain a separate lowering-helper lane bridged
 //! through this crate. It does not own VM dispatch, runtime state, or object
 //! semantics that belong in `lyng_js_vm`, `lyng_js_env`, or `lyng_js_objects`.
 

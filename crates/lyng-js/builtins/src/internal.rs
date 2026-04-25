@@ -7,35 +7,34 @@ use lyng_js_objects::{
     OrdinaryObjectData, PrimitiveWrapperKind,
 };
 use lyng_js_types::{
-    js3_internal_array_index_of_builtin, js3_internal_array_pop_builtin,
-    js3_internal_array_push_builtin, js3_internal_bind_function_private_env_builtin,
-    js3_internal_capture_arrow_context_builtin, js3_internal_construct_super_builtin,
-    js3_internal_construct_super_spread_builtin, js3_internal_define_class_getter_property_builtin,
-    js3_internal_define_class_setter_property_builtin, js3_internal_define_getter_property_builtin,
-    js3_internal_define_method_property_builtin, js3_internal_define_private_field_builtin,
-    js3_internal_define_setter_property_builtin, js3_internal_direct_eval_builtin,
-    js3_internal_dynamic_import_builtin, js3_internal_function_call_builtin,
-    js3_internal_get_instance_field_key_builtin, js3_internal_get_template_object_builtin,
-    js3_internal_import_meta_builtin, js3_internal_install_instance_field_key_builtin,
-    js3_internal_instance_of_builtin, js3_internal_object_has_own_property_builtin,
-    js3_internal_object_literal_set_prototype_builtin, js3_internal_object_to_string_builtin,
-    js3_internal_private_field_get_builtin, js3_internal_private_field_init_builtin,
-    js3_internal_private_field_set_builtin, js3_internal_private_has_builtin,
-    js3_internal_set_function_home_object_builtin, js3_internal_string_index_of_builtin,
-    js3_internal_string_replace_builtin, js3_internal_super_property_get_builtin,
-    js3_internal_super_property_set_builtin, js3_internal_template_to_string_builtin,
-    js3_internal_throw_type_error_builtin, BuiltinFunctionId, EnvironmentRef, ObjectRef,
+    internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
+    internal_bind_function_private_env_builtin, internal_capture_arrow_context_builtin,
+    internal_construct_super_builtin, internal_construct_super_spread_builtin,
+    internal_define_class_getter_property_builtin, internal_define_class_setter_property_builtin,
+    internal_define_getter_property_builtin, internal_define_method_property_builtin,
+    internal_define_private_field_builtin, internal_define_setter_property_builtin,
+    internal_direct_eval_builtin, internal_dynamic_import_builtin, internal_function_call_builtin,
+    internal_get_instance_field_key_builtin, internal_get_template_object_builtin,
+    internal_import_meta_builtin, internal_install_instance_field_key_builtin,
+    internal_instance_of_builtin, internal_object_has_own_property_builtin,
+    internal_object_literal_set_prototype_builtin, internal_object_to_string_builtin,
+    internal_private_field_get_builtin, internal_private_field_init_builtin,
+    internal_private_field_set_builtin, internal_private_has_builtin,
+    internal_set_function_home_object_builtin, internal_string_index_of_builtin,
+    internal_string_replace_builtin, internal_super_property_get_builtin,
+    internal_super_property_set_builtin, internal_template_to_string_builtin,
+    internal_throw_type_error_builtin, BuiltinFunctionId, EnvironmentRef, ObjectRef,
     PropertyDescriptor, PropertyKey, RealmRef, ShapeId, Value,
 };
 use std::collections::HashMap;
 
-/// Cold compatibility cache for the reserved JS3-internal builtin namespace.
+/// Cold compatibility cache for the reserved internal builtin namespace.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct InternalBuiltinCache {
     realms: HashMap<RealmRef, InternalRealmBuiltins>,
 }
 
-/// Per-realm object set backing the reserved JS3-internal builtin namespace.
+/// Per-realm object set backing the reserved internal builtin namespace.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InternalRealmBuiltins {
     object_prototype: ObjectRef,
@@ -120,109 +119,109 @@ impl InternalRealmBuiltins {
 
     #[inline]
     pub fn builtin_object(self, entry: BuiltinFunctionId) -> Option<ObjectRef> {
-        if entry == js3_internal_function_call_builtin() {
+        if entry == internal_function_call_builtin() {
             return Some(self.function_call);
         }
-        if entry == js3_internal_string_replace_builtin() {
+        if entry == internal_string_replace_builtin() {
             return Some(self.string_replace);
         }
-        if entry == js3_internal_string_index_of_builtin() {
+        if entry == internal_string_index_of_builtin() {
             return Some(self.string_index_of);
         }
-        if entry == js3_internal_array_index_of_builtin() {
+        if entry == internal_array_index_of_builtin() {
             return Some(self.array_index_of);
         }
-        if entry == js3_internal_array_push_builtin() {
+        if entry == internal_array_push_builtin() {
             return Some(self.array_push);
         }
-        if entry == js3_internal_array_pop_builtin() {
+        if entry == internal_array_pop_builtin() {
             return Some(self.array_pop);
         }
-        if entry == js3_internal_object_to_string_builtin() {
+        if entry == internal_object_to_string_builtin() {
             return Some(self.object_to_string);
         }
-        if entry == js3_internal_template_to_string_builtin() {
+        if entry == internal_template_to_string_builtin() {
             return Some(self.template_to_string);
         }
-        if entry == js3_internal_get_template_object_builtin() {
+        if entry == internal_get_template_object_builtin() {
             return Some(self.get_template_object);
         }
-        if entry == js3_internal_instance_of_builtin() {
+        if entry == internal_instance_of_builtin() {
             return Some(self.instance_of);
         }
-        if entry == js3_internal_define_method_property_builtin() {
+        if entry == internal_define_method_property_builtin() {
             return Some(self.define_method_property);
         }
-        if entry == js3_internal_define_getter_property_builtin() {
+        if entry == internal_define_getter_property_builtin() {
             return Some(self.define_getter_property);
         }
-        if entry == js3_internal_define_setter_property_builtin() {
+        if entry == internal_define_setter_property_builtin() {
             return Some(self.define_setter_property);
         }
-        if entry == js3_internal_define_class_getter_property_builtin() {
+        if entry == internal_define_class_getter_property_builtin() {
             return Some(self.define_class_getter_property);
         }
-        if entry == js3_internal_define_class_setter_property_builtin() {
+        if entry == internal_define_class_setter_property_builtin() {
             return Some(self.define_class_setter_property);
         }
-        if entry == js3_internal_define_private_field_builtin() {
+        if entry == internal_define_private_field_builtin() {
             return Some(self.define_private_field);
         }
-        if entry == js3_internal_private_field_init_builtin() {
+        if entry == internal_private_field_init_builtin() {
             return Some(self.private_field_init);
         }
-        if entry == js3_internal_private_field_get_builtin() {
+        if entry == internal_private_field_get_builtin() {
             return Some(self.private_field_get);
         }
-        if entry == js3_internal_private_field_set_builtin() {
+        if entry == internal_private_field_set_builtin() {
             return Some(self.private_field_set);
         }
-        if entry == js3_internal_private_has_builtin() {
+        if entry == internal_private_has_builtin() {
             return Some(self.private_has);
         }
-        if entry == js3_internal_super_property_get_builtin() {
+        if entry == internal_super_property_get_builtin() {
             return Some(self.super_property_get);
         }
-        if entry == js3_internal_super_property_set_builtin() {
+        if entry == internal_super_property_set_builtin() {
             return Some(self.super_property_set);
         }
-        if entry == js3_internal_construct_super_builtin() {
+        if entry == internal_construct_super_builtin() {
             return Some(self.construct_super);
         }
-        if entry == js3_internal_construct_super_spread_builtin() {
+        if entry == internal_construct_super_spread_builtin() {
             return Some(self.construct_super_spread);
         }
-        if entry == js3_internal_object_has_own_property_builtin() {
+        if entry == internal_object_has_own_property_builtin() {
             return Some(self.object_has_own_property);
         }
-        if entry == js3_internal_set_function_home_object_builtin() {
+        if entry == internal_set_function_home_object_builtin() {
             return Some(self.set_function_home_object);
         }
-        if entry == js3_internal_object_literal_set_prototype_builtin() {
+        if entry == internal_object_literal_set_prototype_builtin() {
             return Some(self.object_literal_set_prototype);
         }
-        if entry == js3_internal_bind_function_private_env_builtin() {
+        if entry == internal_bind_function_private_env_builtin() {
             return Some(self.bind_function_private_env);
         }
-        if entry == js3_internal_capture_arrow_context_builtin() {
+        if entry == internal_capture_arrow_context_builtin() {
             return Some(self.capture_arrow_context);
         }
-        if entry == js3_internal_install_instance_field_key_builtin() {
+        if entry == internal_install_instance_field_key_builtin() {
             return Some(self.install_instance_field_key);
         }
-        if entry == js3_internal_get_instance_field_key_builtin() {
+        if entry == internal_get_instance_field_key_builtin() {
             return Some(self.get_instance_field_key);
         }
-        if entry == js3_internal_throw_type_error_builtin() {
+        if entry == internal_throw_type_error_builtin() {
             return Some(self.throw_type_error);
         }
-        if entry == js3_internal_import_meta_builtin() {
+        if entry == internal_import_meta_builtin() {
             return Some(self.import_meta);
         }
-        if entry == js3_internal_dynamic_import_builtin() {
+        if entry == internal_dynamic_import_builtin() {
             return Some(self.dynamic_import);
         }
-        if entry == js3_internal_direct_eval_builtin() {
+        if entry == internal_direct_eval_builtin() {
             return Some(self.direct_eval);
         }
         None
@@ -335,116 +334,104 @@ impl InternalBuiltinCache {
                 number_prototype,
                 bigint_prototype,
                 boolean_prototype,
-                function_call: alloc_builtin(js3_internal_function_call_builtin(), &mut mutator),
-                string_replace: alloc_builtin(js3_internal_string_replace_builtin(), &mut mutator),
-                string_index_of: alloc_builtin(
-                    js3_internal_string_index_of_builtin(),
-                    &mut mutator,
-                ),
-                array_index_of: alloc_builtin(js3_internal_array_index_of_builtin(), &mut mutator),
-                array_push: alloc_builtin(js3_internal_array_push_builtin(), &mut mutator),
-                array_pop: alloc_builtin(js3_internal_array_pop_builtin(), &mut mutator),
-                object_to_string: alloc_builtin(
-                    js3_internal_object_to_string_builtin(),
-                    &mut mutator,
-                ),
+                function_call: alloc_builtin(internal_function_call_builtin(), &mut mutator),
+                string_replace: alloc_builtin(internal_string_replace_builtin(), &mut mutator),
+                string_index_of: alloc_builtin(internal_string_index_of_builtin(), &mut mutator),
+                array_index_of: alloc_builtin(internal_array_index_of_builtin(), &mut mutator),
+                array_push: alloc_builtin(internal_array_push_builtin(), &mut mutator),
+                array_pop: alloc_builtin(internal_array_pop_builtin(), &mut mutator),
+                object_to_string: alloc_builtin(internal_object_to_string_builtin(), &mut mutator),
                 object_has_own_property: alloc_builtin(
-                    js3_internal_object_has_own_property_builtin(),
+                    internal_object_has_own_property_builtin(),
                     &mut mutator,
                 ),
                 template_to_string: alloc_builtin(
-                    js3_internal_template_to_string_builtin(),
+                    internal_template_to_string_builtin(),
                     &mut mutator,
                 ),
                 get_template_object: alloc_builtin(
-                    js3_internal_get_template_object_builtin(),
+                    internal_get_template_object_builtin(),
                     &mut mutator,
                 ),
-                instance_of: alloc_builtin(js3_internal_instance_of_builtin(), &mut mutator),
+                instance_of: alloc_builtin(internal_instance_of_builtin(), &mut mutator),
                 define_method_property: alloc_builtin(
-                    js3_internal_define_method_property_builtin(),
+                    internal_define_method_property_builtin(),
                     &mut mutator,
                 ),
                 define_getter_property: alloc_builtin(
-                    js3_internal_define_getter_property_builtin(),
+                    internal_define_getter_property_builtin(),
                     &mut mutator,
                 ),
                 define_setter_property: alloc_builtin(
-                    js3_internal_define_setter_property_builtin(),
+                    internal_define_setter_property_builtin(),
                     &mut mutator,
                 ),
                 define_class_getter_property: alloc_builtin(
-                    js3_internal_define_class_getter_property_builtin(),
+                    internal_define_class_getter_property_builtin(),
                     &mut mutator,
                 ),
                 define_class_setter_property: alloc_builtin(
-                    js3_internal_define_class_setter_property_builtin(),
+                    internal_define_class_setter_property_builtin(),
                     &mut mutator,
                 ),
                 define_private_field: alloc_builtin(
-                    js3_internal_define_private_field_builtin(),
+                    internal_define_private_field_builtin(),
                     &mut mutator,
                 ),
                 private_field_init: alloc_builtin(
-                    js3_internal_private_field_init_builtin(),
+                    internal_private_field_init_builtin(),
                     &mut mutator,
                 ),
                 private_field_get: alloc_builtin(
-                    js3_internal_private_field_get_builtin(),
+                    internal_private_field_get_builtin(),
                     &mut mutator,
                 ),
                 private_field_set: alloc_builtin(
-                    js3_internal_private_field_set_builtin(),
+                    internal_private_field_set_builtin(),
                     &mut mutator,
                 ),
-                private_has: alloc_builtin(js3_internal_private_has_builtin(), &mut mutator),
+                private_has: alloc_builtin(internal_private_has_builtin(), &mut mutator),
                 super_property_get: alloc_builtin(
-                    js3_internal_super_property_get_builtin(),
+                    internal_super_property_get_builtin(),
                     &mut mutator,
                 ),
                 super_property_set: alloc_builtin(
-                    js3_internal_super_property_set_builtin(),
+                    internal_super_property_set_builtin(),
                     &mut mutator,
                 ),
-                construct_super: alloc_builtin(
-                    js3_internal_construct_super_builtin(),
-                    &mut mutator,
-                ),
+                construct_super: alloc_builtin(internal_construct_super_builtin(), &mut mutator),
                 construct_super_spread: alloc_builtin(
-                    js3_internal_construct_super_spread_builtin(),
+                    internal_construct_super_spread_builtin(),
                     &mut mutator,
                 ),
                 set_function_home_object: alloc_builtin(
-                    js3_internal_set_function_home_object_builtin(),
+                    internal_set_function_home_object_builtin(),
                     &mut mutator,
                 ),
                 object_literal_set_prototype: alloc_builtin(
-                    js3_internal_object_literal_set_prototype_builtin(),
+                    internal_object_literal_set_prototype_builtin(),
                     &mut mutator,
                 ),
                 bind_function_private_env: alloc_builtin(
-                    js3_internal_bind_function_private_env_builtin(),
+                    internal_bind_function_private_env_builtin(),
                     &mut mutator,
                 ),
                 capture_arrow_context: alloc_builtin(
-                    js3_internal_capture_arrow_context_builtin(),
+                    internal_capture_arrow_context_builtin(),
                     &mut mutator,
                 ),
                 install_instance_field_key: alloc_builtin(
-                    js3_internal_install_instance_field_key_builtin(),
+                    internal_install_instance_field_key_builtin(),
                     &mut mutator,
                 ),
                 get_instance_field_key: alloc_builtin(
-                    js3_internal_get_instance_field_key_builtin(),
+                    internal_get_instance_field_key_builtin(),
                     &mut mutator,
                 ),
-                throw_type_error: alloc_builtin(
-                    js3_internal_throw_type_error_builtin(),
-                    &mut mutator,
-                ),
-                import_meta: alloc_builtin(js3_internal_import_meta_builtin(), &mut mutator),
-                dynamic_import: alloc_builtin(js3_internal_dynamic_import_builtin(), &mut mutator),
-                direct_eval: alloc_builtin(js3_internal_direct_eval_builtin(), &mut mutator),
+                throw_type_error: alloc_builtin(internal_throw_type_error_builtin(), &mut mutator),
+                import_meta: alloc_builtin(internal_import_meta_builtin(), &mut mutator),
+                dynamic_import: alloc_builtin(internal_dynamic_import_builtin(), &mut mutator),
+                direct_eval: alloc_builtin(internal_direct_eval_builtin(), &mut mutator),
             }
         });
 
@@ -535,244 +522,244 @@ impl InternalBuiltinCache {
     }
 }
 
-/// Compatibility metadata for the reserved JS3-internal builtin namespace.
+/// Compatibility metadata for the reserved internal builtin namespace.
 #[inline]
 pub fn internal_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
-    if entry == js3_internal_function_call_builtin() {
+    if entry == internal_function_call_builtin() {
         return Some(BuiltinEntryMetadata::new("call", 1, false, false));
     }
-    if entry == js3_internal_string_replace_builtin() {
+    if entry == internal_string_replace_builtin() {
         return Some(BuiltinEntryMetadata::new("replace", 2, false, false));
     }
-    if entry == js3_internal_string_index_of_builtin() {
+    if entry == internal_string_index_of_builtin() {
         return Some(BuiltinEntryMetadata::new("indexOf", 1, false, false));
     }
-    if entry == js3_internal_array_index_of_builtin() {
+    if entry == internal_array_index_of_builtin() {
         return Some(BuiltinEntryMetadata::new("indexOf", 1, false, false));
     }
-    if entry == js3_internal_array_push_builtin() {
+    if entry == internal_array_push_builtin() {
         return Some(BuiltinEntryMetadata::new("push", 1, false, false));
     }
-    if entry == js3_internal_array_pop_builtin() {
+    if entry == internal_array_pop_builtin() {
         return Some(BuiltinEntryMetadata::new("pop", 0, false, false));
     }
-    if entry == js3_internal_object_to_string_builtin() {
+    if entry == internal_object_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
-    if entry == js3_internal_template_to_string_builtin() {
+    if entry == internal_template_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_templateToString",
+            "internal_templateToString",
             1,
             false,
             false,
         ));
     }
-    if entry == js3_internal_get_template_object_builtin() {
+    if entry == internal_get_template_object_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_getTemplateObject",
+            "internal_getTemplateObject",
             0,
             false,
             false,
         ));
     }
-    if entry == js3_internal_instance_of_builtin() {
+    if entry == internal_instance_of_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_instanceOf",
+            "internal_instanceOf",
             2,
             false,
             false,
         ));
     }
-    if entry == js3_internal_define_method_property_builtin() {
+    if entry == internal_define_method_property_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_defineMethodProperty",
+            "internal_defineMethodProperty",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_define_getter_property_builtin() {
+    if entry == internal_define_getter_property_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_defineGetterProperty",
+            "internal_defineGetterProperty",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_define_setter_property_builtin() {
+    if entry == internal_define_setter_property_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_defineSetterProperty",
+            "internal_defineSetterProperty",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_define_class_getter_property_builtin() {
+    if entry == internal_define_class_getter_property_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_defineClassGetterProperty",
+            "internal_defineClassGetterProperty",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_define_class_setter_property_builtin() {
+    if entry == internal_define_class_setter_property_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_defineClassSetterProperty",
+            "internal_defineClassSetterProperty",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_define_private_field_builtin() {
+    if entry == internal_define_private_field_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_definePrivateField",
+            "internal_definePrivateField",
             6,
             false,
             false,
         ));
     }
-    if entry == js3_internal_private_field_init_builtin() {
+    if entry == internal_private_field_init_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_privateFieldInit",
+            "internal_privateFieldInit",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_private_field_get_builtin() {
+    if entry == internal_private_field_get_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_privateFieldGet",
+            "internal_privateFieldGet",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_private_field_set_builtin() {
+    if entry == internal_private_field_set_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_privateFieldSet",
+            "internal_privateFieldSet",
             4,
             false,
             false,
         ));
     }
-    if entry == js3_internal_private_has_builtin() {
+    if entry == internal_private_has_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_privateHas",
+            "internal_privateHas",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_super_property_get_builtin() {
+    if entry == internal_super_property_get_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_superPropertyGet",
+            "internal_superPropertyGet",
             2,
             false,
             false,
         ));
     }
-    if entry == js3_internal_super_property_set_builtin() {
+    if entry == internal_super_property_set_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_superPropertySet",
+            "internal_superPropertySet",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_construct_super_builtin() {
+    if entry == internal_construct_super_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_constructSuper",
+            "internal_constructSuper",
             0,
             false,
             false,
         ));
     }
-    if entry == js3_internal_construct_super_spread_builtin() {
+    if entry == internal_construct_super_spread_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_constructSuperSpread",
+            "internal_constructSuperSpread",
             1,
             false,
             false,
         ));
     }
-    if entry == js3_internal_object_has_own_property_builtin() {
+    if entry == internal_object_has_own_property_builtin() {
         return Some(BuiltinEntryMetadata::new("hasOwnProperty", 1, false, false));
     }
-    if entry == js3_internal_set_function_home_object_builtin() {
+    if entry == internal_set_function_home_object_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_setFunctionHomeObject",
+            "internal_setFunctionHomeObject",
             2,
             false,
             false,
         ));
     }
-    if entry == js3_internal_object_literal_set_prototype_builtin() {
+    if entry == internal_object_literal_set_prototype_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_objectLiteralSetPrototype",
+            "internal_objectLiteralSetPrototype",
             2,
             false,
             false,
         ));
     }
-    if entry == js3_internal_bind_function_private_env_builtin() {
+    if entry == internal_bind_function_private_env_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_bindFunctionPrivateEnv",
+            "internal_bindFunctionPrivateEnv",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_capture_arrow_context_builtin() {
+    if entry == internal_capture_arrow_context_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_captureArrowContext",
+            "internal_captureArrowContext",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_install_instance_field_key_builtin() {
+    if entry == internal_install_instance_field_key_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_installInstanceFieldKey",
+            "internal_installInstanceFieldKey",
             3,
             false,
             false,
         ));
     }
-    if entry == js3_internal_get_instance_field_key_builtin() {
+    if entry == internal_get_instance_field_key_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_getInstanceFieldKey",
+            "internal_getInstanceFieldKey",
             2,
             false,
             false,
         ));
     }
-    if entry == js3_internal_throw_type_error_builtin() {
+    if entry == internal_throw_type_error_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_throwTypeError",
+            "internal_throwTypeError",
             0,
             false,
             false,
         ));
     }
-    if entry == js3_internal_import_meta_builtin() {
+    if entry == internal_import_meta_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_importMeta",
+            "internal_importMeta",
             0,
             false,
             false,
         ));
     }
-    if entry == js3_internal_dynamic_import_builtin() {
+    if entry == internal_dynamic_import_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_dynamicImport",
+            "internal_dynamicImport",
             2,
             false,
             false,
         ));
     }
-    if entry == js3_internal_direct_eval_builtin() {
+    if entry == internal_direct_eval_builtin() {
         return Some(BuiltinEntryMetadata::new(
-            "js3_internal_directEval",
+            "internal_directEval",
             1,
             false,
             false,
@@ -781,7 +768,7 @@ pub fn internal_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntr
     None
 }
 
-/// Narrow VM-side bridge for executing the reserved JS3-internal builtin namespace.
+/// Narrow VM-side bridge for executing the reserved internal builtin namespace.
 ///
 /// Methods that return `Result` use the implementing context's error channel.
 /// That keeps internal helper dispatch independent from VM error storage while
@@ -956,7 +943,7 @@ pub trait InternalBuiltinDispatchContext {
     ) -> Result<Value, Self::Error>;
 }
 
-/// Dispatches one reserved JS3-internal builtin entry through the builtins-owned bridge.
+/// Dispatches one reserved internal builtin entry through the builtins-owned bridge.
 ///
 /// Returns `Ok(None)` when `entry` is not part of the reserved internal builtin
 /// namespace.
@@ -969,117 +956,117 @@ pub fn dispatch_internal_builtin<Cx: InternalBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == js3_internal_function_call_builtin() {
+    if entry == internal_function_call_builtin() {
         return context.function_call_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_string_replace_builtin() {
+    if entry == internal_string_replace_builtin() {
         return context.string_replace_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_string_index_of_builtin() {
+    if entry == internal_string_index_of_builtin() {
         return context.string_index_of_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_array_index_of_builtin() {
+    if entry == internal_array_index_of_builtin() {
         return context.array_index_of_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_array_push_builtin() {
+    if entry == internal_array_push_builtin() {
         return context.array_push_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_array_pop_builtin() {
+    if entry == internal_array_pop_builtin() {
         return context.array_pop_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_object_to_string_builtin() {
+    if entry == internal_object_to_string_builtin() {
         return context.object_to_string_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_template_to_string_builtin() {
+    if entry == internal_template_to_string_builtin() {
         return context.template_to_string_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_get_template_object_builtin() {
+    if entry == internal_get_template_object_builtin() {
         return context.get_template_object_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_instance_of_builtin() {
+    if entry == internal_instance_of_builtin() {
         return context.instance_of_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_define_method_property_builtin() {
+    if entry == internal_define_method_property_builtin() {
         return context.define_method_property_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_define_getter_property_builtin() {
+    if entry == internal_define_getter_property_builtin() {
         return context.define_getter_property_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_define_setter_property_builtin() {
+    if entry == internal_define_setter_property_builtin() {
         return context.define_setter_property_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_define_class_getter_property_builtin() {
+    if entry == internal_define_class_getter_property_builtin() {
         return context
             .define_class_getter_property_builtin(invocation)
             .map(Some);
     }
-    if entry == js3_internal_define_class_setter_property_builtin() {
+    if entry == internal_define_class_setter_property_builtin() {
         return context
             .define_class_setter_property_builtin(invocation)
             .map(Some);
     }
-    if entry == js3_internal_define_private_field_builtin() {
+    if entry == internal_define_private_field_builtin() {
         return context.define_private_field_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_private_field_init_builtin() {
+    if entry == internal_private_field_init_builtin() {
         return context.private_field_init_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_private_field_get_builtin() {
+    if entry == internal_private_field_get_builtin() {
         return context.private_field_get_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_private_field_set_builtin() {
+    if entry == internal_private_field_set_builtin() {
         return context.private_field_set_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_private_has_builtin() {
+    if entry == internal_private_has_builtin() {
         return context.private_has_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_super_property_get_builtin() {
+    if entry == internal_super_property_get_builtin() {
         return context.super_property_get_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_super_property_set_builtin() {
+    if entry == internal_super_property_set_builtin() {
         return context.super_property_set_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_construct_super_builtin() {
+    if entry == internal_construct_super_builtin() {
         return context.construct_super_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_construct_super_spread_builtin() {
+    if entry == internal_construct_super_spread_builtin() {
         return context.construct_super_spread_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_object_has_own_property_builtin() {
+    if entry == internal_object_has_own_property_builtin() {
         return context
             .object_has_own_property_builtin(invocation)
             .map(Some);
     }
-    if entry == js3_internal_set_function_home_object_builtin() {
+    if entry == internal_set_function_home_object_builtin() {
         return context
             .set_function_home_object_builtin(invocation)
             .map(Some);
     }
-    if entry == js3_internal_object_literal_set_prototype_builtin() {
+    if entry == internal_object_literal_set_prototype_builtin() {
         return context
             .object_literal_set_prototype_builtin(invocation)
             .map(Some);
     }
-    if entry == js3_internal_bind_function_private_env_builtin() {
+    if entry == internal_bind_function_private_env_builtin() {
         return context
             .bind_function_private_env_builtin(invocation)
             .map(Some);
     }
-    if entry == js3_internal_capture_arrow_context_builtin() {
+    if entry == internal_capture_arrow_context_builtin() {
         return context.capture_arrow_context_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_install_instance_field_key_builtin() {
+    if entry == internal_install_instance_field_key_builtin() {
         return context
             .install_instance_field_key_builtin(invocation)
             .map(Some);
     }
-    if entry == js3_internal_get_instance_field_key_builtin() {
+    if entry == internal_get_instance_field_key_builtin() {
         return context.get_instance_field_key_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_throw_type_error_builtin() {
+    if entry == internal_throw_type_error_builtin() {
         return context.throw_type_error_builtin(invocation).map(Some);
     }
-    if entry == js3_internal_direct_eval_builtin() {
+    if entry == internal_direct_eval_builtin() {
         return context.direct_eval_builtin(invocation).map(Some);
     }
     Ok(None)

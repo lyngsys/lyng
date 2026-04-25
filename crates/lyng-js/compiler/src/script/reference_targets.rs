@@ -321,7 +321,7 @@ impl PreparedPrivateReferenceTarget {
             .get_descriptor
             .ok_or(LoweringError::UnsupportedExpression { expr: self.expr_id })?;
         compiler.emit_internal_builtin_call_into(
-            js3_internal_private_field_get_builtin(),
+            internal_private_field_get_builtin(),
             &[self.receiver, descriptor, self.depth],
             self.span,
             dest,
@@ -330,7 +330,7 @@ impl PreparedPrivateReferenceTarget {
 
     fn assign(self, compiler: &mut FunctionCompiler<'_, '_>, value: u16) -> LoweringResult<()> {
         compiler.emit_internal_builtin_call_into(
-            js3_internal_private_field_set_builtin(),
+            internal_private_field_set_builtin(),
             &[self.receiver, self.set_descriptor, value, self.depth],
             self.span,
             value,

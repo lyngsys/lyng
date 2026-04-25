@@ -39,16 +39,16 @@ fn dispatch_string_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_string_builtin() {
+    if entry == super::string_builtin() {
         return string_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_from_char_code_builtin() {
+    if entry == super::string_from_char_code_builtin() {
         return string_from_char_code_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_from_code_point_builtin() {
+    if entry == super::string_from_code_point_builtin() {
         return string_from_code_point_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_raw_builtin() {
+    if entry == super::string_raw_builtin() {
         return string_raw_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -59,10 +59,10 @@ fn dispatch_string_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_string_iterator_builtin() {
+    if entry == super::string_iterator_builtin() {
         return string_iterator_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_iterator_next_builtin() {
+    if entry == super::string_iterator_next_builtin() {
         return string_iterator_next_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -73,25 +73,25 @@ fn dispatch_string_basic_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_string_to_string_builtin() {
+    if entry == super::string_to_string_builtin() {
         return string_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_value_of_builtin() {
+    if entry == super::string_value_of_builtin() {
         return string_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_concat_builtin() {
+    if entry == super::string_concat_builtin() {
         return string_concat_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_char_at_builtin() {
+    if entry == super::string_char_at_builtin() {
         return string_char_at_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_char_code_at_builtin() {
+    if entry == super::string_char_code_at_builtin() {
         return string_char_code_at_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_at_builtin() {
+    if entry == super::string_at_builtin() {
         return string_at_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_code_point_at_builtin() {
+    if entry == super::string_code_point_at_builtin() {
         return string_code_point_at_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -102,40 +102,40 @@ fn dispatch_string_search_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_string_ends_with_builtin() {
+    if entry == super::string_ends_with_builtin() {
         return string_ends_with_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_includes_builtin() {
+    if entry == super::string_includes_builtin() {
         return string_includes_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_index_of_builtin() {
+    if entry == super::string_index_of_builtin() {
         return string_index_of_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_locale_compare_builtin() {
+    if entry == super::string_locale_compare_builtin() {
         return string_locale_compare_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_match_builtin() {
+    if entry == super::string_match_builtin() {
         return string_match_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_match_all_builtin() {
+    if entry == super::string_match_all_builtin() {
         return string_match_all_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_last_index_of_builtin() {
+    if entry == super::string_last_index_of_builtin() {
         return string_last_index_of_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_replace_builtin() {
+    if entry == super::string_replace_builtin() {
         return string_replace_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_replace_all_builtin() {
+    if entry == super::string_replace_all_builtin() {
         return string_replace_all_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_search_builtin() {
+    if entry == super::string_search_builtin() {
         return string_search_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_split_builtin() {
+    if entry == super::string_split_builtin() {
         return string_split_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_starts_with_builtin() {
+    if entry == super::string_starts_with_builtin() {
         return string_starts_with_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -146,53 +146,53 @@ fn dispatch_string_transform_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_string_is_well_formed_builtin() {
+    if entry == super::string_is_well_formed_builtin() {
         return string_is_well_formed_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_normalize_builtin() {
+    if entry == super::string_normalize_builtin() {
         return string_normalize_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_pad_end_builtin() {
+    if entry == super::string_pad_end_builtin() {
         return string_pad_end_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_pad_start_builtin() {
+    if entry == super::string_pad_start_builtin() {
         return string_pad_start_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_repeat_builtin() {
+    if entry == super::string_repeat_builtin() {
         return string_repeat_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_slice_builtin() {
+    if entry == super::string_slice_builtin() {
         return string_slice_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_substring_builtin() {
+    if entry == super::string_substring_builtin() {
         return string_substring_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_to_locale_lower_case_builtin() {
+    if entry == super::string_to_locale_lower_case_builtin() {
         return string_case_mapping_builtin(context, invocation, StringCaseMapping::Lower)
             .map(Some);
     }
-    if entry == super::js3_string_to_locale_upper_case_builtin() {
+    if entry == super::string_to_locale_upper_case_builtin() {
         return string_case_mapping_builtin(context, invocation, StringCaseMapping::Upper)
             .map(Some);
     }
-    if entry == super::js3_string_to_lower_case_builtin() {
+    if entry == super::string_to_lower_case_builtin() {
         return string_case_mapping_builtin(context, invocation, StringCaseMapping::Lower)
             .map(Some);
     }
-    if entry == super::js3_string_to_upper_case_builtin() {
+    if entry == super::string_to_upper_case_builtin() {
         return string_case_mapping_builtin(context, invocation, StringCaseMapping::Upper)
             .map(Some);
     }
-    if entry == super::js3_string_to_well_formed_builtin() {
+    if entry == super::string_to_well_formed_builtin() {
         return string_to_well_formed_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_string_trim_builtin() {
+    if entry == super::string_trim_builtin() {
         return string_trim_builtin(context, invocation, true, true).map(Some);
     }
-    if entry == super::js3_string_trim_end_builtin() {
+    if entry == super::string_trim_end_builtin() {
         return string_trim_builtin(context, invocation, false, true).map(Some);
     }
-    if entry == super::js3_string_trim_start_builtin() {
+    if entry == super::string_trim_start_builtin() {
         return string_trim_builtin(context, invocation, true, false).map(Some);
     }
     Ok(None)

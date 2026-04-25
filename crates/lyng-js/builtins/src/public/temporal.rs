@@ -103,8 +103,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_builtin())?,
+        lyng_js_types::temporal_instant_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_builtin())?,
         Some(instant_prototype),
     );
     let instant_from = allocate_builtin_function_object(
@@ -114,8 +114,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_from_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_from_builtin())?,
+        lyng_js_types::temporal_instant_from_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_from_builtin())?,
         None,
     );
     let instant_from_epoch_nanoseconds = allocate_builtin_function_object(
@@ -125,10 +125,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_from_epoch_nanoseconds_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_instant_from_epoch_nanoseconds_builtin(),
-        )?,
+        lyng_js_types::temporal_instant_from_epoch_nanoseconds_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_from_epoch_nanoseconds_builtin())?,
         None,
     );
     let instant_from_epoch_milliseconds = allocate_builtin_function_object(
@@ -138,10 +136,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_from_epoch_milliseconds_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_instant_from_epoch_milliseconds_builtin(),
-        )?,
+        lyng_js_types::temporal_instant_from_epoch_milliseconds_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_from_epoch_milliseconds_builtin())?,
         None,
     );
     let instant_compare = allocate_builtin_function_object(
@@ -151,8 +147,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_compare_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_compare_builtin())?,
+        lyng_js_types::temporal_instant_compare_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_compare_builtin())?,
         None,
     );
     let instant_epoch_nanoseconds_getter = allocate_builtin_function_object(
@@ -162,9 +158,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_epoch_nanoseconds_getter_builtin(),
+        lyng_js_types::temporal_instant_epoch_nanoseconds_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_instant_epoch_nanoseconds_getter_builtin(),
+            lyng_js_types::temporal_instant_epoch_nanoseconds_getter_builtin(),
         )?,
         None,
     );
@@ -175,9 +171,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_epoch_milliseconds_getter_builtin(),
+        lyng_js_types::temporal_instant_epoch_milliseconds_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_instant_epoch_milliseconds_getter_builtin(),
+            lyng_js_types::temporal_instant_epoch_milliseconds_getter_builtin(),
         )?,
         None,
     );
@@ -188,10 +184,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_epoch_seconds_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_instant_epoch_seconds_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_instant_epoch_seconds_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_epoch_seconds_getter_builtin())?,
         None,
     );
     let instant_to_string = allocate_builtin_function_object(
@@ -201,8 +195,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_to_string_builtin())?,
+        lyng_js_types::temporal_instant_to_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_to_string_builtin())?,
         None,
     );
     let instant_to_json = allocate_builtin_function_object(
@@ -212,8 +206,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_to_json_builtin())?,
+        lyng_js_types::temporal_instant_to_json_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_to_json_builtin())?,
         None,
     );
     let instant_to_locale_string = allocate_builtin_function_object(
@@ -223,8 +217,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_to_locale_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_to_locale_string_builtin())?,
+        lyng_js_types::temporal_instant_to_locale_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_to_locale_string_builtin())?,
         None,
     );
     let instant_value_of = allocate_builtin_function_object(
@@ -234,8 +228,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_value_of_builtin())?,
+        lyng_js_types::temporal_instant_value_of_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_value_of_builtin())?,
         None,
     );
     let instant_equals = allocate_builtin_function_object(
@@ -245,8 +239,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_equals_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_equals_builtin())?,
+        lyng_js_types::temporal_instant_equals_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_equals_builtin())?,
         None,
     );
     let instant_add = allocate_builtin_function_object(
@@ -256,8 +250,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_add_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_add_builtin())?,
+        lyng_js_types::temporal_instant_add_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_add_builtin())?,
         None,
     );
     let instant_subtract = allocate_builtin_function_object(
@@ -267,8 +261,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_subtract_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_subtract_builtin())?,
+        lyng_js_types::temporal_instant_subtract_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_subtract_builtin())?,
         None,
     );
     let instant_round = allocate_builtin_function_object(
@@ -278,8 +272,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_round_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_round_builtin())?,
+        lyng_js_types::temporal_instant_round_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_round_builtin())?,
         None,
     );
     let instant_since = allocate_builtin_function_object(
@@ -289,8 +283,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_since_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_since_builtin())?,
+        lyng_js_types::temporal_instant_since_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_since_builtin())?,
         None,
     );
     let instant_until = allocate_builtin_function_object(
@@ -300,8 +294,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_until_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_instant_until_builtin())?,
+        lyng_js_types::temporal_instant_until_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_until_builtin())?,
         None,
     );
     let instant_to_zoned_date_time_iso = allocate_builtin_function_object(
@@ -311,10 +305,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_instant_to_zoned_date_time_iso_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_instant_to_zoned_date_time_iso_builtin(),
-        )?,
+        lyng_js_types::temporal_instant_to_zoned_date_time_iso_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_instant_to_zoned_date_time_iso_builtin())?,
         None,
     );
     let duration_constructor = allocate_builtin_function_object(
@@ -324,8 +316,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_builtin())?,
+        lyng_js_types::temporal_duration_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_builtin())?,
         Some(duration_prototype),
     );
     let duration_years_getter = allocate_builtin_function_object(
@@ -335,8 +327,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_years_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_years_getter_builtin())?,
+        lyng_js_types::temporal_duration_years_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_years_getter_builtin())?,
         None,
     );
     let duration_months_getter = allocate_builtin_function_object(
@@ -346,8 +338,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_months_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_months_getter_builtin())?,
+        lyng_js_types::temporal_duration_months_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_months_getter_builtin())?,
         None,
     );
     let duration_weeks_getter = allocate_builtin_function_object(
@@ -357,8 +349,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_weeks_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_weeks_getter_builtin())?,
+        lyng_js_types::temporal_duration_weeks_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_weeks_getter_builtin())?,
         None,
     );
     let duration_days_getter = allocate_builtin_function_object(
@@ -368,8 +360,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_days_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_days_getter_builtin())?,
+        lyng_js_types::temporal_duration_days_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_days_getter_builtin())?,
         None,
     );
     let duration_hours_getter = allocate_builtin_function_object(
@@ -379,8 +371,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_hours_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_hours_getter_builtin())?,
+        lyng_js_types::temporal_duration_hours_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_hours_getter_builtin())?,
         None,
     );
     let duration_minutes_getter = allocate_builtin_function_object(
@@ -390,8 +382,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_minutes_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_minutes_getter_builtin())?,
+        lyng_js_types::temporal_duration_minutes_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_minutes_getter_builtin())?,
         None,
     );
     let duration_seconds_getter = allocate_builtin_function_object(
@@ -401,8 +393,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_seconds_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_seconds_getter_builtin())?,
+        lyng_js_types::temporal_duration_seconds_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_seconds_getter_builtin())?,
         None,
     );
     let duration_milliseconds_getter = allocate_builtin_function_object(
@@ -412,10 +404,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_milliseconds_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_duration_milliseconds_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_duration_milliseconds_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_milliseconds_getter_builtin())?,
         None,
     );
     let duration_microseconds_getter = allocate_builtin_function_object(
@@ -425,10 +415,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_microseconds_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_duration_microseconds_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_duration_microseconds_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_microseconds_getter_builtin())?,
         None,
     );
     let duration_nanoseconds_getter = allocate_builtin_function_object(
@@ -438,8 +426,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_nanoseconds_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_nanoseconds_getter_builtin())?,
+        lyng_js_types::temporal_duration_nanoseconds_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_nanoseconds_getter_builtin())?,
         None,
     );
     let duration_sign_getter = allocate_builtin_function_object(
@@ -449,8 +437,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_sign_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_sign_getter_builtin())?,
+        lyng_js_types::temporal_duration_sign_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_sign_getter_builtin())?,
         None,
     );
     let duration_blank_getter = allocate_builtin_function_object(
@@ -460,8 +448,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_blank_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_blank_getter_builtin())?,
+        lyng_js_types::temporal_duration_blank_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_blank_getter_builtin())?,
         None,
     );
     let duration_to_string = allocate_builtin_function_object(
@@ -471,8 +459,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_to_string_builtin())?,
+        lyng_js_types::temporal_duration_to_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_to_string_builtin())?,
         None,
     );
     let duration_to_json = allocate_builtin_function_object(
@@ -482,8 +470,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_to_json_builtin())?,
+        lyng_js_types::temporal_duration_to_json_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_to_json_builtin())?,
         None,
     );
     let duration_to_locale_string = allocate_builtin_function_object(
@@ -493,8 +481,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_to_locale_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_to_locale_string_builtin())?,
+        lyng_js_types::temporal_duration_to_locale_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_to_locale_string_builtin())?,
         None,
     );
     let duration_negated = allocate_builtin_function_object(
@@ -504,8 +492,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_negated_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_negated_builtin())?,
+        lyng_js_types::temporal_duration_negated_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_negated_builtin())?,
         None,
     );
     let duration_abs = allocate_builtin_function_object(
@@ -515,8 +503,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_abs_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_abs_builtin())?,
+        lyng_js_types::temporal_duration_abs_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_abs_builtin())?,
         None,
     );
     let duration_with = allocate_builtin_function_object(
@@ -526,8 +514,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_with_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_with_builtin())?,
+        lyng_js_types::temporal_duration_with_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_with_builtin())?,
         None,
     );
     let duration_round = allocate_builtin_function_object(
@@ -537,8 +525,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_round_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_round_builtin())?,
+        lyng_js_types::temporal_duration_round_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_round_builtin())?,
         None,
     );
     let duration_total = allocate_builtin_function_object(
@@ -548,8 +536,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_total_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_total_builtin())?,
+        lyng_js_types::temporal_duration_total_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_total_builtin())?,
         None,
     );
     let duration_add = allocate_builtin_function_object(
@@ -559,8 +547,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_add_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_add_builtin())?,
+        lyng_js_types::temporal_duration_add_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_add_builtin())?,
         None,
     );
     let duration_subtract = allocate_builtin_function_object(
@@ -570,8 +558,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_subtract_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_subtract_builtin())?,
+        lyng_js_types::temporal_duration_subtract_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_subtract_builtin())?,
         None,
     );
     let duration_value_of = allocate_builtin_function_object(
@@ -581,8 +569,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_value_of_builtin())?,
+        lyng_js_types::temporal_duration_value_of_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_value_of_builtin())?,
         None,
     );
     let duration_from = allocate_builtin_function_object(
@@ -592,8 +580,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_from_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_from_builtin())?,
+        lyng_js_types::temporal_duration_from_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_from_builtin())?,
         None,
     );
     let duration_compare = allocate_builtin_function_object(
@@ -603,8 +591,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_duration_compare_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_duration_compare_builtin())?,
+        lyng_js_types::temporal_duration_compare_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_duration_compare_builtin())?,
         None,
     );
     let plain_date_constructor = allocate_builtin_function_object(
@@ -614,8 +602,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_builtin())?,
+        lyng_js_types::temporal_plain_date_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_builtin())?,
         Some(plain_date_prototype),
     );
     let plain_date_year_getter = allocate_builtin_function_object(
@@ -625,8 +613,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_year_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_year_getter_builtin())?,
+        lyng_js_types::temporal_plain_date_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_year_getter_builtin())?,
         None,
     );
     let plain_date_month_getter = allocate_builtin_function_object(
@@ -636,8 +624,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_month_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_month_getter_builtin())?,
+        lyng_js_types::temporal_plain_date_month_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_month_getter_builtin())?,
         None,
     );
     let plain_date_month_code_getter = allocate_builtin_function_object(
@@ -647,10 +635,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_month_code_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_month_code_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_month_code_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_month_code_getter_builtin())?,
         None,
     );
     let plain_date_day_getter = allocate_builtin_function_object(
@@ -660,8 +646,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_day_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_day_getter_builtin())?,
+        lyng_js_types::temporal_plain_date_day_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_day_getter_builtin())?,
         None,
     );
     let plain_date_day_of_week_getter = allocate_builtin_function_object(
@@ -671,10 +657,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_day_of_week_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_day_of_week_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_day_of_week_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_day_of_week_getter_builtin())?,
         None,
     );
     let plain_date_day_of_year_getter = allocate_builtin_function_object(
@@ -684,10 +668,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_day_of_year_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_day_of_year_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_day_of_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_day_of_year_getter_builtin())?,
         None,
     );
     let plain_date_days_in_month_getter = allocate_builtin_function_object(
@@ -697,10 +679,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_days_in_month_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_days_in_month_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_days_in_month_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_days_in_month_getter_builtin())?,
         None,
     );
     let plain_date_days_in_year_getter = allocate_builtin_function_object(
@@ -710,10 +690,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_days_in_year_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_days_in_year_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_days_in_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_days_in_year_getter_builtin())?,
         None,
     );
     let plain_date_months_in_year_getter = allocate_builtin_function_object(
@@ -723,9 +701,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_months_in_year_getter_builtin(),
+        lyng_js_types::temporal_plain_date_months_in_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_months_in_year_getter_builtin(),
+            lyng_js_types::temporal_plain_date_months_in_year_getter_builtin(),
         )?,
         None,
     );
@@ -736,10 +714,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_in_leap_year_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_in_leap_year_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_in_leap_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_in_leap_year_getter_builtin())?,
         None,
     );
     let plain_date_days_in_week_getter = allocate_builtin_function_object(
@@ -749,10 +725,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_days_in_week_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_days_in_week_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_days_in_week_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_days_in_week_getter_builtin())?,
         None,
     );
     let plain_date_week_of_year_getter = allocate_builtin_function_object(
@@ -762,10 +736,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_week_of_year_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_week_of_year_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_week_of_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_week_of_year_getter_builtin())?,
         None,
     );
     let plain_date_year_of_week_getter = allocate_builtin_function_object(
@@ -775,10 +747,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_year_of_week_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_year_of_week_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_year_of_week_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_year_of_week_getter_builtin())?,
         None,
     );
     let plain_date_era_getter = allocate_builtin_function_object(
@@ -788,8 +758,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_era_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_era_getter_builtin())?,
+        lyng_js_types::temporal_plain_date_era_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_era_getter_builtin())?,
         None,
     );
     let plain_date_era_year_getter = allocate_builtin_function_object(
@@ -799,8 +769,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_era_year_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_era_year_getter_builtin())?,
+        lyng_js_types::temporal_plain_date_era_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_era_year_getter_builtin())?,
         None,
     );
     let plain_date_calendar_id_getter = allocate_builtin_function_object(
@@ -810,10 +780,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_calendar_id_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_calendar_id_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_calendar_id_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_calendar_id_getter_builtin())?,
         None,
     );
     let plain_date_to_string = allocate_builtin_function_object(
@@ -823,8 +791,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_to_string_builtin())?,
+        lyng_js_types::temporal_plain_date_to_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_to_string_builtin())?,
         None,
     );
     let plain_date_to_json = allocate_builtin_function_object(
@@ -834,8 +802,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_to_json_builtin())?,
+        lyng_js_types::temporal_plain_date_to_json_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_to_json_builtin())?,
         None,
     );
     let plain_date_to_locale_string = allocate_builtin_function_object(
@@ -845,8 +813,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_to_locale_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_to_locale_string_builtin())?,
+        lyng_js_types::temporal_plain_date_to_locale_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_to_locale_string_builtin())?,
         None,
     );
     let plain_date_value_of = allocate_builtin_function_object(
@@ -856,8 +824,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_value_of_builtin())?,
+        lyng_js_types::temporal_plain_date_value_of_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_value_of_builtin())?,
         None,
     );
     let plain_date_equals = allocate_builtin_function_object(
@@ -867,8 +835,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_equals_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_equals_builtin())?,
+        lyng_js_types::temporal_plain_date_equals_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_equals_builtin())?,
         None,
     );
     let plain_date_with = allocate_builtin_function_object(
@@ -878,8 +846,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_with_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_with_builtin())?,
+        lyng_js_types::temporal_plain_date_with_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_with_builtin())?,
         None,
     );
     let plain_date_with_calendar = allocate_builtin_function_object(
@@ -889,8 +857,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_with_calendar_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_with_calendar_builtin())?,
+        lyng_js_types::temporal_plain_date_with_calendar_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_with_calendar_builtin())?,
         None,
     );
     let plain_date_add = allocate_builtin_function_object(
@@ -900,8 +868,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_add_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_add_builtin())?,
+        lyng_js_types::temporal_plain_date_add_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_add_builtin())?,
         None,
     );
     let plain_date_subtract = allocate_builtin_function_object(
@@ -911,8 +879,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_subtract_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_subtract_builtin())?,
+        lyng_js_types::temporal_plain_date_subtract_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_subtract_builtin())?,
         None,
     );
     let plain_date_since = allocate_builtin_function_object(
@@ -922,8 +890,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_since_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_since_builtin())?,
+        lyng_js_types::temporal_plain_date_since_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_since_builtin())?,
         None,
     );
     let plain_date_until = allocate_builtin_function_object(
@@ -933,8 +901,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_until_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_until_builtin())?,
+        lyng_js_types::temporal_plain_date_until_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_until_builtin())?,
         None,
     );
     let plain_date_to_plain_date_time = allocate_builtin_function_object(
@@ -944,10 +912,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_to_plain_date_time_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_to_plain_date_time_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_to_plain_date_time_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_to_plain_date_time_builtin())?,
         None,
     );
     let plain_date_to_zoned_date_time = allocate_builtin_function_object(
@@ -957,10 +923,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_to_zoned_date_time_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_to_zoned_date_time_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_to_zoned_date_time_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_to_zoned_date_time_builtin())?,
         None,
     );
     let plain_date_to_plain_year_month = allocate_builtin_function_object(
@@ -970,10 +934,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_to_plain_year_month_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_to_plain_year_month_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_to_plain_year_month_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_to_plain_year_month_builtin())?,
         None,
     );
     let plain_date_to_plain_month_day = allocate_builtin_function_object(
@@ -983,10 +945,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_to_plain_month_day_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_to_plain_month_day_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_to_plain_month_day_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_to_plain_month_day_builtin())?,
         None,
     );
     let plain_date_from = allocate_builtin_function_object(
@@ -996,8 +956,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_from_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_from_builtin())?,
+        lyng_js_types::temporal_plain_date_from_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_from_builtin())?,
         None,
     );
     let plain_date_compare = allocate_builtin_function_object(
@@ -1007,8 +967,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_compare_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_compare_builtin())?,
+        lyng_js_types::temporal_plain_date_compare_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_compare_builtin())?,
         None,
     );
     let plain_time_constructor = allocate_builtin_function_object(
@@ -1018,8 +978,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_builtin())?,
+        lyng_js_types::temporal_plain_time_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_builtin())?,
         Some(plain_time_prototype),
     );
     let plain_time_hour_getter = allocate_builtin_function_object(
@@ -1029,8 +989,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_hour_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_hour_getter_builtin())?,
+        lyng_js_types::temporal_plain_time_hour_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_hour_getter_builtin())?,
         None,
     );
     let plain_time_minute_getter = allocate_builtin_function_object(
@@ -1040,8 +1000,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_minute_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_minute_getter_builtin())?,
+        lyng_js_types::temporal_plain_time_minute_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_minute_getter_builtin())?,
         None,
     );
     let plain_time_second_getter = allocate_builtin_function_object(
@@ -1051,8 +1011,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_second_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_second_getter_builtin())?,
+        lyng_js_types::temporal_plain_time_second_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_second_getter_builtin())?,
         None,
     );
     let plain_time_millisecond_getter = allocate_builtin_function_object(
@@ -1062,10 +1022,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_millisecond_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_time_millisecond_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_time_millisecond_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_millisecond_getter_builtin())?,
         None,
     );
     let plain_time_microsecond_getter = allocate_builtin_function_object(
@@ -1075,10 +1033,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_microsecond_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_time_microsecond_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_time_microsecond_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_microsecond_getter_builtin())?,
         None,
     );
     let plain_time_nanosecond_getter = allocate_builtin_function_object(
@@ -1088,10 +1044,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_nanosecond_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_time_nanosecond_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_time_nanosecond_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_nanosecond_getter_builtin())?,
         None,
     );
     let plain_time_to_string = allocate_builtin_function_object(
@@ -1101,8 +1055,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_to_string_builtin())?,
+        lyng_js_types::temporal_plain_time_to_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_to_string_builtin())?,
         None,
     );
     let plain_time_to_json = allocate_builtin_function_object(
@@ -1112,8 +1066,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_to_json_builtin())?,
+        lyng_js_types::temporal_plain_time_to_json_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_to_json_builtin())?,
         None,
     );
     let plain_time_to_locale_string = allocate_builtin_function_object(
@@ -1123,8 +1077,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_to_locale_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_to_locale_string_builtin())?,
+        lyng_js_types::temporal_plain_time_to_locale_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_to_locale_string_builtin())?,
         None,
     );
     let plain_time_value_of = allocate_builtin_function_object(
@@ -1134,8 +1088,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_value_of_builtin())?,
+        lyng_js_types::temporal_plain_time_value_of_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_value_of_builtin())?,
         None,
     );
     let plain_time_equals = allocate_builtin_function_object(
@@ -1145,8 +1099,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_equals_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_equals_builtin())?,
+        lyng_js_types::temporal_plain_time_equals_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_equals_builtin())?,
         None,
     );
     let plain_time_with = allocate_builtin_function_object(
@@ -1156,8 +1110,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_with_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_with_builtin())?,
+        lyng_js_types::temporal_plain_time_with_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_with_builtin())?,
         None,
     );
     let plain_time_add = allocate_builtin_function_object(
@@ -1167,8 +1121,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_add_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_add_builtin())?,
+        lyng_js_types::temporal_plain_time_add_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_add_builtin())?,
         None,
     );
     let plain_time_subtract = allocate_builtin_function_object(
@@ -1178,8 +1132,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_subtract_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_subtract_builtin())?,
+        lyng_js_types::temporal_plain_time_subtract_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_subtract_builtin())?,
         None,
     );
     let plain_time_round = allocate_builtin_function_object(
@@ -1189,8 +1143,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_round_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_round_builtin())?,
+        lyng_js_types::temporal_plain_time_round_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_round_builtin())?,
         None,
     );
     let plain_time_since = allocate_builtin_function_object(
@@ -1200,8 +1154,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_since_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_since_builtin())?,
+        lyng_js_types::temporal_plain_time_since_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_since_builtin())?,
         None,
     );
     let plain_time_until = allocate_builtin_function_object(
@@ -1211,8 +1165,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_until_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_until_builtin())?,
+        lyng_js_types::temporal_plain_time_until_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_until_builtin())?,
         None,
     );
     let plain_time_to_plain_date_time = allocate_builtin_function_object(
@@ -1222,10 +1176,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_to_plain_date_time_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_time_to_plain_date_time_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_time_to_plain_date_time_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_to_plain_date_time_builtin())?,
         None,
     );
     let plain_time_from = allocate_builtin_function_object(
@@ -1235,8 +1187,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_from_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_from_builtin())?,
+        lyng_js_types::temporal_plain_time_from_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_from_builtin())?,
         None,
     );
     let plain_time_compare = allocate_builtin_function_object(
@@ -1246,8 +1198,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_time_compare_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_time_compare_builtin())?,
+        lyng_js_types::temporal_plain_time_compare_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_time_compare_builtin())?,
         None,
     );
     let plain_date_time_constructor = allocate_builtin_function_object(
@@ -1257,8 +1209,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_builtin())?,
+        lyng_js_types::temporal_plain_date_time_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_builtin())?,
         Some(plain_date_time_prototype),
     );
     let plain_date_time_year_getter = allocate_builtin_function_object(
@@ -1268,8 +1220,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_year_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_year_getter_builtin())?,
+        lyng_js_types::temporal_plain_date_time_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_year_getter_builtin())?,
         None,
     );
     let plain_date_time_month_getter = allocate_builtin_function_object(
@@ -1279,10 +1231,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_month_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_month_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_time_month_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_month_getter_builtin())?,
         None,
     );
     let plain_date_time_month_code_getter = allocate_builtin_function_object(
@@ -1292,9 +1242,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_month_code_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_month_code_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_month_code_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_month_code_getter_builtin(),
         )?,
         None,
     );
@@ -1305,8 +1255,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_day_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_day_getter_builtin())?,
+        lyng_js_types::temporal_plain_date_time_day_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_day_getter_builtin())?,
         None,
     );
     let plain_date_time_day_of_week_getter = allocate_builtin_function_object(
@@ -1316,9 +1266,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_day_of_week_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_day_of_week_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_day_of_week_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_day_of_week_getter_builtin(),
         )?,
         None,
     );
@@ -1329,9 +1279,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_day_of_year_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_day_of_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_day_of_year_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_day_of_year_getter_builtin(),
         )?,
         None,
     );
@@ -1342,9 +1292,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_days_in_month_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_days_in_month_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_days_in_month_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_days_in_month_getter_builtin(),
         )?,
         None,
     );
@@ -1355,9 +1305,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_days_in_year_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_days_in_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_days_in_year_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_days_in_year_getter_builtin(),
         )?,
         None,
     );
@@ -1368,9 +1318,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_months_in_year_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_months_in_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_months_in_year_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_months_in_year_getter_builtin(),
         )?,
         None,
     );
@@ -1381,9 +1331,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_in_leap_year_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_in_leap_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_in_leap_year_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_in_leap_year_getter_builtin(),
         )?,
         None,
     );
@@ -1394,9 +1344,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_days_in_week_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_days_in_week_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_days_in_week_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_days_in_week_getter_builtin(),
         )?,
         None,
     );
@@ -1407,9 +1357,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_week_of_year_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_week_of_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_week_of_year_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_week_of_year_getter_builtin(),
         )?,
         None,
     );
@@ -1420,9 +1370,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_year_of_week_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_year_of_week_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_year_of_week_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_year_of_week_getter_builtin(),
         )?,
         None,
     );
@@ -1433,8 +1383,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_era_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_era_getter_builtin())?,
+        lyng_js_types::temporal_plain_date_time_era_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_era_getter_builtin())?,
         None,
     );
     let plain_date_time_era_year_getter = allocate_builtin_function_object(
@@ -1444,10 +1394,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_era_year_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_era_year_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_time_era_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_era_year_getter_builtin())?,
         None,
     );
     let plain_date_time_hour_getter = allocate_builtin_function_object(
@@ -1457,8 +1405,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_hour_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_hour_getter_builtin())?,
+        lyng_js_types::temporal_plain_date_time_hour_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_hour_getter_builtin())?,
         None,
     );
     let plain_date_time_minute_getter = allocate_builtin_function_object(
@@ -1468,10 +1416,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_minute_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_minute_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_time_minute_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_minute_getter_builtin())?,
         None,
     );
     let plain_date_time_second_getter = allocate_builtin_function_object(
@@ -1481,10 +1427,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_second_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_second_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_time_second_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_second_getter_builtin())?,
         None,
     );
     let plain_date_time_millisecond_getter = allocate_builtin_function_object(
@@ -1494,9 +1438,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_millisecond_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_millisecond_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_millisecond_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_millisecond_getter_builtin(),
         )?,
         None,
     );
@@ -1507,9 +1451,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_microsecond_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_microsecond_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_microsecond_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_microsecond_getter_builtin(),
         )?,
         None,
     );
@@ -1520,9 +1464,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_nanosecond_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_nanosecond_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_nanosecond_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_nanosecond_getter_builtin(),
         )?,
         None,
     );
@@ -1533,9 +1477,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_calendar_id_getter_builtin(),
+        lyng_js_types::temporal_plain_date_time_calendar_id_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_calendar_id_getter_builtin(),
+            lyng_js_types::temporal_plain_date_time_calendar_id_getter_builtin(),
         )?,
         None,
     );
@@ -1546,8 +1490,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_to_string_builtin())?,
+        lyng_js_types::temporal_plain_date_time_to_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_to_string_builtin())?,
         None,
     );
     let plain_date_time_to_json = allocate_builtin_function_object(
@@ -1557,8 +1501,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_to_json_builtin())?,
+        lyng_js_types::temporal_plain_date_time_to_json_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_to_json_builtin())?,
         None,
     );
     let plain_date_time_to_locale_string = allocate_builtin_function_object(
@@ -1568,9 +1512,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_to_locale_string_builtin(),
+        lyng_js_types::temporal_plain_date_time_to_locale_string_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_to_locale_string_builtin(),
+            lyng_js_types::temporal_plain_date_time_to_locale_string_builtin(),
         )?,
         None,
     );
@@ -1581,8 +1525,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_value_of_builtin())?,
+        lyng_js_types::temporal_plain_date_time_value_of_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_value_of_builtin())?,
         None,
     );
     let plain_date_time_equals = allocate_builtin_function_object(
@@ -1592,8 +1536,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_equals_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_equals_builtin())?,
+        lyng_js_types::temporal_plain_date_time_equals_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_equals_builtin())?,
         None,
     );
     let plain_date_time_with = allocate_builtin_function_object(
@@ -1603,8 +1547,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_with_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_with_builtin())?,
+        lyng_js_types::temporal_plain_date_time_with_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_with_builtin())?,
         None,
     );
     let plain_date_time_with_plain_time = allocate_builtin_function_object(
@@ -1614,10 +1558,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_with_plain_time_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_with_plain_time_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_time_with_plain_time_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_with_plain_time_builtin())?,
         None,
     );
     let plain_date_time_with_calendar = allocate_builtin_function_object(
@@ -1627,10 +1569,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_with_calendar_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_with_calendar_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_time_with_calendar_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_with_calendar_builtin())?,
         None,
     );
     let plain_date_time_add = allocate_builtin_function_object(
@@ -1640,8 +1580,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_add_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_add_builtin())?,
+        lyng_js_types::temporal_plain_date_time_add_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_add_builtin())?,
         None,
     );
     let plain_date_time_subtract = allocate_builtin_function_object(
@@ -1651,8 +1591,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_subtract_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_subtract_builtin())?,
+        lyng_js_types::temporal_plain_date_time_subtract_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_subtract_builtin())?,
         None,
     );
     let plain_date_time_round = allocate_builtin_function_object(
@@ -1662,8 +1602,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_round_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_round_builtin())?,
+        lyng_js_types::temporal_plain_date_time_round_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_round_builtin())?,
         None,
     );
     let plain_date_time_since = allocate_builtin_function_object(
@@ -1673,8 +1613,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_since_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_since_builtin())?,
+        lyng_js_types::temporal_plain_date_time_since_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_since_builtin())?,
         None,
     );
     let plain_date_time_until = allocate_builtin_function_object(
@@ -1684,8 +1624,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_until_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_until_builtin())?,
+        lyng_js_types::temporal_plain_date_time_until_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_until_builtin())?,
         None,
     );
     let plain_date_time_to_plain_date = allocate_builtin_function_object(
@@ -1695,10 +1635,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_to_plain_date_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_to_plain_date_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_time_to_plain_date_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_to_plain_date_builtin())?,
         None,
     );
     let plain_date_time_to_plain_time = allocate_builtin_function_object(
@@ -1708,10 +1646,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_to_plain_time_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_to_plain_time_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_date_time_to_plain_time_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_to_plain_time_builtin())?,
         None,
     );
     let plain_date_time_to_zoned_date_time = allocate_builtin_function_object(
@@ -1721,9 +1657,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_to_zoned_date_time_builtin(),
+        lyng_js_types::temporal_plain_date_time_to_zoned_date_time_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_date_time_to_zoned_date_time_builtin(),
+            lyng_js_types::temporal_plain_date_time_to_zoned_date_time_builtin(),
         )?,
         None,
     );
@@ -1734,8 +1670,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_from_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_from_builtin())?,
+        lyng_js_types::temporal_plain_date_time_from_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_from_builtin())?,
         None,
     );
     let plain_date_time_compare = allocate_builtin_function_object(
@@ -1745,8 +1681,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_date_time_compare_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_date_time_compare_builtin())?,
+        lyng_js_types::temporal_plain_date_time_compare_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_date_time_compare_builtin())?,
         None,
     );
     let plain_year_month_constructor = allocate_builtin_function_object(
@@ -1756,8 +1692,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_builtin())?,
+        lyng_js_types::temporal_plain_year_month_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_builtin())?,
         Some(plain_year_month_prototype),
     );
     let plain_year_month_year_getter = allocate_builtin_function_object(
@@ -1767,10 +1703,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_year_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_year_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_year_month_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_year_getter_builtin())?,
         None,
     );
     let plain_year_month_month_getter = allocate_builtin_function_object(
@@ -1780,10 +1714,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_month_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_month_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_year_month_month_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_month_getter_builtin())?,
         None,
     );
     let plain_year_month_month_code_getter = allocate_builtin_function_object(
@@ -1793,9 +1725,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_month_code_getter_builtin(),
+        lyng_js_types::temporal_plain_year_month_month_code_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_month_code_getter_builtin(),
+            lyng_js_types::temporal_plain_year_month_month_code_getter_builtin(),
         )?,
         None,
     );
@@ -1806,9 +1738,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_days_in_month_getter_builtin(),
+        lyng_js_types::temporal_plain_year_month_days_in_month_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_days_in_month_getter_builtin(),
+            lyng_js_types::temporal_plain_year_month_days_in_month_getter_builtin(),
         )?,
         None,
     );
@@ -1819,9 +1751,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_days_in_year_getter_builtin(),
+        lyng_js_types::temporal_plain_year_month_days_in_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_days_in_year_getter_builtin(),
+            lyng_js_types::temporal_plain_year_month_days_in_year_getter_builtin(),
         )?,
         None,
     );
@@ -1832,9 +1764,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_months_in_year_getter_builtin(),
+        lyng_js_types::temporal_plain_year_month_months_in_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_months_in_year_getter_builtin(),
+            lyng_js_types::temporal_plain_year_month_months_in_year_getter_builtin(),
         )?,
         None,
     );
@@ -1845,9 +1777,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_in_leap_year_getter_builtin(),
+        lyng_js_types::temporal_plain_year_month_in_leap_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_in_leap_year_getter_builtin(),
+            lyng_js_types::temporal_plain_year_month_in_leap_year_getter_builtin(),
         )?,
         None,
     );
@@ -1858,8 +1790,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_era_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_era_getter_builtin())?,
+        lyng_js_types::temporal_plain_year_month_era_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_era_getter_builtin())?,
         None,
     );
     let plain_year_month_era_year_getter = allocate_builtin_function_object(
@@ -1869,9 +1801,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_era_year_getter_builtin(),
+        lyng_js_types::temporal_plain_year_month_era_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_era_year_getter_builtin(),
+            lyng_js_types::temporal_plain_year_month_era_year_getter_builtin(),
         )?,
         None,
     );
@@ -1882,9 +1814,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_calendar_id_getter_builtin(),
+        lyng_js_types::temporal_plain_year_month_calendar_id_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_calendar_id_getter_builtin(),
+            lyng_js_types::temporal_plain_year_month_calendar_id_getter_builtin(),
         )?,
         None,
     );
@@ -1895,8 +1827,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_to_string_builtin())?,
+        lyng_js_types::temporal_plain_year_month_to_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_to_string_builtin())?,
         None,
     );
     let plain_year_month_to_json = allocate_builtin_function_object(
@@ -1906,8 +1838,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_to_json_builtin())?,
+        lyng_js_types::temporal_plain_year_month_to_json_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_to_json_builtin())?,
         None,
     );
     let plain_year_month_to_locale_string = allocate_builtin_function_object(
@@ -1917,9 +1849,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_to_locale_string_builtin(),
+        lyng_js_types::temporal_plain_year_month_to_locale_string_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_to_locale_string_builtin(),
+            lyng_js_types::temporal_plain_year_month_to_locale_string_builtin(),
         )?,
         None,
     );
@@ -1930,8 +1862,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_value_of_builtin())?,
+        lyng_js_types::temporal_plain_year_month_value_of_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_value_of_builtin())?,
         None,
     );
     let plain_year_month_equals = allocate_builtin_function_object(
@@ -1941,8 +1873,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_equals_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_equals_builtin())?,
+        lyng_js_types::temporal_plain_year_month_equals_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_equals_builtin())?,
         None,
     );
     let plain_year_month_with = allocate_builtin_function_object(
@@ -1952,8 +1884,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_with_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_with_builtin())?,
+        lyng_js_types::temporal_plain_year_month_with_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_with_builtin())?,
         None,
     );
     let plain_year_month_add = allocate_builtin_function_object(
@@ -1963,8 +1895,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_add_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_add_builtin())?,
+        lyng_js_types::temporal_plain_year_month_add_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_add_builtin())?,
         None,
     );
     let plain_year_month_subtract = allocate_builtin_function_object(
@@ -1974,8 +1906,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_subtract_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_subtract_builtin())?,
+        lyng_js_types::temporal_plain_year_month_subtract_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_subtract_builtin())?,
         None,
     );
     let plain_year_month_since = allocate_builtin_function_object(
@@ -1985,8 +1917,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_since_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_since_builtin())?,
+        lyng_js_types::temporal_plain_year_month_since_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_since_builtin())?,
         None,
     );
     let plain_year_month_until = allocate_builtin_function_object(
@@ -1996,8 +1928,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_until_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_until_builtin())?,
+        lyng_js_types::temporal_plain_year_month_until_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_until_builtin())?,
         None,
     );
     let plain_year_month_to_plain_date = allocate_builtin_function_object(
@@ -2007,10 +1939,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_to_plain_date_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_year_month_to_plain_date_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_year_month_to_plain_date_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_to_plain_date_builtin())?,
         None,
     );
     let plain_year_month_from = allocate_builtin_function_object(
@@ -2020,8 +1950,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_from_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_from_builtin())?,
+        lyng_js_types::temporal_plain_year_month_from_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_from_builtin())?,
         None,
     );
     let plain_year_month_compare = allocate_builtin_function_object(
@@ -2031,8 +1961,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_year_month_compare_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_year_month_compare_builtin())?,
+        lyng_js_types::temporal_plain_year_month_compare_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_year_month_compare_builtin())?,
         None,
     );
     let plain_month_day_constructor = allocate_builtin_function_object(
@@ -2042,8 +1972,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_month_day_builtin())?,
+        lyng_js_types::temporal_plain_month_day_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_builtin())?,
         Some(plain_month_day_prototype),
     );
     let plain_month_day_month_code_getter = allocate_builtin_function_object(
@@ -2053,9 +1983,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_month_code_getter_builtin(),
+        lyng_js_types::temporal_plain_month_day_month_code_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_month_day_month_code_getter_builtin(),
+            lyng_js_types::temporal_plain_month_day_month_code_getter_builtin(),
         )?,
         None,
     );
@@ -2066,8 +1996,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_day_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_month_day_day_getter_builtin())?,
+        lyng_js_types::temporal_plain_month_day_day_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_day_getter_builtin())?,
         None,
     );
     let plain_month_day_calendar_id_getter = allocate_builtin_function_object(
@@ -2077,9 +2007,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_calendar_id_getter_builtin(),
+        lyng_js_types::temporal_plain_month_day_calendar_id_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_month_day_calendar_id_getter_builtin(),
+            lyng_js_types::temporal_plain_month_day_calendar_id_getter_builtin(),
         )?,
         None,
     );
@@ -2090,8 +2020,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_month_day_to_string_builtin())?,
+        lyng_js_types::temporal_plain_month_day_to_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_to_string_builtin())?,
         None,
     );
     let plain_month_day_to_json = allocate_builtin_function_object(
@@ -2101,8 +2031,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_month_day_to_json_builtin())?,
+        lyng_js_types::temporal_plain_month_day_to_json_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_to_json_builtin())?,
         None,
     );
     let plain_month_day_to_locale_string = allocate_builtin_function_object(
@@ -2112,9 +2042,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_to_locale_string_builtin(),
+        lyng_js_types::temporal_plain_month_day_to_locale_string_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_month_day_to_locale_string_builtin(),
+            lyng_js_types::temporal_plain_month_day_to_locale_string_builtin(),
         )?,
         None,
     );
@@ -2125,8 +2055,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_month_day_value_of_builtin())?,
+        lyng_js_types::temporal_plain_month_day_value_of_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_value_of_builtin())?,
         None,
     );
     let plain_month_day_equals = allocate_builtin_function_object(
@@ -2136,8 +2066,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_equals_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_month_day_equals_builtin())?,
+        lyng_js_types::temporal_plain_month_day_equals_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_equals_builtin())?,
         None,
     );
     let plain_month_day_with = allocate_builtin_function_object(
@@ -2147,8 +2077,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_with_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_month_day_with_builtin())?,
+        lyng_js_types::temporal_plain_month_day_with_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_with_builtin())?,
         None,
     );
     let plain_month_day_to_plain_date = allocate_builtin_function_object(
@@ -2158,10 +2088,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_to_plain_date_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_plain_month_day_to_plain_date_builtin(),
-        )?,
+        lyng_js_types::temporal_plain_month_day_to_plain_date_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_to_plain_date_builtin())?,
         None,
     );
     let plain_month_day_from = allocate_builtin_function_object(
@@ -2171,8 +2099,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_plain_month_day_from_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_plain_month_day_from_builtin())?,
+        lyng_js_types::temporal_plain_month_day_from_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_from_builtin())?,
         None,
     );
     let zoned_date_time_constructor = allocate_builtin_function_object(
@@ -2182,8 +2110,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_builtin())?,
         Some(zoned_date_time_prototype),
     );
     let zoned_date_time_year_getter = allocate_builtin_function_object(
@@ -2193,8 +2121,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_year_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_year_getter_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_year_getter_builtin())?,
         None,
     );
     let zoned_date_time_month_getter = allocate_builtin_function_object(
@@ -2204,10 +2132,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_month_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_month_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_month_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_month_getter_builtin())?,
         None,
     );
     let zoned_date_time_month_code_getter = allocate_builtin_function_object(
@@ -2217,9 +2143,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_month_code_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_month_code_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_month_code_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_month_code_getter_builtin(),
         )?,
         None,
     );
@@ -2230,8 +2156,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_day_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_day_getter_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_day_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_day_getter_builtin())?,
         None,
     );
     let zoned_date_time_day_of_week_getter = allocate_builtin_function_object(
@@ -2241,9 +2167,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_day_of_week_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_day_of_week_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_day_of_week_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_day_of_week_getter_builtin(),
         )?,
         None,
     );
@@ -2254,9 +2180,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_day_of_year_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_day_of_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_day_of_year_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_day_of_year_getter_builtin(),
         )?,
         None,
     );
@@ -2267,9 +2193,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_days_in_month_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_days_in_month_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_days_in_month_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_days_in_month_getter_builtin(),
         )?,
         None,
     );
@@ -2280,9 +2206,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_days_in_year_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_days_in_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_days_in_year_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_days_in_year_getter_builtin(),
         )?,
         None,
     );
@@ -2293,9 +2219,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_months_in_year_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_months_in_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_months_in_year_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_months_in_year_getter_builtin(),
         )?,
         None,
     );
@@ -2306,9 +2232,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_in_leap_year_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_in_leap_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_in_leap_year_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_in_leap_year_getter_builtin(),
         )?,
         None,
     );
@@ -2319,9 +2245,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_days_in_week_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_days_in_week_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_days_in_week_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_days_in_week_getter_builtin(),
         )?,
         None,
     );
@@ -2332,9 +2258,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_week_of_year_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_week_of_year_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_week_of_year_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_week_of_year_getter_builtin(),
         )?,
         None,
     );
@@ -2345,9 +2271,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_year_of_week_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_year_of_week_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_year_of_week_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_year_of_week_getter_builtin(),
         )?,
         None,
     );
@@ -2358,8 +2284,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_era_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_era_getter_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_era_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_era_getter_builtin())?,
         None,
     );
     let zoned_date_time_era_year_getter = allocate_builtin_function_object(
@@ -2369,10 +2295,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_era_year_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_era_year_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_era_year_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_era_year_getter_builtin())?,
         None,
     );
     let zoned_date_time_hour_getter = allocate_builtin_function_object(
@@ -2382,8 +2306,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_hour_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_hour_getter_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_hour_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_hour_getter_builtin())?,
         None,
     );
     let zoned_date_time_minute_getter = allocate_builtin_function_object(
@@ -2393,10 +2317,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_minute_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_minute_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_minute_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_minute_getter_builtin())?,
         None,
     );
     let zoned_date_time_second_getter = allocate_builtin_function_object(
@@ -2406,10 +2328,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_second_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_second_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_second_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_second_getter_builtin())?,
         None,
     );
     let zoned_date_time_millisecond_getter = allocate_builtin_function_object(
@@ -2419,9 +2339,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_millisecond_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_millisecond_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_millisecond_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_millisecond_getter_builtin(),
         )?,
         None,
     );
@@ -2432,9 +2352,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_microsecond_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_microsecond_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_microsecond_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_microsecond_getter_builtin(),
         )?,
         None,
     );
@@ -2445,9 +2365,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_nanosecond_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_nanosecond_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_nanosecond_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_nanosecond_getter_builtin(),
         )?,
         None,
     );
@@ -2458,9 +2378,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_epoch_nanoseconds_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_epoch_nanoseconds_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_epoch_nanoseconds_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_epoch_nanoseconds_getter_builtin(),
         )?,
         None,
     );
@@ -2471,9 +2391,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_epoch_milliseconds_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_epoch_milliseconds_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_epoch_milliseconds_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_epoch_milliseconds_getter_builtin(),
         )?,
         None,
     );
@@ -2484,9 +2404,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_time_zone_id_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_time_zone_id_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_time_zone_id_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_time_zone_id_getter_builtin(),
         )?,
         None,
     );
@@ -2497,9 +2417,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_calendar_id_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_calendar_id_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_calendar_id_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_calendar_id_getter_builtin(),
         )?,
         None,
     );
@@ -2510,10 +2430,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_offset_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_offset_getter_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_offset_getter_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_offset_getter_builtin())?,
         None,
     );
     let zoned_date_time_offset_nanoseconds_getter = allocate_builtin_function_object(
@@ -2523,9 +2441,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_offset_nanoseconds_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_offset_nanoseconds_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_offset_nanoseconds_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_offset_nanoseconds_getter_builtin(),
         )?,
         None,
     );
@@ -2536,8 +2454,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_to_string_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_to_string_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_to_string_builtin())?,
         None,
     );
     let zoned_date_time_to_json = allocate_builtin_function_object(
@@ -2547,8 +2465,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_to_json_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_to_json_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_to_json_builtin())?,
         None,
     );
     let zoned_date_time_to_locale_string = allocate_builtin_function_object(
@@ -2558,9 +2476,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_to_locale_string_builtin(),
+        lyng_js_types::temporal_zoned_date_time_to_locale_string_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_to_locale_string_builtin(),
+            lyng_js_types::temporal_zoned_date_time_to_locale_string_builtin(),
         )?,
         None,
     );
@@ -2571,8 +2489,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_value_of_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_value_of_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_value_of_builtin())?,
         None,
     );
     let zoned_date_time_equals = allocate_builtin_function_object(
@@ -2582,8 +2500,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_equals_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_equals_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_equals_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_equals_builtin())?,
         None,
     );
     let zoned_date_time_add = allocate_builtin_function_object(
@@ -2593,8 +2511,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_add_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_add_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_add_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_add_builtin())?,
         None,
     );
     let zoned_date_time_round = allocate_builtin_function_object(
@@ -2604,8 +2522,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_round_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_round_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_round_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_round_builtin())?,
         None,
     );
     let zoned_date_time_with = allocate_builtin_function_object(
@@ -2615,8 +2533,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_with_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_with_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_with_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_with_builtin())?,
         None,
     );
     let zoned_date_time_subtract = allocate_builtin_function_object(
@@ -2626,8 +2544,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_subtract_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_subtract_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_subtract_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_subtract_builtin())?,
         None,
     );
     let zoned_date_time_with_time_zone = allocate_builtin_function_object(
@@ -2637,10 +2555,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_with_time_zone_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_with_time_zone_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_with_time_zone_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_with_time_zone_builtin())?,
         None,
     );
     let zoned_date_time_with_calendar = allocate_builtin_function_object(
@@ -2650,10 +2566,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_with_calendar_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_with_calendar_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_with_calendar_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_with_calendar_builtin())?,
         None,
     );
     let zoned_date_time_with_plain_time = allocate_builtin_function_object(
@@ -2663,10 +2577,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_with_plain_time_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_with_plain_time_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_with_plain_time_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_with_plain_time_builtin())?,
         None,
     );
     let zoned_date_time_start_of_day = allocate_builtin_function_object(
@@ -2676,10 +2588,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_start_of_day_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_start_of_day_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_start_of_day_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_start_of_day_builtin())?,
         None,
     );
     let zoned_date_time_hours_in_day_getter = allocate_builtin_function_object(
@@ -2689,9 +2599,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_hours_in_day_getter_builtin(),
+        lyng_js_types::temporal_zoned_date_time_hours_in_day_getter_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_hours_in_day_getter_builtin(),
+            lyng_js_types::temporal_zoned_date_time_hours_in_day_getter_builtin(),
         )?,
         None,
     );
@@ -2702,8 +2612,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_since_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_since_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_since_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_since_builtin())?,
         None,
     );
     let zoned_date_time_until = allocate_builtin_function_object(
@@ -2713,8 +2623,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_until_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_until_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_until_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_until_builtin())?,
         None,
     );
     let zoned_date_time_from = allocate_builtin_function_object(
@@ -2724,8 +2634,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_from_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_from_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_from_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_from_builtin())?,
         None,
     );
     let zoned_date_time_compare = allocate_builtin_function_object(
@@ -2735,8 +2645,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_compare_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_compare_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_compare_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_compare_builtin())?,
         None,
     );
     let zoned_date_time_to_instant = allocate_builtin_function_object(
@@ -2746,8 +2656,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_to_instant_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_zoned_date_time_to_instant_builtin())?,
+        lyng_js_types::temporal_zoned_date_time_to_instant_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_to_instant_builtin())?,
         None,
     );
     let zoned_date_time_to_plain_date_time = allocate_builtin_function_object(
@@ -2757,9 +2667,9 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_to_plain_date_time_builtin(),
+        lyng_js_types::temporal_zoned_date_time_to_plain_date_time_builtin(),
         public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_to_plain_date_time_builtin(),
+            lyng_js_types::temporal_zoned_date_time_to_plain_date_time_builtin(),
         )?,
         None,
     );
@@ -2770,10 +2680,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_to_plain_date_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_to_plain_date_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_to_plain_date_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_to_plain_date_builtin())?,
         None,
     );
     let zoned_date_time_to_plain_time = allocate_builtin_function_object(
@@ -2783,10 +2691,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_zoned_date_time_to_plain_time_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::js3_temporal_zoned_date_time_to_plain_time_builtin(),
-        )?,
+        lyng_js_types::temporal_zoned_date_time_to_plain_time_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_to_plain_time_builtin())?,
         None,
     );
     let now_instant = allocate_builtin_function_object(
@@ -2796,8 +2702,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_now_instant_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_now_instant_builtin())?,
+        lyng_js_types::temporal_now_instant_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_now_instant_builtin())?,
         None,
     );
     let now_time_zone_id = allocate_builtin_function_object(
@@ -2807,8 +2713,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_now_time_zone_id_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_now_time_zone_id_builtin())?,
+        lyng_js_types::temporal_now_time_zone_id_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_now_time_zone_id_builtin())?,
         None,
     );
     let now_plain_date_iso = allocate_builtin_function_object(
@@ -2818,8 +2724,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_now_plain_date_iso_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_now_plain_date_iso_builtin())?,
+        lyng_js_types::temporal_now_plain_date_iso_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_now_plain_date_iso_builtin())?,
         None,
     );
     let now_plain_time_iso = allocate_builtin_function_object(
@@ -2829,8 +2735,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_now_plain_time_iso_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_now_plain_time_iso_builtin())?,
+        lyng_js_types::temporal_now_plain_time_iso_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_now_plain_time_iso_builtin())?,
         None,
     );
     let now_plain_date_time_iso = allocate_builtin_function_object(
@@ -2840,8 +2746,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_now_plain_date_time_iso_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_now_plain_date_time_iso_builtin())?,
+        lyng_js_types::temporal_now_plain_date_time_iso_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_now_plain_date_time_iso_builtin())?,
         None,
     );
     let now_zoned_date_time_iso = allocate_builtin_function_object(
@@ -2851,8 +2757,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::js3_temporal_now_zoned_date_time_iso_builtin(),
-        public_builtin_metadata(lyng_js_types::js3_temporal_now_zoned_date_time_iso_builtin())?,
+        lyng_js_types::temporal_now_zoned_date_time_iso_builtin(),
+        public_builtin_metadata(lyng_js_types::temporal_now_zoned_date_time_iso_builtin())?,
         None,
     );
 
@@ -5385,22 +5291,22 @@ pub(super) fn install_temporal_public_objects(
 }
 
 pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
-    if entry == lyng_js_types::js3_temporal_instant_builtin() {
+    if entry == lyng_js_types::temporal_instant_builtin() {
         return Some(BuiltinEntryMetadata::new("Instant", 1, true, true));
     }
-    if entry == lyng_js_types::js3_temporal_now_instant_builtin() {
+    if entry == lyng_js_types::temporal_now_instant_builtin() {
         return Some(BuiltinEntryMetadata::new("instant", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_now_time_zone_id_builtin() {
+    if entry == lyng_js_types::temporal_now_time_zone_id_builtin() {
         return Some(BuiltinEntryMetadata::new("timeZoneId", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_now_plain_date_iso_builtin() {
+    if entry == lyng_js_types::temporal_now_plain_date_iso_builtin() {
         return Some(BuiltinEntryMetadata::new("plainDateISO", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_now_plain_time_iso_builtin() {
+    if entry == lyng_js_types::temporal_now_plain_time_iso_builtin() {
         return Some(BuiltinEntryMetadata::new("plainTimeISO", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_now_plain_date_time_iso_builtin() {
+    if entry == lyng_js_types::temporal_now_plain_date_time_iso_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "plainDateTimeISO",
             0,
@@ -5408,7 +5314,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_now_zoned_date_time_iso_builtin() {
+    if entry == lyng_js_types::temporal_now_zoned_date_time_iso_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "zonedDateTimeISO",
             0,
@@ -5416,10 +5322,10 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_instant_from_builtin() {
+    if entry == lyng_js_types::temporal_instant_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_from_epoch_nanoseconds_builtin() {
+    if entry == lyng_js_types::temporal_instant_from_epoch_nanoseconds_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "fromEpochNanoseconds",
             1,
@@ -5427,7 +5333,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_instant_from_epoch_milliseconds_builtin() {
+    if entry == lyng_js_types::temporal_instant_from_epoch_milliseconds_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "fromEpochMilliseconds",
             1,
@@ -5435,10 +5341,10 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_instant_compare_builtin() {
+    if entry == lyng_js_types::temporal_instant_compare_builtin() {
         return Some(BuiltinEntryMetadata::new("compare", 2, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_epoch_nanoseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_instant_epoch_nanoseconds_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get epochNanoseconds",
             0,
@@ -5446,7 +5352,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_instant_epoch_milliseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_instant_epoch_milliseconds_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get epochMilliseconds",
             0,
@@ -5454,7 +5360,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_instant_epoch_seconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_instant_epoch_seconds_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get epochSeconds",
             0,
@@ -5462,37 +5368,37 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_instant_to_string_builtin() {
+    if entry == lyng_js_types::temporal_instant_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_to_json_builtin() {
+    if entry == lyng_js_types::temporal_instant_to_json_builtin() {
         return Some(BuiltinEntryMetadata::new("toJSON", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_instant_to_locale_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_value_of_builtin() {
+    if entry == lyng_js_types::temporal_instant_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_equals_builtin() {
+    if entry == lyng_js_types::temporal_instant_equals_builtin() {
         return Some(BuiltinEntryMetadata::new("equals", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_add_builtin() {
+    if entry == lyng_js_types::temporal_instant_add_builtin() {
         return Some(BuiltinEntryMetadata::new("add", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_subtract_builtin() {
+    if entry == lyng_js_types::temporal_instant_subtract_builtin() {
         return Some(BuiltinEntryMetadata::new("subtract", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_round_builtin() {
+    if entry == lyng_js_types::temporal_instant_round_builtin() {
         return Some(BuiltinEntryMetadata::new("round", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_since_builtin() {
+    if entry == lyng_js_types::temporal_instant_since_builtin() {
         return Some(BuiltinEntryMetadata::new("since", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_until_builtin() {
+    if entry == lyng_js_types::temporal_instant_until_builtin() {
         return Some(BuiltinEntryMetadata::new("until", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_instant_to_zoned_date_time_iso_builtin() {
+    if entry == lyng_js_types::temporal_instant_to_zoned_date_time_iso_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "toZonedDateTimeISO",
             1,
@@ -5500,31 +5406,31 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_duration_builtin() {
+    if entry == lyng_js_types::temporal_duration_builtin() {
         return Some(BuiltinEntryMetadata::new("Duration", 0, true, true));
     }
-    if entry == lyng_js_types::js3_temporal_duration_years_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_years_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get years", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_months_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_months_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get months", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_weeks_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_weeks_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get weeks", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_days_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_days_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get days", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_hours_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_hours_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get hours", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_minutes_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_minutes_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get minutes", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_seconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_seconds_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get seconds", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_milliseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_milliseconds_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get milliseconds",
             0,
@@ -5532,7 +5438,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_duration_microseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_microseconds_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get microseconds",
             0,
@@ -5540,7 +5446,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_duration_nanoseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_nanoseconds_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get nanoseconds",
             0,
@@ -5548,73 +5454,73 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_duration_sign_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_sign_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get sign", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_blank_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_blank_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get blank", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_to_string_builtin() {
+    if entry == lyng_js_types::temporal_duration_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_to_json_builtin() {
+    if entry == lyng_js_types::temporal_duration_to_json_builtin() {
         return Some(BuiltinEntryMetadata::new("toJSON", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_duration_to_locale_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_negated_builtin() {
+    if entry == lyng_js_types::temporal_duration_negated_builtin() {
         return Some(BuiltinEntryMetadata::new("negated", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_abs_builtin() {
+    if entry == lyng_js_types::temporal_duration_abs_builtin() {
         return Some(BuiltinEntryMetadata::new("abs", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_with_builtin() {
+    if entry == lyng_js_types::temporal_duration_with_builtin() {
         return Some(BuiltinEntryMetadata::new("with", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_round_builtin() {
+    if entry == lyng_js_types::temporal_duration_round_builtin() {
         return Some(BuiltinEntryMetadata::new("round", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_total_builtin() {
+    if entry == lyng_js_types::temporal_duration_total_builtin() {
         return Some(BuiltinEntryMetadata::new("total", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_add_builtin() {
+    if entry == lyng_js_types::temporal_duration_add_builtin() {
         return Some(BuiltinEntryMetadata::new("add", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_subtract_builtin() {
+    if entry == lyng_js_types::temporal_duration_subtract_builtin() {
         return Some(BuiltinEntryMetadata::new("subtract", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_value_of_builtin() {
+    if entry == lyng_js_types::temporal_duration_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_from_builtin() {
+    if entry == lyng_js_types::temporal_duration_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_duration_compare_builtin() {
+    if entry == lyng_js_types::temporal_duration_compare_builtin() {
         return Some(BuiltinEntryMetadata::new("compare", 2, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_builtin() {
         return Some(BuiltinEntryMetadata::new("PlainDate", 3, true, true));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get year", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_month_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get month", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_month_code_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_month_code_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get monthCode", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_day_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_day_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get day", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_day_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_day_of_week_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get dayOfWeek", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_day_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_day_of_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get dayOfYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_days_in_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_days_in_month_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get daysInMonth",
             0,
@@ -5622,10 +5528,10 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_days_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_days_in_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get daysInYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_months_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_months_in_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get monthsInYear",
             0,
@@ -5633,61 +5539,61 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_in_leap_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_in_leap_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get inLeapYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_days_in_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_days_in_week_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get daysInWeek", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_week_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_week_of_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get weekOfYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_year_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_year_of_week_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get yearOfWeek", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_era_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_era_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get era", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_era_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_era_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get eraYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_calendar_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_calendar_id_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get calendarId", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_json_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_json_builtin() {
         return Some(BuiltinEntryMetadata::new("toJSON", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_locale_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_value_of_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_equals_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_equals_builtin() {
         return Some(BuiltinEntryMetadata::new("equals", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_with_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_with_builtin() {
         return Some(BuiltinEntryMetadata::new("with", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_with_calendar_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_with_calendar_builtin() {
         return Some(BuiltinEntryMetadata::new("withCalendar", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_add_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_add_builtin() {
         return Some(BuiltinEntryMetadata::new("add", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_subtract_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_subtract_builtin() {
         return Some(BuiltinEntryMetadata::new("subtract", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_since_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_since_builtin() {
         return Some(BuiltinEntryMetadata::new("since", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_until_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_until_builtin() {
         return Some(BuiltinEntryMetadata::new("until", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_plain_date_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_plain_date_time_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "toPlainDateTime",
             0,
@@ -5695,7 +5601,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_zoned_date_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_zoned_date_time_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "toZonedDateTime",
             1,
@@ -5703,7 +5609,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_plain_year_month_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_plain_year_month_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "toPlainYearMonth",
             0,
@@ -5711,7 +5617,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_plain_month_day_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_plain_month_day_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "toPlainMonthDay",
             0,
@@ -5719,25 +5625,25 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_from_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_compare_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_compare_builtin() {
         return Some(BuiltinEntryMetadata::new("compare", 2, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_builtin() {
         return Some(BuiltinEntryMetadata::new("PlainTime", 0, true, true));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_hour_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_hour_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get hour", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_minute_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_minute_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get minute", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_second_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_second_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get second", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_millisecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_millisecond_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get millisecond",
             0,
@@ -5745,7 +5651,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_microsecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_microsecond_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get microsecond",
             0,
@@ -5753,43 +5659,43 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_nanosecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_nanosecond_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get nanosecond", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_to_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_to_json_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_to_json_builtin() {
         return Some(BuiltinEntryMetadata::new("toJSON", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_to_locale_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_value_of_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_equals_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_equals_builtin() {
         return Some(BuiltinEntryMetadata::new("equals", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_with_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_with_builtin() {
         return Some(BuiltinEntryMetadata::new("with", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_add_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_add_builtin() {
         return Some(BuiltinEntryMetadata::new("add", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_subtract_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_subtract_builtin() {
         return Some(BuiltinEntryMetadata::new("subtract", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_round_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_round_builtin() {
         return Some(BuiltinEntryMetadata::new("round", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_since_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_since_builtin() {
         return Some(BuiltinEntryMetadata::new("since", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_until_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_until_builtin() {
         return Some(BuiltinEntryMetadata::new("until", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_to_plain_date_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_to_plain_date_time_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "toPlainDateTime",
             1,
@@ -5797,34 +5703,34 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_from_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_compare_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_compare_builtin() {
         return Some(BuiltinEntryMetadata::new("compare", 2, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_builtin() {
         return Some(BuiltinEntryMetadata::new("PlainDateTime", 3, true, true));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get year", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_month_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get month", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_month_code_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_month_code_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get monthCode", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_day_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_day_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get day", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_day_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_day_of_week_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get dayOfWeek", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_day_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_day_of_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get dayOfYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_days_in_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_days_in_month_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get daysInMonth",
             0,
@@ -5832,10 +5738,10 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_days_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_days_in_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get daysInYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_months_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_months_in_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get monthsInYear",
             0,
@@ -5843,34 +5749,34 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_in_leap_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_in_leap_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get inLeapYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_days_in_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_days_in_week_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get daysInWeek", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_week_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_week_of_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get weekOfYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_year_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_year_of_week_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get yearOfWeek", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_era_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_era_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get era", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_era_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_era_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get eraYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_hour_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_hour_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get hour", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_minute_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_minute_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get minute", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_second_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_second_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get second", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_millisecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_millisecond_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get millisecond",
             0,
@@ -5878,7 +5784,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_microsecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_microsecond_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get microsecond",
             0,
@@ -5886,58 +5792,58 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_nanosecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_nanosecond_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get nanosecond", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_calendar_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_calendar_id_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get calendarId", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_json_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_json_builtin() {
         return Some(BuiltinEntryMetadata::new("toJSON", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_locale_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_value_of_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_equals_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_equals_builtin() {
         return Some(BuiltinEntryMetadata::new("equals", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_with_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_with_builtin() {
         return Some(BuiltinEntryMetadata::new("with", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_with_plain_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_with_plain_time_builtin() {
         return Some(BuiltinEntryMetadata::new("withPlainTime", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_with_calendar_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_with_calendar_builtin() {
         return Some(BuiltinEntryMetadata::new("withCalendar", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_add_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_add_builtin() {
         return Some(BuiltinEntryMetadata::new("add", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_subtract_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_subtract_builtin() {
         return Some(BuiltinEntryMetadata::new("subtract", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_round_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_round_builtin() {
         return Some(BuiltinEntryMetadata::new("round", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_since_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_since_builtin() {
         return Some(BuiltinEntryMetadata::new("since", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_until_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_until_builtin() {
         return Some(BuiltinEntryMetadata::new("until", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_plain_date_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_plain_date_builtin() {
         return Some(BuiltinEntryMetadata::new("toPlainDate", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_plain_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_plain_time_builtin() {
         return Some(BuiltinEntryMetadata::new("toPlainTime", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_zoned_date_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_zoned_date_time_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "toZonedDateTime",
             1,
@@ -5945,25 +5851,25 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_from_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_compare_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_compare_builtin() {
         return Some(BuiltinEntryMetadata::new("compare", 2, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_builtin() {
         return Some(BuiltinEntryMetadata::new("PlainYearMonth", 2, true, true));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get year", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_month_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get month", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_month_code_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_month_code_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get monthCode", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_days_in_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_days_in_month_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get daysInMonth",
             0,
@@ -5971,10 +5877,10 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_days_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_days_in_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get daysInYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_months_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_months_in_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get monthsInYear",
             0,
@@ -5982,115 +5888,115 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_in_leap_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_in_leap_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get inLeapYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_era_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_era_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get era", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_era_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_era_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get eraYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_calendar_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_calendar_id_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get calendarId", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_to_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_to_json_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_to_json_builtin() {
         return Some(BuiltinEntryMetadata::new("toJSON", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_to_locale_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_value_of_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_equals_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_equals_builtin() {
         return Some(BuiltinEntryMetadata::new("equals", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_with_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_with_builtin() {
         return Some(BuiltinEntryMetadata::new("with", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_add_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_add_builtin() {
         return Some(BuiltinEntryMetadata::new("add", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_subtract_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_subtract_builtin() {
         return Some(BuiltinEntryMetadata::new("subtract", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_since_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_since_builtin() {
         return Some(BuiltinEntryMetadata::new("since", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_until_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_until_builtin() {
         return Some(BuiltinEntryMetadata::new("until", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_to_plain_date_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_to_plain_date_builtin() {
         return Some(BuiltinEntryMetadata::new("toPlainDate", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_from_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_compare_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_compare_builtin() {
         return Some(BuiltinEntryMetadata::new("compare", 2, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_builtin() {
         return Some(BuiltinEntryMetadata::new("PlainMonthDay", 2, true, true));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_month_code_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_month_code_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get monthCode", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_day_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_day_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get day", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_calendar_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_calendar_id_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get calendarId", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_to_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_to_json_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_to_json_builtin() {
         return Some(BuiltinEntryMetadata::new("toJSON", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_to_locale_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_value_of_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_equals_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_equals_builtin() {
         return Some(BuiltinEntryMetadata::new("equals", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_with_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_with_builtin() {
         return Some(BuiltinEntryMetadata::new("with", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_to_plain_date_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_to_plain_date_builtin() {
         return Some(BuiltinEntryMetadata::new("toPlainDate", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_from_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_builtin() {
         return Some(BuiltinEntryMetadata::new("ZonedDateTime", 2, true, true));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get year", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_month_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get month", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_month_code_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_month_code_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get monthCode", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_day_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_day_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get day", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_day_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_day_of_week_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get dayOfWeek", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_day_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_day_of_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get dayOfYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_days_in_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_days_in_month_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get daysInMonth",
             0,
@@ -6098,10 +6004,10 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_days_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_days_in_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get daysInYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_months_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_months_in_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get monthsInYear",
             0,
@@ -6109,34 +6015,34 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_in_leap_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_in_leap_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get inLeapYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_days_in_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_days_in_week_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get daysInWeek", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_week_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_week_of_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get weekOfYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_year_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_year_of_week_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get yearOfWeek", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_era_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_era_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get era", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_era_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_era_year_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get eraYear", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_hour_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_hour_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get hour", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_minute_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_minute_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get minute", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_second_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_second_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get second", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_millisecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_millisecond_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get millisecond",
             0,
@@ -6144,7 +6050,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_microsecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_microsecond_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get microsecond",
             0,
@@ -6152,10 +6058,10 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_nanosecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_nanosecond_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get nanosecond", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_epoch_nanoseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_epoch_nanoseconds_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get epochNanoseconds",
             0,
@@ -6163,7 +6069,7 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_epoch_milliseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_epoch_milliseconds_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get epochMilliseconds",
             0,
@@ -6171,16 +6077,16 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_time_zone_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_time_zone_id_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get timeZoneId", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_calendar_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_calendar_id_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get calendarId", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_offset_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_offset_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get offset", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_offset_nanoseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_offset_nanoseconds_getter_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "get offsetNanoseconds",
             0,
@@ -6188,64 +6094,64 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_string_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_json_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_json_builtin() {
         return Some(BuiltinEntryMetadata::new("toJSON", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_locale_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toLocaleString", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_value_of_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_value_of_builtin() {
         return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_equals_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_equals_builtin() {
         return Some(BuiltinEntryMetadata::new("equals", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_add_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_add_builtin() {
         return Some(BuiltinEntryMetadata::new("add", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_round_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_round_builtin() {
         return Some(BuiltinEntryMetadata::new("round", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_with_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_with_builtin() {
         return Some(BuiltinEntryMetadata::new("with", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_subtract_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_subtract_builtin() {
         return Some(BuiltinEntryMetadata::new("subtract", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_with_time_zone_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_with_time_zone_builtin() {
         return Some(BuiltinEntryMetadata::new("withTimeZone", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_with_calendar_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_with_calendar_builtin() {
         return Some(BuiltinEntryMetadata::new("withCalendar", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_with_plain_time_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_with_plain_time_builtin() {
         return Some(BuiltinEntryMetadata::new("withPlainTime", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_start_of_day_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_start_of_day_builtin() {
         return Some(BuiltinEntryMetadata::new("startOfDay", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_hours_in_day_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_hours_in_day_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get hoursInDay", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_since_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_since_builtin() {
         return Some(BuiltinEntryMetadata::new("since", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_until_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_until_builtin() {
         return Some(BuiltinEntryMetadata::new("until", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_from_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_compare_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_compare_builtin() {
         return Some(BuiltinEntryMetadata::new("compare", 2, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_instant_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_instant_builtin() {
         return Some(BuiltinEntryMetadata::new("toInstant", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_plain_date_time_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_plain_date_time_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "toPlainDateTime",
             0,
@@ -6253,10 +6159,10 @@ pub(super) fn temporal_builtin_metadata(entry: BuiltinFunctionId) -> Option<Buil
             false,
         ));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_plain_date_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_plain_date_builtin() {
         return Some(BuiltinEntryMetadata::new("toPlainDate", 0, false, false));
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_plain_time_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_plain_time_builtin() {
         return Some(BuiltinEntryMetadata::new("toPlainTime", 0, false, false));
     }
     None

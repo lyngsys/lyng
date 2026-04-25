@@ -153,7 +153,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     home_object
                 };
                 self.emit_internal_builtin_call(
-                    lyng_js_types::js3_internal_capture_arrow_context_builtin(),
+                    lyng_js_types::internal_capture_arrow_context_builtin(),
                     &[dest, this_override, home_object],
                     span,
                 )?;
@@ -193,7 +193,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             undefined
         };
         self.emit_internal_builtin_call_into(
-            lyng_js_types::js3_internal_dynamic_import_builtin(),
+            lyng_js_types::internal_dynamic_import_builtin(),
             &[source_value, options_value],
             self.ast().get_expr(source).span(),
             dest,
@@ -391,7 +391,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         let literal = self.ast().literals().get_regexp(value).clone();
         let callee = self.alloc_temp()?;
-        self.emit_load_builtin(callee, js3_regexp_builtin())?;
+        self.emit_load_builtin(callee, regexp_builtin())?;
 
         let pattern = self.alloc_temp()?;
         let pattern_atom = self.state.atoms.intern(&literal.pattern);
@@ -430,7 +430,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         dest: u16,
     ) -> LoweringResult<()> {
         let callee = self.alloc_temp()?;
-        self.emit_load_builtin(callee, js3_bigint_builtin())?;
+        self.emit_load_builtin(callee, bigint_builtin())?;
 
         let this_value = self.alloc_temp()?;
         self.emit_load_undefined(this_value)?;

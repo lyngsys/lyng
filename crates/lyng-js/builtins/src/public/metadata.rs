@@ -1,189 +1,157 @@
 use super::temporal;
 use crate::BuiltinEntryMetadata;
 use lyng_js_types::{
-    js3_abstract_module_source_builtin, js3_abstract_module_source_to_string_tag_getter_builtin,
-    js3_add_async_disposable_resource_builtin, js3_add_sync_disposable_resource_builtin,
-    js3_aggregate_error_builtin, js3_array_at_builtin, js3_array_buffer_builtin,
-    js3_array_buffer_byte_length_getter_builtin, js3_array_buffer_is_view_builtin,
-    js3_array_buffer_slice_builtin, js3_array_builtin, js3_array_concat_builtin,
-    js3_array_copy_within_builtin, js3_array_entries_builtin, js3_array_every_builtin,
-    js3_array_fill_builtin, js3_array_filter_builtin, js3_array_find_builtin,
-    js3_array_find_index_builtin, js3_array_find_last_builtin, js3_array_find_last_index_builtin,
-    js3_array_flat_builtin, js3_array_flat_map_builtin, js3_array_for_each_builtin,
-    js3_array_from_async_builtin, js3_array_from_builtin, js3_array_includes_builtin,
-    js3_array_index_of_builtin, js3_array_is_array_builtin, js3_array_iterator_next_builtin,
-    js3_array_join_builtin, js3_array_keys_builtin, js3_array_last_index_of_builtin,
-    js3_array_map_builtin, js3_array_of_builtin, js3_array_pop_builtin, js3_array_push_builtin,
-    js3_array_reduce_builtin, js3_array_reduce_right_builtin, js3_array_reverse_builtin,
-    js3_array_shift_builtin, js3_array_slice_builtin, js3_array_some_builtin,
-    js3_array_sort_builtin, js3_array_species_getter_builtin, js3_array_splice_builtin,
-    js3_array_to_locale_string_builtin, js3_array_to_reversed_builtin, js3_array_to_sorted_builtin,
-    js3_array_to_spliced_builtin, js3_array_to_string_builtin, js3_array_unshift_builtin,
-    js3_array_values_builtin, js3_array_with_builtin, js3_async_disposable_stack_adopt_builtin,
-    js3_async_disposable_stack_builtin, js3_async_disposable_stack_defer_builtin,
-    js3_async_disposable_stack_dispose_async_builtin,
-    js3_async_disposable_stack_disposed_getter_builtin, js3_async_disposable_stack_move_builtin,
-    js3_async_disposable_stack_use_builtin, js3_async_disposal_resume_builtin,
-    js3_async_function_builtin, js3_async_generator_function_builtin,
-    js3_async_generator_next_builtin, js3_async_generator_return_builtin,
-    js3_async_generator_throw_builtin, js3_atomics_add_builtin, js3_atomics_and_builtin,
-    js3_atomics_compare_exchange_builtin, js3_atomics_exchange_builtin,
-    js3_atomics_is_lock_free_builtin, js3_atomics_load_builtin, js3_atomics_notify_builtin,
-    js3_atomics_or_builtin, js3_atomics_store_builtin, js3_atomics_sub_builtin,
-    js3_atomics_wait_async_builtin, js3_atomics_wait_builtin, js3_atomics_xor_builtin,
-    js3_big_int64_array_builtin, js3_big_uint64_array_builtin, js3_bigint_as_int_n_builtin,
-    js3_bigint_as_uint_n_builtin, js3_bigint_builtin, js3_bigint_to_string_builtin,
-    js3_bigint_value_of_builtin, js3_boolean_builtin, js3_boolean_to_string_builtin,
-    js3_boolean_value_of_builtin, js3_create_async_disposal_scope_builtin,
-    js3_create_sync_disposal_scope_builtin, js3_data_view_buffer_getter_builtin,
-    js3_data_view_builtin, js3_data_view_byte_length_getter_builtin,
-    js3_data_view_byte_offset_getter_builtin, js3_data_view_get_float32_builtin,
-    js3_data_view_get_float64_builtin, js3_data_view_get_int16_builtin,
-    js3_data_view_get_int32_builtin, js3_data_view_get_int8_builtin,
-    js3_data_view_get_uint16_builtin, js3_data_view_get_uint32_builtin,
-    js3_data_view_get_uint8_builtin, js3_data_view_set_float32_builtin,
-    js3_data_view_set_float64_builtin, js3_data_view_set_int16_builtin,
-    js3_data_view_set_int32_builtin, js3_data_view_set_int8_builtin,
-    js3_data_view_set_uint16_builtin, js3_data_view_set_uint32_builtin,
-    js3_data_view_set_uint8_builtin, js3_date_builtin, js3_date_get_date_builtin,
-    js3_date_get_day_builtin, js3_date_get_full_year_builtin, js3_date_get_hours_builtin,
-    js3_date_get_milliseconds_builtin, js3_date_get_minutes_builtin, js3_date_get_month_builtin,
-    js3_date_get_seconds_builtin, js3_date_get_time_builtin, js3_date_get_timezone_offset_builtin,
-    js3_date_get_utc_date_builtin, js3_date_get_utc_day_builtin,
-    js3_date_get_utc_full_year_builtin, js3_date_get_utc_hours_builtin,
-    js3_date_get_utc_milliseconds_builtin, js3_date_get_utc_minutes_builtin,
-    js3_date_get_utc_month_builtin, js3_date_get_utc_seconds_builtin, js3_date_now_builtin,
-    js3_date_parse_builtin, js3_date_set_date_builtin, js3_date_set_full_year_builtin,
-    js3_date_set_hours_builtin, js3_date_set_milliseconds_builtin, js3_date_set_minutes_builtin,
-    js3_date_set_month_builtin, js3_date_set_seconds_builtin, js3_date_set_time_builtin,
-    js3_date_set_utc_date_builtin, js3_date_set_utc_full_year_builtin,
-    js3_date_set_utc_hours_builtin, js3_date_set_utc_milliseconds_builtin,
-    js3_date_set_utc_minutes_builtin, js3_date_set_utc_month_builtin,
-    js3_date_set_utc_seconds_builtin, js3_date_to_date_string_builtin,
-    js3_date_to_iso_string_builtin, js3_date_to_json_builtin,
-    js3_date_to_locale_date_string_builtin, js3_date_to_locale_string_builtin,
-    js3_date_to_locale_time_string_builtin, js3_date_to_primitive_builtin,
-    js3_date_to_string_builtin, js3_date_to_temporal_instant_builtin,
-    js3_date_to_time_string_builtin, js3_date_to_utc_string_builtin, js3_date_utc_builtin,
-    js3_date_value_of_builtin, js3_decode_uri_builtin, js3_decode_uri_component_builtin,
-    js3_disposable_stack_adopt_builtin, js3_disposable_stack_builtin,
-    js3_disposable_stack_defer_builtin, js3_disposable_stack_dispose_builtin,
-    js3_disposable_stack_disposed_getter_builtin, js3_disposable_stack_move_builtin,
-    js3_disposable_stack_use_builtin, js3_dispose_scope_async_builtin, js3_dispose_scope_builtin,
-    js3_encode_uri_builtin, js3_encode_uri_component_builtin, js3_error_builtin,
-    js3_error_to_string_builtin, js3_eval_builtin, js3_eval_error_builtin,
-    js3_finalization_registry_builtin, js3_finalization_registry_register_builtin,
-    js3_finalization_registry_unregister_builtin, js3_float32_array_builtin,
-    js3_float64_array_builtin, js3_function_apply_builtin, js3_function_bind_builtin,
-    js3_function_builtin, js3_function_call_builtin, js3_function_prototype_builtin,
-    js3_function_symbol_has_instance_builtin, js3_function_to_string_builtin,
-    js3_generator_function_builtin, js3_generator_next_builtin, js3_generator_return_builtin,
-    js3_generator_throw_builtin, js3_int16_array_builtin, js3_int32_array_builtin,
-    js3_int8_array_builtin, js3_is_finite_builtin, js3_is_nan_builtin,
-    js3_iterator_prototype_iterator_builtin, js3_json_is_raw_json_builtin, js3_json_parse_builtin,
-    js3_json_raw_json_builtin, js3_json_stringify_builtin, js3_map_builtin, js3_map_clear_builtin,
-    js3_map_delete_builtin, js3_map_entries_builtin, js3_map_for_each_builtin, js3_map_get_builtin,
-    js3_map_has_builtin, js3_map_iterator_next_builtin, js3_map_keys_builtin, js3_map_set_builtin,
-    js3_map_size_getter_builtin, js3_map_values_builtin, js3_math_abs_builtin,
-    js3_math_acos_builtin, js3_math_acosh_builtin, js3_math_asin_builtin, js3_math_asinh_builtin,
-    js3_math_atan2_builtin, js3_math_atan_builtin, js3_math_atanh_builtin, js3_math_cbrt_builtin,
-    js3_math_ceil_builtin, js3_math_clz32_builtin, js3_math_cos_builtin, js3_math_cosh_builtin,
-    js3_math_exp_builtin, js3_math_expm1_builtin, js3_math_f16round_builtin,
-    js3_math_floor_builtin, js3_math_fround_builtin, js3_math_hypot_builtin, js3_math_imul_builtin,
-    js3_math_log10_builtin, js3_math_log1p_builtin, js3_math_log2_builtin, js3_math_log_builtin,
-    js3_math_max_builtin, js3_math_min_builtin, js3_math_pow_builtin, js3_math_random_builtin,
-    js3_math_round_builtin, js3_math_sign_builtin, js3_math_sin_builtin, js3_math_sinh_builtin,
-    js3_math_sqrt_builtin, js3_math_sum_precise_builtin, js3_math_tan_builtin,
-    js3_math_tanh_builtin, js3_math_trunc_builtin, js3_number_builtin,
-    js3_number_is_finite_builtin, js3_number_is_integer_builtin, js3_number_is_nan_builtin,
-    js3_number_is_safe_integer_builtin, js3_number_to_exponential_builtin,
-    js3_number_to_fixed_builtin, js3_number_to_locale_string_builtin,
-    js3_number_to_precision_builtin, js3_number_to_string_builtin, js3_number_value_of_builtin,
-    js3_object_assign_builtin, js3_object_builtin, js3_object_create_builtin,
-    js3_object_define_getter_builtin, js3_object_define_properties_builtin,
-    js3_object_define_property_builtin, js3_object_define_setter_builtin,
-    js3_object_entries_builtin, js3_object_freeze_builtin, js3_object_from_entries_builtin,
-    js3_object_get_own_property_descriptor_builtin,
-    js3_object_get_own_property_descriptors_builtin, js3_object_get_own_property_names_builtin,
-    js3_object_get_own_property_symbols_builtin, js3_object_get_prototype_of_builtin,
-    js3_object_group_by_builtin, js3_object_has_own_builtin, js3_object_has_own_property_builtin,
-    js3_object_is_builtin, js3_object_is_extensible_builtin, js3_object_is_frozen_builtin,
-    js3_object_is_prototype_of_builtin, js3_object_is_sealed_builtin, js3_object_keys_builtin,
-    js3_object_lookup_getter_builtin, js3_object_lookup_setter_builtin,
-    js3_object_prevent_extensions_builtin, js3_object_property_is_enumerable_builtin,
-    js3_object_proto_getter_builtin, js3_object_proto_setter_builtin, js3_object_seal_builtin,
-    js3_object_set_prototype_of_builtin, js3_object_to_locale_string_builtin,
-    js3_object_to_string_builtin, js3_object_value_of_builtin, js3_object_values_builtin,
-    js3_parse_float_builtin, js3_parse_int_builtin, js3_promise_all_builtin,
-    js3_promise_all_resolve_element_builtin, js3_promise_all_settled_builtin,
-    js3_promise_all_settled_reject_element_builtin,
-    js3_promise_all_settled_resolve_element_builtin, js3_promise_any_builtin,
-    js3_promise_any_reject_element_builtin, js3_promise_builtin,
-    js3_promise_capability_executor_builtin, js3_promise_catch_builtin,
-    js3_promise_finally_builtin, js3_promise_finally_function_builtin, js3_promise_race_builtin,
-    js3_promise_reject_builtin, js3_promise_reject_function_builtin, js3_promise_resolve_builtin,
-    js3_promise_resolve_function_builtin, js3_promise_species_getter_builtin,
-    js3_promise_then_builtin, js3_proxy_builtin, js3_proxy_revocable_builtin,
-    js3_proxy_revoke_builtin, js3_range_error_builtin, js3_reference_error_builtin,
-    js3_reflect_apply_builtin, js3_reflect_construct_builtin, js3_reflect_define_property_builtin,
-    js3_reflect_delete_property_builtin, js3_reflect_get_builtin,
-    js3_reflect_get_own_property_descriptor_builtin, js3_reflect_get_prototype_of_builtin,
-    js3_reflect_has_builtin, js3_reflect_is_extensible_builtin, js3_reflect_own_keys_builtin,
-    js3_reflect_prevent_extensions_builtin, js3_reflect_set_builtin,
-    js3_reflect_set_prototype_of_builtin, js3_regexp_builtin, js3_regexp_dot_all_getter_builtin,
-    js3_regexp_escape_builtin, js3_regexp_exec_builtin, js3_regexp_flags_getter_builtin,
-    js3_regexp_global_getter_builtin, js3_regexp_has_indices_getter_builtin,
-    js3_regexp_ignore_case_getter_builtin, js3_regexp_multiline_getter_builtin,
-    js3_regexp_source_getter_builtin, js3_regexp_species_getter_builtin,
-    js3_regexp_sticky_getter_builtin, js3_regexp_symbol_match_all_builtin,
-    js3_regexp_symbol_match_builtin, js3_regexp_symbol_replace_builtin,
-    js3_regexp_symbol_search_builtin, js3_regexp_symbol_split_builtin, js3_regexp_test_builtin,
-    js3_regexp_to_string_builtin, js3_regexp_unicode_getter_builtin, js3_set_add_builtin,
-    js3_set_builtin, js3_set_clear_builtin, js3_set_delete_builtin, js3_set_entries_builtin,
-    js3_set_for_each_builtin, js3_set_has_builtin, js3_set_iterator_next_builtin,
-    js3_set_keys_builtin, js3_set_size_getter_builtin, js3_set_values_builtin,
-    js3_shared_array_buffer_builtin, js3_shared_array_buffer_byte_length_getter_builtin,
-    js3_shared_array_buffer_slice_builtin, js3_string_at_builtin, js3_string_builtin,
-    js3_string_char_at_builtin, js3_string_char_code_at_builtin, js3_string_code_point_at_builtin,
-    js3_string_concat_builtin, js3_string_ends_with_builtin, js3_string_from_char_code_builtin,
-    js3_string_from_code_point_builtin, js3_string_includes_builtin, js3_string_index_of_builtin,
-    js3_string_is_well_formed_builtin, js3_string_iterator_builtin,
-    js3_string_iterator_next_builtin, js3_string_last_index_of_builtin,
-    js3_string_locale_compare_builtin, js3_string_match_all_builtin, js3_string_match_builtin,
-    js3_string_normalize_builtin, js3_string_pad_end_builtin, js3_string_pad_start_builtin,
-    js3_string_raw_builtin, js3_string_repeat_builtin, js3_string_replace_all_builtin,
-    js3_string_replace_builtin, js3_string_search_builtin, js3_string_slice_builtin,
-    js3_string_split_builtin, js3_string_starts_with_builtin, js3_string_substring_builtin,
-    js3_string_to_locale_lower_case_builtin, js3_string_to_locale_upper_case_builtin,
-    js3_string_to_lower_case_builtin, js3_string_to_string_builtin,
-    js3_string_to_upper_case_builtin, js3_string_to_well_formed_builtin, js3_string_trim_builtin,
-    js3_string_trim_end_builtin, js3_string_trim_start_builtin, js3_string_value_of_builtin,
-    js3_suppressed_error_builtin, js3_symbol_builtin, js3_symbol_description_getter_builtin,
-    js3_symbol_for_builtin, js3_symbol_key_for_builtin, js3_symbol_to_primitive_builtin,
-    js3_symbol_to_string_builtin, js3_symbol_value_of_builtin, js3_syntax_error_builtin,
-    js3_type_error_builtin, js3_typed_array_at_builtin, js3_typed_array_builtin,
-    js3_typed_array_copy_within_builtin, js3_typed_array_every_builtin,
-    js3_typed_array_fill_builtin, js3_typed_array_filter_builtin, js3_typed_array_find_builtin,
-    js3_typed_array_find_index_builtin, js3_typed_array_find_last_builtin,
-    js3_typed_array_find_last_index_builtin, js3_typed_array_for_each_builtin,
-    js3_typed_array_from_builtin, js3_typed_array_includes_builtin,
-    js3_typed_array_index_of_builtin, js3_typed_array_join_builtin,
-    js3_typed_array_last_index_of_builtin, js3_typed_array_map_builtin, js3_typed_array_of_builtin,
-    js3_typed_array_reduce_builtin, js3_typed_array_reduce_right_builtin,
-    js3_typed_array_reverse_builtin, js3_typed_array_some_builtin, js3_typed_array_sort_builtin,
-    js3_typed_array_to_locale_string_builtin, js3_typed_array_to_reversed_builtin,
-    js3_typed_array_to_sorted_builtin, js3_typed_array_to_string_builtin,
-    js3_typed_array_to_string_tag_getter_builtin, js3_typed_array_with_builtin,
-    js3_uint16_array_builtin, js3_uint32_array_builtin, js3_uint8_array_buffer_getter_builtin,
-    js3_uint8_array_builtin, js3_uint8_array_byte_length_getter_builtin,
-    js3_uint8_array_byte_offset_getter_builtin, js3_uint8_array_entries_builtin,
-    js3_uint8_array_keys_builtin, js3_uint8_array_length_getter_builtin,
-    js3_uint8_array_set_builtin, js3_uint8_array_slice_builtin, js3_uint8_array_subarray_builtin,
-    js3_uint8_array_values_builtin, js3_uint8_clamped_array_builtin, js3_uri_error_builtin,
-    js3_weak_map_builtin, js3_weak_map_delete_builtin, js3_weak_map_get_builtin,
-    js3_weak_map_has_builtin, js3_weak_map_set_builtin, js3_weak_ref_builtin,
-    js3_weak_ref_deref_builtin, js3_weak_set_add_builtin, js3_weak_set_builtin,
-    js3_weak_set_delete_builtin, js3_weak_set_has_builtin, BuiltinFunctionId,
+    abstract_module_source_builtin, abstract_module_source_to_string_tag_getter_builtin,
+    add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin,
+    aggregate_error_builtin, array_at_builtin, array_buffer_builtin,
+    array_buffer_byte_length_getter_builtin, array_buffer_is_view_builtin,
+    array_buffer_slice_builtin, array_builtin, array_concat_builtin, array_copy_within_builtin,
+    array_entries_builtin, array_every_builtin, array_fill_builtin, array_filter_builtin,
+    array_find_builtin, array_find_index_builtin, array_find_last_builtin,
+    array_find_last_index_builtin, array_flat_builtin, array_flat_map_builtin,
+    array_for_each_builtin, array_from_async_builtin, array_from_builtin, array_includes_builtin,
+    array_index_of_builtin, array_is_array_builtin, array_iterator_next_builtin,
+    array_join_builtin, array_keys_builtin, array_last_index_of_builtin, array_map_builtin,
+    array_of_builtin, array_pop_builtin, array_push_builtin, array_reduce_builtin,
+    array_reduce_right_builtin, array_reverse_builtin, array_shift_builtin, array_slice_builtin,
+    array_some_builtin, array_sort_builtin, array_species_getter_builtin, array_splice_builtin,
+    array_to_locale_string_builtin, array_to_reversed_builtin, array_to_sorted_builtin,
+    array_to_spliced_builtin, array_to_string_builtin, array_unshift_builtin, array_values_builtin,
+    array_with_builtin, async_disposable_stack_adopt_builtin, async_disposable_stack_builtin,
+    async_disposable_stack_defer_builtin, async_disposable_stack_dispose_async_builtin,
+    async_disposable_stack_disposed_getter_builtin, async_disposable_stack_move_builtin,
+    async_disposable_stack_use_builtin, async_disposal_resume_builtin, async_function_builtin,
+    async_generator_function_builtin, async_generator_next_builtin, async_generator_return_builtin,
+    async_generator_throw_builtin, atomics_add_builtin, atomics_and_builtin,
+    atomics_compare_exchange_builtin, atomics_exchange_builtin, atomics_is_lock_free_builtin,
+    atomics_load_builtin, atomics_notify_builtin, atomics_or_builtin, atomics_store_builtin,
+    atomics_sub_builtin, atomics_wait_async_builtin, atomics_wait_builtin, atomics_xor_builtin,
+    big_int64_array_builtin, big_uint64_array_builtin, bigint_as_int_n_builtin,
+    bigint_as_uint_n_builtin, bigint_builtin, bigint_to_string_builtin, bigint_value_of_builtin,
+    boolean_builtin, boolean_to_string_builtin, boolean_value_of_builtin,
+    create_async_disposal_scope_builtin, create_sync_disposal_scope_builtin,
+    data_view_buffer_getter_builtin, data_view_builtin, data_view_byte_length_getter_builtin,
+    data_view_byte_offset_getter_builtin, data_view_get_float32_builtin,
+    data_view_get_float64_builtin, data_view_get_int16_builtin, data_view_get_int32_builtin,
+    data_view_get_int8_builtin, data_view_get_uint16_builtin, data_view_get_uint32_builtin,
+    data_view_get_uint8_builtin, data_view_set_float32_builtin, data_view_set_float64_builtin,
+    data_view_set_int16_builtin, data_view_set_int32_builtin, data_view_set_int8_builtin,
+    data_view_set_uint16_builtin, data_view_set_uint32_builtin, data_view_set_uint8_builtin,
+    date_builtin, date_get_date_builtin, date_get_day_builtin, date_get_full_year_builtin,
+    date_get_hours_builtin, date_get_milliseconds_builtin, date_get_minutes_builtin,
+    date_get_month_builtin, date_get_seconds_builtin, date_get_time_builtin,
+    date_get_timezone_offset_builtin, date_get_utc_date_builtin, date_get_utc_day_builtin,
+    date_get_utc_full_year_builtin, date_get_utc_hours_builtin, date_get_utc_milliseconds_builtin,
+    date_get_utc_minutes_builtin, date_get_utc_month_builtin, date_get_utc_seconds_builtin,
+    date_now_builtin, date_parse_builtin, date_set_date_builtin, date_set_full_year_builtin,
+    date_set_hours_builtin, date_set_milliseconds_builtin, date_set_minutes_builtin,
+    date_set_month_builtin, date_set_seconds_builtin, date_set_time_builtin,
+    date_set_utc_date_builtin, date_set_utc_full_year_builtin, date_set_utc_hours_builtin,
+    date_set_utc_milliseconds_builtin, date_set_utc_minutes_builtin, date_set_utc_month_builtin,
+    date_set_utc_seconds_builtin, date_to_date_string_builtin, date_to_iso_string_builtin,
+    date_to_json_builtin, date_to_locale_date_string_builtin, date_to_locale_string_builtin,
+    date_to_locale_time_string_builtin, date_to_primitive_builtin, date_to_string_builtin,
+    date_to_temporal_instant_builtin, date_to_time_string_builtin, date_to_utc_string_builtin,
+    date_utc_builtin, date_value_of_builtin, decode_uri_builtin, decode_uri_component_builtin,
+    disposable_stack_adopt_builtin, disposable_stack_builtin, disposable_stack_defer_builtin,
+    disposable_stack_dispose_builtin, disposable_stack_disposed_getter_builtin,
+    disposable_stack_move_builtin, disposable_stack_use_builtin, dispose_scope_async_builtin,
+    dispose_scope_builtin, encode_uri_builtin, encode_uri_component_builtin, error_builtin,
+    error_to_string_builtin, eval_builtin, eval_error_builtin, finalization_registry_builtin,
+    finalization_registry_register_builtin, finalization_registry_unregister_builtin,
+    float32_array_builtin, float64_array_builtin, function_apply_builtin, function_bind_builtin,
+    function_builtin, function_call_builtin, function_prototype_builtin,
+    function_symbol_has_instance_builtin, function_to_string_builtin, generator_function_builtin,
+    generator_next_builtin, generator_return_builtin, generator_throw_builtin, int16_array_builtin,
+    int32_array_builtin, int8_array_builtin, is_finite_builtin, is_nan_builtin,
+    iterator_prototype_iterator_builtin, json_is_raw_json_builtin, json_parse_builtin,
+    json_raw_json_builtin, json_stringify_builtin, map_builtin, map_clear_builtin,
+    map_delete_builtin, map_entries_builtin, map_for_each_builtin, map_get_builtin,
+    map_has_builtin, map_iterator_next_builtin, map_keys_builtin, map_set_builtin,
+    map_size_getter_builtin, map_values_builtin, math_abs_builtin, math_acos_builtin,
+    math_acosh_builtin, math_asin_builtin, math_asinh_builtin, math_atan2_builtin,
+    math_atan_builtin, math_atanh_builtin, math_cbrt_builtin, math_ceil_builtin,
+    math_clz32_builtin, math_cos_builtin, math_cosh_builtin, math_exp_builtin, math_expm1_builtin,
+    math_f16round_builtin, math_floor_builtin, math_fround_builtin, math_hypot_builtin,
+    math_imul_builtin, math_log10_builtin, math_log1p_builtin, math_log2_builtin, math_log_builtin,
+    math_max_builtin, math_min_builtin, math_pow_builtin, math_random_builtin, math_round_builtin,
+    math_sign_builtin, math_sin_builtin, math_sinh_builtin, math_sqrt_builtin,
+    math_sum_precise_builtin, math_tan_builtin, math_tanh_builtin, math_trunc_builtin,
+    number_builtin, number_is_finite_builtin, number_is_integer_builtin, number_is_nan_builtin,
+    number_is_safe_integer_builtin, number_to_exponential_builtin, number_to_fixed_builtin,
+    number_to_locale_string_builtin, number_to_precision_builtin, number_to_string_builtin,
+    number_value_of_builtin, object_assign_builtin, object_builtin, object_create_builtin,
+    object_define_getter_builtin, object_define_properties_builtin, object_define_property_builtin,
+    object_define_setter_builtin, object_entries_builtin, object_freeze_builtin,
+    object_from_entries_builtin, object_get_own_property_descriptor_builtin,
+    object_get_own_property_descriptors_builtin, object_get_own_property_names_builtin,
+    object_get_own_property_symbols_builtin, object_get_prototype_of_builtin,
+    object_group_by_builtin, object_has_own_builtin, object_has_own_property_builtin,
+    object_is_builtin, object_is_extensible_builtin, object_is_frozen_builtin,
+    object_is_prototype_of_builtin, object_is_sealed_builtin, object_keys_builtin,
+    object_lookup_getter_builtin, object_lookup_setter_builtin, object_prevent_extensions_builtin,
+    object_property_is_enumerable_builtin, object_proto_getter_builtin,
+    object_proto_setter_builtin, object_seal_builtin, object_set_prototype_of_builtin,
+    object_to_locale_string_builtin, object_to_string_builtin, object_value_of_builtin,
+    object_values_builtin, parse_float_builtin, parse_int_builtin, promise_all_builtin,
+    promise_all_resolve_element_builtin, promise_all_settled_builtin,
+    promise_all_settled_reject_element_builtin, promise_all_settled_resolve_element_builtin,
+    promise_any_builtin, promise_any_reject_element_builtin, promise_builtin,
+    promise_capability_executor_builtin, promise_catch_builtin, promise_finally_builtin,
+    promise_finally_function_builtin, promise_race_builtin, promise_reject_builtin,
+    promise_reject_function_builtin, promise_resolve_builtin, promise_resolve_function_builtin,
+    promise_species_getter_builtin, promise_then_builtin, proxy_builtin, proxy_revocable_builtin,
+    proxy_revoke_builtin, range_error_builtin, reference_error_builtin, reflect_apply_builtin,
+    reflect_construct_builtin, reflect_define_property_builtin, reflect_delete_property_builtin,
+    reflect_get_builtin, reflect_get_own_property_descriptor_builtin,
+    reflect_get_prototype_of_builtin, reflect_has_builtin, reflect_is_extensible_builtin,
+    reflect_own_keys_builtin, reflect_prevent_extensions_builtin, reflect_set_builtin,
+    reflect_set_prototype_of_builtin, regexp_builtin, regexp_dot_all_getter_builtin,
+    regexp_escape_builtin, regexp_exec_builtin, regexp_flags_getter_builtin,
+    regexp_global_getter_builtin, regexp_has_indices_getter_builtin,
+    regexp_ignore_case_getter_builtin, regexp_multiline_getter_builtin,
+    regexp_source_getter_builtin, regexp_species_getter_builtin, regexp_sticky_getter_builtin,
+    regexp_symbol_match_all_builtin, regexp_symbol_match_builtin, regexp_symbol_replace_builtin,
+    regexp_symbol_search_builtin, regexp_symbol_split_builtin, regexp_test_builtin,
+    regexp_to_string_builtin, regexp_unicode_getter_builtin, set_add_builtin, set_builtin,
+    set_clear_builtin, set_delete_builtin, set_entries_builtin, set_for_each_builtin,
+    set_has_builtin, set_iterator_next_builtin, set_keys_builtin, set_size_getter_builtin,
+    set_values_builtin, shared_array_buffer_builtin,
+    shared_array_buffer_byte_length_getter_builtin, shared_array_buffer_slice_builtin,
+    string_at_builtin, string_builtin, string_char_at_builtin, string_char_code_at_builtin,
+    string_code_point_at_builtin, string_concat_builtin, string_ends_with_builtin,
+    string_from_char_code_builtin, string_from_code_point_builtin, string_includes_builtin,
+    string_index_of_builtin, string_is_well_formed_builtin, string_iterator_builtin,
+    string_iterator_next_builtin, string_last_index_of_builtin, string_locale_compare_builtin,
+    string_match_all_builtin, string_match_builtin, string_normalize_builtin,
+    string_pad_end_builtin, string_pad_start_builtin, string_raw_builtin, string_repeat_builtin,
+    string_replace_all_builtin, string_replace_builtin, string_search_builtin,
+    string_slice_builtin, string_split_builtin, string_starts_with_builtin,
+    string_substring_builtin, string_to_locale_lower_case_builtin,
+    string_to_locale_upper_case_builtin, string_to_lower_case_builtin, string_to_string_builtin,
+    string_to_upper_case_builtin, string_to_well_formed_builtin, string_trim_builtin,
+    string_trim_end_builtin, string_trim_start_builtin, string_value_of_builtin,
+    suppressed_error_builtin, symbol_builtin, symbol_description_getter_builtin,
+    symbol_for_builtin, symbol_key_for_builtin, symbol_to_primitive_builtin,
+    symbol_to_string_builtin, symbol_value_of_builtin, syntax_error_builtin, type_error_builtin,
+    typed_array_at_builtin, typed_array_builtin, typed_array_copy_within_builtin,
+    typed_array_every_builtin, typed_array_fill_builtin, typed_array_filter_builtin,
+    typed_array_find_builtin, typed_array_find_index_builtin, typed_array_find_last_builtin,
+    typed_array_find_last_index_builtin, typed_array_for_each_builtin, typed_array_from_builtin,
+    typed_array_includes_builtin, typed_array_index_of_builtin, typed_array_join_builtin,
+    typed_array_last_index_of_builtin, typed_array_map_builtin, typed_array_of_builtin,
+    typed_array_reduce_builtin, typed_array_reduce_right_builtin, typed_array_reverse_builtin,
+    typed_array_some_builtin, typed_array_sort_builtin, typed_array_to_locale_string_builtin,
+    typed_array_to_reversed_builtin, typed_array_to_sorted_builtin, typed_array_to_string_builtin,
+    typed_array_to_string_tag_getter_builtin, typed_array_with_builtin, uint16_array_builtin,
+    uint32_array_builtin, uint8_array_buffer_getter_builtin, uint8_array_builtin,
+    uint8_array_byte_length_getter_builtin, uint8_array_byte_offset_getter_builtin,
+    uint8_array_entries_builtin, uint8_array_keys_builtin, uint8_array_length_getter_builtin,
+    uint8_array_set_builtin, uint8_array_slice_builtin, uint8_array_subarray_builtin,
+    uint8_array_values_builtin, uint8_clamped_array_builtin, uri_error_builtin, weak_map_builtin,
+    weak_map_delete_builtin, weak_map_get_builtin, weak_map_has_builtin, weak_map_set_builtin,
+    weak_ref_builtin, weak_ref_deref_builtin, weak_set_add_builtin, weak_set_builtin,
+    weak_set_delete_builtin, weak_set_has_builtin, BuiltinFunctionId,
 };
 
 /// Compatibility metadata for the public core builtin namespace.
@@ -211,1951 +179,1945 @@ impl PublicBuiltinMetadataRow {
 
 const PUBLIC_OBJECT_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_object_builtin,
+        object_builtin,
         BuiltinEntryMetadata::new("Object", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_create_builtin,
+        object_create_builtin,
         BuiltinEntryMetadata::new("create", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_get_prototype_of_builtin,
+        object_get_prototype_of_builtin,
         BuiltinEntryMetadata::new("getPrototypeOf", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_set_prototype_of_builtin,
+        object_set_prototype_of_builtin,
         BuiltinEntryMetadata::new("setPrototypeOf", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_get_own_property_descriptor_builtin,
+        object_get_own_property_descriptor_builtin,
         BuiltinEntryMetadata::new("getOwnPropertyDescriptor", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_get_own_property_descriptors_builtin,
+        object_get_own_property_descriptors_builtin,
         BuiltinEntryMetadata::new("getOwnPropertyDescriptors", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_get_own_property_names_builtin,
+        object_get_own_property_names_builtin,
         BuiltinEntryMetadata::new("getOwnPropertyNames", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_get_own_property_symbols_builtin,
+        object_get_own_property_symbols_builtin,
         BuiltinEntryMetadata::new("getOwnPropertySymbols", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_define_properties_builtin,
+        object_define_properties_builtin,
         BuiltinEntryMetadata::new("defineProperties", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_define_property_builtin,
+        object_define_property_builtin,
         BuiltinEntryMetadata::new("defineProperty", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_assign_builtin,
+        object_assign_builtin,
         BuiltinEntryMetadata::new("assign", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_from_entries_builtin,
+        object_from_entries_builtin,
         BuiltinEntryMetadata::new("fromEntries", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_group_by_builtin,
+        object_group_by_builtin,
         BuiltinEntryMetadata::new("groupBy", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_prevent_extensions_builtin,
+        object_prevent_extensions_builtin,
         BuiltinEntryMetadata::new("preventExtensions", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_is_extensible_builtin,
+        object_is_extensible_builtin,
         BuiltinEntryMetadata::new("isExtensible", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_is_builtin,
+        object_is_builtin,
         BuiltinEntryMetadata::new("is", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_seal_builtin,
+        object_seal_builtin,
         BuiltinEntryMetadata::new("seal", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_freeze_builtin,
+        object_freeze_builtin,
         BuiltinEntryMetadata::new("freeze", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_is_sealed_builtin,
+        object_is_sealed_builtin,
         BuiltinEntryMetadata::new("isSealed", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_is_frozen_builtin,
+        object_is_frozen_builtin,
         BuiltinEntryMetadata::new("isFrozen", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_to_locale_string_builtin,
+        object_to_locale_string_builtin,
         BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_to_string_builtin,
+        object_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_value_of_builtin,
+        object_value_of_builtin,
         BuiltinEntryMetadata::new("valueOf", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_has_own_property_builtin,
+        object_has_own_property_builtin,
         BuiltinEntryMetadata::new("hasOwnProperty", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_is_prototype_of_builtin,
+        object_is_prototype_of_builtin,
         BuiltinEntryMetadata::new("isPrototypeOf", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_property_is_enumerable_builtin,
+        object_property_is_enumerable_builtin,
         BuiltinEntryMetadata::new("propertyIsEnumerable", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_define_getter_builtin,
+        object_define_getter_builtin,
         BuiltinEntryMetadata::new("__defineGetter__", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_define_setter_builtin,
+        object_define_setter_builtin,
         BuiltinEntryMetadata::new("__defineSetter__", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_lookup_getter_builtin,
+        object_lookup_getter_builtin,
         BuiltinEntryMetadata::new("__lookupGetter__", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_lookup_setter_builtin,
+        object_lookup_setter_builtin,
         BuiltinEntryMetadata::new("__lookupSetter__", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_proto_getter_builtin,
+        object_proto_getter_builtin,
         BuiltinEntryMetadata::new("get __proto__", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_proto_setter_builtin,
+        object_proto_setter_builtin,
         BuiltinEntryMetadata::new("set __proto__", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_keys_builtin,
+        object_keys_builtin,
         BuiltinEntryMetadata::new("keys", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_entries_builtin,
+        object_entries_builtin,
         BuiltinEntryMetadata::new("entries", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_values_builtin,
+        object_values_builtin,
         BuiltinEntryMetadata::new("values", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_object_has_own_builtin,
+        object_has_own_builtin,
         BuiltinEntryMetadata::new("hasOwn", 2, false, false),
     ),
 ];
 
 const PUBLIC_FUNCTION_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_function_builtin,
+        function_builtin,
         BuiltinEntryMetadata::new("Function", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_function_prototype_builtin,
+        function_prototype_builtin,
         BuiltinEntryMetadata::new("", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_function_call_builtin,
+        function_call_builtin,
         BuiltinEntryMetadata::new("call", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_function_apply_builtin,
+        function_apply_builtin,
         BuiltinEntryMetadata::new("apply", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_function_bind_builtin,
+        function_bind_builtin,
         BuiltinEntryMetadata::new("bind", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_function_to_string_builtin,
+        function_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_function_symbol_has_instance_builtin,
+        function_symbol_has_instance_builtin,
         BuiltinEntryMetadata::new("[Symbol.hasInstance]", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_function_builtin,
+        async_function_builtin,
         BuiltinEntryMetadata::new("AsyncFunction", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_generator_function_builtin,
+        async_generator_function_builtin,
         BuiltinEntryMetadata::new("AsyncGeneratorFunction", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_generator_next_builtin,
+        async_generator_next_builtin,
         BuiltinEntryMetadata::new("next", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_generator_return_builtin,
+        async_generator_return_builtin,
         BuiltinEntryMetadata::new("return", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_generator_throw_builtin,
+        async_generator_throw_builtin,
         BuiltinEntryMetadata::new("throw", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_generator_function_builtin,
+        generator_function_builtin,
         BuiltinEntryMetadata::new("GeneratorFunction", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_generator_next_builtin,
+        generator_next_builtin,
         BuiltinEntryMetadata::new("next", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_generator_return_builtin,
+        generator_return_builtin,
         BuiltinEntryMetadata::new("return", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_generator_throw_builtin,
+        generator_throw_builtin,
         BuiltinEntryMetadata::new("throw", 1, false, false),
     ),
 ];
 
 const PUBLIC_ARRAY_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_array_builtin,
+        array_builtin,
         BuiltinEntryMetadata::new("Array", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_from_builtin,
+        array_from_builtin,
         BuiltinEntryMetadata::new("from", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_from_async_builtin,
+        array_from_async_builtin,
         BuiltinEntryMetadata::new("fromAsync", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_of_builtin,
+        array_of_builtin,
         BuiltinEntryMetadata::new("of", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_is_array_builtin,
+        array_is_array_builtin,
         BuiltinEntryMetadata::new("isArray", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_at_builtin,
+        array_at_builtin,
         BuiltinEntryMetadata::new("at", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_concat_builtin,
+        array_concat_builtin,
         BuiltinEntryMetadata::new("concat", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_copy_within_builtin,
+        array_copy_within_builtin,
         BuiltinEntryMetadata::new("copyWithin", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_fill_builtin,
+        array_fill_builtin,
         BuiltinEntryMetadata::new("fill", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_join_builtin,
+        array_join_builtin,
         BuiltinEntryMetadata::new("join", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_pop_builtin,
+        array_pop_builtin,
         BuiltinEntryMetadata::new("pop", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_push_builtin,
+        array_push_builtin,
         BuiltinEntryMetadata::new("push", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_shift_builtin,
+        array_shift_builtin,
         BuiltinEntryMetadata::new("shift", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_unshift_builtin,
+        array_unshift_builtin,
         BuiltinEntryMetadata::new("unshift", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_every_builtin,
+        array_every_builtin,
         BuiltinEntryMetadata::new("every", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_filter_builtin,
+        array_filter_builtin,
         BuiltinEntryMetadata::new("filter", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_flat_builtin,
+        array_flat_builtin,
         BuiltinEntryMetadata::new("flat", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_flat_map_builtin,
+        array_flat_map_builtin,
         BuiltinEntryMetadata::new("flatMap", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_find_builtin,
+        array_find_builtin,
         BuiltinEntryMetadata::new("find", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_find_index_builtin,
+        array_find_index_builtin,
         BuiltinEntryMetadata::new("findIndex", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_find_last_builtin,
+        array_find_last_builtin,
         BuiltinEntryMetadata::new("findLast", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_find_last_index_builtin,
+        array_find_last_index_builtin,
         BuiltinEntryMetadata::new("findLastIndex", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_for_each_builtin,
+        array_for_each_builtin,
         BuiltinEntryMetadata::new("forEach", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_includes_builtin,
+        array_includes_builtin,
         BuiltinEntryMetadata::new("includes", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_index_of_builtin,
+        array_index_of_builtin,
         BuiltinEntryMetadata::new("indexOf", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_map_builtin,
+        array_map_builtin,
         BuiltinEntryMetadata::new("map", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_reduce_builtin,
+        array_reduce_builtin,
         BuiltinEntryMetadata::new("reduce", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_reduce_right_builtin,
+        array_reduce_right_builtin,
         BuiltinEntryMetadata::new("reduceRight", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_reverse_builtin,
+        array_reverse_builtin,
         BuiltinEntryMetadata::new("reverse", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_slice_builtin,
+        array_slice_builtin,
         BuiltinEntryMetadata::new("slice", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_some_builtin,
+        array_some_builtin,
         BuiltinEntryMetadata::new("some", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_last_index_of_builtin,
+        array_last_index_of_builtin,
         BuiltinEntryMetadata::new("lastIndexOf", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_sort_builtin,
+        array_sort_builtin,
         BuiltinEntryMetadata::new("sort", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_splice_builtin,
+        array_splice_builtin,
         BuiltinEntryMetadata::new("splice", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_to_reversed_builtin,
+        array_to_reversed_builtin,
         BuiltinEntryMetadata::new("toReversed", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_to_sorted_builtin,
+        array_to_sorted_builtin,
         BuiltinEntryMetadata::new("toSorted", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_to_spliced_builtin,
+        array_to_spliced_builtin,
         BuiltinEntryMetadata::new("toSpliced", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_to_string_builtin,
+        array_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_to_locale_string_builtin,
+        array_to_locale_string_builtin,
         BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_values_builtin,
+        array_values_builtin,
         BuiltinEntryMetadata::new("values", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_keys_builtin,
+        array_keys_builtin,
         BuiltinEntryMetadata::new("keys", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_entries_builtin,
+        array_entries_builtin,
         BuiltinEntryMetadata::new("entries", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_with_builtin,
+        array_with_builtin,
         BuiltinEntryMetadata::new("with", 2, false, false),
     ),
 ];
 
 const PUBLIC_KEYED_COLLECTION_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(map_builtin, BuiltinEntryMetadata::new("Map", 0, true, true)),
+    PublicBuiltinMetadataRow::new(set_builtin, BuiltinEntryMetadata::new("Set", 0, true, true)),
     PublicBuiltinMetadataRow::new(
-        js3_map_builtin,
-        BuiltinEntryMetadata::new("Map", 0, true, true),
-    ),
-    PublicBuiltinMetadataRow::new(
-        js3_set_builtin,
-        BuiltinEntryMetadata::new("Set", 0, true, true),
-    ),
-    PublicBuiltinMetadataRow::new(
-        js3_weak_map_builtin,
+        weak_map_builtin,
         BuiltinEntryMetadata::new("WeakMap", 0, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_weak_set_builtin,
+        weak_set_builtin,
         BuiltinEntryMetadata::new("WeakSet", 0, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_get_builtin,
+        map_get_builtin,
         BuiltinEntryMetadata::new("get", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_set_builtin,
+        map_set_builtin,
         BuiltinEntryMetadata::new("set", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_has_builtin,
+        map_has_builtin,
         BuiltinEntryMetadata::new("has", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_delete_builtin,
+        map_delete_builtin,
         BuiltinEntryMetadata::new("delete", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_clear_builtin,
+        map_clear_builtin,
         BuiltinEntryMetadata::new("clear", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_entries_builtin,
+        map_entries_builtin,
         BuiltinEntryMetadata::new("entries", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_values_builtin,
+        map_values_builtin,
         BuiltinEntryMetadata::new("values", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_keys_builtin,
+        map_keys_builtin,
         BuiltinEntryMetadata::new("keys", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_for_each_builtin,
+        map_for_each_builtin,
         BuiltinEntryMetadata::new("forEach", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_size_getter_builtin,
+        map_size_getter_builtin,
         BuiltinEntryMetadata::new("get size", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_set_add_builtin,
+        set_add_builtin,
         BuiltinEntryMetadata::new("add", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_set_has_builtin,
+        set_has_builtin,
         BuiltinEntryMetadata::new("has", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_set_delete_builtin,
+        set_delete_builtin,
         BuiltinEntryMetadata::new("delete", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_set_clear_builtin,
+        set_clear_builtin,
         BuiltinEntryMetadata::new("clear", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_set_entries_builtin,
+        set_entries_builtin,
         BuiltinEntryMetadata::new("entries", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_set_values_builtin,
+        set_values_builtin,
         BuiltinEntryMetadata::new("values", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_set_keys_builtin,
+        set_keys_builtin,
         BuiltinEntryMetadata::new("keys", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_set_for_each_builtin,
+        set_for_each_builtin,
         BuiltinEntryMetadata::new("forEach", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_set_size_getter_builtin,
+        set_size_getter_builtin,
         BuiltinEntryMetadata::new("get size", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_weak_map_get_builtin,
+        weak_map_get_builtin,
         BuiltinEntryMetadata::new("get", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_weak_map_set_builtin,
+        weak_map_set_builtin,
         BuiltinEntryMetadata::new("set", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_weak_map_has_builtin,
+        weak_map_has_builtin,
         BuiltinEntryMetadata::new("has", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_weak_map_delete_builtin,
+        weak_map_delete_builtin,
         BuiltinEntryMetadata::new("delete", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_weak_set_add_builtin,
+        weak_set_add_builtin,
         BuiltinEntryMetadata::new("add", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_weak_set_has_builtin,
+        weak_set_has_builtin,
         BuiltinEntryMetadata::new("has", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_weak_set_delete_builtin,
+        weak_set_delete_builtin,
         BuiltinEntryMetadata::new("delete", 1, false, false),
     ),
 ];
 
 const PUBLIC_WEAK_REF_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_weak_ref_builtin,
+        weak_ref_builtin,
         BuiltinEntryMetadata::new("WeakRef", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_finalization_registry_builtin,
+        finalization_registry_builtin,
         BuiltinEntryMetadata::new("FinalizationRegistry", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_weak_ref_deref_builtin,
+        weak_ref_deref_builtin,
         BuiltinEntryMetadata::new("deref", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_finalization_registry_register_builtin,
+        finalization_registry_register_builtin,
         BuiltinEntryMetadata::new("register", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_finalization_registry_unregister_builtin,
+        finalization_registry_unregister_builtin,
         BuiltinEntryMetadata::new("unregister", 1, false, false),
     ),
 ];
 
 const PUBLIC_BINARY_DATA_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_array_buffer_builtin,
+        array_buffer_builtin,
         BuiltinEntryMetadata::new("ArrayBuffer", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_buffer_is_view_builtin,
+        array_buffer_is_view_builtin,
         BuiltinEntryMetadata::new("isView", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_shared_array_buffer_builtin,
+        shared_array_buffer_builtin,
         BuiltinEntryMetadata::new("SharedArrayBuffer", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_builtin,
+        data_view_builtin,
         BuiltinEntryMetadata::new("DataView", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_builtin,
+        typed_array_builtin,
         BuiltinEntryMetadata::new("TypedArray", 0, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_from_builtin,
+        typed_array_from_builtin,
         BuiltinEntryMetadata::new("from", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_of_builtin,
+        typed_array_of_builtin,
         BuiltinEntryMetadata::new("of", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_every_builtin,
+        typed_array_every_builtin,
         BuiltinEntryMetadata::new("every", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_some_builtin,
+        typed_array_some_builtin,
         BuiltinEntryMetadata::new("some", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_find_builtin,
+        typed_array_find_builtin,
         BuiltinEntryMetadata::new("find", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_find_index_builtin,
+        typed_array_find_index_builtin,
         BuiltinEntryMetadata::new("findIndex", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_find_last_builtin,
+        typed_array_find_last_builtin,
         BuiltinEntryMetadata::new("findLast", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_find_last_index_builtin,
+        typed_array_find_last_index_builtin,
         BuiltinEntryMetadata::new("findLastIndex", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_fill_builtin,
+        typed_array_fill_builtin,
         BuiltinEntryMetadata::new("fill", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_copy_within_builtin,
+        typed_array_copy_within_builtin,
         BuiltinEntryMetadata::new("copyWithin", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_filter_builtin,
+        typed_array_filter_builtin,
         BuiltinEntryMetadata::new("filter", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_for_each_builtin,
+        typed_array_for_each_builtin,
         BuiltinEntryMetadata::new("forEach", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_includes_builtin,
+        typed_array_includes_builtin,
         BuiltinEntryMetadata::new("includes", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_index_of_builtin,
+        typed_array_index_of_builtin,
         BuiltinEntryMetadata::new("indexOf", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_join_builtin,
+        typed_array_join_builtin,
         BuiltinEntryMetadata::new("join", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_last_index_of_builtin,
+        typed_array_last_index_of_builtin,
         BuiltinEntryMetadata::new("lastIndexOf", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_map_builtin,
+        typed_array_map_builtin,
         BuiltinEntryMetadata::new("map", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_reduce_builtin,
+        typed_array_reduce_builtin,
         BuiltinEntryMetadata::new("reduce", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_reduce_right_builtin,
+        typed_array_reduce_right_builtin,
         BuiltinEntryMetadata::new("reduceRight", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_reverse_builtin,
+        typed_array_reverse_builtin,
         BuiltinEntryMetadata::new("reverse", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_sort_builtin,
+        typed_array_sort_builtin,
         BuiltinEntryMetadata::new("sort", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_to_locale_string_builtin,
+        typed_array_to_locale_string_builtin,
         BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_to_string_builtin,
+        typed_array_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_to_reversed_builtin,
+        typed_array_to_reversed_builtin,
         BuiltinEntryMetadata::new("toReversed", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_to_sorted_builtin,
+        typed_array_to_sorted_builtin,
         BuiltinEntryMetadata::new("toSorted", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_with_builtin,
+        typed_array_with_builtin,
         BuiltinEntryMetadata::new("with", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_int8_array_builtin,
+        int8_array_builtin,
         BuiltinEntryMetadata::new("Int8Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_int16_array_builtin,
+        int16_array_builtin,
         BuiltinEntryMetadata::new("Int16Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_int32_array_builtin,
+        int32_array_builtin,
         BuiltinEntryMetadata::new("Int32Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_float32_array_builtin,
+        float32_array_builtin,
         BuiltinEntryMetadata::new("Float32Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_float64_array_builtin,
+        float64_array_builtin,
         BuiltinEntryMetadata::new("Float64Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_big_int64_array_builtin,
+        big_int64_array_builtin,
         BuiltinEntryMetadata::new("BigInt64Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_big_uint64_array_builtin,
+        big_uint64_array_builtin,
         BuiltinEntryMetadata::new("BigUint64Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint32_array_builtin,
+        uint32_array_builtin,
         BuiltinEntryMetadata::new("Uint32Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint16_array_builtin,
+        uint16_array_builtin,
         BuiltinEntryMetadata::new("Uint16Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_clamped_array_builtin,
+        uint8_clamped_array_builtin,
         BuiltinEntryMetadata::new("Uint8ClampedArray", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_builtin,
+        uint8_array_builtin,
         BuiltinEntryMetadata::new("Uint8Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_buffer_byte_length_getter_builtin,
+        array_buffer_byte_length_getter_builtin,
         BuiltinEntryMetadata::new("get byteLength", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_buffer_slice_builtin,
+        array_buffer_slice_builtin,
         BuiltinEntryMetadata::new("slice", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_shared_array_buffer_byte_length_getter_builtin,
+        shared_array_buffer_byte_length_getter_builtin,
         BuiltinEntryMetadata::new("get byteLength", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_shared_array_buffer_slice_builtin,
+        shared_array_buffer_slice_builtin,
         BuiltinEntryMetadata::new("slice", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_load_builtin,
+        atomics_load_builtin,
         BuiltinEntryMetadata::new("load", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_store_builtin,
+        atomics_store_builtin,
         BuiltinEntryMetadata::new("store", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_add_builtin,
+        atomics_add_builtin,
         BuiltinEntryMetadata::new("add", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_sub_builtin,
+        atomics_sub_builtin,
         BuiltinEntryMetadata::new("sub", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_and_builtin,
+        atomics_and_builtin,
         BuiltinEntryMetadata::new("and", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_or_builtin,
+        atomics_or_builtin,
         BuiltinEntryMetadata::new("or", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_xor_builtin,
+        atomics_xor_builtin,
         BuiltinEntryMetadata::new("xor", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_exchange_builtin,
+        atomics_exchange_builtin,
         BuiltinEntryMetadata::new("exchange", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_compare_exchange_builtin,
+        atomics_compare_exchange_builtin,
         BuiltinEntryMetadata::new("compareExchange", 4, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_notify_builtin,
+        atomics_notify_builtin,
         BuiltinEntryMetadata::new("notify", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_wait_builtin,
+        atomics_wait_builtin,
         BuiltinEntryMetadata::new("wait", 4, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_wait_async_builtin,
+        atomics_wait_async_builtin,
         BuiltinEntryMetadata::new("waitAsync", 4, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_atomics_is_lock_free_builtin,
+        atomics_is_lock_free_builtin,
         BuiltinEntryMetadata::new("isLockFree", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_buffer_getter_builtin,
+        data_view_buffer_getter_builtin,
         BuiltinEntryMetadata::new("get buffer", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_byte_length_getter_builtin,
+        data_view_byte_length_getter_builtin,
         BuiltinEntryMetadata::new("get byteLength", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_byte_offset_getter_builtin,
+        data_view_byte_offset_getter_builtin,
         BuiltinEntryMetadata::new("get byteOffset", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_get_float32_builtin,
+        data_view_get_float32_builtin,
         BuiltinEntryMetadata::new("getFloat32", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_get_float64_builtin,
+        data_view_get_float64_builtin,
         BuiltinEntryMetadata::new("getFloat64", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_get_int16_builtin,
+        data_view_get_int16_builtin,
         BuiltinEntryMetadata::new("getInt16", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_get_int32_builtin,
+        data_view_get_int32_builtin,
         BuiltinEntryMetadata::new("getInt32", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_get_int8_builtin,
+        data_view_get_int8_builtin,
         BuiltinEntryMetadata::new("getInt8", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_get_uint16_builtin,
+        data_view_get_uint16_builtin,
         BuiltinEntryMetadata::new("getUint16", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_get_uint32_builtin,
+        data_view_get_uint32_builtin,
         BuiltinEntryMetadata::new("getUint32", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_get_uint8_builtin,
+        data_view_get_uint8_builtin,
         BuiltinEntryMetadata::new("getUint8", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_set_float32_builtin,
+        data_view_set_float32_builtin,
         BuiltinEntryMetadata::new("setFloat32", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_set_float64_builtin,
+        data_view_set_float64_builtin,
         BuiltinEntryMetadata::new("setFloat64", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_set_int16_builtin,
+        data_view_set_int16_builtin,
         BuiltinEntryMetadata::new("setInt16", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_set_int32_builtin,
+        data_view_set_int32_builtin,
         BuiltinEntryMetadata::new("setInt32", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_set_int8_builtin,
+        data_view_set_int8_builtin,
         BuiltinEntryMetadata::new("setInt8", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_set_uint16_builtin,
+        data_view_set_uint16_builtin,
         BuiltinEntryMetadata::new("setUint16", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_set_uint32_builtin,
+        data_view_set_uint32_builtin,
         BuiltinEntryMetadata::new("setUint32", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_data_view_set_uint8_builtin,
+        data_view_set_uint8_builtin,
         BuiltinEntryMetadata::new("setUint8", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_buffer_getter_builtin,
+        uint8_array_buffer_getter_builtin,
         BuiltinEntryMetadata::new("get buffer", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_byte_length_getter_builtin,
+        uint8_array_byte_length_getter_builtin,
         BuiltinEntryMetadata::new("get byteLength", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_byte_offset_getter_builtin,
+        uint8_array_byte_offset_getter_builtin,
         BuiltinEntryMetadata::new("get byteOffset", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_length_getter_builtin,
+        uint8_array_length_getter_builtin,
         BuiltinEntryMetadata::new("get length", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_values_builtin,
+        uint8_array_values_builtin,
         BuiltinEntryMetadata::new("values", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_keys_builtin,
+        uint8_array_keys_builtin,
         BuiltinEntryMetadata::new("keys", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_entries_builtin,
+        uint8_array_entries_builtin,
         BuiltinEntryMetadata::new("entries", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_set_builtin,
+        uint8_array_set_builtin,
         BuiltinEntryMetadata::new("set", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_slice_builtin,
+        uint8_array_slice_builtin,
         BuiltinEntryMetadata::new("slice", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uint8_array_subarray_builtin,
+        uint8_array_subarray_builtin,
         BuiltinEntryMetadata::new("subarray", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_at_builtin,
+        typed_array_at_builtin,
         BuiltinEntryMetadata::new("at", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_typed_array_to_string_tag_getter_builtin,
+        typed_array_to_string_tag_getter_builtin,
         BuiltinEntryMetadata::new("get [Symbol.toStringTag]", 0, false, false),
     ),
 ];
 
 const PUBLIC_OBJECT_REFLECTION_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_json_parse_builtin,
+        json_parse_builtin,
         BuiltinEntryMetadata::new("parse", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_json_stringify_builtin,
+        json_stringify_builtin,
         BuiltinEntryMetadata::new("stringify", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_json_raw_json_builtin,
+        json_raw_json_builtin,
         BuiltinEntryMetadata::new("rawJSON", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_json_is_raw_json_builtin,
+        json_is_raw_json_builtin,
         BuiltinEntryMetadata::new("isRawJSON", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_apply_builtin,
+        reflect_apply_builtin,
         BuiltinEntryMetadata::new("apply", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_construct_builtin,
+        reflect_construct_builtin,
         BuiltinEntryMetadata::new("construct", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_define_property_builtin,
+        reflect_define_property_builtin,
         BuiltinEntryMetadata::new("defineProperty", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_delete_property_builtin,
+        reflect_delete_property_builtin,
         BuiltinEntryMetadata::new("deleteProperty", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_get_builtin,
+        reflect_get_builtin,
         BuiltinEntryMetadata::new("get", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_get_own_property_descriptor_builtin,
+        reflect_get_own_property_descriptor_builtin,
         BuiltinEntryMetadata::new("getOwnPropertyDescriptor", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_get_prototype_of_builtin,
+        reflect_get_prototype_of_builtin,
         BuiltinEntryMetadata::new("getPrototypeOf", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_has_builtin,
+        reflect_has_builtin,
         BuiltinEntryMetadata::new("has", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_is_extensible_builtin,
+        reflect_is_extensible_builtin,
         BuiltinEntryMetadata::new("isExtensible", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_own_keys_builtin,
+        reflect_own_keys_builtin,
         BuiltinEntryMetadata::new("ownKeys", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_prevent_extensions_builtin,
+        reflect_prevent_extensions_builtin,
         BuiltinEntryMetadata::new("preventExtensions", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_set_builtin,
+        reflect_set_builtin,
         BuiltinEntryMetadata::new("set", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reflect_set_prototype_of_builtin,
+        reflect_set_prototype_of_builtin,
         BuiltinEntryMetadata::new("setPrototypeOf", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_proxy_builtin,
+        proxy_builtin,
         BuiltinEntryMetadata::new("Proxy", 2, true, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_proxy_revocable_builtin,
+        proxy_revocable_builtin,
         BuiltinEntryMetadata::new("revocable", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_proxy_revoke_builtin,
+        proxy_revoke_builtin,
         BuiltinEntryMetadata::new("", 0, false, false),
     ),
 ];
 
 const PUBLIC_TEXT_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_iterator_prototype_iterator_builtin,
+        iterator_prototype_iterator_builtin,
         BuiltinEntryMetadata::new("[Symbol.iterator]", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_iterator_next_builtin,
+        array_iterator_next_builtin,
         BuiltinEntryMetadata::new("next", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_map_iterator_next_builtin,
+        map_iterator_next_builtin,
         BuiltinEntryMetadata::new("next", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_set_iterator_next_builtin,
+        set_iterator_next_builtin,
         BuiltinEntryMetadata::new("next", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_builtin,
+        string_builtin,
         BuiltinEntryMetadata::new("String", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_iterator_builtin,
+        string_iterator_builtin,
         BuiltinEntryMetadata::new("[Symbol.iterator]", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_iterator_next_builtin,
+        string_iterator_next_builtin,
         BuiltinEntryMetadata::new("next", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_to_string_builtin,
+        string_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_value_of_builtin,
+        string_value_of_builtin,
         BuiltinEntryMetadata::new("valueOf", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_concat_builtin,
+        string_concat_builtin,
         BuiltinEntryMetadata::new("concat", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_char_at_builtin,
+        string_char_at_builtin,
         BuiltinEntryMetadata::new("charAt", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_char_code_at_builtin,
+        string_char_code_at_builtin,
         BuiltinEntryMetadata::new("charCodeAt", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_from_char_code_builtin,
+        string_from_char_code_builtin,
         BuiltinEntryMetadata::new("fromCharCode", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_from_code_point_builtin,
+        string_from_code_point_builtin,
         BuiltinEntryMetadata::new("fromCodePoint", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_raw_builtin,
+        string_raw_builtin,
         BuiltinEntryMetadata::new("raw", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_at_builtin,
+        string_at_builtin,
         BuiltinEntryMetadata::new("at", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_code_point_at_builtin,
+        string_code_point_at_builtin,
         BuiltinEntryMetadata::new("codePointAt", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_ends_with_builtin,
+        string_ends_with_builtin,
         BuiltinEntryMetadata::new("endsWith", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_includes_builtin,
+        string_includes_builtin,
         BuiltinEntryMetadata::new("includes", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_index_of_builtin,
+        string_index_of_builtin,
         BuiltinEntryMetadata::new("indexOf", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_is_well_formed_builtin,
+        string_is_well_formed_builtin,
         BuiltinEntryMetadata::new("isWellFormed", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_locale_compare_builtin,
+        string_locale_compare_builtin,
         BuiltinEntryMetadata::new("localeCompare", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_match_builtin,
+        string_match_builtin,
         BuiltinEntryMetadata::new("match", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_match_all_builtin,
+        string_match_all_builtin,
         BuiltinEntryMetadata::new("matchAll", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_normalize_builtin,
+        string_normalize_builtin,
         BuiltinEntryMetadata::new("normalize", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_last_index_of_builtin,
+        string_last_index_of_builtin,
         BuiltinEntryMetadata::new("lastIndexOf", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_pad_end_builtin,
+        string_pad_end_builtin,
         BuiltinEntryMetadata::new("padEnd", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_pad_start_builtin,
+        string_pad_start_builtin,
         BuiltinEntryMetadata::new("padStart", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_repeat_builtin,
+        string_repeat_builtin,
         BuiltinEntryMetadata::new("repeat", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_replace_builtin,
+        string_replace_builtin,
         BuiltinEntryMetadata::new("replace", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_replace_all_builtin,
+        string_replace_all_builtin,
         BuiltinEntryMetadata::new("replaceAll", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_search_builtin,
+        string_search_builtin,
         BuiltinEntryMetadata::new("search", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_split_builtin,
+        string_split_builtin,
         BuiltinEntryMetadata::new("split", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_slice_builtin,
+        string_slice_builtin,
         BuiltinEntryMetadata::new("slice", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_substring_builtin,
+        string_substring_builtin,
         BuiltinEntryMetadata::new("substring", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_starts_with_builtin,
+        string_starts_with_builtin,
         BuiltinEntryMetadata::new("startsWith", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_to_locale_lower_case_builtin,
+        string_to_locale_lower_case_builtin,
         BuiltinEntryMetadata::new("toLocaleLowerCase", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_to_locale_upper_case_builtin,
+        string_to_locale_upper_case_builtin,
         BuiltinEntryMetadata::new("toLocaleUpperCase", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_to_lower_case_builtin,
+        string_to_lower_case_builtin,
         BuiltinEntryMetadata::new("toLowerCase", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_to_upper_case_builtin,
+        string_to_upper_case_builtin,
         BuiltinEntryMetadata::new("toUpperCase", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_to_well_formed_builtin,
+        string_to_well_formed_builtin,
         BuiltinEntryMetadata::new("toWellFormed", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_trim_builtin,
+        string_trim_builtin,
         BuiltinEntryMetadata::new("trim", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_trim_end_builtin,
+        string_trim_end_builtin,
         BuiltinEntryMetadata::new("trimEnd", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_string_trim_start_builtin,
+        string_trim_start_builtin,
         BuiltinEntryMetadata::new("trimStart", 0, false, false),
     ),
 ];
 
 const PUBLIC_REGEXP_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_regexp_builtin,
+        regexp_builtin,
         BuiltinEntryMetadata::new("RegExp", 2, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_escape_builtin,
+        regexp_escape_builtin,
         BuiltinEntryMetadata::new("escape", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_to_string_builtin,
+        regexp_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_exec_builtin,
+        regexp_exec_builtin,
         BuiltinEntryMetadata::new("exec", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_test_builtin,
+        regexp_test_builtin,
         BuiltinEntryMetadata::new("test", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_global_getter_builtin,
+        regexp_global_getter_builtin,
         BuiltinEntryMetadata::new("get global", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_ignore_case_getter_builtin,
+        regexp_ignore_case_getter_builtin,
         BuiltinEntryMetadata::new("get ignoreCase", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_multiline_getter_builtin,
+        regexp_multiline_getter_builtin,
         BuiltinEntryMetadata::new("get multiline", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_dot_all_getter_builtin,
+        regexp_dot_all_getter_builtin,
         BuiltinEntryMetadata::new("get dotAll", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_unicode_getter_builtin,
+        regexp_unicode_getter_builtin,
         BuiltinEntryMetadata::new("get unicode", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_sticky_getter_builtin,
+        regexp_sticky_getter_builtin,
         BuiltinEntryMetadata::new("get sticky", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_source_getter_builtin,
+        regexp_source_getter_builtin,
         BuiltinEntryMetadata::new("get source", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_flags_getter_builtin,
+        regexp_flags_getter_builtin,
         BuiltinEntryMetadata::new("get flags", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_has_indices_getter_builtin,
+        regexp_has_indices_getter_builtin,
         BuiltinEntryMetadata::new("get hasIndices", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_species_getter_builtin,
+        regexp_species_getter_builtin,
         BuiltinEntryMetadata::new("get [Symbol.species]", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_symbol_match_builtin,
+        regexp_symbol_match_builtin,
         BuiltinEntryMetadata::new("[Symbol.match]", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_symbol_replace_builtin,
+        regexp_symbol_replace_builtin,
         BuiltinEntryMetadata::new("[Symbol.replace]", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_symbol_search_builtin,
+        regexp_symbol_search_builtin,
         BuiltinEntryMetadata::new("[Symbol.search]", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_symbol_split_builtin,
+        regexp_symbol_split_builtin,
         BuiltinEntryMetadata::new("[Symbol.split]", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_regexp_symbol_match_all_builtin,
+        regexp_symbol_match_all_builtin,
         BuiltinEntryMetadata::new("[Symbol.matchAll]", 1, false, false),
     ),
 ];
 
 const PUBLIC_DATE_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_date_builtin,
+        date_builtin,
         BuiltinEntryMetadata::new("Date", 7, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_now_builtin,
+        date_now_builtin,
         BuiltinEntryMetadata::new("now", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_parse_builtin,
+        date_parse_builtin,
         BuiltinEntryMetadata::new("parse", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_utc_builtin,
+        date_utc_builtin,
         BuiltinEntryMetadata::new("UTC", 7, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_string_builtin,
+        date_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_date_string_builtin,
+        date_to_date_string_builtin,
         BuiltinEntryMetadata::new("toDateString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_time_string_builtin,
+        date_to_time_string_builtin,
         BuiltinEntryMetadata::new("toTimeString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_locale_string_builtin,
+        date_to_locale_string_builtin,
         BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_locale_date_string_builtin,
+        date_to_locale_date_string_builtin,
         BuiltinEntryMetadata::new("toLocaleDateString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_locale_time_string_builtin,
+        date_to_locale_time_string_builtin,
         BuiltinEntryMetadata::new("toLocaleTimeString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_value_of_builtin,
+        date_value_of_builtin,
         BuiltinEntryMetadata::new("valueOf", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_time_builtin,
+        date_get_time_builtin,
         BuiltinEntryMetadata::new("getTime", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_full_year_builtin,
+        date_get_full_year_builtin,
         BuiltinEntryMetadata::new("getFullYear", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_utc_full_year_builtin,
+        date_get_utc_full_year_builtin,
         BuiltinEntryMetadata::new("getUTCFullYear", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_month_builtin,
+        date_get_month_builtin,
         BuiltinEntryMetadata::new("getMonth", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_utc_month_builtin,
+        date_get_utc_month_builtin,
         BuiltinEntryMetadata::new("getUTCMonth", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_date_builtin,
+        date_get_date_builtin,
         BuiltinEntryMetadata::new("getDate", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_utc_date_builtin,
+        date_get_utc_date_builtin,
         BuiltinEntryMetadata::new("getUTCDate", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_day_builtin,
+        date_get_day_builtin,
         BuiltinEntryMetadata::new("getDay", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_utc_day_builtin,
+        date_get_utc_day_builtin,
         BuiltinEntryMetadata::new("getUTCDay", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_hours_builtin,
+        date_get_hours_builtin,
         BuiltinEntryMetadata::new("getHours", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_utc_hours_builtin,
+        date_get_utc_hours_builtin,
         BuiltinEntryMetadata::new("getUTCHours", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_minutes_builtin,
+        date_get_minutes_builtin,
         BuiltinEntryMetadata::new("getMinutes", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_utc_minutes_builtin,
+        date_get_utc_minutes_builtin,
         BuiltinEntryMetadata::new("getUTCMinutes", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_seconds_builtin,
+        date_get_seconds_builtin,
         BuiltinEntryMetadata::new("getSeconds", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_utc_seconds_builtin,
+        date_get_utc_seconds_builtin,
         BuiltinEntryMetadata::new("getUTCSeconds", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_milliseconds_builtin,
+        date_get_milliseconds_builtin,
         BuiltinEntryMetadata::new("getMilliseconds", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_utc_milliseconds_builtin,
+        date_get_utc_milliseconds_builtin,
         BuiltinEntryMetadata::new("getUTCMilliseconds", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_get_timezone_offset_builtin,
+        date_get_timezone_offset_builtin,
         BuiltinEntryMetadata::new("getTimezoneOffset", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_time_builtin,
+        date_set_time_builtin,
         BuiltinEntryMetadata::new("setTime", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_milliseconds_builtin,
+        date_set_milliseconds_builtin,
         BuiltinEntryMetadata::new("setMilliseconds", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_utc_milliseconds_builtin,
+        date_set_utc_milliseconds_builtin,
         BuiltinEntryMetadata::new("setUTCMilliseconds", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_seconds_builtin,
+        date_set_seconds_builtin,
         BuiltinEntryMetadata::new("setSeconds", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_utc_seconds_builtin,
+        date_set_utc_seconds_builtin,
         BuiltinEntryMetadata::new("setUTCSeconds", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_minutes_builtin,
+        date_set_minutes_builtin,
         BuiltinEntryMetadata::new("setMinutes", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_utc_minutes_builtin,
+        date_set_utc_minutes_builtin,
         BuiltinEntryMetadata::new("setUTCMinutes", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_hours_builtin,
+        date_set_hours_builtin,
         BuiltinEntryMetadata::new("setHours", 4, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_utc_hours_builtin,
+        date_set_utc_hours_builtin,
         BuiltinEntryMetadata::new("setUTCHours", 4, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_date_builtin,
+        date_set_date_builtin,
         BuiltinEntryMetadata::new("setDate", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_utc_date_builtin,
+        date_set_utc_date_builtin,
         BuiltinEntryMetadata::new("setUTCDate", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_month_builtin,
+        date_set_month_builtin,
         BuiltinEntryMetadata::new("setMonth", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_utc_month_builtin,
+        date_set_utc_month_builtin,
         BuiltinEntryMetadata::new("setUTCMonth", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_full_year_builtin,
+        date_set_full_year_builtin,
         BuiltinEntryMetadata::new("setFullYear", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_set_utc_full_year_builtin,
+        date_set_utc_full_year_builtin,
         BuiltinEntryMetadata::new("setUTCFullYear", 3, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_utc_string_builtin,
+        date_to_utc_string_builtin,
         BuiltinEntryMetadata::new("toUTCString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_iso_string_builtin,
+        date_to_iso_string_builtin,
         BuiltinEntryMetadata::new("toISOString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_json_builtin,
+        date_to_json_builtin,
         BuiltinEntryMetadata::new("toJSON", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_temporal_instant_builtin,
+        date_to_temporal_instant_builtin,
         BuiltinEntryMetadata::new("toTemporalInstant", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_date_to_primitive_builtin,
+        date_to_primitive_builtin,
         BuiltinEntryMetadata::new("[Symbol.toPrimitive]", 1, false, false),
     ),
 ];
 
 const PUBLIC_PRIMITIVE_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_number_builtin,
+        number_builtin,
         BuiltinEntryMetadata::new("Number", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_number_is_finite_builtin,
+        number_is_finite_builtin,
         BuiltinEntryMetadata::new("isFinite", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_number_is_integer_builtin,
+        number_is_integer_builtin,
         BuiltinEntryMetadata::new("isInteger", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_number_is_nan_builtin,
+        number_is_nan_builtin,
         BuiltinEntryMetadata::new("isNaN", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_number_is_safe_integer_builtin,
+        number_is_safe_integer_builtin,
         BuiltinEntryMetadata::new("isSafeInteger", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_number_to_exponential_builtin,
+        number_to_exponential_builtin,
         BuiltinEntryMetadata::new("toExponential", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_number_to_fixed_builtin,
+        number_to_fixed_builtin,
         BuiltinEntryMetadata::new("toFixed", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_number_to_locale_string_builtin,
+        number_to_locale_string_builtin,
         BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_number_to_precision_builtin,
+        number_to_precision_builtin,
         BuiltinEntryMetadata::new("toPrecision", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_number_to_string_builtin,
+        number_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_number_value_of_builtin,
+        number_value_of_builtin,
         BuiltinEntryMetadata::new("valueOf", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_abs_builtin,
+        math_abs_builtin,
         BuiltinEntryMetadata::new("abs", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_acos_builtin,
+        math_acos_builtin,
         BuiltinEntryMetadata::new("acos", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_acosh_builtin,
+        math_acosh_builtin,
         BuiltinEntryMetadata::new("acosh", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_asin_builtin,
+        math_asin_builtin,
         BuiltinEntryMetadata::new("asin", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_asinh_builtin,
+        math_asinh_builtin,
         BuiltinEntryMetadata::new("asinh", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_atan_builtin,
+        math_atan_builtin,
         BuiltinEntryMetadata::new("atan", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_atan2_builtin,
+        math_atan2_builtin,
         BuiltinEntryMetadata::new("atan2", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_atanh_builtin,
+        math_atanh_builtin,
         BuiltinEntryMetadata::new("atanh", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_cbrt_builtin,
+        math_cbrt_builtin,
         BuiltinEntryMetadata::new("cbrt", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_ceil_builtin,
+        math_ceil_builtin,
         BuiltinEntryMetadata::new("ceil", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_clz32_builtin,
+        math_clz32_builtin,
         BuiltinEntryMetadata::new("clz32", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_cos_builtin,
+        math_cos_builtin,
         BuiltinEntryMetadata::new("cos", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_cosh_builtin,
+        math_cosh_builtin,
         BuiltinEntryMetadata::new("cosh", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_exp_builtin,
+        math_exp_builtin,
         BuiltinEntryMetadata::new("exp", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_expm1_builtin,
+        math_expm1_builtin,
         BuiltinEntryMetadata::new("expm1", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_f16round_builtin,
+        math_f16round_builtin,
         BuiltinEntryMetadata::new("f16round", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_floor_builtin,
+        math_floor_builtin,
         BuiltinEntryMetadata::new("floor", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_fround_builtin,
+        math_fround_builtin,
         BuiltinEntryMetadata::new("fround", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_hypot_builtin,
+        math_hypot_builtin,
         BuiltinEntryMetadata::new("hypot", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_imul_builtin,
+        math_imul_builtin,
         BuiltinEntryMetadata::new("imul", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_log_builtin,
+        math_log_builtin,
         BuiltinEntryMetadata::new("log", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_log10_builtin,
+        math_log10_builtin,
         BuiltinEntryMetadata::new("log10", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_log1p_builtin,
+        math_log1p_builtin,
         BuiltinEntryMetadata::new("log1p", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_log2_builtin,
+        math_log2_builtin,
         BuiltinEntryMetadata::new("log2", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_max_builtin,
+        math_max_builtin,
         BuiltinEntryMetadata::new("max", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_min_builtin,
+        math_min_builtin,
         BuiltinEntryMetadata::new("min", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_pow_builtin,
+        math_pow_builtin,
         BuiltinEntryMetadata::new("pow", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_random_builtin,
+        math_random_builtin,
         BuiltinEntryMetadata::new("random", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_round_builtin,
+        math_round_builtin,
         BuiltinEntryMetadata::new("round", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_sign_builtin,
+        math_sign_builtin,
         BuiltinEntryMetadata::new("sign", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_sin_builtin,
+        math_sin_builtin,
         BuiltinEntryMetadata::new("sin", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_sinh_builtin,
+        math_sinh_builtin,
         BuiltinEntryMetadata::new("sinh", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_sqrt_builtin,
+        math_sqrt_builtin,
         BuiltinEntryMetadata::new("sqrt", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_sum_precise_builtin,
+        math_sum_precise_builtin,
         BuiltinEntryMetadata::new("sumPrecise", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_tan_builtin,
+        math_tan_builtin,
         BuiltinEntryMetadata::new("tan", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_tanh_builtin,
+        math_tanh_builtin,
         BuiltinEntryMetadata::new("tanh", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_math_trunc_builtin,
+        math_trunc_builtin,
         BuiltinEntryMetadata::new("trunc", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_bigint_builtin,
+        bigint_builtin,
         BuiltinEntryMetadata::new("BigInt", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_bigint_as_int_n_builtin,
+        bigint_as_int_n_builtin,
         BuiltinEntryMetadata::new("asIntN", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_bigint_as_uint_n_builtin,
+        bigint_as_uint_n_builtin,
         BuiltinEntryMetadata::new("asUintN", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_bigint_to_string_builtin,
+        bigint_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_bigint_value_of_builtin,
+        bigint_value_of_builtin,
         BuiltinEntryMetadata::new("valueOf", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_boolean_builtin,
+        boolean_builtin,
         BuiltinEntryMetadata::new("Boolean", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_boolean_to_string_builtin,
+        boolean_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_boolean_value_of_builtin,
+        boolean_value_of_builtin,
         BuiltinEntryMetadata::new("valueOf", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_symbol_builtin,
+        symbol_builtin,
         BuiltinEntryMetadata::new("Symbol", 0, false, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_symbol_for_builtin,
+        symbol_for_builtin,
         BuiltinEntryMetadata::new("for", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_symbol_key_for_builtin,
+        symbol_key_for_builtin,
         BuiltinEntryMetadata::new("keyFor", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_symbol_to_string_builtin,
+        symbol_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_symbol_value_of_builtin,
+        symbol_value_of_builtin,
         BuiltinEntryMetadata::new("valueOf", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_symbol_to_primitive_builtin,
+        symbol_to_primitive_builtin,
         BuiltinEntryMetadata::new("[Symbol.toPrimitive]", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_array_species_getter_builtin,
+        array_species_getter_builtin,
         BuiltinEntryMetadata::new("get [Symbol.species]", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_symbol_description_getter_builtin,
+        symbol_description_getter_builtin,
         BuiltinEntryMetadata::new("get description", 0, false, false),
     ),
 ];
 
 const PUBLIC_MODULE_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_abstract_module_source_builtin,
+        abstract_module_source_builtin,
         BuiltinEntryMetadata::new("AbstractModuleSource", 0, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_abstract_module_source_to_string_tag_getter_builtin,
+        abstract_module_source_to_string_tag_getter_builtin,
         BuiltinEntryMetadata::new("get [Symbol.toStringTag]", 0, false, false),
     ),
 ];
 
 const PUBLIC_LANGUAGE_SUPPORT_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(
-        js3_error_builtin,
+        error_builtin,
         BuiltinEntryMetadata::new("Error", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_error_to_string_builtin,
+        error_to_string_builtin,
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_eval_error_builtin,
+        eval_error_builtin,
         BuiltinEntryMetadata::new("EvalError", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_range_error_builtin,
+        range_error_builtin,
         BuiltinEntryMetadata::new("RangeError", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_reference_error_builtin,
+        reference_error_builtin,
         BuiltinEntryMetadata::new("ReferenceError", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_syntax_error_builtin,
+        syntax_error_builtin,
         BuiltinEntryMetadata::new("SyntaxError", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_type_error_builtin,
+        type_error_builtin,
         BuiltinEntryMetadata::new("TypeError", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_uri_error_builtin,
+        uri_error_builtin,
         BuiltinEntryMetadata::new("URIError", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_aggregate_error_builtin,
+        aggregate_error_builtin,
         BuiltinEntryMetadata::new("AggregateError", 2, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_suppressed_error_builtin,
+        suppressed_error_builtin,
         BuiltinEntryMetadata::new("SuppressedError", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_eval_builtin,
+        eval_builtin,
         BuiltinEntryMetadata::new("eval", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_builtin,
+        promise_builtin,
         BuiltinEntryMetadata::new("Promise", 1, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_disposable_stack_builtin,
+        disposable_stack_builtin,
         BuiltinEntryMetadata::new("DisposableStack", 0, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_disposable_stack_use_builtin,
+        disposable_stack_use_builtin,
         BuiltinEntryMetadata::new("use", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_disposable_stack_adopt_builtin,
+        disposable_stack_adopt_builtin,
         BuiltinEntryMetadata::new("adopt", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_disposable_stack_defer_builtin,
+        disposable_stack_defer_builtin,
         BuiltinEntryMetadata::new("defer", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_disposable_stack_move_builtin,
+        disposable_stack_move_builtin,
         BuiltinEntryMetadata::new("move", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_disposable_stack_disposed_getter_builtin,
+        disposable_stack_disposed_getter_builtin,
         BuiltinEntryMetadata::new("get disposed", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_disposable_stack_dispose_builtin,
+        disposable_stack_dispose_builtin,
         BuiltinEntryMetadata::new("dispose", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_disposable_stack_builtin,
+        async_disposable_stack_builtin,
         BuiltinEntryMetadata::new("AsyncDisposableStack", 0, true, true),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_disposable_stack_use_builtin,
+        async_disposable_stack_use_builtin,
         BuiltinEntryMetadata::new("use", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_disposable_stack_adopt_builtin,
+        async_disposable_stack_adopt_builtin,
         BuiltinEntryMetadata::new("adopt", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_disposable_stack_defer_builtin,
+        async_disposable_stack_defer_builtin,
         BuiltinEntryMetadata::new("defer", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_disposable_stack_move_builtin,
+        async_disposable_stack_move_builtin,
         BuiltinEntryMetadata::new("move", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_disposable_stack_disposed_getter_builtin,
+        async_disposable_stack_disposed_getter_builtin,
         BuiltinEntryMetadata::new("get disposed", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_disposable_stack_dispose_async_builtin,
+        async_disposable_stack_dispose_async_builtin,
         BuiltinEntryMetadata::new("disposeAsync", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_async_disposal_resume_builtin,
+        async_disposal_resume_builtin,
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_create_sync_disposal_scope_builtin,
+        create_sync_disposal_scope_builtin,
         BuiltinEntryMetadata::new("", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_create_async_disposal_scope_builtin,
+        create_async_disposal_scope_builtin,
         BuiltinEntryMetadata::new("", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_add_sync_disposable_resource_builtin,
+        add_sync_disposable_resource_builtin,
         BuiltinEntryMetadata::new("", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_add_async_disposable_resource_builtin,
+        add_async_disposable_resource_builtin,
         BuiltinEntryMetadata::new("", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_dispose_scope_builtin,
+        dispose_scope_builtin,
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_dispose_scope_async_builtin,
+        dispose_scope_async_builtin,
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_then_builtin,
+        promise_then_builtin,
         BuiltinEntryMetadata::new("then", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_catch_builtin,
+        promise_catch_builtin,
         BuiltinEntryMetadata::new("catch", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_finally_builtin,
+        promise_finally_builtin,
         BuiltinEntryMetadata::new("finally", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_finally_function_builtin,
+        promise_finally_function_builtin,
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_resolve_builtin,
+        promise_resolve_builtin,
         BuiltinEntryMetadata::new("resolve", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_reject_builtin,
+        promise_reject_builtin,
         BuiltinEntryMetadata::new("reject", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_all_builtin,
+        promise_all_builtin,
         BuiltinEntryMetadata::new("all", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_all_settled_builtin,
+        promise_all_settled_builtin,
         BuiltinEntryMetadata::new("allSettled", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_race_builtin,
+        promise_race_builtin,
         BuiltinEntryMetadata::new("race", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_any_builtin,
+        promise_any_builtin,
         BuiltinEntryMetadata::new("any", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_species_getter_builtin,
+        promise_species_getter_builtin,
         BuiltinEntryMetadata::new("get [Symbol.species]", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_capability_executor_builtin,
+        promise_capability_executor_builtin,
         BuiltinEntryMetadata::new("", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_resolve_function_builtin,
+        promise_resolve_function_builtin,
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_reject_function_builtin,
+        promise_reject_function_builtin,
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_all_resolve_element_builtin,
+        promise_all_resolve_element_builtin,
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_all_settled_resolve_element_builtin,
+        promise_all_settled_resolve_element_builtin,
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_all_settled_reject_element_builtin,
+        promise_all_settled_reject_element_builtin,
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_promise_any_reject_element_builtin,
+        promise_any_reject_element_builtin,
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_parse_int_builtin,
+        parse_int_builtin,
         BuiltinEntryMetadata::new("parseInt", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_parse_float_builtin,
+        parse_float_builtin,
         BuiltinEntryMetadata::new("parseFloat", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_is_nan_builtin,
+        is_nan_builtin,
         BuiltinEntryMetadata::new("isNaN", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_is_finite_builtin,
+        is_finite_builtin,
         BuiltinEntryMetadata::new("isFinite", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_encode_uri_builtin,
+        encode_uri_builtin,
         BuiltinEntryMetadata::new("encodeURI", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_encode_uri_component_builtin,
+        encode_uri_component_builtin,
         BuiltinEntryMetadata::new("encodeURIComponent", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_decode_uri_builtin,
+        decode_uri_builtin,
         BuiltinEntryMetadata::new("decodeURI", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
-        js3_decode_uri_component_builtin,
+        decode_uri_component_builtin,
         BuiltinEntryMetadata::new("decodeURIComponent", 1, false, false),
     ),
 ];
@@ -2281,147 +2243,147 @@ mod tests {
     fn object_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_object_builtin(),
+                object_builtin(),
                 BuiltinEntryMetadata::new("Object", 1, true, true),
             ),
             (
-                js3_object_create_builtin(),
+                object_create_builtin(),
                 BuiltinEntryMetadata::new("create", 2, false, false),
             ),
             (
-                js3_object_get_prototype_of_builtin(),
+                object_get_prototype_of_builtin(),
                 BuiltinEntryMetadata::new("getPrototypeOf", 1, false, false),
             ),
             (
-                js3_object_set_prototype_of_builtin(),
+                object_set_prototype_of_builtin(),
                 BuiltinEntryMetadata::new("setPrototypeOf", 2, false, false),
             ),
             (
-                js3_object_get_own_property_descriptor_builtin(),
+                object_get_own_property_descriptor_builtin(),
                 BuiltinEntryMetadata::new("getOwnPropertyDescriptor", 2, false, false),
             ),
             (
-                js3_object_get_own_property_descriptors_builtin(),
+                object_get_own_property_descriptors_builtin(),
                 BuiltinEntryMetadata::new("getOwnPropertyDescriptors", 1, false, false),
             ),
             (
-                js3_object_get_own_property_names_builtin(),
+                object_get_own_property_names_builtin(),
                 BuiltinEntryMetadata::new("getOwnPropertyNames", 1, false, false),
             ),
             (
-                js3_object_get_own_property_symbols_builtin(),
+                object_get_own_property_symbols_builtin(),
                 BuiltinEntryMetadata::new("getOwnPropertySymbols", 1, false, false),
             ),
             (
-                js3_object_define_properties_builtin(),
+                object_define_properties_builtin(),
                 BuiltinEntryMetadata::new("defineProperties", 2, false, false),
             ),
             (
-                js3_object_define_property_builtin(),
+                object_define_property_builtin(),
                 BuiltinEntryMetadata::new("defineProperty", 3, false, false),
             ),
             (
-                js3_object_assign_builtin(),
+                object_assign_builtin(),
                 BuiltinEntryMetadata::new("assign", 2, false, false),
             ),
             (
-                js3_object_from_entries_builtin(),
+                object_from_entries_builtin(),
                 BuiltinEntryMetadata::new("fromEntries", 1, false, false),
             ),
             (
-                js3_object_group_by_builtin(),
+                object_group_by_builtin(),
                 BuiltinEntryMetadata::new("groupBy", 2, false, false),
             ),
             (
-                js3_object_prevent_extensions_builtin(),
+                object_prevent_extensions_builtin(),
                 BuiltinEntryMetadata::new("preventExtensions", 1, false, false),
             ),
             (
-                js3_object_is_extensible_builtin(),
+                object_is_extensible_builtin(),
                 BuiltinEntryMetadata::new("isExtensible", 1, false, false),
             ),
             (
-                js3_object_is_builtin(),
+                object_is_builtin(),
                 BuiltinEntryMetadata::new("is", 2, false, false),
             ),
             (
-                js3_object_seal_builtin(),
+                object_seal_builtin(),
                 BuiltinEntryMetadata::new("seal", 1, false, false),
             ),
             (
-                js3_object_freeze_builtin(),
+                object_freeze_builtin(),
                 BuiltinEntryMetadata::new("freeze", 1, false, false),
             ),
             (
-                js3_object_is_sealed_builtin(),
+                object_is_sealed_builtin(),
                 BuiltinEntryMetadata::new("isSealed", 1, false, false),
             ),
             (
-                js3_object_is_frozen_builtin(),
+                object_is_frozen_builtin(),
                 BuiltinEntryMetadata::new("isFrozen", 1, false, false),
             ),
             (
-                js3_object_to_locale_string_builtin(),
+                object_to_locale_string_builtin(),
                 BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
             ),
             (
-                js3_object_to_string_builtin(),
+                object_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_object_value_of_builtin(),
+                object_value_of_builtin(),
                 BuiltinEntryMetadata::new("valueOf", 0, false, false),
             ),
             (
-                js3_object_has_own_property_builtin(),
+                object_has_own_property_builtin(),
                 BuiltinEntryMetadata::new("hasOwnProperty", 1, false, false),
             ),
             (
-                js3_object_is_prototype_of_builtin(),
+                object_is_prototype_of_builtin(),
                 BuiltinEntryMetadata::new("isPrototypeOf", 1, false, false),
             ),
             (
-                js3_object_property_is_enumerable_builtin(),
+                object_property_is_enumerable_builtin(),
                 BuiltinEntryMetadata::new("propertyIsEnumerable", 1, false, false),
             ),
             (
-                js3_object_define_getter_builtin(),
+                object_define_getter_builtin(),
                 BuiltinEntryMetadata::new("__defineGetter__", 2, false, false),
             ),
             (
-                js3_object_define_setter_builtin(),
+                object_define_setter_builtin(),
                 BuiltinEntryMetadata::new("__defineSetter__", 2, false, false),
             ),
             (
-                js3_object_lookup_getter_builtin(),
+                object_lookup_getter_builtin(),
                 BuiltinEntryMetadata::new("__lookupGetter__", 1, false, false),
             ),
             (
-                js3_object_lookup_setter_builtin(),
+                object_lookup_setter_builtin(),
                 BuiltinEntryMetadata::new("__lookupSetter__", 1, false, false),
             ),
             (
-                js3_object_proto_getter_builtin(),
+                object_proto_getter_builtin(),
                 BuiltinEntryMetadata::new("get __proto__", 0, false, false),
             ),
             (
-                js3_object_proto_setter_builtin(),
+                object_proto_setter_builtin(),
                 BuiltinEntryMetadata::new("set __proto__", 1, false, false),
             ),
             (
-                js3_object_keys_builtin(),
+                object_keys_builtin(),
                 BuiltinEntryMetadata::new("keys", 1, false, false),
             ),
             (
-                js3_object_entries_builtin(),
+                object_entries_builtin(),
                 BuiltinEntryMetadata::new("entries", 1, false, false),
             ),
             (
-                js3_object_values_builtin(),
+                object_values_builtin(),
                 BuiltinEntryMetadata::new("values", 1, false, false),
             ),
             (
-                js3_object_has_own_builtin(),
+                object_has_own_builtin(),
                 BuiltinEntryMetadata::new("hasOwn", 2, false, false),
             ),
         ];
@@ -2437,67 +2399,67 @@ mod tests {
     fn function_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_function_builtin(),
+                function_builtin(),
                 BuiltinEntryMetadata::new("Function", 1, true, true),
             ),
             (
-                js3_function_prototype_builtin(),
+                function_prototype_builtin(),
                 BuiltinEntryMetadata::new("", 0, false, false),
             ),
             (
-                js3_function_call_builtin(),
+                function_call_builtin(),
                 BuiltinEntryMetadata::new("call", 1, false, false),
             ),
             (
-                js3_function_apply_builtin(),
+                function_apply_builtin(),
                 BuiltinEntryMetadata::new("apply", 2, false, false),
             ),
             (
-                js3_function_bind_builtin(),
+                function_bind_builtin(),
                 BuiltinEntryMetadata::new("bind", 1, false, false),
             ),
             (
-                js3_function_to_string_builtin(),
+                function_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_function_symbol_has_instance_builtin(),
+                function_symbol_has_instance_builtin(),
                 BuiltinEntryMetadata::new("[Symbol.hasInstance]", 1, false, false),
             ),
             (
-                js3_async_function_builtin(),
+                async_function_builtin(),
                 BuiltinEntryMetadata::new("AsyncFunction", 1, true, true),
             ),
             (
-                js3_async_generator_function_builtin(),
+                async_generator_function_builtin(),
                 BuiltinEntryMetadata::new("AsyncGeneratorFunction", 1, true, true),
             ),
             (
-                js3_async_generator_next_builtin(),
+                async_generator_next_builtin(),
                 BuiltinEntryMetadata::new("next", 1, false, false),
             ),
             (
-                js3_async_generator_return_builtin(),
+                async_generator_return_builtin(),
                 BuiltinEntryMetadata::new("return", 1, false, false),
             ),
             (
-                js3_async_generator_throw_builtin(),
+                async_generator_throw_builtin(),
                 BuiltinEntryMetadata::new("throw", 1, false, false),
             ),
             (
-                js3_generator_function_builtin(),
+                generator_function_builtin(),
                 BuiltinEntryMetadata::new("GeneratorFunction", 1, true, true),
             ),
             (
-                js3_generator_next_builtin(),
+                generator_next_builtin(),
                 BuiltinEntryMetadata::new("next", 1, false, false),
             ),
             (
-                js3_generator_return_builtin(),
+                generator_return_builtin(),
                 BuiltinEntryMetadata::new("return", 1, false, false),
             ),
             (
-                js3_generator_throw_builtin(),
+                generator_throw_builtin(),
                 BuiltinEntryMetadata::new("throw", 1, false, false),
             ),
         ];
@@ -2513,175 +2475,175 @@ mod tests {
     fn array_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_array_builtin(),
+                array_builtin(),
                 BuiltinEntryMetadata::new("Array", 1, true, true),
             ),
             (
-                js3_array_from_builtin(),
+                array_from_builtin(),
                 BuiltinEntryMetadata::new("from", 1, false, false),
             ),
             (
-                js3_array_from_async_builtin(),
+                array_from_async_builtin(),
                 BuiltinEntryMetadata::new("fromAsync", 1, false, false),
             ),
             (
-                js3_array_of_builtin(),
+                array_of_builtin(),
                 BuiltinEntryMetadata::new("of", 0, false, false),
             ),
             (
-                js3_array_is_array_builtin(),
+                array_is_array_builtin(),
                 BuiltinEntryMetadata::new("isArray", 1, false, false),
             ),
             (
-                js3_array_at_builtin(),
+                array_at_builtin(),
                 BuiltinEntryMetadata::new("at", 1, false, false),
             ),
             (
-                js3_array_concat_builtin(),
+                array_concat_builtin(),
                 BuiltinEntryMetadata::new("concat", 1, false, false),
             ),
             (
-                js3_array_copy_within_builtin(),
+                array_copy_within_builtin(),
                 BuiltinEntryMetadata::new("copyWithin", 2, false, false),
             ),
             (
-                js3_array_fill_builtin(),
+                array_fill_builtin(),
                 BuiltinEntryMetadata::new("fill", 1, false, false),
             ),
             (
-                js3_array_join_builtin(),
+                array_join_builtin(),
                 BuiltinEntryMetadata::new("join", 1, false, false),
             ),
             (
-                js3_array_pop_builtin(),
+                array_pop_builtin(),
                 BuiltinEntryMetadata::new("pop", 0, false, false),
             ),
             (
-                js3_array_push_builtin(),
+                array_push_builtin(),
                 BuiltinEntryMetadata::new("push", 1, false, false),
             ),
             (
-                js3_array_shift_builtin(),
+                array_shift_builtin(),
                 BuiltinEntryMetadata::new("shift", 0, false, false),
             ),
             (
-                js3_array_unshift_builtin(),
+                array_unshift_builtin(),
                 BuiltinEntryMetadata::new("unshift", 1, false, false),
             ),
             (
-                js3_array_every_builtin(),
+                array_every_builtin(),
                 BuiltinEntryMetadata::new("every", 1, false, false),
             ),
             (
-                js3_array_filter_builtin(),
+                array_filter_builtin(),
                 BuiltinEntryMetadata::new("filter", 1, false, false),
             ),
             (
-                js3_array_flat_builtin(),
+                array_flat_builtin(),
                 BuiltinEntryMetadata::new("flat", 0, false, false),
             ),
             (
-                js3_array_flat_map_builtin(),
+                array_flat_map_builtin(),
                 BuiltinEntryMetadata::new("flatMap", 1, false, false),
             ),
             (
-                js3_array_find_builtin(),
+                array_find_builtin(),
                 BuiltinEntryMetadata::new("find", 1, false, false),
             ),
             (
-                js3_array_find_index_builtin(),
+                array_find_index_builtin(),
                 BuiltinEntryMetadata::new("findIndex", 1, false, false),
             ),
             (
-                js3_array_find_last_builtin(),
+                array_find_last_builtin(),
                 BuiltinEntryMetadata::new("findLast", 1, false, false),
             ),
             (
-                js3_array_find_last_index_builtin(),
+                array_find_last_index_builtin(),
                 BuiltinEntryMetadata::new("findLastIndex", 1, false, false),
             ),
             (
-                js3_array_for_each_builtin(),
+                array_for_each_builtin(),
                 BuiltinEntryMetadata::new("forEach", 1, false, false),
             ),
             (
-                js3_array_includes_builtin(),
+                array_includes_builtin(),
                 BuiltinEntryMetadata::new("includes", 1, false, false),
             ),
             (
-                js3_array_index_of_builtin(),
+                array_index_of_builtin(),
                 BuiltinEntryMetadata::new("indexOf", 1, false, false),
             ),
             (
-                js3_array_map_builtin(),
+                array_map_builtin(),
                 BuiltinEntryMetadata::new("map", 1, false, false),
             ),
             (
-                js3_array_reduce_builtin(),
+                array_reduce_builtin(),
                 BuiltinEntryMetadata::new("reduce", 1, false, false),
             ),
             (
-                js3_array_reduce_right_builtin(),
+                array_reduce_right_builtin(),
                 BuiltinEntryMetadata::new("reduceRight", 1, false, false),
             ),
             (
-                js3_array_reverse_builtin(),
+                array_reverse_builtin(),
                 BuiltinEntryMetadata::new("reverse", 0, false, false),
             ),
             (
-                js3_array_slice_builtin(),
+                array_slice_builtin(),
                 BuiltinEntryMetadata::new("slice", 2, false, false),
             ),
             (
-                js3_array_some_builtin(),
+                array_some_builtin(),
                 BuiltinEntryMetadata::new("some", 1, false, false),
             ),
             (
-                js3_array_last_index_of_builtin(),
+                array_last_index_of_builtin(),
                 BuiltinEntryMetadata::new("lastIndexOf", 1, false, false),
             ),
             (
-                js3_array_sort_builtin(),
+                array_sort_builtin(),
                 BuiltinEntryMetadata::new("sort", 1, false, false),
             ),
             (
-                js3_array_splice_builtin(),
+                array_splice_builtin(),
                 BuiltinEntryMetadata::new("splice", 2, false, false),
             ),
             (
-                js3_array_to_reversed_builtin(),
+                array_to_reversed_builtin(),
                 BuiltinEntryMetadata::new("toReversed", 0, false, false),
             ),
             (
-                js3_array_to_sorted_builtin(),
+                array_to_sorted_builtin(),
                 BuiltinEntryMetadata::new("toSorted", 1, false, false),
             ),
             (
-                js3_array_to_spliced_builtin(),
+                array_to_spliced_builtin(),
                 BuiltinEntryMetadata::new("toSpliced", 2, false, false),
             ),
             (
-                js3_array_to_string_builtin(),
+                array_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_array_to_locale_string_builtin(),
+                array_to_locale_string_builtin(),
                 BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
             ),
             (
-                js3_array_values_builtin(),
+                array_values_builtin(),
                 BuiltinEntryMetadata::new("values", 0, false, false),
             ),
             (
-                js3_array_keys_builtin(),
+                array_keys_builtin(),
                 BuiltinEntryMetadata::new("keys", 0, false, false),
             ),
             (
-                js3_array_entries_builtin(),
+                array_entries_builtin(),
                 BuiltinEntryMetadata::new("entries", 0, false, false),
             ),
             (
-                js3_array_with_builtin(),
+                array_with_builtin(),
                 BuiltinEntryMetadata::new("with", 2, false, false),
             ),
         ];
@@ -2697,123 +2659,123 @@ mod tests {
     fn keyed_collection_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_map_builtin(),
+                map_builtin(),
                 BuiltinEntryMetadata::new("Map", 0, true, true),
             ),
             (
-                js3_set_builtin(),
+                set_builtin(),
                 BuiltinEntryMetadata::new("Set", 0, true, true),
             ),
             (
-                js3_weak_map_builtin(),
+                weak_map_builtin(),
                 BuiltinEntryMetadata::new("WeakMap", 0, true, true),
             ),
             (
-                js3_weak_set_builtin(),
+                weak_set_builtin(),
                 BuiltinEntryMetadata::new("WeakSet", 0, true, true),
             ),
             (
-                js3_map_get_builtin(),
+                map_get_builtin(),
                 BuiltinEntryMetadata::new("get", 1, false, false),
             ),
             (
-                js3_map_set_builtin(),
+                map_set_builtin(),
                 BuiltinEntryMetadata::new("set", 2, false, false),
             ),
             (
-                js3_map_has_builtin(),
+                map_has_builtin(),
                 BuiltinEntryMetadata::new("has", 1, false, false),
             ),
             (
-                js3_map_delete_builtin(),
+                map_delete_builtin(),
                 BuiltinEntryMetadata::new("delete", 1, false, false),
             ),
             (
-                js3_map_clear_builtin(),
+                map_clear_builtin(),
                 BuiltinEntryMetadata::new("clear", 0, false, false),
             ),
             (
-                js3_map_entries_builtin(),
+                map_entries_builtin(),
                 BuiltinEntryMetadata::new("entries", 0, false, false),
             ),
             (
-                js3_map_values_builtin(),
+                map_values_builtin(),
                 BuiltinEntryMetadata::new("values", 0, false, false),
             ),
             (
-                js3_map_keys_builtin(),
+                map_keys_builtin(),
                 BuiltinEntryMetadata::new("keys", 0, false, false),
             ),
             (
-                js3_map_for_each_builtin(),
+                map_for_each_builtin(),
                 BuiltinEntryMetadata::new("forEach", 1, false, false),
             ),
             (
-                js3_map_size_getter_builtin(),
+                map_size_getter_builtin(),
                 BuiltinEntryMetadata::new("get size", 0, false, false),
             ),
             (
-                js3_set_add_builtin(),
+                set_add_builtin(),
                 BuiltinEntryMetadata::new("add", 1, false, false),
             ),
             (
-                js3_set_has_builtin(),
+                set_has_builtin(),
                 BuiltinEntryMetadata::new("has", 1, false, false),
             ),
             (
-                js3_set_delete_builtin(),
+                set_delete_builtin(),
                 BuiltinEntryMetadata::new("delete", 1, false, false),
             ),
             (
-                js3_set_clear_builtin(),
+                set_clear_builtin(),
                 BuiltinEntryMetadata::new("clear", 0, false, false),
             ),
             (
-                js3_set_entries_builtin(),
+                set_entries_builtin(),
                 BuiltinEntryMetadata::new("entries", 0, false, false),
             ),
             (
-                js3_set_values_builtin(),
+                set_values_builtin(),
                 BuiltinEntryMetadata::new("values", 0, false, false),
             ),
             (
-                js3_set_keys_builtin(),
+                set_keys_builtin(),
                 BuiltinEntryMetadata::new("keys", 0, false, false),
             ),
             (
-                js3_set_for_each_builtin(),
+                set_for_each_builtin(),
                 BuiltinEntryMetadata::new("forEach", 1, false, false),
             ),
             (
-                js3_set_size_getter_builtin(),
+                set_size_getter_builtin(),
                 BuiltinEntryMetadata::new("get size", 0, false, false),
             ),
             (
-                js3_weak_map_get_builtin(),
+                weak_map_get_builtin(),
                 BuiltinEntryMetadata::new("get", 1, false, false),
             ),
             (
-                js3_weak_map_set_builtin(),
+                weak_map_set_builtin(),
                 BuiltinEntryMetadata::new("set", 2, false, false),
             ),
             (
-                js3_weak_map_has_builtin(),
+                weak_map_has_builtin(),
                 BuiltinEntryMetadata::new("has", 1, false, false),
             ),
             (
-                js3_weak_map_delete_builtin(),
+                weak_map_delete_builtin(),
                 BuiltinEntryMetadata::new("delete", 1, false, false),
             ),
             (
-                js3_weak_set_add_builtin(),
+                weak_set_add_builtin(),
                 BuiltinEntryMetadata::new("add", 1, false, false),
             ),
             (
-                js3_weak_set_has_builtin(),
+                weak_set_has_builtin(),
                 BuiltinEntryMetadata::new("has", 1, false, false),
             ),
             (
-                js3_weak_set_delete_builtin(),
+                weak_set_delete_builtin(),
                 BuiltinEntryMetadata::new("delete", 1, false, false),
             ),
         ];
@@ -2835,363 +2797,363 @@ mod tests {
     fn binary_data_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_array_buffer_builtin(),
+                array_buffer_builtin(),
                 BuiltinEntryMetadata::new("ArrayBuffer", 1, true, true),
             ),
             (
-                js3_array_buffer_is_view_builtin(),
+                array_buffer_is_view_builtin(),
                 BuiltinEntryMetadata::new("isView", 1, false, false),
             ),
             (
-                js3_shared_array_buffer_builtin(),
+                shared_array_buffer_builtin(),
                 BuiltinEntryMetadata::new("SharedArrayBuffer", 1, true, true),
             ),
             (
-                js3_data_view_builtin(),
+                data_view_builtin(),
                 BuiltinEntryMetadata::new("DataView", 1, true, true),
             ),
             (
-                js3_typed_array_builtin(),
+                typed_array_builtin(),
                 BuiltinEntryMetadata::new("TypedArray", 0, true, true),
             ),
             (
-                js3_typed_array_from_builtin(),
+                typed_array_from_builtin(),
                 BuiltinEntryMetadata::new("from", 1, false, false),
             ),
             (
-                js3_typed_array_of_builtin(),
+                typed_array_of_builtin(),
                 BuiltinEntryMetadata::new("of", 0, false, false),
             ),
             (
-                js3_typed_array_every_builtin(),
+                typed_array_every_builtin(),
                 BuiltinEntryMetadata::new("every", 1, false, false),
             ),
             (
-                js3_typed_array_some_builtin(),
+                typed_array_some_builtin(),
                 BuiltinEntryMetadata::new("some", 1, false, false),
             ),
             (
-                js3_typed_array_find_builtin(),
+                typed_array_find_builtin(),
                 BuiltinEntryMetadata::new("find", 1, false, false),
             ),
             (
-                js3_typed_array_find_index_builtin(),
+                typed_array_find_index_builtin(),
                 BuiltinEntryMetadata::new("findIndex", 1, false, false),
             ),
             (
-                js3_typed_array_find_last_builtin(),
+                typed_array_find_last_builtin(),
                 BuiltinEntryMetadata::new("findLast", 1, false, false),
             ),
             (
-                js3_typed_array_find_last_index_builtin(),
+                typed_array_find_last_index_builtin(),
                 BuiltinEntryMetadata::new("findLastIndex", 1, false, false),
             ),
             (
-                js3_typed_array_fill_builtin(),
+                typed_array_fill_builtin(),
                 BuiltinEntryMetadata::new("fill", 1, false, false),
             ),
             (
-                js3_typed_array_copy_within_builtin(),
+                typed_array_copy_within_builtin(),
                 BuiltinEntryMetadata::new("copyWithin", 2, false, false),
             ),
             (
-                js3_typed_array_filter_builtin(),
+                typed_array_filter_builtin(),
                 BuiltinEntryMetadata::new("filter", 1, false, false),
             ),
             (
-                js3_typed_array_for_each_builtin(),
+                typed_array_for_each_builtin(),
                 BuiltinEntryMetadata::new("forEach", 1, false, false),
             ),
             (
-                js3_typed_array_includes_builtin(),
+                typed_array_includes_builtin(),
                 BuiltinEntryMetadata::new("includes", 1, false, false),
             ),
             (
-                js3_typed_array_index_of_builtin(),
+                typed_array_index_of_builtin(),
                 BuiltinEntryMetadata::new("indexOf", 1, false, false),
             ),
             (
-                js3_typed_array_join_builtin(),
+                typed_array_join_builtin(),
                 BuiltinEntryMetadata::new("join", 1, false, false),
             ),
             (
-                js3_typed_array_last_index_of_builtin(),
+                typed_array_last_index_of_builtin(),
                 BuiltinEntryMetadata::new("lastIndexOf", 1, false, false),
             ),
             (
-                js3_typed_array_map_builtin(),
+                typed_array_map_builtin(),
                 BuiltinEntryMetadata::new("map", 1, false, false),
             ),
             (
-                js3_typed_array_reduce_builtin(),
+                typed_array_reduce_builtin(),
                 BuiltinEntryMetadata::new("reduce", 1, false, false),
             ),
             (
-                js3_typed_array_reduce_right_builtin(),
+                typed_array_reduce_right_builtin(),
                 BuiltinEntryMetadata::new("reduceRight", 1, false, false),
             ),
             (
-                js3_typed_array_reverse_builtin(),
+                typed_array_reverse_builtin(),
                 BuiltinEntryMetadata::new("reverse", 0, false, false),
             ),
             (
-                js3_typed_array_sort_builtin(),
+                typed_array_sort_builtin(),
                 BuiltinEntryMetadata::new("sort", 1, false, false),
             ),
             (
-                js3_typed_array_to_locale_string_builtin(),
+                typed_array_to_locale_string_builtin(),
                 BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
             ),
             (
-                js3_typed_array_to_string_builtin(),
+                typed_array_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_typed_array_to_reversed_builtin(),
+                typed_array_to_reversed_builtin(),
                 BuiltinEntryMetadata::new("toReversed", 0, false, false),
             ),
             (
-                js3_typed_array_to_sorted_builtin(),
+                typed_array_to_sorted_builtin(),
                 BuiltinEntryMetadata::new("toSorted", 1, false, false),
             ),
             (
-                js3_typed_array_with_builtin(),
+                typed_array_with_builtin(),
                 BuiltinEntryMetadata::new("with", 2, false, false),
             ),
             (
-                js3_int8_array_builtin(),
+                int8_array_builtin(),
                 BuiltinEntryMetadata::new("Int8Array", 3, true, true),
             ),
             (
-                js3_int16_array_builtin(),
+                int16_array_builtin(),
                 BuiltinEntryMetadata::new("Int16Array", 3, true, true),
             ),
             (
-                js3_int32_array_builtin(),
+                int32_array_builtin(),
                 BuiltinEntryMetadata::new("Int32Array", 3, true, true),
             ),
             (
-                js3_float32_array_builtin(),
+                float32_array_builtin(),
                 BuiltinEntryMetadata::new("Float32Array", 3, true, true),
             ),
             (
-                js3_float64_array_builtin(),
+                float64_array_builtin(),
                 BuiltinEntryMetadata::new("Float64Array", 3, true, true),
             ),
             (
-                js3_big_int64_array_builtin(),
+                big_int64_array_builtin(),
                 BuiltinEntryMetadata::new("BigInt64Array", 3, true, true),
             ),
             (
-                js3_big_uint64_array_builtin(),
+                big_uint64_array_builtin(),
                 BuiltinEntryMetadata::new("BigUint64Array", 3, true, true),
             ),
             (
-                js3_uint32_array_builtin(),
+                uint32_array_builtin(),
                 BuiltinEntryMetadata::new("Uint32Array", 3, true, true),
             ),
             (
-                js3_uint16_array_builtin(),
+                uint16_array_builtin(),
                 BuiltinEntryMetadata::new("Uint16Array", 3, true, true),
             ),
             (
-                js3_uint8_clamped_array_builtin(),
+                uint8_clamped_array_builtin(),
                 BuiltinEntryMetadata::new("Uint8ClampedArray", 3, true, true),
             ),
             (
-                js3_uint8_array_builtin(),
+                uint8_array_builtin(),
                 BuiltinEntryMetadata::new("Uint8Array", 3, true, true),
             ),
             (
-                js3_array_buffer_byte_length_getter_builtin(),
+                array_buffer_byte_length_getter_builtin(),
                 BuiltinEntryMetadata::new("get byteLength", 0, false, false),
             ),
             (
-                js3_array_buffer_slice_builtin(),
+                array_buffer_slice_builtin(),
                 BuiltinEntryMetadata::new("slice", 2, false, false),
             ),
             (
-                js3_shared_array_buffer_byte_length_getter_builtin(),
+                shared_array_buffer_byte_length_getter_builtin(),
                 BuiltinEntryMetadata::new("get byteLength", 0, false, false),
             ),
             (
-                js3_shared_array_buffer_slice_builtin(),
+                shared_array_buffer_slice_builtin(),
                 BuiltinEntryMetadata::new("slice", 2, false, false),
             ),
             (
-                js3_atomics_load_builtin(),
+                atomics_load_builtin(),
                 BuiltinEntryMetadata::new("load", 2, false, false),
             ),
             (
-                js3_atomics_store_builtin(),
+                atomics_store_builtin(),
                 BuiltinEntryMetadata::new("store", 3, false, false),
             ),
             (
-                js3_atomics_add_builtin(),
+                atomics_add_builtin(),
                 BuiltinEntryMetadata::new("add", 3, false, false),
             ),
             (
-                js3_atomics_sub_builtin(),
+                atomics_sub_builtin(),
                 BuiltinEntryMetadata::new("sub", 3, false, false),
             ),
             (
-                js3_atomics_and_builtin(),
+                atomics_and_builtin(),
                 BuiltinEntryMetadata::new("and", 3, false, false),
             ),
             (
-                js3_atomics_or_builtin(),
+                atomics_or_builtin(),
                 BuiltinEntryMetadata::new("or", 3, false, false),
             ),
             (
-                js3_atomics_xor_builtin(),
+                atomics_xor_builtin(),
                 BuiltinEntryMetadata::new("xor", 3, false, false),
             ),
             (
-                js3_atomics_exchange_builtin(),
+                atomics_exchange_builtin(),
                 BuiltinEntryMetadata::new("exchange", 3, false, false),
             ),
             (
-                js3_atomics_compare_exchange_builtin(),
+                atomics_compare_exchange_builtin(),
                 BuiltinEntryMetadata::new("compareExchange", 4, false, false),
             ),
             (
-                js3_atomics_notify_builtin(),
+                atomics_notify_builtin(),
                 BuiltinEntryMetadata::new("notify", 3, false, false),
             ),
             (
-                js3_atomics_wait_builtin(),
+                atomics_wait_builtin(),
                 BuiltinEntryMetadata::new("wait", 4, false, false),
             ),
             (
-                js3_atomics_wait_async_builtin(),
+                atomics_wait_async_builtin(),
                 BuiltinEntryMetadata::new("waitAsync", 4, false, false),
             ),
             (
-                js3_atomics_is_lock_free_builtin(),
+                atomics_is_lock_free_builtin(),
                 BuiltinEntryMetadata::new("isLockFree", 1, false, false),
             ),
             (
-                js3_data_view_buffer_getter_builtin(),
+                data_view_buffer_getter_builtin(),
                 BuiltinEntryMetadata::new("get buffer", 0, false, false),
             ),
             (
-                js3_data_view_byte_length_getter_builtin(),
+                data_view_byte_length_getter_builtin(),
                 BuiltinEntryMetadata::new("get byteLength", 0, false, false),
             ),
             (
-                js3_data_view_byte_offset_getter_builtin(),
+                data_view_byte_offset_getter_builtin(),
                 BuiltinEntryMetadata::new("get byteOffset", 0, false, false),
             ),
             (
-                js3_data_view_get_float32_builtin(),
+                data_view_get_float32_builtin(),
                 BuiltinEntryMetadata::new("getFloat32", 1, false, false),
             ),
             (
-                js3_data_view_get_float64_builtin(),
+                data_view_get_float64_builtin(),
                 BuiltinEntryMetadata::new("getFloat64", 1, false, false),
             ),
             (
-                js3_data_view_get_int16_builtin(),
+                data_view_get_int16_builtin(),
                 BuiltinEntryMetadata::new("getInt16", 1, false, false),
             ),
             (
-                js3_data_view_get_int32_builtin(),
+                data_view_get_int32_builtin(),
                 BuiltinEntryMetadata::new("getInt32", 1, false, false),
             ),
             (
-                js3_data_view_get_int8_builtin(),
+                data_view_get_int8_builtin(),
                 BuiltinEntryMetadata::new("getInt8", 1, false, false),
             ),
             (
-                js3_data_view_get_uint16_builtin(),
+                data_view_get_uint16_builtin(),
                 BuiltinEntryMetadata::new("getUint16", 1, false, false),
             ),
             (
-                js3_data_view_get_uint32_builtin(),
+                data_view_get_uint32_builtin(),
                 BuiltinEntryMetadata::new("getUint32", 1, false, false),
             ),
             (
-                js3_data_view_get_uint8_builtin(),
+                data_view_get_uint8_builtin(),
                 BuiltinEntryMetadata::new("getUint8", 1, false, false),
             ),
             (
-                js3_data_view_set_float32_builtin(),
+                data_view_set_float32_builtin(),
                 BuiltinEntryMetadata::new("setFloat32", 2, false, false),
             ),
             (
-                js3_data_view_set_float64_builtin(),
+                data_view_set_float64_builtin(),
                 BuiltinEntryMetadata::new("setFloat64", 2, false, false),
             ),
             (
-                js3_data_view_set_int16_builtin(),
+                data_view_set_int16_builtin(),
                 BuiltinEntryMetadata::new("setInt16", 2, false, false),
             ),
             (
-                js3_data_view_set_int32_builtin(),
+                data_view_set_int32_builtin(),
                 BuiltinEntryMetadata::new("setInt32", 2, false, false),
             ),
             (
-                js3_data_view_set_int8_builtin(),
+                data_view_set_int8_builtin(),
                 BuiltinEntryMetadata::new("setInt8", 2, false, false),
             ),
             (
-                js3_data_view_set_uint16_builtin(),
+                data_view_set_uint16_builtin(),
                 BuiltinEntryMetadata::new("setUint16", 2, false, false),
             ),
             (
-                js3_data_view_set_uint32_builtin(),
+                data_view_set_uint32_builtin(),
                 BuiltinEntryMetadata::new("setUint32", 2, false, false),
             ),
             (
-                js3_data_view_set_uint8_builtin(),
+                data_view_set_uint8_builtin(),
                 BuiltinEntryMetadata::new("setUint8", 2, false, false),
             ),
             (
-                js3_uint8_array_buffer_getter_builtin(),
+                uint8_array_buffer_getter_builtin(),
                 BuiltinEntryMetadata::new("get buffer", 0, false, false),
             ),
             (
-                js3_uint8_array_byte_length_getter_builtin(),
+                uint8_array_byte_length_getter_builtin(),
                 BuiltinEntryMetadata::new("get byteLength", 0, false, false),
             ),
             (
-                js3_uint8_array_byte_offset_getter_builtin(),
+                uint8_array_byte_offset_getter_builtin(),
                 BuiltinEntryMetadata::new("get byteOffset", 0, false, false),
             ),
             (
-                js3_uint8_array_length_getter_builtin(),
+                uint8_array_length_getter_builtin(),
                 BuiltinEntryMetadata::new("get length", 0, false, false),
             ),
             (
-                js3_uint8_array_values_builtin(),
+                uint8_array_values_builtin(),
                 BuiltinEntryMetadata::new("values", 0, false, false),
             ),
             (
-                js3_uint8_array_keys_builtin(),
+                uint8_array_keys_builtin(),
                 BuiltinEntryMetadata::new("keys", 0, false, false),
             ),
             (
-                js3_uint8_array_entries_builtin(),
+                uint8_array_entries_builtin(),
                 BuiltinEntryMetadata::new("entries", 0, false, false),
             ),
             (
-                js3_uint8_array_set_builtin(),
+                uint8_array_set_builtin(),
                 BuiltinEntryMetadata::new("set", 1, false, false),
             ),
             (
-                js3_uint8_array_slice_builtin(),
+                uint8_array_slice_builtin(),
                 BuiltinEntryMetadata::new("slice", 2, false, false),
             ),
             (
-                js3_uint8_array_subarray_builtin(),
+                uint8_array_subarray_builtin(),
                 BuiltinEntryMetadata::new("subarray", 2, false, false),
             ),
             (
-                js3_typed_array_at_builtin(),
+                typed_array_at_builtin(),
                 BuiltinEntryMetadata::new("at", 1, false, false),
             ),
             (
-                js3_typed_array_to_string_tag_getter_builtin(),
+                typed_array_to_string_tag_getter_builtin(),
                 BuiltinEntryMetadata::new("get [Symbol.toStringTag]", 0, false, false),
             ),
         ];
@@ -3207,83 +3169,83 @@ mod tests {
     fn object_reflection_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_json_parse_builtin(),
+                json_parse_builtin(),
                 BuiltinEntryMetadata::new("parse", 2, false, false),
             ),
             (
-                js3_json_stringify_builtin(),
+                json_stringify_builtin(),
                 BuiltinEntryMetadata::new("stringify", 3, false, false),
             ),
             (
-                js3_json_raw_json_builtin(),
+                json_raw_json_builtin(),
                 BuiltinEntryMetadata::new("rawJSON", 1, false, false),
             ),
             (
-                js3_json_is_raw_json_builtin(),
+                json_is_raw_json_builtin(),
                 BuiltinEntryMetadata::new("isRawJSON", 1, false, false),
             ),
             (
-                js3_reflect_apply_builtin(),
+                reflect_apply_builtin(),
                 BuiltinEntryMetadata::new("apply", 3, false, false),
             ),
             (
-                js3_reflect_construct_builtin(),
+                reflect_construct_builtin(),
                 BuiltinEntryMetadata::new("construct", 2, false, false),
             ),
             (
-                js3_reflect_define_property_builtin(),
+                reflect_define_property_builtin(),
                 BuiltinEntryMetadata::new("defineProperty", 3, false, false),
             ),
             (
-                js3_reflect_delete_property_builtin(),
+                reflect_delete_property_builtin(),
                 BuiltinEntryMetadata::new("deleteProperty", 2, false, false),
             ),
             (
-                js3_reflect_get_builtin(),
+                reflect_get_builtin(),
                 BuiltinEntryMetadata::new("get", 2, false, false),
             ),
             (
-                js3_reflect_get_own_property_descriptor_builtin(),
+                reflect_get_own_property_descriptor_builtin(),
                 BuiltinEntryMetadata::new("getOwnPropertyDescriptor", 2, false, false),
             ),
             (
-                js3_reflect_get_prototype_of_builtin(),
+                reflect_get_prototype_of_builtin(),
                 BuiltinEntryMetadata::new("getPrototypeOf", 1, false, false),
             ),
             (
-                js3_reflect_has_builtin(),
+                reflect_has_builtin(),
                 BuiltinEntryMetadata::new("has", 2, false, false),
             ),
             (
-                js3_reflect_is_extensible_builtin(),
+                reflect_is_extensible_builtin(),
                 BuiltinEntryMetadata::new("isExtensible", 1, false, false),
             ),
             (
-                js3_reflect_own_keys_builtin(),
+                reflect_own_keys_builtin(),
                 BuiltinEntryMetadata::new("ownKeys", 1, false, false),
             ),
             (
-                js3_reflect_prevent_extensions_builtin(),
+                reflect_prevent_extensions_builtin(),
                 BuiltinEntryMetadata::new("preventExtensions", 1, false, false),
             ),
             (
-                js3_reflect_set_builtin(),
+                reflect_set_builtin(),
                 BuiltinEntryMetadata::new("set", 3, false, false),
             ),
             (
-                js3_reflect_set_prototype_of_builtin(),
+                reflect_set_prototype_of_builtin(),
                 BuiltinEntryMetadata::new("setPrototypeOf", 2, false, false),
             ),
             (
-                js3_proxy_builtin(),
+                proxy_builtin(),
                 BuiltinEntryMetadata::new("Proxy", 2, true, false),
             ),
             (
-                js3_proxy_revocable_builtin(),
+                proxy_revocable_builtin(),
                 BuiltinEntryMetadata::new("revocable", 2, false, false),
             ),
             (
-                js3_proxy_revoke_builtin(),
+                proxy_revoke_builtin(),
                 BuiltinEntryMetadata::new("", 0, false, false),
             ),
         ];
@@ -3305,179 +3267,179 @@ mod tests {
     fn text_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_iterator_prototype_iterator_builtin(),
+                iterator_prototype_iterator_builtin(),
                 BuiltinEntryMetadata::new("[Symbol.iterator]", 0, false, false),
             ),
             (
-                js3_array_iterator_next_builtin(),
+                array_iterator_next_builtin(),
                 BuiltinEntryMetadata::new("next", 0, false, false),
             ),
             (
-                js3_map_iterator_next_builtin(),
+                map_iterator_next_builtin(),
                 BuiltinEntryMetadata::new("next", 0, false, false),
             ),
             (
-                js3_set_iterator_next_builtin(),
+                set_iterator_next_builtin(),
                 BuiltinEntryMetadata::new("next", 0, false, false),
             ),
             (
-                js3_string_builtin(),
+                string_builtin(),
                 BuiltinEntryMetadata::new("String", 1, true, true),
             ),
             (
-                js3_string_iterator_builtin(),
+                string_iterator_builtin(),
                 BuiltinEntryMetadata::new("[Symbol.iterator]", 0, false, false),
             ),
             (
-                js3_string_iterator_next_builtin(),
+                string_iterator_next_builtin(),
                 BuiltinEntryMetadata::new("next", 0, false, false),
             ),
             (
-                js3_string_to_string_builtin(),
+                string_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_string_value_of_builtin(),
+                string_value_of_builtin(),
                 BuiltinEntryMetadata::new("valueOf", 0, false, false),
             ),
             (
-                js3_string_concat_builtin(),
+                string_concat_builtin(),
                 BuiltinEntryMetadata::new("concat", 1, false, false),
             ),
             (
-                js3_string_char_at_builtin(),
+                string_char_at_builtin(),
                 BuiltinEntryMetadata::new("charAt", 1, false, false),
             ),
             (
-                js3_string_char_code_at_builtin(),
+                string_char_code_at_builtin(),
                 BuiltinEntryMetadata::new("charCodeAt", 1, false, false),
             ),
             (
-                js3_string_from_char_code_builtin(),
+                string_from_char_code_builtin(),
                 BuiltinEntryMetadata::new("fromCharCode", 1, false, false),
             ),
             (
-                js3_string_from_code_point_builtin(),
+                string_from_code_point_builtin(),
                 BuiltinEntryMetadata::new("fromCodePoint", 1, false, false),
             ),
             (
-                js3_string_raw_builtin(),
+                string_raw_builtin(),
                 BuiltinEntryMetadata::new("raw", 1, false, false),
             ),
             (
-                js3_string_at_builtin(),
+                string_at_builtin(),
                 BuiltinEntryMetadata::new("at", 1, false, false),
             ),
             (
-                js3_string_code_point_at_builtin(),
+                string_code_point_at_builtin(),
                 BuiltinEntryMetadata::new("codePointAt", 1, false, false),
             ),
             (
-                js3_string_ends_with_builtin(),
+                string_ends_with_builtin(),
                 BuiltinEntryMetadata::new("endsWith", 1, false, false),
             ),
             (
-                js3_string_includes_builtin(),
+                string_includes_builtin(),
                 BuiltinEntryMetadata::new("includes", 1, false, false),
             ),
             (
-                js3_string_index_of_builtin(),
+                string_index_of_builtin(),
                 BuiltinEntryMetadata::new("indexOf", 1, false, false),
             ),
             (
-                js3_string_is_well_formed_builtin(),
+                string_is_well_formed_builtin(),
                 BuiltinEntryMetadata::new("isWellFormed", 0, false, false),
             ),
             (
-                js3_string_locale_compare_builtin(),
+                string_locale_compare_builtin(),
                 BuiltinEntryMetadata::new("localeCompare", 1, false, false),
             ),
             (
-                js3_string_match_builtin(),
+                string_match_builtin(),
                 BuiltinEntryMetadata::new("match", 1, false, false),
             ),
             (
-                js3_string_match_all_builtin(),
+                string_match_all_builtin(),
                 BuiltinEntryMetadata::new("matchAll", 1, false, false),
             ),
             (
-                js3_string_normalize_builtin(),
+                string_normalize_builtin(),
                 BuiltinEntryMetadata::new("normalize", 0, false, false),
             ),
             (
-                js3_string_last_index_of_builtin(),
+                string_last_index_of_builtin(),
                 BuiltinEntryMetadata::new("lastIndexOf", 1, false, false),
             ),
             (
-                js3_string_pad_end_builtin(),
+                string_pad_end_builtin(),
                 BuiltinEntryMetadata::new("padEnd", 1, false, false),
             ),
             (
-                js3_string_pad_start_builtin(),
+                string_pad_start_builtin(),
                 BuiltinEntryMetadata::new("padStart", 1, false, false),
             ),
             (
-                js3_string_repeat_builtin(),
+                string_repeat_builtin(),
                 BuiltinEntryMetadata::new("repeat", 1, false, false),
             ),
             (
-                js3_string_replace_builtin(),
+                string_replace_builtin(),
                 BuiltinEntryMetadata::new("replace", 2, false, false),
             ),
             (
-                js3_string_replace_all_builtin(),
+                string_replace_all_builtin(),
                 BuiltinEntryMetadata::new("replaceAll", 2, false, false),
             ),
             (
-                js3_string_search_builtin(),
+                string_search_builtin(),
                 BuiltinEntryMetadata::new("search", 1, false, false),
             ),
             (
-                js3_string_split_builtin(),
+                string_split_builtin(),
                 BuiltinEntryMetadata::new("split", 2, false, false),
             ),
             (
-                js3_string_slice_builtin(),
+                string_slice_builtin(),
                 BuiltinEntryMetadata::new("slice", 2, false, false),
             ),
             (
-                js3_string_substring_builtin(),
+                string_substring_builtin(),
                 BuiltinEntryMetadata::new("substring", 2, false, false),
             ),
             (
-                js3_string_starts_with_builtin(),
+                string_starts_with_builtin(),
                 BuiltinEntryMetadata::new("startsWith", 1, false, false),
             ),
             (
-                js3_string_to_locale_lower_case_builtin(),
+                string_to_locale_lower_case_builtin(),
                 BuiltinEntryMetadata::new("toLocaleLowerCase", 0, false, false),
             ),
             (
-                js3_string_to_locale_upper_case_builtin(),
+                string_to_locale_upper_case_builtin(),
                 BuiltinEntryMetadata::new("toLocaleUpperCase", 0, false, false),
             ),
             (
-                js3_string_to_lower_case_builtin(),
+                string_to_lower_case_builtin(),
                 BuiltinEntryMetadata::new("toLowerCase", 0, false, false),
             ),
             (
-                js3_string_to_upper_case_builtin(),
+                string_to_upper_case_builtin(),
                 BuiltinEntryMetadata::new("toUpperCase", 0, false, false),
             ),
             (
-                js3_string_to_well_formed_builtin(),
+                string_to_well_formed_builtin(),
                 BuiltinEntryMetadata::new("toWellFormed", 0, false, false),
             ),
             (
-                js3_string_trim_builtin(),
+                string_trim_builtin(),
                 BuiltinEntryMetadata::new("trim", 0, false, false),
             ),
             (
-                js3_string_trim_end_builtin(),
+                string_trim_end_builtin(),
                 BuiltinEntryMetadata::new("trimEnd", 0, false, false),
             ),
             (
-                js3_string_trim_start_builtin(),
+                string_trim_start_builtin(),
                 BuiltinEntryMetadata::new("trimStart", 0, false, false),
             ),
         ];
@@ -3493,83 +3455,83 @@ mod tests {
     fn regexp_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_regexp_builtin(),
+                regexp_builtin(),
                 BuiltinEntryMetadata::new("RegExp", 2, true, true),
             ),
             (
-                js3_regexp_escape_builtin(),
+                regexp_escape_builtin(),
                 BuiltinEntryMetadata::new("escape", 1, false, false),
             ),
             (
-                js3_regexp_to_string_builtin(),
+                regexp_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_regexp_exec_builtin(),
+                regexp_exec_builtin(),
                 BuiltinEntryMetadata::new("exec", 1, false, false),
             ),
             (
-                js3_regexp_test_builtin(),
+                regexp_test_builtin(),
                 BuiltinEntryMetadata::new("test", 1, false, false),
             ),
             (
-                js3_regexp_global_getter_builtin(),
+                regexp_global_getter_builtin(),
                 BuiltinEntryMetadata::new("get global", 0, false, false),
             ),
             (
-                js3_regexp_ignore_case_getter_builtin(),
+                regexp_ignore_case_getter_builtin(),
                 BuiltinEntryMetadata::new("get ignoreCase", 0, false, false),
             ),
             (
-                js3_regexp_multiline_getter_builtin(),
+                regexp_multiline_getter_builtin(),
                 BuiltinEntryMetadata::new("get multiline", 0, false, false),
             ),
             (
-                js3_regexp_dot_all_getter_builtin(),
+                regexp_dot_all_getter_builtin(),
                 BuiltinEntryMetadata::new("get dotAll", 0, false, false),
             ),
             (
-                js3_regexp_unicode_getter_builtin(),
+                regexp_unicode_getter_builtin(),
                 BuiltinEntryMetadata::new("get unicode", 0, false, false),
             ),
             (
-                js3_regexp_sticky_getter_builtin(),
+                regexp_sticky_getter_builtin(),
                 BuiltinEntryMetadata::new("get sticky", 0, false, false),
             ),
             (
-                js3_regexp_source_getter_builtin(),
+                regexp_source_getter_builtin(),
                 BuiltinEntryMetadata::new("get source", 0, false, false),
             ),
             (
-                js3_regexp_flags_getter_builtin(),
+                regexp_flags_getter_builtin(),
                 BuiltinEntryMetadata::new("get flags", 0, false, false),
             ),
             (
-                js3_regexp_has_indices_getter_builtin(),
+                regexp_has_indices_getter_builtin(),
                 BuiltinEntryMetadata::new("get hasIndices", 0, false, false),
             ),
             (
-                js3_regexp_species_getter_builtin(),
+                regexp_species_getter_builtin(),
                 BuiltinEntryMetadata::new("get [Symbol.species]", 0, false, false),
             ),
             (
-                js3_regexp_symbol_match_builtin(),
+                regexp_symbol_match_builtin(),
                 BuiltinEntryMetadata::new("[Symbol.match]", 1, false, false),
             ),
             (
-                js3_regexp_symbol_replace_builtin(),
+                regexp_symbol_replace_builtin(),
                 BuiltinEntryMetadata::new("[Symbol.replace]", 2, false, false),
             ),
             (
-                js3_regexp_symbol_search_builtin(),
+                regexp_symbol_search_builtin(),
                 BuiltinEntryMetadata::new("[Symbol.search]", 1, false, false),
             ),
             (
-                js3_regexp_symbol_split_builtin(),
+                regexp_symbol_split_builtin(),
                 BuiltinEntryMetadata::new("[Symbol.split]", 2, false, false),
             ),
             (
-                js3_regexp_symbol_match_all_builtin(),
+                regexp_symbol_match_all_builtin(),
                 BuiltinEntryMetadata::new("[Symbol.matchAll]", 1, false, false),
             ),
         ];
@@ -3585,199 +3547,199 @@ mod tests {
     fn date_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_date_builtin(),
+                date_builtin(),
                 BuiltinEntryMetadata::new("Date", 7, true, true),
             ),
             (
-                js3_date_now_builtin(),
+                date_now_builtin(),
                 BuiltinEntryMetadata::new("now", 0, false, false),
             ),
             (
-                js3_date_parse_builtin(),
+                date_parse_builtin(),
                 BuiltinEntryMetadata::new("parse", 1, false, false),
             ),
             (
-                js3_date_utc_builtin(),
+                date_utc_builtin(),
                 BuiltinEntryMetadata::new("UTC", 7, false, false),
             ),
             (
-                js3_date_to_string_builtin(),
+                date_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_date_to_date_string_builtin(),
+                date_to_date_string_builtin(),
                 BuiltinEntryMetadata::new("toDateString", 0, false, false),
             ),
             (
-                js3_date_to_time_string_builtin(),
+                date_to_time_string_builtin(),
                 BuiltinEntryMetadata::new("toTimeString", 0, false, false),
             ),
             (
-                js3_date_to_locale_string_builtin(),
+                date_to_locale_string_builtin(),
                 BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
             ),
             (
-                js3_date_to_locale_date_string_builtin(),
+                date_to_locale_date_string_builtin(),
                 BuiltinEntryMetadata::new("toLocaleDateString", 0, false, false),
             ),
             (
-                js3_date_to_locale_time_string_builtin(),
+                date_to_locale_time_string_builtin(),
                 BuiltinEntryMetadata::new("toLocaleTimeString", 0, false, false),
             ),
             (
-                js3_date_value_of_builtin(),
+                date_value_of_builtin(),
                 BuiltinEntryMetadata::new("valueOf", 0, false, false),
             ),
             (
-                js3_date_get_time_builtin(),
+                date_get_time_builtin(),
                 BuiltinEntryMetadata::new("getTime", 0, false, false),
             ),
             (
-                js3_date_get_full_year_builtin(),
+                date_get_full_year_builtin(),
                 BuiltinEntryMetadata::new("getFullYear", 0, false, false),
             ),
             (
-                js3_date_get_utc_full_year_builtin(),
+                date_get_utc_full_year_builtin(),
                 BuiltinEntryMetadata::new("getUTCFullYear", 0, false, false),
             ),
             (
-                js3_date_get_month_builtin(),
+                date_get_month_builtin(),
                 BuiltinEntryMetadata::new("getMonth", 0, false, false),
             ),
             (
-                js3_date_get_utc_month_builtin(),
+                date_get_utc_month_builtin(),
                 BuiltinEntryMetadata::new("getUTCMonth", 0, false, false),
             ),
             (
-                js3_date_get_date_builtin(),
+                date_get_date_builtin(),
                 BuiltinEntryMetadata::new("getDate", 0, false, false),
             ),
             (
-                js3_date_get_utc_date_builtin(),
+                date_get_utc_date_builtin(),
                 BuiltinEntryMetadata::new("getUTCDate", 0, false, false),
             ),
             (
-                js3_date_get_day_builtin(),
+                date_get_day_builtin(),
                 BuiltinEntryMetadata::new("getDay", 0, false, false),
             ),
             (
-                js3_date_get_utc_day_builtin(),
+                date_get_utc_day_builtin(),
                 BuiltinEntryMetadata::new("getUTCDay", 0, false, false),
             ),
             (
-                js3_date_get_hours_builtin(),
+                date_get_hours_builtin(),
                 BuiltinEntryMetadata::new("getHours", 0, false, false),
             ),
             (
-                js3_date_get_utc_hours_builtin(),
+                date_get_utc_hours_builtin(),
                 BuiltinEntryMetadata::new("getUTCHours", 0, false, false),
             ),
             (
-                js3_date_get_minutes_builtin(),
+                date_get_minutes_builtin(),
                 BuiltinEntryMetadata::new("getMinutes", 0, false, false),
             ),
             (
-                js3_date_get_utc_minutes_builtin(),
+                date_get_utc_minutes_builtin(),
                 BuiltinEntryMetadata::new("getUTCMinutes", 0, false, false),
             ),
             (
-                js3_date_get_seconds_builtin(),
+                date_get_seconds_builtin(),
                 BuiltinEntryMetadata::new("getSeconds", 0, false, false),
             ),
             (
-                js3_date_get_utc_seconds_builtin(),
+                date_get_utc_seconds_builtin(),
                 BuiltinEntryMetadata::new("getUTCSeconds", 0, false, false),
             ),
             (
-                js3_date_get_milliseconds_builtin(),
+                date_get_milliseconds_builtin(),
                 BuiltinEntryMetadata::new("getMilliseconds", 0, false, false),
             ),
             (
-                js3_date_get_utc_milliseconds_builtin(),
+                date_get_utc_milliseconds_builtin(),
                 BuiltinEntryMetadata::new("getUTCMilliseconds", 0, false, false),
             ),
             (
-                js3_date_get_timezone_offset_builtin(),
+                date_get_timezone_offset_builtin(),
                 BuiltinEntryMetadata::new("getTimezoneOffset", 0, false, false),
             ),
             (
-                js3_date_set_time_builtin(),
+                date_set_time_builtin(),
                 BuiltinEntryMetadata::new("setTime", 1, false, false),
             ),
             (
-                js3_date_set_milliseconds_builtin(),
+                date_set_milliseconds_builtin(),
                 BuiltinEntryMetadata::new("setMilliseconds", 1, false, false),
             ),
             (
-                js3_date_set_utc_milliseconds_builtin(),
+                date_set_utc_milliseconds_builtin(),
                 BuiltinEntryMetadata::new("setUTCMilliseconds", 1, false, false),
             ),
             (
-                js3_date_set_seconds_builtin(),
+                date_set_seconds_builtin(),
                 BuiltinEntryMetadata::new("setSeconds", 2, false, false),
             ),
             (
-                js3_date_set_utc_seconds_builtin(),
+                date_set_utc_seconds_builtin(),
                 BuiltinEntryMetadata::new("setUTCSeconds", 2, false, false),
             ),
             (
-                js3_date_set_minutes_builtin(),
+                date_set_minutes_builtin(),
                 BuiltinEntryMetadata::new("setMinutes", 3, false, false),
             ),
             (
-                js3_date_set_utc_minutes_builtin(),
+                date_set_utc_minutes_builtin(),
                 BuiltinEntryMetadata::new("setUTCMinutes", 3, false, false),
             ),
             (
-                js3_date_set_hours_builtin(),
+                date_set_hours_builtin(),
                 BuiltinEntryMetadata::new("setHours", 4, false, false),
             ),
             (
-                js3_date_set_utc_hours_builtin(),
+                date_set_utc_hours_builtin(),
                 BuiltinEntryMetadata::new("setUTCHours", 4, false, false),
             ),
             (
-                js3_date_set_date_builtin(),
+                date_set_date_builtin(),
                 BuiltinEntryMetadata::new("setDate", 1, false, false),
             ),
             (
-                js3_date_set_utc_date_builtin(),
+                date_set_utc_date_builtin(),
                 BuiltinEntryMetadata::new("setUTCDate", 1, false, false),
             ),
             (
-                js3_date_set_month_builtin(),
+                date_set_month_builtin(),
                 BuiltinEntryMetadata::new("setMonth", 2, false, false),
             ),
             (
-                js3_date_set_utc_month_builtin(),
+                date_set_utc_month_builtin(),
                 BuiltinEntryMetadata::new("setUTCMonth", 2, false, false),
             ),
             (
-                js3_date_set_full_year_builtin(),
+                date_set_full_year_builtin(),
                 BuiltinEntryMetadata::new("setFullYear", 3, false, false),
             ),
             (
-                js3_date_set_utc_full_year_builtin(),
+                date_set_utc_full_year_builtin(),
                 BuiltinEntryMetadata::new("setUTCFullYear", 3, false, false),
             ),
             (
-                js3_date_to_utc_string_builtin(),
+                date_to_utc_string_builtin(),
                 BuiltinEntryMetadata::new("toUTCString", 0, false, false),
             ),
             (
-                js3_date_to_iso_string_builtin(),
+                date_to_iso_string_builtin(),
                 BuiltinEntryMetadata::new("toISOString", 0, false, false),
             ),
             (
-                js3_date_to_json_builtin(),
+                date_to_json_builtin(),
                 BuiltinEntryMetadata::new("toJSON", 1, false, false),
             ),
             (
-                js3_date_to_temporal_instant_builtin(),
+                date_to_temporal_instant_builtin(),
                 BuiltinEntryMetadata::new("toTemporalInstant", 0, false, false),
             ),
             (
-                js3_date_to_primitive_builtin(),
+                date_to_primitive_builtin(),
                 BuiltinEntryMetadata::new("[Symbol.toPrimitive]", 1, false, false),
             ),
         ];
@@ -3793,259 +3755,259 @@ mod tests {
     fn primitive_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_number_builtin(),
+                number_builtin(),
                 BuiltinEntryMetadata::new("Number", 1, true, true),
             ),
             (
-                js3_number_is_finite_builtin(),
+                number_is_finite_builtin(),
                 BuiltinEntryMetadata::new("isFinite", 1, false, false),
             ),
             (
-                js3_number_is_integer_builtin(),
+                number_is_integer_builtin(),
                 BuiltinEntryMetadata::new("isInteger", 1, false, false),
             ),
             (
-                js3_number_is_nan_builtin(),
+                number_is_nan_builtin(),
                 BuiltinEntryMetadata::new("isNaN", 1, false, false),
             ),
             (
-                js3_number_is_safe_integer_builtin(),
+                number_is_safe_integer_builtin(),
                 BuiltinEntryMetadata::new("isSafeInteger", 1, false, false),
             ),
             (
-                js3_number_to_exponential_builtin(),
+                number_to_exponential_builtin(),
                 BuiltinEntryMetadata::new("toExponential", 1, false, false),
             ),
             (
-                js3_number_to_fixed_builtin(),
+                number_to_fixed_builtin(),
                 BuiltinEntryMetadata::new("toFixed", 1, false, false),
             ),
             (
-                js3_number_to_locale_string_builtin(),
+                number_to_locale_string_builtin(),
                 BuiltinEntryMetadata::new("toLocaleString", 0, false, false),
             ),
             (
-                js3_number_to_precision_builtin(),
+                number_to_precision_builtin(),
                 BuiltinEntryMetadata::new("toPrecision", 1, false, false),
             ),
             (
-                js3_number_to_string_builtin(),
+                number_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 1, false, false),
             ),
             (
-                js3_number_value_of_builtin(),
+                number_value_of_builtin(),
                 BuiltinEntryMetadata::new("valueOf", 0, false, false),
             ),
             (
-                js3_math_abs_builtin(),
+                math_abs_builtin(),
                 BuiltinEntryMetadata::new("abs", 1, false, false),
             ),
             (
-                js3_math_acos_builtin(),
+                math_acos_builtin(),
                 BuiltinEntryMetadata::new("acos", 1, false, false),
             ),
             (
-                js3_math_acosh_builtin(),
+                math_acosh_builtin(),
                 BuiltinEntryMetadata::new("acosh", 1, false, false),
             ),
             (
-                js3_math_asin_builtin(),
+                math_asin_builtin(),
                 BuiltinEntryMetadata::new("asin", 1, false, false),
             ),
             (
-                js3_math_asinh_builtin(),
+                math_asinh_builtin(),
                 BuiltinEntryMetadata::new("asinh", 1, false, false),
             ),
             (
-                js3_math_atan_builtin(),
+                math_atan_builtin(),
                 BuiltinEntryMetadata::new("atan", 1, false, false),
             ),
             (
-                js3_math_atan2_builtin(),
+                math_atan2_builtin(),
                 BuiltinEntryMetadata::new("atan2", 2, false, false),
             ),
             (
-                js3_math_atanh_builtin(),
+                math_atanh_builtin(),
                 BuiltinEntryMetadata::new("atanh", 1, false, false),
             ),
             (
-                js3_math_cbrt_builtin(),
+                math_cbrt_builtin(),
                 BuiltinEntryMetadata::new("cbrt", 1, false, false),
             ),
             (
-                js3_math_ceil_builtin(),
+                math_ceil_builtin(),
                 BuiltinEntryMetadata::new("ceil", 1, false, false),
             ),
             (
-                js3_math_clz32_builtin(),
+                math_clz32_builtin(),
                 BuiltinEntryMetadata::new("clz32", 1, false, false),
             ),
             (
-                js3_math_cos_builtin(),
+                math_cos_builtin(),
                 BuiltinEntryMetadata::new("cos", 1, false, false),
             ),
             (
-                js3_math_cosh_builtin(),
+                math_cosh_builtin(),
                 BuiltinEntryMetadata::new("cosh", 1, false, false),
             ),
             (
-                js3_math_exp_builtin(),
+                math_exp_builtin(),
                 BuiltinEntryMetadata::new("exp", 1, false, false),
             ),
             (
-                js3_math_expm1_builtin(),
+                math_expm1_builtin(),
                 BuiltinEntryMetadata::new("expm1", 1, false, false),
             ),
             (
-                js3_math_f16round_builtin(),
+                math_f16round_builtin(),
                 BuiltinEntryMetadata::new("f16round", 1, false, false),
             ),
             (
-                js3_math_floor_builtin(),
+                math_floor_builtin(),
                 BuiltinEntryMetadata::new("floor", 1, false, false),
             ),
             (
-                js3_math_fround_builtin(),
+                math_fround_builtin(),
                 BuiltinEntryMetadata::new("fround", 1, false, false),
             ),
             (
-                js3_math_hypot_builtin(),
+                math_hypot_builtin(),
                 BuiltinEntryMetadata::new("hypot", 2, false, false),
             ),
             (
-                js3_math_imul_builtin(),
+                math_imul_builtin(),
                 BuiltinEntryMetadata::new("imul", 2, false, false),
             ),
             (
-                js3_math_log_builtin(),
+                math_log_builtin(),
                 BuiltinEntryMetadata::new("log", 1, false, false),
             ),
             (
-                js3_math_log10_builtin(),
+                math_log10_builtin(),
                 BuiltinEntryMetadata::new("log10", 1, false, false),
             ),
             (
-                js3_math_log1p_builtin(),
+                math_log1p_builtin(),
                 BuiltinEntryMetadata::new("log1p", 1, false, false),
             ),
             (
-                js3_math_log2_builtin(),
+                math_log2_builtin(),
                 BuiltinEntryMetadata::new("log2", 1, false, false),
             ),
             (
-                js3_math_max_builtin(),
+                math_max_builtin(),
                 BuiltinEntryMetadata::new("max", 2, false, false),
             ),
             (
-                js3_math_min_builtin(),
+                math_min_builtin(),
                 BuiltinEntryMetadata::new("min", 2, false, false),
             ),
             (
-                js3_math_pow_builtin(),
+                math_pow_builtin(),
                 BuiltinEntryMetadata::new("pow", 2, false, false),
             ),
             (
-                js3_math_random_builtin(),
+                math_random_builtin(),
                 BuiltinEntryMetadata::new("random", 0, false, false),
             ),
             (
-                js3_math_round_builtin(),
+                math_round_builtin(),
                 BuiltinEntryMetadata::new("round", 1, false, false),
             ),
             (
-                js3_math_sign_builtin(),
+                math_sign_builtin(),
                 BuiltinEntryMetadata::new("sign", 1, false, false),
             ),
             (
-                js3_math_sin_builtin(),
+                math_sin_builtin(),
                 BuiltinEntryMetadata::new("sin", 1, false, false),
             ),
             (
-                js3_math_sinh_builtin(),
+                math_sinh_builtin(),
                 BuiltinEntryMetadata::new("sinh", 1, false, false),
             ),
             (
-                js3_math_sqrt_builtin(),
+                math_sqrt_builtin(),
                 BuiltinEntryMetadata::new("sqrt", 1, false, false),
             ),
             (
-                js3_math_sum_precise_builtin(),
+                math_sum_precise_builtin(),
                 BuiltinEntryMetadata::new("sumPrecise", 1, false, false),
             ),
             (
-                js3_math_tan_builtin(),
+                math_tan_builtin(),
                 BuiltinEntryMetadata::new("tan", 1, false, false),
             ),
             (
-                js3_math_tanh_builtin(),
+                math_tanh_builtin(),
                 BuiltinEntryMetadata::new("tanh", 1, false, false),
             ),
             (
-                js3_math_trunc_builtin(),
+                math_trunc_builtin(),
                 BuiltinEntryMetadata::new("trunc", 1, false, false),
             ),
             (
-                js3_bigint_builtin(),
+                bigint_builtin(),
                 BuiltinEntryMetadata::new("BigInt", 1, true, true),
             ),
             (
-                js3_bigint_as_int_n_builtin(),
+                bigint_as_int_n_builtin(),
                 BuiltinEntryMetadata::new("asIntN", 2, false, false),
             ),
             (
-                js3_bigint_as_uint_n_builtin(),
+                bigint_as_uint_n_builtin(),
                 BuiltinEntryMetadata::new("asUintN", 2, false, false),
             ),
             (
-                js3_bigint_to_string_builtin(),
+                bigint_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_bigint_value_of_builtin(),
+                bigint_value_of_builtin(),
                 BuiltinEntryMetadata::new("valueOf", 0, false, false),
             ),
             (
-                js3_boolean_builtin(),
+                boolean_builtin(),
                 BuiltinEntryMetadata::new("Boolean", 1, true, true),
             ),
             (
-                js3_boolean_to_string_builtin(),
+                boolean_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_boolean_value_of_builtin(),
+                boolean_value_of_builtin(),
                 BuiltinEntryMetadata::new("valueOf", 0, false, false),
             ),
             (
-                js3_symbol_builtin(),
+                symbol_builtin(),
                 BuiltinEntryMetadata::new("Symbol", 0, false, true),
             ),
             (
-                js3_symbol_for_builtin(),
+                symbol_for_builtin(),
                 BuiltinEntryMetadata::new("for", 1, false, false),
             ),
             (
-                js3_symbol_key_for_builtin(),
+                symbol_key_for_builtin(),
                 BuiltinEntryMetadata::new("keyFor", 1, false, false),
             ),
             (
-                js3_symbol_to_string_builtin(),
+                symbol_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_symbol_value_of_builtin(),
+                symbol_value_of_builtin(),
                 BuiltinEntryMetadata::new("valueOf", 0, false, false),
             ),
             (
-                js3_symbol_to_primitive_builtin(),
+                symbol_to_primitive_builtin(),
                 BuiltinEntryMetadata::new("[Symbol.toPrimitive]", 1, false, false),
             ),
             (
-                js3_array_species_getter_builtin(),
+                array_species_getter_builtin(),
                 BuiltinEntryMetadata::new("get [Symbol.species]", 0, false, false),
             ),
             (
-                js3_symbol_description_getter_builtin(),
+                symbol_description_getter_builtin(),
                 BuiltinEntryMetadata::new("get description", 0, false, false),
             ),
         ];
@@ -4061,11 +4023,11 @@ mod tests {
     fn module_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_abstract_module_source_builtin(),
+                abstract_module_source_builtin(),
                 BuiltinEntryMetadata::new("AbstractModuleSource", 0, true, true),
             ),
             (
-                js3_abstract_module_source_to_string_tag_getter_builtin(),
+                abstract_module_source_to_string_tag_getter_builtin(),
                 BuiltinEntryMetadata::new("get [Symbol.toStringTag]", 0, false, false),
             ),
         ];
@@ -4081,239 +4043,239 @@ mod tests {
     fn language_support_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_error_builtin(),
+                error_builtin(),
                 BuiltinEntryMetadata::new("Error", 1, true, true),
             ),
             (
-                js3_error_to_string_builtin(),
+                error_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
             ),
             (
-                js3_eval_error_builtin(),
+                eval_error_builtin(),
                 BuiltinEntryMetadata::new("EvalError", 1, true, true),
             ),
             (
-                js3_range_error_builtin(),
+                range_error_builtin(),
                 BuiltinEntryMetadata::new("RangeError", 1, true, true),
             ),
             (
-                js3_reference_error_builtin(),
+                reference_error_builtin(),
                 BuiltinEntryMetadata::new("ReferenceError", 1, true, true),
             ),
             (
-                js3_syntax_error_builtin(),
+                syntax_error_builtin(),
                 BuiltinEntryMetadata::new("SyntaxError", 1, true, true),
             ),
             (
-                js3_type_error_builtin(),
+                type_error_builtin(),
                 BuiltinEntryMetadata::new("TypeError", 1, true, true),
             ),
             (
-                js3_uri_error_builtin(),
+                uri_error_builtin(),
                 BuiltinEntryMetadata::new("URIError", 1, true, true),
             ),
             (
-                js3_aggregate_error_builtin(),
+                aggregate_error_builtin(),
                 BuiltinEntryMetadata::new("AggregateError", 2, true, true),
             ),
             (
-                js3_suppressed_error_builtin(),
+                suppressed_error_builtin(),
                 BuiltinEntryMetadata::new("SuppressedError", 3, true, true),
             ),
             (
-                js3_eval_builtin(),
+                eval_builtin(),
                 BuiltinEntryMetadata::new("eval", 1, false, false),
             ),
             (
-                js3_promise_builtin(),
+                promise_builtin(),
                 BuiltinEntryMetadata::new("Promise", 1, true, true),
             ),
             (
-                js3_disposable_stack_builtin(),
+                disposable_stack_builtin(),
                 BuiltinEntryMetadata::new("DisposableStack", 0, true, true),
             ),
             (
-                js3_disposable_stack_use_builtin(),
+                disposable_stack_use_builtin(),
                 BuiltinEntryMetadata::new("use", 1, false, false),
             ),
             (
-                js3_disposable_stack_adopt_builtin(),
+                disposable_stack_adopt_builtin(),
                 BuiltinEntryMetadata::new("adopt", 2, false, false),
             ),
             (
-                js3_disposable_stack_defer_builtin(),
+                disposable_stack_defer_builtin(),
                 BuiltinEntryMetadata::new("defer", 1, false, false),
             ),
             (
-                js3_disposable_stack_move_builtin(),
+                disposable_stack_move_builtin(),
                 BuiltinEntryMetadata::new("move", 0, false, false),
             ),
             (
-                js3_disposable_stack_disposed_getter_builtin(),
+                disposable_stack_disposed_getter_builtin(),
                 BuiltinEntryMetadata::new("get disposed", 0, false, false),
             ),
             (
-                js3_disposable_stack_dispose_builtin(),
+                disposable_stack_dispose_builtin(),
                 BuiltinEntryMetadata::new("dispose", 0, false, false),
             ),
             (
-                js3_async_disposable_stack_builtin(),
+                async_disposable_stack_builtin(),
                 BuiltinEntryMetadata::new("AsyncDisposableStack", 0, true, true),
             ),
             (
-                js3_async_disposable_stack_use_builtin(),
+                async_disposable_stack_use_builtin(),
                 BuiltinEntryMetadata::new("use", 1, false, false),
             ),
             (
-                js3_async_disposable_stack_adopt_builtin(),
+                async_disposable_stack_adopt_builtin(),
                 BuiltinEntryMetadata::new("adopt", 2, false, false),
             ),
             (
-                js3_async_disposable_stack_defer_builtin(),
+                async_disposable_stack_defer_builtin(),
                 BuiltinEntryMetadata::new("defer", 1, false, false),
             ),
             (
-                js3_async_disposable_stack_move_builtin(),
+                async_disposable_stack_move_builtin(),
                 BuiltinEntryMetadata::new("move", 0, false, false),
             ),
             (
-                js3_async_disposable_stack_disposed_getter_builtin(),
+                async_disposable_stack_disposed_getter_builtin(),
                 BuiltinEntryMetadata::new("get disposed", 0, false, false),
             ),
             (
-                js3_async_disposable_stack_dispose_async_builtin(),
+                async_disposable_stack_dispose_async_builtin(),
                 BuiltinEntryMetadata::new("disposeAsync", 0, false, false),
             ),
             (
-                js3_async_disposal_resume_builtin(),
+                async_disposal_resume_builtin(),
                 BuiltinEntryMetadata::new("", 1, false, false),
             ),
             (
-                js3_create_sync_disposal_scope_builtin(),
+                create_sync_disposal_scope_builtin(),
                 BuiltinEntryMetadata::new("", 0, false, false),
             ),
             (
-                js3_create_async_disposal_scope_builtin(),
+                create_async_disposal_scope_builtin(),
                 BuiltinEntryMetadata::new("", 0, false, false),
             ),
             (
-                js3_add_sync_disposable_resource_builtin(),
+                add_sync_disposable_resource_builtin(),
                 BuiltinEntryMetadata::new("", 2, false, false),
             ),
             (
-                js3_add_async_disposable_resource_builtin(),
+                add_async_disposable_resource_builtin(),
                 BuiltinEntryMetadata::new("", 2, false, false),
             ),
             (
-                js3_dispose_scope_builtin(),
+                dispose_scope_builtin(),
                 BuiltinEntryMetadata::new("", 1, false, false),
             ),
             (
-                js3_dispose_scope_async_builtin(),
+                dispose_scope_async_builtin(),
                 BuiltinEntryMetadata::new("", 1, false, false),
             ),
             (
-                js3_promise_then_builtin(),
+                promise_then_builtin(),
                 BuiltinEntryMetadata::new("then", 2, false, false),
             ),
             (
-                js3_promise_catch_builtin(),
+                promise_catch_builtin(),
                 BuiltinEntryMetadata::new("catch", 1, false, false),
             ),
             (
-                js3_promise_finally_builtin(),
+                promise_finally_builtin(),
                 BuiltinEntryMetadata::new("finally", 1, false, false),
             ),
             (
-                js3_promise_finally_function_builtin(),
+                promise_finally_function_builtin(),
                 BuiltinEntryMetadata::new("", 1, false, false),
             ),
             (
-                js3_promise_resolve_builtin(),
+                promise_resolve_builtin(),
                 BuiltinEntryMetadata::new("resolve", 1, false, false),
             ),
             (
-                js3_promise_reject_builtin(),
+                promise_reject_builtin(),
                 BuiltinEntryMetadata::new("reject", 1, false, false),
             ),
             (
-                js3_promise_all_builtin(),
+                promise_all_builtin(),
                 BuiltinEntryMetadata::new("all", 1, false, false),
             ),
             (
-                js3_promise_all_settled_builtin(),
+                promise_all_settled_builtin(),
                 BuiltinEntryMetadata::new("allSettled", 1, false, false),
             ),
             (
-                js3_promise_race_builtin(),
+                promise_race_builtin(),
                 BuiltinEntryMetadata::new("race", 1, false, false),
             ),
             (
-                js3_promise_any_builtin(),
+                promise_any_builtin(),
                 BuiltinEntryMetadata::new("any", 1, false, false),
             ),
             (
-                js3_promise_species_getter_builtin(),
+                promise_species_getter_builtin(),
                 BuiltinEntryMetadata::new("get [Symbol.species]", 0, false, false),
             ),
             (
-                js3_promise_capability_executor_builtin(),
+                promise_capability_executor_builtin(),
                 BuiltinEntryMetadata::new("", 2, false, false),
             ),
             (
-                js3_promise_resolve_function_builtin(),
+                promise_resolve_function_builtin(),
                 BuiltinEntryMetadata::new("", 1, false, false),
             ),
             (
-                js3_promise_reject_function_builtin(),
+                promise_reject_function_builtin(),
                 BuiltinEntryMetadata::new("", 1, false, false),
             ),
             (
-                js3_promise_all_resolve_element_builtin(),
+                promise_all_resolve_element_builtin(),
                 BuiltinEntryMetadata::new("", 1, false, false),
             ),
             (
-                js3_promise_all_settled_resolve_element_builtin(),
+                promise_all_settled_resolve_element_builtin(),
                 BuiltinEntryMetadata::new("", 1, false, false),
             ),
             (
-                js3_promise_all_settled_reject_element_builtin(),
+                promise_all_settled_reject_element_builtin(),
                 BuiltinEntryMetadata::new("", 1, false, false),
             ),
             (
-                js3_promise_any_reject_element_builtin(),
+                promise_any_reject_element_builtin(),
                 BuiltinEntryMetadata::new("", 1, false, false),
             ),
             (
-                js3_parse_int_builtin(),
+                parse_int_builtin(),
                 BuiltinEntryMetadata::new("parseInt", 2, false, false),
             ),
             (
-                js3_parse_float_builtin(),
+                parse_float_builtin(),
                 BuiltinEntryMetadata::new("parseFloat", 1, false, false),
             ),
             (
-                js3_is_nan_builtin(),
+                is_nan_builtin(),
                 BuiltinEntryMetadata::new("isNaN", 1, false, false),
             ),
             (
-                js3_is_finite_builtin(),
+                is_finite_builtin(),
                 BuiltinEntryMetadata::new("isFinite", 1, false, false),
             ),
             (
-                js3_encode_uri_builtin(),
+                encode_uri_builtin(),
                 BuiltinEntryMetadata::new("encodeURI", 1, false, false),
             ),
             (
-                js3_encode_uri_component_builtin(),
+                encode_uri_component_builtin(),
                 BuiltinEntryMetadata::new("encodeURIComponent", 1, false, false),
             ),
             (
-                js3_decode_uri_builtin(),
+                decode_uri_builtin(),
                 BuiltinEntryMetadata::new("decodeURI", 1, false, false),
             ),
             (
-                js3_decode_uri_component_builtin(),
+                decode_uri_component_builtin(),
                 BuiltinEntryMetadata::new("decodeURIComponent", 1, false, false),
             ),
         ];
@@ -4335,23 +4297,23 @@ mod tests {
     fn weak_ref_public_metadata_table_matches_public_lookup() {
         let expected = [
             (
-                js3_weak_ref_builtin(),
+                weak_ref_builtin(),
                 BuiltinEntryMetadata::new("WeakRef", 1, true, true),
             ),
             (
-                js3_finalization_registry_builtin(),
+                finalization_registry_builtin(),
                 BuiltinEntryMetadata::new("FinalizationRegistry", 1, true, true),
             ),
             (
-                js3_weak_ref_deref_builtin(),
+                weak_ref_deref_builtin(),
                 BuiltinEntryMetadata::new("deref", 0, false, false),
             ),
             (
-                js3_finalization_registry_register_builtin(),
+                finalization_registry_register_builtin(),
                 BuiltinEntryMetadata::new("register", 2, false, false),
             ),
             (
-                js3_finalization_registry_unregister_builtin(),
+                finalization_registry_unregister_builtin(),
                 BuiltinEntryMetadata::new("unregister", 1, false, false),
             ),
         ];

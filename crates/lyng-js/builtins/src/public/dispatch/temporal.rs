@@ -67,714 +67,714 @@ pub(super) fn dispatch_temporal_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::js3_temporal_instant_builtin() {
+    if entry == lyng_js_types::temporal_instant_builtin() {
         return temporal_instant_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_now_instant_builtin() {
+    if entry == lyng_js_types::temporal_now_instant_builtin() {
         return temporal_now_instant_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_now_time_zone_id_builtin() {
+    if entry == lyng_js_types::temporal_now_time_zone_id_builtin() {
         return temporal_now_time_zone_id_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_now_plain_date_iso_builtin() {
+    if entry == lyng_js_types::temporal_now_plain_date_iso_builtin() {
         return temporal_now_plain_date_iso_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_now_plain_time_iso_builtin() {
+    if entry == lyng_js_types::temporal_now_plain_time_iso_builtin() {
         return temporal_now_plain_time_iso_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_now_plain_date_time_iso_builtin() {
+    if entry == lyng_js_types::temporal_now_plain_date_time_iso_builtin() {
         return temporal_now_plain_date_time_iso_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_now_zoned_date_time_iso_builtin() {
+    if entry == lyng_js_types::temporal_now_zoned_date_time_iso_builtin() {
         return temporal_now_zoned_date_time_iso_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_from_builtin() {
+    if entry == lyng_js_types::temporal_instant_from_builtin() {
         return temporal_instant_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_from_epoch_nanoseconds_builtin() {
+    if entry == lyng_js_types::temporal_instant_from_epoch_nanoseconds_builtin() {
         return temporal_instant_from_epoch_nanoseconds_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_from_epoch_milliseconds_builtin() {
+    if entry == lyng_js_types::temporal_instant_from_epoch_milliseconds_builtin() {
         return temporal_instant_from_epoch_milliseconds_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_compare_builtin() {
+    if entry == lyng_js_types::temporal_instant_compare_builtin() {
         return temporal_instant_compare_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_epoch_nanoseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_instant_epoch_nanoseconds_getter_builtin() {
         return temporal_instant_epoch_nanoseconds_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_epoch_milliseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_instant_epoch_milliseconds_getter_builtin() {
         return temporal_instant_epoch_milliseconds_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_epoch_seconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_instant_epoch_seconds_getter_builtin() {
         return temporal_instant_epoch_seconds_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_to_string_builtin() {
+    if entry == lyng_js_types::temporal_instant_to_string_builtin() {
         return temporal_instant_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_to_json_builtin() {
+    if entry == lyng_js_types::temporal_instant_to_json_builtin() {
         return temporal_instant_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_instant_to_locale_string_builtin() {
         return temporal_instant_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_value_of_builtin() {
+    if entry == lyng_js_types::temporal_instant_value_of_builtin() {
         return temporal_instant_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_equals_builtin() {
+    if entry == lyng_js_types::temporal_instant_equals_builtin() {
         return temporal_instant_equals_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_add_builtin() {
+    if entry == lyng_js_types::temporal_instant_add_builtin() {
         return temporal_instant_add_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_subtract_builtin() {
+    if entry == lyng_js_types::temporal_instant_subtract_builtin() {
         return temporal_instant_subtract_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_round_builtin() {
+    if entry == lyng_js_types::temporal_instant_round_builtin() {
         return temporal_instant_round_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_since_builtin() {
+    if entry == lyng_js_types::temporal_instant_since_builtin() {
         return temporal_instant_since_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_until_builtin() {
+    if entry == lyng_js_types::temporal_instant_until_builtin() {
         return temporal_instant_until_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_instant_to_zoned_date_time_iso_builtin() {
+    if entry == lyng_js_types::temporal_instant_to_zoned_date_time_iso_builtin() {
         return temporal_instant_to_zoned_date_time_iso_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_builtin() {
+    if entry == lyng_js_types::temporal_duration_builtin() {
         return temporal_duration_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_years_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_years_getter_builtin() {
         return temporal_duration_years_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_months_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_months_getter_builtin() {
         return temporal_duration_months_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_weeks_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_weeks_getter_builtin() {
         return temporal_duration_weeks_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_days_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_days_getter_builtin() {
         return temporal_duration_days_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_hours_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_hours_getter_builtin() {
         return temporal_duration_hours_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_minutes_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_minutes_getter_builtin() {
         return temporal_duration_minutes_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_seconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_seconds_getter_builtin() {
         return temporal_duration_seconds_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_milliseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_milliseconds_getter_builtin() {
         return temporal_duration_milliseconds_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_microseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_microseconds_getter_builtin() {
         return temporal_duration_microseconds_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_nanoseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_nanoseconds_getter_builtin() {
         return temporal_duration_nanoseconds_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_sign_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_sign_getter_builtin() {
         return temporal_duration_sign_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_blank_getter_builtin() {
+    if entry == lyng_js_types::temporal_duration_blank_getter_builtin() {
         return temporal_duration_blank_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_to_string_builtin() {
+    if entry == lyng_js_types::temporal_duration_to_string_builtin() {
         return temporal_duration_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_to_json_builtin() {
+    if entry == lyng_js_types::temporal_duration_to_json_builtin() {
         return temporal_duration_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_duration_to_locale_string_builtin() {
         return temporal_duration_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_negated_builtin() {
+    if entry == lyng_js_types::temporal_duration_negated_builtin() {
         return temporal_duration_negated_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_abs_builtin() {
+    if entry == lyng_js_types::temporal_duration_abs_builtin() {
         return temporal_duration_abs_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_with_builtin() {
+    if entry == lyng_js_types::temporal_duration_with_builtin() {
         return temporal_duration_with_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_round_builtin() {
+    if entry == lyng_js_types::temporal_duration_round_builtin() {
         return temporal_duration_round_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_total_builtin() {
+    if entry == lyng_js_types::temporal_duration_total_builtin() {
         return temporal_duration_total_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_add_builtin() {
+    if entry == lyng_js_types::temporal_duration_add_builtin() {
         return temporal_duration_add_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_subtract_builtin() {
+    if entry == lyng_js_types::temporal_duration_subtract_builtin() {
         return temporal_duration_subtract_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_value_of_builtin() {
+    if entry == lyng_js_types::temporal_duration_value_of_builtin() {
         return temporal_duration_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_from_builtin() {
+    if entry == lyng_js_types::temporal_duration_from_builtin() {
         return temporal_duration_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_duration_compare_builtin() {
+    if entry == lyng_js_types::temporal_duration_compare_builtin() {
         return temporal_duration_compare_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_builtin() {
         return temporal_plain_date_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_year_getter_builtin() {
         return temporal_plain_date_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_month_getter_builtin() {
         return temporal_plain_date_month_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_month_code_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_month_code_getter_builtin() {
         return temporal_plain_date_month_code_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_day_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_day_getter_builtin() {
         return temporal_plain_date_day_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_day_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_day_of_week_getter_builtin() {
         return temporal_plain_date_day_of_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_day_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_day_of_year_getter_builtin() {
         return temporal_plain_date_day_of_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_days_in_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_days_in_month_getter_builtin() {
         return temporal_plain_date_days_in_month_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_days_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_days_in_year_getter_builtin() {
         return temporal_plain_date_days_in_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_months_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_months_in_year_getter_builtin() {
         return temporal_plain_date_months_in_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_in_leap_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_in_leap_year_getter_builtin() {
         return temporal_plain_date_in_leap_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_days_in_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_days_in_week_getter_builtin() {
         return temporal_plain_date_days_in_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_week_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_week_of_year_getter_builtin() {
         return temporal_plain_date_week_of_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_year_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_year_of_week_getter_builtin() {
         return temporal_plain_date_year_of_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_era_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_era_getter_builtin() {
         return temporal_plain_date_era_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_era_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_era_year_getter_builtin() {
         return temporal_plain_date_era_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_calendar_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_calendar_id_getter_builtin() {
         return temporal_plain_date_calendar_id_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_string_builtin() {
         return temporal_plain_date_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_json_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_json_builtin() {
         return temporal_plain_date_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_locale_string_builtin() {
         return temporal_plain_date_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_value_of_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_value_of_builtin() {
         return temporal_plain_date_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_equals_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_equals_builtin() {
         return temporal_plain_date_equals_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_with_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_with_builtin() {
         return temporal_plain_date_with_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_with_calendar_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_with_calendar_builtin() {
         return temporal_plain_date_with_calendar_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_add_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_add_builtin() {
         return temporal_plain_date_add_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_subtract_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_subtract_builtin() {
         return temporal_plain_date_subtract_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_since_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_since_builtin() {
         return temporal_plain_date_since_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_until_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_until_builtin() {
         return temporal_plain_date_until_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_plain_date_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_plain_date_time_builtin() {
         return temporal_plain_date_to_plain_date_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_zoned_date_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_zoned_date_time_builtin() {
         return temporal_plain_date_to_zoned_date_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_plain_year_month_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_plain_year_month_builtin() {
         return temporal_plain_date_to_plain_year_month_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_to_plain_month_day_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_to_plain_month_day_builtin() {
         return temporal_plain_date_to_plain_month_day_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_from_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_from_builtin() {
         return temporal_plain_date_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_compare_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_compare_builtin() {
         return temporal_plain_date_compare_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_builtin() {
         return temporal_plain_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_hour_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_hour_getter_builtin() {
         return temporal_plain_time_hour_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_minute_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_minute_getter_builtin() {
         return temporal_plain_time_minute_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_second_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_second_getter_builtin() {
         return temporal_plain_time_second_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_millisecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_millisecond_getter_builtin() {
         return temporal_plain_time_millisecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_microsecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_microsecond_getter_builtin() {
         return temporal_plain_time_microsecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_nanosecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_nanosecond_getter_builtin() {
         return temporal_plain_time_nanosecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_to_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_to_string_builtin() {
         return temporal_plain_time_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_to_json_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_to_json_builtin() {
         return temporal_plain_time_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_to_locale_string_builtin() {
         return temporal_plain_time_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_value_of_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_value_of_builtin() {
         return temporal_plain_time_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_equals_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_equals_builtin() {
         return temporal_plain_time_equals_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_with_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_with_builtin() {
         return temporal_plain_time_with_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_add_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_add_builtin() {
         return temporal_plain_time_add_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_subtract_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_subtract_builtin() {
         return temporal_plain_time_subtract_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_round_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_round_builtin() {
         return temporal_plain_time_round_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_since_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_since_builtin() {
         return temporal_plain_time_since_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_until_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_until_builtin() {
         return temporal_plain_time_until_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_to_plain_date_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_to_plain_date_time_builtin() {
         return temporal_plain_time_to_plain_date_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_from_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_from_builtin() {
         return temporal_plain_time_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_time_compare_builtin() {
+    if entry == lyng_js_types::temporal_plain_time_compare_builtin() {
         return temporal_plain_time_compare_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_builtin() {
         return temporal_plain_date_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_year_getter_builtin() {
         return temporal_plain_date_time_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_month_getter_builtin() {
         return temporal_plain_date_time_month_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_month_code_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_month_code_getter_builtin() {
         return temporal_plain_date_time_month_code_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_day_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_day_getter_builtin() {
         return temporal_plain_date_time_day_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_day_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_day_of_week_getter_builtin() {
         return temporal_plain_date_time_day_of_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_day_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_day_of_year_getter_builtin() {
         return temporal_plain_date_time_day_of_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_days_in_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_days_in_month_getter_builtin() {
         return temporal_plain_date_time_days_in_month_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_days_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_days_in_year_getter_builtin() {
         return temporal_plain_date_time_days_in_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_months_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_months_in_year_getter_builtin() {
         return temporal_plain_date_time_months_in_year_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_in_leap_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_in_leap_year_getter_builtin() {
         return temporal_plain_date_time_in_leap_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_days_in_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_days_in_week_getter_builtin() {
         return temporal_plain_date_time_days_in_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_week_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_week_of_year_getter_builtin() {
         return temporal_plain_date_time_week_of_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_year_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_year_of_week_getter_builtin() {
         return temporal_plain_date_time_year_of_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_era_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_era_getter_builtin() {
         return temporal_plain_date_time_era_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_era_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_era_year_getter_builtin() {
         return temporal_plain_date_time_era_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_hour_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_hour_getter_builtin() {
         return temporal_plain_date_time_hour_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_minute_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_minute_getter_builtin() {
         return temporal_plain_date_time_minute_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_second_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_second_getter_builtin() {
         return temporal_plain_date_time_second_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_millisecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_millisecond_getter_builtin() {
         return temporal_plain_date_time_millisecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_microsecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_microsecond_getter_builtin() {
         return temporal_plain_date_time_microsecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_nanosecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_nanosecond_getter_builtin() {
         return temporal_plain_date_time_nanosecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_calendar_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_calendar_id_getter_builtin() {
         return temporal_plain_date_time_calendar_id_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_string_builtin() {
         return temporal_plain_date_time_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_json_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_json_builtin() {
         return temporal_plain_date_time_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_locale_string_builtin() {
         return temporal_plain_date_time_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_value_of_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_value_of_builtin() {
         return temporal_plain_date_time_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_equals_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_equals_builtin() {
         return temporal_plain_date_time_equals_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_with_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_with_builtin() {
         return temporal_plain_date_time_with_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_with_plain_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_with_plain_time_builtin() {
         return temporal_plain_date_time_with_plain_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_with_calendar_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_with_calendar_builtin() {
         return temporal_plain_date_time_with_calendar_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_add_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_add_builtin() {
         return temporal_plain_date_time_add_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_subtract_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_subtract_builtin() {
         return temporal_plain_date_time_subtract_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_round_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_round_builtin() {
         return temporal_plain_date_time_round_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_since_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_since_builtin() {
         return temporal_plain_date_time_since_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_until_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_until_builtin() {
         return temporal_plain_date_time_until_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_plain_date_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_plain_date_builtin() {
         return temporal_plain_date_time_to_plain_date_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_plain_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_plain_time_builtin() {
         return temporal_plain_date_time_to_plain_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_to_zoned_date_time_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_to_zoned_date_time_builtin() {
         return temporal_plain_date_time_to_zoned_date_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_from_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_from_builtin() {
         return temporal_plain_date_time_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_date_time_compare_builtin() {
+    if entry == lyng_js_types::temporal_plain_date_time_compare_builtin() {
         return temporal_plain_date_time_compare_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_builtin() {
         return temporal_plain_year_month_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_year_getter_builtin() {
         return temporal_plain_year_month_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_month_getter_builtin() {
         return temporal_plain_year_month_month_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_month_code_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_month_code_getter_builtin() {
         return temporal_plain_year_month_month_code_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_days_in_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_days_in_month_getter_builtin() {
         return temporal_plain_year_month_days_in_month_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_days_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_days_in_year_getter_builtin() {
         return temporal_plain_year_month_days_in_year_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_months_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_months_in_year_getter_builtin() {
         return temporal_plain_year_month_months_in_year_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_in_leap_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_in_leap_year_getter_builtin() {
         return temporal_plain_year_month_in_leap_year_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_era_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_era_getter_builtin() {
         return temporal_plain_year_month_era_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_era_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_era_year_getter_builtin() {
         return temporal_plain_year_month_era_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_calendar_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_calendar_id_getter_builtin() {
         return temporal_plain_year_month_calendar_id_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_to_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_to_string_builtin() {
         return temporal_plain_year_month_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_to_json_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_to_json_builtin() {
         return temporal_plain_year_month_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_to_locale_string_builtin() {
         return temporal_plain_year_month_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_value_of_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_value_of_builtin() {
         return temporal_plain_year_month_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_equals_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_equals_builtin() {
         return temporal_plain_year_month_equals_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_with_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_with_builtin() {
         return temporal_plain_year_month_with_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_add_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_add_builtin() {
         return temporal_plain_year_month_add_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_subtract_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_subtract_builtin() {
         return temporal_plain_year_month_subtract_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_since_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_since_builtin() {
         return temporal_plain_year_month_since_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_until_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_until_builtin() {
         return temporal_plain_year_month_until_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_to_plain_date_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_to_plain_date_builtin() {
         return temporal_plain_year_month_to_plain_date_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_from_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_from_builtin() {
         return temporal_plain_year_month_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_year_month_compare_builtin() {
+    if entry == lyng_js_types::temporal_plain_year_month_compare_builtin() {
         return temporal_plain_year_month_compare_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_builtin() {
         return temporal_plain_month_day_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_month_code_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_month_code_getter_builtin() {
         return temporal_plain_month_day_month_code_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_day_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_day_getter_builtin() {
         return temporal_plain_month_day_day_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_calendar_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_calendar_id_getter_builtin() {
         return temporal_plain_month_day_calendar_id_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_to_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_to_string_builtin() {
         return temporal_plain_month_day_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_to_json_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_to_json_builtin() {
         return temporal_plain_month_day_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_to_locale_string_builtin() {
         return temporal_plain_month_day_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_value_of_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_value_of_builtin() {
         return temporal_plain_month_day_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_equals_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_equals_builtin() {
         return temporal_plain_month_day_equals_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_with_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_with_builtin() {
         return temporal_plain_month_day_with_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_to_plain_date_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_to_plain_date_builtin() {
         return temporal_plain_month_day_to_plain_date_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_plain_month_day_from_builtin() {
+    if entry == lyng_js_types::temporal_plain_month_day_from_builtin() {
         return temporal_plain_month_day_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_builtin() {
         return temporal_zoned_date_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_year_getter_builtin() {
         return temporal_zoned_date_time_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_month_getter_builtin() {
         return temporal_zoned_date_time_month_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_month_code_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_month_code_getter_builtin() {
         return temporal_zoned_date_time_month_code_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_day_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_day_getter_builtin() {
         return temporal_zoned_date_time_day_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_day_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_day_of_week_getter_builtin() {
         return temporal_zoned_date_time_day_of_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_day_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_day_of_year_getter_builtin() {
         return temporal_zoned_date_time_day_of_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_days_in_month_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_days_in_month_getter_builtin() {
         return temporal_zoned_date_time_days_in_month_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_days_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_days_in_year_getter_builtin() {
         return temporal_zoned_date_time_days_in_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_months_in_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_months_in_year_getter_builtin() {
         return temporal_zoned_date_time_months_in_year_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_in_leap_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_in_leap_year_getter_builtin() {
         return temporal_zoned_date_time_in_leap_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_days_in_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_days_in_week_getter_builtin() {
         return temporal_zoned_date_time_days_in_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_week_of_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_week_of_year_getter_builtin() {
         return temporal_zoned_date_time_week_of_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_year_of_week_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_year_of_week_getter_builtin() {
         return temporal_zoned_date_time_year_of_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_era_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_era_getter_builtin() {
         return temporal_zoned_date_time_era_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_era_year_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_era_year_getter_builtin() {
         return temporal_zoned_date_time_era_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_hour_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_hour_getter_builtin() {
         return temporal_zoned_date_time_hour_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_minute_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_minute_getter_builtin() {
         return temporal_zoned_date_time_minute_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_second_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_second_getter_builtin() {
         return temporal_zoned_date_time_second_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_millisecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_millisecond_getter_builtin() {
         return temporal_zoned_date_time_millisecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_microsecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_microsecond_getter_builtin() {
         return temporal_zoned_date_time_microsecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_nanosecond_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_nanosecond_getter_builtin() {
         return temporal_zoned_date_time_nanosecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_epoch_nanoseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_epoch_nanoseconds_getter_builtin() {
         return temporal_zoned_date_time_epoch_nanoseconds_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_epoch_milliseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_epoch_milliseconds_getter_builtin() {
         return temporal_zoned_date_time_epoch_milliseconds_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_time_zone_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_time_zone_id_getter_builtin() {
         return temporal_zoned_date_time_time_zone_id_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_calendar_id_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_calendar_id_getter_builtin() {
         return temporal_zoned_date_time_calendar_id_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_offset_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_offset_getter_builtin() {
         return temporal_zoned_date_time_offset_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_offset_nanoseconds_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_offset_nanoseconds_getter_builtin() {
         return temporal_zoned_date_time_offset_nanoseconds_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_string_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_string_builtin() {
         return temporal_zoned_date_time_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_json_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_json_builtin() {
         return temporal_zoned_date_time_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_locale_string_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_locale_string_builtin() {
         return temporal_zoned_date_time_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_value_of_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_value_of_builtin() {
         return temporal_zoned_date_time_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_equals_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_equals_builtin() {
         return temporal_zoned_date_time_equals_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_add_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_add_builtin() {
         return temporal_zoned_date_time_add_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_round_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_round_builtin() {
         return temporal_zoned_date_time_round_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_with_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_with_builtin() {
         return temporal_zoned_date_time_with_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_subtract_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_subtract_builtin() {
         return temporal_zoned_date_time_subtract_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_with_time_zone_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_with_time_zone_builtin() {
         return temporal_zoned_date_time_with_time_zone_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_with_calendar_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_with_calendar_builtin() {
         return temporal_zoned_date_time_with_calendar_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_with_plain_time_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_with_plain_time_builtin() {
         return temporal_zoned_date_time_with_plain_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_start_of_day_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_start_of_day_builtin() {
         return temporal_zoned_date_time_start_of_day_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_hours_in_day_getter_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_hours_in_day_getter_builtin() {
         return temporal_zoned_date_time_hours_in_day_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_since_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_since_builtin() {
         return temporal_zoned_date_time_since_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_until_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_until_builtin() {
         return temporal_zoned_date_time_until_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_from_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_from_builtin() {
         return temporal_zoned_date_time_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_compare_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_compare_builtin() {
         return temporal_zoned_date_time_compare_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_instant_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_instant_builtin() {
         return temporal_zoned_date_time_to_instant_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_plain_date_time_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_plain_date_time_builtin() {
         return temporal_zoned_date_time_to_plain_date_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_plain_date_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_plain_date_builtin() {
         return temporal_zoned_date_time_to_plain_date_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::js3_temporal_zoned_date_time_to_plain_time_builtin() {
+    if entry == lyng_js_types::temporal_zoned_date_time_to_plain_time_builtin() {
         return temporal_zoned_date_time_to_plain_time_builtin(context, invocation).map(Some);
     }
     Ok(None)

@@ -1068,11 +1068,11 @@ fn script_core_hides_iterator_internal_state_and_requires_real_iterator_receiver
         let arrayIterator = [1].values();
         let stringIterator = "ab"[Symbol.iterator]();
 
-        score += (arrayIterator.__js3ArrayIteratorTarget === undefined ? 1 : 0);
-        score += (arrayIterator.__js3ArrayIteratorIndex === undefined ? 2 : 0);
-        score += (arrayIterator.__js3ArrayIteratorKind === undefined ? 4 : 0);
-        score += (stringIterator.__js3StringIteratorString === undefined ? 8 : 0);
-        score += (stringIterator.__js3StringIteratorIndex === undefined ? 16 : 0);
+        score += (arrayIterator.__arrayIteratorTarget === undefined ? 1 : 0);
+        score += (arrayIterator.__arrayIteratorIndex === undefined ? 2 : 0);
+        score += (arrayIterator.__arrayIteratorKind === undefined ? 4 : 0);
+        score += (stringIterator.__stringIteratorString === undefined ? 8 : 0);
+        score += (stringIterator.__stringIteratorIndex === undefined ? 16 : 0);
 
         let arrayNext = arrayIterator.next;
         let stringNext = stringIterator.next;

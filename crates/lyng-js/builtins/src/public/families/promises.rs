@@ -15,20 +15,19 @@ use crate::{
 use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
 use lyng_js_types::{
-    js3_add_async_disposable_resource_builtin, js3_add_sync_disposable_resource_builtin,
-    js3_async_disposable_stack_adopt_builtin, js3_async_disposable_stack_builtin,
-    js3_async_disposable_stack_defer_builtin, js3_async_disposable_stack_dispose_async_builtin,
-    js3_async_disposable_stack_disposed_getter_builtin, js3_async_disposable_stack_move_builtin,
-    js3_async_disposable_stack_use_builtin, js3_create_async_disposal_scope_builtin,
-    js3_create_sync_disposal_scope_builtin, js3_disposable_stack_adopt_builtin,
-    js3_disposable_stack_builtin, js3_disposable_stack_defer_builtin,
-    js3_disposable_stack_dispose_builtin, js3_disposable_stack_disposed_getter_builtin,
-    js3_disposable_stack_move_builtin, js3_disposable_stack_use_builtin,
-    js3_dispose_scope_async_builtin, js3_dispose_scope_builtin, js3_promise_all_builtin,
-    js3_promise_all_settled_builtin, js3_promise_any_builtin, js3_promise_builtin,
-    js3_promise_catch_builtin, js3_promise_finally_builtin, js3_promise_race_builtin,
-    js3_promise_reject_builtin, js3_promise_resolve_builtin, js3_promise_species_getter_builtin,
-    js3_promise_then_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
+    add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin,
+    async_disposable_stack_adopt_builtin, async_disposable_stack_builtin,
+    async_disposable_stack_defer_builtin, async_disposable_stack_dispose_async_builtin,
+    async_disposable_stack_disposed_getter_builtin, async_disposable_stack_move_builtin,
+    async_disposable_stack_use_builtin, create_async_disposal_scope_builtin,
+    create_sync_disposal_scope_builtin, disposable_stack_adopt_builtin, disposable_stack_builtin,
+    disposable_stack_defer_builtin, disposable_stack_dispose_builtin,
+    disposable_stack_disposed_getter_builtin, disposable_stack_move_builtin,
+    disposable_stack_use_builtin, dispose_scope_async_builtin, dispose_scope_builtin,
+    promise_all_builtin, promise_all_settled_builtin, promise_any_builtin, promise_builtin,
+    promise_catch_builtin, promise_finally_builtin, promise_race_builtin, promise_reject_builtin,
+    promise_resolve_builtin, promise_species_getter_builtin, promise_then_builtin,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
 };
 
 pub(in crate::public) fn install_promise_disposal_family(
@@ -134,7 +133,7 @@ fn install_promise_constructor_descriptors(
     )?;
     let species = [accessor_symbol_property(
         WellKnownSymbolId::Species,
-        Some(js3_promise_species_getter_builtin()),
+        Some(promise_species_getter_builtin()),
         None,
         readonly_builtin_attributes(),
     )];
@@ -155,9 +154,9 @@ fn install_promise_prototype_descriptors(
             Value::from_object_ref(promise),
             writable_builtin_attributes(),
         ),
-        builtin_function_atom_property(atoms.then, js3_promise_then_builtin()),
-        builtin_function_atom_property(atoms.catch, js3_promise_catch_builtin()),
-        builtin_function_atom_property(atoms.finally, js3_promise_finally_builtin()),
+        builtin_function_atom_property(atoms.then, promise_then_builtin()),
+        builtin_function_atom_property(atoms.catch, promise_catch_builtin()),
+        builtin_function_atom_property(atoms.finally, promise_finally_builtin()),
         data_symbol_property(
             WellKnownSymbolId::ToStringTag,
             promise_tag,
@@ -187,20 +186,20 @@ fn install_disposable_stack_prototype_descriptors(
             Value::from_object_ref(disposable_stack),
             writable_builtin_attributes(),
         ),
-        builtin_function_atom_property(atoms.use_method, js3_disposable_stack_use_builtin()),
-        builtin_function_atom_property(atoms.adopt, js3_disposable_stack_adopt_builtin()),
-        builtin_function_atom_property(atoms.defer, js3_disposable_stack_defer_builtin()),
-        builtin_function_atom_property(atoms.move_method, js3_disposable_stack_move_builtin()),
+        builtin_function_atom_property(atoms.use_method, disposable_stack_use_builtin()),
+        builtin_function_atom_property(atoms.adopt, disposable_stack_adopt_builtin()),
+        builtin_function_atom_property(atoms.defer, disposable_stack_defer_builtin()),
+        builtin_function_atom_property(atoms.move_method, disposable_stack_move_builtin()),
         accessor_atom_property(
             atoms.disposed,
-            Some(js3_disposable_stack_disposed_getter_builtin()),
+            Some(disposable_stack_disposed_getter_builtin()),
             None,
             readonly_builtin_attributes(),
         ),
-        builtin_function_atom_property(atoms.dispose, js3_disposable_stack_dispose_builtin()),
+        builtin_function_atom_property(atoms.dispose, disposable_stack_dispose_builtin()),
         builtin_function_symbol_property(
             WellKnownSymbolId::Dispose,
-            js3_disposable_stack_dispose_builtin(),
+            disposable_stack_dispose_builtin(),
             writable_builtin_attributes(),
         ),
         data_symbol_property(
@@ -236,26 +235,23 @@ fn install_async_disposable_stack_prototype_descriptors(
             Value::from_object_ref(async_disposable_stack),
             writable_builtin_attributes(),
         ),
-        builtin_function_atom_property(atoms.use_method, js3_async_disposable_stack_use_builtin()),
-        builtin_function_atom_property(atoms.adopt, js3_async_disposable_stack_adopt_builtin()),
-        builtin_function_atom_property(atoms.defer, js3_async_disposable_stack_defer_builtin()),
-        builtin_function_atom_property(
-            atoms.move_method,
-            js3_async_disposable_stack_move_builtin(),
-        ),
+        builtin_function_atom_property(atoms.use_method, async_disposable_stack_use_builtin()),
+        builtin_function_atom_property(atoms.adopt, async_disposable_stack_adopt_builtin()),
+        builtin_function_atom_property(atoms.defer, async_disposable_stack_defer_builtin()),
+        builtin_function_atom_property(atoms.move_method, async_disposable_stack_move_builtin()),
         accessor_atom_property(
             atoms.disposed,
-            Some(js3_async_disposable_stack_disposed_getter_builtin()),
+            Some(async_disposable_stack_disposed_getter_builtin()),
             None,
             readonly_builtin_attributes(),
         ),
         builtin_function_atom_property(
             atoms.dispose_async,
-            js3_async_disposable_stack_dispose_async_builtin(),
+            async_disposable_stack_dispose_async_builtin(),
         ),
         builtin_function_symbol_property(
             WellKnownSymbolId::AsyncDispose,
-            js3_async_disposable_stack_dispose_async_builtin(),
+            async_disposable_stack_dispose_async_builtin(),
             writable_builtin_attributes(),
         ),
         data_symbol_property(
@@ -357,12 +353,12 @@ fn promise_static_method_specs(
     atoms: &PromiseDisposalDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 6] {
     [
-        (atoms.resolve, js3_promise_resolve_builtin()),
-        (atoms.reject, js3_promise_reject_builtin()),
-        (atoms.all, js3_promise_all_builtin()),
-        (atoms.all_settled, js3_promise_all_settled_builtin()),
-        (atoms.race, js3_promise_race_builtin()),
-        (atoms.any, js3_promise_any_builtin()),
+        (atoms.resolve, promise_resolve_builtin()),
+        (atoms.reject, promise_reject_builtin()),
+        (atoms.all, promise_all_builtin()),
+        (atoms.all_settled, promise_all_settled_builtin()),
+        (atoms.race, promise_race_builtin()),
+        (atoms.any, promise_any_builtin()),
     ]
 }
 
@@ -371,21 +367,18 @@ fn promise_builtin_object(
     entry: BuiltinFunctionId,
 ) -> Option<ObjectRef> {
     [
-        (js3_promise_builtin(), builtins.promise),
-        (js3_promise_then_builtin(), builtins.promise_then),
-        (js3_promise_catch_builtin(), builtins.promise_catch),
-        (js3_promise_finally_builtin(), builtins.promise_finally),
-        (js3_promise_resolve_builtin(), builtins.promise_resolve),
-        (js3_promise_reject_builtin(), builtins.promise_reject),
-        (js3_promise_all_builtin(), builtins.promise_all),
+        (promise_builtin(), builtins.promise),
+        (promise_then_builtin(), builtins.promise_then),
+        (promise_catch_builtin(), builtins.promise_catch),
+        (promise_finally_builtin(), builtins.promise_finally),
+        (promise_resolve_builtin(), builtins.promise_resolve),
+        (promise_reject_builtin(), builtins.promise_reject),
+        (promise_all_builtin(), builtins.promise_all),
+        (promise_all_settled_builtin(), builtins.promise_all_settled),
+        (promise_race_builtin(), builtins.promise_race),
+        (promise_any_builtin(), builtins.promise_any),
         (
-            js3_promise_all_settled_builtin(),
-            builtins.promise_all_settled,
-        ),
-        (js3_promise_race_builtin(), builtins.promise_race),
-        (js3_promise_any_builtin(), builtins.promise_any),
-        (
-            js3_promise_species_getter_builtin(),
+            promise_species_getter_builtin(),
             builtins.promise_species_getter,
         ),
     ]
@@ -398,29 +391,29 @@ fn disposable_stack_builtin_object(
     entry: BuiltinFunctionId,
 ) -> Option<ObjectRef> {
     [
-        (js3_disposable_stack_builtin(), builtins.disposable_stack),
+        (disposable_stack_builtin(), builtins.disposable_stack),
         (
-            js3_disposable_stack_use_builtin(),
+            disposable_stack_use_builtin(),
             builtins.disposable_stack_use,
         ),
         (
-            js3_disposable_stack_adopt_builtin(),
+            disposable_stack_adopt_builtin(),
             builtins.disposable_stack_adopt,
         ),
         (
-            js3_disposable_stack_defer_builtin(),
+            disposable_stack_defer_builtin(),
             builtins.disposable_stack_defer,
         ),
         (
-            js3_disposable_stack_move_builtin(),
+            disposable_stack_move_builtin(),
             builtins.disposable_stack_move,
         ),
         (
-            js3_disposable_stack_disposed_getter_builtin(),
+            disposable_stack_disposed_getter_builtin(),
             builtins.disposable_stack_disposed_getter,
         ),
         (
-            js3_disposable_stack_dispose_builtin(),
+            disposable_stack_dispose_builtin(),
             builtins.disposable_stack_dispose,
         ),
     ]
@@ -434,31 +427,31 @@ fn async_disposable_stack_builtin_object(
 ) -> Option<ObjectRef> {
     [
         (
-            js3_async_disposable_stack_builtin(),
+            async_disposable_stack_builtin(),
             builtins.async_disposable_stack,
         ),
         (
-            js3_async_disposable_stack_use_builtin(),
+            async_disposable_stack_use_builtin(),
             builtins.async_disposable_stack_use,
         ),
         (
-            js3_async_disposable_stack_adopt_builtin(),
+            async_disposable_stack_adopt_builtin(),
             builtins.async_disposable_stack_adopt,
         ),
         (
-            js3_async_disposable_stack_defer_builtin(),
+            async_disposable_stack_defer_builtin(),
             builtins.async_disposable_stack_defer,
         ),
         (
-            js3_async_disposable_stack_move_builtin(),
+            async_disposable_stack_move_builtin(),
             builtins.async_disposable_stack_move,
         ),
         (
-            js3_async_disposable_stack_disposed_getter_builtin(),
+            async_disposable_stack_disposed_getter_builtin(),
             builtins.async_disposable_stack_disposed_getter,
         ),
         (
-            js3_async_disposable_stack_dispose_async_builtin(),
+            async_disposable_stack_dispose_async_builtin(),
             builtins.async_disposable_stack_dispose_async,
         ),
     ]
@@ -472,26 +465,23 @@ fn disposal_helper_builtin_object(
 ) -> Option<ObjectRef> {
     [
         (
-            js3_create_sync_disposal_scope_builtin(),
+            create_sync_disposal_scope_builtin(),
             builtins.create_sync_disposal_scope,
         ),
         (
-            js3_create_async_disposal_scope_builtin(),
+            create_async_disposal_scope_builtin(),
             builtins.create_async_disposal_scope,
         ),
         (
-            js3_add_sync_disposable_resource_builtin(),
+            add_sync_disposable_resource_builtin(),
             builtins.add_sync_disposable_resource,
         ),
         (
-            js3_add_async_disposable_resource_builtin(),
+            add_async_disposable_resource_builtin(),
             builtins.add_async_disposable_resource,
         ),
-        (js3_dispose_scope_builtin(), builtins.dispose_scope),
-        (
-            js3_dispose_scope_async_builtin(),
-            builtins.dispose_scope_async,
-        ),
+        (dispose_scope_builtin(), builtins.dispose_scope),
+        (dispose_scope_async_builtin(), builtins.dispose_scope_async),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -519,26 +509,26 @@ fn install_promise_family(
     prototype: ObjectRef,
 ) -> PromiseFamilyBuiltins {
     PromiseFamilyBuiltins {
-        promise: install_public_builtin_function(agent, cx, js3_promise_builtin(), Some(prototype)),
+        promise: install_public_builtin_function(agent, cx, promise_builtin(), Some(prototype)),
         prototype,
-        then: install_public_builtin_function(agent, cx, js3_promise_then_builtin(), None),
-        catch: install_public_builtin_function(agent, cx, js3_promise_catch_builtin(), None),
-        finally: install_public_builtin_function(agent, cx, js3_promise_finally_builtin(), None),
-        resolve: install_public_builtin_function(agent, cx, js3_promise_resolve_builtin(), None),
-        reject: install_public_builtin_function(agent, cx, js3_promise_reject_builtin(), None),
-        all: install_public_builtin_function(agent, cx, js3_promise_all_builtin(), None),
+        then: install_public_builtin_function(agent, cx, promise_then_builtin(), None),
+        catch: install_public_builtin_function(agent, cx, promise_catch_builtin(), None),
+        finally: install_public_builtin_function(agent, cx, promise_finally_builtin(), None),
+        resolve: install_public_builtin_function(agent, cx, promise_resolve_builtin(), None),
+        reject: install_public_builtin_function(agent, cx, promise_reject_builtin(), None),
+        all: install_public_builtin_function(agent, cx, promise_all_builtin(), None),
         all_settled: install_public_builtin_function(
             agent,
             cx,
-            js3_promise_all_settled_builtin(),
+            promise_all_settled_builtin(),
             None,
         ),
-        race: install_public_builtin_function(agent, cx, js3_promise_race_builtin(), None),
-        any: install_public_builtin_function(agent, cx, js3_promise_any_builtin(), None),
+        race: install_public_builtin_function(agent, cx, promise_race_builtin(), None),
+        any: install_public_builtin_function(agent, cx, promise_any_builtin(), None),
         species_getter: install_public_builtin_function(
             agent,
             cx,
-            js3_promise_species_getter_builtin(),
+            promise_species_getter_builtin(),
             None,
         ),
     }
@@ -565,44 +555,34 @@ fn install_disposable_stack_family(
         disposable_stack: install_public_builtin_function(
             agent,
             cx,
-            js3_disposable_stack_builtin(),
+            disposable_stack_builtin(),
             Some(prototype),
         ),
         prototype,
         use_method: install_public_builtin_function(
             agent,
             cx,
-            js3_disposable_stack_use_builtin(),
+            disposable_stack_use_builtin(),
             None,
         ),
-        adopt: install_public_builtin_function(
-            agent,
-            cx,
-            js3_disposable_stack_adopt_builtin(),
-            None,
-        ),
-        defer: install_public_builtin_function(
-            agent,
-            cx,
-            js3_disposable_stack_defer_builtin(),
-            None,
-        ),
+        adopt: install_public_builtin_function(agent, cx, disposable_stack_adopt_builtin(), None),
+        defer: install_public_builtin_function(agent, cx, disposable_stack_defer_builtin(), None),
         move_method: install_public_builtin_function(
             agent,
             cx,
-            js3_disposable_stack_move_builtin(),
+            disposable_stack_move_builtin(),
             None,
         ),
         disposed_getter: install_public_builtin_function(
             agent,
             cx,
-            js3_disposable_stack_disposed_getter_builtin(),
+            disposable_stack_disposed_getter_builtin(),
             None,
         ),
         dispose: install_public_builtin_function(
             agent,
             cx,
-            js3_disposable_stack_dispose_builtin(),
+            disposable_stack_dispose_builtin(),
             None,
         ),
     }
@@ -629,44 +609,44 @@ fn install_async_disposable_stack_family(
         async_disposable_stack: install_public_builtin_function(
             agent,
             cx,
-            js3_async_disposable_stack_builtin(),
+            async_disposable_stack_builtin(),
             Some(prototype),
         ),
         prototype,
         use_method: install_public_builtin_function(
             agent,
             cx,
-            js3_async_disposable_stack_use_builtin(),
+            async_disposable_stack_use_builtin(),
             None,
         ),
         adopt: install_public_builtin_function(
             agent,
             cx,
-            js3_async_disposable_stack_adopt_builtin(),
+            async_disposable_stack_adopt_builtin(),
             None,
         ),
         defer: install_public_builtin_function(
             agent,
             cx,
-            js3_async_disposable_stack_defer_builtin(),
+            async_disposable_stack_defer_builtin(),
             None,
         ),
         move_method: install_public_builtin_function(
             agent,
             cx,
-            js3_async_disposable_stack_move_builtin(),
+            async_disposable_stack_move_builtin(),
             None,
         ),
         disposed_getter: install_public_builtin_function(
             agent,
             cx,
-            js3_async_disposable_stack_disposed_getter_builtin(),
+            async_disposable_stack_disposed_getter_builtin(),
             None,
         ),
         dispose_async: install_public_builtin_function(
             agent,
             cx,
-            js3_async_disposable_stack_dispose_async_builtin(),
+            async_disposable_stack_dispose_async_builtin(),
             None,
         ),
     }
@@ -690,37 +670,32 @@ fn install_disposal_helper_family(
         create_sync_disposal_scope: install_public_builtin_function(
             agent,
             cx,
-            js3_create_sync_disposal_scope_builtin(),
+            create_sync_disposal_scope_builtin(),
             None,
         ),
         create_async_disposal_scope: install_public_builtin_function(
             agent,
             cx,
-            js3_create_async_disposal_scope_builtin(),
+            create_async_disposal_scope_builtin(),
             None,
         ),
         add_sync_disposable_resource: install_public_builtin_function(
             agent,
             cx,
-            js3_add_sync_disposable_resource_builtin(),
+            add_sync_disposable_resource_builtin(),
             None,
         ),
         add_async_disposable_resource: install_public_builtin_function(
             agent,
             cx,
-            js3_add_async_disposable_resource_builtin(),
+            add_async_disposable_resource_builtin(),
             None,
         ),
-        dispose_scope: install_public_builtin_function(
-            agent,
-            cx,
-            js3_dispose_scope_builtin(),
-            None,
-        ),
+        dispose_scope: install_public_builtin_function(agent, cx, dispose_scope_builtin(), None),
         dispose_scope_async: install_public_builtin_function(
             agent,
             cx,
-            js3_dispose_scope_async_builtin(),
+            dispose_scope_async_builtin(),
             None,
         ),
     }

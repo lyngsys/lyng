@@ -16,7 +16,7 @@ pub(super) fn dispatch_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_iterator_prototype_iterator_builtin() {
+    if entry == super::iterator_prototype_iterator_builtin() {
         return iterator_prototype_iterator_builtin(context, invocation).map(Some);
     }
     Ok(None)

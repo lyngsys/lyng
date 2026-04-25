@@ -1,5 +1,5 @@
 use super::*;
-use lyng_js_types::js3_internal_import_meta_builtin;
+use lyng_js_types::internal_import_meta_builtin;
 
 impl<'a, 'b> FunctionCompiler<'a, 'b> {
     pub(super) fn lower_update_expression(
@@ -138,7 +138,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     && named_atom == Some(WellKnownAtom::__proto__.id())
                 {
                     return self.emit_internal_builtin_call(
-                        js3_internal_object_literal_set_prototype_builtin(),
+                        internal_object_literal_set_prototype_builtin(),
                         &[object, value_register],
                         property.span,
                     );
@@ -198,9 +198,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.emit_load_builtin(
             callee,
             if is_getter {
-                js3_internal_define_getter_property_builtin()
+                internal_define_getter_property_builtin()
             } else {
-                js3_internal_define_setter_property_builtin()
+                internal_define_setter_property_builtin()
             },
         )?;
         let this_value = self.alloc_temp()?;
@@ -235,7 +235,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
         if meta == WellKnownAtom::import.id() && property == WellKnownAtom::meta.id() {
             return self.emit_internal_builtin_call_into(
-                js3_internal_import_meta_builtin(),
+                internal_import_meta_builtin(),
                 &[],
                 self.ast().get_expr(expr_id).span(),
                 dest,
@@ -267,7 +267,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             vec![receiver, key]
         };
         self.emit_internal_builtin_call_into(
-            js3_internal_super_property_get_builtin(),
+            internal_super_property_get_builtin(),
             &arguments,
             span,
             dest,
@@ -288,7 +288,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             vec![receiver, key, value]
         };
         self.emit_internal_builtin_call_into(
-            js3_internal_super_property_set_builtin(),
+            internal_super_property_set_builtin(),
             &arguments,
             span,
             dest,
@@ -431,7 +431,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
     fn emit_throw_reference_error(&mut self, span: Span) -> LoweringResult<()> {
         let error = self.alloc_temp()?;
-        self.emit_internal_builtin_call_into(js3_reference_error_builtin(), &[], span, error)?;
+        self.emit_internal_builtin_call_into(reference_error_builtin(), &[], span, error)?;
         self.builder.emit_ax(Opcode::Throw, i32::from(error));
         Ok(())
     }

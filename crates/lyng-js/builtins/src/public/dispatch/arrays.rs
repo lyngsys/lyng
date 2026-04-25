@@ -38,22 +38,22 @@ fn dispatch_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_array_builtin() {
+    if entry == super::array_builtin() {
         return array_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_from_builtin() {
+    if entry == super::array_from_builtin() {
         return array_from_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_from_async_builtin() {
+    if entry == super::array_from_async_builtin() {
         return array_from_async_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_of_builtin() {
+    if entry == super::array_of_builtin() {
         return array_of_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_is_array_builtin() {
+    if entry == super::array_is_array_builtin() {
         return array_is_array_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_species_getter_builtin() {
+    if entry == super::array_species_getter_builtin() {
         return array_species_getter_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -64,43 +64,43 @@ fn dispatch_array_indexed_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_array_at_builtin() {
+    if entry == super::array_at_builtin() {
         return array_at_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_concat_builtin() {
+    if entry == super::array_concat_builtin() {
         return array_concat_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_copy_within_builtin() {
+    if entry == super::array_copy_within_builtin() {
         return array_copy_within_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_fill_builtin() {
+    if entry == super::array_fill_builtin() {
         return array_fill_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_join_builtin() {
+    if entry == super::array_join_builtin() {
         return array_join_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_pop_builtin() {
+    if entry == super::array_pop_builtin() {
         return array_pop_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_push_builtin() {
+    if entry == super::array_push_builtin() {
         return array_push_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_shift_builtin() {
+    if entry == super::array_shift_builtin() {
         return array_shift_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_unshift_builtin() {
+    if entry == super::array_unshift_builtin() {
         return array_unshift_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_reverse_builtin() {
+    if entry == super::array_reverse_builtin() {
         return array_reverse_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_slice_builtin() {
+    if entry == super::array_slice_builtin() {
         return array_slice_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_sort_builtin() {
+    if entry == super::array_sort_builtin() {
         return array_sort_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_splice_builtin() {
+    if entry == super::array_splice_builtin() {
         return array_splice_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -111,52 +111,52 @@ fn dispatch_array_iteration_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_array_every_builtin() {
+    if entry == super::array_every_builtin() {
         return array_every_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_filter_builtin() {
+    if entry == super::array_filter_builtin() {
         return array_filter_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_flat_builtin() {
+    if entry == super::array_flat_builtin() {
         return array_flat_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_flat_map_builtin() {
+    if entry == super::array_flat_map_builtin() {
         return array_flat_map_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_find_builtin() {
+    if entry == super::array_find_builtin() {
         return array_find_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_find_index_builtin() {
+    if entry == super::array_find_index_builtin() {
         return array_find_index_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_find_last_builtin() {
+    if entry == super::array_find_last_builtin() {
         return array_find_last_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_find_last_index_builtin() {
+    if entry == super::array_find_last_index_builtin() {
         return array_find_last_index_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_for_each_builtin() {
+    if entry == super::array_for_each_builtin() {
         return array_for_each_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_includes_builtin() {
+    if entry == super::array_includes_builtin() {
         return array_includes_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_index_of_builtin() {
+    if entry == super::array_index_of_builtin() {
         return array_index_of_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_last_index_of_builtin() {
+    if entry == super::array_last_index_of_builtin() {
         return array_last_index_of_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_map_builtin() {
+    if entry == super::array_map_builtin() {
         return array_map_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_reduce_builtin() {
+    if entry == super::array_reduce_builtin() {
         return array_reduce_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_reduce_right_builtin() {
+    if entry == super::array_reduce_right_builtin() {
         return array_reduce_right_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_some_builtin() {
+    if entry == super::array_some_builtin() {
         return array_some_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -167,37 +167,37 @@ fn dispatch_array_copying_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_array_to_reversed_builtin() {
+    if entry == super::array_to_reversed_builtin() {
         return array_to_reversed_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_to_sorted_builtin() {
+    if entry == super::array_to_sorted_builtin() {
         return array_to_sorted_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_to_spliced_builtin() {
+    if entry == super::array_to_spliced_builtin() {
         return array_to_spliced_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_to_string_builtin() {
+    if entry == super::array_to_string_builtin() {
         return array_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_to_locale_string_builtin() {
+    if entry == super::array_to_locale_string_builtin() {
         return array_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_values_builtin() {
+    if entry == super::array_values_builtin() {
         return array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Value)
             .map(Some);
     }
-    if entry == super::js3_array_keys_builtin() {
+    if entry == super::array_keys_builtin() {
         return array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Key)
             .map(Some);
     }
-    if entry == super::js3_array_entries_builtin() {
+    if entry == super::array_entries_builtin() {
         return array_iterator_factory_builtin(context, invocation, ArrayIterationKind::Entry)
             .map(Some);
     }
-    if entry == super::js3_array_iterator_next_builtin() {
+    if entry == super::array_iterator_next_builtin() {
         return array_iterator_next_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_array_with_builtin() {
+    if entry == super::array_with_builtin() {
         return array_with_builtin(context, invocation).map(Some);
     }
     Ok(None)

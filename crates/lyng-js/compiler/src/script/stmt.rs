@@ -269,12 +269,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
         match scope.kind {
             lyng_js_env::DisposalCapabilityKind::Sync => {
-                self.emit_internal_builtin_call(js3_dispose_scope_builtin(), &arguments, span)
+                self.emit_internal_builtin_call(dispose_scope_builtin(), &arguments, span)
             }
             lyng_js_env::DisposalCapabilityKind::Async => {
                 let promise = self.alloc_temp()?;
                 self.emit_internal_builtin_call_into(
-                    js3_dispose_scope_async_builtin(),
+                    dispose_scope_async_builtin(),
                     &arguments,
                     span,
                     promise,
@@ -296,8 +296,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     {
         let capability_register = self.alloc_temp()?;
         let create_builtin = match kind {
-            lyng_js_env::DisposalCapabilityKind::Sync => js3_create_sync_disposal_scope_builtin(),
-            lyng_js_env::DisposalCapabilityKind::Async => js3_create_async_disposal_scope_builtin(),
+            lyng_js_env::DisposalCapabilityKind::Sync => create_sync_disposal_scope_builtin(),
+            lyng_js_env::DisposalCapabilityKind::Async => create_async_disposal_scope_builtin(),
         };
         self.emit_internal_builtin_call_into(create_builtin, &[], span, capability_register)?;
         let scope = super::state::ActiveDisposalScope {
@@ -823,7 +823,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         let sink = self.alloc_temp()?;
         self.emit_internal_builtin_call_into(
-            js3_internal_private_field_set_builtin(),
+            internal_private_field_set_builtin(),
             &[
                 target.receiver,
                 target.descriptor,
@@ -1569,8 +1569,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             },
         )?;
         let builtin = match kind {
-            VariableKind::Using => js3_add_sync_disposable_resource_builtin(),
-            VariableKind::AwaitUsing => js3_add_async_disposable_resource_builtin(),
+            VariableKind::Using => add_sync_disposable_resource_builtin(),
+            VariableKind::AwaitUsing => add_async_disposable_resource_builtin(),
             _ => return Ok(()),
         };
         self.emit_internal_builtin_call(builtin, &[scope.capability_register, value_register], span)

@@ -8,16 +8,16 @@ pub(super) fn dispatch_json_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_json_parse_builtin() {
+    if entry == super::json_parse_builtin() {
         return json_parse_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_json_stringify_builtin() {
+    if entry == super::json_stringify_builtin() {
         return json_stringify_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_json_raw_json_builtin() {
+    if entry == super::json_raw_json_builtin() {
         return json_raw_json_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_json_is_raw_json_builtin() {
+    if entry == super::json_is_raw_json_builtin() {
         return json_is_raw_json_builtin(context, invocation).map(Some);
     }
     Ok(None)

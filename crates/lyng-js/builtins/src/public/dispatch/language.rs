@@ -22,10 +22,10 @@ fn dispatch_module_source_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
     entry: BuiltinFunctionId,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_abstract_module_source_builtin() {
+    if entry == super::abstract_module_source_builtin() {
         return Err(super::type_error(context));
     }
-    if entry == super::js3_abstract_module_source_to_string_tag_getter_builtin() {
+    if entry == super::abstract_module_source_to_string_tag_getter_builtin() {
         return Ok(Some(Value::undefined()));
     }
     Ok(None)
@@ -36,31 +36,31 @@ fn dispatch_global_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::js3_eval_builtin() {
+    if entry == super::eval_builtin() {
         return eval_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_parse_int_builtin() {
+    if entry == super::parse_int_builtin() {
         return parse_int_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_parse_float_builtin() {
+    if entry == super::parse_float_builtin() {
         return parse_float_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_is_nan_builtin() {
+    if entry == super::is_nan_builtin() {
         return is_nan_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_is_finite_builtin() {
+    if entry == super::is_finite_builtin() {
         return is_finite_builtin(context, invocation).map(Some);
     }
-    if entry == super::js3_encode_uri_builtin() {
+    if entry == super::encode_uri_builtin() {
         return encode_uri_builtin(context, invocation, false).map(Some);
     }
-    if entry == super::js3_encode_uri_component_builtin() {
+    if entry == super::encode_uri_component_builtin() {
         return encode_uri_builtin(context, invocation, true).map(Some);
     }
-    if entry == super::js3_decode_uri_builtin() {
+    if entry == super::decode_uri_builtin() {
         return decode_uri_builtin(context, invocation, false).map(Some);
     }
-    if entry == super::js3_decode_uri_component_builtin() {
+    if entry == super::decode_uri_component_builtin() {
         return decode_uri_builtin(context, invocation, true).map(Some);
     }
     Ok(None)
