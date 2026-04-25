@@ -795,7 +795,8 @@ mod tests {
     use lyng_js_types::{
         js3_array_from_async_builtin, js3_array_iterator_next_builtin,
         js3_array_species_getter_builtin, js3_array_values_builtin, js3_error_to_string_builtin,
-        js3_symbol_to_primitive_builtin, PropertyKey, Value,
+        js3_map_size_getter_builtin, js3_set_values_builtin, js3_symbol_to_primitive_builtin,
+        js3_weak_ref_deref_builtin, PropertyKey, Value,
     };
 
     fn own_descriptor(
@@ -1496,6 +1497,98 @@ mod tests {
         assert_eq!(next.writable(), Some(true));
         assert_eq!(next.enumerable(), Some(false));
         assert_eq!(next.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_collection_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let map = intrinsics.map().expect("Map intrinsic should exist");
+        let map_prototype = intrinsics
+            .map_prototype()
+            .expect("Map.prototype intrinsic should exist");
+        let set_prototype = intrinsics
+            .set_prototype()
+            .expect("Set.prototype intrinsic should exist");
+        let weak_ref_prototype = intrinsics
+            .weak_ref_prototype()
+            .expect("WeakRef.prototype intrinsic should exist");
+
+        let size_atom = agent.atoms_mut().intern_collectible("size");
+        let keys_atom = agent.atoms_mut().intern_collectible("keys");
+        let deref_atom = agent.atoms_mut().intern_collectible("deref");
+        let species_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Species)
+            .expect("Symbol.species should exist");
+
+        let species_getter = cache
+            .builtin_constant(agent, artifacts.realm(), js3_array_species_getter_builtin())
+            .expect("collection @@species getter should resolve");
+        let map_size_getter = cache
+            .builtin_constant(agent, artifacts.realm(), js3_map_size_getter_builtin())
+            .expect("Map.prototype.size getter should resolve");
+        let set_values = cache
+            .builtin_constant(agent, artifacts.realm(), js3_set_values_builtin())
+            .expect("Set.prototype.values builtin should resolve");
+        let weak_ref_deref = cache
+            .builtin_constant(agent, artifacts.realm(), js3_weak_ref_deref_builtin())
+            .expect("WeakRef.prototype.deref builtin should resolve");
+
+        let map_species = own_descriptor(
+            agent,
+            map,
+            PropertyKey::from_symbol(species_symbol),
+            "Map[Symbol.species]",
+        );
+        assert_eq!(map_species.getter(), Some(species_getter));
+        assert_eq!(map_species.setter(), Some(Value::undefined()));
+        assert_eq!(map_species.enumerable(), Some(false));
+        assert_eq!(map_species.configurable(), Some(true));
+
+        let map_size = own_descriptor(
+            agent,
+            map_prototype,
+            PropertyKey::from_atom(size_atom),
+            "Map.prototype.size",
+        );
+        assert_eq!(map_size.getter(), Some(map_size_getter));
+        assert_eq!(map_size.setter(), Some(Value::undefined()));
+        assert_eq!(map_size.enumerable(), Some(false));
+        assert_eq!(map_size.configurable(), Some(true));
+
+        let set_keys = own_descriptor(
+            agent,
+            set_prototype,
+            PropertyKey::from_atom(keys_atom),
+            "Set.prototype.keys",
+        );
+        assert_eq!(set_keys.value(), Some(set_values));
+        assert_eq!(set_keys.writable(), Some(true));
+        assert_eq!(set_keys.enumerable(), Some(false));
+        assert_eq!(set_keys.configurable(), Some(true));
+
+        let weak_ref_deref_descriptor = own_descriptor(
+            agent,
+            weak_ref_prototype,
+            PropertyKey::from_atom(deref_atom),
+            "WeakRef.prototype.deref",
+        );
+        assert_eq!(weak_ref_deref_descriptor.value(), Some(weak_ref_deref));
+        assert_eq!(weak_ref_deref_descriptor.writable(), Some(true));
+        assert_eq!(weak_ref_deref_descriptor.enumerable(), Some(false));
+        assert_eq!(weak_ref_deref_descriptor.configurable(), Some(true));
     }
 
     #[test]

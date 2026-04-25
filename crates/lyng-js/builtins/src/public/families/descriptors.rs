@@ -83,6 +83,14 @@ pub(super) fn descriptor_tag(agent: &mut Agent, text: &str) -> Value {
     Value::from_string_ref(agent.alloc_runtime_string(text, None, AllocationLifetime::Default))
 }
 
+pub(super) fn descriptor_tag_with_atom(agent: &mut Agent, text: &str, atom: AtomId) -> Value {
+    Value::from_string_ref(agent.alloc_runtime_string(
+        text,
+        Some(atom),
+        AllocationLifetime::Default,
+    ))
+}
+
 pub(super) const fn writable_builtin_attributes() -> BuiltinAttributes {
     BuiltinAttributes::new(true, false, true)
 }

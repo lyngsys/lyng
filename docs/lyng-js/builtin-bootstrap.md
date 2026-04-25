@@ -95,6 +95,8 @@ Rules:
   and async generator descriptor installation in `public/families/functions.rs`
 - the Array family owns `Array`, `Array.prototype`, array unscopables, and Array Iterator
   prototype descriptor installation in `public/families/arrays.rs`
+- the keyed collection family owns Map, Set, WeakMap, WeakSet, WeakRef, and
+  FinalizationRegistry descriptor installation in `public/families/collections.rs`
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

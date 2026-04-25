@@ -1083,36 +1083,6 @@ impl BuiltinCache {
             Some(bootstrap_atoms.math()),
             AllocationLifetime::Default,
         ));
-        let map_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Map",
-            Some(bootstrap_atoms.map()),
-            AllocationLifetime::Default,
-        ));
-        let set_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Set",
-            Some(bootstrap_atoms.set()),
-            AllocationLifetime::Default,
-        ));
-        let weak_map_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "WeakMap",
-            Some(bootstrap_atoms.weak_map()),
-            AllocationLifetime::Default,
-        ));
-        let weak_set_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "WeakSet",
-            Some(bootstrap_atoms.weak_set()),
-            AllocationLifetime::Default,
-        ));
-        let weak_ref_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "WeakRef",
-            Some(bootstrap_atoms.weak_ref()),
-            AllocationLifetime::Default,
-        ));
-        let finalization_registry_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "FinalizationRegistry",
-            Some(bootstrap_atoms.finalization_registry()),
-            AllocationLifetime::Default,
-        ));
         let array_buffer_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "ArrayBuffer",
             Some(bootstrap_atoms.array_buffer()),
@@ -1425,27 +1395,21 @@ impl BuiltinCache {
         let get_int16_atom = agent.atoms_mut().intern_collectible("getInt16");
         let get_int32_atom = agent.atoms_mut().intern_collectible("getInt32");
         let get_int8_atom = agent.atoms_mut().intern_collectible("getInt8");
-        let get_atom = agent.atoms_mut().intern_collectible("get");
         let get_uint16_atom = agent.atoms_mut().intern_collectible("getUint16");
         let get_uint32_atom = agent.atoms_mut().intern_collectible("getUint32");
         let get_uint8_atom = agent.atoms_mut().intern_collectible("getUint8");
-        let has_atom = agent.atoms_mut().intern_collectible("has");
         let has_indices_atom = bootstrap_atoms.has_indices();
         let add_atom = agent.atoms_mut().intern_collectible("add");
         let and_atom = agent.atoms_mut().intern_collectible("and");
         let as_int_n_atom = agent.atoms_mut().intern_collectible("asIntN");
         let as_uint_n_atom = agent.atoms_mut().intern_collectible("asUintN");
-        let clear_atom = agent.atoms_mut().intern_collectible("clear");
         let compare_exchange_atom = agent.atoms_mut().intern_collectible("compareExchange");
-        let delete_atom = agent.atoms_mut().intern_collectible("delete");
-        let deref_atom = agent.atoms_mut().intern_collectible("deref");
         let exchange_atom = agent.atoms_mut().intern_collectible("exchange");
         let is_lock_free_atom = agent.atoms_mut().intern_collectible("isLockFree");
         let load_atom = agent.atoms_mut().intern_collectible("load");
         let notify_atom = agent.atoms_mut().intern_collectible("notify");
         let now_atom = agent.atoms_mut().intern_collectible("now");
         let or_atom = agent.atoms_mut().intern_collectible("or");
-        let register_atom = agent.atoms_mut().intern_collectible("register");
         let set_atom = agent.atoms_mut().intern_collectible("set");
         let set_float32_atom = agent.atoms_mut().intern_collectible("setFloat32");
         let set_float64_atom = agent.atoms_mut().intern_collectible("setFloat64");
@@ -1455,11 +1419,9 @@ impl BuiltinCache {
         let set_uint16_atom = agent.atoms_mut().intern_collectible("setUint16");
         let set_uint32_atom = agent.atoms_mut().intern_collectible("setUint32");
         let set_uint8_atom = agent.atoms_mut().intern_collectible("setUint8");
-        let size_atom = agent.atoms_mut().intern_collectible("size");
         let store_atom = agent.atoms_mut().intern_collectible("store");
         let sub_atom = agent.atoms_mut().intern_collectible("sub");
         let subarray_atom = agent.atoms_mut().intern_collectible("subarray");
-        let unregister_atom = agent.atoms_mut().intern_collectible("unregister");
         let test_atom = agent.atoms_mut().intern_collectible("test");
         let trunc_atom = agent.atoms_mut().intern_collectible("trunc");
         let to_exponential_atom = agent.atoms_mut().intern_collectible("toExponential");
@@ -1469,265 +1431,6 @@ impl BuiltinCache {
         let wait_atom = agent.atoms_mut().intern_collectible("wait");
         let wait_async_atom = agent.atoms_mut().intern_collectible("waitAsync");
         let xor_atom = agent.atoms_mut().intern_collectible("xor");
-        let map_descriptors = [BuiltinPropertyDescriptor::new(
-            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Species),
-            BuiltinPropertyValueSpec::Accessor {
-                get: Some(js3_array_species_getter_builtin()),
-                set: None,
-            },
-            BuiltinAttributes::new(false, false, true),
-        )];
-        let map_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.map)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_get_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(has_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_has_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(delete_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_delete_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(clear_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_clear_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(for_each_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_for_each_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(size_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_map_size_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(map_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let set_descriptors = [BuiltinPropertyDescriptor::new(
-            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Species),
-            BuiltinPropertyValueSpec::Accessor {
-                get: Some(js3_array_species_getter_builtin()),
-                set: None,
-            },
-            BuiltinAttributes::new(false, false, true),
-        )];
-        let set_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.set)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(add_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_set_add_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(has_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_set_has_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(delete_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_set_delete_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(clear_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_set_clear_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_set_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_set_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.set_values)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(for_each_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_set_for_each_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(size_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_set_size_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_set_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(set_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let weak_map_descriptors: [BuiltinPropertyDescriptor; 0] = [];
-        let weak_map_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.weak_map)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(get_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_map_get_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_map_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(has_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_map_has_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(delete_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_map_delete_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(weak_map_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let weak_set_descriptors: [BuiltinPropertyDescriptor; 0] = [];
-        let weak_set_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.weak_set)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(add_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_set_add_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(has_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_set_has_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(delete_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_set_delete_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(weak_set_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let weak_ref_descriptors: [BuiltinPropertyDescriptor; 0] = [];
-        let weak_ref_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.weak_ref)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(deref_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_weak_ref_deref_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(weak_ref_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let finalization_registry_descriptors: [BuiltinPropertyDescriptor; 0] = [];
-        let finalization_registry_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(
-                    builtins.finalization_registry,
-                )),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(register_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    js3_finalization_registry_register_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(unregister_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(
-                    js3_finalization_registry_unregister_builtin(),
-                ),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(finalization_registry_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
         let array_buffer_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(is_view_atom),
@@ -4832,54 +4535,6 @@ impl BuiltinCache {
         ];
         let tables = [
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Map),
-                &map_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::MapPrototype),
-                &map_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Set),
-                &set_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::SetPrototype),
-                &set_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::WeakMap),
-                &weak_map_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::WeakMapPrototype),
-                &weak_map_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::WeakSet),
-                &weak_set_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::WeakSetPrototype),
-                &weak_set_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::WeakRef),
-                &weak_ref_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::WeakRefPrototype),
-                &weak_ref_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::FinalizationRegistry),
-                &finalization_registry_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::FinalizationRegistryPrototype),
-                &finalization_registry_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ArrayBuffer),
                 &array_buffer_descriptors,
             ),
@@ -5166,6 +4821,10 @@ impl BuiltinCache {
             return None;
         }
         if families::install_array_family_descriptors(agent, self, realm, &builtins).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_collection_family_descriptors(agent, self, realm, &builtins).is_err() {
             self.public.remove(&realm);
             return None;
         }
