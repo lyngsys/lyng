@@ -10,6 +10,7 @@ mod modules;
 mod object_reflection;
 mod objects;
 mod primitives;
+mod promises;
 mod regexp;
 mod strings;
 
@@ -29,6 +30,7 @@ pub(super) use modules::install_module_family;
 pub(super) use object_reflection::install_object_reflection_family;
 pub(super) use objects::install_object_family;
 pub(super) use primitives::install_primitive_family;
+pub(super) use promises::install_promise_disposal_family;
 pub(super) use regexp::install_regexp_family;
 pub(super) use strings::install_string_family;
 
@@ -632,6 +634,52 @@ pub(super) struct ErrorFamilyBuiltins {
     pub(super) aggregate_error_prototype: ObjectRef,
     pub(super) suppressed_error: ObjectRef,
     pub(super) suppressed_error_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct PromiseDisposalFamilyPrototypes {
+    pub(super) promise_prototype: ObjectRef,
+    pub(super) disposable_stack_prototype: ObjectRef,
+    pub(super) async_disposable_stack_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct PromiseDisposalFamilyBuiltins {
+    pub(super) promise: ObjectRef,
+    pub(super) promise_prototype: ObjectRef,
+    pub(super) disposable_stack: ObjectRef,
+    pub(super) disposable_stack_prototype: ObjectRef,
+    pub(super) async_disposable_stack: ObjectRef,
+    pub(super) async_disposable_stack_prototype: ObjectRef,
+    pub(super) disposable_stack_use: ObjectRef,
+    pub(super) disposable_stack_adopt: ObjectRef,
+    pub(super) disposable_stack_defer: ObjectRef,
+    pub(super) disposable_stack_move: ObjectRef,
+    pub(super) disposable_stack_disposed_getter: ObjectRef,
+    pub(super) disposable_stack_dispose: ObjectRef,
+    pub(super) async_disposable_stack_use: ObjectRef,
+    pub(super) async_disposable_stack_adopt: ObjectRef,
+    pub(super) async_disposable_stack_defer: ObjectRef,
+    pub(super) async_disposable_stack_move: ObjectRef,
+    pub(super) async_disposable_stack_disposed_getter: ObjectRef,
+    pub(super) async_disposable_stack_dispose_async: ObjectRef,
+    pub(super) create_sync_disposal_scope: ObjectRef,
+    pub(super) create_async_disposal_scope: ObjectRef,
+    pub(super) add_sync_disposable_resource: ObjectRef,
+    pub(super) add_async_disposable_resource: ObjectRef,
+    pub(super) dispose_scope: ObjectRef,
+    pub(super) dispose_scope_async: ObjectRef,
+    pub(super) promise_then: ObjectRef,
+    pub(super) promise_catch: ObjectRef,
+    pub(super) promise_finally: ObjectRef,
+    pub(super) promise_resolve: ObjectRef,
+    pub(super) promise_reject: ObjectRef,
+    pub(super) promise_all: ObjectRef,
+    pub(super) promise_all_settled: ObjectRef,
+    pub(super) promise_race: ObjectRef,
+    pub(super) promise_any: ObjectRef,
+    pub(super) promise_species_getter: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]
