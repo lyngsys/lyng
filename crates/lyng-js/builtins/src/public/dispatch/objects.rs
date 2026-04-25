@@ -1,11 +1,11 @@
 use super::{
+    binary_data::{typed_array_storage_bits_from_builtin_value, typed_array_write_storage_bits},
     close_iterator_after_error, create_array_from_values, create_array_result,
     create_data_property_or_throw, get_property_from_object, is_array_for_species,
     length_value_u64, map_completion, property_key_string_value, proxy_define_property,
     proxy_get_own_property, proxy_get_prototype_of, proxy_is_extensible, proxy_own_property_keys,
     proxy_prevent_extensions, proxy_set_prototype_of, set_property_on_object_with_receiver,
-    string_value, type_error, typed_array_storage_bits_from_builtin_value,
-    typed_array_write_storage_bits, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
+    string_value, type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
     MAX_SAFE_INTEGER_U64,
 };
 use crate::BuiltinInvocation;

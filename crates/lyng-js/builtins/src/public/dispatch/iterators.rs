@@ -1,7 +1,8 @@
 use super::{
-    array_like_length, create_array_result, get_property_from_object, length_value, map_completion,
-    set_property_on_object, string_from_code_units, string_ref_code_units, string_this_ref,
-    type_error, typed_array_validated_object_and_record, PublicBuiltinDispatchContext,
+    array_like_length, binary_data::typed_array_validated_object_and_record, create_array_result,
+    get_property_from_object, length_value, map_completion, set_property_on_object,
+    string_from_code_units, string_ref_code_units, string_this_ref, type_error,
+    PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use lyng_js_env::Agent;
