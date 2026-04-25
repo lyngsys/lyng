@@ -44,6 +44,8 @@ use lyng_js_types::{
     js3_uint8_array_values_builtin, js3_uint8_clamped_array_builtin, BuiltinFunctionId, ObjectRef,
 };
 
+use crate::public::PublicRealmBuiltins;
+
 #[allow(clippy::too_many_lines)]
 pub(in crate::public) fn install_binary_data_family(
     agent: &mut Agent,
@@ -165,6 +167,284 @@ pub(in crate::public) fn install_binary_data_family(
         typed_array_at: typed_array_methods.at,
         typed_array_to_string_tag_getter: typed_array_methods.to_string_tag_getter,
     }
+}
+
+#[allow(clippy::too_many_lines)]
+pub(in crate::public) fn binary_data_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    if entry == js3_array_buffer_builtin() {
+        return Some(builtins.array_buffer);
+    }
+    if entry == js3_array_buffer_is_view_builtin() {
+        return Some(builtins.array_buffer_is_view);
+    }
+    if entry == js3_shared_array_buffer_builtin() {
+        return Some(builtins.shared_array_buffer);
+    }
+    if entry == js3_data_view_builtin() {
+        return Some(builtins.data_view);
+    }
+    if entry == js3_typed_array_builtin() {
+        return Some(builtins.typed_array);
+    }
+    if entry == js3_typed_array_from_builtin() {
+        return Some(builtins.typed_array_from);
+    }
+    if entry == js3_typed_array_of_builtin() {
+        return Some(builtins.typed_array_of);
+    }
+    if entry == js3_int8_array_builtin() {
+        return Some(builtins.int8_array);
+    }
+    if entry == js3_int16_array_builtin() {
+        return Some(builtins.int16_array);
+    }
+    if entry == js3_int32_array_builtin() {
+        return Some(builtins.int32_array);
+    }
+    if entry == js3_float32_array_builtin() {
+        return Some(builtins.float32_array);
+    }
+    if entry == js3_float64_array_builtin() {
+        return Some(builtins.float64_array);
+    }
+    if entry == js3_big_int64_array_builtin() {
+        return Some(builtins.big_int64_array);
+    }
+    if entry == js3_big_uint64_array_builtin() {
+        return Some(builtins.big_uint64_array);
+    }
+    if entry == js3_uint32_array_builtin() {
+        return Some(builtins.uint32_array);
+    }
+    if entry == js3_uint16_array_builtin() {
+        return Some(builtins.uint16_array);
+    }
+    if entry == js3_uint8_clamped_array_builtin() {
+        return Some(builtins.uint8_clamped_array);
+    }
+    if entry == js3_uint8_array_builtin() {
+        return Some(builtins.uint8_array);
+    }
+    if entry == js3_array_buffer_byte_length_getter_builtin() {
+        return Some(builtins.array_buffer_byte_length_getter);
+    }
+    if entry == js3_array_buffer_slice_builtin() {
+        return Some(builtins.array_buffer_slice);
+    }
+    if entry == js3_shared_array_buffer_byte_length_getter_builtin() {
+        return Some(builtins.shared_array_buffer_byte_length_getter);
+    }
+    if entry == js3_shared_array_buffer_slice_builtin() {
+        return Some(builtins.shared_array_buffer_slice);
+    }
+    if entry == js3_atomics_load_builtin() {
+        return Some(builtins.atomics_load);
+    }
+    if entry == js3_atomics_store_builtin() {
+        return Some(builtins.atomics_store);
+    }
+    if entry == js3_atomics_add_builtin() {
+        return Some(builtins.atomics_add);
+    }
+    if entry == js3_atomics_sub_builtin() {
+        return Some(builtins.atomics_sub);
+    }
+    if entry == js3_atomics_and_builtin() {
+        return Some(builtins.atomics_and);
+    }
+    if entry == js3_atomics_or_builtin() {
+        return Some(builtins.atomics_or);
+    }
+    if entry == js3_atomics_xor_builtin() {
+        return Some(builtins.atomics_xor);
+    }
+    if entry == js3_atomics_exchange_builtin() {
+        return Some(builtins.atomics_exchange);
+    }
+    if entry == js3_atomics_compare_exchange_builtin() {
+        return Some(builtins.atomics_compare_exchange);
+    }
+    if entry == js3_atomics_notify_builtin() {
+        return Some(builtins.atomics_notify);
+    }
+    if entry == js3_atomics_wait_builtin() {
+        return Some(builtins.atomics_wait);
+    }
+    if entry == js3_atomics_wait_async_builtin() {
+        return Some(builtins.atomics_wait_async);
+    }
+    if entry == js3_atomics_is_lock_free_builtin() {
+        return Some(builtins.atomics_is_lock_free);
+    }
+    if entry == js3_data_view_buffer_getter_builtin() {
+        return Some(builtins.data_view_buffer_getter);
+    }
+    if entry == js3_data_view_byte_length_getter_builtin() {
+        return Some(builtins.data_view_byte_length_getter);
+    }
+    if entry == js3_data_view_byte_offset_getter_builtin() {
+        return Some(builtins.data_view_byte_offset_getter);
+    }
+    if entry == js3_data_view_get_float32_builtin() {
+        return Some(builtins.data_view_get_float32);
+    }
+    if entry == js3_data_view_get_float64_builtin() {
+        return Some(builtins.data_view_get_float64);
+    }
+    if entry == js3_data_view_get_int16_builtin() {
+        return Some(builtins.data_view_get_int16);
+    }
+    if entry == js3_data_view_get_int32_builtin() {
+        return Some(builtins.data_view_get_int32);
+    }
+    if entry == js3_data_view_get_int8_builtin() {
+        return Some(builtins.data_view_get_int8);
+    }
+    if entry == js3_data_view_get_uint16_builtin() {
+        return Some(builtins.data_view_get_uint16);
+    }
+    if entry == js3_data_view_get_uint32_builtin() {
+        return Some(builtins.data_view_get_uint32);
+    }
+    if entry == js3_data_view_get_uint8_builtin() {
+        return Some(builtins.data_view_get_uint8);
+    }
+    if entry == js3_data_view_set_float32_builtin() {
+        return Some(builtins.data_view_set_float32);
+    }
+    if entry == js3_data_view_set_float64_builtin() {
+        return Some(builtins.data_view_set_float64);
+    }
+    if entry == js3_data_view_set_int16_builtin() {
+        return Some(builtins.data_view_set_int16);
+    }
+    if entry == js3_data_view_set_int32_builtin() {
+        return Some(builtins.data_view_set_int32);
+    }
+    if entry == js3_data_view_set_int8_builtin() {
+        return Some(builtins.data_view_set_int8);
+    }
+    if entry == js3_data_view_set_uint16_builtin() {
+        return Some(builtins.data_view_set_uint16);
+    }
+    if entry == js3_data_view_set_uint32_builtin() {
+        return Some(builtins.data_view_set_uint32);
+    }
+    if entry == js3_data_view_set_uint8_builtin() {
+        return Some(builtins.data_view_set_uint8);
+    }
+    if entry == js3_uint8_array_buffer_getter_builtin() {
+        return Some(builtins.uint8_array_buffer_getter);
+    }
+    if entry == js3_uint8_array_byte_length_getter_builtin() {
+        return Some(builtins.uint8_array_byte_length_getter);
+    }
+    if entry == js3_uint8_array_byte_offset_getter_builtin() {
+        return Some(builtins.uint8_array_byte_offset_getter);
+    }
+    if entry == js3_uint8_array_length_getter_builtin() {
+        return Some(builtins.uint8_array_length_getter);
+    }
+    if entry == js3_uint8_array_values_builtin() {
+        return Some(builtins.uint8_array_values);
+    }
+    if entry == js3_uint8_array_keys_builtin() {
+        return Some(builtins.uint8_array_keys);
+    }
+    if entry == js3_uint8_array_entries_builtin() {
+        return Some(builtins.uint8_array_entries);
+    }
+    if entry == js3_uint8_array_set_builtin() {
+        return Some(builtins.uint8_array_set);
+    }
+    if entry == js3_uint8_array_slice_builtin() {
+        return Some(builtins.uint8_array_slice);
+    }
+    if entry == js3_uint8_array_subarray_builtin() {
+        return Some(builtins.uint8_array_subarray);
+    }
+    if entry == js3_typed_array_every_builtin() {
+        return Some(builtins.typed_array_every);
+    }
+    if entry == js3_typed_array_some_builtin() {
+        return Some(builtins.typed_array_some);
+    }
+    if entry == js3_typed_array_find_builtin() {
+        return Some(builtins.typed_array_find);
+    }
+    if entry == js3_typed_array_find_index_builtin() {
+        return Some(builtins.typed_array_find_index);
+    }
+    if entry == js3_typed_array_find_last_builtin() {
+        return Some(builtins.typed_array_find_last);
+    }
+    if entry == js3_typed_array_find_last_index_builtin() {
+        return Some(builtins.typed_array_find_last_index);
+    }
+    if entry == js3_typed_array_fill_builtin() {
+        return Some(builtins.typed_array_fill);
+    }
+    if entry == js3_typed_array_copy_within_builtin() {
+        return Some(builtins.typed_array_copy_within);
+    }
+    if entry == js3_typed_array_filter_builtin() {
+        return Some(builtins.typed_array_filter);
+    }
+    if entry == js3_typed_array_for_each_builtin() {
+        return Some(builtins.typed_array_for_each);
+    }
+    if entry == js3_typed_array_includes_builtin() {
+        return Some(builtins.typed_array_includes);
+    }
+    if entry == js3_typed_array_index_of_builtin() {
+        return Some(builtins.typed_array_index_of);
+    }
+    if entry == js3_typed_array_join_builtin() {
+        return Some(builtins.typed_array_join);
+    }
+    if entry == js3_typed_array_last_index_of_builtin() {
+        return Some(builtins.typed_array_last_index_of);
+    }
+    if entry == js3_typed_array_map_builtin() {
+        return Some(builtins.typed_array_map);
+    }
+    if entry == js3_typed_array_reduce_builtin() {
+        return Some(builtins.typed_array_reduce);
+    }
+    if entry == js3_typed_array_reduce_right_builtin() {
+        return Some(builtins.typed_array_reduce_right);
+    }
+    if entry == js3_typed_array_reverse_builtin() {
+        return Some(builtins.typed_array_reverse);
+    }
+    if entry == js3_typed_array_sort_builtin() {
+        return Some(builtins.typed_array_sort);
+    }
+    if entry == js3_typed_array_to_locale_string_builtin() {
+        return Some(builtins.typed_array_to_locale_string);
+    }
+    if entry == js3_typed_array_to_string_builtin() {
+        return Some(builtins.typed_array_to_string);
+    }
+    if entry == js3_typed_array_to_reversed_builtin() {
+        return Some(builtins.typed_array_to_reversed);
+    }
+    if entry == js3_typed_array_to_sorted_builtin() {
+        return Some(builtins.typed_array_to_sorted);
+    }
+    if entry == js3_typed_array_with_builtin() {
+        return Some(builtins.typed_array_with);
+    }
+    if entry == js3_typed_array_at_builtin() {
+        return Some(builtins.typed_array_at);
+    }
+    if entry == js3_typed_array_to_string_tag_getter_builtin() {
+        return Some(builtins.typed_array_to_string_tag_getter);
+    }
+    None
 }
 
 #[derive(Clone, Copy, Debug)]
