@@ -1,7 +1,8 @@
+use super::strings::push_code_point_units;
 use super::{
-    number_value, push_code_point_units, string_from_code_units, string_ref_code_units,
-    string_value, to_number_for_builtin, to_number_value_for_builtin, to_string_string_ref,
-    uri_error, PublicBuiltinDispatchContext,
+    number_value, string_from_code_units, string_ref_code_units, string_value,
+    to_number_for_builtin, to_number_value_for_builtin, to_string_string_ref, uri_error,
+    PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use lyng_js_types::{BuiltinFunctionId, Value};
