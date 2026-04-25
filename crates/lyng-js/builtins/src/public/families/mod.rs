@@ -4,6 +4,7 @@ mod date;
 mod errors;
 mod functions;
 mod globals;
+mod iterators;
 mod json;
 mod modules;
 mod object_reflection;
@@ -22,6 +23,7 @@ pub(super) use date::install_date_family;
 pub(super) use errors::install_error_family;
 pub(super) use functions::install_function_family;
 pub(super) use globals::install_global_function_family;
+pub(super) use iterators::install_iterator_family;
 pub(super) use json::install_json_family;
 pub(super) use modules::install_module_family;
 pub(super) use object_reflection::install_object_reflection_family;
@@ -54,6 +56,23 @@ pub(super) fn install_public_builtin_function(
     )
 }
 
+pub(super) fn install_public_builtin_function_with_metadata(
+    agent: &mut Agent,
+    cx: FamilyInstallContext,
+    entry: BuiltinFunctionId,
+    metadata: crate::BuiltinEntryMetadata,
+    prototype_object: Option<ObjectRef>,
+) -> ObjectRef {
+    allocate_public_builtin_function(
+        agent,
+        cx,
+        cx.function_prototype,
+        entry,
+        metadata,
+        prototype_object,
+    )
+}
+
 pub(super) fn install_public_builtin_function_with_function_prototype(
     agent: &mut Agent,
     cx: FamilyInstallContext,
@@ -63,6 +82,24 @@ pub(super) fn install_public_builtin_function_with_function_prototype(
 ) -> ObjectRef {
     let metadata =
         public_builtin_metadata(entry).expect("family installer entry must have public metadata");
+    allocate_public_builtin_function(
+        agent,
+        cx,
+        function_prototype,
+        entry,
+        metadata,
+        prototype_object,
+    )
+}
+
+fn allocate_public_builtin_function(
+    agent: &mut Agent,
+    cx: FamilyInstallContext,
+    function_prototype: ObjectRef,
+    entry: BuiltinFunctionId,
+    metadata: crate::BuiltinEntryMetadata,
+    prototype_object: Option<ObjectRef>,
+) -> ObjectRef {
     allocate_builtin_function_object(
         agent,
         cx.realm,
@@ -150,6 +187,21 @@ pub(super) struct FunctionFamilyBuiltins {
     pub(super) generator_next: ObjectRef,
     pub(super) generator_return: ObjectRef,
     pub(super) generator_throw: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct IteratorFamilyPrototypes {
+    pub(super) async_iterator_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct IteratorFamilyBuiltins {
+    pub(super) async_iterator_prototype: ObjectRef,
+    pub(super) iterator_prototype_iterator: ObjectRef,
+    pub(super) async_iterator_method: ObjectRef,
+    pub(super) map_iterator_next: ObjectRef,
+    pub(super) set_iterator_next: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]
