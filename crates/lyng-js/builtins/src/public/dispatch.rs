@@ -1,3 +1,4 @@
+mod functions;
 mod objects;
 mod temporal;
 use crate::internal::{dispatch_internal_builtin, InternalBuiltinDispatchContext};
@@ -573,53 +574,8 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if let Some(result) = objects::dispatch_object_builtin(context, entry, invocation)? {
         return Ok(Some(result));
     }
-    if entry == js3_function_builtin() {
-        return function_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_function_prototype_builtin() {
-        return function_prototype_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_function_call_builtin() {
-        return function_call_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_function_apply_builtin() {
-        return function_apply_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_function_bind_builtin() {
-        return function_bind_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_function_to_string_builtin() {
-        return function_to_string_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_function_symbol_has_instance_builtin() {
-        return function_symbol_has_instance_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_async_function_builtin() {
-        return async_function_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_async_generator_function_builtin() {
-        return async_generator_function_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_async_generator_next_builtin() {
-        return async_generator_next_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_async_generator_return_builtin() {
-        return async_generator_return_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_async_generator_throw_builtin() {
-        return async_generator_throw_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_generator_function_builtin() {
-        return generator_function_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_generator_next_builtin() {
-        return generator_next_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_generator_return_builtin() {
-        return generator_return_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_generator_throw_builtin() {
-        return generator_throw_builtin(context, invocation).map(Some);
+    if let Some(result) = functions::dispatch_function_builtin(context, entry, invocation)? {
+        return Ok(Some(result));
     }
     if entry == js3_map_builtin() {
         return map_builtin(context, invocation).map(Some);
