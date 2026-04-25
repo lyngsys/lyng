@@ -282,7 +282,9 @@ fn allocate_date_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent.realm(realm).and_then(|record| record.root_shape())
+        agent
+            .realm(realm)
+            .and_then(lyng_js_env::RealmRecord::root_shape)
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
@@ -975,7 +977,7 @@ fn date_parse_iso_text<Cx: PublicBuiltinDispatchContext>(
                 offset_minutes = Some(0);
                 index += 1;
             }
-            Some(b'+') | Some(b'-') => {
+            Some(b'+' | b'-') => {
                 let offset_text = &text[index..];
                 offset_minutes = date_parse_timezone_offset_colon(offset_text);
                 if offset_minutes.is_none() {

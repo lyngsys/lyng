@@ -528,8 +528,9 @@ fn typed_array_storage_bits_to_value(
                 .unwrap_or_else(|_| Value::from_f64(f64::from(value)))
         }
         TypedArrayElementKind::Uint16 => Value::from_smi(i32::from(bits as u16)),
-        TypedArrayElementKind::Uint8Clamped => Value::from_smi(i32::from(bits as u8)),
-        TypedArrayElementKind::Uint8 => Value::from_smi(i32::from(bits as u8)),
+        TypedArrayElementKind::Uint8Clamped | TypedArrayElementKind::Uint8 => {
+            Value::from_smi(i32::from(bits as u8))
+        }
     }
 }
 
@@ -2792,22 +2793,12 @@ fn typed_array_predicate_builtin<Cx: PublicBuiltinDispatchContext>(
                     return Ok(Value::from_bool(true));
                 }
             }
-            TypedArrayPredicateKind::Find => {
+            TypedArrayPredicateKind::Find | TypedArrayPredicateKind::FindLast => {
                 if selected {
                     return Ok(element);
                 }
             }
-            TypedArrayPredicateKind::FindIndex => {
-                if selected {
-                    return Ok(length_value_u64(u64::try_from(index).unwrap_or(u64::MAX)));
-                }
-            }
-            TypedArrayPredicateKind::FindLast => {
-                if selected {
-                    return Ok(element);
-                }
-            }
-            TypedArrayPredicateKind::FindLastIndex => {
+            TypedArrayPredicateKind::FindIndex | TypedArrayPredicateKind::FindLastIndex => {
                 if selected {
                     return Ok(length_value_u64(u64::try_from(index).unwrap_or(u64::MAX)));
                 }
@@ -2817,10 +2808,10 @@ fn typed_array_predicate_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(match kind {
         TypedArrayPredicateKind::Every => Value::from_bool(true),
         TypedArrayPredicateKind::Some => Value::from_bool(false),
-        TypedArrayPredicateKind::Find => Value::undefined(),
-        TypedArrayPredicateKind::FindIndex => Value::from_smi(-1),
-        TypedArrayPredicateKind::FindLast => Value::undefined(),
-        TypedArrayPredicateKind::FindLastIndex => Value::from_smi(-1),
+        TypedArrayPredicateKind::Find | TypedArrayPredicateKind::FindLast => Value::undefined(),
+        TypedArrayPredicateKind::FindIndex | TypedArrayPredicateKind::FindLastIndex => {
+            Value::from_smi(-1)
+        }
     })
 }
 

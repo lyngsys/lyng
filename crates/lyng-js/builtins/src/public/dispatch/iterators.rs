@@ -80,7 +80,9 @@ pub(super) fn allocate_iterator_object<Cx: PublicBuiltinDispatchContext>(
     let realm = cx.builtin_realm();
     let root_shape = {
         let agent = cx.agent();
-        agent.realm(realm).and_then(|record| record.root_shape())
+        agent
+            .realm(realm)
+            .and_then(lyng_js_env::RealmRecord::root_shape)
     }
     .ok_or_else(|| type_error(cx))?;
     let iterator_object = cx

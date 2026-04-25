@@ -155,9 +155,9 @@ fn json_raw_number_literal_is_valid(bytes: &[u8]) -> bool {
             index += 1;
         }
     }
-    if matches!(bytes.get(index), Some(b'e') | Some(b'E')) {
+    if matches!(bytes.get(index), Some(b'e' | b'E')) {
         index += 1;
-        if matches!(bytes.get(index), Some(b'+') | Some(b'-')) {
+        if matches!(bytes.get(index), Some(b'+' | b'-')) {
             index += 1;
         }
         if !matches!(bytes.get(index), Some(b'0'..=b'9')) {
@@ -299,7 +299,7 @@ impl<'a> JsonParser<'a> {
             }
             Some(JSON_CHAR_LEFT_BRACKET) => self.parse_array(cx),
             Some(JSON_CHAR_LEFT_BRACE) => self.parse_object(cx),
-            Some(JSON_CHAR_MINUS) | Some(JSON_CHAR_ZERO..=JSON_CHAR_NINE) => self.parse_number(cx),
+            Some(JSON_CHAR_MINUS | JSON_CHAR_ZERO..=JSON_CHAR_NINE) => self.parse_number(cx),
             _ => Err(syntax_error(cx)),
         }
     }
@@ -421,9 +421,9 @@ impl<'a> JsonParser<'a> {
                 self.index += 1;
             }
         }
-        if matches!(self.peek(), Some(JSON_CHAR_E) | Some(JSON_CHAR_UPPER_E)) {
+        if matches!(self.peek(), Some(JSON_CHAR_E | JSON_CHAR_UPPER_E)) {
             self.index += 1;
-            if matches!(self.peek(), Some(JSON_CHAR_PLUS) | Some(JSON_CHAR_MINUS)) {
+            if matches!(self.peek(), Some(JSON_CHAR_PLUS | JSON_CHAR_MINUS)) {
                 self.index += 1;
             }
             if !matches!(self.peek(), Some(JSON_CHAR_ZERO..=JSON_CHAR_NINE)) {
@@ -934,7 +934,7 @@ fn json_serialize_array<Cx: PublicBuiltinDispatchContext>(
     if gap_empty {
         return Ok(format!("[{}]", parts.join(",")));
     }
-    let separator = format!(",\n{}", indent);
+    let separator = format!(",\n{indent}");
     Ok(format!(
         "[\n{}{}\n{}]",
         indent,
@@ -977,7 +977,7 @@ fn json_serialize_object<Cx: PublicBuiltinDispatchContext>(
     if gap_empty {
         return Ok(format!("{{{}}}", parts.join(",")));
     }
-    let separator = format!(",\n{}", indent);
+    let separator = format!(",\n{indent}");
     Ok(format!(
         "{{\n{}{}\n{}}}",
         indent,
@@ -1019,8 +1019,8 @@ fn json_quote_string_units(units: &[u16]) -> String {
             0x000A => quoted.push_str("\\n"),
             0x000C => quoted.push_str("\\f"),
             0x000D => quoted.push_str("\\r"),
-            0x0000..=0x001F => {
-                let _ = write!(quoted, "\\u{:04x}", unit);
+            0x0000..=0x001F | 0xDC00..=0xDFFF => {
+                let _ = write!(quoted, "\\u{unit:04x}");
             }
             0xD800..=0xDBFF => {
                 if let Some(next) = units.get(index + 1).copied() {
@@ -1033,14 +1033,11 @@ fn json_quote_string_units(units: &[u16]) -> String {
                         );
                         index += 1;
                     } else {
-                        let _ = write!(quoted, "\\u{:04x}", unit);
+                        let _ = write!(quoted, "\\u{unit:04x}");
                     }
                 } else {
-                    let _ = write!(quoted, "\\u{:04x}", unit);
+                    let _ = write!(quoted, "\\u{unit:04x}");
                 }
-            }
-            0xDC00..=0xDFFF => {
-                let _ = write!(quoted, "\\u{:04x}", unit);
             }
             unit => quoted.push(
                 char::from_u32(u32::from(unit))

@@ -1133,7 +1133,7 @@ pub(super) fn promise_capability_promise<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<ObjectRef, Cx::Error> {
     cx.agent()
         .promise_capability(capability)
-        .and_then(|record| record.promise())
+        .and_then(lyng_js_env::PromiseCapabilityRecord::promise)
         .ok_or_else(|| type_error(cx))
 }
 
@@ -1143,7 +1143,7 @@ pub(super) fn promise_capability_resolve<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<ObjectRef, Cx::Error> {
     cx.agent()
         .promise_capability(capability)
-        .and_then(|record| record.resolve())
+        .and_then(lyng_js_env::PromiseCapabilityRecord::resolve)
         .ok_or_else(|| type_error(cx))
 }
 
@@ -1153,7 +1153,7 @@ pub(super) fn promise_capability_reject<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<ObjectRef, Cx::Error> {
     cx.agent()
         .promise_capability(capability)
-        .and_then(|record| record.reject())
+        .and_then(lyng_js_env::PromiseCapabilityRecord::reject)
         .ok_or_else(|| type_error(cx))
 }
 
@@ -1250,7 +1250,7 @@ fn promise_resolving_function_builtin<Cx: PublicBuiltinDispatchContext>(
     if cx
         .agent()
         .promise_capability(capability)
-        .is_some_and(|record| record.already_resolved())
+        .is_some_and(lyng_js_env::PromiseCapabilityRecord::already_resolved)
     {
         return Ok(Value::undefined());
     }
@@ -1304,7 +1304,7 @@ fn promise_resolving_function_builtin<Cx: PublicBuiltinDispatchContext>(
     let realm = cx
         .agent()
         .promise_record(promise_object)
-        .map(|record| record.realm())
+        .map(lyng_js_env::PromiseRecord::realm)
         .unwrap_or(cx.builtin_realm());
     promise::enqueue_thenable_job(cx.agent(), realm, promise_object, thenable, then);
     Ok(Value::undefined())
