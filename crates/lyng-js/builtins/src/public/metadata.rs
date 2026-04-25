@@ -1190,6 +1190,185 @@ const PUBLIC_OBJECT_REFLECTION_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &
     ),
 ];
 
+const PUBLIC_TEXT_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
+    PublicBuiltinMetadataRow::new(
+        js3_iterator_prototype_iterator_builtin,
+        BuiltinEntryMetadata::new("[Symbol.iterator]", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_array_iterator_next_builtin,
+        BuiltinEntryMetadata::new("next", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_map_iterator_next_builtin,
+        BuiltinEntryMetadata::new("next", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_set_iterator_next_builtin,
+        BuiltinEntryMetadata::new("next", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_builtin,
+        BuiltinEntryMetadata::new("String", 1, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_iterator_builtin,
+        BuiltinEntryMetadata::new("[Symbol.iterator]", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_iterator_next_builtin,
+        BuiltinEntryMetadata::new("next", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_to_string_builtin,
+        BuiltinEntryMetadata::new("toString", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_value_of_builtin,
+        BuiltinEntryMetadata::new("valueOf", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_concat_builtin,
+        BuiltinEntryMetadata::new("concat", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_char_at_builtin,
+        BuiltinEntryMetadata::new("charAt", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_char_code_at_builtin,
+        BuiltinEntryMetadata::new("charCodeAt", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_from_char_code_builtin,
+        BuiltinEntryMetadata::new("fromCharCode", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_from_code_point_builtin,
+        BuiltinEntryMetadata::new("fromCodePoint", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_raw_builtin,
+        BuiltinEntryMetadata::new("raw", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_at_builtin,
+        BuiltinEntryMetadata::new("at", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_code_point_at_builtin,
+        BuiltinEntryMetadata::new("codePointAt", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_ends_with_builtin,
+        BuiltinEntryMetadata::new("endsWith", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_includes_builtin,
+        BuiltinEntryMetadata::new("includes", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_index_of_builtin,
+        BuiltinEntryMetadata::new("indexOf", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_is_well_formed_builtin,
+        BuiltinEntryMetadata::new("isWellFormed", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_locale_compare_builtin,
+        BuiltinEntryMetadata::new("localeCompare", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_match_builtin,
+        BuiltinEntryMetadata::new("match", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_match_all_builtin,
+        BuiltinEntryMetadata::new("matchAll", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_normalize_builtin,
+        BuiltinEntryMetadata::new("normalize", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_last_index_of_builtin,
+        BuiltinEntryMetadata::new("lastIndexOf", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_pad_end_builtin,
+        BuiltinEntryMetadata::new("padEnd", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_pad_start_builtin,
+        BuiltinEntryMetadata::new("padStart", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_repeat_builtin,
+        BuiltinEntryMetadata::new("repeat", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_replace_builtin,
+        BuiltinEntryMetadata::new("replace", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_replace_all_builtin,
+        BuiltinEntryMetadata::new("replaceAll", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_search_builtin,
+        BuiltinEntryMetadata::new("search", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_split_builtin,
+        BuiltinEntryMetadata::new("split", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_slice_builtin,
+        BuiltinEntryMetadata::new("slice", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_substring_builtin,
+        BuiltinEntryMetadata::new("substring", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_starts_with_builtin,
+        BuiltinEntryMetadata::new("startsWith", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_to_locale_lower_case_builtin,
+        BuiltinEntryMetadata::new("toLocaleLowerCase", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_to_locale_upper_case_builtin,
+        BuiltinEntryMetadata::new("toLocaleUpperCase", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_to_lower_case_builtin,
+        BuiltinEntryMetadata::new("toLowerCase", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_to_upper_case_builtin,
+        BuiltinEntryMetadata::new("toUpperCase", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_to_well_formed_builtin,
+        BuiltinEntryMetadata::new("toWellFormed", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_trim_builtin,
+        BuiltinEntryMetadata::new("trim", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_trim_end_builtin,
+        BuiltinEntryMetadata::new("trimEnd", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        js3_string_trim_start_builtin,
+        BuiltinEntryMetadata::new("trimStart", 0, false, false),
+    ),
+];
+
 fn public_builtin_metadata_from_rows(
     entry: BuiltinFunctionId,
     rows: &[PublicBuiltinMetadataRow],
@@ -1227,6 +1406,10 @@ fn object_reflection_public_builtin_metadata(
     entry: BuiltinFunctionId,
 ) -> Option<BuiltinEntryMetadata> {
     public_builtin_metadata_from_rows(entry, PUBLIC_OBJECT_REFLECTION_BUILTIN_METADATA)
+}
+
+fn text_public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
+    public_builtin_metadata_from_rows(entry, PUBLIC_TEXT_BUILTIN_METADATA)
 }
 
 /// Compatibility metadata for the public core builtin namespace.
@@ -1269,157 +1452,8 @@ pub fn public_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryM
     if let Some(metadata) = object_reflection_public_builtin_metadata(entry) {
         return Some(metadata);
     }
-    if entry == js3_iterator_prototype_iterator_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "[Symbol.iterator]",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_array_iterator_next_builtin() {
-        return Some(BuiltinEntryMetadata::new("next", 0, false, false));
-    }
-    if entry == js3_map_iterator_next_builtin() {
-        return Some(BuiltinEntryMetadata::new("next", 0, false, false));
-    }
-    if entry == js3_set_iterator_next_builtin() {
-        return Some(BuiltinEntryMetadata::new("next", 0, false, false));
-    }
-    if entry == js3_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("String", 1, true, true));
-    }
-    if entry == js3_string_iterator_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "[Symbol.iterator]",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_string_iterator_next_builtin() {
-        return Some(BuiltinEntryMetadata::new("next", 0, false, false));
-    }
-    if entry == js3_string_to_string_builtin() {
-        return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
-    }
-    if entry == js3_string_value_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("valueOf", 0, false, false));
-    }
-    if entry == js3_string_concat_builtin() {
-        return Some(BuiltinEntryMetadata::new("concat", 1, false, false));
-    }
-    if entry == js3_string_char_at_builtin() {
-        return Some(BuiltinEntryMetadata::new("charAt", 1, false, false));
-    }
-    if entry == js3_string_char_code_at_builtin() {
-        return Some(BuiltinEntryMetadata::new("charCodeAt", 1, false, false));
-    }
-    if entry == js3_string_from_char_code_builtin() {
-        return Some(BuiltinEntryMetadata::new("fromCharCode", 1, false, false));
-    }
-    if entry == js3_string_from_code_point_builtin() {
-        return Some(BuiltinEntryMetadata::new("fromCodePoint", 1, false, false));
-    }
-    if entry == js3_string_raw_builtin() {
-        return Some(BuiltinEntryMetadata::new("raw", 1, false, false));
-    }
-    if entry == js3_string_at_builtin() {
-        return Some(BuiltinEntryMetadata::new("at", 1, false, false));
-    }
-    if entry == js3_string_code_point_at_builtin() {
-        return Some(BuiltinEntryMetadata::new("codePointAt", 1, false, false));
-    }
-    if entry == js3_string_ends_with_builtin() {
-        return Some(BuiltinEntryMetadata::new("endsWith", 1, false, false));
-    }
-    if entry == js3_string_includes_builtin() {
-        return Some(BuiltinEntryMetadata::new("includes", 1, false, false));
-    }
-    if entry == js3_string_index_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("indexOf", 1, false, false));
-    }
-    if entry == js3_string_is_well_formed_builtin() {
-        return Some(BuiltinEntryMetadata::new("isWellFormed", 0, false, false));
-    }
-    if entry == js3_string_locale_compare_builtin() {
-        return Some(BuiltinEntryMetadata::new("localeCompare", 1, false, false));
-    }
-    if entry == js3_string_match_builtin() {
-        return Some(BuiltinEntryMetadata::new("match", 1, false, false));
-    }
-    if entry == js3_string_match_all_builtin() {
-        return Some(BuiltinEntryMetadata::new("matchAll", 1, false, false));
-    }
-    if entry == js3_string_normalize_builtin() {
-        return Some(BuiltinEntryMetadata::new("normalize", 0, false, false));
-    }
-    if entry == js3_string_last_index_of_builtin() {
-        return Some(BuiltinEntryMetadata::new("lastIndexOf", 1, false, false));
-    }
-    if entry == js3_string_pad_end_builtin() {
-        return Some(BuiltinEntryMetadata::new("padEnd", 1, false, false));
-    }
-    if entry == js3_string_pad_start_builtin() {
-        return Some(BuiltinEntryMetadata::new("padStart", 1, false, false));
-    }
-    if entry == js3_string_repeat_builtin() {
-        return Some(BuiltinEntryMetadata::new("repeat", 1, false, false));
-    }
-    if entry == js3_string_replace_builtin() {
-        return Some(BuiltinEntryMetadata::new("replace", 2, false, false));
-    }
-    if entry == js3_string_replace_all_builtin() {
-        return Some(BuiltinEntryMetadata::new("replaceAll", 2, false, false));
-    }
-    if entry == js3_string_search_builtin() {
-        return Some(BuiltinEntryMetadata::new("search", 1, false, false));
-    }
-    if entry == js3_string_split_builtin() {
-        return Some(BuiltinEntryMetadata::new("split", 2, false, false));
-    }
-    if entry == js3_string_slice_builtin() {
-        return Some(BuiltinEntryMetadata::new("slice", 2, false, false));
-    }
-    if entry == js3_string_substring_builtin() {
-        return Some(BuiltinEntryMetadata::new("substring", 2, false, false));
-    }
-    if entry == js3_string_starts_with_builtin() {
-        return Some(BuiltinEntryMetadata::new("startsWith", 1, false, false));
-    }
-    if entry == js3_string_to_locale_lower_case_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "toLocaleLowerCase",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_string_to_locale_upper_case_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "toLocaleUpperCase",
-            0,
-            false,
-            false,
-        ));
-    }
-    if entry == js3_string_to_lower_case_builtin() {
-        return Some(BuiltinEntryMetadata::new("toLowerCase", 0, false, false));
-    }
-    if entry == js3_string_to_upper_case_builtin() {
-        return Some(BuiltinEntryMetadata::new("toUpperCase", 0, false, false));
-    }
-    if entry == js3_string_to_well_formed_builtin() {
-        return Some(BuiltinEntryMetadata::new("toWellFormed", 0, false, false));
-    }
-    if entry == js3_string_trim_builtin() {
-        return Some(BuiltinEntryMetadata::new("trim", 0, false, false));
-    }
-    if entry == js3_string_trim_end_builtin() {
-        return Some(BuiltinEntryMetadata::new("trimEnd", 0, false, false));
-    }
-    if entry == js3_string_trim_start_builtin() {
-        return Some(BuiltinEntryMetadata::new("trimStart", 0, false, false));
+    if let Some(metadata) = text_public_builtin_metadata(entry) {
+        return Some(metadata);
     }
     if entry == js3_regexp_builtin() {
         return Some(BuiltinEntryMetadata::new("RegExp", 2, true, true));
@@ -3127,6 +3161,194 @@ mod tests {
                 object_reflection_public_builtin_metadata(entry),
                 Some(metadata)
             );
+            assert_eq!(public_builtin_metadata(entry), Some(metadata));
+        }
+    }
+
+    #[test]
+    fn text_public_metadata_table_matches_public_lookup() {
+        let expected = [
+            (
+                js3_iterator_prototype_iterator_builtin(),
+                BuiltinEntryMetadata::new("[Symbol.iterator]", 0, false, false),
+            ),
+            (
+                js3_array_iterator_next_builtin(),
+                BuiltinEntryMetadata::new("next", 0, false, false),
+            ),
+            (
+                js3_map_iterator_next_builtin(),
+                BuiltinEntryMetadata::new("next", 0, false, false),
+            ),
+            (
+                js3_set_iterator_next_builtin(),
+                BuiltinEntryMetadata::new("next", 0, false, false),
+            ),
+            (
+                js3_string_builtin(),
+                BuiltinEntryMetadata::new("String", 1, true, true),
+            ),
+            (
+                js3_string_iterator_builtin(),
+                BuiltinEntryMetadata::new("[Symbol.iterator]", 0, false, false),
+            ),
+            (
+                js3_string_iterator_next_builtin(),
+                BuiltinEntryMetadata::new("next", 0, false, false),
+            ),
+            (
+                js3_string_to_string_builtin(),
+                BuiltinEntryMetadata::new("toString", 0, false, false),
+            ),
+            (
+                js3_string_value_of_builtin(),
+                BuiltinEntryMetadata::new("valueOf", 0, false, false),
+            ),
+            (
+                js3_string_concat_builtin(),
+                BuiltinEntryMetadata::new("concat", 1, false, false),
+            ),
+            (
+                js3_string_char_at_builtin(),
+                BuiltinEntryMetadata::new("charAt", 1, false, false),
+            ),
+            (
+                js3_string_char_code_at_builtin(),
+                BuiltinEntryMetadata::new("charCodeAt", 1, false, false),
+            ),
+            (
+                js3_string_from_char_code_builtin(),
+                BuiltinEntryMetadata::new("fromCharCode", 1, false, false),
+            ),
+            (
+                js3_string_from_code_point_builtin(),
+                BuiltinEntryMetadata::new("fromCodePoint", 1, false, false),
+            ),
+            (
+                js3_string_raw_builtin(),
+                BuiltinEntryMetadata::new("raw", 1, false, false),
+            ),
+            (
+                js3_string_at_builtin(),
+                BuiltinEntryMetadata::new("at", 1, false, false),
+            ),
+            (
+                js3_string_code_point_at_builtin(),
+                BuiltinEntryMetadata::new("codePointAt", 1, false, false),
+            ),
+            (
+                js3_string_ends_with_builtin(),
+                BuiltinEntryMetadata::new("endsWith", 1, false, false),
+            ),
+            (
+                js3_string_includes_builtin(),
+                BuiltinEntryMetadata::new("includes", 1, false, false),
+            ),
+            (
+                js3_string_index_of_builtin(),
+                BuiltinEntryMetadata::new("indexOf", 1, false, false),
+            ),
+            (
+                js3_string_is_well_formed_builtin(),
+                BuiltinEntryMetadata::new("isWellFormed", 0, false, false),
+            ),
+            (
+                js3_string_locale_compare_builtin(),
+                BuiltinEntryMetadata::new("localeCompare", 1, false, false),
+            ),
+            (
+                js3_string_match_builtin(),
+                BuiltinEntryMetadata::new("match", 1, false, false),
+            ),
+            (
+                js3_string_match_all_builtin(),
+                BuiltinEntryMetadata::new("matchAll", 1, false, false),
+            ),
+            (
+                js3_string_normalize_builtin(),
+                BuiltinEntryMetadata::new("normalize", 0, false, false),
+            ),
+            (
+                js3_string_last_index_of_builtin(),
+                BuiltinEntryMetadata::new("lastIndexOf", 1, false, false),
+            ),
+            (
+                js3_string_pad_end_builtin(),
+                BuiltinEntryMetadata::new("padEnd", 1, false, false),
+            ),
+            (
+                js3_string_pad_start_builtin(),
+                BuiltinEntryMetadata::new("padStart", 1, false, false),
+            ),
+            (
+                js3_string_repeat_builtin(),
+                BuiltinEntryMetadata::new("repeat", 1, false, false),
+            ),
+            (
+                js3_string_replace_builtin(),
+                BuiltinEntryMetadata::new("replace", 2, false, false),
+            ),
+            (
+                js3_string_replace_all_builtin(),
+                BuiltinEntryMetadata::new("replaceAll", 2, false, false),
+            ),
+            (
+                js3_string_search_builtin(),
+                BuiltinEntryMetadata::new("search", 1, false, false),
+            ),
+            (
+                js3_string_split_builtin(),
+                BuiltinEntryMetadata::new("split", 2, false, false),
+            ),
+            (
+                js3_string_slice_builtin(),
+                BuiltinEntryMetadata::new("slice", 2, false, false),
+            ),
+            (
+                js3_string_substring_builtin(),
+                BuiltinEntryMetadata::new("substring", 2, false, false),
+            ),
+            (
+                js3_string_starts_with_builtin(),
+                BuiltinEntryMetadata::new("startsWith", 1, false, false),
+            ),
+            (
+                js3_string_to_locale_lower_case_builtin(),
+                BuiltinEntryMetadata::new("toLocaleLowerCase", 0, false, false),
+            ),
+            (
+                js3_string_to_locale_upper_case_builtin(),
+                BuiltinEntryMetadata::new("toLocaleUpperCase", 0, false, false),
+            ),
+            (
+                js3_string_to_lower_case_builtin(),
+                BuiltinEntryMetadata::new("toLowerCase", 0, false, false),
+            ),
+            (
+                js3_string_to_upper_case_builtin(),
+                BuiltinEntryMetadata::new("toUpperCase", 0, false, false),
+            ),
+            (
+                js3_string_to_well_formed_builtin(),
+                BuiltinEntryMetadata::new("toWellFormed", 0, false, false),
+            ),
+            (
+                js3_string_trim_builtin(),
+                BuiltinEntryMetadata::new("trim", 0, false, false),
+            ),
+            (
+                js3_string_trim_end_builtin(),
+                BuiltinEntryMetadata::new("trimEnd", 0, false, false),
+            ),
+            (
+                js3_string_trim_start_builtin(),
+                BuiltinEntryMetadata::new("trimStart", 0, false, false),
+            ),
+        ];
+
+        assert_eq!(PUBLIC_TEXT_BUILTIN_METADATA.len(), expected.len());
+        for (entry, metadata) in expected {
+            assert_eq!(text_public_builtin_metadata(entry), Some(metadata));
             assert_eq!(public_builtin_metadata(entry), Some(metadata));
         }
     }
