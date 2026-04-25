@@ -2,7 +2,11 @@ mod arrays;
 mod binary_data;
 mod collections;
 mod functions;
+mod iterators;
+mod json;
+mod object_reflection;
 mod objects;
+mod promises;
 mod temporal;
 use crate::internal::{dispatch_internal_builtin, InternalBuiltinDispatchContext};
 use crate::{BuiltinInvocation, DynamicFunctionKind};
@@ -589,145 +593,19 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if let Some(result) = binary_data::dispatch_binary_data_builtin(context, entry, invocation)? {
         return Ok(Some(result));
     }
-    if entry == js3_json_parse_builtin() {
-        return json_parse_builtin(context, invocation).map(Some);
+    if let Some(result) = json::dispatch_json_builtin(context, entry, invocation)? {
+        return Ok(Some(result));
     }
-    if entry == js3_json_stringify_builtin() {
-        return json_stringify_builtin(context, invocation).map(Some);
+    if let Some(result) =
+        object_reflection::dispatch_object_reflection_builtin(context, entry, invocation)?
+    {
+        return Ok(Some(result));
     }
-    if entry == js3_json_raw_json_builtin() {
-        return json_raw_json_builtin(context, invocation).map(Some);
+    if let Some(result) = promises::dispatch_promise_builtin(context, entry, invocation)? {
+        return Ok(Some(result));
     }
-    if entry == js3_json_is_raw_json_builtin() {
-        return json_is_raw_json_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_apply_builtin() {
-        return reflect_apply_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_construct_builtin() {
-        return reflect_construct_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_define_property_builtin() {
-        return reflect_define_property_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_delete_property_builtin() {
-        return reflect_delete_property_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_get_builtin() {
-        return reflect_get_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_get_own_property_descriptor_builtin() {
-        return reflect_get_own_property_descriptor_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_get_prototype_of_builtin() {
-        return reflect_get_prototype_of_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_has_builtin() {
-        return reflect_has_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_is_extensible_builtin() {
-        return reflect_is_extensible_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_own_keys_builtin() {
-        return reflect_own_keys_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_prevent_extensions_builtin() {
-        return reflect_prevent_extensions_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_set_builtin() {
-        return reflect_set_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_reflect_set_prototype_of_builtin() {
-        return reflect_set_prototype_of_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_proxy_builtin() {
-        return proxy_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_proxy_revocable_builtin() {
-        return proxy_revocable_builtin(context, invocation).map(Some);
-    }
-    if entry == lyng_js_types::js3_proxy_revoke_builtin() {
-        return proxy_revoke_builtin(context).map(Some);
-    }
-    if entry == js3_promise_builtin() {
-        return promise_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_then_builtin() {
-        return promise_then_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_catch_builtin() {
-        return promise_catch_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_finally_builtin() {
-        return promise_finally_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_resolve_builtin() {
-        return promise_resolve_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_reject_builtin() {
-        return promise_reject_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_all_builtin() {
-        return promise_all_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_all_settled_builtin() {
-        return promise_all_settled_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_race_builtin() {
-        return promise_race_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_any_builtin() {
-        return promise_any_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_species_getter_builtin() {
-        return promise_species_getter_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_capability_executor_builtin() {
-        return promise_capability_executor_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_resolve_function_builtin() {
-        return promise_resolve_function_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_reject_function_builtin() {
-        return promise_reject_function_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_finally_function_builtin() {
-        return promise_finally_function_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_promise_all_resolve_element_builtin() {
-        return promise_combinator_element_builtin(
-            context,
-            invocation,
-            PromiseCombinatorElementKind::AllResolve,
-        )
-        .map(Some);
-    }
-    if entry == js3_promise_all_settled_resolve_element_builtin() {
-        return promise_combinator_element_builtin(
-            context,
-            invocation,
-            PromiseCombinatorElementKind::AllSettledResolve,
-        )
-        .map(Some);
-    }
-    if entry == js3_promise_all_settled_reject_element_builtin() {
-        return promise_combinator_element_builtin(
-            context,
-            invocation,
-            PromiseCombinatorElementKind::AllSettledReject,
-        )
-        .map(Some);
-    }
-    if entry == js3_promise_any_reject_element_builtin() {
-        return promise_combinator_element_builtin(
-            context,
-            invocation,
-            PromiseCombinatorElementKind::AnyReject,
-        )
-        .map(Some);
-    }
-    if entry == js3_iterator_prototype_iterator_builtin() {
-        return iterator_prototype_iterator_builtin(context, invocation).map(Some);
+    if let Some(result) = iterators::dispatch_iterator_builtin(context, entry, invocation)? {
+        return Ok(Some(result));
     }
     if entry == js3_string_builtin() {
         return string_builtin(context, invocation).map(Some);
