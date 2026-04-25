@@ -1,6 +1,7 @@
 mod arrays;
 mod collections;
 mod date;
+mod errors;
 mod functions;
 mod json;
 mod modules;
@@ -16,6 +17,7 @@ use lyng_js_types::{BuiltinFunctionId, EnvironmentRef, ObjectRef, RealmRef, Shap
 pub(super) use arrays::install_array_family;
 pub(super) use collections::install_collection_family;
 pub(super) use date::install_date_family;
+pub(super) use errors::install_error_family;
 pub(super) use functions::install_function_family;
 pub(super) use json::install_json_family;
 pub(super) use modules::install_module_family;
@@ -39,6 +41,22 @@ pub(super) fn install_public_builtin_function(
     entry: BuiltinFunctionId,
     prototype_object: Option<ObjectRef>,
 ) -> ObjectRef {
+    install_public_builtin_function_with_function_prototype(
+        agent,
+        cx,
+        cx.function_prototype,
+        entry,
+        prototype_object,
+    )
+}
+
+pub(super) fn install_public_builtin_function_with_function_prototype(
+    agent: &mut Agent,
+    cx: FamilyInstallContext,
+    function_prototype: ObjectRef,
+    entry: BuiltinFunctionId,
+    prototype_object: Option<ObjectRef>,
+) -> ObjectRef {
     let metadata =
         public_builtin_metadata(entry).expect("family installer entry must have public metadata");
     allocate_builtin_function_object(
@@ -46,7 +64,7 @@ pub(super) fn install_public_builtin_function(
         cx.realm,
         cx.global_env,
         cx.root_shape,
-        cx.function_prototype,
+        function_prototype,
         cx.object_prototype,
         entry,
         metadata,
@@ -434,4 +452,41 @@ pub(super) struct ModuleFamilyBuiltins {
     pub(super) abstract_module_source: ObjectRef,
     pub(super) abstract_module_source_prototype: ObjectRef,
     pub(super) abstract_module_source_to_string_tag_getter: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct ErrorFamilyPrototypes {
+    pub(super) error_prototype: ObjectRef,
+    pub(super) eval_error_prototype: ObjectRef,
+    pub(super) range_error_prototype: ObjectRef,
+    pub(super) reference_error_prototype: ObjectRef,
+    pub(super) syntax_error_prototype: ObjectRef,
+    pub(super) type_error_prototype: ObjectRef,
+    pub(super) uri_error_prototype: ObjectRef,
+    pub(super) aggregate_error_prototype: ObjectRef,
+    pub(super) suppressed_error_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct ErrorFamilyBuiltins {
+    pub(super) error: ObjectRef,
+    pub(super) error_prototype: ObjectRef,
+    pub(super) error_to_string: ObjectRef,
+    pub(super) eval_error: ObjectRef,
+    pub(super) eval_error_prototype: ObjectRef,
+    pub(super) range_error: ObjectRef,
+    pub(super) range_error_prototype: ObjectRef,
+    pub(super) reference_error: ObjectRef,
+    pub(super) reference_error_prototype: ObjectRef,
+    pub(super) syntax_error: ObjectRef,
+    pub(super) syntax_error_prototype: ObjectRef,
+    pub(super) type_error: ObjectRef,
+    pub(super) type_error_prototype: ObjectRef,
+    pub(super) uri_error: ObjectRef,
+    pub(super) uri_error_prototype: ObjectRef,
+    pub(super) aggregate_error: ObjectRef,
+    pub(super) aggregate_error_prototype: ObjectRef,
+    pub(super) suppressed_error: ObjectRef,
+    pub(super) suppressed_error_prototype: ObjectRef,
 }
