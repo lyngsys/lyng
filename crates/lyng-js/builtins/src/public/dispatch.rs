@@ -1,3 +1,4 @@
+mod objects;
 mod temporal;
 use crate::internal::{dispatch_internal_builtin, InternalBuiltinDispatchContext};
 use crate::{BuiltinInvocation, DynamicFunctionKind};
@@ -569,113 +570,8 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_abstract_module_source_to_string_tag_getter_builtin() {
         return Ok(Some(Value::undefined()));
     }
-    if entry == js3_object_builtin() {
-        return object_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_create_builtin() {
-        return object_create_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_get_prototype_of_builtin() {
-        return object_get_prototype_of_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_set_prototype_of_builtin() {
-        return object_set_prototype_of_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_get_own_property_descriptor_builtin() {
-        return object_get_own_property_descriptor_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_get_own_property_descriptors_builtin() {
-        return object_get_own_property_descriptors_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_get_own_property_names_builtin() {
-        return object_get_own_property_names_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_get_own_property_symbols_builtin() {
-        return object_get_own_property_symbols_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_define_properties_builtin() {
-        return object_define_properties_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_define_property_builtin() {
-        return object_define_property_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_assign_builtin() {
-        return object_assign_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_from_entries_builtin() {
-        return object_from_entries_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_group_by_builtin() {
-        return object_group_by_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_prevent_extensions_builtin() {
-        return object_prevent_extensions_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_is_extensible_builtin() {
-        return object_is_extensible_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_is_builtin() {
-        return object_is_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_seal_builtin() {
-        return object_seal_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_freeze_builtin() {
-        return object_freeze_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_is_sealed_builtin() {
-        return object_is_sealed_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_is_frozen_builtin() {
-        return object_is_frozen_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_to_locale_string_builtin() {
-        return object_to_locale_string_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_to_string_builtin() {
-        return object_to_string_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_value_of_builtin() {
-        return object_value_of_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_has_own_property_builtin() {
-        return object_has_own_property_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_is_prototype_of_builtin() {
-        return object_is_prototype_of_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_property_is_enumerable_builtin() {
-        return object_property_is_enumerable_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_define_getter_builtin() {
-        return object_define_getter_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_define_setter_builtin() {
-        return object_define_setter_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_lookup_getter_builtin() {
-        return object_lookup_getter_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_lookup_setter_builtin() {
-        return object_lookup_setter_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_proto_getter_builtin() {
-        return object_proto_getter_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_proto_setter_builtin() {
-        return object_proto_setter_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_keys_builtin() {
-        return object_keys_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_entries_builtin() {
-        return object_entries_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_values_builtin() {
-        return object_values_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_object_has_own_builtin() {
-        return object_has_own_builtin(context, invocation).map(Some);
+    if let Some(result) = objects::dispatch_object_builtin(context, entry, invocation)? {
+        return Ok(Some(result));
     }
     if entry == js3_function_builtin() {
         return function_builtin(context, invocation).map(Some);
