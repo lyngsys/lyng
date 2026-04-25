@@ -795,8 +795,9 @@ mod tests {
     use lyng_js_types::{
         js3_array_from_async_builtin, js3_array_iterator_next_builtin,
         js3_array_species_getter_builtin, js3_array_values_builtin, js3_error_to_string_builtin,
-        js3_map_size_getter_builtin, js3_set_values_builtin, js3_symbol_to_primitive_builtin,
-        js3_weak_ref_deref_builtin, PropertyKey, Value,
+        js3_iterator_prototype_iterator_builtin, js3_map_iterator_next_builtin,
+        js3_map_size_getter_builtin, js3_set_iterator_next_builtin, js3_set_values_builtin,
+        js3_symbol_to_primitive_builtin, js3_weak_ref_deref_builtin, PropertyKey, Value,
     };
 
     fn own_descriptor(
@@ -1589,6 +1590,144 @@ mod tests {
         assert_eq!(weak_ref_deref_descriptor.writable(), Some(true));
         assert_eq!(weak_ref_deref_descriptor.enumerable(), Some(false));
         assert_eq!(weak_ref_deref_descriptor.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_iterator_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let iterator_prototype = intrinsics
+            .iterator_prototype()
+            .expect("Iterator.prototype intrinsic should exist");
+        let async_iterator_prototype = intrinsics
+            .async_iterator_prototype()
+            .expect("AsyncIterator.prototype intrinsic should exist");
+        let map_iterator_prototype = intrinsics
+            .map_iterator_prototype()
+            .expect("Map Iterator prototype intrinsic should exist");
+        let set_iterator_prototype = intrinsics
+            .set_iterator_prototype()
+            .expect("Set Iterator prototype intrinsic should exist");
+
+        let next_atom = agent.atoms_mut().intern_collectible("next");
+        let iterator_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Iterator)
+            .expect("Symbol.iterator should exist");
+        let async_iterator_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::AsyncIterator)
+            .expect("Symbol.asyncIterator should exist");
+        let to_string_tag_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::ToStringTag)
+            .expect("Symbol.toStringTag should exist");
+
+        let iterator_method = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_iterator_prototype_iterator_builtin(),
+            )
+            .expect("Iterator.prototype[Symbol.iterator] builtin should resolve");
+        let map_iterator_next = cache
+            .builtin_constant(agent, artifacts.realm(), js3_map_iterator_next_builtin())
+            .expect("Map Iterator next builtin should resolve");
+        let set_iterator_next = cache
+            .builtin_constant(agent, artifacts.realm(), js3_set_iterator_next_builtin())
+            .expect("Set Iterator next builtin should resolve");
+
+        let iterator = own_descriptor(
+            agent,
+            iterator_prototype,
+            PropertyKey::from_symbol(iterator_symbol),
+            "Iterator.prototype[Symbol.iterator]",
+        );
+        assert_eq!(iterator.value(), Some(iterator_method));
+        assert_eq!(iterator.writable(), Some(true));
+        assert_eq!(iterator.enumerable(), Some(false));
+        assert_eq!(iterator.configurable(), Some(true));
+
+        let async_iterator = own_descriptor(
+            agent,
+            async_iterator_prototype,
+            PropertyKey::from_symbol(async_iterator_symbol),
+            "AsyncIterator.prototype[Symbol.asyncIterator]",
+        );
+        assert!(async_iterator
+            .value()
+            .and_then(Value::as_object_ref)
+            .is_some());
+        assert_eq!(async_iterator.writable(), Some(true));
+        assert_eq!(async_iterator.enumerable(), Some(false));
+        assert_eq!(async_iterator.configurable(), Some(true));
+
+        let async_iterator_tag = own_descriptor(
+            agent,
+            async_iterator_prototype,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "AsyncIterator.prototype[Symbol.toStringTag]",
+        );
+        assert!(async_iterator_tag
+            .value()
+            .and_then(Value::as_string_ref)
+            .is_some());
+        assert_eq!(async_iterator_tag.writable(), Some(false));
+        assert_eq!(async_iterator_tag.enumerable(), Some(false));
+        assert_eq!(async_iterator_tag.configurable(), Some(true));
+
+        let map_next = own_descriptor(
+            agent,
+            map_iterator_prototype,
+            PropertyKey::from_atom(next_atom),
+            "Map Iterator prototype.next",
+        );
+        assert_eq!(map_next.value(), Some(map_iterator_next));
+        assert_eq!(map_next.writable(), Some(true));
+        assert_eq!(map_next.enumerable(), Some(false));
+        assert_eq!(map_next.configurable(), Some(true));
+
+        let map_tag = own_descriptor(
+            agent,
+            map_iterator_prototype,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "Map Iterator prototype[Symbol.toStringTag]",
+        );
+        assert!(map_tag.value().and_then(Value::as_string_ref).is_some());
+        assert_eq!(map_tag.writable(), Some(false));
+        assert_eq!(map_tag.enumerable(), Some(false));
+        assert_eq!(map_tag.configurable(), Some(true));
+
+        let set_next = own_descriptor(
+            agent,
+            set_iterator_prototype,
+            PropertyKey::from_atom(next_atom),
+            "Set Iterator prototype.next",
+        );
+        assert_eq!(set_next.value(), Some(set_iterator_next));
+        assert_eq!(set_next.writable(), Some(true));
+        assert_eq!(set_next.enumerable(), Some(false));
+        assert_eq!(set_next.configurable(), Some(true));
+
+        let set_tag = own_descriptor(
+            agent,
+            set_iterator_prototype,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "Set Iterator prototype[Symbol.toStringTag]",
+        );
+        assert!(set_tag.value().and_then(Value::as_string_ref).is_some());
+        assert_eq!(set_tag.writable(), Some(false));
+        assert_eq!(set_tag.enumerable(), Some(false));
+        assert_eq!(set_tag.configurable(), Some(true));
     }
 
     #[test]

@@ -39,7 +39,9 @@ pub(super) use installed::{
     install_public_realm_intrinsics, link_installed_family_prototypes, InstalledBuiltinFamilies,
     PublicRealmPrototypeHandles,
 };
-pub(super) use iterators::{install_iterator_family, iterator_builtin_object};
+pub(super) use iterators::{
+    install_iterator_family, install_iterator_family_descriptors, iterator_builtin_object,
+};
 pub(super) use json::{install_json_family, json_builtin_object};
 pub(super) use modules::{
     install_module_family, install_module_family_descriptors, module_builtin_object,

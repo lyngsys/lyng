@@ -97,6 +97,8 @@ Rules:
   prototype descriptor installation in `public/families/arrays.rs`
 - the keyed collection family owns Map, Set, WeakMap, WeakSet, WeakRef, and
   FinalizationRegistry descriptor installation in `public/families/collections.rs`
+- the Iterator family owns Iterator, AsyncIterator, Map Iterator, and Set Iterator
+  prototype descriptor installation in `public/families/iterators.rs`
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

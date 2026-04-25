@@ -1103,21 +1103,6 @@ impl BuiltinCache {
             Some(bootstrap_atoms.atomics()),
             AllocationLifetime::Default,
         ));
-        let async_iterator_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "AsyncIterator",
-            None,
-            AllocationLifetime::Default,
-        ));
-        let map_iterator_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Map Iterator",
-            None,
-            AllocationLifetime::Default,
-        ));
-        let set_iterator_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Set Iterator",
-            None,
-            AllocationLifetime::Default,
-        ));
         let symbol_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "Symbol",
             Some(bootstrap_atoms.symbol()),
@@ -2905,49 +2890,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let iterator_prototype_descriptors = [BuiltinPropertyDescriptor::new(
-            BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-            BuiltinPropertyValueSpec::BuiltinFunction(js3_iterator_prototype_iterator_builtin()),
-            BuiltinAttributes::new(true, false, true),
-        )];
-        let async_iterator_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::AsyncIterator),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(
-                    builtins.async_iterator_method,
-                )),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(async_iterator_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let map_iterator_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(next_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_map_iterator_next_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(map_iterator_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let set_iterator_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(next_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_set_iterator_next_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(set_iterator_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
         let string_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(from_char_code_atom),
@@ -4659,22 +4601,6 @@ impl BuiltinCache {
                 &uint8_array_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::IteratorPrototype),
-                &iterator_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::AsyncIteratorPrototype),
-                &async_iterator_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::MapIteratorPrototype),
-                &map_iterator_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::SetIteratorPrototype),
-                &set_iterator_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::String),
                 &string_descriptors,
             ),
@@ -4825,6 +4751,10 @@ impl BuiltinCache {
             return None;
         }
         if families::install_collection_family_descriptors(agent, self, realm, &builtins).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_iterator_family_descriptors(agent, self, realm, &builtins).is_err() {
             self.public.remove(&realm);
             return None;
         }
