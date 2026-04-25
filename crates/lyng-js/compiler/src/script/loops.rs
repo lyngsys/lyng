@@ -54,20 +54,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         self.reset_statement_result()?;
         let target = self.push_control_target(label, ControlTargetKind::Loop);
-        let loop_start = self.builder.current_offset();
+        let loop_start = self.builder.current_offset()?;
         self.lower_statement(body)?;
-        let continue_target = self.builder.current_offset();
-        self.patch_continue_placeholders(target, continue_target);
+        let continue_target = self.builder.current_offset()?;
+        self.patch_continue_placeholders(target, continue_target)?;
         let test_register = self.lower_expr_to_temp(test)?;
-        let jump_end = self
-            .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(test_register)?);
-        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump);
-        self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge);
-        self.builder.patch_jump_to(jump_back, loop_start);
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
-        self.patch_break_placeholders(target, end);
+        let jump_end = self.builder.emit_cond_jump_placeholder(
+            Opcode::JumpIfFalse,
+            self.encode_register(test_register)?,
+        )?;
+        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge)?;
+        self.builder.patch_jump_to(jump_back, loop_start)?;
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
+        self.patch_break_placeholders(target, end)?;
         self.pop_control_target(target);
         Ok(())
     }
@@ -81,20 +82,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         self.reset_statement_result()?;
         let target = self.push_control_target(label, ControlTargetKind::Loop);
-        let loop_start = self.builder.current_offset();
-        self.patch_continue_placeholders(target, loop_start);
+        let loop_start = self.builder.current_offset()?;
+        self.patch_continue_placeholders(target, loop_start)?;
         let test_register = self.lower_expr_to_temp(test)?;
-        let jump_end = self
-            .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(test_register)?);
+        let jump_end = self.builder.emit_cond_jump_placeholder(
+            Opcode::JumpIfFalse,
+            self.encode_register(test_register)?,
+        )?;
         self.lower_statement(body)?;
-        self.patch_continue_placeholders(target, loop_start);
-        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump);
-        self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge);
-        self.builder.patch_jump_to(jump_back, loop_start);
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
-        self.patch_break_placeholders(target, end);
+        self.patch_continue_placeholders(target, loop_start)?;
+        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge)?;
+        self.builder.patch_jump_to(jump_back, loop_start)?;
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
+        self.patch_break_placeholders(target, end)?;
         self.pop_control_target(target);
         Ok(())
     }
@@ -139,31 +141,31 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.lower_for_init(init)?;
         }
         let target = self.push_control_target(label, ControlTargetKind::Loop);
-        let loop_start = self.builder.current_offset();
+        let loop_start = self.builder.current_offset()?;
         let exit_jump = if let Some(test) = test {
             let test_register = self.lower_expr_to_temp(test)?;
             Some(self.builder.emit_cond_jump_placeholder(
                 Opcode::JumpIfFalse,
                 self.encode_register(test_register)?,
-            ))
+            )?)
         } else {
             None
         };
         self.lower_statement(body)?;
-        let continue_target = self.builder.current_offset();
-        self.patch_continue_placeholders(target, continue_target);
+        let continue_target = self.builder.current_offset()?;
+        self.patch_continue_placeholders(target, continue_target)?;
         if let Some(update) = update {
             let update_register = self.alloc_temp()?;
             self.lower_expr_into(update, update_register)?;
         }
-        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump);
-        self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge);
-        self.builder.patch_jump_to(jump_back, loop_start);
-        let end = self.builder.current_offset();
+        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge)?;
+        self.builder.patch_jump_to(jump_back, loop_start)?;
+        let end = self.builder.current_offset()?;
         if let Some(exit_jump) = exit_jump {
-            self.builder.patch_jump_to(exit_jump, end);
+            self.builder.patch_jump_to(exit_jump, end)?;
         }
-        self.patch_break_placeholders(target, end);
+        self.patch_break_placeholders(target, end)?;
         self.pop_control_target(target);
         Ok(())
     }
@@ -195,14 +197,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let head_tdz_plan = self.for_in_of_head_tdz_plan(left)?;
         let iteration_disposal_kind = self.for_in_of_declaration_disposal_scope_kind(left);
         let object_register = if let Some(plan) = &head_tdz_plan {
-            let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0);
+            let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
             self.builder.add_loop_iteration_environment_site(
                 push,
                 plan.iteration_slots.clone(),
                 plan.shared_slots.clone(),
             );
             let object_register = self.lower_expr_to_temp(right)?;
-            self.builder.emit_ax(Opcode::PopClosureEnv, 0);
+            self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
             object_register
         } else {
             self.lower_expr_to_temp(right)?
@@ -218,21 +220,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(enumerator_register)?,
             self.encode_register(object_register)?,
             0,
-        );
+        )?;
 
-        let loop_start = self.builder.current_offset();
+        let loop_start = self.builder.current_offset()?;
         self.builder.emit_abc(
             Opcode::AdvanceForIn,
             self.encode_register(enumerator_register)?,
             self.encode_register(key_register)?,
             self.encode_register(done_register)?,
-        );
+        )?;
         let exit_jump = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?)?;
 
         if let Some(plan) = &loop_iteration_plan {
-            let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0);
+            let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
             self.builder.add_loop_iteration_environment_site(
                 push,
                 plan.iteration_slots.clone(),
@@ -248,29 +250,29 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.lower_for_in_left_assignment(left, key_register)?;
             self.lower_statement(body)?;
         }
-        let continue_cleanup = self.builder.current_offset();
-        self.patch_continue_placeholders(target, continue_cleanup);
+        let continue_cleanup = self.builder.current_offset()?;
+        self.patch_continue_placeholders(target, continue_cleanup)?;
         if loop_iteration_plan.is_some() {
-            self.builder.emit_ax(Opcode::PopClosureEnv, 0);
+            self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
         }
 
-        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump);
-        self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge);
-        self.builder.patch_jump_to(jump_back, loop_start);
+        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge)?;
+        self.builder.patch_jump_to(jump_back, loop_start)?;
 
-        let break_cleanup = self.builder.current_offset();
+        let break_cleanup = self.builder.current_offset()?;
         if loop_iteration_plan.is_some() {
-            self.builder.emit_ax(Opcode::PopClosureEnv, 0);
+            self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
         }
-        let close_offset = self.builder.current_offset();
+        let close_offset = self.builder.current_offset()?;
         self.builder.emit_abx(
             Opcode::CloseForIn,
             self.encode_register(enumerator_register)?,
             0,
-        );
-        let end_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(exit_jump, close_offset);
-        self.patch_break_placeholders(target, break_cleanup);
+        )?;
+        let end_offset = self.builder.current_offset()?;
+        self.builder.patch_jump_to(exit_jump, close_offset)?;
+        self.patch_break_placeholders(target, break_cleanup)?;
         self.pop_control_target(target);
         debug_assert!(end_offset >= close_offset);
         Ok(())
@@ -305,14 +307,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let head_tdz_plan = self.for_in_of_head_tdz_plan(left)?;
         let iteration_disposal_kind = self.for_in_of_declaration_disposal_scope_kind(left);
         let iterable_register = if let Some(plan) = &head_tdz_plan {
-            let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0);
+            let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
             self.builder.add_loop_iteration_environment_site(
                 push,
                 plan.iteration_slots.clone(),
                 plan.shared_slots.clone(),
             );
             let iterable_register = self.lower_expr_to_temp(right)?;
-            self.builder.emit_ax(Opcode::PopClosureEnv, 0);
+            self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
             iterable_register
         } else {
             self.lower_expr_to_temp(right)?
@@ -328,19 +330,19 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(iterator_register)?,
             self.encode_register(iterable_register)?,
             u8::from(r#await),
-        );
-        let loop_start = self.builder.current_offset();
+        )?;
+        let loop_start = self.builder.current_offset()?;
         self.builder.emit_abc(
             Opcode::AdvanceIterator,
             self.encode_register(iterator_register)?,
             self.encode_register(value_register)?,
             self.encode_register(done_register)?,
-        );
+        )?;
         let exit_jump = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?)?;
         if let Some(plan) = &loop_iteration_plan {
-            let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0);
+            let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
             self.builder.add_loop_iteration_environment_site(
                 push,
                 plan.iteration_slots.clone(),
@@ -348,7 +350,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             );
         }
         let finally_index = self.push_finally_context();
-        let protected_start = self.builder.current_offset();
+        let protected_start = self.builder.current_offset()?;
         if let Some(kind) = iteration_disposal_kind {
             self.with_disposal_scope(kind, span, move |this| {
                 this.lower_for_in_left_assignment(left, value_register)?;
@@ -358,62 +360,62 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.lower_for_in_left_assignment(left, value_register)?;
             self.lower_statement(body)?;
         }
-        let protected_end = self.builder.current_offset();
+        let protected_end = self.builder.current_offset()?;
         self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
-        self.emit_jump_to_finally(finally_index);
+        self.emit_jump_to_finally(finally_index)?;
 
-        let throw_entry = self.builder.current_offset();
-        let enter_handler = self.emit_enter_handler();
-        self.attach_safepoint(enter_handler, span, SafepointKind::ExceptionEdge);
+        let throw_entry = self.builder.current_offset()?;
+        let enter_handler = self.emit_enter_handler()?;
+        self.attach_safepoint(enter_handler, span, SafepointKind::ExceptionEdge)?;
         self.begin_exception_finally_path()?;
-        let normal_entry = self.builder.current_offset();
-        self.set_finally_normal_entry(finally_index, normal_entry);
+        let normal_entry = self.builder.current_offset()?;
+        self.set_finally_normal_entry(finally_index, normal_entry)?;
         self.mark_finally_body(finally_index, true);
-        self.emit_leave_handler();
+        self.emit_leave_handler()?;
 
         let resume_jump = self.emit_completion_dispatch_branch(CompletionKind::Normal, None)?;
         let continue_self_jump =
             self.emit_completion_dispatch_branch(CompletionKind::Continue, Some(target_id))?;
         let break_self_jump =
             self.emit_completion_dispatch_branch(CompletionKind::Break, Some(target_id))?;
-        let jump_escape = self.builder.emit_jump_placeholder(Opcode::Jump);
+        let jump_escape = self.builder.emit_jump_placeholder(Opcode::Jump)?;
 
-        let resume_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(resume_jump, resume_offset);
+        let resume_offset = self.builder.current_offset()?;
+        self.builder.patch_jump_to(resume_jump, resume_offset)?;
         self.builder
-            .patch_jump_to(continue_self_jump, resume_offset);
-        self.patch_continue_placeholders(target, resume_offset);
+            .patch_jump_to(continue_self_jump, resume_offset)?;
+        self.patch_continue_placeholders(target, resume_offset)?;
         if loop_iteration_plan.is_some() {
-            self.builder.emit_ax(Opcode::PopClosureEnv, 0);
+            self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
         }
-        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump);
-        self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge);
-        self.builder.patch_jump_to(jump_back, loop_start);
+        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge)?;
+        self.builder.patch_jump_to(jump_back, loop_start)?;
 
-        let break_cleanup = self.builder.current_offset();
-        self.builder.patch_jump_to(break_self_jump, break_cleanup);
+        let break_cleanup = self.builder.current_offset()?;
+        self.builder.patch_jump_to(break_self_jump, break_cleanup)?;
         if loop_iteration_plan.is_some() {
-            self.builder.emit_ax(Opcode::PopClosureEnv, 0);
+            self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
         }
         self.builder.emit_abx(
             Opcode::CloseIterator,
             self.encode_register(iterator_register)?,
             1,
-        );
-        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump);
+        )?;
+        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
 
-        let escape_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_escape, escape_offset);
+        let escape_offset = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_escape, escape_offset)?;
         if loop_iteration_plan.is_some() {
-            self.builder.emit_ax(Opcode::PopClosureEnv, 0);
+            self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
         }
         self.builder.emit_abx(
             Opcode::CloseIterator,
             self.encode_register(iterator_register)?,
             1,
-        );
+        )?;
         if let Some(outer) = self.outer_active_finally(finally_index) {
-            self.emit_jump_to_finally(outer);
+            self.emit_jump_to_finally(outer)?;
         } else {
             self.emit_completion_terminal_dispatch()?;
         }
@@ -426,12 +428,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             ExceptionHandlerKind::Finally,
             self.builder.header().register_count(),
             None,
-        ));
+        ))?;
 
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
-        self.builder.patch_jump_to(exit_jump, end);
-        self.patch_break_placeholders(target, break_cleanup);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
+        self.builder.patch_jump_to(exit_jump, end)?;
+        self.patch_break_placeholders(target, break_cleanup)?;
         self.pop_control_target(target);
         Ok(())
     }
@@ -450,10 +452,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(kind_match)?,
             self.encode_register(registers.kind)?,
             self.encode_register(kind_constant)?,
-        );
+        )?;
         let jump_next = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(kind_match)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(kind_match)?)?;
 
         let branch = if let Some(target) = target {
             let target_constant = self.alloc_temp()?;
@@ -464,21 +466,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.encode_register(target_match)?,
                 self.encode_register(registers.target)?,
                 self.encode_register(target_constant)?,
-            );
+            )?;
             let jump_target = self.builder.emit_cond_jump_placeholder(
                 Opcode::JumpIfFalse,
                 self.encode_register(target_match)?,
-            );
-            let branch = self.builder.emit_jump_placeholder(Opcode::Jump);
-            let next = self.builder.current_offset();
-            self.builder.patch_jump_to(jump_target, next);
+            )?;
+            let branch = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+            let next = self.builder.current_offset()?;
+            self.builder.patch_jump_to(jump_target, next)?;
             branch
         } else {
-            self.builder.emit_jump_placeholder(Opcode::Jump)
+            self.builder.emit_jump_placeholder(Opcode::Jump)?
         };
 
-        let next = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_next, next);
+        let next = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_next, next)?;
         Ok(branch)
     }
 

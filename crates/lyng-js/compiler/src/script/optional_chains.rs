@@ -80,10 +80,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_optional_chain_call_target(callee, callee_register, this_register, shorted)?;
         let jump_end = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?)?;
         self.emit_optional_call(expr_id, callee_register, this_register, arguments, dest)?;
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 
@@ -211,7 +211,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_optional_chain_operand_value(object, receiver, shorted)?;
         let guard = self.emit_optional_nullish_guard(receiver, dest, shorted)?;
         self.emit_get_property_by_atom(dest, receiver, property)?;
-        self.finish_optional_nullish_guard(guard);
+        self.finish_optional_nullish_guard(guard)?;
         Ok(())
     }
 
@@ -227,7 +227,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let guard = self.emit_optional_nullish_guard(receiver, dest, shorted)?;
         let key = self.lower_expr_to_temp(property)?;
         self.emit_get_keyed_property(dest, receiver, key)?;
-        self.finish_optional_nullish_guard(guard);
+        self.finish_optional_nullish_guard(guard)?;
         Ok(())
     }
 
@@ -244,7 +244,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let guard = self.emit_optional_nullish_guard(receiver, dest, shorted)?;
         let span = self.ast().get_expr(object).span();
         self.emit_private_field_get_from_receiver(expr_id, receiver, property, span, dest)?;
-        self.finish_optional_nullish_guard(guard);
+        self.finish_optional_nullish_guard(guard)?;
         Ok(())
     }
 
@@ -261,7 +261,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_optional_chain_call_target(callee, callee_register, this_register, shorted)?;
         let guard = self.emit_optional_nullish_guard(callee_register, dest, shorted)?;
         self.emit_optional_call(expr_id, callee_register, this_register, arguments, dest)?;
-        self.finish_optional_nullish_guard(guard);
+        self.finish_optional_nullish_guard(guard)?;
         Ok(())
     }
 
@@ -277,10 +277,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_optional_chain_segment(object, receiver, shorted)?;
         let jump_end = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?)?;
         self.emit_get_property_by_atom(dest, receiver, property)?;
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 
@@ -296,11 +296,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_optional_chain_segment(object, receiver, shorted)?;
         let jump_end = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?)?;
         let key = self.lower_expr_to_temp(property)?;
         self.emit_get_keyed_property(dest, receiver, key)?;
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 
@@ -317,11 +317,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_optional_chain_segment(object, receiver, shorted)?;
         let jump_end = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?)?;
         let span = self.ast().get_expr(object).span();
         self.emit_private_field_get_from_receiver(expr_id, receiver, property, span, dest)?;
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 
@@ -339,10 +339,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_optional_chain_call_target(callee, callee_register, this_register, shorted)?;
         let jump_end = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?)?;
         self.emit_optional_call(expr_id, callee_register, this_register, arguments, dest)?;
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 
@@ -362,7 +362,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let guard = self.emit_optional_nullish_guard(receiver, callee_dest, shorted)?;
                 self.emit_get_property_by_atom(callee_dest, receiver, property)?;
                 self.emit_move(this_dest, receiver)?;
-                self.finish_optional_nullish_guard(guard);
+                self.finish_optional_nullish_guard(guard)?;
                 Ok(())
             }
             Expr::ComputedMemberExpression {
@@ -374,7 +374,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let key = self.lower_expr_to_temp(property)?;
                 self.emit_get_keyed_property(callee_dest, receiver, key)?;
                 self.emit_move(this_dest, receiver)?;
-                self.finish_optional_nullish_guard(guard);
+                self.finish_optional_nullish_guard(guard)?;
                 Ok(())
             }
             Expr::PrivateMemberExpression {
@@ -392,7 +392,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     callee_dest,
                 )?;
                 self.emit_move(this_dest, receiver)?;
-                self.finish_optional_nullish_guard(guard);
+                self.finish_optional_nullish_guard(guard)?;
                 Ok(())
             }
             Expr::CallExpression {
@@ -421,11 +421,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_optional_chain_segment(object, receiver, shorted)?;
         let jump_end = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?)?;
         self.emit_get_property_by_atom(callee_dest, receiver, property)?;
         self.emit_move(this_dest, receiver)?;
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 
@@ -442,12 +442,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_optional_chain_segment(object, receiver, shorted)?;
         let jump_end = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?)?;
         let key = self.lower_expr_to_temp(property)?;
         self.emit_get_keyed_property(callee_dest, receiver, key)?;
         self.emit_move(this_dest, receiver)?;
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 
@@ -465,12 +465,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.lower_optional_chain_segment(object, receiver, shorted)?;
         let jump_end = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?)?;
         let span = self.ast().get_expr(object).span();
         self.emit_private_field_get_from_receiver(expr_id, receiver, property, span, callee_dest)?;
         self.emit_move(this_dest, receiver)?;
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 
@@ -499,7 +499,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.emit_profiled_binary(Opcode::StrictEqual, is_null, value, null_value)?;
         let jump_short_from_null = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(is_null)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(is_null)?)?;
 
         let undefined_value = self.alloc_temp()?;
         self.emit_load_undefined(undefined_value)?;
@@ -507,23 +507,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.emit_profiled_binary(Opcode::StrictEqual, is_undefined, value, undefined_value)?;
         let jump_continue = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(is_undefined)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(is_undefined)?)?;
 
-        let short_offset = self.builder.current_offset();
+        let short_offset = self.builder.current_offset()?;
         self.builder
-            .patch_jump_to(jump_short_from_null, short_offset);
+            .patch_jump_to(jump_short_from_null, short_offset)?;
         self.emit_load_undefined(dest)?;
         self.emit_load_bool(shorted, true)?;
-        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump);
+        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
 
-        let continue_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_continue, continue_offset);
+        let continue_offset = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_continue, continue_offset)?;
         Ok(OptionalNullishGuard { jump_end })
     }
 
-    fn finish_optional_nullish_guard(&mut self, guard: OptionalNullishGuard) {
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(guard.jump_end, end);
+    fn finish_optional_nullish_guard(&mut self, guard: OptionalNullishGuard) -> LoweringResult<()> {
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(guard.jump_end, end)?;
+        Ok(())
     }
 
     fn emit_optional_call(
@@ -543,9 +544,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(call_callee)?,
             self.encode_register(call_this)?,
             argument_range,
-        );
+        )?;
         let span = self.ast().get_expr(expr_id).span();
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         self.builder.add_feedback_site(
             instruction_offset,
             FeedbackSiteKind::Call,
@@ -553,7 +554,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 argument_range.argument_count(),
                 argument_values.spread_mask,
             ),
-        );
+        )?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
         }

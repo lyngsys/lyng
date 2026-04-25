@@ -242,18 +242,18 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(throw_match)?,
             self.encode_register(registers.kind)?,
             self.encode_register(throw_constant)?,
-        );
+        )?;
         let jump_without_prior = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(throw_match)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(throw_match)?)?;
         self.emit_disposal_scope_cleanup_call(scope, span, Some(registers.value))?;
-        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump);
-        let without_prior = self.builder.current_offset();
+        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        let without_prior = self.builder.current_offset()?;
         self.builder
-            .patch_jump_to(jump_without_prior, without_prior);
+            .patch_jump_to(jump_without_prior, without_prior)?;
         self.emit_disposal_scope_cleanup_call(scope, span, None)?;
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 
@@ -279,7 +279,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     span,
                     promise,
                 )?;
-                self.builder.emit_ax(Opcode::Await, i32::from(promise));
+                self.builder.emit_ax(Opcode::Await, i32::from(promise))?;
                 Ok(())
             }
         }
@@ -307,25 +307,25 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.active_disposal_scopes.push(scope);
 
         let finally_index = self.push_finally_context();
-        let protected_start = self.builder.current_offset();
+        let protected_start = self.builder.current_offset()?;
         if let Err(error) = body(self) {
             let _ = self.active_disposal_scopes.pop();
             self.pop_finally_context(finally_index);
             return Err(error);
         }
-        let protected_end = self.builder.current_offset();
+        let protected_end = self.builder.current_offset()?;
         self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
-        self.emit_jump_to_finally(finally_index);
+        self.emit_jump_to_finally(finally_index)?;
 
-        let throw_entry = self.builder.current_offset();
-        let enter_handler = self.emit_enter_handler();
-        self.attach_safepoint(enter_handler, span, SafepointKind::ExceptionEdge);
+        let throw_entry = self.builder.current_offset()?;
+        let enter_handler = self.emit_enter_handler()?;
+        self.attach_safepoint(enter_handler, span, SafepointKind::ExceptionEdge)?;
         self.begin_exception_finally_path()?;
-        let normal_entry = self.builder.current_offset();
-        self.set_finally_normal_entry(finally_index, normal_entry);
+        let normal_entry = self.builder.current_offset()?;
+        self.set_finally_normal_entry(finally_index, normal_entry)?;
         self.mark_finally_body(finally_index, true);
         self.emit_disposal_scope_cleanup(scope, span)?;
-        self.emit_leave_handler();
+        self.emit_leave_handler()?;
         self.emit_finally_dispatch(finally_index)?;
         self.mark_finally_body(finally_index, false);
         self.pop_finally_context(finally_index);
@@ -338,7 +338,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             ExceptionHandlerKind::Finally,
             self.builder.header().register_count(),
             None,
-        ));
+        ))?;
         Ok(())
     }
 
@@ -373,8 +373,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 } else {
                     let target = self.push_control_target(Some(label), ControlTargetKind::Label);
                     self.lower_statement(body)?;
-                    let end = self.builder.current_offset();
-                    self.patch_break_placeholders(target, end);
+                    let end = self.builder.current_offset()?;
+                    self.patch_break_placeholders(target, end)?;
                     self.pop_control_target(target);
                     Ok(())
                 }
@@ -390,18 +390,18 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let jump_false = self.builder.emit_cond_jump_placeholder(
                     Opcode::JumpIfFalse,
                     self.encode_register(test_register)?,
-                );
+                )?;
                 self.lower_statement(consequent)?;
                 if let Some(alternate) = alternate {
-                    let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump);
-                    let alternate_offset = self.builder.current_offset();
-                    self.builder.patch_jump_to(jump_false, alternate_offset);
+                    let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+                    let alternate_offset = self.builder.current_offset()?;
+                    self.builder.patch_jump_to(jump_false, alternate_offset)?;
                     self.lower_statement(alternate)?;
-                    let end_offset = self.builder.current_offset();
-                    self.builder.patch_jump_to(jump_end, end_offset);
+                    let end_offset = self.builder.current_offset()?;
+                    self.builder.patch_jump_to(jump_end, end_offset)?;
                 } else {
-                    let end_offset = self.builder.current_offset();
-                    self.builder.patch_jump_to(jump_false, end_offset);
+                    let end_offset = self.builder.current_offset()?;
+                    self.builder.patch_jump_to(jump_false, end_offset)?;
                 }
                 Ok(())
             }
@@ -446,7 +446,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Stmt::Continue { label, .. } => self.lower_continue_statement(label),
             Stmt::Throw { argument, .. } => {
                 let value = self.lower_expr_to_temp(argument)?;
-                self.builder.emit_ax(Opcode::Throw, i32::from(value));
+                self.builder.emit_ax(Opcode::Throw, i32::from(value))?;
                 Ok(())
             }
             Stmt::Try {
@@ -484,21 +484,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.emit_push_with_env(object_register, self.ast().get_expr(object).span())?;
 
         let finally_index = self.push_finally_context();
-        let protected_start = self.builder.current_offset();
+        let protected_start = self.builder.current_offset()?;
         self.lower_statement(body)?;
-        let protected_end = self.builder.current_offset();
+        let protected_end = self.builder.current_offset()?;
         self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
-        self.emit_jump_to_finally(finally_index);
+        self.emit_jump_to_finally(finally_index)?;
 
-        let throw_entry = self.builder.current_offset();
-        let enter_handler = self.emit_enter_handler();
-        self.attach_safepoint(enter_handler, span, SafepointKind::ExceptionEdge);
+        let throw_entry = self.builder.current_offset()?;
+        let enter_handler = self.emit_enter_handler()?;
+        self.attach_safepoint(enter_handler, span, SafepointKind::ExceptionEdge)?;
         self.begin_exception_finally_path()?;
-        let normal_entry = self.builder.current_offset();
-        self.set_finally_normal_entry(finally_index, normal_entry);
+        let normal_entry = self.builder.current_offset()?;
+        self.set_finally_normal_entry(finally_index, normal_entry)?;
         self.mark_finally_body(finally_index, true);
-        self.emit_pop_with_env();
-        self.emit_leave_handler();
+        self.emit_pop_with_env()?;
+        self.emit_leave_handler()?;
         self.emit_finally_dispatch(finally_index)?;
         self.mark_finally_body(finally_index, false);
         self.pop_finally_context(finally_index);
@@ -510,7 +510,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             ExceptionHandlerKind::Finally,
             self.builder.header().register_count(),
             None,
-        ));
+        ))?;
         Ok(())
     }
 
@@ -555,32 +555,32 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.encode_register(match_register)?,
                 self.encode_register(discriminant_register)?,
                 self.encode_register(test_register)?,
-            );
+            )?;
             let jump = self.builder.emit_cond_jump_placeholder(
                 Opcode::JumpIfTrue,
                 self.encode_register(match_register)?,
-            );
+            )?;
             case_match_jumps.push((index, jump));
         }
 
-        let jump_fallback = self.builder.emit_jump_placeholder(Opcode::Jump);
+        let jump_fallback = self.builder.emit_jump_placeholder(Opcode::Jump)?;
         for (index, case) in cases.iter().enumerate() {
-            case_body_offsets[index] = Some(self.builder.current_offset());
+            case_body_offsets[index] = Some(self.builder.current_offset()?);
             for stmt in self.ast().get_stmt_list(case.consequent).to_vec() {
                 self.lower_statement(stmt)?;
             }
         }
 
-        let end = self.builder.current_offset();
+        let end = self.builder.current_offset()?;
         let fallback = default_index
             .and_then(|index| case_body_offsets[index])
             .unwrap_or(end);
-        self.builder.patch_jump_to(jump_fallback, fallback);
+        self.builder.patch_jump_to(jump_fallback, fallback)?;
         for (index, jump) in case_match_jumps {
             let target = case_body_offsets[index].unwrap_or(end);
-            self.builder.patch_jump_to(jump, target);
+            self.builder.patch_jump_to(jump, target)?;
         }
-        self.patch_break_placeholders(switch_target, end);
+        self.patch_break_placeholders(switch_target, end)?;
         self.pop_control_target(switch_target);
         Ok(())
     }
@@ -669,7 +669,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let use_source = self.builder.emit_cond_jump_placeholder(
                     Opcode::JumpIfFalse,
                     self.encode_register(is_undefined)?,
-                );
+                )?;
                 let default_value = self.alloc_temp()?;
                 self.lower_initializer_with_inferred_name(
                     right,
@@ -677,12 +677,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     default_value,
                 )?;
                 self.lower_destructuring_assignment_from_register(left, default_value)?;
-                let end = self.builder.emit_jump_placeholder(Opcode::Jump);
-                let use_source_offset = self.builder.current_offset();
-                self.builder.patch_jump_to(use_source, use_source_offset);
+                let end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+                let use_source_offset = self.builder.current_offset()?;
+                self.builder.patch_jump_to(use_source, use_source_offset)?;
                 self.lower_destructuring_assignment_from_register(left, source_register)?;
-                let end_offset = self.builder.current_offset();
-                self.builder.patch_jump_to(end, end_offset);
+                let end_offset = self.builder.current_offset()?;
+                self.builder.patch_jump_to(end, end_offset)?;
                 Ok(())
             }
             Expr::ArrayExpression { elements, .. } => self
@@ -744,7 +744,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         let use_source = self.builder.emit_cond_jump_placeholder(
                             Opcode::JumpIfFalse,
                             self.encode_register(is_undefined)?,
-                        );
+                        )?;
                         let default_value = self.alloc_temp()?;
                         self.lower_initializer_with_inferred_name(
                             property.value,
@@ -755,12 +755,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             property.key,
                             default_value,
                         )?;
-                        let end = self.builder.emit_jump_placeholder(Opcode::Jump);
-                        let use_source_offset = self.builder.current_offset();
-                        self.builder.patch_jump_to(use_source, use_source_offset);
+                        let end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+                        let use_source_offset = self.builder.current_offset()?;
+                        self.builder.patch_jump_to(use_source, use_source_offset)?;
                         self.lower_destructuring_assignment_from_register(property.key, value)?;
-                        let end_offset = self.builder.current_offset();
-                        self.builder.patch_jump_to(end, end_offset);
+                        let end_offset = self.builder.current_offset()?;
+                        self.builder.patch_jump_to(end, end_offset)?;
                     } else {
                         let target_expr = if property.shorthand {
                             property.key
@@ -847,29 +847,29 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(iterator_register)?,
             self.encode_register(source_register)?,
             0,
-        );
+        )?;
 
         let finally_index = self.push_finally_context();
-        let protected_start = self.builder.current_offset();
+        let protected_start = self.builder.current_offset()?;
         if let Err(error) =
             self.lower_array_destructuring_assignment_elements(elements, iterator_register)
         {
             self.pop_finally_context(finally_index);
             return Err(error);
         }
-        let protected_end = self.builder.current_offset();
+        let protected_end = self.builder.current_offset()?;
         self.set_completion_state(CompletionKind::Normal, None, None)?;
-        self.emit_jump_to_finally(finally_index);
+        self.emit_jump_to_finally(finally_index)?;
 
-        let throw_entry = self.builder.current_offset();
-        let enter_handler = self.emit_enter_handler();
-        self.attach_safepoint(enter_handler, span, SafepointKind::ExceptionEdge);
+        let throw_entry = self.builder.current_offset()?;
+        let enter_handler = self.emit_enter_handler()?;
+        self.attach_safepoint(enter_handler, span, SafepointKind::ExceptionEdge)?;
         self.begin_exception_finally_path()?;
-        let normal_entry = self.builder.current_offset();
-        self.set_finally_normal_entry(finally_index, normal_entry);
+        let normal_entry = self.builder.current_offset()?;
+        self.set_finally_normal_entry(finally_index, normal_entry)?;
         self.mark_finally_body(finally_index, true);
         self.emit_close_iterator_for_completion(iterator_register)?;
-        self.emit_leave_handler();
+        self.emit_leave_handler()?;
         self.emit_finally_dispatch(finally_index)?;
         self.mark_finally_body(finally_index, false);
         self.pop_finally_context(finally_index);
@@ -881,7 +881,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             ExceptionHandlerKind::Finally,
             self.builder.header().register_count(),
             None,
-        ));
+        ))?;
         Ok(())
     }
 
@@ -925,7 +925,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(iterator_register)?,
             self.encode_register(value_register)?,
             self.encode_register(done_register)?,
-        );
+        )?;
         Ok(())
     }
 
@@ -990,7 +990,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.emit_profiled_binary(Opcode::StrictEqual, is_undefined, value_register, undefined)?;
         let use_source = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(is_undefined)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(is_undefined)?)?;
         let default_value = self.alloc_temp()?;
         self.lower_initializer_with_inferred_name(
             default_initializer,
@@ -998,12 +998,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             default_value,
         )?;
         self.assign_prepared_reference(target, default_value)?;
-        let end = self.builder.emit_jump_placeholder(Opcode::Jump);
-        let use_source_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(use_source, use_source_offset);
+        let end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        let use_source_offset = self.builder.current_offset()?;
+        self.builder.patch_jump_to(use_source, use_source_offset)?;
         self.assign_prepared_reference(target, value_register)?;
-        let end_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(end, end_offset);
+        let end_offset = self.builder.current_offset()?;
+        self.builder.patch_jump_to(end, end_offset)?;
         Ok(())
     }
 
@@ -1017,26 +1017,26 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(is_throw)?,
             self.encode_register(registers.kind)?,
             self.encode_register(throw_kind)?,
-        );
+        )?;
         let close_without_preserving = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(is_throw)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(is_throw)?)?;
         self.builder.emit_abx(
             Opcode::CloseIterator,
             self.encode_register(iterator_register)?,
             1,
-        );
-        let end = self.builder.emit_jump_placeholder(Opcode::Jump);
-        let close_without_preserving_offset = self.builder.current_offset();
+        )?;
+        let end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        let close_without_preserving_offset = self.builder.current_offset()?;
         self.builder
-            .patch_jump_to(close_without_preserving, close_without_preserving_offset);
+            .patch_jump_to(close_without_preserving, close_without_preserving_offset)?;
         self.builder.emit_abx(
             Opcode::CloseIterator,
             self.encode_register(iterator_register)?,
             0,
-        );
-        let end_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(end, end_offset);
+        )?;
+        let end_offset = self.builder.current_offset()?;
+        self.builder.patch_jump_to(end, end_offset)?;
         Ok(())
     }
 
@@ -1056,12 +1056,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let rest_value = self.alloc_temp()?;
         let instruction_offset =
             self.builder
-                .emit_abx(Opcode::CreateArray, self.encode_register(rest_value)?, 0);
+                .emit_abx(Opcode::CreateArray, self.encode_register(rest_value)?, 0)?;
         self.attach_safepoint(
             instruction_offset,
             self.ast().get_expr(target_expr).span(),
             SafepointKind::Allocation,
-        );
+        )?;
 
         let rest_index = self.alloc_temp()?;
         self.emit_load_smi(rest_index, 0)?;
@@ -1070,26 +1070,26 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let element_value = self.alloc_temp()?;
         let done_register = self.alloc_temp()?;
 
-        let loop_start = self.builder.current_offset();
+        let loop_start = self.builder.current_offset()?;
         self.builder.emit_abc(
             Opcode::AdvanceIterator,
             self.encode_register(iterator_register)?,
             self.encode_register(element_value)?,
             self.encode_register(done_register)?,
-        );
+        )?;
         let exit_jump = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?)?;
         self.emit_set_keyed_property(rest_value, element_value, rest_index)?;
 
         let next_rest = self.alloc_temp()?;
         self.emit_profiled_binary(Opcode::Add, next_rest, rest_index, one_register)?;
         self.emit_move(rest_index, next_rest)?;
 
-        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump);
-        self.builder.patch_jump_to(jump_back, loop_start);
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(exit_jump, end);
+        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        self.builder.patch_jump_to(jump_back, loop_start)?;
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(exit_jump, end)?;
         self.emit_set_property_by_atom(rest_value, rest_index, WellKnownAtom::length.id())?;
 
         if let Some(target) = prepared_target {
@@ -1133,8 +1133,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let rest_value = self.alloc_temp()?;
         let instruction_offset =
             self.builder
-                .emit_abx(Opcode::CreateObject, self.encode_register(rest_value)?, 0);
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+                .emit_abx(Opcode::CreateObject, self.encode_register(rest_value)?, 0)?;
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         let excluded_keys_register = if excluded_keys.is_empty() {
             let excluded = self.alloc_temp()?;
             self.emit_load_undefined(excluded)?;
@@ -1143,8 +1143,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             let excluded = self.alloc_temp()?;
             let instruction_offset =
                 self.builder
-                    .emit_abx(Opcode::CreateArray, self.encode_register(excluded)?, 0);
-            self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+                    .emit_abx(Opcode::CreateArray, self.encode_register(excluded)?, 0)?;
+            self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
             for (index, excluded_key) in excluded_keys.iter().enumerate() {
                 let excluded_value = match excluded_key {
                     ObjectRestExcludedKey::Atom(atom) => {
@@ -1160,12 +1160,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 if let Ok(index_smi) = i16::try_from(index_value) {
                     self.emit_load_smi(index_register, index_smi)?;
                 } else {
-                    let constant = self.constant_smi(index_value);
+                    let constant = self.constant_smi(index_value)?;
                     self.builder.emit_abx(
                         Opcode::LoadConst,
                         self.encode_register(index_register)?,
                         constant,
-                    );
+                    )?;
                 }
                 self.emit_define_keyed_property(excluded, excluded_value, index_register)?;
             }
@@ -1370,7 +1370,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     Opcode::CreateClosure,
                     self.encode_register(register)?,
                     child_index,
-                );
+                )?;
                 Ok(())
             }
             StorageClass::GlobalName => {
@@ -1379,7 +1379,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     Opcode::CreateClosure,
                     self.encode_register(temp)?,
                     child_index,
-                );
+                )?;
                 self.emit_store_global(temp, name)
             }
             StorageClass::EnvironmentSlot => {
@@ -1388,7 +1388,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     Opcode::CreateClosure,
                     self.encode_register(temp)?,
                     child_index,
-                );
+                )?;
                 let (depth, slot) = self.binding_env_access(binding_id)?.ok_or(
                     LoweringError::MissingEnvironmentSlot {
                         binding: binding_id,
@@ -1402,7 +1402,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     Opcode::CreateClosure,
                     self.encode_register(temp)?,
                     child_index,
-                );
+                )?;
                 self.emit_assign_name(temp, name)
             }
         }

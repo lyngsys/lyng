@@ -7475,17 +7475,29 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
         BytecodeFunctionKind::Script,
     );
     builder.set_name(Some(AtomId::from_raw(17)));
-    builder.alloc_registers(2);
-    let constant = builder.add_constant(ConstantValue::Smi(41));
-    builder.emit_abx(Opcode::LoadConst, 0, constant);
-    builder.emit_abc(Opcode::Move, 1, 0, 0);
-    builder.emit_ax(Opcode::Return, 1);
-    builder.add_feedback_site(
-        0,
-        FeedbackSiteKind::Arithmetic,
-        lyng_js_bytecode::FeedbackSiteMetadata::None,
-    );
-    let function = builder.finish();
+    builder
+        .alloc_registers(2)
+        .expect("test bytecode registers should allocate");
+    let constant = builder
+        .add_constant(ConstantValue::Smi(41))
+        .expect("test bytecode constant should build");
+    builder
+        .emit_abx(Opcode::LoadConst, 0, constant)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::Move, 1, 0, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 1)
+        .expect("test bytecode should build");
+    builder
+        .add_feedback_site(
+            0,
+            FeedbackSiteKind::Arithmetic,
+            lyng_js_bytecode::FeedbackSiteMetadata::None,
+        )
+        .expect("test bytecode feedback site should build");
+    let function = builder.finish().expect("test bytecode should build");
     let unit = CompiledScriptUnit::new(SourceId::new(9), function.id(), vec![function]);
 
     let mut vm = Vm::new();
@@ -7836,15 +7848,23 @@ fn vm_executes_wide_register_and_constant_operands() {
         BytecodeFunctionId::from_raw(7).unwrap(),
         BytecodeFunctionKind::Script,
     );
-    builder.alloc_registers(300);
+    builder
+        .alloc_registers(300)
+        .expect("test bytecode registers should allocate");
     let mut last_constant = 0;
     for index in 0..70_000u32 {
-        last_constant = builder.add_constant(ConstantValue::Smi(index as i32));
+        last_constant = builder
+            .add_constant(ConstantValue::Smi(index as i32))
+            .expect("test bytecode constant should build");
     }
-    builder.emit_abx(Opcode::LoadConst, 299u16, last_constant);
-    builder.emit_ax(Opcode::Return, 299);
+    builder
+        .emit_abx(Opcode::LoadConst, 299u16, last_constant)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 299)
+        .expect("test bytecode should build");
 
-    let function = builder.finish();
+    let function = builder.finish().expect("test bytecode should build");
     let unit = CompiledScriptUnit::new(SourceId::new(17), function.id(), vec![function]);
 
     let mut vm = Vm::new();
@@ -7866,20 +7886,40 @@ fn vm_executes_wide_conditional_jumps() {
         BytecodeFunctionId::from_raw(8).unwrap(),
         BytecodeFunctionKind::Script,
     );
-    builder.alloc_registers(300);
-    builder.emit_abx(Opcode::LoadTrue, 299u16, 0);
-    let jump = builder.emit_cond_jump_placeholder(Opcode::JumpIfTrue, 299u16);
-    builder.emit_abx(Opcode::LoadSmi, 0u16, 1u16);
-    builder.emit_ax(Opcode::Return, 0);
+    builder
+        .alloc_registers(300)
+        .expect("test bytecode registers should allocate");
+    builder
+        .emit_abx(Opcode::LoadTrue, 299u16, 0)
+        .expect("test bytecode should build");
+    let jump = builder
+        .emit_cond_jump_placeholder(Opcode::JumpIfTrue, 299u16)
+        .expect("test bytecode should build");
+    builder
+        .emit_abx(Opcode::LoadSmi, 0u16, 1u16)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 0)
+        .expect("test bytecode should build");
     for _ in 0..40_000 {
-        builder.emit_ax(Opcode::Nop, 0);
+        builder
+            .emit_ax(Opcode::Nop, 0)
+            .expect("test bytecode should build");
     }
-    let target = builder.current_offset();
-    builder.emit_abx(Opcode::LoadSmi, 0u16, 7u16);
-    builder.emit_ax(Opcode::Return, 0);
-    builder.patch_jump_to(jump, target);
+    let target = builder
+        .current_offset()
+        .expect("test bytecode offset should build");
+    builder
+        .emit_abx(Opcode::LoadSmi, 0u16, 7u16)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 0)
+        .expect("test bytecode should build");
+    builder
+        .patch_jump_to(jump, target)
+        .expect("test bytecode jump should patch");
 
-    let function = builder.finish();
+    let function = builder.finish().expect("test bytecode should build");
     let unit = CompiledScriptUnit::new(SourceId::new(18), function.id(), vec![function]);
 
     let mut vm = Vm::new();
@@ -8009,12 +8049,25 @@ fn vm_tracks_child_parent_links_and_unconditional_jumps() {
         BytecodeFunctionId::from_raw(1).unwrap(),
         BytecodeFunctionKind::Function,
     );
-    builder.alloc_registers(1);
-    let jump = builder.emit_jump_placeholder(Opcode::Jump);
-    builder.emit_abx(Opcode::LoadSmi, 0, 99);
-    let ret = builder.emit_ax(Opcode::ReturnUndefined, 0);
-    builder.patch_jump_to(jump, ret);
-    let parent = builder.finish().with_child_functions(vec![child.id()]);
+    builder
+        .alloc_registers(1)
+        .expect("test bytecode registers should allocate");
+    let jump = builder
+        .emit_jump_placeholder(Opcode::Jump)
+        .expect("test bytecode should build");
+    builder
+        .emit_abx(Opcode::LoadSmi, 0, 99)
+        .expect("test bytecode should build");
+    let ret = builder
+        .emit_ax(Opcode::ReturnUndefined, 0)
+        .expect("test bytecode should build");
+    builder
+        .patch_jump_to(jump, ret)
+        .expect("test bytecode jump should patch");
+    let parent = builder
+        .finish()
+        .expect("test bytecode should build")
+        .with_child_functions(vec![child.id()]);
     let unit = CompiledFunctionUnit::new(SourceId::new(11), parent.id(), vec![parent, child]);
 
     let mut vm = Vm::new();
@@ -8410,19 +8463,41 @@ fn for_in_state_is_cleared_when_return_exits_loop_body() {
         BytecodeFunctionId::from_raw(1).unwrap(),
         BytecodeFunctionKind::Script,
     );
-    builder.alloc_registers(4);
-    let object_name = builder.add_constant(ConstantValue::Atom(source_name));
-    builder.emit_abx(Opcode::LoadGlobal, 0, object_name);
-    builder.emit_abc(Opcode::CreateForIn, 1, 0, 0);
-    builder.emit_abc(Opcode::AdvanceForIn, 1, 2, 3);
-    let done = builder.emit_cond_jump_placeholder(Opcode::JumpIfTrue, 3);
-    builder.emit_ax(Opcode::ReturnUndefined, 0);
-    let close_offset = builder.current_offset();
-    builder.patch_jump_to(done, close_offset);
-    builder.emit_abx(Opcode::CloseForIn, 1, 0);
-    builder.emit_ax(Opcode::ReturnUndefined, 0);
+    builder
+        .alloc_registers(4)
+        .expect("test bytecode registers should allocate");
+    let object_name = builder
+        .add_constant(ConstantValue::Atom(source_name))
+        .expect("test bytecode constant should build");
+    builder
+        .emit_abx(Opcode::LoadGlobal, 0, object_name)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::CreateForIn, 1, 0, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::AdvanceForIn, 1, 2, 3)
+        .expect("test bytecode should build");
+    let done = builder
+        .emit_cond_jump_placeholder(Opcode::JumpIfTrue, 3)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::ReturnUndefined, 0)
+        .expect("test bytecode should build");
+    let close_offset = builder
+        .current_offset()
+        .expect("test bytecode offset should build");
+    builder
+        .patch_jump_to(done, close_offset)
+        .expect("test bytecode jump should patch");
+    builder
+        .emit_abx(Opcode::CloseForIn, 1, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::ReturnUndefined, 0)
+        .expect("test bytecode should build");
 
-    let function = builder.finish();
+    let function = builder.finish().expect("test bytecode should build");
     let unit = CompiledScriptUnit::new(SourceId::new(15), function.id(), vec![function]);
 
     let mut vm = Vm::new();
@@ -8445,25 +8520,46 @@ fn throw_transfers_control_to_matching_catch_handler() {
         BytecodeFunctionId::from_raw(1).unwrap(),
         BytecodeFunctionKind::Script,
     );
-    builder.alloc_registers(2);
-    builder.emit_abx(Opcode::LoadSmi, 0, 13);
-    let protected_end = builder.current_offset() + 1;
-    builder.emit_ax(Opcode::Throw, 0);
-    let catch_entry = builder.current_offset();
-    builder.emit_ax(Opcode::EnterHandler, 0);
-    builder.emit_ax(Opcode::LoadException, 1);
-    builder.emit_ax(Opcode::LeaveHandler, 0);
-    builder.emit_ax(Opcode::Return, 1);
-    builder.add_exception_handler(ExceptionHandler::new(
-        0,
-        protected_end,
-        catch_entry,
-        ExceptionHandlerKind::Catch,
-        builder.header().register_count(),
-        Some(1),
-    ));
+    builder
+        .alloc_registers(2)
+        .expect("test bytecode registers should allocate");
+    builder
+        .emit_abx(Opcode::LoadSmi, 0, 13)
+        .expect("test bytecode should build");
+    let protected_end = builder
+        .current_offset()
+        .expect("test bytecode offset should build")
+        + 1;
+    builder
+        .emit_ax(Opcode::Throw, 0)
+        .expect("test bytecode should build");
+    let catch_entry = builder
+        .current_offset()
+        .expect("test bytecode offset should build");
+    builder
+        .emit_ax(Opcode::EnterHandler, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::LoadException, 1)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::LeaveHandler, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 1)
+        .expect("test bytecode should build");
+    builder
+        .add_exception_handler(ExceptionHandler::new(
+            0,
+            protected_end,
+            catch_entry,
+            ExceptionHandlerKind::Catch,
+            builder.header().register_count(),
+            Some(1),
+        ))
+        .expect("test bytecode handler should build");
 
-    let function = builder.finish();
+    let function = builder.finish().expect("test bytecode should build");
     let unit = CompiledScriptUnit::new(SourceId::new(16), function.id(), vec![function]);
 
     let mut vm = Vm::new();
@@ -8679,10 +8775,16 @@ fn load_env_slot_throws_for_uninitialized_lexicals() {
         BytecodeFunctionId::from_raw(30).unwrap(),
         BytecodeFunctionKind::Script,
     );
-    builder.alloc_registers(1);
-    builder.emit_abx(Opcode::LoadEnvSlot, 0, 0);
-    builder.emit_ax(Opcode::Return, 0);
-    let function = builder.finish();
+    builder
+        .alloc_registers(1)
+        .expect("test bytecode registers should allocate");
+    builder
+        .emit_abx(Opcode::LoadEnvSlot, 0, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 0)
+        .expect("test bytecode should build");
+    let function = builder.finish().expect("test bytecode should build");
     let unit = CompiledScriptUnit::new(SourceId::new(24), function.id(), vec![function]);
 
     let mut vm = Vm::new();
@@ -8718,12 +8820,22 @@ fn store_env_slot_rejects_reassigning_initialized_const_bindings() {
         BytecodeFunctionId::from_raw(31).unwrap(),
         BytecodeFunctionKind::Script,
     );
-    builder.alloc_registers(1);
-    let constant = builder.add_constant(ConstantValue::Smi(2));
-    builder.emit_abx(Opcode::LoadConst, 0, constant);
-    builder.emit_abx(Opcode::StoreEnvSlot, 0, 0);
-    builder.emit_ax(Opcode::Return, 0);
-    let function = builder.finish();
+    builder
+        .alloc_registers(1)
+        .expect("test bytecode registers should allocate");
+    let constant = builder
+        .add_constant(ConstantValue::Smi(2))
+        .expect("test bytecode constant should build");
+    builder
+        .emit_abx(Opcode::LoadConst, 0, constant)
+        .expect("test bytecode should build");
+    builder
+        .emit_abx(Opcode::StoreEnvSlot, 0, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 0)
+        .expect("test bytecode should build");
+    let function = builder.finish().expect("test bytecode should build");
     let unit = CompiledScriptUnit::new(SourceId::new(25), function.id(), vec![function]);
 
     let mut vm = Vm::new();

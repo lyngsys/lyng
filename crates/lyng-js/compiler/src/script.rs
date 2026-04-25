@@ -7,11 +7,12 @@ use lyng_js_ast::{
     VariableKind,
 };
 use lyng_js_bytecode::{
-    ArgumentsMode, BytecodeBuilder, BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags,
-    BytecodeFunction, BytecodeFunctionFlags, BytecodeFunctionId, BytecodeFunctionKind, CallRange,
-    CaptureDescriptor, CaptureSource, CompiledAtom, CompiledScriptUnit, ConstantValue,
-    DeoptFrameValue, DeoptSnapshot, DeoptValueSource, DirectEvalLexicalScope, ExceptionHandler,
-    ExceptionHandlerKind, FeedbackSiteKind, FeedbackSiteMetadata, Opcode, SafepointKind, ThisMode,
+    ArgumentsMode, BytecodeBuildError, BytecodeBuilder, BytecodeEnvironmentBinding,
+    BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionFlags, BytecodeFunctionId,
+    BytecodeFunctionKind, BytecodeLimitKind, CallRange, CaptureDescriptor, CaptureSource,
+    CompiledAtom, CompiledScriptUnit, ConstantValue, DeoptFrameValue, DeoptSnapshot,
+    DeoptValueSource, DirectEvalLexicalScope, ExceptionHandler, ExceptionHandlerKind,
+    FeedbackSiteKind, FeedbackSiteMetadata, Opcode, SafepointKind, ThisMode,
 };
 use lyng_js_common::{AtomId, AtomTable, Span, WellKnownAtom};
 use lyng_js_sema::{

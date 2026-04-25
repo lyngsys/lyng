@@ -14,12 +14,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 value
             };
             self.set_completion_state(CompletionKind::Return, Some(value), None)?;
-            self.emit_jump_to_finally(finally_index);
+            self.emit_jump_to_finally(finally_index)?;
             return Ok(());
         }
 
         let Some(argument) = argument else {
-            self.builder.emit_ax(Opcode::ReturnUndefined, 0);
+            self.builder.emit_ax(Opcode::ReturnUndefined, 0)?;
             return Ok(());
         };
 
@@ -54,7 +54,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
             _ => {
                 let value = self.lower_expr_to_temp(expr)?;
-                self.builder.emit_ax(Opcode::Return, i32::from(value));
+                self.builder.emit_ax(Opcode::Return, i32::from(value))?;
                 Ok(())
             }
         }
@@ -67,12 +67,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         alternate: ExprId,
     ) -> LoweringResult<()> {
         let test_register = self.lower_expr_to_temp(test)?;
-        let jump_alternate = self
-            .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(test_register)?);
+        let jump_alternate = self.builder.emit_cond_jump_placeholder(
+            Opcode::JumpIfFalse,
+            self.encode_register(test_register)?,
+        )?;
         self.lower_tail_return_expression(consequent)?;
-        let alternate_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_alternate, alternate_offset);
+        let alternate_offset = self.builder.current_offset()?;
+        self.builder
+            .patch_jump_to(jump_alternate, alternate_offset)?;
         self.lower_tail_return_expression(alternate)
     }
 
@@ -93,12 +95,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let jump_short = self.builder.emit_cond_jump_placeholder(
                     short_circuit,
                     self.encode_register(left_register)?,
-                );
+                )?;
                 self.lower_tail_return_expression(right)?;
-                let short_offset = self.builder.current_offset();
-                self.builder.patch_jump_to(jump_short, short_offset);
+                let short_offset = self.builder.current_offset()?;
+                self.builder.patch_jump_to(jump_short, short_offset)?;
                 self.builder
-                    .emit_ax(Opcode::Return, i32::from(left_register));
+                    .emit_ax(Opcode::Return, i32::from(left_register))?;
                 Ok(())
             }
             lyng_js_ast::LogicalOp::NullishCoalescing => {
@@ -106,9 +108,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.emit_load_null(null_value)?;
                 let is_null = self.alloc_temp()?;
                 self.emit_profiled_binary(Opcode::StrictEqual, is_null, left_register, null_value)?;
-                let jump_right_from_null = self
-                    .builder
-                    .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(is_null)?);
+                let jump_right_from_null = self.builder.emit_cond_jump_placeholder(
+                    Opcode::JumpIfTrue,
+                    self.encode_register(is_null)?,
+                )?;
 
                 let undefined_value = self.alloc_temp()?;
                 self.emit_load_undefined(undefined_value)?;
@@ -122,16 +125,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let jump_return_left = self.builder.emit_cond_jump_placeholder(
                     Opcode::JumpIfFalse,
                     self.encode_register(is_undefined)?,
-                );
-                let right_offset = self.builder.current_offset();
+                )?;
+                let right_offset = self.builder.current_offset()?;
                 self.builder
-                    .patch_jump_to(jump_right_from_null, right_offset);
+                    .patch_jump_to(jump_right_from_null, right_offset)?;
                 self.lower_tail_return_expression(right)?;
-                let return_left_offset = self.builder.current_offset();
+                let return_left_offset = self.builder.current_offset()?;
                 self.builder
-                    .patch_jump_to(jump_return_left, return_left_offset);
+                    .patch_jump_to(jump_return_left, return_left_offset)?;
                 self.builder
-                    .emit_ax(Opcode::Return, i32::from(left_register));
+                    .emit_ax(Opcode::Return, i32::from(left_register))?;
                 Ok(())
             }
         }
@@ -143,7 +146,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         let expressions = self.ast().get_expr_list(expressions).to_vec();
         let Some((last, rest)) = expressions.split_last() else {
-            self.builder.emit_ax(Opcode::ReturnUndefined, 0);
+            self.builder.emit_ax(Opcode::ReturnUndefined, 0)?;
             return Ok(());
         };
         for expr in rest {
@@ -179,11 +182,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if let Some(finally_index) = self.nearest_active_finally() {
             let target_id = self.control_targets[target].id;
             self.set_completion_state(kind, self.result_register, Some(target_id))?;
-            self.emit_jump_to_finally(finally_index);
+            self.emit_jump_to_finally(finally_index)?;
             return Ok(());
         }
 
-        let placeholder = self.builder.emit_jump_placeholder(Opcode::Jump);
+        let placeholder = self.builder.emit_jump_placeholder(Opcode::Jump)?;
         match kind {
             CompletionKind::Break => self.control_targets[target]
                 .break_placeholders
@@ -220,18 +223,18 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         block: StmtId,
         handler: CatchClause,
     ) -> LoweringResult<()> {
-        let protected_start = self.builder.current_offset();
+        let protected_start = self.builder.current_offset()?;
         self.lower_statement(block)?;
-        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump);
-        let protected_end = self.builder.current_offset();
-        let catch_entry = self.builder.current_offset();
-        let enter_handler = self.emit_enter_handler();
+        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        let protected_end = self.builder.current_offset()?;
+        let catch_entry = self.builder.current_offset()?;
+        let enter_handler = self.emit_enter_handler()?;
         let catch_span = self.ast().get_stmt(handler.body).span();
-        self.attach_safepoint(enter_handler, catch_span, SafepointKind::ExceptionEdge);
+        self.attach_safepoint(enter_handler, catch_span, SafepointKind::ExceptionEdge)?;
         self.lower_catch_clause(handler)?;
-        self.emit_leave_handler();
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        self.emit_leave_handler()?;
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         self.builder.add_exception_handler(ExceptionHandler::new(
             protected_start,
             protected_end,
@@ -239,7 +242,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             ExceptionHandlerKind::Catch,
             self.builder.header().register_count(),
             None,
-        ));
+        ))?;
         Ok(())
     }
 
@@ -249,22 +252,22 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         finalizer: StmtId,
     ) -> LoweringResult<()> {
         let finally_index = self.push_finally_context();
-        let protected_start = self.builder.current_offset();
+        let protected_start = self.builder.current_offset()?;
         self.lower_statement(block)?;
-        let protected_end = self.builder.current_offset();
+        let protected_end = self.builder.current_offset()?;
         self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
-        self.emit_jump_to_finally(finally_index);
+        self.emit_jump_to_finally(finally_index)?;
 
-        let throw_entry = self.builder.current_offset();
-        let enter_handler = self.emit_enter_handler();
+        let throw_entry = self.builder.current_offset()?;
+        let enter_handler = self.emit_enter_handler()?;
         let finalizer_span = self.ast().get_stmt(finalizer).span();
-        self.attach_safepoint(enter_handler, finalizer_span, SafepointKind::ExceptionEdge);
+        self.attach_safepoint(enter_handler, finalizer_span, SafepointKind::ExceptionEdge)?;
         self.begin_exception_finally_path()?;
-        let normal_entry = self.builder.current_offset();
-        self.set_finally_normal_entry(finally_index, normal_entry);
+        let normal_entry = self.builder.current_offset()?;
+        self.set_finally_normal_entry(finally_index, normal_entry)?;
         self.mark_finally_body(finally_index, true);
         self.lower_statement(finalizer)?;
-        self.emit_leave_handler();
+        self.emit_leave_handler()?;
         self.emit_finally_dispatch(finally_index)?;
         self.mark_finally_body(finally_index, false);
         self.pop_finally_context(finally_index);
@@ -276,7 +279,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             ExceptionHandlerKind::Finally,
             self.builder.header().register_count(),
             None,
-        ));
+        ))?;
         Ok(())
     }
 
@@ -287,32 +290,32 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         finalizer: StmtId,
     ) -> LoweringResult<()> {
         let finally_index = self.push_finally_context();
-        let try_start = self.builder.current_offset();
+        let try_start = self.builder.current_offset()?;
         self.lower_statement(block)?;
-        let try_end = self.builder.current_offset();
+        let try_end = self.builder.current_offset()?;
         self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
-        self.emit_jump_to_finally(finally_index);
+        self.emit_jump_to_finally(finally_index)?;
 
-        let catch_entry = self.builder.current_offset();
-        let catch_enter = self.emit_enter_handler();
+        let catch_entry = self.builder.current_offset()?;
+        let catch_enter = self.emit_enter_handler()?;
         let catch_span = self.ast().get_stmt(handler.body).span();
-        self.attach_safepoint(catch_enter, catch_span, SafepointKind::ExceptionEdge);
+        self.attach_safepoint(catch_enter, catch_span, SafepointKind::ExceptionEdge)?;
         self.lower_catch_clause(handler)?;
-        self.emit_leave_handler();
-        let catch_end = self.builder.current_offset();
+        self.emit_leave_handler()?;
+        let catch_end = self.builder.current_offset()?;
         self.set_completion_state(CompletionKind::Normal, self.result_register, None)?;
-        self.emit_jump_to_finally(finally_index);
+        self.emit_jump_to_finally(finally_index)?;
 
-        let throw_entry = self.builder.current_offset();
-        let finally_enter = self.emit_enter_handler();
+        let throw_entry = self.builder.current_offset()?;
+        let finally_enter = self.emit_enter_handler()?;
         let finalizer_span = self.ast().get_stmt(finalizer).span();
-        self.attach_safepoint(finally_enter, finalizer_span, SafepointKind::ExceptionEdge);
+        self.attach_safepoint(finally_enter, finalizer_span, SafepointKind::ExceptionEdge)?;
         self.begin_exception_finally_path()?;
-        let normal_entry = self.builder.current_offset();
-        self.set_finally_normal_entry(finally_index, normal_entry);
+        let normal_entry = self.builder.current_offset()?;
+        self.set_finally_normal_entry(finally_index, normal_entry)?;
         self.mark_finally_body(finally_index, true);
         self.lower_statement(finalizer)?;
-        self.emit_leave_handler();
+        self.emit_leave_handler()?;
         self.emit_finally_dispatch(finally_index)?;
         self.mark_finally_body(finally_index, false);
         self.pop_finally_context(finally_index);
@@ -324,7 +327,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             ExceptionHandlerKind::Catch,
             self.builder.header().register_count(),
             None,
-        ));
+        ))?;
         self.builder.add_exception_handler(ExceptionHandler::new(
             catch_entry,
             catch_end,
@@ -332,7 +335,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             ExceptionHandlerKind::Finally,
             self.builder.header().register_count(),
             None,
-        ));
+        ))?;
         Ok(())
     }
 
@@ -341,7 +344,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             if let Some(pattern) = handler.param {
                 let value = this.alloc_temp()?;
                 this.builder
-                    .emit_ax(Opcode::LoadException, i32::from(value));
+                    .emit_ax(Opcode::LoadException, i32::from(value))?;
                 this.lower_binding_pattern_initialization(
                     pattern,
                     DeclarationKind::CatchParam,
@@ -355,7 +358,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     pub(super) fn begin_exception_finally_path(&mut self) -> LoweringResult<()> {
         let registers = self.ensure_completion_registers()?;
         self.builder
-            .emit_ax(Opcode::LoadException, i32::from(registers.value));
+            .emit_ax(Opcode::LoadException, i32::from(registers.value))?;
         self.emit_load_smi(registers.target, 0)?;
         self.emit_load_smi(registers.kind, CompletionKind::Throw.encoded())?;
         Ok(())
@@ -374,22 +377,22 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(kind_test)?,
             self.encode_register(registers.kind)?,
             self.encode_register(zero)?,
-        );
+        )?;
         let jump_resume = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(kind_test)?);
-        let normal_end = self.builder.emit_jump_placeholder(Opcode::Jump);
-        let resume_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_resume, resume_offset);
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(kind_test)?)?;
+        let normal_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        let resume_offset = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_resume, resume_offset)?;
 
         if let Some(outer) = self.outer_active_finally(current_finally) {
-            self.emit_jump_to_finally(outer);
+            self.emit_jump_to_finally(outer)?;
         } else {
             self.emit_completion_terminal_dispatch()?;
         }
 
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(normal_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(normal_end, end)?;
         Ok(())
     }
 
@@ -404,14 +407,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(kind_test)?,
             self.encode_register(registers.kind)?,
             self.encode_register(constant)?,
-        );
+        )?;
         let jump_return = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(kind_test)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(kind_test)?)?;
         self.builder
-            .emit_ax(Opcode::Return, i32::from(registers.value));
-        let next = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_return, next);
+            .emit_ax(Opcode::Return, i32::from(registers.value))?;
+        let next = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_return, next)?;
 
         self.emit_load_smi(constant, CompletionKind::Throw.encoded())?;
         self.builder.emit_abc(
@@ -419,14 +422,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(kind_test)?,
             self.encode_register(registers.kind)?,
             self.encode_register(constant)?,
-        );
+        )?;
         let jump_throw = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(kind_test)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(kind_test)?)?;
         self.builder
-            .emit_ax(Opcode::Throw, i32::from(registers.value));
-        let next = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_throw, next);
+            .emit_ax(Opcode::Throw, i32::from(registers.value))?;
+        let next = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_throw, next)?;
 
         self.emit_target_dispatch(CompletionKind::Break)?;
         self.emit_target_dispatch(CompletionKind::Continue)?;
@@ -443,10 +446,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(kind_match)?,
             self.encode_register(registers.kind)?,
             self.encode_register(kind_constant)?,
-        );
+        )?;
         let jump_end = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(kind_match)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(kind_match)?)?;
 
         for index in 0..self.control_targets.len() {
             if kind == CompletionKind::Continue
@@ -466,12 +469,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.encode_register(target_match)?,
                 self.encode_register(registers.target)?,
                 self.encode_register(target_constant)?,
-            );
+            )?;
             let next_case = self.builder.emit_cond_jump_placeholder(
                 Opcode::JumpIfFalse,
                 self.encode_register(target_match)?,
-            );
-            let placeholder = self.builder.emit_jump_placeholder(Opcode::Jump);
+            )?;
+            let placeholder = self.builder.emit_jump_placeholder(Opcode::Jump)?;
             match kind {
                 CompletionKind::Break => self.control_targets[index]
                     .break_placeholders
@@ -481,12 +484,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     .push(placeholder),
                 _ => unreachable!("target dispatch only handles break/continue"),
             }
-            let after_case = self.builder.current_offset();
-            self.builder.patch_jump_to(next_case, after_case);
+            let after_case = self.builder.current_offset()?;
+            self.builder.patch_jump_to(next_case, after_case)?;
         }
 
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 
@@ -518,18 +521,28 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let _ = self.control_targets.pop();
     }
 
-    pub(super) fn patch_break_placeholders(&mut self, index: usize, target_offset: u32) {
+    pub(super) fn patch_break_placeholders(
+        &mut self,
+        index: usize,
+        target_offset: u32,
+    ) -> LoweringResult<()> {
         let placeholders = std::mem::take(&mut self.control_targets[index].break_placeholders);
         for jump in placeholders {
-            self.builder.patch_jump_to(jump, target_offset);
+            self.builder.patch_jump_to(jump, target_offset)?;
         }
+        Ok(())
     }
 
-    pub(super) fn patch_continue_placeholders(&mut self, index: usize, target_offset: u32) {
+    pub(super) fn patch_continue_placeholders(
+        &mut self,
+        index: usize,
+        target_offset: u32,
+    ) -> LoweringResult<()> {
         let placeholders = std::mem::take(&mut self.control_targets[index].continue_placeholders);
         for jump in placeholders {
-            self.builder.patch_jump_to(jump, target_offset);
+            self.builder.patch_jump_to(jump, target_offset)?;
         }
+        Ok(())
     }
 
     pub(super) fn resolve_break_target(&self, label: Option<AtomId>) -> Option<usize> {
@@ -614,25 +627,31 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
     }
 
-    pub(super) fn set_finally_normal_entry(&mut self, index: usize, entry: u32) {
+    pub(super) fn set_finally_normal_entry(
+        &mut self,
+        index: usize,
+        entry: u32,
+    ) -> LoweringResult<()> {
         let context = &mut self.finally_stack[index];
         context.normal_entry = Some(entry);
         for jump in std::mem::take(&mut context.normal_entry_placeholders) {
-            self.builder.patch_jump_to(jump, entry);
+            self.builder.patch_jump_to(jump, entry)?;
         }
+        Ok(())
     }
 
-    pub(super) fn emit_jump_to_finally(&mut self, index: usize) {
+    pub(super) fn emit_jump_to_finally(&mut self, index: usize) -> LoweringResult<()> {
         if let Some(entry) = self.finally_stack[index].normal_entry {
-            let jump = self.builder.emit_jump_placeholder(Opcode::Jump);
-            self.builder.patch_jump_to(jump, entry);
-            return;
+            let jump = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+            self.builder.patch_jump_to(jump, entry)?;
+            return Ok(());
         }
 
-        let jump = self.builder.emit_jump_placeholder(Opcode::Jump);
+        let jump = self.builder.emit_jump_placeholder(Opcode::Jump)?;
         self.finally_stack[index]
             .normal_entry_placeholders
             .push(jump);
+        Ok(())
     }
 
     pub(super) fn nearest_active_finally(&self) -> Option<usize> {
@@ -651,11 +670,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .find_map(|(index, context)| (!context.in_finalizer).then_some(index))
     }
 
-    pub(super) fn emit_enter_handler(&mut self) -> u32 {
-        self.builder.emit_ax(Opcode::EnterHandler, 0)
+    pub(super) fn emit_enter_handler(&mut self) -> LoweringResult<u32> {
+        Ok(self.builder.emit_ax(Opcode::EnterHandler, 0)?)
     }
 
-    pub(super) fn emit_leave_handler(&mut self) {
-        self.builder.emit_ax(Opcode::LeaveHandler, 0);
+    pub(super) fn emit_leave_handler(&mut self) -> LoweringResult<()> {
+        self.builder.emit_ax(Opcode::LeaveHandler, 0)?;
+        Ok(())
     }
 }

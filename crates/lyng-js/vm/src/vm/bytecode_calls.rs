@@ -593,7 +593,8 @@ mod tests {
             BytecodeFunctionId::from_raw(11).unwrap(),
             BytecodeFunctionKind::Function,
         )
-        .finish();
+        .finish()
+        .expect("test bytecode should build");
         let unit = CompiledFunctionUnit::new(SourceId::new(91), function.id(), vec![function]);
         let mut vm = Vm::new();
         let installed = vm
@@ -671,7 +672,7 @@ mod tests {
             BytecodeFunctionKind::Function,
         );
         function.set_needs_environment(true);
-        let function = function.finish();
+        let function = function.finish().expect("test bytecode should build");
         let unit = CompiledFunctionUnit::new(SourceId::new(92), function.id(), vec![function]);
         let mut vm = Vm::new();
         let _ = vm

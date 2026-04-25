@@ -204,7 +204,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             return Ok(*index);
         }
         let child_id = self.state.ensure_child_compiled(function)?;
-        let child_index = self.builder.add_child_function(child_id);
+        let child_index = self.builder.add_child_function(child_id)?;
         self.child_indices.insert(function, child_index);
         Ok(child_index)
     }

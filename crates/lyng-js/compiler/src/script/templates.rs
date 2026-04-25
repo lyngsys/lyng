@@ -84,13 +84,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.encode_register(call_callee)?,
                 self.encode_register(call_this)?,
                 argument_range,
-            );
-            self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+            )?;
+            self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
             self.builder.add_feedback_site(
                 instruction_offset,
                 FeedbackSiteKind::Call,
                 FeedbackSiteMetadata::ExpectedArity(argument_range.argument_count()),
-            );
+            )?;
             if let Some(dest) = move_back {
                 self.emit_move(dest, call_result)?;
             }
@@ -103,13 +103,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(tail_callee)?,
             self.encode_register(tail_this)?,
             argument_range,
-        );
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        )?;
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         self.builder.add_feedback_site(
             instruction_offset,
             FeedbackSiteKind::Call,
             FeedbackSiteMetadata::ExpectedArity(argument_range.argument_count()),
-        );
+        )?;
         Ok(())
     }
 
@@ -152,8 +152,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(call_callee)?,
             self.encode_register(call_this)?,
             argument_range,
-        );
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        )?;
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
         }
@@ -179,9 +179,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(call_callee)?,
             self.encode_register(call_this)?,
             argument_range,
-        );
+        )?;
         let span = self.ast().get_expr(expr_id).span();
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
         }

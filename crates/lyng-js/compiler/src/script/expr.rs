@@ -128,9 +128,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Opcode::CreateClosure,
             self.encode_register(dest)?,
             child_index,
-        );
+        )?;
         let span = self.ast().get_expr(expr_id).span();
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         if self.ast().get_function(function).name.is_none() {
             let empty_name = self.alloc_temp()?;
             let empty_atom = self.state.atoms.intern_collectible("");
@@ -217,7 +217,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.emit_load_undefined(value)?;
             value
         };
-        self.builder.emit_ax(Opcode::Yield, i32::from(value));
+        self.builder.emit_ax(Opcode::Yield, i32::from(value))?;
         self.emit_generator_resume_dispatch(dest)
     }
 
@@ -227,7 +227,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         dest: u16,
     ) -> LoweringResult<()> {
         self.lower_expr_into(argument, dest)?;
-        self.builder.emit_ax(Opcode::Await, i32::from(dest));
+        self.builder.emit_ax(Opcode::Await, i32::from(dest))?;
         Ok(())
     }
 
@@ -249,13 +249,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(iterator_register)?,
             self.encode_register(iterable)?,
             0,
-        );
+        )?;
         self.builder.emit_abc(
             Opcode::DelegateYield,
             self.encode_register(iterator_register)?,
             self.encode_register(dest)?,
             self.encode_register(done_register)?,
-        );
+        )?;
         self.emit_generator_delegate_completion_dispatch(dest)
     }
 
@@ -270,9 +270,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Opcode::CreateArray,
             self.encode_register(dest)?,
             u32::try_from(elements.len()).unwrap_or(u32::MAX),
-        );
+        )?;
         let span = self.ast().get_expr(expr_id).span();
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         let has_spread = elements
             .iter()
             .flatten()
@@ -313,7 +313,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.encode_register(dest)?,
                 self.encode_register(value_register)?,
                 index,
-            );
+            )?;
         }
         if elements.iter().any(Option::is_none) {
             let length_register = self.alloc_temp()?;
@@ -342,28 +342,28 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(iterator_register)?,
             self.encode_register(iterable_register)?,
             0,
-        );
-        let loop_start = self.builder.current_offset();
+        )?;
+        let loop_start = self.builder.current_offset()?;
         self.builder.emit_abc(
             Opcode::AdvanceIterator,
             self.encode_register(iterator_register)?,
             self.encode_register(value_register)?,
             self.encode_register(done_register)?,
-        );
+        )?;
         let exit_jump = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?)?;
         self.emit_set_keyed_property(array_register, value_register, index_register)?;
         self.bump_array_literal_index(index_register, one_register)?;
-        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump);
-        self.builder.patch_jump_to(jump_back, loop_start);
-        let close_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(exit_jump, close_offset);
+        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        self.builder.patch_jump_to(jump_back, loop_start)?;
+        let close_offset = self.builder.current_offset()?;
+        self.builder.patch_jump_to(exit_jump, close_offset)?;
         self.builder.emit_abx(
             Opcode::CloseIterator,
             self.encode_register(iterator_register)?,
             0,
-        );
+        )?;
         Ok(())
     }
 
@@ -409,14 +409,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(call_result)?,
             self.encode_register(call_callee)?,
             argument_range,
-        );
+        )?;
         let span = self.ast().get_expr(expr_id).span();
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         self.builder.add_feedback_site(
             instruction_offset,
             FeedbackSiteKind::Construct,
             self.call_feedback_metadata(argument_range.argument_count(), 0),
-        );
+        )?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
         }
@@ -449,14 +449,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(call_callee)?,
             self.encode_register(call_this)?,
             argument_range,
-        );
+        )?;
         let span = self.ast().get_expr(expr_id).span();
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         self.builder.add_feedback_site(
             instruction_offset,
             FeedbackSiteKind::Call,
             self.call_feedback_metadata(argument_range.argument_count(), 0),
-        );
+        )?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
         }

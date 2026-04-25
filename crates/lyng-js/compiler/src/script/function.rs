@@ -265,7 +265,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.emit_parameter_environment_prologue()?;
         self.current_scope = self.body_scope;
         self.builder
-            .set_parameter_initializer_end_offset(self.builder.current_offset());
+            .set_parameter_initializer_end_offset(self.builder.current_offset()?);
         self.emit_hoisted_function_declarations()?;
         self.emit_class_constructor_field_prologue()?;
         self.emit_generator_start_suspend_point()?;
@@ -276,7 +276,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.lower_tail_return_expression(expression_body)?;
             } else {
                 self.lower_statement_list_with_disposal(ast_function.body, ast_function.span)?;
-                self.builder.emit_ax(Opcode::ReturnUndefined, 0);
+                self.builder.emit_ax(Opcode::ReturnUndefined, 0)?;
             }
         } else {
             self.lower_statement_list_with_disposal(self.state.program.body, self.root_span())?;
@@ -286,15 +286,15 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         .result_register
                         .expect("script lowers into a result register");
                     self.builder
-                        .emit_ax(Opcode::Return, i32::from(result_register));
+                        .emit_ax(Opcode::Return, i32::from(result_register))?;
                 }
                 ProgramRootKind::Module => {
-                    self.builder.emit_ax(Opcode::ReturnUndefined, 0);
+                    self.builder.emit_ax(Opcode::ReturnUndefined, 0)?;
                 }
             }
         }
 
-        Ok(self.builder.finish())
+        Ok(self.builder.finish()?)
     }
 
     pub(super) fn emit_capture_descriptors(&mut self) -> LoweringResult<()> {
@@ -322,7 +322,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     slot: u16::try_from(slot)
                         .map_err(|_| LoweringError::ConstantIndexOverflow { index: u32::MAX })?,
                 },
-            ));
+            ))?;
         }
         Ok(())
     }
@@ -337,7 +337,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         ) {
             return Ok(());
         }
-        self.builder.emit_ax(Opcode::SuspendGeneratorStart, 0);
+        self.builder.emit_ax(Opcode::SuspendGeneratorStart, 0)?;
         Ok(())
     }
 
@@ -515,7 +515,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let use_source = self.builder.emit_cond_jump_placeholder(
                     Opcode::JumpIfFalse,
                     self.encode_register(is_undefined)?,
-                );
+                )?;
                 let default_value = self.alloc_temp()?;
                 self.lower_initializer_with_inferred_name(
                     right,
@@ -523,12 +523,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     default_value,
                 )?;
                 self.lower_binding_pattern_initialization(left, kind, default_value)?;
-                let end = self.builder.emit_jump_placeholder(Opcode::Jump);
-                let use_source_offset = self.builder.current_offset();
-                self.builder.patch_jump_to(use_source, use_source_offset);
+                let end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+                let use_source_offset = self.builder.current_offset()?;
+                self.builder.patch_jump_to(use_source, use_source_offset)?;
                 self.lower_binding_pattern_initialization(left, kind, source_register)?;
-                let end_offset = self.builder.current_offset();
-                self.builder.patch_jump_to(end, end_offset);
+                let end_offset = self.builder.current_offset()?;
+                self.builder.patch_jump_to(end, end_offset)?;
                 Ok(())
             }
             Pattern::InvalidPattern { .. } => Err(LoweringError::UnsupportedPattern { pattern }),
@@ -607,7 +607,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(iterator_register)?,
             self.encode_register(source_register)?,
             0,
-        );
+        )?;
 
         for element in self.ast().get_opt_pattern_elem_list(elements).to_vec() {
             self.builder.emit_abc(
@@ -615,7 +615,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.encode_register(iterator_register)?,
                 self.encode_register(value_register)?,
                 self.encode_register(done_register)?,
-            );
+            )?;
             if let Some(element) = element {
                 self.lower_binding_pattern_initialization(element.pattern, kind, value_register)?;
             }
@@ -633,7 +633,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Opcode::CloseIterator,
             self.encode_register(iterator_register)?,
             0,
-        );
+        )?;
         Ok(())
     }
 
@@ -646,12 +646,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let rest_value = self.alloc_temp()?;
         let instruction_offset =
             self.builder
-                .emit_abx(Opcode::CreateArray, self.encode_register(rest_value)?, 0);
+                .emit_abx(Opcode::CreateArray, self.encode_register(rest_value)?, 0)?;
         self.attach_safepoint(
             instruction_offset,
             self.ast().get_pattern(rest_pattern).span(),
             SafepointKind::Allocation,
-        );
+        )?;
 
         let rest_index = self.alloc_temp()?;
         self.emit_load_smi(rest_index, 0)?;
@@ -660,24 +660,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let value_register = self.alloc_temp()?;
         let done_register = self.alloc_temp()?;
 
-        let loop_start = self.builder.current_offset();
+        let loop_start = self.builder.current_offset()?;
         self.builder.emit_abc(
             Opcode::AdvanceIterator,
             self.encode_register(iterator_register)?,
             self.encode_register(value_register)?,
             self.encode_register(done_register)?,
-        );
+        )?;
         let exit_jump = self
             .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?);
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?)?;
         self.emit_set_keyed_property(rest_value, value_register, rest_index)?;
         let next_rest = self.alloc_temp()?;
         self.emit_profiled_binary(Opcode::Add, next_rest, rest_index, one_register)?;
         self.emit_move(rest_index, next_rest)?;
-        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump);
-        self.builder.patch_jump_to(jump_back, loop_start);
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(exit_jump, end);
+        let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        self.builder.patch_jump_to(jump_back, loop_start)?;
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(exit_jump, end)?;
         self.emit_set_property_by_atom(rest_value, rest_index, WellKnownAtom::length.id())?;
 
         self.lower_binding_pattern_initialization(rest_pattern, kind, rest_value)

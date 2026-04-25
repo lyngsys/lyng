@@ -1056,9 +1056,13 @@ mod tests {
         let parent_id = BytecodeFunctionId::from_raw(1).expect("bytecode id should allocate");
         let child_id = BytecodeFunctionId::from_raw(2).expect("bytecode id should allocate");
         let mut parent = BytecodeBuilder::new(parent_id, BytecodeFunctionKind::Function);
-        let _ = parent.add_child_function(child_id);
-        let parent = parent.finish();
-        let child = BytecodeBuilder::new(child_id, BytecodeFunctionKind::Arrow).finish();
+        parent
+            .add_child_function(child_id)
+            .expect("test bytecode child should build");
+        let parent = parent.finish().expect("test bytecode should build");
+        let child = BytecodeBuilder::new(child_id, BytecodeFunctionKind::Arrow)
+            .finish()
+            .expect("test bytecode should build");
         let unit = CompiledFunctionUnit::new(SourceId::new(90), parent.id(), vec![parent, child]);
 
         let mut vm = Vm::new();
@@ -1105,15 +1109,17 @@ mod tests {
         let parent_id = BytecodeFunctionId::from_raw(1).expect("bytecode id should allocate");
         let child_id = BytecodeFunctionId::from_raw(2).expect("bytecode id should allocate");
         let mut parent = BytecodeBuilder::new(parent_id, BytecodeFunctionKind::Function);
-        let _ = parent.add_child_function(child_id);
-        let parent = parent.finish();
+        parent
+            .add_child_function(child_id)
+            .expect("test bytecode child should build");
+        let parent = parent.finish().expect("test bytecode should build");
         let mut child = BytecodeBuilder::new(child_id, BytecodeFunctionKind::Function);
         child.set_flags(
             BytecodeFunctionFlags::new(true, false)
                 .with_class_constructor(true)
                 .with_constructible(true),
         );
-        let child = child.finish();
+        let child = child.finish().expect("test bytecode should build");
         let unit = CompiledFunctionUnit::new(SourceId::new(91), parent.id(), vec![parent, child]);
 
         let mut vm = Vm::new();
@@ -1161,15 +1167,17 @@ mod tests {
         let parent_id = BytecodeFunctionId::from_raw(3).expect("bytecode id should allocate");
         let child_id = BytecodeFunctionId::from_raw(4).expect("bytecode id should allocate");
         let mut parent = BytecodeBuilder::new(parent_id, BytecodeFunctionKind::Function);
-        let _ = parent.add_child_function(child_id);
-        let parent = parent.finish();
+        parent
+            .add_child_function(child_id)
+            .expect("test bytecode child should build");
+        let parent = parent.finish().expect("test bytecode should build");
         let mut child = BytecodeBuilder::new(child_id, BytecodeFunctionKind::Function);
         child.set_flags(
             BytecodeFunctionFlags::new(true, false)
                 .with_class_constructor(true)
                 .with_constructible(true),
         );
-        let child = child.finish();
+        let child = child.finish().expect("test bytecode should build");
         let unit = CompiledFunctionUnit::new(SourceId::new(92), parent.id(), vec![parent, child]);
 
         let mut vm = Vm::new();
@@ -1248,15 +1256,17 @@ mod tests {
         let parent_id = BytecodeFunctionId::from_raw(5).expect("bytecode id should allocate");
         let child_id = BytecodeFunctionId::from_raw(6).expect("bytecode id should allocate");
         let mut parent = BytecodeBuilder::new(parent_id, BytecodeFunctionKind::Function);
-        let _ = parent.add_child_function(child_id);
-        let parent = parent.finish();
+        parent
+            .add_child_function(child_id)
+            .expect("test bytecode child should build");
+        let parent = parent.finish().expect("test bytecode should build");
         let mut child = BytecodeBuilder::new(child_id, BytecodeFunctionKind::Function);
         child.set_flags(
             BytecodeFunctionFlags::new(true, false)
                 .with_class_constructor(true)
                 .with_constructible(true),
         );
-        let child = child.finish();
+        let child = child.finish().expect("test bytecode should build");
         let unit = CompiledFunctionUnit::new(SourceId::new(93), parent.id(), vec![parent, child]);
 
         let mut vm = Vm::new();

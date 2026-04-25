@@ -145,6 +145,45 @@ fn compile_script_emits_child_templates_and_call_sites() {
 }
 
 #[test]
+fn attach_safepoint_reports_register_window_limit_as_lowering_error() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(36),
+        "let marker = 1;",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+    let span = parsed.ast.get_script(parsed.root).span;
+    let program = ProgramSource {
+        ast: &parsed.ast,
+        body: parsed.ast.get_script(parsed.root).body,
+        span,
+        strict: parsed.strict,
+        kind: ProgramRootKind::Script,
+    };
+    let mut state = CompilationState::new(program, sema.view(), &mut atoms).unwrap();
+    let entry = state.alloc_function_id();
+    let mut compiler = FunctionCompiler::for_root(&mut state, entry).unwrap();
+    compiler.builder.alloc_registers(u16::MAX).unwrap();
+    compiler.builder.set_hidden_register_count(1);
+
+    let error = compiler
+        .attach_safepoint(0, span, SafepointKind::Allocation)
+        .expect_err("oversized register window should fail lowering");
+
+    assert!(matches!(
+        error,
+        LoweringError::BytecodeBuild {
+            error: BytecodeBuildError::LimitExceeded {
+                kind: BytecodeLimitKind::FinalRegisterWindow,
+            }
+        }
+    ));
+}
+
+#[test]
 fn compile_script_allocates_function_environment_for_direct_arrow_children() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(

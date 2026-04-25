@@ -19,7 +19,10 @@ mod instruction;
 mod metadata;
 mod opcode;
 
-pub use builder::BytecodeBuilder;
+pub use builder::{
+    BytecodeBuildError, BytecodeBuildResult, BytecodeBuilder, BytecodeLimitKind,
+    BytecodeOperandKind,
+};
 pub use decoder::{
     decode_instruction_stream, decode_instruction_word, DecodeError, DecodedInstructionStream,
     InvalidInstructionWord,

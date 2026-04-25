@@ -135,8 +135,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         }
                         self.assign_prepared_reference(target, value)?;
                         self.emit_move(dest, value)?;
-                        let end = self.builder.current_offset();
-                        self.builder.patch_jump_to(jump_end, end);
+                        let end = self.builder.current_offset()?;
+                        self.builder.patch_jump_to(jump_end, end)?;
                         Ok(())
                     }
                     operator => {
@@ -149,7 +149,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             self.encode_register(result)?,
                             self.encode_register(current)?,
                             self.encode_register(rhs)?,
-                        );
+                        )?;
                         self.assign_prepared_reference(target, result)?;
                         self.emit_move(dest, result)
                     }

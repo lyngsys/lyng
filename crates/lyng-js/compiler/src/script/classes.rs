@@ -837,8 +837,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Opcode::CreateClosure,
             self.encode_register(dest)?,
             u32::from(child_index),
-        );
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        )?;
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         Ok(())
     }
 
@@ -860,7 +860,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         )?;
         self.state.functions.push(function);
 
-        let child_index = self.builder.add_child_function(id);
+        let child_index = self.builder.add_child_function(id)?;
         self.emit_create_closure(dest, child_index, self.root_span())
     }
 
@@ -895,8 +895,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         builder.set_source_span(Some(class_span));
 
         if instance_elements.is_empty() && !derived {
-            builder.emit_ax(Opcode::ReturnUndefined, 0);
-            return Ok((id, builder.finish()));
+            builder.emit_ax(Opcode::ReturnUndefined, 0)?;
+            return Ok((id, builder.finish()?));
         }
 
         let binding_count = self.state.sema.binding_table.len();
@@ -958,7 +958,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 )?;
                 synthetic
                     .builder
-                    .emit_ax(Opcode::Return, i32::from(this_register));
+                    .emit_ax(Opcode::Return, i32::from(this_register))?;
                 synthetic.builder.finish()
             } else {
                 synthetic.emit_instance_element_initializers(
@@ -966,12 +966,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     instance_elements,
                     class_body,
                 )?;
-                synthetic.builder.emit_ax(Opcode::ReturnUndefined, 0);
+                synthetic.builder.emit_ax(Opcode::ReturnUndefined, 0)?;
                 synthetic.builder.finish()
             }
         };
 
-        Ok((id, function))
+        Ok((id, function?))
     }
 
     fn instance_elements_need_environment(
@@ -1419,8 +1419,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(call_callee)?,
             self.encode_register(call_this)?,
             argument_range,
-        );
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        )?;
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
         }
@@ -1443,8 +1443,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(bridges.callee)?,
             self.encode_register(bridges.this_value)?,
             arguments,
-        );
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        )?;
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         Ok(())
     }
 }

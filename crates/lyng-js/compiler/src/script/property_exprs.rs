@@ -94,9 +94,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Opcode::CreateObject,
             self.encode_register(dest)?,
             u32::try_from(properties.len()).unwrap_or(u32::MAX),
-        );
+        )?;
         let span = self.ast().get_expr(expr_id).span();
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         for property in properties {
             self.lower_object_property(dest, property)?;
         }
@@ -215,8 +215,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(call_callee)?,
             self.encode_register(call_this)?,
             argument_range,
-        );
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation);
+        )?;
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
         }
@@ -318,7 +318,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     self.encode_register(dest)?,
                     self.encode_register(object_register)?,
                     self.encode_register(key_register)?,
-                );
+                )?;
                 Ok(())
             }
             Expr::ComputedMemberExpression {
@@ -336,7 +336,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     self.encode_register(dest)?,
                     self.encode_register(object_register)?,
                     self.encode_register(key_register)?,
-                );
+                )?;
                 Ok(())
             }
             _ => {
@@ -412,9 +412,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.emit_load_bool(dest, false)
             }
             ResolutionKind::Global | ResolutionKind::Unresolved => {
-                let index = self.constant_atom(name);
+                let index = self.constant_atom(name)?;
                 self.builder
-                    .emit_abx(Opcode::DeleteGlobal, self.encode_register(dest)?, index);
+                    .emit_abx(Opcode::DeleteGlobal, self.encode_register(dest)?, index)?;
                 Ok(())
             }
             ResolutionKind::Dynamic => self.emit_delete_name(dest, name),
@@ -432,7 +432,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     fn emit_throw_reference_error(&mut self, span: Span) -> LoweringResult<()> {
         let error = self.alloc_temp()?;
         self.emit_internal_builtin_call_into(reference_error_builtin(), &[], span, error)?;
-        self.builder.emit_ax(Opcode::Throw, i32::from(error));
+        self.builder.emit_ax(Opcode::Throw, i32::from(error))?;
         Ok(())
     }
 }

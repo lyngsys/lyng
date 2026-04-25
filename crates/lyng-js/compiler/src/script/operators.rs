@@ -24,14 +24,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let jump_false = self.builder.emit_cond_jump_placeholder(
                     Opcode::JumpIfFalse,
                     self.encode_register(argument_register)?,
-                );
+                )?;
                 self.emit_load_bool(dest, false)?;
-                let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump);
-                let true_offset = self.builder.current_offset();
-                self.builder.patch_jump_to(jump_false, true_offset);
+                let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+                let true_offset = self.builder.current_offset()?;
+                self.builder.patch_jump_to(jump_false, true_offset)?;
                 self.emit_load_bool(dest, true)?;
-                let end_offset = self.builder.current_offset();
-                self.builder.patch_jump_to(jump_end, end_offset);
+                let end_offset = self.builder.current_offset()?;
+                self.builder.patch_jump_to(jump_end, end_offset)?;
                 Ok(())
             }
             lyng_js_ast::UnaryOp::BitNot => {
@@ -67,18 +67,18 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             | ResolutionKind::Global
                             | ResolutionKind::Unresolved
                     ) {
-                        let index = self.constant_atom(name);
+                        let index = self.constant_atom(name)?;
                         self.builder.emit_abx(
                             Opcode::ResolveName,
                             self.encode_register(dest)?,
                             index,
-                        );
-                        self.builder.emit_ax(Opcode::TypeOf, i32::from(dest));
+                        )?;
+                        self.builder.emit_ax(Opcode::TypeOf, i32::from(dest))?;
                         return Ok(());
                     }
                 }
                 self.lower_expr_into(argument, dest)?;
-                self.builder.emit_ax(Opcode::TypeOf, i32::from(dest));
+                self.builder.emit_ax(Opcode::TypeOf, i32::from(dest))?;
                 Ok(())
             }
             lyng_js_ast::UnaryOp::Delete => self.lower_delete_expression(argument, dest),
@@ -155,7 +155,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(dest)?,
             self.encode_register(dest)?,
             self.encode_register(false_register)?,
-        );
+        )?;
         Ok(())
     }
 
@@ -181,7 +181,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.encode_register(call_callee)?,
             self.encode_register(call_this)?,
             argument_range,
-        );
+        )?;
         self.attach_safepoint(
             instruction_offset,
             self.ast()
@@ -189,7 +189,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 .span()
                 .cover(self.ast().get_expr(right_expr).span()),
             SafepointKind::Allocation,
-        );
+        )?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
         }
@@ -213,10 +213,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 };
                 let jump_end = self
                     .builder
-                    .emit_cond_jump_placeholder(short_circuit, self.encode_register(dest)?);
+                    .emit_cond_jump_placeholder(short_circuit, self.encode_register(dest)?)?;
                 self.lower_expr_into(right, dest)?;
-                let end = self.builder.current_offset();
-                self.builder.patch_jump_to(jump_end, end);
+                let end = self.builder.current_offset()?;
+                self.builder.patch_jump_to(jump_end, end)?;
                 Ok(())
             }
             lyng_js_ast::LogicalOp::NullishCoalescing => {
@@ -224,9 +224,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.emit_load_null(null_value)?;
                 let is_null = self.alloc_temp()?;
                 self.emit_profiled_binary(Opcode::StrictEqual, is_null, dest, null_value)?;
-                let jump_right_from_null = self
-                    .builder
-                    .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(is_null)?);
+                let jump_right_from_null = self.builder.emit_cond_jump_placeholder(
+                    Opcode::JumpIfTrue,
+                    self.encode_register(is_null)?,
+                )?;
 
                 let undefined_value = self.alloc_temp()?;
                 self.emit_load_undefined(undefined_value)?;
@@ -240,13 +241,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let jump_end = self.builder.emit_cond_jump_placeholder(
                     Opcode::JumpIfFalse,
                     self.encode_register(is_undefined)?,
-                );
-                let right_offset = self.builder.current_offset();
+                )?;
+                let right_offset = self.builder.current_offset()?;
                 self.builder
-                    .patch_jump_to(jump_right_from_null, right_offset);
+                    .patch_jump_to(jump_right_from_null, right_offset)?;
                 self.lower_expr_into(right, dest)?;
-                let end = self.builder.current_offset();
-                self.builder.patch_jump_to(jump_end, end);
+                let end = self.builder.current_offset()?;
+                self.builder.patch_jump_to(jump_end, end)?;
                 Ok(())
             }
         }
@@ -260,16 +261,18 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         dest: u16,
     ) -> LoweringResult<()> {
         let test_register = self.lower_expr_to_temp(test)?;
-        let jump_alternate = self
-            .builder
-            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(test_register)?);
+        let jump_alternate = self.builder.emit_cond_jump_placeholder(
+            Opcode::JumpIfFalse,
+            self.encode_register(test_register)?,
+        )?;
         self.lower_expr_into(consequent, dest)?;
-        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump);
-        let alternate_offset = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_alternate, alternate_offset);
+        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+        let alternate_offset = self.builder.current_offset()?;
+        self.builder
+            .patch_jump_to(jump_alternate, alternate_offset)?;
         self.lower_expr_into(alternate, dest)?;
-        let end = self.builder.current_offset();
-        self.builder.patch_jump_to(jump_end, end);
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
         Ok(())
     }
 }

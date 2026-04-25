@@ -1,4 +1,5 @@
 use lyng_js_ast::{DeclId, ExprId, FunctionId, PatternId, StmtId};
+use lyng_js_bytecode::BytecodeBuildError;
 use lyng_js_common::AtomId;
 use lyng_js_sema::{FunctionSemaId, SemanticBindingId};
 
@@ -38,6 +39,9 @@ pub enum LoweringError {
     RegisterOverflow {
         register: u16,
     },
+    BytecodeBuild {
+        error: BytecodeBuildError,
+    },
     ConstantIndexOverflow {
         index: u32,
     },
@@ -63,4 +67,10 @@ pub enum LoweringError {
     UnsupportedNamedPropertyKey {
         expr: ExprId,
     },
+}
+
+impl From<BytecodeBuildError> for LoweringError {
+    fn from(error: BytecodeBuildError) -> Self {
+        Self::BytecodeBuild { error }
+    }
 }

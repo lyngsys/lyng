@@ -159,13 +159,25 @@ fn phase4_vm_installs_and_executes_hand_authored_bytecode() {
         BytecodeFunctionId::from_raw(1).expect("non-zero bytecode id"),
         BytecodeFunctionKind::Script,
     );
-    builder.alloc_registers(2);
-    let constant = builder.add_constant(lyng_js_bytecode::ConstantValue::Smi(12));
-    builder.emit_abx(Opcode::LoadConst, 0, constant);
-    builder.emit_abc(Opcode::Move, 1, 0, 0);
-    builder.emit_ax(Opcode::Return, 1);
-    builder.add_feedback_site(0, FeedbackSiteKind::Arithmetic, FeedbackSiteMetadata::None);
-    let function = builder.finish();
+    builder
+        .alloc_registers(2)
+        .expect("test bytecode registers should allocate");
+    let constant = builder
+        .add_constant(lyng_js_bytecode::ConstantValue::Smi(12))
+        .expect("test bytecode constant should build");
+    builder
+        .emit_abx(Opcode::LoadConst, 0, constant)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::Move, 1, 0, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 1)
+        .expect("test bytecode should build");
+    builder
+        .add_feedback_site(0, FeedbackSiteKind::Arithmetic, FeedbackSiteMetadata::None)
+        .expect("test bytecode feedback site should build");
+    let function = builder.finish().expect("test bytecode should build");
     let unit = CompiledScriptUnit::new(SourceId::new(19), function.id(), vec![function]);
 
     let mut vm = Vm::new();
