@@ -5,7 +5,7 @@ use super::{
 };
 use crate::BuiltinInvocation;
 use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
+use lyng_js_env::{Agent, RealmRecord};
 use lyng_js_gc::{AllocationLifetime, BigIntSign};
 use lyng_js_host::{
     TemporalCivilDateTime, TemporalCivilTime, TemporalCivilToInstantRequest,
@@ -60,6 +60,7 @@ use lyng_js_ops::temporal::{
 };
 use lyng_js_ops::{object, temporal as temporal_ops};
 use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
+use std::fmt::Write as _;
 
 pub(super) fn dispatch_temporal_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
@@ -841,7 +842,7 @@ fn current_temporal_constructor_prototype<Cx: PublicBuiltinDispatchContext>(
     let global_object = cx
         .agent()
         .realm(realm)
-        .map(|record| record.global_object())
+        .map(RealmRecord::global_object)
         .ok_or_else(|| type_error(cx))?;
     let (temporal_key, instant_key) = {
         let agent = cx.agent();
@@ -925,7 +926,7 @@ fn allocate_temporal_instant_object<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(|record| record.root_shape())
+        .and_then(RealmRecord::root_shape)
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();
@@ -1263,6 +1264,10 @@ fn temporal_instant_from_epoch_milliseconds_builtin<Cx: PublicBuiltinDispatchCon
     allocate_temporal_instant_object(cx, prototype, epoch_nanoseconds)
 }
 
+#[allow(
+    clippy::float_cmp,
+    reason = "Temporal numeric conversion requires exact integral-number validation."
+)]
 fn temporal_epoch_milliseconds_from_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
@@ -2114,11 +2119,13 @@ fn temporal_instant_to_zoned_date_time_iso_builtin<Cx: PublicBuiltinDispatchCont
 }
 
 fn temporal_i64_to_number_value(value: i64) -> Value {
-    i32::try_from(value)
-        .map(Value::from_smi)
-        .unwrap_or_else(|_| Value::from_f64(value as f64))
+    i32::try_from(value).map_or_else(|_| Value::from_f64(value as f64), Value::from_smi)
 }
 
+#[allow(
+    clippy::float_cmp,
+    reason = "Temporal numeric conversion requires exact integral-number validation."
+)]
 fn temporal_duration_part_from_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
@@ -2136,6 +2143,10 @@ fn temporal_duration_part_from_value<Cx: PublicBuiltinDispatchContext>(
     Ok(number as i64)
 }
 
+#[allow(
+    clippy::float_cmp,
+    reason = "Temporal numeric conversion requires exact integral-number validation."
+)]
 fn temporal_duration_part_i128_from_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
@@ -2220,7 +2231,7 @@ fn allocate_temporal_duration_object<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(|record| record.root_shape())
+        .and_then(RealmRecord::root_shape)
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();
@@ -3539,7 +3550,7 @@ fn allocate_temporal_plain_date_object<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(|record| record.root_shape())
+        .and_then(RealmRecord::root_shape)
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();
@@ -4527,10 +4538,7 @@ fn temporal_plain_date_difference_builtin<Cx: PublicBuiltinDispatchContext>(
         && !matches!(
             (options.largest_unit, options.smallest_unit),
             (
-                TemporalDateDifferenceUnit::Day,
-                TemporalDateDifferenceUnit::Week | TemporalDateDifferenceUnit::Day
-            ) | (
-                TemporalDateDifferenceUnit::Week,
+                TemporalDateDifferenceUnit::Day | TemporalDateDifferenceUnit::Week,
                 TemporalDateDifferenceUnit::Week | TemporalDateDifferenceUnit::Day
             )
         )
@@ -4990,7 +4998,7 @@ fn allocate_temporal_plain_time_object<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(|record| record.root_shape())
+        .and_then(RealmRecord::root_shape)
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();
@@ -5305,7 +5313,7 @@ fn format_temporal_plain_time_with_precision(
     if precision == TemporalInstantStringPrecision::Minute {
         return text;
     }
-    text.push_str(&format!(":{:02}", data.second()));
+    let _ = write!(&mut text, ":{:02}", data.second());
     let fraction = u32::from(data.millisecond()) * 1_000_000
         + u32::from(data.microsecond()) * 1_000
         + u32::from(data.nanosecond());
@@ -5802,7 +5810,7 @@ fn allocate_temporal_plain_date_time_object<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(|record| record.root_shape())
+        .and_then(RealmRecord::root_shape)
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();
@@ -6585,9 +6593,8 @@ fn temporal_plain_date_time_add_duration<Cx: PublicBuiltinDispatchContext>(
         cx,
         time_nanoseconds.rem_euclid(TEMPORAL_NANOS_PER_DAY),
     )?;
-    let ordinal_day = match temporal_plain_date_ordinal_day(date).checked_add(day_carry) {
-        Some(ordinal_day) => ordinal_day,
-        None => return Err(range_error(cx)),
+    let Some(ordinal_day) = temporal_plain_date_ordinal_day(date).checked_add(day_carry) else {
+        return Err(range_error(cx));
     };
     let date = temporal_plain_date_from_ordinal_day(cx, ordinal_day)?;
     Ok(TemporalPlainDateTimeObjectData::new(
@@ -7320,7 +7327,7 @@ fn allocate_temporal_plain_year_month_object<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(|record| record.root_shape())
+        .and_then(RealmRecord::root_shape)
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();
@@ -8085,7 +8092,7 @@ fn allocate_temporal_plain_month_day_object<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(|record| record.root_shape())
+        .and_then(RealmRecord::root_shape)
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();
@@ -8124,7 +8131,7 @@ fn temporal_plain_month_day_from_value<Cx: PublicBuiltinDispatchContext>(
             cx,
             i64::from(month),
             i64::from(day),
-            i64::from(TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR),
+            TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR,
         );
     }
 
@@ -8160,7 +8167,7 @@ fn temporal_plain_month_day_from_value<Cx: PublicBuiltinDispatchContext>(
         cx,
         fields,
         TemporalOverflow::Constrain,
-        i64::from(TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR),
+        TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR,
     )
 }
 
@@ -8191,8 +8198,7 @@ fn temporal_plain_month_day_builtin<Cx: PublicBuiltinDispatchContext>(
     temporal_validate_optional_iso_calendar_identifier_argument(cx, invocation, 2)?;
     let reference_year = match invocation.arguments().get(3).copied() {
         Some(value) if !value.is_undefined() => temporal_integer_part_from_value(cx, value)?,
-        Some(_) => TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR,
-        None => TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR,
+        Some(_) | None => TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR,
     };
     let data = temporal_plain_month_day_from_parts(cx, month, day, reference_year)?;
     let prototype = temporal_constructor_prototype(cx, new_target)?;
@@ -8439,7 +8445,7 @@ fn temporal_plain_month_day_from_builtin<Cx: PublicBuiltinDispatchContext>(
                     cx,
                     fields,
                     overflow,
-                    i64::from(TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR),
+                    TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR,
                 )?
             }
         }
@@ -8461,7 +8467,7 @@ fn temporal_time_zone_id_from_string(text: &str) -> Option<String> {
     if text.eq_ignore_ascii_case(TEMPORAL_UTC_TIME_ZONE_ID) {
         return Some(TEMPORAL_UTC_TIME_ZONE_ID.to_string());
     }
-    if let Some(offset_nanoseconds) = temporal_parse_fixed_offset_time_zone_id(&text) {
+    if let Some(offset_nanoseconds) = temporal_parse_fixed_offset_time_zone_id(text) {
         return Some(format_temporal_offset(offset_nanoseconds));
     }
     if text.contains('[') {
@@ -8481,12 +8487,6 @@ fn temporal_time_zone_id_from_string(text: &str) -> Option<String> {
 }
 
 fn temporal_parse_fixed_offset_time_zone_id(text: &str) -> Option<i64> {
-    let bytes = text.as_bytes();
-    let sign = match bytes.first().copied()? {
-        b'+' => 1_i128,
-        b'-' => -1_i128,
-        _ => return None,
-    };
     fn parse_two_digits(bytes: &[u8], index: &mut usize) -> Option<i128> {
         let tens = *bytes.get(*index)?;
         let ones = *bytes.get(*index + 1)?;
@@ -8497,6 +8497,12 @@ fn temporal_parse_fixed_offset_time_zone_id(text: &str) -> Option<i64> {
         Some(i128::from(tens - b'0') * 10 + i128::from(ones - b'0'))
     }
 
+    let bytes = text.as_bytes();
+    let sign = match bytes.first().copied()? {
+        b'+' => 1_i128,
+        b'-' => -1_i128,
+        _ => return None,
+    };
     let mut index = 1;
     let hours = parse_two_digits(bytes, &mut index)?;
     let mut minutes = 0_i128;
@@ -8689,7 +8695,7 @@ fn allocate_temporal_zoned_date_time_object<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(|record| record.root_shape())
+        .and_then(RealmRecord::root_shape)
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();
@@ -8730,17 +8736,14 @@ fn temporal_zoned_date_time_from_value<Cx: PublicBuiltinDispatchContext>(
             let parsed = parse_temporal_plain_date_time(&text).ok_or_else(|| range_error(cx))?;
             let (millisecond, microsecond, nanosecond) =
                 temporal_subsecond_parts_from_nanoseconds(cx, parsed.fraction_nanoseconds)?;
-            let millisecond = match u16::try_from(millisecond) {
-                Ok(value) => value,
-                Err(_) => return Err(range_error(cx)),
+            let Ok(millisecond) = u16::try_from(millisecond) else {
+                return Err(range_error(cx));
             };
-            let microsecond = match u16::try_from(microsecond) {
-                Ok(value) => value,
-                Err(_) => return Err(range_error(cx)),
+            let Ok(microsecond) = u16::try_from(microsecond) else {
+                return Err(range_error(cx));
             };
-            let nanosecond = match u16::try_from(nanosecond) {
-                Ok(value) => value,
-                Err(_) => return Err(range_error(cx)),
+            let Ok(nanosecond) = u16::try_from(nanosecond) else {
+                return Err(range_error(cx));
             };
             let date_time = TemporalCivilDateTime::new(
                 parsed.year,
@@ -8787,29 +8790,23 @@ fn temporal_zoned_date_time_from_value<Cx: PublicBuiltinDispatchContext>(
         temporal_optional_time_part_from_property(cx, object_ref, "microsecond")?.unwrap_or(0);
     let nanosecond =
         temporal_optional_time_part_from_property(cx, object_ref, "nanosecond")?.unwrap_or(0);
-    let hour = match u8::try_from(hour) {
-        Ok(value) => value,
-        Err(_) => return Err(range_error(cx)),
+    let Ok(hour) = u8::try_from(hour) else {
+        return Err(range_error(cx));
     };
-    let minute = match u8::try_from(minute) {
-        Ok(value) => value,
-        Err(_) => return Err(range_error(cx)),
+    let Ok(minute) = u8::try_from(minute) else {
+        return Err(range_error(cx));
     };
-    let second = match u8::try_from(second) {
-        Ok(value) => value,
-        Err(_) => return Err(range_error(cx)),
+    let Ok(second) = u8::try_from(second) else {
+        return Err(range_error(cx));
     };
-    let millisecond = match u16::try_from(millisecond) {
-        Ok(value) => value,
-        Err(_) => return Err(range_error(cx)),
+    let Ok(millisecond) = u16::try_from(millisecond) else {
+        return Err(range_error(cx));
     };
-    let microsecond = match u16::try_from(microsecond) {
-        Ok(value) => value,
-        Err(_) => return Err(range_error(cx)),
+    let Ok(microsecond) = u16::try_from(microsecond) else {
+        return Err(range_error(cx));
     };
-    let nanosecond = match u16::try_from(nanosecond) {
-        Ok(value) => value,
-        Err(_) => return Err(range_error(cx)),
+    let Ok(nanosecond) = u16::try_from(nanosecond) else {
+        return Err(range_error(cx));
     };
     let date_time = TemporalCivilDateTime::new(
         date.year(),
@@ -9053,10 +9050,10 @@ fn format_temporal_zoned_date_time_with_options<Cx: PublicBuiltinDispatchContext
     }
     match options.time_zone_name {
         TemporalZonedDateTimeTimeZoneNameOption::Auto => {
-            text.push_str(&format!("[{time_zone_id}]"));
+            let _ = write!(&mut text, "[{time_zone_id}]");
         }
         TemporalZonedDateTimeTimeZoneNameOption::Critical => {
-            text.push_str(&format!("[!{time_zone_id}]"));
+            let _ = write!(&mut text, "[!{time_zone_id}]");
         }
         TemporalZonedDateTimeTimeZoneNameOption::Never => {}
     }
