@@ -2,12 +2,13 @@ use super::{
     install_public_builtin_function, install_public_builtin_function_with_function_prototype,
     ErrorFamilyBuiltins, ErrorFamilyPrototypes, FamilyInstallContext,
 };
+use crate::public::PublicRealmBuiltins;
 use lyng_js_env::Agent;
 use lyng_js_types::{
     js3_aggregate_error_builtin, js3_error_builtin, js3_error_to_string_builtin,
     js3_eval_error_builtin, js3_range_error_builtin, js3_reference_error_builtin,
     js3_suppressed_error_builtin, js3_syntax_error_builtin, js3_type_error_builtin,
-    js3_uri_error_builtin,
+    js3_uri_error_builtin, BuiltinFunctionId, ObjectRef,
 };
 
 pub(in crate::public) fn install_error_family(
@@ -96,6 +97,26 @@ pub(in crate::public) fn install_error_family(
         ),
         suppressed_error_prototype: prototypes.suppressed_error_prototype,
     }
+}
+
+pub(in crate::public) fn error_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_error_builtin(), builtins.error),
+        (js3_error_to_string_builtin(), builtins.error_to_string),
+        (js3_eval_error_builtin(), builtins.eval_error),
+        (js3_range_error_builtin(), builtins.range_error),
+        (js3_reference_error_builtin(), builtins.reference_error),
+        (js3_syntax_error_builtin(), builtins.syntax_error),
+        (js3_type_error_builtin(), builtins.type_error),
+        (js3_uri_error_builtin(), builtins.uri_error),
+        (js3_aggregate_error_builtin(), builtins.aggregate_error),
+        (js3_suppressed_error_builtin(), builtins.suppressed_error),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
 }
 
 fn install_error_constructor(

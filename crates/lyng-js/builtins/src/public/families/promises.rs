@@ -2,6 +2,7 @@ use super::{
     install_public_builtin_function, FamilyInstallContext, PromiseDisposalFamilyBuiltins,
     PromiseDisposalFamilyPrototypes,
 };
+use crate::public::PublicRealmBuiltins;
 use lyng_js_env::Agent;
 use lyng_js_types::{
     js3_add_async_disposable_resource_builtin, js3_add_sync_disposable_resource_builtin,
@@ -17,7 +18,7 @@ use lyng_js_types::{
     js3_promise_all_settled_builtin, js3_promise_any_builtin, js3_promise_builtin,
     js3_promise_catch_builtin, js3_promise_finally_builtin, js3_promise_race_builtin,
     js3_promise_reject_builtin, js3_promise_resolve_builtin, js3_promise_species_getter_builtin,
-    js3_promise_then_builtin, ObjectRef,
+    js3_promise_then_builtin, BuiltinFunctionId, ObjectRef,
 };
 
 pub(in crate::public) fn install_promise_disposal_family(
@@ -71,6 +72,147 @@ pub(in crate::public) fn install_promise_disposal_family(
         promise_any: promise.any,
         promise_species_getter: promise.species_getter,
     }
+}
+
+pub(in crate::public) fn promise_disposal_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    promise_builtin_object(builtins, entry)
+        .or_else(|| disposable_stack_builtin_object(builtins, entry))
+        .or_else(|| async_disposable_stack_builtin_object(builtins, entry))
+        .or_else(|| disposal_helper_builtin_object(builtins, entry))
+}
+
+fn promise_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_promise_builtin(), builtins.promise),
+        (js3_promise_then_builtin(), builtins.promise_then),
+        (js3_promise_catch_builtin(), builtins.promise_catch),
+        (js3_promise_finally_builtin(), builtins.promise_finally),
+        (js3_promise_resolve_builtin(), builtins.promise_resolve),
+        (js3_promise_reject_builtin(), builtins.promise_reject),
+        (js3_promise_all_builtin(), builtins.promise_all),
+        (
+            js3_promise_all_settled_builtin(),
+            builtins.promise_all_settled,
+        ),
+        (js3_promise_race_builtin(), builtins.promise_race),
+        (js3_promise_any_builtin(), builtins.promise_any),
+        (
+            js3_promise_species_getter_builtin(),
+            builtins.promise_species_getter,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn disposable_stack_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_disposable_stack_builtin(), builtins.disposable_stack),
+        (
+            js3_disposable_stack_use_builtin(),
+            builtins.disposable_stack_use,
+        ),
+        (
+            js3_disposable_stack_adopt_builtin(),
+            builtins.disposable_stack_adopt,
+        ),
+        (
+            js3_disposable_stack_defer_builtin(),
+            builtins.disposable_stack_defer,
+        ),
+        (
+            js3_disposable_stack_move_builtin(),
+            builtins.disposable_stack_move,
+        ),
+        (
+            js3_disposable_stack_disposed_getter_builtin(),
+            builtins.disposable_stack_disposed_getter,
+        ),
+        (
+            js3_disposable_stack_dispose_builtin(),
+            builtins.disposable_stack_dispose,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn async_disposable_stack_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (
+            js3_async_disposable_stack_builtin(),
+            builtins.async_disposable_stack,
+        ),
+        (
+            js3_async_disposable_stack_use_builtin(),
+            builtins.async_disposable_stack_use,
+        ),
+        (
+            js3_async_disposable_stack_adopt_builtin(),
+            builtins.async_disposable_stack_adopt,
+        ),
+        (
+            js3_async_disposable_stack_defer_builtin(),
+            builtins.async_disposable_stack_defer,
+        ),
+        (
+            js3_async_disposable_stack_move_builtin(),
+            builtins.async_disposable_stack_move,
+        ),
+        (
+            js3_async_disposable_stack_disposed_getter_builtin(),
+            builtins.async_disposable_stack_disposed_getter,
+        ),
+        (
+            js3_async_disposable_stack_dispose_async_builtin(),
+            builtins.async_disposable_stack_dispose_async,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+fn disposal_helper_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (
+            js3_create_sync_disposal_scope_builtin(),
+            builtins.create_sync_disposal_scope,
+        ),
+        (
+            js3_create_async_disposal_scope_builtin(),
+            builtins.create_async_disposal_scope,
+        ),
+        (
+            js3_add_sync_disposable_resource_builtin(),
+            builtins.add_sync_disposable_resource,
+        ),
+        (
+            js3_add_async_disposable_resource_builtin(),
+            builtins.add_async_disposable_resource,
+        ),
+        (js3_dispose_scope_builtin(), builtins.dispose_scope),
+        (
+            js3_dispose_scope_async_builtin(),
+            builtins.dispose_scope_async,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
 }
 
 #[derive(Clone, Copy, Debug)]

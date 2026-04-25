@@ -2,14 +2,16 @@ use super::{
     install_public_builtin_function, FamilyInstallContext, FunctionFamilyBuiltins,
     FunctionFamilyPrototypes,
 };
+use crate::public::PublicRealmBuiltins;
 use lyng_js_env::Agent;
 use lyng_js_types::{
     js3_async_function_builtin, js3_async_generator_function_builtin,
     js3_async_generator_next_builtin, js3_async_generator_return_builtin,
     js3_async_generator_throw_builtin, js3_function_apply_builtin, js3_function_bind_builtin,
-    js3_function_builtin, js3_function_call_builtin, js3_function_symbol_has_instance_builtin,
-    js3_function_to_string_builtin, js3_generator_function_builtin, js3_generator_next_builtin,
-    js3_generator_return_builtin, js3_generator_throw_builtin,
+    js3_function_builtin, js3_function_call_builtin, js3_function_prototype_builtin,
+    js3_function_symbol_has_instance_builtin, js3_function_to_string_builtin,
+    js3_generator_function_builtin, js3_generator_next_builtin, js3_generator_return_builtin,
+    js3_generator_throw_builtin, BuiltinFunctionId, ObjectRef,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -116,4 +118,54 @@ pub(in crate::public) fn install_function_family(
             None,
         ),
     }
+}
+
+pub(in crate::public) fn function_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_function_builtin(), builtins.function),
+        (
+            js3_function_prototype_builtin(),
+            builtins.function_prototype,
+        ),
+        (js3_function_call_builtin(), builtins.function_call),
+        (js3_function_apply_builtin(), builtins.function_apply),
+        (js3_function_bind_builtin(), builtins.function_bind),
+        (
+            js3_function_to_string_builtin(),
+            builtins.function_to_string,
+        ),
+        (
+            js3_function_symbol_has_instance_builtin(),
+            builtins.function_symbol_has_instance,
+        ),
+        (js3_async_function_builtin(), builtins.async_function),
+        (
+            js3_async_generator_function_builtin(),
+            builtins.async_generator_function,
+        ),
+        (
+            js3_async_generator_next_builtin(),
+            builtins.async_generator_next,
+        ),
+        (
+            js3_async_generator_return_builtin(),
+            builtins.async_generator_return,
+        ),
+        (
+            js3_async_generator_throw_builtin(),
+            builtins.async_generator_throw,
+        ),
+        (
+            js3_generator_function_builtin(),
+            builtins.generator_function,
+        ),
+        (js3_generator_next_builtin(), builtins.generator_next),
+        (js3_generator_return_builtin(), builtins.generator_return),
+        (js3_generator_throw_builtin(), builtins.generator_throw),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
 }

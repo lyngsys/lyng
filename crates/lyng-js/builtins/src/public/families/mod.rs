@@ -23,18 +23,18 @@ pub(super) use arrays::{array_builtin_object, install_array_family};
 pub(super) use binary_data::{binary_data_builtin_object, install_binary_data_family};
 pub(super) use collections::{collection_builtin_object, install_collection_family};
 pub(super) use date::{date_builtin_object, install_date_family};
-pub(super) use errors::install_error_family;
-pub(super) use functions::install_function_family;
-pub(super) use globals::install_global_function_family;
+pub(super) use errors::{error_builtin_object, install_error_family};
+pub(super) use functions::{function_builtin_object, install_function_family};
+pub(super) use globals::{global_function_builtin_object, install_global_function_family};
 pub(super) use iterators::{install_iterator_family, iterator_builtin_object};
 pub(super) use json::{install_json_family, json_builtin_object};
-pub(super) use modules::install_module_family;
+pub(super) use modules::{install_module_family, module_builtin_object};
 pub(super) use object_reflection::{
     install_object_reflection_family, object_reflection_builtin_object,
 };
-pub(super) use objects::install_object_family;
+pub(super) use objects::{install_object_family, object_builtin_object};
 pub(super) use primitives::{install_primitive_family, primitive_builtin_object};
-pub(super) use promises::install_promise_disposal_family;
+pub(super) use promises::{install_promise_disposal_family, promise_disposal_builtin_object};
 pub(super) use regexp::{install_regexp_family, regexp_builtin_object};
 pub(super) use strings::{install_string_family, string_builtin_object};
 

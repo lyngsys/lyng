@@ -77,6 +77,8 @@ Rules:
 - `ensure_public_realm_builtins` owns realm-level ordering and cross-family dependencies
 - family modules own allocation of their constructors, prototypes, and methods once the
   required shared prototype handles are available
+- family modules own their `BuiltinFunctionId -> ObjectRef` lookup tables; the realm-level
+  lookup only orchestrates family queries
 - object and function family allocation live in `public/families/objects.rs` and
   `public/families/functions.rs`; later families should follow the same boundary
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
