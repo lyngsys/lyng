@@ -999,14 +999,8 @@ impl PublicRealmBuiltins {
         if entry == js3_generator_throw_builtin() {
             return Some(self.generator_throw);
         }
-        if entry == js3_array_builtin() {
-            return Some(self.array);
-        }
-        if entry == js3_array_from_builtin() {
-            return Some(self.array_from);
-        }
-        if entry == js3_array_from_async_builtin() {
-            return Some(self.array_from_async);
+        if let Some(object) = families::array_builtin_object(&self, entry) {
+            return Some(object);
         }
         if entry == js3_map_builtin() {
             return Some(self.map);
@@ -1028,126 +1022,6 @@ impl PublicRealmBuiltins {
         }
         if let Some(object) = families::binary_data_builtin_object(&self, entry) {
             return Some(object);
-        }
-        if entry == js3_array_is_array_builtin() {
-            return Some(self.array_is_array);
-        }
-        if entry == js3_array_at_builtin() {
-            return Some(self.array_at);
-        }
-        if entry == js3_array_concat_builtin() {
-            return Some(self.array_concat);
-        }
-        if entry == js3_array_copy_within_builtin() {
-            return Some(self.array_copy_within);
-        }
-        if entry == js3_array_fill_builtin() {
-            return Some(self.array_fill);
-        }
-        if entry == js3_array_flat_builtin() {
-            return Some(self.array_flat);
-        }
-        if entry == js3_array_flat_map_builtin() {
-            return Some(self.array_flat_map);
-        }
-        if entry == js3_array_join_builtin() {
-            return Some(self.array_join);
-        }
-        if entry == js3_array_pop_builtin() {
-            return Some(self.array_pop);
-        }
-        if entry == js3_array_push_builtin() {
-            return Some(self.array_push);
-        }
-        if entry == js3_array_shift_builtin() {
-            return Some(self.array_shift);
-        }
-        if entry == js3_array_unshift_builtin() {
-            return Some(self.array_unshift);
-        }
-        if entry == js3_array_every_builtin() {
-            return Some(self.array_every);
-        }
-        if entry == js3_array_filter_builtin() {
-            return Some(self.array_filter);
-        }
-        if entry == js3_array_find_builtin() {
-            return Some(self.array_find);
-        }
-        if entry == js3_array_find_index_builtin() {
-            return Some(self.array_find_index);
-        }
-        if entry == js3_array_find_last_builtin() {
-            return Some(self.array_find_last);
-        }
-        if entry == js3_array_find_last_index_builtin() {
-            return Some(self.array_find_last_index);
-        }
-        if entry == js3_array_for_each_builtin() {
-            return Some(self.array_for_each);
-        }
-        if entry == js3_array_includes_builtin() {
-            return Some(self.array_includes);
-        }
-        if entry == js3_array_index_of_builtin() {
-            return Some(self.array_index_of);
-        }
-        if entry == js3_array_map_builtin() {
-            return Some(self.array_map);
-        }
-        if entry == js3_array_reduce_builtin() {
-            return Some(self.array_reduce);
-        }
-        if entry == js3_array_reduce_right_builtin() {
-            return Some(self.array_reduce_right);
-        }
-        if entry == js3_array_reverse_builtin() {
-            return Some(self.array_reverse);
-        }
-        if entry == js3_array_slice_builtin() {
-            return Some(self.array_slice);
-        }
-        if entry == js3_array_some_builtin() {
-            return Some(self.array_some);
-        }
-        if entry == js3_array_last_index_of_builtin() {
-            return Some(self.array_last_index_of);
-        }
-        if entry == js3_array_sort_builtin() {
-            return Some(self.array_sort);
-        }
-        if entry == js3_array_splice_builtin() {
-            return Some(self.array_splice);
-        }
-        if entry == js3_array_to_reversed_builtin() {
-            return Some(self.array_to_reversed);
-        }
-        if entry == js3_array_to_sorted_builtin() {
-            return Some(self.array_to_sorted);
-        }
-        if entry == js3_array_to_spliced_builtin() {
-            return Some(self.array_to_spliced);
-        }
-        if entry == js3_array_to_string_builtin() {
-            return Some(self.array_to_string);
-        }
-        if entry == js3_array_to_locale_string_builtin() {
-            return Some(self.array_to_locale_string);
-        }
-        if entry == js3_array_values_builtin() {
-            return Some(self.array_values);
-        }
-        if entry == js3_array_keys_builtin() {
-            return Some(self.array_keys);
-        }
-        if entry == js3_array_entries_builtin() {
-            return Some(self.array_entries);
-        }
-        if entry == js3_array_with_builtin() {
-            return Some(self.array_with);
-        }
-        if entry == js3_array_of_builtin() {
-            return Some(self.array_of);
         }
         if entry == js3_map_get_builtin() {
             return Some(self.map_get);
@@ -1238,9 +1112,6 @@ impl PublicRealmBuiltins {
         }
         if entry == js3_iterator_prototype_iterator_builtin() {
             return Some(self.iterator_prototype_iterator);
-        }
-        if entry == js3_array_iterator_next_builtin() {
-            return Some(self.array_iterator_next);
         }
         if entry == js3_map_iterator_next_builtin() {
             return Some(self.map_iterator_next);

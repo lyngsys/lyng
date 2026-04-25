@@ -18,8 +18,10 @@ use lyng_js_types::{
     js3_array_sort_builtin, js3_array_splice_builtin, js3_array_to_locale_string_builtin,
     js3_array_to_reversed_builtin, js3_array_to_sorted_builtin, js3_array_to_spliced_builtin,
     js3_array_to_string_builtin, js3_array_unshift_builtin, js3_array_values_builtin,
-    js3_array_with_builtin,
+    js3_array_with_builtin, BuiltinFunctionId, ObjectRef,
 };
+
+use crate::public::PublicRealmBuiltins;
 
 #[allow(clippy::too_many_lines)]
 pub(in crate::public) fn install_array_family(
@@ -184,4 +186,73 @@ pub(in crate::public) fn install_array_family(
             None,
         ),
     }
+}
+
+pub(in crate::public) fn array_builtin_object(
+    builtins: &PublicRealmBuiltins,
+    entry: BuiltinFunctionId,
+) -> Option<ObjectRef> {
+    [
+        (js3_array_builtin(), builtins.array),
+        (js3_array_from_builtin(), builtins.array_from),
+        (js3_array_from_async_builtin(), builtins.array_from_async),
+        (js3_array_of_builtin(), builtins.array_of),
+        (js3_array_is_array_builtin(), builtins.array_is_array),
+        (js3_array_at_builtin(), builtins.array_at),
+        (js3_array_concat_builtin(), builtins.array_concat),
+        (js3_array_copy_within_builtin(), builtins.array_copy_within),
+        (js3_array_fill_builtin(), builtins.array_fill),
+        (js3_array_flat_builtin(), builtins.array_flat),
+        (js3_array_flat_map_builtin(), builtins.array_flat_map),
+        (js3_array_join_builtin(), builtins.array_join),
+        (js3_array_pop_builtin(), builtins.array_pop),
+        (js3_array_push_builtin(), builtins.array_push),
+        (js3_array_shift_builtin(), builtins.array_shift),
+        (js3_array_unshift_builtin(), builtins.array_unshift),
+        (js3_array_every_builtin(), builtins.array_every),
+        (js3_array_filter_builtin(), builtins.array_filter),
+        (js3_array_find_builtin(), builtins.array_find),
+        (js3_array_find_index_builtin(), builtins.array_find_index),
+        (js3_array_find_last_builtin(), builtins.array_find_last),
+        (
+            js3_array_find_last_index_builtin(),
+            builtins.array_find_last_index,
+        ),
+        (js3_array_for_each_builtin(), builtins.array_for_each),
+        (js3_array_includes_builtin(), builtins.array_includes),
+        (js3_array_index_of_builtin(), builtins.array_index_of),
+        (js3_array_map_builtin(), builtins.array_map),
+        (js3_array_reduce_builtin(), builtins.array_reduce),
+        (
+            js3_array_reduce_right_builtin(),
+            builtins.array_reduce_right,
+        ),
+        (js3_array_reverse_builtin(), builtins.array_reverse),
+        (js3_array_slice_builtin(), builtins.array_slice),
+        (js3_array_some_builtin(), builtins.array_some),
+        (
+            js3_array_last_index_of_builtin(),
+            builtins.array_last_index_of,
+        ),
+        (js3_array_sort_builtin(), builtins.array_sort),
+        (js3_array_splice_builtin(), builtins.array_splice),
+        (js3_array_to_reversed_builtin(), builtins.array_to_reversed),
+        (js3_array_to_sorted_builtin(), builtins.array_to_sorted),
+        (js3_array_to_spliced_builtin(), builtins.array_to_spliced),
+        (js3_array_to_string_builtin(), builtins.array_to_string),
+        (
+            js3_array_to_locale_string_builtin(),
+            builtins.array_to_locale_string,
+        ),
+        (js3_array_values_builtin(), builtins.array_values),
+        (js3_array_keys_builtin(), builtins.array_keys),
+        (js3_array_entries_builtin(), builtins.array_entries),
+        (js3_array_with_builtin(), builtins.array_with),
+        (
+            js3_array_iterator_next_builtin(),
+            builtins.array_iterator_next,
+        ),
+    ]
+    .into_iter()
+    .find_map(|(id, object)| (entry == id).then_some(object))
 }
