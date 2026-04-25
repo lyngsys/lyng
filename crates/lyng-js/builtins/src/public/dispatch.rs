@@ -1,3 +1,4 @@
+mod collections;
 mod functions;
 mod objects;
 mod temporal;
@@ -577,23 +578,8 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if let Some(result) = functions::dispatch_function_builtin(context, entry, invocation)? {
         return Ok(Some(result));
     }
-    if entry == js3_map_builtin() {
-        return map_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_set_builtin() {
-        return set_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_map_builtin() {
-        return weak_map_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_set_builtin() {
-        return weak_set_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_ref_builtin() {
-        return weak_ref_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_finalization_registry_builtin() {
-        return finalization_registry_builtin(context, invocation).map(Some);
+    if let Some(result) = collections::dispatch_collection_builtin(context, entry, invocation)? {
+        return Ok(Some(result));
     }
     if entry == js3_array_buffer_builtin() {
         return array_buffer_builtin(context, invocation).map(Some);
@@ -1134,110 +1120,11 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == js3_array_with_builtin() {
         return array_with_builtin(context, invocation).map(Some);
     }
-    if entry == js3_map_get_builtin() {
-        return map_get_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_map_set_builtin() {
-        return map_set_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_map_has_builtin() {
-        return map_has_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_map_delete_builtin() {
-        return map_delete_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_map_clear_builtin() {
-        return map_clear_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_map_entries_builtin() {
-        return map_iterator_factory_builtin(context, invocation, ArrayIterationKind::Entry)
-            .map(Some);
-    }
-    if entry == js3_map_values_builtin() {
-        return map_iterator_factory_builtin(context, invocation, ArrayIterationKind::Value)
-            .map(Some);
-    }
-    if entry == js3_map_keys_builtin() {
-        return map_iterator_factory_builtin(context, invocation, ArrayIterationKind::Key)
-            .map(Some);
-    }
-    if entry == js3_map_for_each_builtin() {
-        return map_for_each_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_map_size_getter_builtin() {
-        return map_size_getter_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_set_add_builtin() {
-        return set_add_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_set_has_builtin() {
-        return set_has_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_set_delete_builtin() {
-        return set_delete_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_set_clear_builtin() {
-        return set_clear_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_set_entries_builtin() {
-        return set_iterator_factory_builtin(context, invocation, ArrayIterationKind::Entry)
-            .map(Some);
-    }
-    if entry == js3_set_values_builtin() {
-        return set_iterator_factory_builtin(context, invocation, ArrayIterationKind::Value)
-            .map(Some);
-    }
-    if entry == js3_set_keys_builtin() {
-        return set_iterator_factory_builtin(context, invocation, ArrayIterationKind::Key)
-            .map(Some);
-    }
-    if entry == js3_set_for_each_builtin() {
-        return set_for_each_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_set_size_getter_builtin() {
-        return set_size_getter_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_map_get_builtin() {
-        return weak_map_get_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_map_set_builtin() {
-        return weak_map_set_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_map_has_builtin() {
-        return weak_map_has_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_map_delete_builtin() {
-        return weak_map_delete_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_set_add_builtin() {
-        return weak_set_add_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_set_has_builtin() {
-        return weak_set_has_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_set_delete_builtin() {
-        return weak_set_delete_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_weak_ref_deref_builtin() {
-        return weak_ref_deref_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_finalization_registry_register_builtin() {
-        return finalization_registry_register_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_finalization_registry_unregister_builtin() {
-        return finalization_registry_unregister_builtin(context, invocation).map(Some);
-    }
     if entry == js3_iterator_prototype_iterator_builtin() {
         return iterator_prototype_iterator_builtin(context, invocation).map(Some);
     }
     if entry == js3_array_iterator_next_builtin() {
         return array_iterator_next_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_map_iterator_next_builtin() {
-        return map_iterator_next_builtin(context, invocation).map(Some);
-    }
-    if entry == js3_set_iterator_next_builtin() {
-        return set_iterator_next_builtin(context, invocation).map(Some);
     }
     if entry == js3_string_builtin() {
         return string_builtin(context, invocation).map(Some);
