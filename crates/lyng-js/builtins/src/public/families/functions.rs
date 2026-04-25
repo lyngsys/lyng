@@ -1,6 +1,6 @@
 use super::descriptors::{
     accessor_atom_property, builtin_function_atom_property, builtin_function_symbol_property,
-    data_atom_property, data_symbol_property, hidden_builtin_attributes,
+    data_atom_property, data_symbol_property, descriptor_tag, hidden_builtin_attributes,
     readonly_builtin_attributes, writable_builtin_attributes,
 };
 use super::{
@@ -12,7 +12,6 @@ use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
 use lyng_js_types::{
     js3_async_function_builtin, js3_async_generator_function_builtin,
     js3_async_generator_next_builtin, js3_async_generator_return_builtin,
@@ -419,10 +418,6 @@ impl FunctionDescriptorTags {
             generator_function: descriptor_tag(agent, "GeneratorFunction"),
         }
     }
-}
-
-fn descriptor_tag(agent: &mut Agent, text: &str) -> Value {
-    Value::from_string_ref(agent.alloc_runtime_string(text, None, AllocationLifetime::Default))
 }
 
 pub(in crate::public) fn function_builtin_object(

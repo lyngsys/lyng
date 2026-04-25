@@ -1138,11 +1138,6 @@ impl BuiltinCache {
             None,
             AllocationLifetime::Default,
         ));
-        let array_iterator_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Array Iterator",
-            None,
-            AllocationLifetime::Default,
-        ));
         let map_iterator_tag = Value::from_string_ref(agent.alloc_runtime_string(
             "Map Iterator",
             None,
@@ -1370,14 +1365,11 @@ impl BuiltinCache {
         let every_atom = agent.atoms_mut().intern_collectible("every");
         let fill_atom = agent.atoms_mut().intern_collectible("fill");
         let filter_atom = agent.atoms_mut().intern_collectible("filter");
-        let flat_atom = agent.atoms_mut().intern_collectible("flat");
-        let flat_map_atom = agent.atoms_mut().intern_collectible("flatMap");
         let find_atom = agent.atoms_mut().intern_collectible("find");
         let find_index_atom = agent.atoms_mut().intern_collectible("findIndex");
         let find_last_atom = agent.atoms_mut().intern_collectible("findLast");
         let find_last_index_atom = agent.atoms_mut().intern_collectible("findLastIndex");
         let from_atom = agent.atoms_mut().intern_collectible("from");
-        let from_async_atom = agent.atoms_mut().intern_collectible("fromAsync");
         let for_each_atom = agent.atoms_mut().intern_collectible("forEach");
         let includes_atom = agent.atoms_mut().intern_collectible("includes");
         let index_of_atom = agent.atoms_mut().intern_collectible("indexOf");
@@ -1397,14 +1389,11 @@ impl BuiltinCache {
         let trim_atom = agent.atoms_mut().intern_collectible("trim");
         let trim_end_atom = agent.atoms_mut().intern_collectible("trimEnd");
         let trim_start_atom = agent.atoms_mut().intern_collectible("trimStart");
-        let is_array_atom = agent.atoms_mut().intern_collectible("isArray");
         let join_atom = agent.atoms_mut().intern_collectible("join");
         let keys_atom = agent.atoms_mut().intern_collectible("keys");
         let map_atom = agent.atoms_mut().intern_collectible("map");
         let next_atom = agent.atoms_mut().intern_collectible("next");
         let of_atom = agent.atoms_mut().intern_collectible("of");
-        let pop_atom = agent.atoms_mut().intern_collectible("pop");
-        let push_atom = agent.atoms_mut().intern_collectible("push");
         let reduce_atom = agent.atoms_mut().intern_collectible("reduce");
         let reduce_right_atom = agent.atoms_mut().intern_collectible("reduceRight");
         let reverse_atom = agent.atoms_mut().intern_collectible("reverse");
@@ -1417,14 +1406,10 @@ impl BuiltinCache {
         let bytes_per_element_atom = agent.atoms_mut().intern_collectible("BYTES_PER_ELEMENT");
         let is_view_atom = agent.atoms_mut().intern_collectible("isView");
         let sort_atom = agent.atoms_mut().intern_collectible("sort");
-        let splice_atom = agent.atoms_mut().intern_collectible("splice");
         let search_atom = agent.atoms_mut().intern_collectible("search");
         let to_locale_string_atom = agent.atoms_mut().intern_collectible("toLocaleString");
         let to_reversed_atom = agent.atoms_mut().intern_collectible("toReversed");
         let to_sorted_atom = agent.atoms_mut().intern_collectible("toSorted");
-        let to_spliced_atom = agent.atoms_mut().intern_collectible("toSpliced");
-        let shift_atom = agent.atoms_mut().intern_collectible("shift");
-        let unshift_atom = agent.atoms_mut().intern_collectible("unshift");
         let values_atom = agent.atoms_mut().intern_collectible("values");
         let with_atom = agent.atoms_mut().intern_collectible("with");
         let sqrt1_2_atom = agent.atoms_mut().intern_collectible("SQRT1_2");
@@ -1484,36 +1469,6 @@ impl BuiltinCache {
         let wait_atom = agent.atoms_mut().intern_collectible("wait");
         let wait_async_atom = agent.atoms_mut().intern_collectible("waitAsync");
         let xor_atom = agent.atoms_mut().intern_collectible("xor");
-        let array_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(from_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_from_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(from_async_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_from_async_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(of_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(is_array_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_is_array_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Species),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_array_species_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
         let map_descriptors = [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Species),
             BuiltinPropertyValueSpec::Accessor {
@@ -3247,300 +3202,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let array_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(at_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_at_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_to_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(0)),
-                BuiltinAttributes::new(true, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(concat_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_concat_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(copy_within_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_copy_within_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(fill_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_fill_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(join_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_join_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(pop_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_pop_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(push_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_push_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(shift_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_shift_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(unshift_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_unshift_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(every_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_every_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(filter_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_filter_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(flat_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_flat_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(flat_map_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_flat_map_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(find_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_find_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(find_index_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_find_index_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(find_last_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_find_last_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(find_last_index_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_find_last_index_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(for_each_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_for_each_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(includes_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_includes_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(index_of_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_index_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(map_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_map_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(reduce_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_reduce_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(reduce_right_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_reduce_right_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(reverse_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_reverse_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(some_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_some_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(last_index_of_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_last_index_of_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(sort_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_sort_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(splice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_splice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_reversed_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_to_reversed_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_sorted_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_to_sorted_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_spliced_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_to_spliced_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_locale_string_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_to_locale_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(with_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_with_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Unscopables),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.array_unscopables)),
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-        ];
-        let array_unscopables_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(at_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(copy_within_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(fill_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(find_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(find_index_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(find_last_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(find_last_index_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(flat_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(flat_map_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(includes_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_reversed_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_sorted_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_spliced_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_bool(true)),
-                BuiltinAttributes::new(true, true, true),
-            ),
-        ];
         let iterator_prototype_descriptors = [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
             BuiltinPropertyValueSpec::BuiltinFunction(js3_iterator_prototype_iterator_builtin()),
@@ -3557,18 +3218,6 @@ impl BuiltinCache {
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
                 BuiltinPropertyValueSpec::Data(async_iterator_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let array_iterator_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(next_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_array_iterator_next_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(array_iterator_tag),
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
@@ -5183,10 +4832,6 @@ impl BuiltinCache {
         ];
         let tables = [
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Array),
-                &array_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Map),
                 &map_descriptors,
             ),
@@ -5359,24 +5004,12 @@ impl BuiltinCache {
                 &uint8_array_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ArrayPrototype),
-                &array_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Object(builtins.array_unscopables),
-                &array_unscopables_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::IteratorPrototype),
                 &iterator_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::AsyncIteratorPrototype),
                 &async_iterator_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::ArrayIteratorPrototype),
-                &array_iterator_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::MapIteratorPrototype),
@@ -5529,6 +5162,10 @@ impl BuiltinCache {
             return None;
         }
         if families::install_function_family_descriptors(agent, self, realm, &builtins).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_array_family_descriptors(agent, self, realm, &builtins).is_err() {
             self.public.remove(&realm);
             return None;
         }

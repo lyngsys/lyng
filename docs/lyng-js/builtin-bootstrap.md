@@ -93,6 +93,8 @@ Rules:
   installer shape while still using the shared descriptor installer
 - the Function family owns `Function.prototype`, async function, generator function, generator,
   and async generator descriptor installation in `public/families/functions.rs`
+- the Array family owns `Array`, `Array.prototype`, array unscopables, and Array Iterator
+  prototype descriptor installation in `public/families/arrays.rs`
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

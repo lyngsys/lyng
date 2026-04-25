@@ -793,8 +793,23 @@ mod tests {
     use lyng_js_gc::AllocationLifetime;
     use lyng_js_host::NoopHostHooks;
     use lyng_js_types::{
-        js3_error_to_string_builtin, js3_symbol_to_primitive_builtin, PropertyKey, Value,
+        js3_array_from_async_builtin, js3_array_iterator_next_builtin,
+        js3_array_species_getter_builtin, js3_array_values_builtin, js3_error_to_string_builtin,
+        js3_symbol_to_primitive_builtin, PropertyKey, Value,
     };
+
+    fn own_descriptor(
+        agent: &Agent,
+        object: ObjectRef,
+        key: PropertyKey,
+        name: &str,
+    ) -> PropertyDescriptor {
+        agent
+            .objects()
+            .get_own_property(agent.heap().view(), object, key)
+            .unwrap()
+            .unwrap_or_else(|| panic!("{name} should be installed"))
+    }
 
     #[test]
     fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
@@ -1349,6 +1364,138 @@ mod tests {
         assert_eq!(reflect.writable(), Some(true));
         assert_eq!(reflect.enumerable(), Some(false));
         assert_eq!(reflect.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_array_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let array = intrinsics.array().expect("Array intrinsic should exist");
+        let array_prototype = intrinsics
+            .array_prototype()
+            .expect("Array.prototype intrinsic should exist");
+        let array_iterator_prototype = intrinsics
+            .array_iterator_prototype()
+            .expect("Array Iterator prototype intrinsic should exist");
+
+        let from_async_atom = agent.atoms_mut().intern_collectible("fromAsync");
+        let flat_atom = agent.atoms_mut().intern_collectible("flat");
+        let length_atom = WellKnownAtom::length.id();
+        let next_atom = agent.atoms_mut().intern_collectible("next");
+        let species_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Species)
+            .expect("Symbol.species should exist");
+        let iterator_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Iterator)
+            .expect("Symbol.iterator should exist");
+        let unscopables_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Unscopables)
+            .expect("Symbol.unscopables should exist");
+
+        let from_async_value = cache
+            .builtin_constant(agent, artifacts.realm(), js3_array_from_async_builtin())
+            .expect("Array.fromAsync builtin should resolve");
+        let species_getter = cache
+            .builtin_constant(agent, artifacts.realm(), js3_array_species_getter_builtin())
+            .expect("Array @@species getter should resolve");
+        let values_value = cache
+            .builtin_constant(agent, artifacts.realm(), js3_array_values_builtin())
+            .expect("Array.prototype.values builtin should resolve");
+        let iterator_next = cache
+            .builtin_constant(agent, artifacts.realm(), js3_array_iterator_next_builtin())
+            .expect("Array Iterator next builtin should resolve");
+
+        let from_async = own_descriptor(
+            agent,
+            array,
+            PropertyKey::from_atom(from_async_atom),
+            "Array.fromAsync",
+        );
+        assert_eq!(from_async.value(), Some(from_async_value));
+        assert_eq!(from_async.writable(), Some(true));
+        assert_eq!(from_async.enumerable(), Some(false));
+        assert_eq!(from_async.configurable(), Some(true));
+
+        let species = own_descriptor(
+            agent,
+            array,
+            PropertyKey::from_symbol(species_symbol),
+            "Array[Symbol.species]",
+        );
+        assert_eq!(species.getter(), Some(species_getter));
+        assert_eq!(species.setter(), Some(Value::undefined()));
+        assert_eq!(species.enumerable(), Some(false));
+        assert_eq!(species.configurable(), Some(true));
+
+        let length = own_descriptor(
+            agent,
+            array_prototype,
+            PropertyKey::from_atom(length_atom),
+            "Array.prototype.length",
+        );
+        assert_eq!(length.value(), Some(Value::from_smi(0)));
+        assert_eq!(length.writable(), Some(true));
+        assert_eq!(length.enumerable(), Some(false));
+        assert_eq!(length.configurable(), Some(false));
+
+        let unscopables = own_descriptor(
+            agent,
+            array_prototype,
+            PropertyKey::from_symbol(unscopables_symbol),
+            "Array.prototype[Symbol.unscopables]",
+        );
+        let unscopables_object = unscopables
+            .value()
+            .and_then(Value::as_object_ref)
+            .expect("Array unscopables should be an object");
+        assert_eq!(unscopables.writable(), Some(false));
+        assert_eq!(unscopables.enumerable(), Some(false));
+        assert_eq!(unscopables.configurable(), Some(true));
+
+        let unscopables_flat = own_descriptor(
+            agent,
+            unscopables_object,
+            PropertyKey::from_atom(flat_atom),
+            "Array.prototype[Symbol.unscopables].flat",
+        );
+        assert_eq!(unscopables_flat.value(), Some(Value::from_bool(true)));
+        assert_eq!(unscopables_flat.writable(), Some(true));
+        assert_eq!(unscopables_flat.enumerable(), Some(true));
+        assert_eq!(unscopables_flat.configurable(), Some(true));
+
+        let iterator = own_descriptor(
+            agent,
+            array_prototype,
+            PropertyKey::from_symbol(iterator_symbol),
+            "Array.prototype[Symbol.iterator]",
+        );
+        assert_eq!(iterator.value(), Some(values_value));
+        assert_eq!(iterator.writable(), Some(true));
+        assert_eq!(iterator.enumerable(), Some(false));
+        assert_eq!(iterator.configurable(), Some(true));
+
+        let next = own_descriptor(
+            agent,
+            array_iterator_prototype,
+            PropertyKey::from_atom(next_atom),
+            "Array Iterator prototype.next",
+        );
+        assert_eq!(next.value(), Some(iterator_next));
+        assert_eq!(next.writable(), Some(true));
+        assert_eq!(next.enumerable(), Some(false));
+        assert_eq!(next.configurable(), Some(true));
     }
 
     #[test]
