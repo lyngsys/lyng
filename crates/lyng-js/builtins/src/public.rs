@@ -1120,7 +1120,7 @@ pub(crate) fn allocate_builtin_function_object(
                 && agent
                     .objects()
                     .object_header(agent.heap().view(), prototype_object)
-                    .and_then(|header| header.prototype())
+                    .and_then(lyng_js_objects::ObjectHeader::prototype)
                     .is_none()
             {
                 let _ = agent.with_heap_and_objects(|heap, objects| {
@@ -1177,16 +1177,8 @@ pub(in crate::public) fn define_builtin_accessor_property(
     configurable: bool,
 ) {
     let mut descriptor = lyng_js_types::PropertyDescriptor::new();
-    descriptor.set_getter(
-        getter
-            .map(Value::from_object_ref)
-            .unwrap_or_else(Value::undefined),
-    );
-    descriptor.set_setter(
-        setter
-            .map(Value::from_object_ref)
-            .unwrap_or_else(Value::undefined),
-    );
+    descriptor.set_getter(getter.map_or_else(Value::undefined, Value::from_object_ref));
+    descriptor.set_setter(setter.map_or_else(Value::undefined, Value::from_object_ref));
     descriptor.set_enumerable(enumerable);
     descriptor.set_configurable(configurable);
     let defined = agent.with_heap_and_objects(|heap, objects| {

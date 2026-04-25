@@ -164,8 +164,7 @@ pub(super) fn intrinsic_error<Cx: PublicBuiltinDispatchContext>(
         let agent = cx.agent();
         errors::create_intrinsic_error_object(agent, realm, kind, None)
             .map(Value::from_object_ref)
-            .map(AbruptCompletion::throw)
-            .unwrap_or_else(|completion| completion)
+            .map_or_else(|completion| completion, AbruptCompletion::throw)
     };
     cx.abrupt(completion)
 }
@@ -192,7 +191,9 @@ pub(super) fn allocate_json_raw_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent.realm(realm).and_then(|record| record.root_shape())
+        agent
+            .realm(realm)
+            .and_then(lyng_js_env::RealmRecord::root_shape)
     }
     .ok_or_else(|| type_error(cx))?;
     let object = cx.agent().with_heap_and_objects(|heap, objects| {
@@ -219,7 +220,9 @@ pub(super) fn allocate_proxy_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent.realm(realm).and_then(|record| record.root_shape())
+        agent
+            .realm(realm)
+            .and_then(lyng_js_env::RealmRecord::root_shape)
     }
     .ok_or_else(|| type_error(cx))?;
     let prototype = {
@@ -227,7 +230,7 @@ pub(super) fn allocate_proxy_object<Cx: PublicBuiltinDispatchContext>(
         agent
             .objects()
             .object_header(agent.heap().view(), target)
-            .and_then(|header| header.prototype())
+            .and_then(lyng_js_objects::ObjectHeader::prototype)
     };
     let (callable, constructible) = {
         let objects = cx.agent().objects();
@@ -339,15 +342,11 @@ pub(super) fn set_data_property_value<Cx: PublicBuiltinDispatchContext>(
 }
 
 pub(super) fn length_value(length: u32) -> Value {
-    i32::try_from(length)
-        .map(Value::from_smi)
-        .unwrap_or_else(|_| Value::from_f64(f64::from(length)))
+    i32::try_from(length).map_or_else(|_| Value::from_f64(f64::from(length)), Value::from_smi)
 }
 
 pub(super) fn length_value_u64(length: u64) -> Value {
-    u32::try_from(length)
-        .map(length_value)
-        .unwrap_or_else(|_| Value::from_f64(length as f64))
+    u32::try_from(length).map_or_else(|_| Value::from_f64(length as f64), length_value)
 }
 
 pub(super) fn is_engine_array<Cx: PublicBuiltinDispatchContext>(
@@ -979,7 +978,9 @@ pub(super) fn create_array_result_with_prototype<Cx: PublicBuiltinDispatchContex
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent.realm(realm).and_then(|record| record.root_shape())
+        agent
+            .realm(realm)
+            .and_then(lyng_js_env::RealmRecord::root_shape)
     }
     .ok_or_else(|| type_error(cx))?;
     let array = cx.agent().with_heap_and_objects(|heap, objects| {
@@ -1395,7 +1396,7 @@ pub(super) fn symbol_descriptive_string<Cx: PublicBuiltinDispatchContext>(
         let heap_view = agent.heap().view();
         heap_view
             .symbol_view(symbol)
-            .and_then(|view| view.description())
+            .and_then(lyng_js_gc::PrimitiveSymbolView::description)
     };
     if let Some(description) = description {
         let description_text = cx.value_to_string_text(Value::from_string_ref(description))?;
@@ -1613,7 +1614,7 @@ pub(super) fn to_index_for_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(0);
     }
     let integer = to_integer_or_infinity_for_builtin(cx, value)?;
-    if !integer.is_finite() || integer < 0.0 || integer > MAX_SAFE_INTEGER {
+    if !integer.is_finite() || !(0.0..=MAX_SAFE_INTEGER).contains(&integer) {
         return Err(range_error(cx));
     }
     Ok(integer as u64)
@@ -1643,9 +1644,7 @@ pub(super) fn callable_object_from_value<Cx: PublicBuiltinDispatchContext>(
 }
 
 pub(super) fn usize_index_value(index: usize) -> Value {
-    i32::try_from(index)
-        .map(Value::from_smi)
-        .unwrap_or_else(|_| Value::from_f64(index as f64))
+    i32::try_from(index).map_or_else(|_| Value::from_f64(index as f64), Value::from_smi)
 }
 
 pub(super) fn code_unit_range_value<Cx: PublicBuiltinDispatchContext>(
@@ -1666,7 +1665,7 @@ pub(super) fn primitive_wrapper_constructor<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(|record| record.root_shape())
+        .and_then(lyng_js_env::RealmRecord::root_shape)
         .ok_or_else(|| type_error(cx))?;
     let wrapper = {
         let agent = cx.agent();
