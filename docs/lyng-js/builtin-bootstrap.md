@@ -106,6 +106,8 @@ Rules:
   `public/families/errors.rs`
 - the String family owns String constructor, String prototype, and String Iterator prototype
   descriptor installation in `public/families/strings.rs`
+- the RegExp family owns RegExp constructor and RegExp prototype descriptor installation in
+  `public/families/regexp.rs`
 - family installers use the shared builtin allocation helpers and `public_builtin_metadata`
   rather than hand-maintaining separate metadata
 - descriptor installation remains table-driven through the shared installer path

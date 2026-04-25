@@ -57,7 +57,9 @@ pub(super) use objects::{
 };
 pub(super) use primitives::{install_primitive_family, primitive_builtin_object};
 pub(super) use promises::{install_promise_disposal_family, promise_disposal_builtin_object};
-pub(super) use regexp::{install_regexp_family, regexp_builtin_object};
+pub(super) use regexp::{
+    install_regexp_family, install_regexp_family_descriptors, regexp_builtin_object,
+};
 pub(super) use scaffolding::{allocate_public_realm_scaffolding, ScaffoldingRequest};
 pub(super) use strings::{
     install_string_family, install_string_family_descriptors, string_builtin_object,

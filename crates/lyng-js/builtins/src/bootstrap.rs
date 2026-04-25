@@ -797,7 +797,9 @@ mod tests {
         js3_array_species_getter_builtin, js3_array_values_builtin, js3_error_to_string_builtin,
         js3_iterator_prototype_iterator_builtin, js3_json_parse_builtin, js3_json_raw_json_builtin,
         js3_map_iterator_next_builtin, js3_map_size_getter_builtin, js3_proxy_revocable_builtin,
-        js3_reflect_get_builtin, js3_set_iterator_next_builtin, js3_set_values_builtin,
+        js3_reflect_get_builtin, js3_regexp_escape_builtin, js3_regexp_exec_builtin,
+        js3_regexp_global_getter_builtin, js3_regexp_species_getter_builtin,
+        js3_regexp_symbol_match_builtin, js3_set_iterator_next_builtin, js3_set_values_builtin,
         js3_string_from_char_code_builtin, js3_string_iterator_builtin,
         js3_string_iterator_next_builtin, js3_string_trim_builtin, js3_symbol_to_primitive_builtin,
         js3_weak_ref_deref_builtin, PropertyKey, Value,
@@ -1984,6 +1986,125 @@ mod tests {
         assert_eq!(tag.writable(), Some(false));
         assert_eq!(tag.enumerable(), Some(false));
         assert_eq!(tag.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_regexp_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let regexp = intrinsics.regexp().expect("RegExp intrinsic should exist");
+        let regexp_prototype = intrinsics
+            .regexp_prototype()
+            .expect("RegExp.prototype intrinsic should exist");
+
+        let constructor_atom = WellKnownAtom::constructor.id();
+        let escape_atom = agent.atoms_mut().intern_collectible("escape");
+        let exec_atom = agent.atoms_mut().intern_collectible("exec");
+        let global_atom = agent.atoms_mut().intern_collectible("global");
+        let species_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Species)
+            .expect("Symbol.species should exist");
+        let match_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::Match)
+            .expect("Symbol.match should exist");
+
+        let escape = cache
+            .builtin_constant(agent, artifacts.realm(), js3_regexp_escape_builtin())
+            .expect("RegExp.escape builtin should resolve");
+        let species_getter = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_regexp_species_getter_builtin(),
+            )
+            .expect("RegExp @@species getter should resolve");
+        let exec = cache
+            .builtin_constant(agent, artifacts.realm(), js3_regexp_exec_builtin())
+            .expect("RegExp.prototype.exec builtin should resolve");
+        let symbol_match = cache
+            .builtin_constant(agent, artifacts.realm(), js3_regexp_symbol_match_builtin())
+            .expect("RegExp.prototype[Symbol.match] builtin should resolve");
+        let global_getter = cache
+            .builtin_constant(agent, artifacts.realm(), js3_regexp_global_getter_builtin())
+            .expect("RegExp.prototype.global getter should resolve");
+
+        let escape_descriptor = own_descriptor(
+            agent,
+            regexp,
+            PropertyKey::from_atom(escape_atom),
+            "RegExp.escape",
+        );
+        assert_eq!(escape_descriptor.value(), Some(escape));
+        assert_eq!(escape_descriptor.writable(), Some(true));
+        assert_eq!(escape_descriptor.enumerable(), Some(false));
+        assert_eq!(escape_descriptor.configurable(), Some(true));
+
+        let species = own_descriptor(
+            agent,
+            regexp,
+            PropertyKey::from_symbol(species_symbol),
+            "RegExp[Symbol.species]",
+        );
+        assert_eq!(species.getter(), Some(species_getter));
+        assert_eq!(species.setter(), Some(Value::undefined()));
+        assert_eq!(species.enumerable(), Some(false));
+        assert_eq!(species.configurable(), Some(true));
+
+        let constructor = own_descriptor(
+            agent,
+            regexp_prototype,
+            PropertyKey::from_atom(constructor_atom),
+            "RegExp.prototype.constructor",
+        );
+        assert_eq!(constructor.value(), Some(Value::from_object_ref(regexp)));
+        assert_eq!(constructor.writable(), Some(true));
+        assert_eq!(constructor.enumerable(), Some(false));
+        assert_eq!(constructor.configurable(), Some(true));
+
+        let exec_descriptor = own_descriptor(
+            agent,
+            regexp_prototype,
+            PropertyKey::from_atom(exec_atom),
+            "RegExp.prototype.exec",
+        );
+        assert_eq!(exec_descriptor.value(), Some(exec));
+        assert_eq!(exec_descriptor.writable(), Some(true));
+        assert_eq!(exec_descriptor.enumerable(), Some(false));
+        assert_eq!(exec_descriptor.configurable(), Some(true));
+
+        let match_descriptor = own_descriptor(
+            agent,
+            regexp_prototype,
+            PropertyKey::from_symbol(match_symbol),
+            "RegExp.prototype[Symbol.match]",
+        );
+        assert_eq!(match_descriptor.value(), Some(symbol_match));
+        assert_eq!(match_descriptor.writable(), Some(true));
+        assert_eq!(match_descriptor.enumerable(), Some(false));
+        assert_eq!(match_descriptor.configurable(), Some(true));
+
+        let global = own_descriptor(
+            agent,
+            regexp_prototype,
+            PropertyKey::from_atom(global_atom),
+            "RegExp.prototype.global",
+        );
+        assert_eq!(global.getter(), Some(global_getter));
+        assert_eq!(global.setter(), Some(Value::undefined()));
+        assert_eq!(global.enumerable(), Some(false));
+        assert_eq!(global.configurable(), Some(true));
     }
 
     #[test]

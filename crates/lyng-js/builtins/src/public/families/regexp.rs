@@ -1,7 +1,18 @@
+use super::descriptors::{
+    accessor_atom_property, accessor_symbol_property, builtin_function_atom_property,
+    builtin_function_symbol_property, data_atom_property, readonly_builtin_attributes,
+    writable_builtin_attributes,
+};
 use super::{
     install_public_builtin_function, FamilyInstallContext, RegExpFamilyBuiltins,
     RegExpFamilyPrototypes,
 };
+use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::public::{BuiltinCache, PublicRealmBuiltins};
+use crate::{
+    BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor,
+};
+use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
 use lyng_js_types::{
     js3_regexp_builtin, js3_regexp_dot_all_getter_builtin, js3_regexp_escape_builtin,
@@ -12,10 +23,9 @@ use lyng_js_types::{
     js3_regexp_symbol_match_all_builtin, js3_regexp_symbol_match_builtin,
     js3_regexp_symbol_replace_builtin, js3_regexp_symbol_search_builtin,
     js3_regexp_symbol_split_builtin, js3_regexp_test_builtin, js3_regexp_to_string_builtin,
-    js3_regexp_unicode_getter_builtin, BuiltinFunctionId, ObjectRef,
+    js3_regexp_unicode_getter_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
+    WellKnownSymbolId,
 };
-
-use crate::public::PublicRealmBuiltins;
 
 pub(in crate::public) fn install_regexp_family(
     agent: &mut Agent,
@@ -255,4 +265,185 @@ fn install_regexp_symbol_methods(
             None,
         ),
     }
+}
+
+pub(in crate::public) fn install_regexp_family_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    builtins: &PublicRealmBuiltins,
+) -> Result<(), BuiltinBootstrapError> {
+    let atoms = RegExpDescriptorAtoms::new(agent);
+    install_regexp_constructor_descriptors(agent, cache, realm, atoms)?;
+    install_regexp_prototype_descriptors(agent, cache, realm, builtins.regexp, atoms)
+}
+
+fn install_regexp_constructor_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    atoms: RegExpDescriptorAtoms,
+) -> Result<(), BuiltinBootstrapError> {
+    let descriptors = [
+        builtin_function_atom_property(atoms.escape, js3_regexp_escape_builtin()),
+        accessor_symbol_property(
+            WellKnownSymbolId::Species,
+            Some(js3_regexp_species_getter_builtin()),
+            None,
+            readonly_builtin_attributes(),
+        ),
+    ];
+    install_intrinsic_descriptor_table(agent, cache, realm, BuiltinIntrinsic::RegExp, &descriptors)
+}
+
+fn install_regexp_prototype_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    regexp: ObjectRef,
+    atoms: RegExpDescriptorAtoms,
+) -> Result<(), BuiltinBootstrapError> {
+    let constructor = [data_atom_property(
+        WellKnownAtom::constructor.id(),
+        Value::from_object_ref(regexp),
+        writable_builtin_attributes(),
+    )];
+    install_intrinsic_descriptor_table(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::RegExpPrototype,
+        &constructor,
+    )?;
+
+    let atom_methods = regexp_prototype_atom_method_specs(atoms)
+        .map(|(atom, entry)| builtin_function_atom_property(atom, entry));
+    install_intrinsic_descriptor_table(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::RegExpPrototype,
+        &atom_methods,
+    )?;
+
+    let symbol_methods = regexp_prototype_symbol_method_specs().map(|(symbol, entry)| {
+        builtin_function_symbol_property(symbol, entry, writable_builtin_attributes())
+    });
+    install_intrinsic_descriptor_table(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::RegExpPrototype,
+        &symbol_methods,
+    )?;
+
+    let accessors = regexp_prototype_accessor_specs(atoms).map(|(atom, get)| {
+        accessor_atom_property(atom, Some(get), None, readonly_builtin_attributes())
+    });
+    install_intrinsic_descriptor_table(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::RegExpPrototype,
+        &accessors,
+    )
+}
+
+fn install_intrinsic_descriptor_table(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    target: BuiltinIntrinsic,
+    descriptors: &[BuiltinPropertyDescriptor],
+) -> Result<(), BuiltinBootstrapError> {
+    install_descriptor_tables(
+        agent,
+        cache,
+        realm,
+        &[BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(target),
+            descriptors,
+        )],
+    )
+}
+
+#[derive(Clone, Copy)]
+struct RegExpDescriptorAtoms {
+    escape: AtomId,
+    exec: AtomId,
+    test: AtomId,
+    source: AtomId,
+    flags: AtomId,
+    has_indices: AtomId,
+    global: AtomId,
+    ignore_case: AtomId,
+    multiline: AtomId,
+    dot_all: AtomId,
+    unicode: AtomId,
+    sticky: AtomId,
+}
+
+impl RegExpDescriptorAtoms {
+    fn new(agent: &mut Agent) -> Self {
+        let bootstrap_atoms = agent.bootstrap_atoms();
+        Self {
+            escape: agent.atoms_mut().intern_collectible("escape"),
+            exec: agent.atoms_mut().intern_collectible("exec"),
+            test: agent.atoms_mut().intern_collectible("test"),
+            source: bootstrap_atoms.source(),
+            flags: bootstrap_atoms.flags(),
+            has_indices: bootstrap_atoms.has_indices(),
+            global: agent.atoms_mut().intern_collectible("global"),
+            ignore_case: agent.atoms_mut().intern_collectible("ignoreCase"),
+            multiline: agent.atoms_mut().intern_collectible("multiline"),
+            dot_all: agent.atoms_mut().intern_collectible("dotAll"),
+            unicode: agent.atoms_mut().intern_collectible("unicode"),
+            sticky: agent.atoms_mut().intern_collectible("sticky"),
+        }
+    }
+}
+
+fn regexp_prototype_atom_method_specs(
+    atoms: RegExpDescriptorAtoms,
+) -> [(AtomId, BuiltinFunctionId); 3] {
+    [
+        (atoms.exec, js3_regexp_exec_builtin()),
+        (atoms.test, js3_regexp_test_builtin()),
+        (WellKnownAtom::toString.id(), js3_regexp_to_string_builtin()),
+    ]
+}
+
+fn regexp_prototype_symbol_method_specs() -> [(WellKnownSymbolId, BuiltinFunctionId); 5] {
+    [
+        (WellKnownSymbolId::Match, js3_regexp_symbol_match_builtin()),
+        (
+            WellKnownSymbolId::Replace,
+            js3_regexp_symbol_replace_builtin(),
+        ),
+        (
+            WellKnownSymbolId::Search,
+            js3_regexp_symbol_search_builtin(),
+        ),
+        (WellKnownSymbolId::Split, js3_regexp_symbol_split_builtin()),
+        (
+            WellKnownSymbolId::MatchAll,
+            js3_regexp_symbol_match_all_builtin(),
+        ),
+    ]
+}
+
+fn regexp_prototype_accessor_specs(
+    atoms: RegExpDescriptorAtoms,
+) -> [(AtomId, BuiltinFunctionId); 9] {
+    [
+        (atoms.source, js3_regexp_source_getter_builtin()),
+        (atoms.flags, js3_regexp_flags_getter_builtin()),
+        (atoms.has_indices, js3_regexp_has_indices_getter_builtin()),
+        (atoms.global, js3_regexp_global_getter_builtin()),
+        (atoms.ignore_case, js3_regexp_ignore_case_getter_builtin()),
+        (atoms.multiline, js3_regexp_multiline_getter_builtin()),
+        (atoms.dot_all, js3_regexp_dot_all_getter_builtin()),
+        (atoms.unicode, js3_regexp_unicode_getter_builtin()),
+        (atoms.sticky, js3_regexp_sticky_getter_builtin()),
+    ]
 }

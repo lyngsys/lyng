@@ -1159,7 +1159,6 @@ impl BuiltinCache {
         let clz32_atom = agent.atoms_mut().intern_collectible("clz32");
         let cos_atom = agent.atoms_mut().intern_collectible("cos");
         let cosh_atom = agent.atoms_mut().intern_collectible("cosh");
-        let escape_atom = agent.atoms_mut().intern_collectible("escape");
         let epsilon_atom = agent.atoms_mut().intern_collectible("EPSILON");
         let e_atom = agent.atoms_mut().intern_collectible("E");
         let exp_atom = agent.atoms_mut().intern_collectible("exp");
@@ -1167,7 +1166,6 @@ impl BuiltinCache {
         let f16round_atom = agent.atoms_mut().intern_collectible("f16round");
         let floor_atom = agent.atoms_mut().intern_collectible("floor");
         let fround_atom = agent.atoms_mut().intern_collectible("fround");
-        let global_atom = agent.atoms_mut().intern_collectible("global");
         let get_date_atom = agent.atoms_mut().intern_collectible("getDate");
         let get_day_atom = agent.atoms_mut().intern_collectible("getDay");
         let get_full_year_atom = agent.atoms_mut().intern_collectible("getFullYear");
@@ -1192,9 +1190,7 @@ impl BuiltinCache {
         let is_integer_atom = agent.atoms_mut().intern_collectible("isInteger");
         let is_nan_atom = agent.atoms_mut().intern_collectible("isNaN");
         let is_safe_integer_atom = agent.atoms_mut().intern_collectible("isSafeInteger");
-        let ignore_case_atom = agent.atoms_mut().intern_collectible("ignoreCase");
         let last_index_of_atom = agent.atoms_mut().intern_collectible("lastIndexOf");
-        let multiline_atom = agent.atoms_mut().intern_collectible("multiline");
         let log_atom = agent.atoms_mut().intern_collectible("log");
         let log10_atom = agent.atoms_mut().intern_collectible("log10");
         let log1p_atom = agent.atoms_mut().intern_collectible("log1p");
@@ -1236,7 +1232,6 @@ impl BuiltinCache {
         let set_utc_minutes_atom = agent.atoms_mut().intern_collectible("setUTCMinutes");
         let set_utc_month_atom = agent.atoms_mut().intern_collectible("setUTCMonth");
         let set_utc_seconds_atom = agent.atoms_mut().intern_collectible("setUTCSeconds");
-        let sticky_atom = agent.atoms_mut().intern_collectible("sticky");
         let sum_precise_atom = agent.atoms_mut().intern_collectible("sumPrecise");
         let tan_atom = agent.atoms_mut().intern_collectible("tan");
         let tanh_atom = agent.atoms_mut().intern_collectible("tanh");
@@ -1286,8 +1281,6 @@ impl BuiltinCache {
         let sqrt1_2_atom = agent.atoms_mut().intern_collectible("SQRT1_2");
         let sqrt2_atom = agent.atoms_mut().intern_collectible("SQRT2");
         let sqrt_atom = agent.atoms_mut().intern_collectible("sqrt");
-        let dot_all_atom = agent.atoms_mut().intern_collectible("dotAll");
-        let exec_atom = agent.atoms_mut().intern_collectible("exec");
         let get_float32_atom = agent.atoms_mut().intern_collectible("getFloat32");
         let get_float64_atom = agent.atoms_mut().intern_collectible("getFloat64");
         let get_int16_atom = agent.atoms_mut().intern_collectible("getInt16");
@@ -1296,7 +1289,6 @@ impl BuiltinCache {
         let get_uint16_atom = agent.atoms_mut().intern_collectible("getUint16");
         let get_uint32_atom = agent.atoms_mut().intern_collectible("getUint32");
         let get_uint8_atom = agent.atoms_mut().intern_collectible("getUint8");
-        let has_indices_atom = bootstrap_atoms.has_indices();
         let add_atom = agent.atoms_mut().intern_collectible("add");
         let and_atom = agent.atoms_mut().intern_collectible("and");
         let as_int_n_atom = agent.atoms_mut().intern_collectible("asIntN");
@@ -1320,12 +1312,10 @@ impl BuiltinCache {
         let store_atom = agent.atoms_mut().intern_collectible("store");
         let sub_atom = agent.atoms_mut().intern_collectible("sub");
         let subarray_atom = agent.atoms_mut().intern_collectible("subarray");
-        let test_atom = agent.atoms_mut().intern_collectible("test");
         let trunc_atom = agent.atoms_mut().intern_collectible("trunc");
         let to_exponential_atom = agent.atoms_mut().intern_collectible("toExponential");
         let to_fixed_atom = agent.atoms_mut().intern_collectible("toFixed");
         let to_precision_atom = agent.atoms_mut().intern_collectible("toPrecision");
-        let unicode_atom = agent.atoms_mut().intern_collectible("unicode");
         let wait_atom = agent.atoms_mut().intern_collectible("wait");
         let wait_async_atom = agent.atoms_mut().intern_collectible("waitAsync");
         let xor_atom = agent.atoms_mut().intern_collectible("xor");
@@ -2803,140 +2793,6 @@ impl BuiltinCache {
                 BuiltinAttributes::new(false, false, true),
             ),
         ];
-        let regexp_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(escape_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_escape_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Species),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_regexp_species_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
-        let regexp_prototype_descriptors = [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.regexp)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(exec_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_exec_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(test_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_test_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::toString.id()),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_to_string_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Match),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_symbol_match_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Replace),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_symbol_replace_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Search),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_symbol_search_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Split),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_symbol_split_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::MatchAll),
-                BuiltinPropertyValueSpec::BuiltinFunction(js3_regexp_symbol_match_all_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.source()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_regexp_source_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bootstrap_atoms.flags()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_regexp_flags_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(has_indices_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_regexp_has_indices_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(global_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_regexp_global_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(ignore_case_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_regexp_ignore_case_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(multiline_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_regexp_multiline_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(dot_all_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_regexp_dot_all_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(unicode_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_regexp_unicode_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(sticky_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(js3_regexp_sticky_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ];
         let date_descriptors = [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(now_atom),
@@ -4074,14 +3930,6 @@ impl BuiltinCache {
                 &uint8_array_prototype_descriptors,
             ),
             BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::RegExp),
-                &regexp_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
-                BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::RegExpPrototype),
-                &regexp_prototype_descriptors,
-            ),
-            BuiltinDescriptorTable::new(
                 BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Date),
                 &date_descriptors,
             ),
@@ -4180,6 +4028,10 @@ impl BuiltinCache {
             return None;
         }
         if families::install_string_family_descriptors(agent, self, realm, &builtins).is_err() {
+            self.public.remove(&realm);
+            return None;
+        }
+        if families::install_regexp_family_descriptors(agent, self, realm, &builtins).is_err() {
             self.public.remove(&realm);
             return None;
         }
