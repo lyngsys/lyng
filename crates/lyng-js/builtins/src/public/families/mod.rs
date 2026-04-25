@@ -1,8 +1,10 @@
+mod collections;
 mod functions;
 mod objects;
 
 use lyng_js_types::{EnvironmentRef, ObjectRef, RealmRef, ShapeId};
 
+pub(super) use collections::install_collection_family;
 pub(super) use functions::install_function_family;
 pub(super) use objects::install_object_family;
 
@@ -89,4 +91,60 @@ pub(super) struct FunctionFamilyBuiltins {
     pub(super) generator_next: ObjectRef,
     pub(super) generator_return: ObjectRef,
     pub(super) generator_throw: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::struct_field_names)]
+pub(super) struct CollectionFamilyPrototypes {
+    pub(super) map_prototype: ObjectRef,
+    pub(super) set_prototype: ObjectRef,
+    pub(super) weak_map_prototype: ObjectRef,
+    pub(super) weak_set_prototype: ObjectRef,
+    pub(super) weak_ref_prototype: ObjectRef,
+    pub(super) finalization_registry_prototype: ObjectRef,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct CollectionFamilyBuiltins {
+    pub(super) map: ObjectRef,
+    pub(super) set: ObjectRef,
+    pub(super) weak_map: ObjectRef,
+    pub(super) weak_set: ObjectRef,
+    pub(super) weak_ref: ObjectRef,
+    pub(super) finalization_registry: ObjectRef,
+    pub(super) map_get: ObjectRef,
+    pub(super) map_set: ObjectRef,
+    pub(super) map_has: ObjectRef,
+    pub(super) map_delete: ObjectRef,
+    pub(super) map_clear: ObjectRef,
+    pub(super) map_entries: ObjectRef,
+    pub(super) map_values: ObjectRef,
+    pub(super) map_keys: ObjectRef,
+    pub(super) map_for_each: ObjectRef,
+    pub(super) map_size_getter: ObjectRef,
+    pub(super) set_add: ObjectRef,
+    pub(super) set_has: ObjectRef,
+    pub(super) set_delete: ObjectRef,
+    pub(super) set_clear: ObjectRef,
+    pub(super) set_entries: ObjectRef,
+    pub(super) set_values: ObjectRef,
+    pub(super) set_keys: ObjectRef,
+    pub(super) set_for_each: ObjectRef,
+    pub(super) set_size_getter: ObjectRef,
+    pub(super) weak_map_get: ObjectRef,
+    pub(super) weak_map_set: ObjectRef,
+    pub(super) weak_map_has: ObjectRef,
+    pub(super) weak_map_delete: ObjectRef,
+    pub(super) weak_set_add: ObjectRef,
+    pub(super) weak_set_has: ObjectRef,
+    pub(super) weak_set_delete: ObjectRef,
+    pub(super) weak_ref_deref: ObjectRef,
+    pub(super) finalization_registry_register: ObjectRef,
+    pub(super) finalization_registry_unregister: ObjectRef,
+    pub(super) map_prototype: ObjectRef,
+    pub(super) set_prototype: ObjectRef,
+    pub(super) weak_map_prototype: ObjectRef,
+    pub(super) weak_set_prototype: ObjectRef,
+    pub(super) weak_ref_prototype: ObjectRef,
+    pub(super) finalization_registry_prototype: ObjectRef,
 }
