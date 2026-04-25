@@ -794,17 +794,20 @@ mod tests {
     use lyng_js_host::NoopHostHooks;
     use lyng_js_types::{
         js3_array_from_async_builtin, js3_array_iterator_next_builtin,
-        js3_array_species_getter_builtin, js3_array_values_builtin, js3_date_get_time_builtin,
+        js3_array_species_getter_builtin, js3_array_values_builtin, js3_bigint_as_int_n_builtin,
+        js3_bigint_to_string_builtin, js3_boolean_to_string_builtin, js3_date_get_time_builtin,
         js3_date_now_builtin, js3_date_set_full_year_builtin, js3_date_to_primitive_builtin,
         js3_date_to_string_builtin, js3_error_to_string_builtin,
         js3_iterator_prototype_iterator_builtin, js3_json_parse_builtin, js3_json_raw_json_builtin,
-        js3_map_iterator_next_builtin, js3_map_size_getter_builtin, js3_proxy_revocable_builtin,
+        js3_map_iterator_next_builtin, js3_map_size_getter_builtin, js3_math_abs_builtin,
+        js3_number_is_finite_builtin, js3_number_to_string_builtin, js3_proxy_revocable_builtin,
         js3_reflect_get_builtin, js3_regexp_escape_builtin, js3_regexp_exec_builtin,
         js3_regexp_global_getter_builtin, js3_regexp_species_getter_builtin,
         js3_regexp_symbol_match_builtin, js3_set_iterator_next_builtin, js3_set_values_builtin,
         js3_string_from_char_code_builtin, js3_string_iterator_builtin,
-        js3_string_iterator_next_builtin, js3_string_trim_builtin, js3_symbol_to_primitive_builtin,
-        js3_weak_ref_deref_builtin, PropertyKey, Value,
+        js3_string_iterator_next_builtin, js3_string_trim_builtin,
+        js3_symbol_description_getter_builtin, js3_symbol_for_builtin,
+        js3_symbol_to_primitive_builtin, js3_weak_ref_deref_builtin, PropertyKey, Value,
     };
 
     fn own_descriptor(
@@ -2215,6 +2218,211 @@ mod tests {
         assert_eq!(to_primitive_descriptor.writable(), Some(false));
         assert_eq!(to_primitive_descriptor.enumerable(), Some(false));
         assert_eq!(to_primitive_descriptor.configurable(), Some(true));
+    }
+
+    #[test]
+    fn shared_bootstrap_installs_primitive_family_descriptors() {
+        let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let mut cache = BuiltinCache::new();
+
+        let artifacts = bootstrap_default_realm(
+            agent,
+            &mut cache,
+            BootstrapRequest::new(BootstrapMode::SpecOnly),
+        )
+        .expect("spec bootstrap should succeed");
+        let intrinsics = agent
+            .realm(artifacts.realm())
+            .expect("default realm should exist")
+            .intrinsics();
+        let number = intrinsics.number().expect("Number intrinsic should exist");
+        let number_prototype = intrinsics
+            .number_prototype()
+            .expect("Number.prototype intrinsic should exist");
+        let math = intrinsics.math().expect("Math intrinsic should exist");
+        let bigint = intrinsics.bigint().expect("BigInt intrinsic should exist");
+        let bigint_prototype = intrinsics
+            .bigint_prototype()
+            .expect("BigInt.prototype intrinsic should exist");
+        let boolean_prototype = intrinsics
+            .boolean_prototype()
+            .expect("Boolean.prototype intrinsic should exist");
+        let symbol = intrinsics.symbol().expect("Symbol intrinsic should exist");
+        let symbol_prototype = intrinsics
+            .symbol_prototype()
+            .expect("Symbol.prototype intrinsic should exist");
+
+        let is_finite_atom = agent.atoms_mut().intern_collectible("isFinite");
+        let abs_atom = agent.atoms_mut().intern_collectible("abs");
+        let as_int_n_atom = agent.atoms_mut().intern_collectible("asIntN");
+        let description_atom = agent.atoms_mut().intern_collectible("description");
+        let to_string_tag_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::ToStringTag)
+            .expect("Symbol.toStringTag should exist");
+        let to_primitive_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::ToPrimitive)
+            .expect("Symbol.toPrimitive should exist");
+        let has_instance_symbol = agent
+            .well_known_symbol(WellKnownSymbolId::HasInstance)
+            .expect("Symbol.hasInstance should exist");
+
+        let number_is_finite = cache
+            .builtin_constant(agent, artifacts.realm(), js3_number_is_finite_builtin())
+            .expect("Number.isFinite builtin should resolve");
+        let number_to_string = cache
+            .builtin_constant(agent, artifacts.realm(), js3_number_to_string_builtin())
+            .expect("Number.prototype.toString builtin should resolve");
+        let math_abs = cache
+            .builtin_constant(agent, artifacts.realm(), js3_math_abs_builtin())
+            .expect("Math.abs builtin should resolve");
+        let bigint_as_int_n = cache
+            .builtin_constant(agent, artifacts.realm(), js3_bigint_as_int_n_builtin())
+            .expect("BigInt.asIntN builtin should resolve");
+        let bigint_to_string = cache
+            .builtin_constant(agent, artifacts.realm(), js3_bigint_to_string_builtin())
+            .expect("BigInt.prototype.toString builtin should resolve");
+        let boolean_to_string = cache
+            .builtin_constant(agent, artifacts.realm(), js3_boolean_to_string_builtin())
+            .expect("Boolean.prototype.toString builtin should resolve");
+        let symbol_for = cache
+            .builtin_constant(agent, artifacts.realm(), js3_symbol_for_builtin())
+            .expect("Symbol.for builtin should resolve");
+        let symbol_to_primitive = cache
+            .builtin_constant(agent, artifacts.realm(), js3_symbol_to_primitive_builtin())
+            .expect("Symbol.prototype[Symbol.toPrimitive] builtin should resolve");
+        let symbol_description_getter = cache
+            .builtin_constant(
+                agent,
+                artifacts.realm(),
+                js3_symbol_description_getter_builtin(),
+            )
+            .expect("Symbol.prototype.description getter should resolve");
+
+        let is_finite = own_descriptor(
+            agent,
+            number,
+            PropertyKey::from_atom(is_finite_atom),
+            "Number.isFinite",
+        );
+        assert_eq!(is_finite.value(), Some(number_is_finite));
+        assert_eq!(is_finite.writable(), Some(true));
+        assert_eq!(is_finite.enumerable(), Some(false));
+        assert_eq!(is_finite.configurable(), Some(true));
+
+        let number_nan = own_descriptor(
+            agent,
+            number,
+            PropertyKey::from_atom(agent.bootstrap_atoms().nan()),
+            "Number.NaN",
+        );
+        assert!(number_nan
+            .value()
+            .and_then(Value::as_f64)
+            .is_some_and(f64::is_nan));
+        assert_eq!(number_nan.writable(), Some(false));
+        assert_eq!(number_nan.enumerable(), Some(false));
+        assert_eq!(number_nan.configurable(), Some(false));
+
+        let number_to_string_descriptor = own_descriptor(
+            agent,
+            number_prototype,
+            PropertyKey::from_atom(WellKnownAtom::toString.id()),
+            "Number.prototype.toString",
+        );
+        assert_eq!(number_to_string_descriptor.value(), Some(number_to_string));
+
+        let math_abs_descriptor =
+            own_descriptor(agent, math, PropertyKey::from_atom(abs_atom), "Math.abs");
+        assert_eq!(math_abs_descriptor.value(), Some(math_abs));
+        assert_eq!(math_abs_descriptor.writable(), Some(true));
+        assert_eq!(math_abs_descriptor.enumerable(), Some(false));
+        assert_eq!(math_abs_descriptor.configurable(), Some(true));
+
+        let math_tag = own_descriptor(
+            agent,
+            math,
+            PropertyKey::from_symbol(to_string_tag_symbol),
+            "Math[Symbol.toStringTag]",
+        );
+        assert!(math_tag.value().and_then(Value::as_string_ref).is_some());
+        assert_eq!(math_tag.writable(), Some(false));
+        assert_eq!(math_tag.enumerable(), Some(false));
+        assert_eq!(math_tag.configurable(), Some(true));
+
+        let as_int_n = own_descriptor(
+            agent,
+            bigint,
+            PropertyKey::from_atom(as_int_n_atom),
+            "BigInt.asIntN",
+        );
+        assert_eq!(as_int_n.value(), Some(bigint_as_int_n));
+
+        let bigint_to_string_descriptor = own_descriptor(
+            agent,
+            bigint_prototype,
+            PropertyKey::from_atom(WellKnownAtom::toString.id()),
+            "BigInt.prototype.toString",
+        );
+        assert_eq!(bigint_to_string_descriptor.value(), Some(bigint_to_string));
+
+        let boolean_to_string_descriptor = own_descriptor(
+            agent,
+            boolean_prototype,
+            PropertyKey::from_atom(WellKnownAtom::toString.id()),
+            "Boolean.prototype.toString",
+        );
+        assert_eq!(
+            boolean_to_string_descriptor.value(),
+            Some(boolean_to_string)
+        );
+
+        let symbol_for_descriptor = own_descriptor(
+            agent,
+            symbol,
+            PropertyKey::from_atom(WellKnownAtom::r#for.id()),
+            "Symbol.for",
+        );
+        assert_eq!(symbol_for_descriptor.value(), Some(symbol_for));
+
+        let has_instance_descriptor = own_descriptor(
+            agent,
+            symbol,
+            PropertyKey::from_atom(agent.bootstrap_atoms().has_instance()),
+            "Symbol.hasInstance",
+        );
+        assert_eq!(
+            has_instance_descriptor.value(),
+            Some(Value::from_symbol_ref(has_instance_symbol))
+        );
+        assert_eq!(has_instance_descriptor.writable(), Some(false));
+        assert_eq!(has_instance_descriptor.enumerable(), Some(false));
+        assert_eq!(has_instance_descriptor.configurable(), Some(false));
+
+        let symbol_to_primitive_descriptor = own_descriptor(
+            agent,
+            symbol_prototype,
+            PropertyKey::from_symbol(to_primitive_symbol),
+            "Symbol.prototype[Symbol.toPrimitive]",
+        );
+        assert_eq!(
+            symbol_to_primitive_descriptor.value(),
+            Some(symbol_to_primitive)
+        );
+        assert_eq!(symbol_to_primitive_descriptor.writable(), Some(false));
+        assert_eq!(symbol_to_primitive_descriptor.enumerable(), Some(false));
+        assert_eq!(symbol_to_primitive_descriptor.configurable(), Some(true));
+
+        let description = own_descriptor(
+            agent,
+            symbol_prototype,
+            PropertyKey::from_atom(description_atom),
+            "Symbol.prototype.description",
+        );
+        assert_eq!(description.getter(), Some(symbol_description_getter));
+        assert_eq!(description.setter(), Some(Value::undefined()));
+        assert_eq!(description.enumerable(), Some(false));
+        assert_eq!(description.configurable(), Some(true));
     }
 
     #[test]

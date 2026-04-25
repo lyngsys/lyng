@@ -1,8 +1,18 @@
+use super::descriptors::{
+    accessor_atom_property, builtin_function_atom_property, builtin_function_symbol_property,
+    data_atom_property, data_symbol_property, descriptor_tag_with_atom, hidden_builtin_attributes,
+    readonly_builtin_attributes, writable_builtin_attributes,
+};
 use super::{
     install_public_builtin_function, FamilyInstallContext, PrimitiveFamilyBuiltins,
     PrimitiveFamilyObjects, PrimitiveFamilyPrototypes,
 };
-use crate::public::PublicRealmBuiltins;
+use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::public::{BuiltinCache, PublicRealmBuiltins};
+use crate::{
+    BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor,
+};
+use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
 use lyng_js_types::{
     js3_array_species_getter_builtin, js3_bigint_as_int_n_builtin, js3_bigint_as_uint_n_builtin,
@@ -22,9 +32,10 @@ use lyng_js_types::{
     js3_number_is_safe_integer_builtin, js3_number_to_exponential_builtin,
     js3_number_to_fixed_builtin, js3_number_to_locale_string_builtin,
     js3_number_to_precision_builtin, js3_number_to_string_builtin, js3_number_value_of_builtin,
-    js3_symbol_builtin, js3_symbol_description_getter_builtin, js3_symbol_for_builtin,
-    js3_symbol_key_for_builtin, js3_symbol_to_primitive_builtin, js3_symbol_to_string_builtin,
-    js3_symbol_value_of_builtin, BuiltinFunctionId, ObjectRef,
+    js3_parse_float_builtin, js3_parse_int_builtin, js3_symbol_builtin,
+    js3_symbol_description_getter_builtin, js3_symbol_for_builtin, js3_symbol_key_for_builtin,
+    js3_symbol_to_primitive_builtin, js3_symbol_to_string_builtin, js3_symbol_value_of_builtin,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
 };
 
 pub(in crate::public) fn install_primitive_family(
@@ -287,6 +298,625 @@ fn primitive_accessor_builtin_object(
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
+}
+
+pub(in crate::public) fn install_primitive_family_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    builtins: &PublicRealmBuiltins,
+) -> Result<(), BuiltinBootstrapError> {
+    let atoms = PrimitiveDescriptorAtoms::new(agent);
+    install_number_constructor_descriptors(agent, cache, realm, &atoms)?;
+    install_number_prototype_descriptors(agent, cache, realm, builtins.number, &atoms)?;
+    install_math_descriptors(agent, cache, realm, &atoms)?;
+    install_bigint_constructor_descriptors(agent, cache, realm, &atoms)?;
+    install_bigint_prototype_descriptors(agent, cache, realm, builtins.bigint)?;
+    install_boolean_prototype_descriptors(agent, cache, realm, builtins.boolean)?;
+    install_symbol_constructor_descriptors(agent, cache, realm, &atoms)?;
+    install_symbol_prototype_descriptors(agent, cache, realm, builtins.symbol, &atoms)
+}
+
+fn install_number_constructor_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    atoms: &PrimitiveDescriptorAtoms,
+) -> Result<(), BuiltinBootstrapError> {
+    install_builtin_method_group(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::Number,
+        number_static_method_specs(atoms),
+    )?;
+
+    let descriptors = [
+        data_atom_property(
+            atoms.nan,
+            Value::from_f64(f64::NAN),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.positive_infinity,
+            Value::from_f64(f64::INFINITY),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.negative_infinity,
+            Value::from_f64(f64::NEG_INFINITY),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.max_value,
+            Value::from_f64(f64::MAX),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.min_value,
+            Value::from_f64(f64::MIN_POSITIVE),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.max_safe_integer,
+            Value::from_f64(9_007_199_254_740_991.0),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.min_safe_integer,
+            Value::from_f64(-9_007_199_254_740_991.0),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.epsilon,
+            Value::from_f64(f64::EPSILON),
+            hidden_builtin_attributes(),
+        ),
+    ];
+    install_intrinsic_descriptor_table(agent, cache, realm, BuiltinIntrinsic::Number, &descriptors)
+}
+
+fn install_number_prototype_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    number: ObjectRef,
+    atoms: &PrimitiveDescriptorAtoms,
+) -> Result<(), BuiltinBootstrapError> {
+    let constructor = [data_atom_property(
+        WellKnownAtom::constructor.id(),
+        Value::from_object_ref(number),
+        writable_builtin_attributes(),
+    )];
+    install_intrinsic_descriptor_table(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::NumberPrototype,
+        &constructor,
+    )?;
+    install_builtin_method_group(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::NumberPrototype,
+        number_prototype_method_specs(atoms),
+    )
+}
+
+fn install_math_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    atoms: &PrimitiveDescriptorAtoms,
+) -> Result<(), BuiltinBootstrapError> {
+    install_builtin_method_group(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::Math,
+        math_method_specs(atoms),
+    )?;
+    let math_atom = agent.bootstrap_atoms().math();
+    let math_tag = descriptor_tag_with_atom(agent, "Math", math_atom);
+    let descriptors = [
+        data_atom_property(
+            atoms.e,
+            Value::from_f64(std::f64::consts::E),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.ln10,
+            Value::from_f64(std::f64::consts::LN_10),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.ln2,
+            Value::from_f64(std::f64::consts::LN_2),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.log10e,
+            Value::from_f64(std::f64::consts::LOG10_E),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.log2e,
+            Value::from_f64(std::f64::consts::LOG2_E),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.pi,
+            Value::from_f64(std::f64::consts::PI),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.sqrt1_2,
+            Value::from_f64(std::f64::consts::FRAC_1_SQRT_2),
+            hidden_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.sqrt2,
+            Value::from_f64(std::f64::consts::SQRT_2),
+            hidden_builtin_attributes(),
+        ),
+        data_symbol_property(
+            WellKnownSymbolId::ToStringTag,
+            math_tag,
+            readonly_builtin_attributes(),
+        ),
+    ];
+    install_intrinsic_descriptor_table(agent, cache, realm, BuiltinIntrinsic::Math, &descriptors)
+}
+
+fn install_bigint_constructor_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    atoms: &PrimitiveDescriptorAtoms,
+) -> Result<(), BuiltinBootstrapError> {
+    install_builtin_method_group(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::BigInt,
+        bigint_static_method_specs(atoms),
+    )
+}
+
+fn install_bigint_prototype_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    bigint: ObjectRef,
+) -> Result<(), BuiltinBootstrapError> {
+    let bigint_atom = agent.bootstrap_atoms().bigint();
+    let bigint_tag = descriptor_tag_with_atom(agent, "BigInt", bigint_atom);
+    let descriptors = [
+        data_atom_property(
+            WellKnownAtom::constructor.id(),
+            Value::from_object_ref(bigint),
+            writable_builtin_attributes(),
+        ),
+        builtin_function_atom_property(
+            WellKnownAtom::toString.id(),
+            js3_bigint_to_string_builtin(),
+        ),
+        builtin_function_atom_property(WellKnownAtom::valueOf.id(), js3_bigint_value_of_builtin()),
+        data_symbol_property(
+            WellKnownSymbolId::ToStringTag,
+            bigint_tag,
+            readonly_builtin_attributes(),
+        ),
+    ];
+    install_intrinsic_descriptor_table(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::BigIntPrototype,
+        &descriptors,
+    )
+}
+
+fn install_boolean_prototype_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    boolean: ObjectRef,
+) -> Result<(), BuiltinBootstrapError> {
+    let descriptors = [
+        data_atom_property(
+            WellKnownAtom::constructor.id(),
+            Value::from_object_ref(boolean),
+            writable_builtin_attributes(),
+        ),
+        builtin_function_atom_property(
+            WellKnownAtom::toString.id(),
+            js3_boolean_to_string_builtin(),
+        ),
+        builtin_function_atom_property(WellKnownAtom::valueOf.id(), js3_boolean_value_of_builtin()),
+    ];
+    install_intrinsic_descriptor_table(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::BooleanPrototype,
+        &descriptors,
+    )
+}
+
+fn install_symbol_constructor_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    atoms: &PrimitiveDescriptorAtoms,
+) -> Result<(), BuiltinBootstrapError> {
+    install_builtin_method_group(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::Symbol,
+        symbol_static_method_specs(atoms),
+    )?;
+
+    let descriptors = symbol_well_known_value_descriptors(agent)?;
+    install_intrinsic_descriptor_table(agent, cache, realm, BuiltinIntrinsic::Symbol, &descriptors)
+}
+
+fn install_symbol_prototype_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    symbol: ObjectRef,
+    atoms: &PrimitiveDescriptorAtoms,
+) -> Result<(), BuiltinBootstrapError> {
+    let symbol_atom = agent.bootstrap_atoms().symbol();
+    let symbol_tag = descriptor_tag_with_atom(agent, "Symbol", symbol_atom);
+    let descriptors = [
+        data_atom_property(
+            WellKnownAtom::constructor.id(),
+            Value::from_object_ref(symbol),
+            writable_builtin_attributes(),
+        ),
+        builtin_function_atom_property(
+            WellKnownAtom::toString.id(),
+            js3_symbol_to_string_builtin(),
+        ),
+        builtin_function_atom_property(WellKnownAtom::valueOf.id(), js3_symbol_value_of_builtin()),
+        builtin_function_symbol_property(
+            WellKnownSymbolId::ToPrimitive,
+            js3_symbol_to_primitive_builtin(),
+            readonly_builtin_attributes(),
+        ),
+        data_symbol_property(
+            WellKnownSymbolId::ToStringTag,
+            symbol_tag,
+            readonly_builtin_attributes(),
+        ),
+        accessor_atom_property(
+            atoms.description,
+            Some(js3_symbol_description_getter_builtin()),
+            None,
+            readonly_builtin_attributes(),
+        ),
+    ];
+    install_intrinsic_descriptor_table(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::SymbolPrototype,
+        &descriptors,
+    )
+}
+
+fn install_builtin_method_group<const N: usize>(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    target: BuiltinIntrinsic,
+    specs: [(AtomId, BuiltinFunctionId); N],
+) -> Result<(), BuiltinBootstrapError> {
+    let descriptors = specs.map(|(atom, entry)| builtin_function_atom_property(atom, entry));
+    install_intrinsic_descriptor_table(agent, cache, realm, target, &descriptors)
+}
+
+fn install_intrinsic_descriptor_table(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    target: BuiltinIntrinsic,
+    descriptors: &[BuiltinPropertyDescriptor],
+) -> Result<(), BuiltinBootstrapError> {
+    install_descriptor_tables(
+        agent,
+        cache,
+        realm,
+        &[BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(target),
+            descriptors,
+        )],
+    )
+}
+
+fn well_known_symbol_value(
+    agent: &Agent,
+    symbol: WellKnownSymbolId,
+) -> Result<Value, BuiltinBootstrapError> {
+    agent
+        .well_known_symbol(symbol)
+        .map(Value::from_symbol_ref)
+        .ok_or(BuiltinBootstrapError::MissingWellKnownSymbol(symbol))
+}
+
+#[derive(Clone, Copy)]
+struct PrimitiveDescriptorAtoms {
+    nan: AtomId,
+    is_finite: AtomId,
+    is_integer: AtomId,
+    is_nan: AtomId,
+    is_safe_integer: AtomId,
+    parse_float: AtomId,
+    parse_int: AtomId,
+    positive_infinity: AtomId,
+    negative_infinity: AtomId,
+    max_value: AtomId,
+    min_value: AtomId,
+    max_safe_integer: AtomId,
+    min_safe_integer: AtomId,
+    epsilon: AtomId,
+    to_exponential: AtomId,
+    to_fixed: AtomId,
+    to_locale_string: AtomId,
+    to_precision: AtomId,
+    abs: AtomId,
+    acos: AtomId,
+    acosh: AtomId,
+    asin: AtomId,
+    asinh: AtomId,
+    atan: AtomId,
+    atan2: AtomId,
+    atanh: AtomId,
+    cbrt: AtomId,
+    ceil: AtomId,
+    clz32: AtomId,
+    cos: AtomId,
+    cosh: AtomId,
+    e: AtomId,
+    exp: AtomId,
+    expm1: AtomId,
+    f16round: AtomId,
+    floor: AtomId,
+    fround: AtomId,
+    hypot: AtomId,
+    imul: AtomId,
+    log: AtomId,
+    log10: AtomId,
+    log1p: AtomId,
+    log2: AtomId,
+    ln10: AtomId,
+    ln2: AtomId,
+    log10e: AtomId,
+    log2e: AtomId,
+    max: AtomId,
+    min: AtomId,
+    pi: AtomId,
+    pow: AtomId,
+    random: AtomId,
+    round: AtomId,
+    sign: AtomId,
+    sin: AtomId,
+    sinh: AtomId,
+    sqrt: AtomId,
+    sqrt1_2: AtomId,
+    sqrt2: AtomId,
+    sum_precise: AtomId,
+    tan: AtomId,
+    tanh: AtomId,
+    trunc: AtomId,
+    as_int_n: AtomId,
+    as_uint_n: AtomId,
+    key_for: AtomId,
+    description: AtomId,
+}
+
+impl PrimitiveDescriptorAtoms {
+    fn new(agent: &mut Agent) -> Self {
+        let nan = agent.bootstrap_atoms().nan();
+        let key_for = agent.bootstrap_atoms().key_for();
+        Self {
+            nan,
+            is_finite: agent.atoms_mut().intern_collectible("isFinite"),
+            is_integer: agent.atoms_mut().intern_collectible("isInteger"),
+            is_nan: agent.atoms_mut().intern_collectible("isNaN"),
+            is_safe_integer: agent.atoms_mut().intern_collectible("isSafeInteger"),
+            parse_float: agent.atoms_mut().intern_collectible("parseFloat"),
+            parse_int: agent.atoms_mut().intern_collectible("parseInt"),
+            positive_infinity: agent.atoms_mut().intern_collectible("POSITIVE_INFINITY"),
+            negative_infinity: agent.atoms_mut().intern_collectible("NEGATIVE_INFINITY"),
+            max_value: agent.atoms_mut().intern_collectible("MAX_VALUE"),
+            min_value: agent.atoms_mut().intern_collectible("MIN_VALUE"),
+            max_safe_integer: agent.atoms_mut().intern_collectible("MAX_SAFE_INTEGER"),
+            min_safe_integer: agent.atoms_mut().intern_collectible("MIN_SAFE_INTEGER"),
+            epsilon: agent.atoms_mut().intern_collectible("EPSILON"),
+            to_exponential: agent.atoms_mut().intern_collectible("toExponential"),
+            to_fixed: agent.atoms_mut().intern_collectible("toFixed"),
+            to_locale_string: agent.atoms_mut().intern_collectible("toLocaleString"),
+            to_precision: agent.atoms_mut().intern_collectible("toPrecision"),
+            abs: agent.atoms_mut().intern_collectible("abs"),
+            acos: agent.atoms_mut().intern_collectible("acos"),
+            acosh: agent.atoms_mut().intern_collectible("acosh"),
+            asin: agent.atoms_mut().intern_collectible("asin"),
+            asinh: agent.atoms_mut().intern_collectible("asinh"),
+            atan: agent.atoms_mut().intern_collectible("atan"),
+            atan2: agent.atoms_mut().intern_collectible("atan2"),
+            atanh: agent.atoms_mut().intern_collectible("atanh"),
+            cbrt: agent.atoms_mut().intern_collectible("cbrt"),
+            ceil: agent.atoms_mut().intern_collectible("ceil"),
+            clz32: agent.atoms_mut().intern_collectible("clz32"),
+            cos: agent.atoms_mut().intern_collectible("cos"),
+            cosh: agent.atoms_mut().intern_collectible("cosh"),
+            e: agent.atoms_mut().intern_collectible("E"),
+            exp: agent.atoms_mut().intern_collectible("exp"),
+            expm1: agent.atoms_mut().intern_collectible("expm1"),
+            f16round: agent.atoms_mut().intern_collectible("f16round"),
+            floor: agent.atoms_mut().intern_collectible("floor"),
+            fround: agent.atoms_mut().intern_collectible("fround"),
+            hypot: agent.atoms_mut().intern_collectible("hypot"),
+            imul: agent.atoms_mut().intern_collectible("imul"),
+            log: agent.atoms_mut().intern_collectible("log"),
+            log10: agent.atoms_mut().intern_collectible("log10"),
+            log1p: agent.atoms_mut().intern_collectible("log1p"),
+            log2: agent.atoms_mut().intern_collectible("log2"),
+            ln10: agent.atoms_mut().intern_collectible("LN10"),
+            ln2: agent.atoms_mut().intern_collectible("LN2"),
+            log10e: agent.atoms_mut().intern_collectible("LOG10E"),
+            log2e: agent.atoms_mut().intern_collectible("LOG2E"),
+            max: agent.atoms_mut().intern_collectible("max"),
+            min: agent.atoms_mut().intern_collectible("min"),
+            pi: agent.atoms_mut().intern_collectible("PI"),
+            pow: agent.atoms_mut().intern_collectible("pow"),
+            random: agent.atoms_mut().intern_collectible("random"),
+            round: agent.atoms_mut().intern_collectible("round"),
+            sign: agent.atoms_mut().intern_collectible("sign"),
+            sin: agent.atoms_mut().intern_collectible("sin"),
+            sinh: agent.atoms_mut().intern_collectible("sinh"),
+            sqrt: agent.atoms_mut().intern_collectible("sqrt"),
+            sqrt1_2: agent.atoms_mut().intern_collectible("SQRT1_2"),
+            sqrt2: agent.atoms_mut().intern_collectible("SQRT2"),
+            sum_precise: agent.atoms_mut().intern_collectible("sumPrecise"),
+            tan: agent.atoms_mut().intern_collectible("tan"),
+            tanh: agent.atoms_mut().intern_collectible("tanh"),
+            trunc: agent.atoms_mut().intern_collectible("trunc"),
+            as_int_n: agent.atoms_mut().intern_collectible("asIntN"),
+            as_uint_n: agent.atoms_mut().intern_collectible("asUintN"),
+            key_for,
+            description: agent.atoms_mut().intern_collectible("description"),
+        }
+    }
+}
+
+fn number_static_method_specs(
+    atoms: &PrimitiveDescriptorAtoms,
+) -> [(AtomId, BuiltinFunctionId); 6] {
+    [
+        (atoms.is_finite, js3_number_is_finite_builtin()),
+        (atoms.is_integer, js3_number_is_integer_builtin()),
+        (atoms.is_nan, js3_number_is_nan_builtin()),
+        (atoms.is_safe_integer, js3_number_is_safe_integer_builtin()),
+        (atoms.parse_float, js3_parse_float_builtin()),
+        (atoms.parse_int, js3_parse_int_builtin()),
+    ]
+}
+
+fn number_prototype_method_specs(
+    atoms: &PrimitiveDescriptorAtoms,
+) -> [(AtomId, BuiltinFunctionId); 6] {
+    [
+        (atoms.to_exponential, js3_number_to_exponential_builtin()),
+        (atoms.to_fixed, js3_number_to_fixed_builtin()),
+        (
+            atoms.to_locale_string,
+            js3_number_to_locale_string_builtin(),
+        ),
+        (atoms.to_precision, js3_number_to_precision_builtin()),
+        (WellKnownAtom::toString.id(), js3_number_to_string_builtin()),
+        (WellKnownAtom::valueOf.id(), js3_number_value_of_builtin()),
+    ]
+}
+
+fn math_method_specs(atoms: &PrimitiveDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 37] {
+    [
+        (atoms.abs, js3_math_abs_builtin()),
+        (atoms.acos, js3_math_acos_builtin()),
+        (atoms.acosh, js3_math_acosh_builtin()),
+        (atoms.asin, js3_math_asin_builtin()),
+        (atoms.asinh, js3_math_asinh_builtin()),
+        (atoms.atan, js3_math_atan_builtin()),
+        (atoms.atan2, js3_math_atan2_builtin()),
+        (atoms.atanh, js3_math_atanh_builtin()),
+        (atoms.cbrt, js3_math_cbrt_builtin()),
+        (atoms.ceil, js3_math_ceil_builtin()),
+        (atoms.clz32, js3_math_clz32_builtin()),
+        (atoms.cos, js3_math_cos_builtin()),
+        (atoms.cosh, js3_math_cosh_builtin()),
+        (atoms.exp, js3_math_exp_builtin()),
+        (atoms.expm1, js3_math_expm1_builtin()),
+        (atoms.f16round, js3_math_f16round_builtin()),
+        (atoms.floor, js3_math_floor_builtin()),
+        (atoms.fround, js3_math_fround_builtin()),
+        (atoms.hypot, js3_math_hypot_builtin()),
+        (atoms.imul, js3_math_imul_builtin()),
+        (atoms.log, js3_math_log_builtin()),
+        (atoms.log10, js3_math_log10_builtin()),
+        (atoms.log1p, js3_math_log1p_builtin()),
+        (atoms.log2, js3_math_log2_builtin()),
+        (atoms.max, js3_math_max_builtin()),
+        (atoms.min, js3_math_min_builtin()),
+        (atoms.pow, js3_math_pow_builtin()),
+        (atoms.random, js3_math_random_builtin()),
+        (atoms.round, js3_math_round_builtin()),
+        (atoms.sign, js3_math_sign_builtin()),
+        (atoms.sin, js3_math_sin_builtin()),
+        (atoms.sinh, js3_math_sinh_builtin()),
+        (atoms.sqrt, js3_math_sqrt_builtin()),
+        (atoms.sum_precise, js3_math_sum_precise_builtin()),
+        (atoms.tan, js3_math_tan_builtin()),
+        (atoms.tanh, js3_math_tanh_builtin()),
+        (atoms.trunc, js3_math_trunc_builtin()),
+    ]
+}
+
+fn bigint_static_method_specs(
+    atoms: &PrimitiveDescriptorAtoms,
+) -> [(AtomId, BuiltinFunctionId); 2] {
+    [
+        (atoms.as_int_n, js3_bigint_as_int_n_builtin()),
+        (atoms.as_uint_n, js3_bigint_as_uint_n_builtin()),
+    ]
+}
+
+fn symbol_static_method_specs(
+    atoms: &PrimitiveDescriptorAtoms,
+) -> [(AtomId, BuiltinFunctionId); 2] {
+    [
+        (WellKnownAtom::r#for.id(), js3_symbol_for_builtin()),
+        (atoms.key_for, js3_symbol_key_for_builtin()),
+    ]
+}
+
+fn symbol_well_known_value_descriptors(
+    agent: &Agent,
+) -> Result<Vec<BuiltinPropertyDescriptor>, BuiltinBootstrapError> {
+    let atoms = agent.bootstrap_atoms();
+    let specs = [
+        (atoms.has_instance(), WellKnownSymbolId::HasInstance),
+        (
+            atoms.is_concat_spreadable(),
+            WellKnownSymbolId::IsConcatSpreadable,
+        ),
+        (atoms.iterator(), WellKnownSymbolId::Iterator),
+        (atoms.async_iterator(), WellKnownSymbolId::AsyncIterator),
+        (atoms.match_(), WellKnownSymbolId::Match),
+        (atoms.match_all(), WellKnownSymbolId::MatchAll),
+        (atoms.replace(), WellKnownSymbolId::Replace),
+        (atoms.search(), WellKnownSymbolId::Search),
+        (atoms.species(), WellKnownSymbolId::Species),
+        (atoms.split(), WellKnownSymbolId::Split),
+        (atoms.to_primitive(), WellKnownSymbolId::ToPrimitive),
+        (atoms.to_string_tag(), WellKnownSymbolId::ToStringTag),
+        (atoms.unscopables(), WellKnownSymbolId::Unscopables),
+        (atoms.dispose(), WellKnownSymbolId::Dispose),
+        (atoms.async_dispose(), WellKnownSymbolId::AsyncDispose),
+    ];
+    let mut descriptors = Vec::with_capacity(specs.len());
+    for (atom, symbol) in specs {
+        descriptors.push(data_atom_property(
+            atom,
+            well_known_symbol_value(agent, symbol)?,
+            hidden_builtin_attributes(),
+        ));
+    }
+    Ok(descriptors)
 }
 
 #[derive(Clone, Copy, Debug)]

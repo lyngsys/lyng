@@ -55,7 +55,9 @@ pub(super) use object_reflection::{
 pub(super) use objects::{
     install_object_family, install_object_family_descriptors, object_builtin_object,
 };
-pub(super) use primitives::{install_primitive_family, primitive_builtin_object};
+pub(super) use primitives::{
+    install_primitive_family, install_primitive_family_descriptors, primitive_builtin_object,
+};
 pub(super) use promises::{install_promise_disposal_family, promise_disposal_builtin_object};
 pub(super) use regexp::{
     install_regexp_family, install_regexp_family_descriptors, regexp_builtin_object,
