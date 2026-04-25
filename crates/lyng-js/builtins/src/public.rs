@@ -1023,17 +1023,8 @@ impl PublicRealmBuiltins {
         if let Some(object) = families::primitive_builtin_object(&self, entry) {
             return Some(object);
         }
-        if entry == js3_json_parse_builtin() {
-            return Some(self.json_parse);
-        }
-        if entry == js3_json_stringify_builtin() {
-            return Some(self.json_stringify);
-        }
-        if entry == js3_json_raw_json_builtin() {
-            return Some(self.json_raw_json);
-        }
-        if entry == js3_json_is_raw_json_builtin() {
-            return Some(self.json_is_raw_json);
+        if let Some(object) = families::json_builtin_object(&self, entry) {
+            return Some(object);
         }
         if entry == lyng_js_types::js3_reflect_apply_builtin() {
             return Some(self.reflect_apply);
