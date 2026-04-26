@@ -53,7 +53,7 @@ fn whole_suite_runner_times_out_hanging_tests() {
 
     let report = fs::read_to_string(&report_path).expect("report should be written");
     assert!(report.contains("timeout after"));
-    assert!(report.contains("| Failed | `1` |"));
+    assert!(report.contains("| Failed | `2` |"));
 
     let _ = fs::remove_dir_all(root);
 }
@@ -78,13 +78,13 @@ fn worker_mode_handles_multiple_requests_in_one_process() {
 
     writeln!(
         stdin,
-        "1\t{}",
+        "1\tnon-strict\t{}",
         first_path.to_str().expect("path should be utf-8")
     )
     .expect("first request should be written");
     writeln!(
         stdin,
-        "2\t{}",
+        "2\tnon-strict\t{}",
         second_path.to_str().expect("path should be utf-8")
     )
     .expect("second request should be written");
@@ -154,8 +154,8 @@ fn whole_suite_runner_recovers_after_timed_out_test() {
 
     let report = fs::read_to_string(&report_path).expect("report should be written");
     assert!(report.contains("timeout after"));
-    assert!(report.contains("| Passed | `1` |"));
-    assert!(report.contains("| Failed | `1` |"));
+    assert!(report.contains("| Passed | `2` |"));
+    assert!(report.contains("| Failed | `2` |"));
 
     let _ = fs::remove_dir_all(root);
 }

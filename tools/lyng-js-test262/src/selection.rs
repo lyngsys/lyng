@@ -87,6 +87,9 @@ const FEATURE_REASON_ALIASES: &[(&str, &str)] = &[
     ("joint-iteration", "unsupported feature: iterator-helpers"),
 ];
 
+const UNSUPPORTED_HOST_FEATURES: &[(&str, &str)] =
+    &[("IsHTMLDDA", "unsupported host feature: IsHTMLDDA")];
+
 const EXPLICIT_TEST_SKIPS: &[(&str, &str)] = &[
     (
         "built-ins/Iterator/concat/proto.js",
@@ -491,6 +494,12 @@ fn should_skip_metadata(metadata: &TestMetadata, helpers: &HelperCatalog) -> Opt
         .iter()
         .any(|feature| feature == "Temporal");
     for feature in &metadata.features {
+        if let Some((_, reason)) = UNSUPPORTED_HOST_FEATURES
+            .iter()
+            .find(|(unsupported, _)| feature == unsupported)
+        {
+            return Some((*reason).to_string());
+        }
         if let Some((_, reason)) = FEATURE_REASON_ALIASES
             .iter()
             .find(|(alias, _)| feature == alias)
@@ -506,9 +515,6 @@ fn should_skip_metadata(metadata: &TestMetadata, helpers: &HelperCatalog) -> Opt
             }
             return Some(format!("unsupported feature: {feature}"));
         }
-    }
-    if metadata.flags.iter().any(|flag| flag == "raw") {
-        return Some("raw harness tests are deferred".to_string());
     }
     for include in &metadata.includes {
         if !helpers.supports_include(include) {
@@ -732,6 +738,59 @@ mod tests {
             decision,
             Some(SkipDecision::Skip(
                 "requires $262.agent multi-agent harness".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn skip_decision_runs_raw_tests() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            flags: [raw]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test.js"),
+            Path::new("/tmp"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_reports_is_htmldda_host_gap() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [IsHTMLDDA]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test.js"),
+            Path::new("/tmp"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(
+            decision,
+            Some(SkipDecision::Skip(
+                "unsupported host feature: IsHTMLDDA".to_string()
             ))
         );
     }

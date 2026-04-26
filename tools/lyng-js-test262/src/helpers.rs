@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::metadata::{has_async_flag, TestMetadata};
+use crate::metadata::{has_async_flag, variants_for_metadata, TestMetadata, TestVariant};
 
 const LOCAL_TEMPORAL_HELPERS_SOURCE: &str = include_str!("temporal_helpers.js");
 const DECIMAL_TO_HEX_STRING_ADAPTER_SOURCE: &str = r#"
@@ -43,15 +43,6 @@ function decimalToPercentHexString(n) {
   return "%" + hex.charAt((n - low) / 16) + hex.charAt(low);
 }
 "#;
-const ASYNC_DONE_SOURCE: &str = r"
-function $DONE(error) {
-  if (arguments.length === 0 || error === undefined) {
-    return;
-  }
-  throw error;
-}
-";
-
 pub(crate) const SUPPORTED_INCLUDES: &[&str] = &[
     "compareArray.js",
     "deepEqual.js",
@@ -80,6 +71,7 @@ pub(crate) const SUPPORTED_INCLUDES: &[&str] = &[
 #[derive(Clone)]
 pub(crate) struct HelperCatalog {
     base_source: String,
+    async_done_source: String,
     include_sources: HashMap<&'static str, String>,
     test262_root: PathBuf,
 }
@@ -97,12 +89,14 @@ impl HelperCatalog {
             include_sources.insert(*include, source);
         }
 
-        let sta_source = read_helper_file(&harness_root, "sta.js")?;
         let assert_source = read_helper_file(&harness_root, "assert.js")?;
-        let base_source = format!("{sta_source}\n{assert_source}");
+        let sta_source = read_helper_file(&harness_root, "sta.js")?;
+        let async_done_source = read_helper_file(&harness_root, "doneprintHandle.js")?;
+        let base_source = format!("{assert_source}\n{sta_source}");
 
         Ok(Self {
             base_source,
+            async_done_source,
             include_sources,
             test262_root,
         })
@@ -113,19 +107,36 @@ impl HelperCatalog {
         metadata: &TestMetadata,
         source: &str,
     ) -> Result<String, String> {
+        let variant = variants_for_metadata(metadata)
+            .into_iter()
+            .next()
+            .unwrap_or(TestVariant::Default);
+        self.build_runtime_source_for_variant(metadata, variant, source)
+    }
+
+    pub(crate) fn build_runtime_source_for_variant(
+        &self,
+        metadata: &TestMetadata,
+        variant: TestVariant,
+        source: &str,
+    ) -> Result<String, String> {
+        if variant.is_raw() {
+            return Ok(source.to_string());
+        }
+
         let mut full = String::with_capacity(
             self.base_source.len()
                 + source.len()
                 + metadata.includes.len() * 128
-                + usize::from(has_async_flag(metadata)) * ASYNC_DONE_SOURCE.len(),
+                + usize::from(has_async_flag(metadata)) * self.async_done_source.len(),
         );
-        if metadata.flags.iter().any(|flag| flag == "onlyStrict") {
+        if variant.uses_strict_directive() {
             full.push_str("\"use strict\";\n");
         }
         full.push_str(&self.base_source);
         if has_async_flag(metadata) {
             full.push('\n');
-            full.push_str(ASYNC_DONE_SOURCE);
+            full.push_str(&self.async_done_source);
         }
         for include in &metadata.includes {
             let extra = self
@@ -234,6 +245,59 @@ mod tests {
             .expect("async harness source");
         assert!(async_source.contains("function $DONE("));
         assert!(async_source.contains("assert.throwsAsync = function"));
+    }
+
+    #[test]
+    fn build_runtime_source_loads_assert_before_sta() {
+        let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata("");
+        let source = catalog
+            .build_runtime_source(&metadata, "")
+            .expect("base harness source");
+
+        let assert_index = source.find("function assert(").expect("assert.js source");
+        let sta_index = source.find("function Test262Error").expect("sta.js source");
+        assert!(
+            assert_index < sta_index,
+            "assert.js must be evaluated before sta.js"
+        );
+    }
+
+    #[test]
+    fn build_runtime_source_uses_doneprint_handle_for_async_tests() {
+        let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            flags: [async]
+            ---*/
+            ",
+        );
+        let source = catalog
+            .build_runtime_source(&metadata, "$DONE();")
+            .expect("async harness source");
+
+        assert!(source.contains("Test262:AsyncTestComplete"));
+        assert!(source.contains("Test262:AsyncTestFailure:"));
+    }
+
+    #[test]
+    fn build_runtime_source_leaves_raw_tests_unmodified() {
+        let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            flags: [raw]
+            includes: [propertyHelper.js]
+            ---*/
+            ",
+        );
+        let test_source = "'use strict'\n[0]\n's'.p = null;";
+        let source = catalog
+            .build_runtime_source(&metadata, test_source)
+            .expect("raw source should build");
+
+        assert_eq!(source, test_source);
     }
 
     #[test]

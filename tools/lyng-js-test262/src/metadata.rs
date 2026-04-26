@@ -12,6 +12,52 @@ pub(crate) struct NegativeExpectation {
     pub(crate) error_type: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TestVariant {
+    Default,
+    NonStrict,
+    Strict,
+    Raw,
+}
+
+impl TestVariant {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::NonStrict => "non-strict",
+            Self::Strict => "strict",
+            Self::Raw => "raw",
+        }
+    }
+
+    pub(crate) fn from_str(value: &str) -> Option<Self> {
+        match value {
+            "default" => Some(Self::Default),
+            "non-strict" => Some(Self::NonStrict),
+            "strict" => Some(Self::Strict),
+            "raw" => Some(Self::Raw),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn report_label(self) -> Option<&'static str> {
+        match self {
+            Self::Default => None,
+            Self::NonStrict => Some("non-strict"),
+            Self::Strict => Some("strict"),
+            Self::Raw => Some("raw"),
+        }
+    }
+
+    pub(crate) const fn uses_strict_directive(self) -> bool {
+        matches!(self, Self::Strict)
+    }
+
+    pub(crate) const fn is_raw(self) -> bool {
+        matches!(self, Self::Raw)
+    }
+}
+
 pub(crate) fn parse_metadata(source: &str) -> TestMetadata {
     let mut features = Vec::new();
     let mut flags = Vec::new();
@@ -134,8 +180,24 @@ pub(crate) fn has_async_flag(metadata: &TestMetadata) -> bool {
     metadata.flags.iter().any(|flag| flag == "async")
 }
 
-pub(crate) fn effective_parse_source(source: &str, metadata: &TestMetadata) -> String {
+pub(crate) fn variants_for_metadata(metadata: &TestMetadata) -> Vec<TestVariant> {
+    if metadata.flags.iter().any(|flag| flag == "raw") {
+        return vec![TestVariant::Raw];
+    }
+    if is_module_test(metadata) {
+        return vec![TestVariant::Default];
+    }
     if metadata.flags.iter().any(|flag| flag == "onlyStrict") {
+        return vec![TestVariant::Strict];
+    }
+    if metadata.flags.iter().any(|flag| flag == "noStrict") {
+        return vec![TestVariant::NonStrict];
+    }
+    vec![TestVariant::NonStrict, TestVariant::Strict]
+}
+
+pub(crate) fn effective_parse_source(source: &str, variant: TestVariant) -> String {
+    if variant.uses_strict_directive() {
         format!("\"use strict\";\n{source}")
     } else {
         source.to_string()

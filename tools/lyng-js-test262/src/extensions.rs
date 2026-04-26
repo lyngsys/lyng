@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use lyng_js_env::Agent;
@@ -26,6 +26,7 @@ const TEST262_EVAL_SCRIPT_RAW: u32 = 1;
 const TEST262_CREATE_REALM_RAW: u32 = 2;
 const TEST262_DETACH_ARRAY_BUFFER_RAW: u32 = 3;
 const TEST262_GC_RAW: u32 = 4;
+const TEST262_PRINT_RAW: u32 = 5;
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone)]
@@ -257,6 +258,11 @@ fn test262_gc_entry() -> EmbeddingFunctionId {
         .expect("test262 embedding function ids should stay non-zero")
 }
 
+fn test262_print_entry() -> EmbeddingFunctionId {
+    EmbeddingFunctionId::from_raw(TEST262_PRINT_RAW)
+        .expect("test262 embedding function ids should stay non-zero")
+}
+
 fn test262_property_key(agent: &mut Agent, text: &str) -> PropertyKey {
     PropertyKey::from_atom(agent.atoms_mut().intern_collectible(text))
 }
@@ -273,7 +279,36 @@ fn read_test262_object(agent: &mut Agent, global_object: ObjectRef) -> Result<Ob
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct Test262RealmExtension;
+pub(crate) struct Test262PrintObserver {
+    messages: Arc<Mutex<Vec<String>>>,
+}
+
+impl Test262PrintObserver {
+    pub(crate) fn record(&self, message: String) {
+        match self.messages.lock() {
+            Ok(mut messages) => messages.push(message),
+            Err(poisoned) => poisoned.into_inner().push(message),
+        }
+    }
+
+    pub(crate) fn messages(&self) -> Vec<String> {
+        match self.messages.lock() {
+            Ok(messages) => messages.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct Test262RealmExtension {
+    print_observer: Test262PrintObserver,
+}
+
+impl Test262RealmExtension {
+    pub(crate) fn new(print_observer: Test262PrintObserver) -> Self {
+        Self { print_observer }
+    }
+}
 
 impl RealmExtensionProvider for Test262RealmExtension {
     fn embedding_function_metadata(
@@ -307,6 +342,9 @@ impl RealmExtensionProvider for Test262RealmExtension {
         if entry == test262_gc_entry() {
             return Some(EmbeddingFunctionMetadata::new("gc", 0, false, false));
         }
+        if entry == test262_print_entry() {
+            return Some(EmbeddingFunctionMetadata::new("print", 1, false, false));
+        }
         None
     }
 
@@ -328,6 +366,7 @@ impl RealmExtensionProvider for Test262RealmExtension {
         let create_realm_key = test262_property_key(installation.agent(), "createRealm");
         let detach_key = test262_property_key(installation.agent(), "detachArrayBuffer");
         let gc_key = test262_property_key(installation.agent(), "gc");
+        let print_key = test262_property_key(installation.agent(), "print");
         let abstract_module_source_key =
             test262_property_key(installation.agent(), "AbstractModuleSource");
 
@@ -375,6 +414,14 @@ impl RealmExtensionProvider for Test262RealmExtension {
             harness,
             gc_key,
             test262_gc_entry(),
+            true,
+            false,
+            true,
+        )?;
+        let _ = installation.define_function_property(
+            installation.global_object(),
+            print_key,
+            test262_print_entry(),
             true,
             false,
             true,
@@ -431,6 +478,16 @@ impl RealmExtensionProvider for Test262RealmExtension {
         }
         if entry == test262_gc_entry() {
             let _ = context.agent().force_collect();
+            return Ok(Value::undefined());
+        }
+        if entry == test262_print_entry() {
+            let value = invocation
+                .arguments()
+                .first()
+                .copied()
+                .unwrap_or(Value::undefined());
+            let message = context.value_to_string_text(value)?;
+            self.print_observer.record(message);
             return Ok(Value::undefined());
         }
         Err(VmError::MissingEmbeddingFunction(entry))

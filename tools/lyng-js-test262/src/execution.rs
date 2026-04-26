@@ -19,15 +19,17 @@ use lyng_js_sema::{analyze_module, analyze_script};
 use lyng_js_types::{AbruptCompletion, ObjectRef, PropertyKey, Value};
 use lyng_js_vm::{ModuleLoadError, SharedRealmExtensionProvider, Vm, VmError};
 
-use crate::extensions::{Test262Host, Test262RealmExtension};
+use crate::extensions::{Test262Host, Test262PrintObserver, Test262RealmExtension};
 use crate::helpers::HelperCatalog;
 use crate::metadata::{
     effective_parse_source, has_async_flag, is_module_test, parse_metadata, NegativeExpectation,
-    TestMetadata,
+    TestMetadata, TestVariant,
 };
 
 pub(crate) const WORKER_RESULT_PREFIX: &str = "__lyng_js_test262_result__:";
 pub(crate) const WORKER_REQUEST_SEPARATOR: char = '\t';
+const ASYNC_COMPLETE_MESSAGE: &str = "Test262:AsyncTestComplete";
+const ASYNC_FAILURE_PREFIX: &str = "Test262:AsyncTestFailure:";
 const STDERR_TAIL_LIMIT: usize = 8;
 const WORKER_RECYCLE_LIMIT: usize = 256;
 
@@ -65,6 +67,7 @@ pub(crate) struct PreparedTest {
     pub(crate) path: PathBuf,
     pub(crate) category: String,
     pub(crate) metadata: TestMetadata,
+    pub(crate) variant: TestVariant,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -160,7 +163,7 @@ pub(crate) fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> Run
     }
 
     if expectation.requires_standalone_frontend_check() {
-        let parse_source = effective_parse_source(&source, &test.metadata);
+        let parse_source = effective_parse_source(&source, test.variant);
         let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let mut atoms = AtomTable::new();
             if expectation.module_goal {
@@ -241,13 +244,18 @@ pub(crate) fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> Run
         }
     }
 
-    let runtime_source = match helpers.build_runtime_source(&test.metadata, &source) {
-        Ok(source) => source,
-        Err(error) => return RunOutcome::Fail(error),
-    };
+    let runtime_source =
+        match helpers.build_runtime_source_for_variant(&test.metadata, test.variant, &source) {
+            Ok(source) => source,
+            Err(error) => return RunOutcome::Fail(error),
+        };
 
-    if expectation.module_goal {
-        match run_module(&test.path, &runtime_source, helpers) {
+    let print_observer = Test262PrintObserver::default();
+    let provider: SharedRealmExtensionProvider =
+        Arc::new(Test262RealmExtension::new(print_observer.clone()));
+
+    let outcome = if expectation.module_goal {
+        match run_module(&test.path, &runtime_source, helpers, &provider) {
             Ok(()) => match expectation
                 .negative
                 .as_ref()
@@ -282,7 +290,7 @@ pub(crate) fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> Run
             },
         }
     } else {
-        match run_script(&test.path, &runtime_source, helpers) {
+        match run_script(&test.path, &runtime_source, helpers, &provider) {
             Ok(()) => match expectation
                 .negative
                 .as_ref()
@@ -310,10 +318,20 @@ pub(crate) fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> Run
                 _ => RunOutcome::Fail(format!("runtime error: {error}")),
             },
         }
+    };
+
+    if expectation.async_test && matches!(outcome, RunOutcome::Pass) {
+        return async_completion_outcome(&print_observer.messages());
     }
+
+    outcome
 }
 
-pub(crate) fn run_single_test_path(path: &Path, helpers: &Arc<HelperCatalog>) -> RunOutcome {
+pub(crate) fn run_single_test_path(
+    path: &Path,
+    variant: TestVariant,
+    helpers: &Arc<HelperCatalog>,
+) -> RunOutcome {
     let source = match fs::read_to_string(path) {
         Ok(source) => source,
         Err(error) => return RunOutcome::Fail(format!("read error: {error}")),
@@ -323,18 +341,41 @@ pub(crate) fn run_single_test_path(path: &Path, helpers: &Arc<HelperCatalog>) ->
             path: path.to_path_buf(),
             category: String::new(),
             metadata: parse_metadata(&source),
+            variant,
         },
         helpers,
     )
 }
 
-pub(crate) fn encode_worker_request(request_id: u64, path: &Path) -> String {
-    format!("{request_id}{WORKER_REQUEST_SEPARATOR}{}", path.display())
+fn async_completion_outcome(messages: &[String]) -> RunOutcome {
+    for message in messages {
+        if message.starts_with(ASYNC_FAILURE_PREFIX) {
+            return RunOutcome::Fail(message.clone());
+        }
+    }
+    if messages
+        .iter()
+        .any(|message| message == ASYNC_COMPLETE_MESSAGE)
+    {
+        return RunOutcome::Pass;
+    }
+    RunOutcome::Fail("async test did not signal completion".to_string())
 }
 
-pub(crate) fn decode_worker_request_line(line: &str) -> Option<(u64, PathBuf)> {
-    let (request_id, path) = line.split_once(WORKER_REQUEST_SEPARATOR)?;
-    Some((request_id.parse().ok()?, PathBuf::from(path)))
+pub(crate) fn encode_worker_request(request_id: u64, path: &Path, variant: TestVariant) -> String {
+    format!(
+        "{request_id}{WORKER_REQUEST_SEPARATOR}{}{WORKER_REQUEST_SEPARATOR}{}",
+        variant.as_str(),
+        path.display()
+    )
+}
+
+pub(crate) fn decode_worker_request_line(line: &str) -> Option<(u64, TestVariant, PathBuf)> {
+    let mut parts = line.splitn(3, WORKER_REQUEST_SEPARATOR);
+    let request_id = parts.next()?.parse().ok()?;
+    let variant = TestVariant::from_str(parts.next()?)?;
+    let path = PathBuf::from(parts.next()?);
+    Some((request_id, variant, path))
 }
 
 pub(crate) fn encode_worker_result(request_id: u64, result: &RunOutcome) -> String {
@@ -372,11 +413,11 @@ pub(crate) fn worker_main(helpers: &Arc<HelperCatalog>) -> ! {
                 std::process::exit(1);
             }
         };
-        let Some((request_id, path)) = decode_worker_request_line(&line) else {
+        let Some((request_id, variant, path)) = decode_worker_request_line(&line) else {
             eprintln!("worker protocol error: malformed request `{line}`");
             std::process::exit(1);
         };
-        let result = run_single_test_path(&path, helpers);
+        let result = run_single_test_path(&path, variant, helpers);
         if writeln!(stdout, "{}", encode_worker_result(request_id, &result)).is_err() {
             eprintln!("worker protocol error: failed to write response");
             std::process::exit(1);
@@ -434,7 +475,10 @@ impl WorkerHandle {
     pub(crate) fn run_test(&mut self, test: &PreparedTest, timeout: Duration) -> WorkerExecution {
         let request_id = self.next_request_id;
         self.next_request_id += 1;
-        let request_line = format!("{}\n", encode_worker_request(request_id, &test.path));
+        let request_line = format!(
+            "{}\n",
+            encode_worker_request(request_id, &test.path, test.variant)
+        );
 
         let Some(stdin) = self.stdin.as_mut() else {
             return self.discard_with_error("worker stdin closed unexpectedly".to_string(), true);
@@ -689,6 +733,7 @@ fn run_script(
     path: &Path,
     runtime_source: &str,
     helpers: &Arc<HelperCatalog>,
+    provider: &SharedRealmExtensionProvider,
 ) -> Result<(), ScriptExecutionError> {
     let compile_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let mut atoms = AtomTable::new();
@@ -717,7 +762,6 @@ fn run_script(
 
     let eval_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let host = Test262Host::from_system_clock(path, runtime_source, Arc::clone(helpers));
-        let provider: SharedRealmExtensionProvider = Arc::new(Test262RealmExtension);
         let script_referrer = ModuleKey::new(
             path.canonicalize()
                 .unwrap_or_else(|_| path.to_path_buf())
@@ -736,7 +780,7 @@ fn run_script(
             &unit,
             Some(&script_referrer),
             &host,
-            Some(&provider),
+            Some(provider),
         ) {
             Ok(_) => Ok(()),
             Err(VmError::Abrupt(completion)) => Err(ScriptExecutionError::Abrupt {
@@ -759,10 +803,10 @@ fn run_module(
     path: &Path,
     runtime_source: &str,
     helpers: &Arc<HelperCatalog>,
+    provider: &SharedRealmExtensionProvider,
 ) -> Result<(), ModuleExecutionError> {
     let eval_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let host = Test262Host::from_system_clock(path, runtime_source, Arc::clone(helpers));
-        let provider: SharedRealmExtensionProvider = Arc::new(Test262RealmExtension);
         let mut runtime = Runtime::new(host.clone());
         let agent = runtime.root_agent_mut();
         let realm = agent.default_realm().expect("default realm should exist");
@@ -778,7 +822,7 @@ fn run_module(
                     referrer: None,
                     attributes: Vec::new(),
                 },
-                Some(&provider),
+                Some(provider),
             )
             .map_err(|error| classify_module_error(agent, global_object, error))?;
         vm.evaluate_linked_module_with_host_and_extensions(
@@ -786,7 +830,7 @@ fn run_module(
             realm,
             loaded.key(),
             &host,
-            Some(&provider),
+            Some(provider),
         )
         .map_err(ModuleLoadError::Vm)
         .map(|_| ())
@@ -899,7 +943,7 @@ mod tests {
         RunOutcome, TestExpectation, WORKER_RESULT_PREFIX,
     };
     use crate::helpers::HelperCatalog;
-    use crate::metadata::parse_metadata;
+    use crate::metadata::{parse_metadata, TestVariant};
 
     fn make_temp_test_dir() -> PathBuf {
         static NEXT_TEMP_ID: AtomicUsize = AtomicUsize::new(0);
@@ -998,9 +1042,12 @@ mod tests {
     #[test]
     fn worker_request_round_trips_request_id_and_path() {
         let path = PathBuf::from("/tmp/example.js");
-        let encoded = encode_worker_request(41, &path);
+        let encoded = encode_worker_request(41, &path, TestVariant::Strict);
 
-        assert_eq!(decode_worker_request_line(&encoded), Some((41, path)));
+        assert_eq!(
+            decode_worker_request_line(&encoded),
+            Some((41, TestVariant::Strict, path))
+        );
     }
 
     #[test]
@@ -1050,6 +1097,7 @@ mod tests {
             path: entry_path,
             category: "language/module-code".to_string(),
             metadata: parse_metadata(entry_source),
+            variant: TestVariant::Default,
         };
 
         assert_eq!(run_test(&test, &helper_catalog()), RunOutcome::Pass);
@@ -1087,9 +1135,72 @@ mod tests {
             path: entry_path,
             category: "language/module-code".to_string(),
             metadata: parse_metadata(entry_source),
+            variant: TestVariant::Default,
         };
 
         assert_eq!(run_test(&test, &helper_catalog()), RunOutcome::Pass);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn run_test_fails_async_tests_without_doneprint_completion() {
+        let root = make_temp_test_dir();
+        let entry_path = root.join("async-missing-done.js");
+        let entry_source = r"
+            /*---
+            flags: [async]
+            ---*/
+            Promise.resolve(1);
+        ";
+        fs::write(&entry_path, entry_source).unwrap();
+
+        let test = PreparedTest {
+            path: entry_path,
+            category: "built-ins".to_string(),
+            metadata: parse_metadata(entry_source),
+            variant: TestVariant::NonStrict,
+        };
+
+        assert_eq!(
+            run_test(&test, &helper_catalog()),
+            RunOutcome::Fail("async test did not signal completion".to_string())
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn run_test_reports_doneprint_async_failure_messages() {
+        let root = make_temp_test_dir();
+        let entry_path = root.join("async-failure.js");
+        let entry_source = r#"
+            /*---
+            flags: [async]
+            ---*/
+            Promise.resolve().then(function() {
+              $DONE("boom");
+            });
+        "#;
+        fs::write(&entry_path, entry_source).unwrap();
+
+        let test = PreparedTest {
+            path: entry_path,
+            category: "built-ins".to_string(),
+            metadata: parse_metadata(entry_source),
+            variant: TestVariant::NonStrict,
+        };
+
+        let outcome = run_test(&test, &helper_catalog());
+        match outcome {
+            RunOutcome::Fail(message) => {
+                assert!(
+                    message.contains("Test262:AsyncTestFailure:Test262Error: boom"),
+                    "unexpected async failure message: {message}"
+                );
+            }
+            RunOutcome::Pass => panic!("async failure should fail the test"),
+        }
 
         let _ = fs::remove_dir_all(root);
     }

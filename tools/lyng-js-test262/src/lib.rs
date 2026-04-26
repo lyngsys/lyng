@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 use cli::RunnerConfig;
 use execution::{PreparedTest, RunOutcome, WorkerHandle};
 use helpers::HelperCatalog;
-use metadata::parse_metadata;
+use metadata::{parse_metadata, variants_for_metadata};
 use report::{CategoryStats, SuiteReport};
 use selection::{
     category_for_test, disabled_manifest, load_manifest, relative_test_path, select_test_paths,
@@ -232,6 +232,8 @@ fn prepare_suite(
         };
         let metadata = parse_metadata(&source);
         let category = category_for_test(path, test_dir);
+        let variants = variants_for_metadata(&metadata);
+        let variant_count = variants.len();
 
         match skip_decision(
             path,
@@ -247,20 +249,25 @@ fn prepare_suite(
                 continue;
             }
             Some(SkipDecision::Skip(reason)) => {
-                *selected_counts.entry(category.clone()).or_default() += 1;
-                category_stats.entry(category).or_default().skip += 1;
-                *skip_reasons.entry(reason).or_default() += 1;
+                *selected_counts.entry(category.clone()).or_default() += variant_count;
+                category_stats.entry(category).or_default().skip +=
+                    u32::try_from(variant_count).unwrap_or(u32::MAX);
+                *skip_reasons.entry(reason).or_default() +=
+                    u32::try_from(variant_count).unwrap_or(u32::MAX);
                 continue;
             }
             None => {}
         }
 
-        *selected_counts.entry(category.clone()).or_default() += 1;
-        prepared.push(PreparedTest {
-            path: path.clone(),
-            category: category.clone(),
-            metadata,
-        });
+        *selected_counts.entry(category.clone()).or_default() += variant_count;
+        for variant in variants {
+            prepared.push(PreparedTest {
+                path: path.clone(),
+                category: category.clone(),
+                metadata: metadata.clone(),
+                variant,
+            });
+        }
         category_stats.entry(category).or_default();
     }
 
@@ -311,7 +318,7 @@ fn execute_suite(
                                     &test.category,
                                     format!(
                                         "{}: {error}",
-                                        relative_test_path(&test.path, test_dir)
+                                        relative_prepared_test_name(test, test_dir)
                                     ),
                                 );
                                 let done = done_count.fetch_add(1, Ordering::Relaxed) + 1;
@@ -350,7 +357,10 @@ fn execute_suite(
                             push_failure(
                                 &failures_lock,
                                 &test.category,
-                                format!("{}: {message}", relative_test_path(&test.path, test_dir)),
+                                format!(
+                                    "{}: {message}",
+                                    relative_prepared_test_name(test, test_dir)
+                                ),
                             );
                         }
                     }
@@ -400,6 +410,16 @@ fn timeout_for_test(test: &PreparedTest, default: Duration) -> Duration {
         return default.max(Duration::from_secs(30));
     }
     default
+}
+
+fn relative_prepared_test_name(test: &PreparedTest, test_dir: &Path) -> String {
+    let mut name = relative_test_path(&test.path, test_dir);
+    if let Some(label) = test.variant.report_label() {
+        name.push_str(" [");
+        name.push_str(label);
+        name.push(']');
+    }
+    name
 }
 
 fn is_exhaustive_uri_legacy_test(path: &Path) -> bool {
@@ -509,6 +529,89 @@ fn print_summary(summary: &SummaryView<'_>) {
 }
 
 #[cfg(test)]
+mod prepare_suite_tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use crate::cli::{RunnerConfig, DEFAULT_MANIFEST_PATH};
+    use crate::helpers::HelperCatalog;
+    use crate::selection::{disabled_manifest, ProposalStage};
+
+    use super::prepare_suite;
+
+    static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    fn make_temp_dir() -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "lyng-js-test262-prepare-{}-{}-{}",
+            std::process::id(),
+            nonce,
+            counter
+        ));
+        fs::create_dir_all(&path).expect("temp dir should be created");
+        path
+    }
+
+    fn workspace_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("workspace root should exist")
+    }
+
+    fn options_for_filter(filter: &str) -> RunnerConfig {
+        RunnerConfig {
+            filter: Some(filter.to_string()),
+            report_path: "/tmp/lyng-js-test262-test.md".to_string(),
+            manifest_path: DEFAULT_MANIFEST_PATH.to_string(),
+            no_skip: false,
+            list_failures: false,
+            jobs: 1,
+            timeout_ms: 1000,
+            proposal_stage: ProposalStage::Stage3,
+            worker: false,
+        }
+    }
+
+    #[test]
+    fn prepare_suite_expands_default_script_tests_into_sloppy_and_strict_runs() {
+        let root = make_temp_dir();
+        let entry_path = root.join("default-script.js");
+        fs::write(
+            &entry_path,
+            r"
+            /*---
+            description: default script should run in both modes
+            ---*/
+            assert.sameValue(1, 1);
+            ",
+        )
+        .expect("fixture should be written");
+
+        let helpers = Arc::new(HelperCatalog::load(&workspace_root()).expect("helper catalog"));
+        let suite = prepare_suite(
+            &options_for_filter(entry_path.to_str().expect("path should be utf-8")),
+            &root,
+            &disabled_manifest(DEFAULT_MANIFEST_PATH),
+            &helpers,
+        );
+
+        assert_eq!(suite.prepared.len(), 2);
+        assert_eq!(suite.selected_total(), 2);
+
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -518,6 +621,7 @@ mod tests {
             path: PathBuf::from("test/built-ins/decodeURI/S15.1.3.1_A2.5_T1.js"),
             category: "built-ins".to_string(),
             metadata: parse_metadata(""),
+            variant: crate::metadata::TestVariant::Default,
         };
 
         assert_eq!(
@@ -532,6 +636,7 @@ mod tests {
             path: PathBuf::from("test/built-ins/String/prototype/slice/basic.js"),
             category: "built-ins".to_string(),
             metadata: parse_metadata(""),
+            variant: crate::metadata::TestVariant::Default,
         };
 
         assert_eq!(

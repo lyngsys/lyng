@@ -50,7 +50,7 @@ fn run_passing_test(path: &Path, source: &str) -> String {
 
     let report = fs::read_to_string(&report_path).expect("report should be written");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
     report
@@ -166,6 +166,9 @@ fn runner_exposes_eval_script_and_create_realm_through_external_embedding() {
         assert.sameValue(typeof other.evalScript, "function");
         assert.sameValue(other.global === globalThis, false);
         assert.sameValue(other.evalScript("typeof $262"), "object");
+        assert.sameValue(typeof $262.AbstractModuleSource, "function");
+        assert.sameValue("agent" in $262, false);
+        assert.sameValue("IsHTMLDDA" in $262, false);
         "#,
     );
 
@@ -252,7 +255,7 @@ fn runner_fails_wrong_runtime_negative_type() {
         "unexpected report:\n{report}"
     );
     assert!(
-        report.contains("| Failed | `1` |"),
+        report.contains("| Failed | `2` |"),
         "unexpected report:\n{report}"
     );
     let _ = fs::remove_dir_all(root);
@@ -305,11 +308,11 @@ fn runner_reports_skips_separately_from_failures() {
 
     let (stdout, report) = run_single_test_with_output(
         &entry_path,
-        r#"
+        r"
         /*---
         includes: [atomicsHelper.js]
         ---*/
-        "#,
+        ",
     );
 
     assert!(
@@ -317,7 +320,7 @@ fn runner_reports_skips_separately_from_failures() {
         "unexpected stdout:\n{stdout}"
     );
     assert!(
-        stdout.contains("Skipped:        1"),
+        stdout.contains("Skipped:        2"),
         "unexpected stdout:\n{stdout}"
     );
     assert!(
@@ -329,7 +332,7 @@ fn runner_reports_skips_separately_from_failures() {
         "unexpected report:\n{report}"
     );
     assert!(
-        report.contains("| Skipped | `1` |"),
+        report.contains("| Skipped | `2` |"),
         "unexpected report:\n{report}"
     );
     assert!(
@@ -344,7 +347,7 @@ fn runner_reports_skips_separately_from_failures() {
 fn runner_passes_async_helper_self_test_without_async_flag_done() {
     let report = run_filtered_test("harness/asyncHelpers-asyncTest-without-async-flag.js");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
 }
@@ -353,7 +356,7 @@ fn runner_passes_async_helper_self_test_without_async_flag_done() {
 fn runner_passes_assert_tostring_harness_self_test() {
     let report = run_filtered_test("harness/assert-tostring.js");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
 }
@@ -362,7 +365,7 @@ fn runner_passes_assert_tostring_harness_self_test() {
 fn runner_passes_compare_array_arguments_harness_self_test() {
     let report = run_filtered_test("harness/compare-array-arguments.js");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
 }
@@ -371,7 +374,7 @@ fn runner_passes_compare_array_arguments_harness_self_test() {
 fn runner_passes_decimal_to_hex_string_harness_self_test() {
     let report = run_filtered_test("harness/decimalToHexString.js");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
 }
@@ -380,7 +383,7 @@ fn runner_passes_decimal_to_hex_string_harness_self_test() {
 fn runner_passes_assert_relative_date_ms_harness_self_test() {
     let report = run_filtered_test("harness/assertRelativeDateMs.js");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
 }
@@ -389,7 +392,7 @@ fn runner_passes_assert_relative_date_ms_harness_self_test() {
 fn runner_passes_compare_array_sparse_harness_self_test() {
     let report = run_filtered_test("harness/compare-array-sparse.js");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
 }
@@ -398,7 +401,7 @@ fn runner_passes_compare_array_sparse_harness_self_test() {
 fn runner_passes_deep_equal_mapset_harness_self_test() {
     let report = run_filtered_test("harness/deepEqual-mapset.js");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
 }
@@ -407,7 +410,7 @@ fn runner_passes_deep_equal_mapset_harness_self_test() {
 fn runner_passes_deep_equal_primitives_bigint_harness_self_test() {
     let report = run_filtered_test("harness/deepEqual-primitives-bigint.js");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
 }
@@ -438,7 +441,7 @@ fn runner_passes_well_known_intrinsics_helper_smoke_test() {
 fn runner_passes_well_known_intrinsics_harness_self_test() {
     let report = run_filtered_test("harness/wellKnownIntrinsicObjects.js");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
 }
@@ -447,7 +450,7 @@ fn runner_passes_well_known_intrinsics_harness_self_test() {
 fn runner_passes_tco_helper_harness_self_test() {
     let report = run_filtered_test("harness/tcoHelper.js");
     assert!(
-        report.contains("| Passed | `1` |"),
+        report.contains("| Passed | `2` |"),
         "unexpected report:\n{report}"
     );
 }
