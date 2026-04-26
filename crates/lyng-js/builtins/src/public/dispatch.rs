@@ -26,7 +26,10 @@ use lyng_js_host::{
     TemporalInstantToCivilRequest, TemporalInstantWithOffset,
 };
 use lyng_js_types::{
-    AbruptCompletion, BuiltinFunctionId, PropertyDescriptor, PropertyKey, RealmRef, Value,
+    internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
+    internal_object_has_own_property_builtin, internal_object_to_string_builtin,
+    internal_string_index_of_builtin, internal_string_replace_builtin, AbruptCompletion,
+    BuiltinFunctionId, PropertyDescriptor, PropertyKey, RealmRef, Value,
 };
 use support::{
     allocate_array_like_result, allocate_json_raw_object, allocate_proxy_object,
@@ -434,6 +437,40 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         &mut self,
         function: lyng_js_types::ObjectRef,
     ) -> Result<String, Self::Error>;
+}
+
+/// Delegates spec-like reserved internal helper IDs to their public builtin semantics.
+///
+/// The reserved IDs remain useful as compatibility function identities for older
+/// lowering/bootstrap paths, but the semantic algorithms are owned by the
+/// public builtin family modules.
+pub(crate) fn dispatch_internal_spec_like_builtin<Cx: PublicBuiltinDispatchContext>(
+    context: &mut Cx,
+    entry: BuiltinFunctionId,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Option<Value>, Cx::Error> {
+    if entry == internal_string_replace_builtin() {
+        return strings::string_replace_builtin(context, invocation).map(Some);
+    }
+    if entry == internal_string_index_of_builtin() {
+        return strings::string_index_of_builtin(context, invocation).map(Some);
+    }
+    if entry == internal_array_index_of_builtin() {
+        return arrays::array_index_of_builtin(context, invocation).map(Some);
+    }
+    if entry == internal_array_push_builtin() {
+        return arrays::array_push_builtin(context, invocation).map(Some);
+    }
+    if entry == internal_array_pop_builtin() {
+        return arrays::array_pop_builtin(context, invocation).map(Some);
+    }
+    if entry == internal_object_to_string_builtin() {
+        return objects::object_to_string_builtin(context, invocation).map(Some);
+    }
+    if entry == internal_object_has_own_property_builtin() {
+        return objects::object_has_own_property_builtin(context, invocation).map(Some);
+    }
+    Ok(None)
 }
 
 /// Dispatches a public builtin by builtin ID.

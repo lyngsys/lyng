@@ -2,11 +2,12 @@ use lyng_js_bytecode::CompiledScriptUnit;
 use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_compiler::compile_script;
 use lyng_js_env::{Agent, RealmRecord, Runtime};
-use lyng_js_gc::{AllocationLifetime, PrimitiveStringView};
+use lyng_js_gc::{AllocationLifetime, PrimitiveMutator, PrimitiveStringView};
 use lyng_js_host::NoopHostHooks;
 use lyng_js_objects::{
-    FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, NativeFunctionRegistry,
-    ObjectAllocation, ObjectColdData,
+    FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, InternalMethodResult,
+    NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry, ObjectAllocation,
+    ObjectColdData, ObjectRuntime,
 };
 use lyng_js_ops::object::ordinary_create_data_property;
 use lyng_js_parser::parse_script;
@@ -63,6 +64,38 @@ pub(super) fn compile_and_run_string(source: &str) -> String {
             .string_view(string)
             .expect("string should exist in the heap"),
     )
+}
+
+pub(super) fn compile_and_run_with_globals(
+    source: &str,
+    install_globals: impl FnOnce(&mut Agent, RealmRecord),
+) -> Value {
+    let mut atoms = AtomTable::new();
+    let unit = compile_unit(source, &mut atoms);
+    let mut registry = RejectingTestNativeRegistry;
+    evaluate_with_registry(&unit, install_globals, &mut registry)
+}
+
+struct RejectingTestNativeRegistry;
+
+impl NativeFunctionRegistry for RejectingTestNativeRegistry {
+    fn call(
+        &mut self,
+        _runtime: &mut ObjectRuntime,
+        _heap: &mut PrimitiveMutator<'_>,
+        _request: NativeCallRequest<'_>,
+    ) -> InternalMethodResult<Value> {
+        panic!("test did not expect an external native call")
+    }
+
+    fn construct(
+        &mut self,
+        _runtime: &mut ObjectRuntime,
+        _heap: &mut PrimitiveMutator<'_>,
+        _request: NativeConstructRequest<'_>,
+    ) -> InternalMethodResult<ObjectRef> {
+        panic!("test did not expect an external native construct")
+    }
 }
 
 pub(super) fn evaluate_with_registry(

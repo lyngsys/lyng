@@ -522,7 +522,7 @@ fn string_index_of_units(source: &[u16], search: &[u16], position: usize) -> i32
         .unwrap_or(-1)
 }
 
-fn string_index_of_builtin<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn string_index_of_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
@@ -1550,7 +1550,7 @@ fn string_repeat_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(string_from_code_units(cx, &result))
 }
 
-fn string_replace_builtin<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn string_replace_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {

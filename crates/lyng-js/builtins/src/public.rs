@@ -155,6 +155,7 @@ use lyng_js_types::{
 };
 use std::collections::HashMap;
 
+pub(crate) use dispatch::dispatch_internal_spec_like_builtin;
 pub use dispatch::{dispatch_builtin, PublicBuiltinDispatchContext};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

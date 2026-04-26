@@ -1,6 +1,13 @@
-use super::support::{compile_and_run, compile_and_run_string, compile_unit};
+use super::support::{
+    compile_and_run, compile_and_run_string, compile_and_run_with_globals, compile_unit,
+    install_native_global,
+};
 use lyng_js_common::AtomTable;
-use lyng_js_types::Value;
+use lyng_js_types::{
+    internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
+    internal_object_has_own_property_builtin, internal_object_to_string_builtin,
+    internal_string_index_of_builtin, internal_string_replace_builtin, Value,
+};
 
 #[test]
 fn script_core_executes_locals_globals_objects_and_arrays() {
@@ -2687,6 +2694,111 @@ fn script_core_supports_object_has_own_property_builtin_shim() {
     );
 
     assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_internal_spec_like_builtin_shims_use_public_semantics() {
+    let result = compile_and_run_with_globals(
+        r#"
+        let score = 0;
+        let call = Function.prototype.call;
+
+        try {
+            score += call.call(internalStringIndexOf, "😀x", "x") === 2 ? 1 : 0;
+        } catch (_error) {}
+
+        try {
+            score += call.call(internalStringReplace, "abc", "b", "$&$&") === "abbc" ? 2 : 0;
+        } catch (_error) {}
+
+        try {
+            let pushTarget = { length: new Number(1.9) };
+            score += call.call(internalArrayPush, pushTarget, "x") === 2 ? 4 : 0;
+            score += pushTarget[1] === "x" && pushTarget.length === 2 ? 8 : 0;
+        } catch (_error) {}
+
+        try {
+            let popTarget = { 0: "first", 1: "last", length: new Number(2.8) };
+            score += call.call(internalArrayPop, popTarget) === "last" ? 16 : 0;
+            score += popTarget.length === 1 && popTarget[1] === undefined ? 32 : 0;
+        } catch (_error) {}
+
+        try {
+            let searchTarget = { 2: "needle", length: new Number(3.9) };
+            score += call.call(internalArrayIndexOf, searchTarget, "needle") === 2 ? 64 : 0;
+        } catch (_error) {}
+
+        try {
+            score += call.call(internalObjectToString, new Date(0)) === "[object Date]" ? 128 : 0;
+        } catch (_error) {}
+
+        try {
+            let tagged = {};
+            tagged[Symbol.toStringTag] = "Tagged";
+            score += call.call(internalObjectToString, tagged) === "[object Tagged]" ? 256 : 0;
+        } catch (_error) {}
+
+        try {
+            let inherited = Object.create({ answer: 1 });
+            score += call.call(internalHasOwnProperty, inherited, "answer") === false ? 512 : 0;
+        } catch (_error) {}
+
+        score;
+        "#,
+        |agent, realm| {
+            install_native_global(
+                agent,
+                realm,
+                "internalStringIndexOf",
+                internal_string_index_of_builtin(),
+                false,
+            );
+            install_native_global(
+                agent,
+                realm,
+                "internalStringReplace",
+                internal_string_replace_builtin(),
+                false,
+            );
+            install_native_global(
+                agent,
+                realm,
+                "internalArrayIndexOf",
+                internal_array_index_of_builtin(),
+                false,
+            );
+            install_native_global(
+                agent,
+                realm,
+                "internalArrayPush",
+                internal_array_push_builtin(),
+                false,
+            );
+            install_native_global(
+                agent,
+                realm,
+                "internalArrayPop",
+                internal_array_pop_builtin(),
+                false,
+            );
+            install_native_global(
+                agent,
+                realm,
+                "internalObjectToString",
+                internal_object_to_string_builtin(),
+                false,
+            );
+            install_native_global(
+                agent,
+                realm,
+                "internalHasOwnProperty",
+                internal_object_has_own_property_builtin(),
+                false,
+            );
+        },
+    );
+
+    assert_eq!(result, Value::from_smi(1023));
 }
 
 #[test]

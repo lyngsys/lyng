@@ -1,3 +1,4 @@
+use crate::public::{dispatch_internal_spec_like_builtin, PublicBuiltinDispatchContext};
 use crate::{BuiltinEntryMetadata, BuiltinInvocation};
 use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
@@ -782,36 +783,6 @@ pub trait InternalBuiltinDispatchContext {
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error>;
 
-    fn string_replace_builtin(
-        &mut self,
-        invocation: BuiltinInvocation<'_>,
-    ) -> Result<Value, Self::Error>;
-
-    fn string_index_of_builtin(
-        &mut self,
-        invocation: BuiltinInvocation<'_>,
-    ) -> Result<Value, Self::Error>;
-
-    fn array_index_of_builtin(
-        &mut self,
-        invocation: BuiltinInvocation<'_>,
-    ) -> Result<Value, Self::Error>;
-
-    fn array_push_builtin(
-        &mut self,
-        invocation: BuiltinInvocation<'_>,
-    ) -> Result<Value, Self::Error>;
-
-    fn array_pop_builtin(
-        &mut self,
-        invocation: BuiltinInvocation<'_>,
-    ) -> Result<Value, Self::Error>;
-
-    fn object_to_string_builtin(
-        &mut self,
-        invocation: BuiltinInvocation<'_>,
-    ) -> Result<Value, Self::Error>;
-
     fn template_to_string_builtin(
         &mut self,
         invocation: BuiltinInvocation<'_>,
@@ -897,11 +868,6 @@ pub trait InternalBuiltinDispatchContext {
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error>;
 
-    fn object_has_own_property_builtin(
-        &mut self,
-        invocation: BuiltinInvocation<'_>,
-    ) -> Result<Value, Self::Error>;
-
     fn set_function_home_object_builtin(
         &mut self,
         invocation: BuiltinInvocation<'_>,
@@ -951,31 +917,16 @@ pub trait InternalBuiltinDispatchContext {
 /// # Errors
 ///
 /// Propagates errors from the selected [`InternalBuiltinDispatchContext`] hook.
-pub fn dispatch_internal_builtin<Cx: InternalBuiltinDispatchContext>(
+pub fn dispatch_internal_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
+    if let Some(result) = dispatch_internal_spec_like_builtin(context, entry, invocation)? {
+        return Ok(Some(result));
+    }
     if entry == internal_function_call_builtin() {
         return context.function_call_builtin(invocation).map(Some);
-    }
-    if entry == internal_string_replace_builtin() {
-        return context.string_replace_builtin(invocation).map(Some);
-    }
-    if entry == internal_string_index_of_builtin() {
-        return context.string_index_of_builtin(invocation).map(Some);
-    }
-    if entry == internal_array_index_of_builtin() {
-        return context.array_index_of_builtin(invocation).map(Some);
-    }
-    if entry == internal_array_push_builtin() {
-        return context.array_push_builtin(invocation).map(Some);
-    }
-    if entry == internal_array_pop_builtin() {
-        return context.array_pop_builtin(invocation).map(Some);
-    }
-    if entry == internal_object_to_string_builtin() {
-        return context.object_to_string_builtin(invocation).map(Some);
     }
     if entry == internal_template_to_string_builtin() {
         return context.template_to_string_builtin(invocation).map(Some);
@@ -1031,11 +982,6 @@ pub fn dispatch_internal_builtin<Cx: InternalBuiltinDispatchContext>(
     }
     if entry == internal_construct_super_spread_builtin() {
         return context.construct_super_spread_builtin(invocation).map(Some);
-    }
-    if entry == internal_object_has_own_property_builtin() {
-        return context
-            .object_has_own_property_builtin(invocation)
-            .map(Some);
     }
     if entry == internal_set_function_home_object_builtin() {
         return context

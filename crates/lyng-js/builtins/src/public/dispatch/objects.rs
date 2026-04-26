@@ -1182,7 +1182,7 @@ fn object_has_own_builtin<Cx: PublicBuiltinDispatchContext>(
     ))
 }
 
-fn object_has_own_property_builtin<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn object_has_own_property_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {

@@ -1107,7 +1107,7 @@ fn array_includes_builtin<Cx: PublicBuiltinDispatchContext>(
     array_search_builtin(cx, invocation, ArraySearchKind::Includes)
 }
 
-fn array_index_of_builtin<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn array_index_of_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
@@ -2038,7 +2038,7 @@ fn array_join_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(string_value(cx, &text))
 }
 
-fn array_pop_builtin<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn array_pop_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
@@ -2057,7 +2057,7 @@ fn array_pop_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(element)
 }
 
-fn array_push_builtin<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn array_push_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
