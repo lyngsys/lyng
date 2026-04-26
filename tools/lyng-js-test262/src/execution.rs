@@ -13,7 +13,7 @@ use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_compiler::compile_script;
 use lyng_js_env::{Agent, Runtime};
 use lyng_js_host::{ModuleKey, ModuleSourceRequest};
-use lyng_js_ops::object::get;
+use lyng_js_ops::object::ordinary_get;
 use lyng_js_parser::{parse_module, parse_script};
 use lyng_js_sema::{analyze_module, analyze_script};
 use lyng_js_types::{AbruptCompletion, ObjectRef, PropertyKey, Value};
@@ -838,17 +838,17 @@ fn thrown_error_type(
     let thrown = completion.thrown_value()?;
     let thrown_object = thrown.as_object_ref()?;
     let constructor_key = property_key(agent, "constructor");
-    let constructor = get(agent, thrown_object, constructor_key)
+    let constructor = ordinary_get(agent, thrown_object, constructor_key)
         .ok()?
         .as_object_ref()?;
 
     let name_key = property_key(agent, "name");
-    let constructor_name = get(agent, constructor, name_key)
+    let constructor_name = ordinary_get(agent, constructor, name_key)
         .ok()
         .and_then(|value| value_string(agent, value));
     if let Some(name) = constructor_name {
         let expected_key = property_key(agent, &name);
-        let expected_constructor = get(agent, global_object, expected_key)
+        let expected_constructor = ordinary_get(agent, global_object, expected_key)
             .ok()
             .and_then(Value::as_object_ref);
         if expected_constructor.is_some_and(|expected| expected == constructor) {

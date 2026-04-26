@@ -229,7 +229,7 @@ impl Vm {
                                         agent, host, registry, frame, receiver, key, value,
                                     )
                                 } else {
-                                    let set_result = object::set(
+                                    let set_result = object::ordinary_set(
                                         agent,
                                         object,
                                         key,
@@ -291,7 +291,7 @@ impl Vm {
                             let key = PropertyKey::from_atom(
                                 self.read_atom_constant(frame.code(), u32::from(c))?,
                             );
-                            let define_result = object::create_data_property(
+                            let define_result = object::ordinary_create_data_property(
                                 agent,
                                 object,
                                 key,
@@ -565,7 +565,7 @@ impl Vm {
                             let Some(key) = self.handle_vm_result(agent, key_result)? else {
                                 continue;
                             };
-                            let define_result = object::create_data_property(
+                            let define_result = object::ordinary_create_data_property(
                                 agent,
                                 object,
                                 key,
@@ -702,8 +702,23 @@ impl Vm {
                                         continue;
                                     };
                                     value
+                                } else if Self::prototype_chain_has_proxy(agent, object) {
+                                    let property_result = self.get_property_from_value(
+                                        agent,
+                                        host,
+                                        registry,
+                                        frame,
+                                        receiver,
+                                        PropertyKey::Index(u32::from(c)),
+                                    );
+                                    let Some(value) =
+                                        self.handle_vm_result(agent, property_result)?
+                                    else {
+                                        continue;
+                                    };
+                                    value
                                 } else {
-                                    let element = object::get(
+                                    let element = object::ordinary_get(
                                         agent,
                                         object,
                                         PropertyKey::Index(u32::from(c)),

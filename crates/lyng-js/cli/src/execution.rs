@@ -271,13 +271,15 @@ fn lookup_data_property_text(
     key: PropertyKey,
 ) -> Option<String> {
     loop {
-        match object::get_own_property(agent, object, key).ok()? {
+        match object::ordinary_get_own_property(agent, object, key).ok()? {
             Some(descriptor) if descriptor.has_value() => {
                 return primitive_value_text(agent, descriptor.value()?);
             }
             Some(_) => return None,
             None => {
-                let prototype = object::get_prototype_of(agent, object).ok().flatten()?;
+                let prototype = object::ordinary_get_prototype_of(agent, object)
+                    .ok()
+                    .flatten()?;
                 object = prototype;
             }
         }

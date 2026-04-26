@@ -332,7 +332,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             .create_array(self.agent, self.frame.realm(), values.len())?;
         for (index, value) in values.iter().copied().enumerate() {
             let key = PropertyKey::Index(u32::try_from(index).unwrap_or(u32::MAX));
-            let created = object::create_data_property(
+            let created = object::ordinary_create_data_property(
                 self.agent,
                 array,
                 key,
@@ -625,7 +625,7 @@ impl Vm {
                 Value::from_object_ref(source),
                 key,
             )?;
-            let created = object::create_data_property(
+            let created = object::ordinary_create_data_property(
                 agent,
                 target,
                 key,
@@ -680,11 +680,12 @@ impl Vm {
                 return result;
             }
             if agent.objects().typed_array(object).is_some() {
-                return object::get_with_receiver(agent, object, key, receiver)
+                return object::ordinary_get_with_receiver(agent, object, key, receiver)
                     .map_err(VmError::Abrupt);
             }
         }
-        let descriptor = object::get_own_property(agent, object, key).map_err(VmError::Abrupt)?;
+        let descriptor =
+            object::ordinary_get_own_property(agent, object, key).map_err(VmError::Abrupt)?;
         if let Some(descriptor) = descriptor {
             if let Some(value) = descriptor.value() {
                 return Ok(value);
@@ -717,7 +718,7 @@ impl Vm {
         key: PropertyKey,
     ) -> VmResult<Option<PropertyDescriptor>> {
         let mut descriptor =
-            object::get_own_property(agent, object, key).map_err(VmError::Abrupt)?;
+            object::ordinary_get_own_property(agent, object, key).map_err(VmError::Abrupt)?;
         let Some(index) = key.as_index() else {
             return Ok(descriptor);
         };
@@ -743,14 +744,14 @@ impl Vm {
         lifetime: AllocationLifetime,
     ) -> VmResult<bool> {
         let Some(index) = key.as_index() else {
-            return object::define_property(agent, object_ref, key, descriptor, lifetime)
+            return object::ordinary_define_property(agent, object_ref, key, descriptor, lifetime)
                 .map_err(VmError::Abrupt);
         };
         let Some((environment, slot)) = self
             .activation_tables
             .mapped_argument_slot(object_ref, index)
         else {
-            return object::define_property(agent, object_ref, key, descriptor, lifetime)
+            return object::ordinary_define_property(agent, object_ref, key, descriptor, lifetime)
                 .map_err(VmError::Abrupt);
         };
 
@@ -763,8 +764,9 @@ impl Vm {
             define_descriptor.set_value(self.read_environment_slot(agent, environment, slot)?);
         }
 
-        let defined = object::define_property(agent, object_ref, key, define_descriptor, lifetime)
-            .map_err(VmError::Abrupt)?;
+        let defined =
+            object::ordinary_define_property(agent, object_ref, key, define_descriptor, lifetime)
+                .map_err(VmError::Abrupt)?;
         if !defined {
             return Ok(false);
         }
@@ -793,7 +795,8 @@ impl Vm {
         object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<bool> {
-        let deleted = object::delete_property(agent, object, key).map_err(VmError::Abrupt)?;
+        let deleted =
+            object::ordinary_delete_property(agent, object, key).map_err(VmError::Abrupt)?;
         if deleted {
             if let Some(index) = key.as_index() {
                 let _ = self.activation_tables.detach_mapped_argument(object, index);
@@ -864,7 +867,7 @@ impl Vm {
             value = self.normalize_array_length_set_value(agent, host, registry, caller, value)?;
         }
         let own_descriptor =
-            object::get_own_property(agent, object, key).map_err(VmError::Abrupt)?;
+            object::ordinary_get_own_property(agent, object, key).map_err(VmError::Abrupt)?;
         if let Some(descriptor) = own_descriptor {
             return self.set_property_from_descriptor(
                 agent, host, registry, caller, descriptor, receiver, key, value,

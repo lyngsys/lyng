@@ -522,7 +522,7 @@ mod tests {
     use lyng_js_env::{ExecutionContextKind, Runtime};
     use lyng_js_host::NoopHostHooks;
     use lyng_js_objects::FunctionEntryIdentity;
-    use lyng_js_ops::object::get;
+    use lyng_js_ops::object::ordinary_get;
     use lyng_js_parser::parse_script;
     use lyng_js_sema::analyze_script;
     use lyng_js_types::PropertyKey;
@@ -575,7 +575,7 @@ mod tests {
 
         let object_atom = unit_atom(&unit, "object");
         let runtime_atom = unit_runtime_atom(agent, &unit, object_atom);
-        let object_value = get(
+        let object_value = ordinary_get(
             agent,
             realm.global_object(),
             PropertyKey::from_atom(runtime_atom),

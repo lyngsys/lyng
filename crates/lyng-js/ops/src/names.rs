@@ -50,7 +50,7 @@ pub fn object_environment_has_binding(
     let binding_object = record.binding_object();
     let receiver = Value::from_object_ref(binding_object);
 
-    let found = object::has_property(agent, binding_object, key)?;
+    let found = object::ordinary_has_property(agent, binding_object, key)?;
     if !found {
         return Ok(false);
     }
@@ -61,7 +61,7 @@ pub fn object_environment_has_binding(
     let Some(unscopables_symbol) = agent.well_known_symbol(WellKnownSymbolId::Unscopables) else {
         return Ok(true);
     };
-    let unscopables = object::get_with_receiver(
+    let unscopables = object::ordinary_get_with_receiver(
         agent,
         binding_object,
         PropertyKey::from_symbol(unscopables_symbol),
@@ -71,7 +71,7 @@ pub fn object_environment_has_binding(
         return Ok(true);
     };
 
-    let blocked = object::get_with_receiver(
+    let blocked = object::ordinary_get_with_receiver(
         agent,
         unscopables_object,
         key,
@@ -93,14 +93,14 @@ pub fn object_environment_get_binding_value(
 ) -> Completion<Value> {
     let key = PropertyKey::from_atom(name);
     let binding_object = record.binding_object();
-    let still_exists = object::has_property(agent, binding_object, key)?;
+    let still_exists = object::ordinary_has_property(agent, binding_object, key)?;
     if !still_exists {
         if strict {
             return Err(throw_reference_error(agent));
         }
         return Ok(Value::undefined());
     }
-    object::get(agent, binding_object, key)
+    object::ordinary_get(agent, binding_object, key)
 }
 
 /// ECMAScript `SetMutableBinding` for one object environment record.
@@ -118,12 +118,12 @@ pub fn object_environment_set_mutable_binding(
 ) -> Completion<()> {
     let key = PropertyKey::from_atom(name);
     let binding_object = record.binding_object();
-    let still_exists = object::has_property(agent, binding_object, key)?;
+    let still_exists = object::ordinary_has_property(agent, binding_object, key)?;
     if !still_exists && strict {
         return Err(throw_reference_error(agent));
     }
 
-    let stored = object::set(agent, binding_object, key, value, lifetime)?;
+    let stored = object::ordinary_set(agent, binding_object, key, value, lifetime)?;
     if !stored && strict {
         return Err(throw_type_error(agent));
     }

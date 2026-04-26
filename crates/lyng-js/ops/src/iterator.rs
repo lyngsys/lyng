@@ -246,7 +246,7 @@ pub fn create_iterator_result_object(
             AllocationLifetime::Default,
         )
     });
-    let value_defined = object::create_data_property(
+    let value_defined = object::ordinary_create_data_property(
         agent,
         object_ref,
         PropertyKey::from_atom(WellKnownAtom::value.id()),
@@ -257,7 +257,7 @@ pub fn create_iterator_result_object(
         return Err(throw_type_error(agent));
     }
     let done_key = key_from_text(agent, "done");
-    let done_defined = object::create_data_property(
+    let done_defined = object::ordinary_create_data_property(
         agent,
         object_ref,
         done_key,
@@ -535,7 +535,7 @@ mod tests {
             let object = receiver
                 .as_object_ref()
                 .ok_or_else(|| errors::throw_type_error(self.agent))?;
-            object::get(self.agent, object, key)
+            object::ordinary_get(self.agent, object, key)
         }
 
         fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
@@ -620,7 +620,7 @@ mod tests {
     }
 
     fn install_property(agent: &mut Agent, object_ref: ObjectRef, key: PropertyKey, value: Value) {
-        assert!(object::create_data_property(
+        assert!(object::ordinary_create_data_property(
             agent,
             object_ref,
             key,
@@ -664,7 +664,7 @@ mod tests {
             create_iterator_result_object(agent, realm, Value::from_smi(7), true).unwrap();
 
         assert_eq!(
-            object::get(
+            object::ordinary_get(
                 agent,
                 object_ref,
                 PropertyKey::from_atom(WellKnownAtom::value.id())
@@ -674,7 +674,7 @@ mod tests {
         );
         let done_key = key_from_text(agent, "done");
         assert_eq!(
-            object::get(agent, object_ref, done_key).unwrap(),
+            object::ordinary_get(agent, object_ref, done_key).unwrap(),
             Value::from_bool(true)
         );
     }

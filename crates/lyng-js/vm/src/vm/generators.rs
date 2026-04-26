@@ -964,7 +964,7 @@ impl Vm {
                 .suspended_execution(suspended)
                 .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
             match record.callee() {
-                Some(callee) => object::get(
+                Some(callee) => object::ordinary_get(
                     agent,
                     callee,
                     PropertyKey::from_atom(WellKnownAtom::prototype.id()),

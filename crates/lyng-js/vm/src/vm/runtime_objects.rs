@@ -291,7 +291,8 @@ impl Vm {
         name_value: Value,
     ) -> VmResult<()> {
         let key = PropertyKey::from_atom(WellKnownAtom::name.id());
-        let existing = object::get_own_property(agent, function, key).map_err(VmError::Abrupt)?;
+        let existing =
+            object::ordinary_get_own_property(agent, function, key).map_err(VmError::Abrupt)?;
         if let Some(existing) = existing {
             let can_overwrite = existing
                 .value()
@@ -1143,7 +1144,7 @@ mod tests {
         let closure = vm
             .create_closure(agent, frame, 0)
             .expect("closure creation should succeed");
-        let descriptor = object::get_own_property(
+        let descriptor = object::ordinary_get_own_property(
             agent,
             closure,
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),
@@ -1210,7 +1211,7 @@ mod tests {
         vm.set_function_name(agent, closure, function_name)
             .expect("setting function name should succeed");
 
-        let prototype_descriptor = object::get_own_property(
+        let prototype_descriptor = object::ordinary_get_own_property(
             agent,
             closure,
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),
@@ -1221,7 +1222,7 @@ mod tests {
         assert_eq!(prototype_descriptor.enumerable(), Some(false));
         assert_eq!(prototype_descriptor.writable(), Some(false));
 
-        let name_descriptor = object::get_own_property(
+        let name_descriptor = object::ordinary_get_own_property(
             agent,
             closure,
             PropertyKey::from_atom(WellKnownAtom::name.id()),
@@ -1290,7 +1291,7 @@ mod tests {
         let closure = vm
             .create_closure(agent, frame, 0)
             .expect("closure creation should succeed");
-        let prototype = object::get_own_property(
+        let prototype = object::ordinary_get_own_property(
             agent,
             closure,
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),
@@ -1311,7 +1312,7 @@ mod tests {
         });
         assert!(updated_private_env);
 
-        let prototype_descriptor = object::get_own_property(
+        let prototype_descriptor = object::ordinary_get_own_property(
             agent,
             closure,
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),

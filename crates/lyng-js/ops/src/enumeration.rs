@@ -49,7 +49,8 @@ impl ForInEnumerator {
             if agent.objects().is_proxy_object(entry.owner) {
                 return Ok(Some(entry.key));
             }
-            let descriptor = crate::object::get_own_property(agent, entry.owner, entry.key)?;
+            let descriptor =
+                crate::object::ordinary_get_own_property(agent, entry.owner, entry.key)?;
             if descriptor.is_some_and(|descriptor| descriptor.enumerable() == Some(true)) {
                 return Ok(Some(entry.key));
             }
@@ -83,7 +84,7 @@ pub fn create_for_in_enumerator(
                 continue;
             }
 
-            let descriptor = crate::object::get_own_property(agent, object, key)?;
+            let descriptor = crate::object::ordinary_get_own_property(agent, object, key)?;
             if descriptor.is_some_and(|descriptor| descriptor.enumerable() == Some(true)) {
                 keys.push((object, key));
             }

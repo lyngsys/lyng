@@ -100,8 +100,9 @@ fn has_restricted_global_property(
     global_object: ObjectRef,
     name: AtomId,
 ) -> VmResult<bool> {
-    let descriptor = object::get_own_property(agent, global_object, PropertyKey::from_atom(name))
-        .map_err(VmError::Abrupt)?;
+    let descriptor =
+        object::ordinary_get_own_property(agent, global_object, PropertyKey::from_atom(name))
+            .map_err(VmError::Abrupt)?;
     Ok(descriptor.is_some_and(|descriptor| descriptor.configurable() == Some(false)))
 }
 
@@ -110,12 +111,13 @@ fn can_declare_global_var(
     global_object: ObjectRef,
     name: AtomId,
 ) -> VmResult<bool> {
-    let descriptor = object::get_own_property(agent, global_object, PropertyKey::from_atom(name))
-        .map_err(VmError::Abrupt)?;
+    let descriptor =
+        object::ordinary_get_own_property(agent, global_object, PropertyKey::from_atom(name))
+            .map_err(VmError::Abrupt)?;
     if descriptor.is_some() {
         return Ok(true);
     }
-    object::is_extensible(agent, global_object).map_err(VmError::Abrupt)
+    object::ordinary_is_extensible(agent, global_object).map_err(VmError::Abrupt)
 }
 
 fn can_declare_global_function(
@@ -123,10 +125,11 @@ fn can_declare_global_function(
     global_object: ObjectRef,
     name: AtomId,
 ) -> VmResult<bool> {
-    let descriptor = object::get_own_property(agent, global_object, PropertyKey::from_atom(name))
-        .map_err(VmError::Abrupt)?;
+    let descriptor =
+        object::ordinary_get_own_property(agent, global_object, PropertyKey::from_atom(name))
+            .map_err(VmError::Abrupt)?;
     let Some(descriptor) = descriptor else {
-        return object::is_extensible(agent, global_object).map_err(VmError::Abrupt);
+        return object::ordinary_is_extensible(agent, global_object).map_err(VmError::Abrupt);
     };
     if descriptor.configurable() == Some(true) {
         return Ok(true);
@@ -142,7 +145,7 @@ fn create_global_var_binding(
     name: AtomId,
 ) -> VmResult<()> {
     let key = PropertyKey::from_atom(name);
-    if object::get_own_property(agent, global_object, key)
+    if object::ordinary_get_own_property(agent, global_object, key)
         .map_err(VmError::Abrupt)?
         .is_some()
     {
@@ -169,7 +172,7 @@ fn define_global_binding_property(
     descriptor.set_writable(true);
     descriptor.set_enumerable(true);
     descriptor.set_configurable(false);
-    let defined = object::define_property(
+    let defined = object::ordinary_define_property(
         agent,
         global_object,
         key,

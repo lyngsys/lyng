@@ -362,7 +362,7 @@ impl Vm {
                             slot: binding.slot(),
                         });
                     }
-                    let has_global_property = object::has_property(
+                    let has_global_property = object::ordinary_has_property(
                         agent,
                         record.global_object(),
                         PropertyKey::from_atom(name),
@@ -429,7 +429,7 @@ impl Vm {
                 self.environment_for_slot_access(agent, binding.environment(), 0, binding.slot())?;
             return self.write_environment_slot(agent, environment, binding.slot(), value);
         }
-        let _ = object::set(
+        let _ = object::ordinary_set(
             agent,
             global.global_object(),
             PropertyKey::from_atom(name),
@@ -461,13 +461,13 @@ impl Vm {
         }
 
         let key = PropertyKey::from_atom(name);
-        let has_property =
-            object::has_property(agent, global.global_object(), key).map_err(VmError::Abrupt)?;
+        let has_property = object::ordinary_has_property(agent, global.global_object(), key)
+            .map_err(VmError::Abrupt)?;
         if !has_property && self.frame_is_strict(frame) {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
 
-        let stored = object::set(
+        let stored = object::ordinary_set(
             agent,
             global.global_object(),
             key,
@@ -535,12 +535,12 @@ impl Vm {
     ) -> VmResult<()> {
         let global = self.find_global_environment(agent, environment)?;
         let key = PropertyKey::from_atom(name);
-        let has_property =
-            object::has_property(agent, global.global_object(), key).map_err(VmError::Abrupt)?;
+        let has_property = object::ordinary_has_property(agent, global.global_object(), key)
+            .map_err(VmError::Abrupt)?;
         if !has_property && strict {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
-        let stored = object::set(
+        let stored = object::ordinary_set(
             agent,
             global.global_object(),
             key,
@@ -566,7 +566,7 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
         let global = self.find_global_environment(agent, global_environment)?;
-        let _ = object::set(
+        let _ = object::ordinary_set(
             agent,
             global.global_object(),
             PropertyKey::from_atom(name),
@@ -865,8 +865,12 @@ impl Vm {
         {
             return Ok(false);
         }
-        object::delete_property(agent, global.global_object(), PropertyKey::from_atom(name))
-            .map_err(VmError::Abrupt)
+        object::ordinary_delete_property(
+            agent,
+            global.global_object(),
+            PropertyKey::from_atom(name),
+        )
+        .map_err(VmError::Abrupt)
     }
 
     pub(super) fn global_has_lexical_binding(
@@ -1012,10 +1016,12 @@ impl Vm {
     ) -> VmResult<Option<Value>> {
         let global = self.find_global_environment(agent, start)?;
         let key = PropertyKey::from_atom(name);
-        if !object::has_property(agent, global.global_object(), key).map_err(VmError::Abrupt)? {
+        if !object::ordinary_has_property(agent, global.global_object(), key)
+            .map_err(VmError::Abrupt)?
+        {
             return Ok(None);
         }
-        object::get(agent, global.global_object(), key)
+        object::ordinary_get(agent, global.global_object(), key)
             .map(Some)
             .map_err(VmError::Abrupt)
     }
@@ -1031,7 +1037,9 @@ impl Vm {
     ) -> VmResult<Option<Value>> {
         let global = self.find_global_environment(agent, start)?;
         let key = PropertyKey::from_atom(name);
-        if !object::has_property(agent, global.global_object(), key).map_err(VmError::Abrupt)? {
+        if !object::ordinary_has_property(agent, global.global_object(), key)
+            .map_err(VmError::Abrupt)?
+        {
             return Ok(None);
         }
         self.get_property_from_value(

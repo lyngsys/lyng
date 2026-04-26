@@ -8,7 +8,7 @@ use lyng_js_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, NativeFunctionRegistry,
     ObjectAllocation, ObjectColdData,
 };
-use lyng_js_ops::object::create_data_property;
+use lyng_js_ops::object::ordinary_create_data_property;
 use lyng_js_parser::parse_script;
 use lyng_js_sema::analyze_script;
 use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
@@ -108,7 +108,7 @@ pub(super) fn install_native_global(
     });
     let name = agent.atoms_mut().intern_collectible(name);
 
-    assert!(create_data_property(
+    assert!(ordinary_create_data_property(
         agent,
         realm.global_object(),
         PropertyKey::from_atom(name),

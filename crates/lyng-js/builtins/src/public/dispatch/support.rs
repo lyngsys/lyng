@@ -333,7 +333,7 @@ pub(super) fn set_data_property_value<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<(), Cx::Error> {
     let updated = {
         let agent = cx.agent();
-        object::set(agent, object_ref, key, value, AllocationLifetime::Default)
+        object::ordinary_set(agent, object_ref, key, value, AllocationLifetime::Default)
     };
     if !map_completion(cx, updated)? {
         return Err(type_error(cx));
@@ -855,7 +855,7 @@ pub(super) fn define_array_length<Cx: PublicBuiltinDispatchContext>(
     descriptor.set_value(length_value(length));
     let defined = {
         let agent = cx.agent();
-        object::define_property(
+        object::ordinary_define_property(
             agent,
             object_ref,
             PropertyKey::from_atom(WellKnownAtom::length.id()),
@@ -1001,7 +1001,7 @@ pub(super) fn create_array_result_with_prototype<Cx: PublicBuiltinDispatchContex
     descriptor.set_configurable(false);
     let defined = {
         let agent = cx.agent();
-        object::define_property(
+        object::ordinary_define_property(
             agent,
             array,
             PropertyKey::from_atom(WellKnownAtom::length.id()),

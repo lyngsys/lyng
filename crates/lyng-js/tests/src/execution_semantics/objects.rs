@@ -8,7 +8,7 @@ use lyng_js_objects::{
     InternalMethodResult, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
     ObjectRuntime,
 };
-use lyng_js_ops::object::create_data_property;
+use lyng_js_ops::object::ordinary_create_data_property;
 use lyng_js_types::{PropertyKey, Value};
 
 #[derive(Default)]
@@ -1017,6 +1017,121 @@ fn phase6_proxy_set_trap_from_prototype_receives_original_receiver() {
 }
 
 #[test]
+fn phase6_array_builtins_route_proxy_observable_operations_through_traps() {
+    let result = compile_and_run_string(
+        r#"
+        let log = [];
+        let target = { length: 1 };
+        let syntheticIndex = true;
+        let proxy = new Proxy(target, {
+            get(target, key, receiver) {
+                log.push("get:" + String(key));
+                if (key === "length") {
+                    return target.length;
+                }
+                if (key === "0") {
+                    return syntheticIndex ? "needle" : Reflect.get(target, key, receiver);
+                }
+                return Reflect.get(target, key, receiver);
+            },
+            has(target, key) {
+                log.push("has:" + String(key));
+                return key === "0" || key in target;
+            },
+            set(target, key, value, receiver) {
+                log.push("set:" + String(key) + "=" + String(value));
+                target[key] = value;
+                return true;
+            },
+            deleteProperty(target, key) {
+                log.push("delete:" + String(key));
+                delete target[key];
+                return true;
+            }
+        });
+
+        let total = 0;
+        total += Array.prototype.indexOf.call(proxy, "needle") === 0 ? 1 : 0;
+
+        Array.prototype.push.call(proxy, "next");
+        total += target[1] === "next" && target.length === 2 ? 2 : 0;
+
+        target[0] = "first";
+        target.length = 1;
+        syntheticIndex = false;
+        total += Array.prototype.pop.call(proxy) === "first" ? 4 : 0;
+        total += target.length === 0 && !("0" in target) ? 8 : 0;
+
+        String(total) + ";" + log.join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "15;get:length|has:0|get:0|get:length|set:1=next|set:length=2|get:length|get:0|delete:0|set:length=0"
+    );
+}
+
+#[test]
+fn phase6_object_prototype_builtins_route_proxy_observable_operations_through_traps() {
+    let result = compile_and_run_string(
+        r#"
+        let log = [];
+        let proxy = new Proxy({}, {
+            getOwnPropertyDescriptor(target, key) {
+                log.push("getOwnPropertyDescriptor:" + String(key));
+                if (key === "virtual") {
+                    return {
+                        value: 1,
+                        writable: true,
+                        enumerable: true,
+                        configurable: true
+                    };
+                }
+                return undefined;
+            },
+            get(target, key, receiver) {
+                if (key === Symbol.toStringTag) {
+                    log.push("get:@@toStringTag");
+                    return "Virtual";
+                }
+                log.push("get:" + String(key));
+                return undefined;
+            }
+        });
+
+        let hasOwn = "unset";
+        let tag = "unset";
+        let hasOwnError = "none";
+        let tagError = "none";
+        try {
+            hasOwn = String(Object.prototype.hasOwnProperty.call(proxy, "virtual"));
+        } catch (error) {
+            hasOwnError = error.constructor === TypeError ? "TypeError" : "other";
+        }
+        try {
+            tag = Object.prototype.toString.call(proxy);
+        } catch (error) {
+            tagError = error.constructor === TypeError ? "TypeError" : "other";
+        }
+
+        [
+            hasOwn,
+            tag,
+            hasOwnError,
+            tagError,
+            log.join("|")
+        ].join(";");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "true;[object Virtual];none;none;getOwnPropertyDescriptor:virtual|get:@@toStringTag"
+    );
+}
+
+#[test]
 fn phase6_proxy_enforces_handler_invariants_for_non_configurable_target_state() {
     let result = compile_and_run(
         r#"
@@ -1185,7 +1300,7 @@ fn phase5_cross_realm_foundations_use_selected_builtin_and_receiver_realms() {
                 ("OtherTypeError", other_type_error),
             ] {
                 let atom = agent.atoms_mut().intern_collectible(name);
-                assert!(create_data_property(
+                assert!(ordinary_create_data_property(
                     agent,
                     realm.global_object(),
                     PropertyKey::from_atom(atom),

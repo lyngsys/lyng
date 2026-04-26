@@ -375,7 +375,7 @@ impl Vm {
                     ImportMetaValue::Smi(value) => Value::from_smi(value),
                     ImportMetaValue::Null => Value::null(),
                 };
-                object::create_data_property(
+                object::ordinary_create_data_property(
                     agent,
                     import_meta,
                     PropertyKey::from_atom(key),
@@ -387,7 +387,7 @@ impl Vm {
         } else {
             let url = Value::from_string_ref(alloc_string(agent, module_key.as_str(), None));
             let url_atom = agent.atoms_mut().intern_collectible("url");
-            object::create_data_property(
+            object::ordinary_create_data_property(
                 agent,
                 import_meta,
                 PropertyKey::from_atom(url_atom),
@@ -544,12 +544,30 @@ impl Vm {
         }
         let attributes_object =
             self.to_object_for_value(agent, caller_frame.realm(), with_value)?;
-        let keys = object::own_property_keys(agent, attributes_object).map_err(VmError::Abrupt)?;
+        let keys = object::own_property_keys_in_context(
+            &mut VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame: caller_frame,
+            },
+            attributes_object,
+        )?;
         let mut attributes = Vec::new();
         for key in keys {
-            let enumerable = object::get_own_property(agent, attributes_object, key)
-                .map_err(VmError::Abrupt)?
-                .is_some_and(|descriptor| descriptor.enumerable() == Some(true));
+            let enumerable = object::get_own_property_in_context(
+                &mut VmProxyBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    frame: caller_frame,
+                },
+                attributes_object,
+                key,
+            )?
+            .is_some_and(|descriptor| descriptor.enumerable() == Some(true));
             if !enumerable {
                 continue;
             }
@@ -714,7 +732,7 @@ impl Vm {
         });
 
         let length_key = PropertyKey::from_atom(WellKnownAtom::length.id());
-        let target_has_own_length = object::get_own_property(agent, target, length_key)
+        let target_has_own_length = object::ordinary_get_own_property(agent, target, length_key)
             .map_err(VmError::Abrupt)?
             .is_some();
         let bound_length = if target_has_own_length {
@@ -769,7 +787,7 @@ impl Vm {
     }
 
     fn function_name_text(&mut self, agent: &mut Agent, function: ObjectRef) -> VmResult<String> {
-        let name = object::get(
+        let name = object::ordinary_get(
             agent,
             function,
             PropertyKey::from_atom(WellKnownAtom::name.id()),
@@ -1111,9 +1129,18 @@ impl Vm {
         let object = self.to_object_for_value(agent, caller.realm(), this_value)?;
         let key_value = arguments.first().copied().unwrap_or(Value::undefined());
         let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
-        let has_property = object::get_own_property(agent, object, key)
-            .map_err(VmError::Abrupt)?
-            .is_some();
+        let has_property = object::get_own_property_in_context(
+            &mut VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame: caller,
+            },
+            object,
+            key,
+        )?
+        .is_some();
         Ok(Value::from_bool(has_property))
     }
 
@@ -1152,21 +1179,25 @@ impl Vm {
     fn array_index_of_builtin(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<Value> {
         const MAX_SAFE_INTEGER_U64: u64 = (1_u64 << 53) - 1;
 
-        let object = this_value
-            .as_object_ref()
-            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let object = self.to_object_for_value(agent, caller.realm(), this_value)?;
         let search = arguments.first().copied().unwrap_or(Value::undefined());
-        let length = object::get(
+        let length = self.get_property_from_object(
             agent,
+            host,
+            registry,
+            caller,
             object,
+            Value::from_object_ref(object),
             PropertyKey::from_atom(WellKnownAtom::length.id()),
-        )
-        .map_err(VmError::Abrupt)?;
+        )?;
 
         let length = {
             let number = to_f64_number(agent, length)?;
@@ -1210,11 +1241,32 @@ impl Vm {
                 let atom = agent.atoms_mut().intern_collectible(&index.to_string());
                 PropertyKey::from_atom(atom)
             });
-            if !object::has_property(agent, object, key).map_err(VmError::Abrupt)? {
+            let has_property = object::has_property_in_context(
+                &mut VmProxyBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    frame: caller,
+                },
+                object,
+                key,
+            )?;
+            if !has_property {
                 index += 1;
                 continue;
             }
-            let value = object::get(agent, object, key).map_err(VmError::Abrupt)?;
+            let value = object::get_in_context(
+                &mut VmProxyBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    frame: caller,
+                },
+                object,
+                key,
+            )?;
             if read::is_strictly_equal(agent.heap().view(), value, search)
                 .map_err(VmError::Abrupt)?
             {
@@ -1274,13 +1326,25 @@ impl Vm {
     }
 
     fn set_array_property_or_throw(
+        &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
         object: ObjectRef,
         key: PropertyKey,
         value: Value,
     ) -> VmResult<()> {
-        let stored = object::set(agent, object, key, value, AllocationLifetime::Default)
-            .map_err(VmError::Abrupt)?;
+        let stored = self.set_property_on_object(
+            agent,
+            host,
+            registry,
+            caller,
+            object,
+            Value::from_object_ref(object),
+            key,
+            value,
+        )?;
         if !stored {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
@@ -1299,12 +1363,15 @@ impl Vm {
         const MAX_SAFE_INTEGER_U64: u64 = (1_u64 << 53) - 1;
 
         let object = self.to_object_for_value(agent, caller.realm(), this_value)?;
-        let length = object::get(
+        let length = self.get_property_from_object(
             agent,
+            host,
+            registry,
+            caller,
             object,
+            Value::from_object_ref(object),
             PropertyKey::from_atom(WellKnownAtom::length.id()),
-        )
-        .map_err(VmError::Abrupt)?;
+        )?;
         let mut length =
             self.array_like_length_from_value(agent, host, registry, caller, length)?;
         let argument_count = u64::try_from(arguments.len()).unwrap_or(u64::MAX);
@@ -1314,12 +1381,17 @@ impl Vm {
 
         for argument in arguments {
             let key = Self::array_like_index_key(agent, length);
-            Self::set_array_property_or_throw(agent, object, key, *argument)?;
+            self.set_array_property_or_throw(
+                agent, host, registry, caller, object, key, *argument,
+            )?;
             length += 1;
         }
 
-        Self::set_array_property_or_throw(
+        self.set_array_property_or_throw(
             agent,
+            host,
+            registry,
+            caller,
             object,
             PropertyKey::from_atom(WellKnownAtom::length.id()),
             Self::array_length_value(length),
@@ -1336,16 +1408,22 @@ impl Vm {
         this_value: Value,
     ) -> VmResult<Value> {
         let object = self.to_object_for_value(agent, caller.realm(), this_value)?;
-        let length = object::get(
+        let length = self.get_property_from_object(
             agent,
+            host,
+            registry,
+            caller,
             object,
+            Value::from_object_ref(object),
             PropertyKey::from_atom(WellKnownAtom::length.id()),
-        )
-        .map_err(VmError::Abrupt)?;
+        )?;
         let length = self.array_like_length_from_value(agent, host, registry, caller, length)?;
         if length == 0 {
-            Self::set_array_property_or_throw(
+            self.set_array_property_or_throw(
                 agent,
+                host,
+                registry,
+                caller,
                 object,
                 PropertyKey::from_atom(WellKnownAtom::length.id()),
                 Value::from_smi(0),
@@ -1355,13 +1433,34 @@ impl Vm {
 
         let new_length = length - 1;
         let key = Self::array_like_index_key(agent, new_length);
-        let element = object::get(agent, object, key).map_err(VmError::Abrupt)?;
-        let deleted = object::delete_property(agent, object, key).map_err(VmError::Abrupt)?;
+        let element = self.get_property_from_object(
+            agent,
+            host,
+            registry,
+            caller,
+            object,
+            Value::from_object_ref(object),
+            key,
+        )?;
+        let deleted = object::delete_property_in_context(
+            &mut VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame: caller,
+            },
+            object,
+            key,
+        )?;
         if !deleted {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
-        Self::set_array_property_or_throw(
+        self.set_array_property_or_throw(
             agent,
+            host,
+            registry,
+            caller,
             object,
             PropertyKey::from_atom(WellKnownAtom::length.id()),
             Self::array_length_value(new_length),
@@ -1372,6 +1471,8 @@ impl Vm {
     fn object_to_string_builtin(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
         this_value: Value,
     ) -> VmResult<Value> {
@@ -1417,7 +1518,18 @@ impl Vm {
         let to_string_tag = agent
             .well_known_symbol(WellKnownSymbolId::ToStringTag)
             .map(PropertyKey::from_symbol)
-            .and_then(|key| object::get(agent, object, key).ok())
+            .map(|key| {
+                self.get_property_from_object(
+                    agent,
+                    host,
+                    registry,
+                    caller,
+                    object,
+                    Value::from_object_ref(object),
+                    key,
+                )
+            })
+            .transpose()?
             .filter(|value| value.is_string())
             .map(|value| self.value_to_string_text(agent, value))
             .transpose()?;
@@ -1818,7 +1930,7 @@ impl Vm {
             return Ok(Value::from_object_ref(object));
         };
         let changed =
-            object::set_prototype_of(agent, object, prototype).map_err(VmError::Abrupt)?;
+            object::ordinary_set_prototype_of(agent, object, prototype).map_err(VmError::Abrupt)?;
         if !changed {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
@@ -2356,7 +2468,7 @@ impl Vm {
             },
             |record| record.this_binding_status(),
         );
-        let super_constructor = object::get_prototype_of(agent, active_function)
+        let super_constructor = object::ordinary_get_prototype_of(agent, active_function)
             .map_err(VmError::Abrupt)?
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let new_target = record
@@ -2600,6 +2712,24 @@ impl VmBuiltinDispatch<'_, '_, '_> {
         self.builtin_get_property_value(Value::from_object_ref(object), key)
     }
 
+    fn builtin_has_property_on_object(
+        &mut self,
+        object: ObjectRef,
+        key: PropertyKey,
+    ) -> VmResult<bool> {
+        object::has_property_in_context(
+            &mut VmProxyBridge {
+                vm: self.vm,
+                agent: self.agent,
+                host: self.host,
+                registry: self.registry,
+                frame: self.caller_frame,
+            },
+            object,
+            key,
+        )
+    }
+
     fn builtin_constructor_prototype(
         &mut self,
         source_realm: RealmRef,
@@ -2717,13 +2847,10 @@ impl VmBuiltinDispatch<'_, '_, '_> {
     ) -> VmResult<PropertyDescriptor> {
         let mut descriptor = PropertyDescriptor::new();
 
-        if object::has_property(
-            self.agent,
+        if self.builtin_has_property_on_object(
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::enumerable.id()),
-        )
-        .map_err(VmError::Abrupt)?
-        {
+        )? {
             let enumerable = self.builtin_get_property_value_from_object(
                 descriptor_object,
                 PropertyKey::from_atom(WellKnownAtom::enumerable.id()),
@@ -2732,13 +2859,10 @@ impl VmBuiltinDispatch<'_, '_, '_> {
                 read::to_boolean(self.agent.heap().view(), enumerable).map_err(VmError::Abrupt)?,
             );
         }
-        if object::has_property(
-            self.agent,
+        if self.builtin_has_property_on_object(
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::configurable.id()),
-        )
-        .map_err(VmError::Abrupt)?
-        {
+        )? {
             let configurable = self.builtin_get_property_value_from_object(
                 descriptor_object,
                 PropertyKey::from_atom(WellKnownAtom::configurable.id()),
@@ -2748,26 +2872,20 @@ impl VmBuiltinDispatch<'_, '_, '_> {
                     .map_err(VmError::Abrupt)?,
             );
         }
-        if object::has_property(
-            self.agent,
+        if self.builtin_has_property_on_object(
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::value.id()),
-        )
-        .map_err(VmError::Abrupt)?
-        {
+        )? {
             let value = self.builtin_get_property_value_from_object(
                 descriptor_object,
                 PropertyKey::from_atom(WellKnownAtom::value.id()),
             )?;
             descriptor.set_value(value);
         }
-        if object::has_property(
-            self.agent,
+        if self.builtin_has_property_on_object(
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::writable.id()),
-        )
-        .map_err(VmError::Abrupt)?
-        {
+        )? {
             let writable = self.builtin_get_property_value_from_object(
                 descriptor_object,
                 PropertyKey::from_atom(WellKnownAtom::writable.id()),
@@ -2776,13 +2894,10 @@ impl VmBuiltinDispatch<'_, '_, '_> {
                 read::to_boolean(self.agent.heap().view(), writable).map_err(VmError::Abrupt)?,
             );
         }
-        if object::has_property(
-            self.agent,
+        if self.builtin_has_property_on_object(
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::get.id()),
-        )
-        .map_err(VmError::Abrupt)?
-        {
+        )? {
             let getter = self.builtin_get_property_value_from_object(
                 descriptor_object,
                 PropertyKey::from_atom(WellKnownAtom::get.id()),
@@ -2797,13 +2912,10 @@ impl VmBuiltinDispatch<'_, '_, '_> {
             }
             descriptor.set_getter(getter);
         }
-        if object::has_property(
-            self.agent,
+        if self.builtin_has_property_on_object(
             descriptor_object,
             PropertyKey::from_atom(WellKnownAtom::set.id()),
-        )
-        .map_err(VmError::Abrupt)?
-        {
+        )? {
             let setter = self.builtin_get_property_value_from_object(
                 descriptor_object,
                 PropertyKey::from_atom(WellKnownAtom::set.id()),
@@ -2973,8 +3085,14 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .array_index_of_builtin(self.agent, invocation.this_value(), invocation.arguments())
+        self.vm.array_index_of_builtin(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            invocation.this_value(),
+            invocation.arguments(),
+        )
     }
 
     fn array_push_builtin(
@@ -3008,8 +3126,13 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .object_to_string_builtin(self.agent, self.caller_frame, invocation.this_value())
+        self.vm.object_to_string_builtin(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            invocation.this_value(),
+        )
     }
 
     fn template_to_string_builtin(

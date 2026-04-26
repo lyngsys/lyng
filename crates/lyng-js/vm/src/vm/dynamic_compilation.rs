@@ -296,9 +296,14 @@ impl Vm {
         descriptor.set_writable(true);
         descriptor.set_enumerable(false);
         descriptor.set_configurable(false);
-        let defined =
-            object::define_property(agent, object, key, descriptor, AllocationLifetime::Default)
-                .map_err(VmError::Abrupt)?;
+        let defined = object::ordinary_define_property(
+            agent,
+            object,
+            key,
+            descriptor,
+            AllocationLifetime::Default,
+        )
+        .map_err(VmError::Abrupt)?;
         if defined {
             Ok(object)
         } else {
@@ -732,12 +737,12 @@ impl Vm {
         name: AtomId,
     ) -> VmResult<bool> {
         let descriptor =
-            object::get_own_property(agent, global_object, PropertyKey::from_atom(name))
+            object::ordinary_get_own_property(agent, global_object, PropertyKey::from_atom(name))
                 .map_err(VmError::Abrupt)?;
         if descriptor.is_some() {
             return Ok(true);
         }
-        object::is_extensible(agent, global_object).map_err(VmError::Abrupt)
+        object::ordinary_is_extensible(agent, global_object).map_err(VmError::Abrupt)
     }
 
     fn can_declare_direct_eval_global_function(
@@ -746,10 +751,10 @@ impl Vm {
         name: AtomId,
     ) -> VmResult<bool> {
         let descriptor =
-            object::get_own_property(agent, global_object, PropertyKey::from_atom(name))
+            object::ordinary_get_own_property(agent, global_object, PropertyKey::from_atom(name))
                 .map_err(VmError::Abrupt)?;
         let Some(descriptor) = descriptor else {
-            return object::is_extensible(agent, global_object).map_err(VmError::Abrupt);
+            return object::ordinary_is_extensible(agent, global_object).map_err(VmError::Abrupt);
         };
         if descriptor.configurable() == Some(true) {
             return Ok(true);
@@ -995,8 +1000,8 @@ impl Vm {
     ) -> VmResult<()> {
         for &name in function_names {
             let key = PropertyKey::from_atom(name);
-            let existing =
-                object::get_own_property(agent, global_object, key).map_err(VmError::Abrupt)?;
+            let existing = object::ordinary_get_own_property(agent, global_object, key)
+                .map_err(VmError::Abrupt)?;
             let mut descriptor = PropertyDescriptor::new();
             descriptor.set_value(Value::undefined());
             if existing.is_none()
@@ -1006,7 +1011,7 @@ impl Vm {
                 descriptor.set_enumerable(true);
                 descriptor.set_configurable(true);
             }
-            let defined = object::define_property(
+            let defined = object::ordinary_define_property(
                 agent,
                 global_object,
                 key,
@@ -1028,12 +1033,12 @@ impl Vm {
             }
 
             let key = PropertyKey::from_atom(name);
-            let has_property = object::get_own_property(agent, global_object, key)
+            let has_property = object::ordinary_get_own_property(agent, global_object, key)
                 .map_err(VmError::Abrupt)?
                 .is_some();
             if !has_property {
-                let extensible =
-                    object::is_extensible(agent, global_object).map_err(VmError::Abrupt)?;
+                let extensible = object::ordinary_is_extensible(agent, global_object)
+                    .map_err(VmError::Abrupt)?;
                 if !extensible {
                     return Err(VmError::Abrupt(errors::throw_type_error(agent)));
                 }
@@ -1043,7 +1048,7 @@ impl Vm {
                 descriptor.set_writable(true);
                 descriptor.set_enumerable(true);
                 descriptor.set_configurable(true);
-                let defined = object::define_property(
+                let defined = object::ordinary_define_property(
                     agent,
                     global_object,
                     key,

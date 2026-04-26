@@ -239,7 +239,7 @@ impl Vm {
             .as_object_ref()
             .filter(|object| agent.promise_record(*object).is_some())
         {
-            let constructor = object::get(
+            let constructor = object::ordinary_get(
                 agent,
                 promise,
                 PropertyKey::from_atom(WellKnownAtom::constructor.id()),

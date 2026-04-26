@@ -335,7 +335,8 @@ impl Vm {
             Err(error) => return Err(error),
         };
         let resolve_key = PropertyKey::from_atom(agent.atoms_mut().intern_collectible("resolve"));
-        let resolve = object::get(agent, constructor, resolve_key).map_err(VmError::Abrupt)?;
+        let resolve =
+            object::ordinary_get(agent, constructor, resolve_key).map_err(VmError::Abrupt)?;
         let resolve = resolve
             .as_object_ref()
             .filter(|object| agent.objects().is_callable(*object))

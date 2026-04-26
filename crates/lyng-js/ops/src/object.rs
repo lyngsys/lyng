@@ -197,6 +197,20 @@ pub fn define_property_in_context<Cx: ObjectOpsContext>(
     proxy::define_property(context, object, key, descriptor, lifetime)
 }
 
+/// ECMAScript `DeletePropertyOrThrow`-style primitive over a proxy-aware object operations
+/// context.
+///
+/// # Errors
+/// Returns an abrupt completion if ordinary object internal methods fail or a
+/// proxy trap fails.
+pub fn delete_property_in_context<Cx: ObjectOpsContext>(
+    context: &mut Cx,
+    object: ObjectRef,
+    key: PropertyKey,
+) -> Result<bool, Cx::Error> {
+    proxy::delete_property(context, object, key)
+}
+
 /// ECMAScript `OwnPropertyKeys` over a proxy-aware object operations context.
 ///
 /// # Errors
@@ -831,11 +845,20 @@ fn typed_array_index_descriptor(
     Ok(Some(descriptor))
 }
 
-/// ECMAScript `HasProperty` over the public object substrate.
+/// Ordinary-only `HasProperty` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use
+/// [`has_property_in_context`] unless the algorithm is explicitly operating on
+/// an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn has_property(agent: &mut Agent, object: ObjectRef, key: PropertyKey) -> Completion<bool> {
+pub fn ordinary_has_property(
+    agent: &mut Agent,
+    object: ObjectRef,
+    key: PropertyKey,
+) -> Completion<bool> {
     if let Some(index) = key.as_index() {
         if agent.objects().typed_array(object).is_some() {
             return Ok(typed_array_index_descriptor(agent, object, index)?.is_some());
@@ -847,19 +870,28 @@ pub fn has_property(agent: &mut Agent, object: ObjectRef, key: PropertyKey) -> C
         .map_err(|error| internal_method_error(agent, error))
 }
 
-/// ECMAScript `Get` over the public object substrate.
+/// Ordinary-only `Get` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use [`get_in_context`] unless
+/// the algorithm is explicitly operating on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn get(agent: &mut Agent, object: ObjectRef, key: PropertyKey) -> Completion<Value> {
-    get_with_receiver(agent, object, key, Value::from_object_ref(object))
+pub fn ordinary_get(agent: &mut Agent, object: ObjectRef, key: PropertyKey) -> Completion<Value> {
+    ordinary_get_with_receiver(agent, object, key, Value::from_object_ref(object))
 }
 
-/// ECMAScript `Get` over the public object substrate with an explicit receiver.
+/// Ordinary-only `Get` over the object substrate with an explicit receiver.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use
+/// [`get_with_receiver_in_context`] unless the algorithm is explicitly
+/// operating on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn get_with_receiver(
+pub fn ordinary_get_with_receiver(
     agent: &mut Agent,
     object: ObjectRef,
     key: PropertyKey,
@@ -903,25 +935,38 @@ pub fn super_get(
     key: PropertyKey,
 ) -> Completion<Value> {
     let base = super_base(agent, home_object)?;
-    get_with_receiver(agent, base, key, receiver)
+    ordinary_get_with_receiver(agent, base, key, receiver)
 }
 
-/// ECMAScript `[[GetPrototypeOf]]` over the public object substrate.
+/// Ordinary-only `[[GetPrototypeOf]]` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use
+/// [`get_prototype_of_in_context`] unless the algorithm is explicitly operating
+/// on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn get_prototype_of(agent: &mut Agent, object: ObjectRef) -> Completion<Option<ObjectRef>> {
+pub fn ordinary_get_prototype_of(
+    agent: &mut Agent,
+    object: ObjectRef,
+) -> Completion<Option<ObjectRef>> {
     agent
         .objects()
         .get_prototype_of(agent.heap().view(), object)
         .map_err(|error| internal_method_error(agent, error))
 }
 
-/// ECMAScript `[[SetPrototypeOf]]` over the public object substrate.
+/// Ordinary-only `[[SetPrototypeOf]]` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use
+/// [`set_prototype_of_in_context`] unless the algorithm is explicitly operating
+/// on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn set_prototype_of(
+pub fn ordinary_set_prototype_of(
     agent: &mut Agent,
     object: ObjectRef,
     prototype: Option<ObjectRef>,
@@ -932,11 +977,16 @@ pub fn set_prototype_of(
     result.map_err(|error| internal_method_error(agent, error))
 }
 
-/// ECMAScript `[[GetOwnProperty]]` over the public object substrate.
+/// Ordinary-only `[[GetOwnProperty]]` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use
+/// [`get_own_property_in_context`] unless the algorithm is explicitly operating
+/// on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn get_own_property(
+pub fn ordinary_get_own_property(
     agent: &mut Agent,
     object: ObjectRef,
     key: PropertyKey,
@@ -952,11 +1002,16 @@ pub fn get_own_property(
         .map_err(|error| internal_method_error(agent, error))
 }
 
-/// ECMAScript `[[DefineOwnProperty]]` over the public object substrate.
+/// Ordinary-only `[[DefineOwnProperty]]` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use
+/// [`define_property_in_context`] unless the algorithm is explicitly operating
+/// on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn define_property(
+pub fn ordinary_define_property(
     agent: &mut Agent,
     object: ObjectRef,
     key: PropertyKey,
@@ -969,50 +1024,72 @@ pub fn define_property(
     result.map_err(|error| internal_method_error(agent, error))
 }
 
-/// ECMAScript `[[IsExtensible]]` over the public object substrate.
+/// Ordinary-only `[[IsExtensible]]` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use `proxy::is_extensible`
+/// with an object-operation context unless the algorithm is explicitly
+/// operating on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn is_extensible(agent: &mut Agent, object: ObjectRef) -> Completion<bool> {
+pub fn ordinary_is_extensible(agent: &mut Agent, object: ObjectRef) -> Completion<bool> {
     agent
         .objects()
         .is_extensible(object)
         .map_err(|error| internal_method_error(agent, error))
 }
 
-/// ECMAScript `[[PreventExtensions]]` over the public object substrate.
+/// Ordinary-only `[[PreventExtensions]]` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use `proxy::prevent_extensions`
+/// with an object-operation context unless the algorithm is explicitly
+/// operating on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn prevent_extensions(agent: &mut Agent, object: ObjectRef) -> Completion<bool> {
+pub fn ordinary_prevent_extensions(agent: &mut Agent, object: ObjectRef) -> Completion<bool> {
     let result = agent
         .with_heap_and_objects(|heap, objects| objects.prevent_extensions(heap.view(), object));
     result.map_err(|error| internal_method_error(agent, error))
 }
 
-/// ECMAScript `[[OwnPropertyKeys]]` over the public object substrate.
+/// Ordinary-only `[[OwnPropertyKeys]]` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use
+/// [`own_property_keys_in_context`] unless the algorithm is explicitly
+/// operating on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn own_property_keys(agent: &mut Agent, object: ObjectRef) -> Completion<Vec<PropertyKey>> {
+pub fn ordinary_own_property_keys(
+    agent: &mut Agent,
+    object: ObjectRef,
+) -> Completion<Vec<PropertyKey>> {
     agent
         .objects()
         .own_property_keys(agent.heap().view(), object)
         .map_err(|error| internal_method_error(agent, error))
 }
 
-/// ECMAScript `Set` over the public object substrate.
+/// Ordinary-only `Set` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use [`set_in_context`] unless
+/// the algorithm is explicitly operating on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn set(
+pub fn ordinary_set(
     agent: &mut Agent,
     object: ObjectRef,
     key: PropertyKey,
     value: Value,
     lifetime: AllocationLifetime,
 ) -> Completion<bool> {
-    set_with_receiver(
+    ordinary_set_with_receiver(
         agent,
         object,
         key,
@@ -1022,11 +1099,16 @@ pub fn set(
     )
 }
 
-/// ECMAScript `Set` over the public object substrate with an explicit receiver.
+/// Ordinary-only `Set` over the object substrate with an explicit receiver.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use
+/// [`set_with_receiver_in_context`] unless the algorithm is explicitly
+/// operating on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn set_with_receiver(
+pub fn ordinary_set_with_receiver(
     agent: &mut Agent,
     object: ObjectRef,
     key: PropertyKey,
@@ -1055,14 +1137,23 @@ pub fn super_set(
     lifetime: AllocationLifetime,
 ) -> Completion<bool> {
     let base = super_base(agent, home_object)?;
-    set_with_receiver(agent, base, key, value, receiver, lifetime)
+    ordinary_set_with_receiver(agent, base, key, value, receiver, lifetime)
 }
 
-/// ECMAScript `DeletePropertyOrThrow`-style primitive over the public object substrate.
+/// Ordinary-only `DeletePropertyOrThrow`-style primitive over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use
+/// [`delete_property_in_context`] unless the algorithm is explicitly operating
+/// on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn delete_property(agent: &mut Agent, object: ObjectRef, key: PropertyKey) -> Completion<bool> {
+pub fn ordinary_delete_property(
+    agent: &mut Agent,
+    object: ObjectRef,
+    key: PropertyKey,
+) -> Completion<bool> {
     let result = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.delete(&mut mutator, object, key)
@@ -1070,11 +1161,16 @@ pub fn delete_property(agent: &mut Agent, object: ObjectRef, key: PropertyKey) -
     result.map_err(|error| internal_method_error(agent, error))
 }
 
-/// ECMAScript `CreateDataProperty` over the public object substrate.
+/// Ordinary-only `CreateDataProperty` over the object substrate.
+///
+/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
+/// internal methods. Guest-observable code should use a context operation that
+/// defines the property through proxy-aware object semantics unless the
+/// algorithm is explicitly operating on an ordinary/bootstrap object.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
-pub fn create_data_property(
+pub fn ordinary_create_data_property(
     agent: &mut Agent,
     object: ObjectRef,
     key: PropertyKey,
@@ -1409,7 +1505,7 @@ fn is_default_object_prototype_method<Cx: ToPrimitiveContext>(
     let key = PropertyKey::from_atom(method_name);
     let prototype = {
         let agent = cx.agent();
-        get_prototype_of(agent, object)
+        ordinary_get_prototype_of(agent, object)
     };
     let Some(wrapper_prototype) = map_completion(cx, prototype)? else {
         return Ok(false);
@@ -1417,7 +1513,7 @@ fn is_default_object_prototype_method<Cx: ToPrimitiveContext>(
 
     let wrapper_descriptor = {
         let agent = cx.agent();
-        get_own_property(agent, wrapper_prototype, key)
+        ordinary_get_own_property(agent, wrapper_prototype, key)
     };
     if map_completion(cx, wrapper_descriptor)?.is_some() {
         return Ok(false);
@@ -1425,7 +1521,7 @@ fn is_default_object_prototype_method<Cx: ToPrimitiveContext>(
 
     let object_prototype = {
         let agent = cx.agent();
-        get_prototype_of(agent, wrapper_prototype)
+        ordinary_get_prototype_of(agent, wrapper_prototype)
     };
     let Some(object_prototype) = map_completion(cx, object_prototype)? else {
         return Ok(false);
@@ -1433,7 +1529,7 @@ fn is_default_object_prototype_method<Cx: ToPrimitiveContext>(
 
     let descriptor = {
         let agent = cx.agent();
-        get_own_property(agent, object_prototype, key)
+        ordinary_get_own_property(agent, object_prototype, key)
     };
     let Some(descriptor) = map_completion(cx, descriptor)? else {
         return Ok(false);
@@ -1641,7 +1737,7 @@ mod tests {
     }
 
     #[test]
-    fn object_property_wrappers_delegate_to_internal_methods() {
+    fn ordinary_only_object_helpers_delegate_to_internal_methods() {
         let mut runtime = Runtime::new(NoopHostHooks);
         let agent = runtime.root_agent_mut();
         let default_realm = agent.default_realm().expect("default realm should exist");
@@ -1658,7 +1754,7 @@ mod tests {
             )
         });
 
-        assert!(create_data_property(
+        assert!(ordinary_create_data_property(
             agent,
             object,
             key,
@@ -1666,9 +1762,12 @@ mod tests {
             AllocationLifetime::Default,
         )
         .unwrap());
-        assert!(has_property(agent, object, key).unwrap());
-        assert_eq!(get(agent, object, key).unwrap(), Value::from_smi(11));
-        assert!(set(
+        assert!(ordinary_has_property(agent, object, key).unwrap());
+        assert_eq!(
+            ordinary_get(agent, object, key).unwrap(),
+            Value::from_smi(11)
+        );
+        assert!(ordinary_set(
             agent,
             object,
             key,
@@ -1676,9 +1775,12 @@ mod tests {
             AllocationLifetime::Default,
         )
         .unwrap());
-        assert_eq!(get(agent, object, key).unwrap(), Value::from_smi(13));
-        assert!(delete_property(agent, object, key).unwrap());
-        assert!(!has_property(agent, object, key).unwrap());
+        assert_eq!(
+            ordinary_get(agent, object, key).unwrap(),
+            Value::from_smi(13)
+        );
+        assert!(ordinary_delete_property(agent, object, key).unwrap());
+        assert!(!ordinary_has_property(agent, object, key).unwrap());
     }
 
     #[test]
@@ -1692,10 +1794,10 @@ mod tests {
             .expect("test typed array should install its view record");
         assert!(agent.backing_store_set_byte(typed_array_record.backing_store(), 0, 7));
 
-        let descriptor = get_own_property(agent, typed_array, PropertyKey::Index(0))
+        let descriptor = ordinary_get_own_property(agent, typed_array, PropertyKey::Index(0))
             .expect("typed-array descriptor lookup should succeed")
             .expect("typed-array index should still exist");
-        let value = get(agent, typed_array, PropertyKey::Index(0))
+        let value = ordinary_get(agent, typed_array, PropertyKey::Index(0))
             .expect("typed-array indexed get should succeed");
 
         assert_eq!(descriptor.value(), Some(Value::from_smi(7)));
@@ -1912,13 +2014,13 @@ mod tests {
         )
         .expect("String wrapper should allocate");
 
-        let length = get(
+        let length = ordinary_get(
             agent,
             wrapper,
             PropertyKey::from_atom(WellKnownAtom::length.id()),
         )
         .unwrap();
-        let first = get(agent, wrapper, PropertyKey::Index(0)).unwrap();
+        let first = ordinary_get(agent, wrapper, PropertyKey::Index(0)).unwrap();
 
         assert_eq!(
             agent.objects().primitive_wrapper_kind(wrapper),
@@ -1966,7 +2068,7 @@ mod tests {
             object: ObjectRef,
             key: PropertyKey,
         ) -> Result<Value, Self::Error> {
-            get(self.agent, object, key)
+            ordinary_get(self.agent, object, key)
         }
 
         fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
@@ -2029,7 +2131,7 @@ mod tests {
             );
             (to_string, value_of)
         });
-        assert!(create_data_property(
+        assert!(ordinary_create_data_property(
             agent,
             object_prototype,
             PropertyKey::from_atom(WellKnownAtom::toString.id()),
@@ -2037,7 +2139,7 @@ mod tests {
             AllocationLifetime::Default,
         )
         .unwrap());
-        assert!(create_data_property(
+        assert!(ordinary_create_data_property(
             agent,
             object_prototype,
             PropertyKey::from_atom(WellKnownAtom::valueOf.id()),

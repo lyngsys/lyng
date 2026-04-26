@@ -61,7 +61,7 @@ impl Vm {
                 .realm(realm)
                 .and_then(|record| record.intrinsics().array_prototype())
             {
-                let iterator_method = object::get(
+                let iterator_method = object::ordinary_get(
                     agent,
                     array_prototype,
                     PropertyKey::from_symbol(iterator_symbol),
@@ -117,11 +117,14 @@ impl Vm {
             .realm(realm)
             .and_then(|record| record.intrinsics().function_prototype())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        let thrower =
-            object::get_own_property(agent, function_prototype, PropertyKey::from_atom(caller))
-                .map_err(VmError::Abrupt)?
-                .and_then(|descriptor| descriptor.getter().zip(descriptor.setter()))
-                .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let thrower = object::ordinary_get_own_property(
+            agent,
+            function_prototype,
+            PropertyKey::from_atom(caller),
+        )
+        .map_err(VmError::Abrupt)?
+        .and_then(|descriptor| descriptor.getter().zip(descriptor.setter()))
+        .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let callee = agent.atoms_mut().intern_collectible("callee");
         let mut descriptor = PropertyDescriptor::new();
         descriptor.set_getter(thrower.0);

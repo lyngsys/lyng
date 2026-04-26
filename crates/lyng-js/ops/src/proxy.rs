@@ -174,7 +174,7 @@ pub fn get_prototype_of<Cx: ProxyTrapContext>(
     if !is_proxy(cx, object) {
         let result = {
             let agent = cx.agent();
-            ordinary_object::get_prototype_of(agent, object)
+            ordinary_object::ordinary_get_prototype_of(agent, object)
         };
         return map_completion(cx, result);
     }
@@ -205,7 +205,7 @@ pub fn set_prototype_of<Cx: ProxyTrapContext>(
     if !is_proxy(cx, object) {
         let result = {
             let agent = cx.agent();
-            ordinary_object::set_prototype_of(agent, object, prototype)
+            ordinary_object::ordinary_set_prototype_of(agent, object, prototype)
         };
         return map_completion(cx, result);
     }
@@ -366,7 +366,7 @@ pub fn is_extensible<Cx: ProxyTrapContext>(
     if !is_proxy(cx, object) {
         let result = {
             let agent = cx.agent();
-            ordinary_object::is_extensible(agent, object)
+            ordinary_object::ordinary_is_extensible(agent, object)
         };
         return map_completion(cx, result);
     }
@@ -391,7 +391,7 @@ pub fn prevent_extensions<Cx: ProxyTrapContext>(
     if !is_proxy(cx, object) {
         let result = {
             let agent = cx.agent();
-            ordinary_object::prevent_extensions(agent, object)
+            ordinary_object::ordinary_prevent_extensions(agent, object)
         };
         return map_completion(cx, result);
     }
@@ -419,7 +419,7 @@ pub fn own_property_keys<Cx: ProxyTrapContext>(
     if !is_proxy(cx, object) {
         let result = {
             let agent = cx.agent();
-            ordinary_object::own_property_keys(agent, object)
+            ordinary_object::ordinary_own_property_keys(agent, object)
         };
         return map_completion(cx, result);
     }

@@ -24,7 +24,7 @@ use lyng_js_objects::{
     FunctionEntryIdentity, InternalMethodResult, NamedPropertyStorageMode, NativeCallRequest,
     NativeConstructRequest, NativeFunctionRegistry, ObjectAllocation, ObjectRuntime,
 };
-use lyng_js_ops::object::{create_data_property, get};
+use lyng_js_ops::object::{ordinary_create_data_property, ordinary_get};
 use lyng_js_parser::{parse_module, parse_script};
 use lyng_js_sema::{analyze_module, analyze_script};
 use lyng_js_types::{
@@ -162,7 +162,7 @@ fn install_global_value(
     name: AtomId,
     value: Value,
 ) {
-    assert!(create_data_property(
+    assert!(ordinary_create_data_property(
         agent,
         realm.global_object(),
         PropertyKey::from_atom(name),
@@ -192,21 +192,21 @@ fn global_value(
     name: &str,
 ) -> Value {
     let atom = agent.atoms_mut().intern_collectible(name);
-    get(agent, realm.global_object(), PropertyKey::from_atom(atom)).unwrap()
+    ordinary_get(agent, realm.global_object(), PropertyKey::from_atom(atom)).unwrap()
 }
 
 fn iterator_result_fields(agent: &mut lyng_js_env::Agent, result: Value) -> (Value, Value) {
     let object = result
         .as_object_ref()
         .expect("iterator result should be an object");
-    let value = get(
+    let value = ordinary_get(
         agent,
         object,
         PropertyKey::from_atom(lyng_js_common::WellKnownAtom::value.id()),
     )
     .unwrap();
     let done_atom = agent.atoms_mut().intern_collectible("done");
-    let done = get(agent, object, PropertyKey::from_atom(done_atom)).unwrap();
+    let done = ordinary_get(agent, object, PropertyKey::from_atom(done_atom)).unwrap();
     (value, done)
 }
 
@@ -2080,7 +2080,7 @@ fn linked_module_graph_resolves_namespace_exports_to_live_namespace_objects() {
 
     assert!(agent.set_environment_slot(dependency_env, counter_export_slot, Value::from_smi(8),));
     assert_eq!(
-        get(agent, namespace, PropertyKey::from_atom(counter_atom)).unwrap(),
+        ordinary_get(agent, namespace, PropertyKey::from_atom(counter_atom)).unwrap(),
         Value::from_smi(8)
     );
 }
@@ -2132,7 +2132,7 @@ fn dynamic_import_fulfills_with_the_loaded_module_namespace() {
         .expect("dynamic import should fulfill with a namespace object");
     let default_atom = agent.atoms_mut().intern_collectible("default");
     assert_eq!(
-        get(agent, namespace, PropertyKey::from_atom(default_atom)).unwrap(),
+        ordinary_get(agent, namespace, PropertyKey::from_atom(default_atom)).unwrap(),
         Value::from_smi(7)
     );
     assert!(host
@@ -2233,7 +2233,7 @@ fn dynamic_import_accepts_unary_assignment_expressions() {
         .expect("dynamic import should fulfill with a namespace object");
     let default_atom = agent.atoms_mut().intern_collectible("default");
     assert_eq!(
-        get(agent, namespace, PropertyKey::from_atom(default_atom)).unwrap(),
+        ordinary_get(agent, namespace, PropertyKey::from_atom(default_atom)).unwrap(),
         Value::from_smi(9)
     );
 }
@@ -2287,7 +2287,7 @@ fn nested_eval_script_preserves_host_access_for_dynamic_import() {
         .expect("nested import should fulfill with a namespace object");
     let default_atom = agent.atoms_mut().intern_collectible("default");
     assert_eq!(
-        get(agent, namespace, PropertyKey::from_atom(default_atom)).unwrap(),
+        ordinary_get(agent, namespace, PropertyKey::from_atom(default_atom)).unwrap(),
         Value::from_smi(11)
     );
     assert!(host
@@ -2325,15 +2325,15 @@ fn promise_checkpoint_drains_reaction_jobs_and_reports_host_phases() {
     let tuple = result
         .as_object_ref()
         .expect("script should return the promise tuple array");
-    let promise = get(agent, tuple, PropertyKey::Index(0))
+    let promise = ordinary_get(agent, tuple, PropertyKey::Index(0))
         .unwrap()
         .as_object_ref()
         .expect("tuple[0] should be the promise");
-    let resolve = get(agent, tuple, PropertyKey::Index(1))
+    let resolve = ordinary_get(agent, tuple, PropertyKey::Index(1))
         .unwrap()
         .as_object_ref()
         .expect("tuple[1] should be the resolve function");
-    let reject = get(agent, tuple, PropertyKey::Index(2))
+    let reject = ordinary_get(agent, tuple, PropertyKey::Index(2))
         .unwrap()
         .as_object_ref()
         .expect("tuple[2] should be the reject function");
@@ -2480,15 +2480,15 @@ fn evaluate_script_resolves_promise_all_values_in_order() {
         .as_object_ref()
         .expect("Promise.all should fulfill with an array object");
     assert_eq!(
-        get(agent, values, PropertyKey::from_array_index(0).unwrap()).unwrap(),
+        ordinary_get(agent, values, PropertyKey::from_array_index(0).unwrap()).unwrap(),
         Value::from_smi(1)
     );
     assert_eq!(
-        get(agent, values, PropertyKey::from_array_index(1).unwrap()).unwrap(),
+        ordinary_get(agent, values, PropertyKey::from_array_index(1).unwrap()).unwrap(),
         Value::from_smi(2)
     );
     assert_eq!(
-        get(agent, values, PropertyKey::from_array_index(2).unwrap()).unwrap(),
+        ordinary_get(agent, values, PropertyKey::from_array_index(2).unwrap()).unwrap(),
         Value::from_smi(3)
     );
 }
@@ -2526,11 +2526,11 @@ fn evaluate_script_array_from_async_resolves_sync_iterable_values() {
         .as_object_ref()
         .expect("Array.fromAsync should fulfill with an array object");
     assert_eq!(
-        get(agent, values, PropertyKey::from_array_index(0).unwrap()).unwrap(),
+        ordinary_get(agent, values, PropertyKey::from_array_index(0).unwrap()).unwrap(),
         Value::from_smi(2)
     );
     assert_eq!(
-        get(agent, values, PropertyKey::from_array_index(1).unwrap()).unwrap(),
+        ordinary_get(agent, values, PropertyKey::from_array_index(1).unwrap()).unwrap(),
         Value::from_smi(4)
     );
 }
@@ -2586,11 +2586,11 @@ fn evaluate_script_array_from_async_uses_intrinsic_iterator_symbols() {
         .as_object_ref()
         .expect("Array.fromAsync should fulfill with an array object");
     assert_eq!(
-        get(agent, values, PropertyKey::from_array_index(0).unwrap()).unwrap(),
+        ordinary_get(agent, values, PropertyKey::from_array_index(0).unwrap()).unwrap(),
         Value::from_smi(5)
     );
     assert_eq!(
-        get(agent, values, PropertyKey::from_array_index(1).unwrap()).unwrap(),
+        ordinary_get(agent, values, PropertyKey::from_array_index(1).unwrap()).unwrap(),
         Value::from_smi(6)
     );
 }
@@ -2731,25 +2731,25 @@ fn evaluate_script_resolves_promise_all_settled_records() {
         .result()
         .as_object_ref()
         .expect("Promise.allSettled should fulfill with an array object");
-    let first = get(agent, results, PropertyKey::from_array_index(0).unwrap())
+    let first = ordinary_get(agent, results, PropertyKey::from_array_index(0).unwrap())
         .unwrap()
         .as_object_ref()
         .expect("first allSettled entry should be an object");
-    let second = get(agent, results, PropertyKey::from_array_index(1).unwrap())
+    let second = ordinary_get(agent, results, PropertyKey::from_array_index(1).unwrap())
         .unwrap()
         .as_object_ref()
         .expect("second allSettled entry should be an object");
     let status_atom = agent.atoms_mut().intern_collectible("status");
     let reason_atom = agent.atoms_mut().intern_collectible("reason");
-    let first_status = get(agent, first, PropertyKey::from_atom(status_atom)).unwrap();
-    let first_value = get(
+    let first_status = ordinary_get(agent, first, PropertyKey::from_atom(status_atom)).unwrap();
+    let first_value = ordinary_get(
         agent,
         first,
         PropertyKey::from_atom(WellKnownAtom::value.id()),
     )
     .unwrap();
-    let second_status = get(agent, second, PropertyKey::from_atom(status_atom)).unwrap();
-    let second_reason = get(agent, second, PropertyKey::from_atom(reason_atom)).unwrap();
+    let second_status = ordinary_get(agent, second, PropertyKey::from_atom(status_atom)).unwrap();
+    let second_reason = ordinary_get(agent, second, PropertyKey::from_atom(reason_atom)).unwrap();
     assert_eq!(
         decode_string(
             agent
@@ -3161,7 +3161,7 @@ fn evaluate_script_promise_any_iterator_step_errors_reject_the_result_promise() 
         .as_object_ref()
         .expect("iterator-step rejection should use the thrown Error object");
     let message_atom = agent.atoms_mut().intern_collectible("message");
-    let message = get(agent, error, PropertyKey::from_atom(message_atom)).unwrap();
+    let message = ordinary_get(agent, error, PropertyKey::from_atom(message_atom)).unwrap();
     assert_eq!(
         decode_string(
             agent
@@ -7545,7 +7545,8 @@ fn vm_installs_callable_index_accessors_from_object_literals() {
     let object_atom = unit_atom(&unit, "object");
     let runtime_atom = unit_runtime_atom(agent, &unit, object_atom);
     let global_object = realm.global_object();
-    let object_value = get(agent, global_object, PropertyKey::from_atom(runtime_atom)).unwrap();
+    let object_value =
+        ordinary_get(agent, global_object, PropertyKey::from_atom(runtime_atom)).unwrap();
     let object = object_value
         .as_object_ref()
         .expect("global object binding should store an object literal");
@@ -7708,7 +7709,7 @@ impl lyng_js_ops::object::ToPrimitiveContext for WrapperPrimitiveProbe<'_> {
         object: ObjectRef,
         key: PropertyKey,
     ) -> Result<Value, Self::Error> {
-        get(self.agent, object, key)
+        ordinary_get(self.agent, object, key)
     }
 
     fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
@@ -8005,7 +8006,7 @@ fn direct_named_property_definitions_preserve_all_named_slots() {
         ("NaN", 7),
     ] {
         let atom = agent.atoms_mut().intern_collectible(name);
-        assert!(create_data_property(
+        assert!(ordinary_create_data_property(
             agent,
             object,
             PropertyKey::from_atom(atom),
@@ -8025,7 +8026,7 @@ fn direct_named_property_definitions_preserve_all_named_slots() {
     ] {
         let atom = agent.atoms_mut().intern_collectible(name);
         assert_eq!(
-            get(agent, object, PropertyKey::from_atom(atom)).unwrap(),
+            ordinary_get(agent, object, PropertyKey::from_atom(atom)).unwrap(),
             Value::from_smi(value)
         );
     }
@@ -8442,7 +8443,7 @@ fn for_in_state_is_cleared_when_return_exits_loop_body() {
             AllocationLifetime::Default,
         )
     });
-    assert!(create_data_property(
+    assert!(ordinary_create_data_property(
         agent,
         object,
         PropertyKey::from_atom(value_name),
@@ -8450,7 +8451,7 @@ fn for_in_state_is_cleared_when_return_exits_loop_body() {
         AllocationLifetime::Default,
     )
     .unwrap());
-    assert!(create_data_property(
+    assert!(ordinary_create_data_property(
         agent,
         realm.global_object(),
         PropertyKey::from_atom(source_name),
@@ -8876,7 +8877,7 @@ fn named_property_load_ic_becomes_monomorphic_for_one_shape() {
             AllocationLifetime::Default,
         )
     });
-    assert!(create_data_property(
+    assert!(ordinary_create_data_property(
         agent,
         object,
         PropertyKey::from_atom(value_name),
@@ -8939,7 +8940,7 @@ fn named_property_load_ic_grows_polymorphic_and_then_megamorphic() {
             )
         });
         for extra in 0..index {
-            assert!(create_data_property(
+            assert!(ordinary_create_data_property(
                 agent,
                 object,
                 PropertyKey::from_atom(AtomId::from_raw(20_000 + extra)),
@@ -8948,7 +8949,7 @@ fn named_property_load_ic_grows_polymorphic_and_then_megamorphic() {
             )
             .unwrap());
         }
-        assert!(create_data_property(
+        assert!(ordinary_create_data_property(
             agent,
             object,
             PropertyKey::from_atom(value_name),
@@ -9003,7 +9004,7 @@ fn named_property_store_ic_caches_own_data_paths() {
             AllocationLifetime::Default,
         )
     });
-    assert!(create_data_property(
+    assert!(ordinary_create_data_property(
         agent,
         object,
         PropertyKey::from_atom(value_name),
@@ -9062,7 +9063,7 @@ fn keyed_named_atom_ic_becomes_monomorphic() {
             AllocationLifetime::Default,
         )
     });
-    assert!(create_data_property(
+    assert!(ordinary_create_data_property(
         agent,
         object,
         PropertyKey::from_atom(value_name),
