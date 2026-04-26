@@ -12,13 +12,9 @@ export default defineConfig({
       title: 'Lyng',
       description:
         'Browser and runtime infrastructure: a JavaScript engine and an HTML parser, written in Rust.',
-      social: [
-        {
-          icon: 'github',
-          label: 'GitHub',
-          href: 'https://github.com/lyngsys/lyng',
-        },
-      ],
+      social: {
+        github: 'https://github.com/lyngsys/lyng',
+      },
       sidebar: [
         {
           label: 'Lyng JS',
