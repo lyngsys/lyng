@@ -374,6 +374,30 @@ pub(super) const PUBLIC_BINARY_DATA_BUILTIN_METADATA: &[PublicBuiltinMetadataRow
         BuiltinEntryMetadata::new("subarray", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        uint8_array_from_base64_builtin,
+        BuiltinEntryMetadata::new("fromBase64", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        uint8_array_from_hex_builtin,
+        BuiltinEntryMetadata::new("fromHex", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        uint8_array_set_from_base64_builtin,
+        BuiltinEntryMetadata::new("setFromBase64", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        uint8_array_set_from_hex_builtin,
+        BuiltinEntryMetadata::new("setFromHex", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        uint8_array_to_base64_builtin,
+        BuiltinEntryMetadata::new("toBase64", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        uint8_array_to_hex_builtin,
+        BuiltinEntryMetadata::new("toHex", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         typed_array_at_builtin,
         BuiltinEntryMetadata::new("at", 1, false, false),
     ),

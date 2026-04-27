@@ -9,7 +9,7 @@ use data_view::dispatch_data_view_builtin;
 use typed_arrays::{
     dispatch_typed_array_access_builtin, dispatch_typed_array_constructor_builtin,
     dispatch_typed_array_iteration_builtin, dispatch_typed_array_mutation_builtin,
-    dispatch_typed_array_search_builtin,
+    dispatch_typed_array_search_builtin, dispatch_uint8_array_base64_hex_builtin,
 };
 pub(super) use typed_arrays::{
     typed_array_storage_bits_from_builtin_value, typed_array_validated_object_and_record,
@@ -21,7 +21,7 @@ use super::{
     collect_array_like_values_for_from_builtin, create_data_property_or_throw,
     get_property_from_object, iterable_to_values_list, iterators, length_value_u64, map_completion,
     normalize_relative_index_u64, promises, property_key_from_text, range_error, string_value,
-    to_bigint_for_builtin, to_boolean_for_builtin, to_index_for_builtin,
+    syntax_error, to_bigint_for_builtin, to_boolean_for_builtin, to_index_for_builtin,
     to_integer_or_infinity_for_builtin, to_number_for_builtin, to_uint32_for_builtin,
     to_uint8_clamp_for_builtin, to_uint8_for_builtin, type_error, PublicBuiltinDispatchContext,
 };
@@ -40,6 +40,9 @@ pub(super) fn dispatch_binary_data_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Some(result));
     }
     if let Some(result) = dispatch_atomics_builtin(context, entry, invocation)? {
+        return Ok(Some(result));
+    }
+    if let Some(result) = dispatch_uint8_array_base64_hex_builtin(context, entry, invocation)? {
         return Ok(Some(result));
     }
     if let Some(result) = dispatch_typed_array_constructor_builtin(context, entry, invocation)? {

@@ -154,13 +154,15 @@ use lyng_js_types::{
     typed_array_to_string_tag_getter_builtin, typed_array_with_builtin, uint16_array_builtin,
     uint32_array_builtin, uint8_array_buffer_getter_builtin, uint8_array_builtin,
     uint8_array_byte_length_getter_builtin, uint8_array_byte_offset_getter_builtin,
-    uint8_array_entries_builtin, uint8_array_keys_builtin, uint8_array_length_getter_builtin,
-    uint8_array_set_builtin, uint8_array_slice_builtin, uint8_array_subarray_builtin,
-    uint8_array_values_builtin, uint8_clamped_array_builtin, uri_error_builtin, weak_map_builtin,
-    weak_map_delete_builtin, weak_map_get_builtin, weak_map_get_or_insert_builtin,
-    weak_map_get_or_insert_computed_builtin, weak_map_has_builtin, weak_map_set_builtin,
-    weak_ref_builtin, weak_ref_deref_builtin, weak_set_add_builtin, weak_set_builtin,
-    weak_set_delete_builtin, weak_set_has_builtin, BuiltinFunctionId,
+    uint8_array_entries_builtin, uint8_array_from_base64_builtin, uint8_array_from_hex_builtin,
+    uint8_array_keys_builtin, uint8_array_length_getter_builtin, uint8_array_set_builtin,
+    uint8_array_set_from_base64_builtin, uint8_array_set_from_hex_builtin,
+    uint8_array_slice_builtin, uint8_array_subarray_builtin, uint8_array_to_base64_builtin,
+    uint8_array_to_hex_builtin, uint8_array_values_builtin, uint8_clamped_array_builtin,
+    uri_error_builtin, weak_map_builtin, weak_map_delete_builtin, weak_map_get_builtin,
+    weak_map_get_or_insert_builtin, weak_map_get_or_insert_computed_builtin, weak_map_has_builtin,
+    weak_map_set_builtin, weak_ref_builtin, weak_ref_deref_builtin, weak_set_add_builtin,
+    weak_set_builtin, weak_set_delete_builtin, weak_set_has_builtin, BuiltinFunctionId,
 };
 
 mod binary_data;
@@ -1293,6 +1295,30 @@ mod tests {
             (
                 uint8_array_subarray_builtin(),
                 BuiltinEntryMetadata::new("subarray", 2, false, false),
+            ),
+            (
+                uint8_array_from_base64_builtin(),
+                BuiltinEntryMetadata::new("fromBase64", 1, false, false),
+            ),
+            (
+                uint8_array_from_hex_builtin(),
+                BuiltinEntryMetadata::new("fromHex", 1, false, false),
+            ),
+            (
+                uint8_array_set_from_base64_builtin(),
+                BuiltinEntryMetadata::new("setFromBase64", 1, false, false),
+            ),
+            (
+                uint8_array_set_from_hex_builtin(),
+                BuiltinEntryMetadata::new("setFromHex", 1, false, false),
+            ),
+            (
+                uint8_array_to_base64_builtin(),
+                BuiltinEntryMetadata::new("toBase64", 0, false, false),
+            ),
+            (
+                uint8_array_to_hex_builtin(),
+                BuiltinEntryMetadata::new("toHex", 0, false, false),
             ),
             (
                 typed_array_at_builtin(),

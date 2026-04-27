@@ -164,6 +164,12 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
     let wait_async_atom = agent.atoms_mut().intern("waitAsync");
     let pause_atom = agent.atoms_mut().intern("pause");
     let xor_atom = agent.atoms_mut().intern("xor");
+    let from_base64_atom = agent.atoms_mut().intern("fromBase64");
+    let from_hex_atom = agent.atoms_mut().intern("fromHex");
+    let set_from_base64_atom = agent.atoms_mut().intern("setFromBase64");
+    let set_from_hex_atom = agent.atoms_mut().intern("setFromHex");
+    let to_base64_atom = agent.atoms_mut().intern("toBase64");
+    let to_hex_atom = agent.atoms_mut().intern("toHex");
     let buffer_descriptor_sets = buffers::descriptor_sets(
         builtins,
         buffers::BufferDescriptorAtoms {
@@ -263,6 +269,12 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
             with: with_atom,
             set: set_atom,
             subarray: subarray_atom,
+            from_base64: from_base64_atom,
+            from_hex: from_hex_atom,
+            set_from_base64: set_from_base64_atom,
+            set_from_hex: set_from_hex_atom,
+            to_base64: to_base64_atom,
+            to_hex: to_hex_atom,
         },
         typed_arrays::TypedArrayDescriptorTags {
             int8_array: int8_array_tag,

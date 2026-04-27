@@ -30,9 +30,12 @@ use lyng_js_types::{
     typed_array_to_string_tag_getter_builtin, typed_array_with_builtin, uint16_array_builtin,
     uint32_array_builtin, uint8_array_buffer_getter_builtin, uint8_array_builtin,
     uint8_array_byte_length_getter_builtin, uint8_array_byte_offset_getter_builtin,
-    uint8_array_entries_builtin, uint8_array_keys_builtin, uint8_array_length_getter_builtin,
-    uint8_array_set_builtin, uint8_array_slice_builtin, uint8_array_subarray_builtin,
-    uint8_array_values_builtin, uint8_clamped_array_builtin, BuiltinFunctionId, ObjectRef,
+    uint8_array_entries_builtin, uint8_array_from_base64_builtin, uint8_array_from_hex_builtin,
+    uint8_array_keys_builtin, uint8_array_length_getter_builtin, uint8_array_set_builtin,
+    uint8_array_set_from_base64_builtin, uint8_array_set_from_hex_builtin,
+    uint8_array_slice_builtin, uint8_array_subarray_builtin, uint8_array_to_base64_builtin,
+    uint8_array_to_hex_builtin, uint8_array_values_builtin, uint8_clamped_array_builtin,
+    BuiltinFunctionId, ObjectRef,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -246,6 +249,24 @@ pub(in crate::public) fn binary_data_builtin_object(
     }
     if entry == uint8_array_subarray_builtin() {
         return Some(builtins.uint8_array_subarray);
+    }
+    if entry == uint8_array_from_base64_builtin() {
+        return Some(builtins.uint8_array_from_base64);
+    }
+    if entry == uint8_array_from_hex_builtin() {
+        return Some(builtins.uint8_array_from_hex);
+    }
+    if entry == uint8_array_set_from_base64_builtin() {
+        return Some(builtins.uint8_array_set_from_base64);
+    }
+    if entry == uint8_array_set_from_hex_builtin() {
+        return Some(builtins.uint8_array_set_from_hex);
+    }
+    if entry == uint8_array_to_base64_builtin() {
+        return Some(builtins.uint8_array_to_base64);
+    }
+    if entry == uint8_array_to_hex_builtin() {
+        return Some(builtins.uint8_array_to_hex);
     }
     if entry == typed_array_every_builtin() {
         return Some(builtins.typed_array_every);
