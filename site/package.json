@@ -1,0 +1,20 @@
+{
+  "name": "lyng-site",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/rss": "^4.0.7",
+    "@astrojs/sitemap": "^3.2.1",
+    "@astrojs/starlight": "^0.30.3",
+    "astro": "^5.0.5",
+    "sharp": "^0.33.5"
+  }
+}

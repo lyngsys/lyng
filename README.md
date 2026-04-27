@@ -33,3 +33,10 @@ cargo test -p lyng-js-tests
 - [Lyng JS Overview](crates/lyng-js/README.md)
 - [Lyng JS Docs Index](docs/lyng-js/README.md)
 - [HTML Parser README](crates/html_parser/README.md)
+
+## Documentation & Blog
+
+The public documentation and blog live at <https://lyngsys.github.io/lyng/>
+and are built from [`site/`](site/README.md) with Astro + Starlight.
+The Markdown under `docs/` and `crates/*/docs/` is for internal engineering
+notes; user-facing content goes in `site/src/content/`.
