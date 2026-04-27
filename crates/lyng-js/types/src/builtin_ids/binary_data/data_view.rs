@@ -159,3 +159,35 @@ pub fn data_view_set_float64_builtin() -> BuiltinFunctionId {
         None => unreachable!("builtin id should stay non-zero"),
     }
 }
+
+#[inline]
+pub fn data_view_get_big_int64_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(DATA_VIEW_GET_BIG_INT64_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn data_view_get_big_uint64_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(DATA_VIEW_GET_BIG_UINT64_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn data_view_set_big_int64_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(DATA_VIEW_SET_BIG_INT64_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn data_view_set_big_uint64_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(DATA_VIEW_SET_BIG_UINT64_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
