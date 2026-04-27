@@ -62,6 +62,7 @@ pub struct Intrinsics {
     uint8_clamped_array_prototype: Option<ObjectRef>,
     uint8_array: Option<ObjectRef>,
     uint8_array_prototype: Option<ObjectRef>,
+    iterator: Option<ObjectRef>,
     iterator_prototype: Option<ObjectRef>,
     async_iterator_prototype: Option<ObjectRef>,
     async_from_sync_iterator_prototype: Option<ObjectRef>,
@@ -175,6 +176,7 @@ impl Intrinsics {
             uint8_clamped_array_prototype: None,
             uint8_array: None,
             uint8_array_prototype: None,
+            iterator: None,
             iterator_prototype: None,
             async_iterator_prototype: None,
             async_from_sync_iterator_prototype: None,
@@ -519,6 +521,11 @@ impl Intrinsics {
     #[inline]
     pub const fn uint8_array_prototype(self) -> Option<ObjectRef> {
         self.uint8_array_prototype
+    }
+
+    #[inline]
+    pub const fn iterator(self) -> Option<ObjectRef> {
+        self.iterator
     }
 
     #[inline]
@@ -1115,6 +1122,12 @@ impl Intrinsics {
     #[inline]
     pub const fn with_uint8_array_prototype(mut self, value: Option<ObjectRef>) -> Self {
         self.uint8_array_prototype = value;
+        self
+    }
+
+    #[inline]
+    pub const fn with_iterator(mut self, value: Option<ObjectRef>) -> Self {
+        self.iterator = value;
         self
     }
 

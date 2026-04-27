@@ -336,18 +336,18 @@ impl RegExpDescriptorAtoms {
     fn new(agent: &mut Agent) -> Self {
         let bootstrap_atoms = agent.bootstrap_atoms();
         Self {
-            escape: agent.atoms_mut().intern_collectible("escape"),
-            exec: agent.atoms_mut().intern_collectible("exec"),
-            test: agent.atoms_mut().intern_collectible("test"),
+            escape: agent.atoms_mut().intern("escape"),
+            exec: agent.atoms_mut().intern("exec"),
+            test: agent.atoms_mut().intern("test"),
             source: bootstrap_atoms.source(),
             flags: bootstrap_atoms.flags(),
             has_indices: bootstrap_atoms.has_indices(),
-            global: agent.atoms_mut().intern_collectible("global"),
-            ignore_case: agent.atoms_mut().intern_collectible("ignoreCase"),
-            multiline: agent.atoms_mut().intern_collectible("multiline"),
-            dot_all: agent.atoms_mut().intern_collectible("dotAll"),
-            unicode: agent.atoms_mut().intern_collectible("unicode"),
-            sticky: agent.atoms_mut().intern_collectible("sticky"),
+            global: agent.atoms_mut().intern("global"),
+            ignore_case: agent.atoms_mut().intern("ignoreCase"),
+            multiline: agent.atoms_mut().intern("multiline"),
+            dot_all: agent.atoms_mut().intern("dotAll"),
+            unicode: agent.atoms_mut().intern("unicode"),
+            sticky: agent.atoms_mut().intern("sticky"),
         }
     }
 }

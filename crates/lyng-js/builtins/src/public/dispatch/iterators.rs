@@ -1,14 +1,16 @@
 use super::{
-    array_like_length, binary_data::typed_array_validated_object_and_record, create_array_result,
-    get_property_from_object, length_value, map_completion, set_property_on_object,
-    string_from_code_units, string_ref_code_units, string_this_ref, type_error,
+    array_like_length, binary_data::typed_array_validated_object_and_record,
+    close_iterator_after_error, create_array_result, get_property_from_object, length_value,
+    map_completion, property_key_from_text, set_property_on_object, string_from_code_units,
+    string_ref_code_units, string_this_ref, type_error, BuiltinIteratorBridge,
     PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
+use lyng_js_common::WellKnownAtom;
 use lyng_js_env::Agent;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData};
-use lyng_js_ops::iterator;
+use lyng_js_ops::{iterator, read};
 use lyng_js_types::{BuiltinFunctionId, PropertyKey, Value};
 
 pub(super) fn dispatch_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -18,6 +20,42 @@ pub(super) fn dispatch_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Option<Value>, Cx::Error> {
     if entry == super::iterator_prototype_iterator_builtin() {
         return iterator_prototype_iterator_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_builtin() {
+        return iterator_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_from_builtin() {
+        return iterator_from_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_reduce_builtin() {
+        return iterator_reduce_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_for_each_builtin() {
+        return iterator_for_each_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_some_builtin() {
+        return iterator_some_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_every_builtin() {
+        return iterator_every_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_find_builtin() {
+        return iterator_find_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_to_array_builtin() {
+        return iterator_to_array_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_to_string_tag_getter_builtin() {
+        return iterator_to_string_tag_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_to_string_tag_setter_builtin() {
+        return iterator_to_string_tag_setter_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_constructor_getter_builtin() {
+        return iterator_constructor_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == super::iterator_constructor_setter_builtin() {
+        return iterator_constructor_setter_builtin(context, invocation).map(Some);
     }
     Ok(None)
 }
@@ -388,4 +426,597 @@ pub(super) fn string_iterator_next_builtin<Cx: PublicBuiltinDispatchContext>(
     )?;
     let value = string_from_code_units(cx, &units[index..next_index]);
     create_iterator_result_value(cx, value, false)
+}
+
+// ====================================================================
+// Iterator constructor + Stage-1 helpers (iterator-helpers proposal)
+// ====================================================================
+//
+// Stage 1 here covers: the Iterator constructor (subclass-only), the eager
+// helpers reduce/forEach/some/every/find/toArray, and Iterator.from when
+// the input already inherits from %Iterator.prototype% (i.e. the
+// fast-path branch of the spec's GetIteratorFlattenable). Wrapped-iterator
+// support for arbitrary input (the lazy WrapForValidIteratorPrototype
+// path) is deferred to Stage 2 along with map/filter/take/drop/flatMap;
+// see dcat issue lyng-3k8k comment c3 for the plan.
+
+fn iterator_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    // Step 1: Iterator() called as a function: TypeError.
+    let new_target = invocation.new_target().ok_or_else(|| type_error(cx))?;
+    // Step 2: new Iterator() with NewTarget == Iterator (no subclass): TypeError.
+    if new_target == cx.callee_object() {
+        return Err(type_error(cx));
+    }
+    // Step 3: Subclass — allocate ordinary object with the subclass's prototype
+    // chained through %Iterator.prototype%.
+    let realm = cx.builtin_realm();
+    let default_prototype = cx
+        .agent()
+        .realm(realm)
+        .and_then(|record| record.intrinsics().iterator_prototype())
+        .ok_or_else(|| type_error(cx))?;
+    let prototype =
+        cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)?;
+    let object = cx.allocate_ordinary_object_with_prototype(realm, Some(prototype))?;
+    Ok(Value::from_object_ref(object))
+}
+
+fn iterator_to_string_tag_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    _invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    // The default getter returns the literal string "Iterator". Per the
+    // spec, custom subclass setters can override this on a per-instance
+    // basis via the brand-checked accessor pair below; the getter only
+    // observes the brand-installed override.
+    let realm = cx.builtin_realm();
+    let agent = cx.agent();
+    let intrinsics = agent
+        .realm(realm)
+        .map(lyng_js_env::RealmRecord::intrinsics)
+        .unwrap_or_default();
+    let _ = intrinsics; // suppress unused warning; reserved for future custom-tag logic
+    Ok(super::string_value(cx, "Iterator"))
+}
+
+fn iterator_to_string_tag_setter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    // SetterThatIgnoresPrototypeProperties: if `this` is the Iterator.prototype
+    // itself, throw TypeError. Otherwise, define the property on `this` as a
+    // plain data property (or update an existing data property).
+    let this_value = invocation.this_value();
+    let this_object = this_value.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let realm = cx.builtin_realm();
+    let iterator_prototype = cx
+        .agent()
+        .realm(realm)
+        .and_then(|record| record.intrinsics().iterator_prototype())
+        .ok_or_else(|| type_error(cx))?;
+    if this_object == iterator_prototype {
+        return Err(type_error(cx));
+    }
+    let new_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let symbol_ref = cx
+        .agent()
+        .well_known_symbol(lyng_js_types::WellKnownSymbolId::ToStringTag)
+        .ok_or_else(|| type_error(cx))?;
+    let symbol_key = PropertyKey::from_symbol(symbol_ref);
+    super::define_data_property_with_attrs(
+        cx,
+        this_object,
+        symbol_key,
+        new_value,
+        true,
+        true,
+        true,
+    )?;
+    Ok(Value::undefined())
+}
+
+fn iterator_constructor_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    _invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    // The default getter returns %Iterator% (the constructor itself).
+    let realm = cx.builtin_realm();
+    let iterator = cx
+        .agent()
+        .realm(realm)
+        .and_then(|record| record.intrinsics().iterator())
+        .ok_or_else(|| type_error(cx))?;
+    Ok(Value::from_object_ref(iterator))
+}
+
+fn iterator_constructor_setter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    // Mirror image of iterator_to_string_tag_setter_builtin: refuse to set
+    // on Iterator.prototype itself, otherwise install a data property on the
+    // receiver.
+    let this_value = invocation.this_value();
+    let this_object = this_value.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let realm = cx.builtin_realm();
+    let iterator_prototype = cx
+        .agent()
+        .realm(realm)
+        .and_then(|record| record.intrinsics().iterator_prototype())
+        .ok_or_else(|| type_error(cx))?;
+    if this_object == iterator_prototype {
+        return Err(type_error(cx));
+    }
+    let new_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let key = PropertyKey::from_atom(WellKnownAtom::constructor.id());
+    super::define_data_property_with_attrs(cx, this_object, key, new_value, true, true, true)?;
+    Ok(Value::undefined())
+}
+
+// Helper: build an IteratorRecord from an arbitrary `O` whose `next` is the
+// only access we need (GetIteratorDirect from the spec).
+fn iterator_direct_record<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    object_ref: lyng_js_types::ObjectRef,
+) -> Result<iterator::IteratorRecord, Cx::Error> {
+    let next_key = property_key_from_text(cx, "next");
+    let next_value = cx.get_property_value(Value::from_object_ref(object_ref), next_key)?;
+    let next_method = cx.require_callable_object(next_value)?;
+    Ok(iterator::IteratorRecord::new(object_ref, next_method))
+}
+
+// Helper: call O.return() if it exists, ignoring any errors. Used for the
+// argument-validation-failure branch of the eager helpers, where the spec
+// asks IteratorClose to run on a record whose [[NextMethod]] hasn't been
+// populated yet (so we can't use the regular IteratorRecord-based close).
+fn iterator_close_for_validation_failure<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    object_ref: lyng_js_types::ObjectRef,
+) {
+    let return_key = property_key_from_text(cx, "return");
+    let return_value = match cx.get_property_value(Value::from_object_ref(object_ref), return_key) {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+    if return_value.is_undefined() || return_value.is_null() {
+        return;
+    }
+    if let Ok(return_method) = cx.require_callable_object(return_value) {
+        // Per spec, the original ThrowCompletion is preserved over any
+        // completion produced by return(); ignore both Ok and Err here.
+        let _ = cx.call_to_completion(return_method, Value::from_object_ref(object_ref), &[]);
+    }
+}
+
+fn iterator_this_object<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+    value.as_object_ref().ok_or_else(|| type_error(cx))
+}
+
+fn iterator_reduce_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = iterator_this_object(cx, invocation.this_value())?;
+    let reducer_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let reducer = match cx.require_callable_object(reducer_value) {
+        Ok(reducer) => reducer,
+        Err(error) => {
+            iterator_close_for_validation_failure(cx, object);
+            return Err(error);
+        }
+    };
+    let mut iterator_record = iterator_direct_record(cx, object)?;
+    let initial = invocation.arguments().get(1).copied();
+    let (mut accumulator, mut counter): (Value, u64) = if let Some(value) = initial {
+        (value, 0)
+    } else {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            return Err(type_error(cx));
+        };
+        let value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let value = match value {
+            Ok(value) => value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        (value, 1)
+    };
+    loop {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            return Ok(accumulator);
+        };
+        let value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let value = match value {
+            Ok(value) => value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let counter_value = u64_to_value(counter);
+        match cx.call_to_completion(
+            reducer,
+            Value::undefined(),
+            &[accumulator, value, counter_value],
+        ) {
+            Ok(result) => {
+                accumulator = result;
+                counter = counter.saturating_add(1);
+            }
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        }
+    }
+}
+
+fn iterator_for_each_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = iterator_this_object(cx, invocation.this_value())?;
+    let callback_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let callback = match cx.require_callable_object(callback_value) {
+        Ok(callback) => callback,
+        Err(error) => {
+            iterator_close_for_validation_failure(cx, object);
+            return Err(error);
+        }
+    };
+    let mut iterator_record = iterator_direct_record(cx, object)?;
+    let mut counter: u64 = 0;
+    loop {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            return Ok(Value::undefined());
+        };
+        let value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let value = match value {
+            Ok(value) => value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let counter_value = u64_to_value(counter);
+        if let Err(error) =
+            cx.call_to_completion(callback, Value::undefined(), &[value, counter_value])
+        {
+            return close_iterator_after_error(cx, &mut iterator_record, error);
+        }
+        counter = counter.saturating_add(1);
+    }
+}
+
+fn iterator_some_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    iterator_predicate_helper(cx, invocation, true)
+}
+
+fn iterator_every_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    iterator_predicate_helper(cx, invocation, false)
+}
+
+// some: returns true on first truthy → true; default false.
+// every: returns false on first falsy → false; default true.
+fn iterator_predicate_helper<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    is_some: bool,
+) -> Result<Value, Cx::Error> {
+    let object = iterator_this_object(cx, invocation.this_value())?;
+    let callback_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let callback = match cx.require_callable_object(callback_value) {
+        Ok(callback) => callback,
+        Err(error) => {
+            iterator_close_for_validation_failure(cx, object);
+            return Err(error);
+        }
+    };
+    let mut iterator_record = iterator_direct_record(cx, object)?;
+    let mut counter: u64 = 0;
+    loop {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            return Ok(Value::from_bool(!is_some));
+        };
+        let value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let value = match value {
+            Ok(value) => value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let counter_value = u64_to_value(counter);
+        let result =
+            match cx.call_to_completion(callback, Value::undefined(), &[value, counter_value]) {
+                Ok(result) => result,
+                Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            };
+        let truthy = {
+            let completion = {
+                let agent = cx.agent();
+                read::to_boolean(agent.heap().view(), result)
+            };
+            map_completion(cx, completion)?
+        };
+        if is_some && truthy {
+            // some short-circuits to true
+            let close_result = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_close(
+                    &mut bridge,
+                    &mut iterator_record,
+                    Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                )
+            };
+            close_result?;
+            return Ok(Value::from_bool(true));
+        }
+        if !is_some && !truthy {
+            // every short-circuits to false
+            let close_result = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_close(
+                    &mut bridge,
+                    &mut iterator_record,
+                    Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                )
+            };
+            close_result?;
+            return Ok(Value::from_bool(false));
+        }
+        counter = counter.saturating_add(1);
+    }
+}
+
+fn iterator_find_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = iterator_this_object(cx, invocation.this_value())?;
+    let callback_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let callback = match cx.require_callable_object(callback_value) {
+        Ok(callback) => callback,
+        Err(error) => {
+            iterator_close_for_validation_failure(cx, object);
+            return Err(error);
+        }
+    };
+    let mut iterator_record = iterator_direct_record(cx, object)?;
+    let mut counter: u64 = 0;
+    loop {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            return Ok(Value::undefined());
+        };
+        let value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let value = match value {
+            Ok(value) => value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let counter_value = u64_to_value(counter);
+        let result =
+            match cx.call_to_completion(callback, Value::undefined(), &[value, counter_value]) {
+                Ok(result) => result,
+                Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            };
+        let truthy = {
+            let completion = {
+                let agent = cx.agent();
+                read::to_boolean(agent.heap().view(), result)
+            };
+            map_completion(cx, completion)?
+        };
+        if truthy {
+            let close_result = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_close(
+                    &mut bridge,
+                    &mut iterator_record,
+                    Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                )
+            };
+            close_result?;
+            return Ok(value);
+        }
+        counter = counter.saturating_add(1);
+    }
+}
+
+fn iterator_to_array_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = iterator_this_object(cx, invocation.this_value())?;
+    let mut iterator_record = iterator_direct_record(cx, object)?;
+    let mut values: Vec<Value> = Vec::new();
+    loop {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            break;
+        };
+        let value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let value = match value {
+            Ok(value) => value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        values.push(value);
+    }
+    let array = super::create_array_from_values(cx, &values)?;
+    Ok(Value::from_object_ref(array))
+}
+
+fn iterator_from_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    // Stage 1 covers the fast path of GetIteratorFlattenable: when O is
+    // already an object whose [[Prototype]] chain includes %Iterator.prototype%,
+    // return it as-is. The wrapping branch (WrapForValidIteratorPrototype) is
+    // deferred to Stage 2 along with the lazy helpers; calling Iterator.from
+    // with a non-Iterator-prototype iterable currently throws TypeError so
+    // the gap is observable rather than silently incorrect.
+    let argument = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let realm = cx.builtin_realm();
+    let iterator_prototype = cx
+        .agent()
+        .realm(realm)
+        .and_then(|record| record.intrinsics().iterator_prototype())
+        .ok_or_else(|| type_error(cx))?;
+    let object = argument.as_object_ref().ok_or_else(|| type_error(cx))?;
+    if iterator_prototype_in_chain(cx, object, iterator_prototype)? {
+        return Ok(Value::from_object_ref(object));
+    }
+    Err(type_error(cx))
+}
+
+fn iterator_prototype_in_chain<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    start: lyng_js_types::ObjectRef,
+    target_prototype: lyng_js_types::ObjectRef,
+) -> Result<bool, Cx::Error> {
+    let mut current = Some(start);
+    let mut steps = 0_u32;
+    while let Some(object) = current {
+        if object == target_prototype {
+            return Ok(true);
+        }
+        // Cap traversal to prevent runaway proxy traps from misbehaving;
+        // the spec never requires more than a finite chain.
+        steps = steps.saturating_add(1);
+        if steps > 1024 {
+            break;
+        }
+        let parent = {
+            let agent = cx.agent();
+            agent
+                .objects()
+                .get_prototype_of(agent.heap().view(), object)
+        };
+        let next = match parent {
+            Ok(Some(parent_object)) => Some(parent_object),
+            Ok(None) => None,
+            Err(_) => return Err(type_error(cx)),
+        };
+        current = next;
+    }
+    Ok(false)
+}
+
+#[inline]
+fn u64_to_value(value: u64) -> Value {
+    if let Ok(small) = i32::try_from(value) {
+        Value::from_smi(small)
+    } else {
+        Value::from_f64(value as f64)
+    }
 }

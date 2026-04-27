@@ -35,7 +35,6 @@ impl ProposalStage {
 
 const UNSUPPORTED_FEATURES: &[&str] = &[
     "decorators",
-    "Error.isError",
     "import-assertions",
     "regexp-v-flag",
     "regexp-duplicate-named-groups",
@@ -44,14 +43,6 @@ const UNSUPPORTED_FEATURES: &[&str] = &[
     "arraybuffer-transfer",
     "immutable-arraybuffer",
     "ShadowRealm",
-    "iterator-helpers",
-    "promise-try",
-    "set-methods",
-    "promise-with-resolvers",
-    "Atomics.pause",
-    "Atomics.waitAsync",
-    "upsert",
-    "symbols-as-weakmap-keys",
 ];
 
 const PROPOSAL_FEATURE_STAGES: &[(&str, ProposalStage)] = &[
@@ -705,12 +696,7 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "unsupported feature: Error.isError".to_string()
-            ))
-        );
+        assert_eq!(decision, None);
     }
 
     #[test]

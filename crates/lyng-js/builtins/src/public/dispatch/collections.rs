@@ -2,8 +2,8 @@ mod iteration;
 
 use super::{
     close_iterator_after_error, get_property_from_object, iterators::ArrayIterationKind,
-    length_value_u64, map_completion, type_error, BuiltinIteratorBridge,
-    PublicBuiltinDispatchContext,
+    length_value_u64, map_completion, property_key_from_text, to_number_for_builtin, type_error,
+    BuiltinIteratorBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use iteration::{
@@ -101,6 +101,12 @@ fn dispatch_map_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::map_iterator_next_builtin() {
         return map_iterator_next_builtin(context, invocation).map(Some);
     }
+    if entry == super::map_get_or_insert_builtin() {
+        return map_get_or_insert_builtin(context, invocation).map(Some);
+    }
+    if entry == super::map_get_or_insert_computed_builtin() {
+        return map_get_or_insert_computed_builtin(context, invocation).map(Some);
+    }
     Ok(None)
 }
 
@@ -142,6 +148,27 @@ fn dispatch_set_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::set_iterator_next_builtin() {
         return set_iterator_next_builtin(context, invocation).map(Some);
     }
+    if entry == super::set_union_builtin() {
+        return set_union_builtin(context, invocation).map(Some);
+    }
+    if entry == super::set_intersection_builtin() {
+        return set_intersection_builtin(context, invocation).map(Some);
+    }
+    if entry == super::set_difference_builtin() {
+        return set_difference_builtin(context, invocation).map(Some);
+    }
+    if entry == super::set_symmetric_difference_builtin() {
+        return set_symmetric_difference_builtin(context, invocation).map(Some);
+    }
+    if entry == super::set_is_subset_of_builtin() {
+        return set_is_subset_of_builtin(context, invocation).map(Some);
+    }
+    if entry == super::set_is_superset_of_builtin() {
+        return set_is_superset_of_builtin(context, invocation).map(Some);
+    }
+    if entry == super::set_is_disjoint_from_builtin() {
+        return set_is_disjoint_from_builtin(context, invocation).map(Some);
+    }
     Ok(None)
 }
 
@@ -161,6 +188,12 @@ fn dispatch_weak_collection_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == super::weak_map_delete_builtin() {
         return weak_map_delete_builtin(context, invocation).map(Some);
+    }
+    if entry == super::weak_map_get_or_insert_builtin() {
+        return weak_map_get_or_insert_builtin(context, invocation).map(Some);
+    }
+    if entry == super::weak_map_get_or_insert_computed_builtin() {
+        return weak_map_get_or_insert_computed_builtin(context, invocation).map(Some);
     }
     if entry == super::weak_set_add_builtin() {
         return weak_set_add_builtin(context, invocation).map(Some);
@@ -873,6 +906,104 @@ fn map_has_builtin<Cx: PublicBuiltinDispatchContext>(
     ))
 }
 
+fn map_get_or_insert_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = map_this_object(cx, invocation.this_value())?;
+    let key = canonicalize_keyed_collection_key(
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    );
+    let value = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    if let Some(index) = map_entry_index(cx, object, key)? {
+        return cx
+            .agent()
+            .objects()
+            .map(object)
+            .and_then(|map| map.entries().get(index).copied().flatten())
+            .map(MapEntry::value)
+            .ok_or_else(|| type_error(cx));
+    }
+    let inserted = cx.agent().with_heap_and_objects(|_, objects| {
+        objects.with_map_mut(object, |map| {
+            map.push(MapEntry::new(key, value));
+            true
+        })
+    });
+    if inserted != Some(true) {
+        return Err(type_error(cx));
+    }
+    Ok(value)
+}
+
+fn map_get_or_insert_computed_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = map_this_object(cx, invocation.this_value())?;
+    let key = canonicalize_keyed_collection_key(
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    );
+    let callback = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let callback_object = cx.require_callable_object(callback)?;
+    if let Some(index) = map_entry_index(cx, object, key)? {
+        return cx
+            .agent()
+            .objects()
+            .map(object)
+            .and_then(|map| map.entries().get(index).copied().flatten())
+            .map(MapEntry::value)
+            .ok_or_else(|| type_error(cx));
+    }
+    let value = cx.call_to_completion(callback_object, Value::undefined(), &[key])?;
+    let existing_after = map_entry_index(cx, object, key)?;
+    let inserted = cx.agent().with_heap_and_objects(|_, objects| {
+        objects.with_map_mut(object, |map| {
+            if let Some(index) = existing_after {
+                if let Some(Some(entry)) = map.entries_mut().get_mut(index) {
+                    entry.set_value(value);
+                    true
+                } else {
+                    false
+                }
+            } else {
+                map.push(MapEntry::new(key, value));
+                true
+            }
+        })
+    });
+    if inserted != Some(true) {
+        return Err(type_error(cx));
+    }
+    Ok(value)
+}
+
+#[inline]
+fn canonicalize_keyed_collection_key(key: Value) -> Value {
+    if let Some(number) = key.as_f64() {
+        if number == 0.0 && number.is_sign_negative() {
+            return Value::from_smi(0);
+        }
+    }
+    key
+}
+
 fn map_delete_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -1016,6 +1147,593 @@ fn set_size_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(length_value_u64(u64::try_from(size).unwrap_or(u64::MAX)))
 }
 
+struct SetRecord {
+    object: ObjectRef,
+    size: f64,
+    has: ObjectRef,
+    keys: ObjectRef,
+}
+
+fn get_set_record<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<SetRecord, Cx::Error> {
+    let object = value.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let size_key = property_key_from_text(cx, "size");
+    let size_value = cx.get_property_value(value, size_key)?;
+    let raw_size = to_number_for_builtin(cx, size_value)?;
+    if raw_size.is_nan() {
+        return Err(type_error(cx));
+    }
+    let int_size = if raw_size == 0.0 {
+        0.0
+    } else if !raw_size.is_finite() {
+        raw_size
+    } else {
+        raw_size.trunc()
+    };
+    if int_size < 0.0 {
+        return Err(type_error(cx));
+    }
+    let has_key = property_key_from_text(cx, "has");
+    let has_value = cx.get_property_value(value, has_key)?;
+    let has = cx.require_callable_object(has_value)?;
+    let keys_key = property_key_from_text(cx, "keys");
+    let keys_value = cx.get_property_value(value, keys_key)?;
+    let keys = cx.require_callable_object(keys_value)?;
+    Ok(SetRecord {
+        object,
+        size: int_size,
+        has,
+        keys,
+    })
+}
+
+fn set_record_iterator<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    record: &SetRecord,
+) -> Result<lyng_js_ops::iterator::IteratorRecord, Cx::Error> {
+    let iterator_value =
+        cx.call_to_completion(record.keys, Value::from_object_ref(record.object), &[])?;
+    let iterator_object = iterator_value
+        .as_object_ref()
+        .ok_or_else(|| type_error(cx))?;
+    let next_key = property_key_from_text(cx, "next");
+    let next_value = cx.get_property_value(Value::from_object_ref(iterator_object), next_key)?;
+    let next_method = cx.require_callable_object(next_value)?;
+    Ok(lyng_js_ops::iterator::IteratorRecord::new(
+        iterator_object,
+        next_method,
+    ))
+}
+
+fn set_record_has<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    record: &SetRecord,
+    value: Value,
+) -> Result<bool, Cx::Error> {
+    let result =
+        cx.call_to_completion(record.has, Value::from_object_ref(record.object), &[value])?;
+    let agent = cx.agent();
+    let to_bool = read::to_boolean(agent.heap().view(), result);
+    map_completion(cx, to_bool)
+}
+
+fn collect_set_values<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    object: ObjectRef,
+) -> Result<Vec<Value>, Cx::Error> {
+    let values = cx
+        .agent()
+        .objects()
+        .set_object_data(object)
+        .map(|set| {
+            set.entries()
+                .iter()
+                .filter_map(|entry| *entry)
+                .collect::<Vec<Value>>()
+        })
+        .ok_or_else(|| type_error(cx))?;
+    Ok(values)
+}
+
+fn allocate_result_set<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+) -> Result<ObjectRef, Cx::Error> {
+    let realm = cx.builtin_realm();
+    let prototype = cx
+        .agent()
+        .realm(realm)
+        .and_then(|record| record.intrinsics().set_prototype())
+        .ok_or_else(|| type_error(cx))?;
+    allocate_set_object(cx, realm, prototype)
+}
+
+fn set_push_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    target: ObjectRef,
+    value: Value,
+) -> Result<(), Cx::Error> {
+    let inserted = cx.agent().with_heap_and_objects(|_, objects| {
+        objects.with_set_mut(target, |set| {
+            set.push(value);
+            true
+        })
+    });
+    if inserted == Some(true) {
+        Ok(())
+    } else {
+        Err(type_error(cx))
+    }
+}
+
+fn set_contains_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    target: ObjectRef,
+    value: Value,
+) -> Result<bool, Cx::Error> {
+    Ok(set_entry_index(cx, target, value)?.is_some())
+}
+
+fn canonical_set_value(value: Value) -> Value {
+    canonicalize_keyed_collection_key(value)
+}
+
+fn set_union_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = set_this_object(cx, invocation.this_value())?;
+    let other = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let record = get_set_record(cx, other)?;
+    let result = allocate_result_set(cx)?;
+    for value in collect_set_values(cx, object)? {
+        set_push_value(cx, result, value)?;
+    }
+    let mut iterator_record = set_record_iterator(cx, &record)?;
+    loop {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            break;
+        };
+        let next_value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let next_value = match next_value {
+            Ok(value) => canonical_set_value(value),
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        if !set_contains_value(cx, result, next_value)? {
+            if let Err(error) = set_push_value(cx, result, next_value) {
+                return close_iterator_after_error(cx, &mut iterator_record, error);
+            }
+        }
+    }
+    Ok(Value::from_object_ref(result))
+}
+
+fn set_intersection_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = set_this_object(cx, invocation.this_value())?;
+    let other = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let record = get_set_record(cx, other)?;
+    let result = allocate_result_set(cx)?;
+    let this_size = u64::try_from(
+        cx.agent()
+            .objects()
+            .set_object_data(object)
+            .map(SetObjectData::len)
+            .ok_or_else(|| type_error(cx))?,
+    )
+    .unwrap_or(u64::MAX);
+    let this_size_f = this_size as f64;
+    if this_size_f <= record.size {
+        for value in collect_set_values(cx, object)? {
+            if set_record_has(cx, &record, value)? {
+                let canonical = canonical_set_value(value);
+                if !set_contains_value(cx, result, canonical)? {
+                    set_push_value(cx, result, canonical)?;
+                }
+            }
+        }
+    } else {
+        let mut iterator_record = set_record_iterator(cx, &record)?;
+        loop {
+            let next = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_step(&mut bridge, &mut iterator_record)
+            };
+            let next = match next {
+                Ok(next) => next,
+                Err(error) => {
+                    iterator_record.set_done(true);
+                    return Err(error);
+                }
+            };
+            let Some(next) = next else {
+                break;
+            };
+            let next_value = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_value(&mut bridge, next)
+            };
+            let next_value = match next_value {
+                Ok(value) => canonical_set_value(value),
+                Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            };
+            let in_this = match set_contains_value(cx, object, next_value) {
+                Ok(b) => b,
+                Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            };
+            if in_this && !set_contains_value(cx, result, next_value)? {
+                if let Err(error) = set_push_value(cx, result, next_value) {
+                    return close_iterator_after_error(cx, &mut iterator_record, error);
+                }
+            }
+        }
+    }
+    Ok(Value::from_object_ref(result))
+}
+
+fn set_difference_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = set_this_object(cx, invocation.this_value())?;
+    let other = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let record = get_set_record(cx, other)?;
+    let result = allocate_result_set(cx)?;
+    let this_size = u64::try_from(
+        cx.agent()
+            .objects()
+            .set_object_data(object)
+            .map(SetObjectData::len)
+            .ok_or_else(|| type_error(cx))?,
+    )
+    .unwrap_or(u64::MAX);
+    let this_size_f = this_size as f64;
+    let this_values = collect_set_values(cx, object)?;
+    if this_size_f <= record.size {
+        for value in this_values {
+            if !set_record_has(cx, &record, value)? {
+                set_push_value(cx, result, value)?;
+            }
+        }
+    } else {
+        for value in &this_values {
+            set_push_value(cx, result, *value)?;
+        }
+        let mut iterator_record = set_record_iterator(cx, &record)?;
+        loop {
+            let next = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_step(&mut bridge, &mut iterator_record)
+            };
+            let next = match next {
+                Ok(next) => next,
+                Err(error) => {
+                    iterator_record.set_done(true);
+                    return Err(error);
+                }
+            };
+            let Some(next) = next else {
+                break;
+            };
+            let next_value = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_value(&mut bridge, next)
+            };
+            let next_value = match next_value {
+                Ok(value) => canonical_set_value(value),
+                Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            };
+            let index = match set_entry_index(cx, result, next_value) {
+                Ok(idx) => idx,
+                Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            };
+            if let Some(idx) = index {
+                let deleted = cx.agent().with_heap_and_objects(|_, objects| {
+                    objects.with_set_mut(result, |set| set.delete_index(idx))
+                });
+                if deleted != Some(true) {
+                    let error = type_error(cx);
+                    return close_iterator_after_error(cx, &mut iterator_record, error);
+                }
+            }
+        }
+    }
+    Ok(Value::from_object_ref(result))
+}
+
+fn set_symmetric_difference_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = set_this_object(cx, invocation.this_value())?;
+    let other = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let record = get_set_record(cx, other)?;
+    let result = allocate_result_set(cx)?;
+    for value in collect_set_values(cx, object)? {
+        set_push_value(cx, result, value)?;
+    }
+    let mut iterator_record = set_record_iterator(cx, &record)?;
+    loop {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            break;
+        };
+        let next_value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let next_value = match next_value {
+            Ok(value) => canonical_set_value(value),
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let result_index = match set_entry_index(cx, result, next_value) {
+            Ok(idx) => idx,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let in_original = match set_contains_value(cx, object, next_value) {
+            Ok(b) => b,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        if in_original {
+            if let Some(idx) = result_index {
+                let deleted = cx.agent().with_heap_and_objects(|_, objects| {
+                    objects.with_set_mut(result, |set| set.delete_index(idx))
+                });
+                if deleted != Some(true) {
+                    let error = type_error(cx);
+                    return close_iterator_after_error(cx, &mut iterator_record, error);
+                }
+            }
+        } else if result_index.is_none() {
+            if let Err(error) = set_push_value(cx, result, next_value) {
+                return close_iterator_after_error(cx, &mut iterator_record, error);
+            }
+        }
+    }
+    Ok(Value::from_object_ref(result))
+}
+
+fn set_is_subset_of_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = set_this_object(cx, invocation.this_value())?;
+    let other = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let record = get_set_record(cx, other)?;
+    let this_size = u64::try_from(
+        cx.agent()
+            .objects()
+            .set_object_data(object)
+            .map(SetObjectData::len)
+            .ok_or_else(|| type_error(cx))?,
+    )
+    .unwrap_or(u64::MAX);
+    if (this_size as f64) > record.size {
+        return Ok(Value::from_bool(false));
+    }
+    let mut index = 0_usize;
+    loop {
+        let entry = {
+            let agent = cx.agent();
+            let Some(set) = agent.objects().set_object_data(object) else {
+                return Err(type_error(cx));
+            };
+            set.entries().get(index).copied()
+        };
+        let Some(entry) = entry else {
+            break;
+        };
+        index = index.saturating_add(1);
+        let Some(value) = entry else {
+            continue;
+        };
+        if !set_record_has(cx, &record, value)? {
+            return Ok(Value::from_bool(false));
+        }
+    }
+    Ok(Value::from_bool(true))
+}
+
+fn set_is_superset_of_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = set_this_object(cx, invocation.this_value())?;
+    let other = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let record = get_set_record(cx, other)?;
+    let this_size = u64::try_from(
+        cx.agent()
+            .objects()
+            .set_object_data(object)
+            .map(SetObjectData::len)
+            .ok_or_else(|| type_error(cx))?,
+    )
+    .unwrap_or(u64::MAX);
+    if (this_size as f64) < record.size {
+        return Ok(Value::from_bool(false));
+    }
+    let mut iterator_record = set_record_iterator(cx, &record)?;
+    loop {
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            break;
+        };
+        let next_value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let next_value = match next_value {
+            Ok(value) => canonical_set_value(value),
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let in_this = match set_contains_value(cx, object, next_value) {
+            Ok(b) => b,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        if !in_this {
+            let close_result = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                lyng_js_ops::iterator::iterator_close(
+                    &mut bridge,
+                    &mut iterator_record,
+                    Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                )
+            };
+            close_result?;
+            return Ok(Value::from_bool(false));
+        }
+    }
+    Ok(Value::from_bool(true))
+}
+
+fn set_is_disjoint_from_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = set_this_object(cx, invocation.this_value())?;
+    let other = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let record = get_set_record(cx, other)?;
+    let this_size = u64::try_from(
+        cx.agent()
+            .objects()
+            .set_object_data(object)
+            .map(SetObjectData::len)
+            .ok_or_else(|| type_error(cx))?,
+    )
+    .unwrap_or(u64::MAX);
+    let this_size_f = this_size as f64;
+    if this_size_f <= record.size {
+        let mut index = 0_usize;
+        loop {
+            let entry = {
+                let agent = cx.agent();
+                let Some(set) = agent.objects().set_object_data(object) else {
+                    return Err(type_error(cx));
+                };
+                set.entries().get(index).copied()
+            };
+            let Some(entry) = entry else {
+                break;
+            };
+            index = index.saturating_add(1);
+            let Some(value) = entry else {
+                continue;
+            };
+            if set_record_has(cx, &record, value)? {
+                return Ok(Value::from_bool(false));
+            }
+        }
+    } else {
+        let mut iterator_record = set_record_iterator(cx, &record)?;
+        loop {
+            let next = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_step(&mut bridge, &mut iterator_record)
+            };
+            let next = match next {
+                Ok(next) => next,
+                Err(error) => {
+                    iterator_record.set_done(true);
+                    return Err(error);
+                }
+            };
+            let Some(next) = next else {
+                break;
+            };
+            let next_value = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_value(&mut bridge, next)
+            };
+            let next_value = match next_value {
+                Ok(value) => canonical_set_value(value),
+                Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            };
+            let in_this = match set_contains_value(cx, object, next_value) {
+                Ok(b) => b,
+                Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            };
+            if in_this {
+                let close_result = {
+                    let mut bridge = BuiltinIteratorBridge { cx };
+                    lyng_js_ops::iterator::iterator_close(
+                        &mut bridge,
+                        &mut iterator_record,
+                        Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                    )
+                };
+                close_result?;
+                return Ok(Value::from_bool(false));
+            }
+        }
+    }
+    Ok(Value::from_bool(true))
+}
+
 fn weak_map_get_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -1098,6 +1816,76 @@ fn weak_map_delete_builtin<Cx: PublicBuiltinDispatchContext>(
         .agent()
         .with_heap_and_objects(|heap, _| heap.mutator().weak_map_delete(object, key));
     deleted.map(Value::from_bool).ok_or_else(|| type_error(cx))
+}
+
+fn weak_map_get_or_insert_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = weak_map_this_object(cx, invocation.this_value())?;
+    let key_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let value = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let key = weak_heap_ref_from_value(cx, key_value).ok_or_else(|| type_error(cx))?;
+    if let Some(existing) = cx
+        .agent()
+        .heap()
+        .view()
+        .weak_map_get(object, key)
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Ok(existing);
+    }
+    let stored = cx
+        .agent()
+        .with_heap_and_objects(|heap, _| heap.mutator().weak_map_set(object, key, value));
+    if !stored {
+        return Err(type_error(cx));
+    }
+    Ok(value)
+}
+
+fn weak_map_get_or_insert_computed_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = weak_map_this_object(cx, invocation.this_value())?;
+    let key_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let callback = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let callback_object = cx.require_callable_object(callback)?;
+    let key = weak_heap_ref_from_value(cx, key_value).ok_or_else(|| type_error(cx))?;
+    if let Some(existing) = cx
+        .agent()
+        .heap()
+        .view()
+        .weak_map_get(object, key)
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Ok(existing);
+    }
+    let value = cx.call_to_completion(callback_object, Value::undefined(), &[key_value])?;
+    let stored = cx
+        .agent()
+        .with_heap_and_objects(|heap, _| heap.mutator().weak_map_set(object, key, value));
+    if !stored {
+        return Err(type_error(cx));
+    }
+    Ok(value)
 }
 
 fn weak_set_add_builtin<Cx: PublicBuiltinDispatchContext>(

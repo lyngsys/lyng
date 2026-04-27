@@ -63,3 +63,11 @@ pub fn uri_error_builtin() -> BuiltinFunctionId {
         None => unreachable!("builtin id should stay non-zero"),
     }
 }
+
+#[inline]
+pub fn error_is_error_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ERROR_IS_ERROR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}

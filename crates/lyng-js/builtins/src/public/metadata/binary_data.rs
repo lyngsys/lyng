@@ -234,6 +234,10 @@ pub(super) const PUBLIC_BINARY_DATA_BUILTIN_METADATA: &[PublicBuiltinMetadataRow
         BuiltinEntryMetadata::new("waitAsync", 4, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        atomics_pause_builtin,
+        BuiltinEntryMetadata::new("pause", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         atomics_is_lock_free_builtin,
         BuiltinEntryMetadata::new("isLockFree", 1, false, false),
     ),

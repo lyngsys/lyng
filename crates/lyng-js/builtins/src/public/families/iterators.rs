@@ -1,6 +1,7 @@
 use super::descriptors::{
-    builtin_function_atom_property, builtin_function_symbol_property, data_symbol_property,
-    descriptor_tag, readonly_builtin_attributes, writable_builtin_attributes,
+    accessor_atom_property, accessor_symbol_property, builtin_function_atom_property,
+    builtin_function_symbol_property, data_atom_property, data_symbol_property, descriptor_tag,
+    readonly_builtin_attributes, writable_builtin_attributes,
 };
 use super::{
     install_public_builtin_function, install_public_builtin_function_with_metadata,
@@ -12,7 +13,11 @@ use crate::{BuiltinDescriptorTable, BuiltinEntryMetadata, BuiltinInstallTarget, 
 use lyng_js_common::AtomId;
 use lyng_js_env::Agent;
 use lyng_js_types::{
-    iterator_prototype_iterator_builtin, map_iterator_next_builtin, set_iterator_next_builtin,
+    iterator_builtin, iterator_constructor_getter_builtin, iterator_constructor_setter_builtin,
+    iterator_every_builtin, iterator_find_builtin, iterator_for_each_builtin,
+    iterator_from_builtin, iterator_prototype_iterator_builtin, iterator_reduce_builtin,
+    iterator_some_builtin, iterator_to_array_builtin, iterator_to_string_tag_getter_builtin,
+    iterator_to_string_tag_setter_builtin, map_iterator_next_builtin, set_iterator_next_builtin,
     BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
 };
 
@@ -48,6 +53,58 @@ pub(in crate::public) fn install_iterator_family(
             set_iterator_next_builtin(),
             None,
         ),
+        iterator: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_builtin(),
+            Some(prototypes.iterator_prototype),
+        ),
+        iterator_from: install_public_builtin_function(agent, cx, iterator_from_builtin(), None),
+        iterator_reduce: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_reduce_builtin(),
+            None,
+        ),
+        iterator_for_each: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_for_each_builtin(),
+            None,
+        ),
+        iterator_some: install_public_builtin_function(agent, cx, iterator_some_builtin(), None),
+        iterator_every: install_public_builtin_function(agent, cx, iterator_every_builtin(), None),
+        iterator_find: install_public_builtin_function(agent, cx, iterator_find_builtin(), None),
+        iterator_to_array: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_to_array_builtin(),
+            None,
+        ),
+        iterator_to_string_tag_getter: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_to_string_tag_getter_builtin(),
+            None,
+        ),
+        iterator_to_string_tag_setter: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_to_string_tag_setter_builtin(),
+            None,
+        ),
+        iterator_constructor_getter: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_constructor_getter_builtin(),
+            None,
+        ),
+        iterator_constructor_setter: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_constructor_setter_builtin(),
+            None,
+        ),
     }
 }
 
@@ -62,6 +119,30 @@ pub(in crate::public) fn iterator_builtin_object(
         ),
         (map_iterator_next_builtin(), builtins.map_iterator_next),
         (set_iterator_next_builtin(), builtins.set_iterator_next),
+        (iterator_builtin(), builtins.iterator),
+        (iterator_from_builtin(), builtins.iterator_from),
+        (iterator_reduce_builtin(), builtins.iterator_reduce),
+        (iterator_for_each_builtin(), builtins.iterator_for_each),
+        (iterator_some_builtin(), builtins.iterator_some),
+        (iterator_every_builtin(), builtins.iterator_every),
+        (iterator_find_builtin(), builtins.iterator_find),
+        (iterator_to_array_builtin(), builtins.iterator_to_array),
+        (
+            iterator_to_string_tag_getter_builtin(),
+            builtins.iterator_to_string_tag_getter,
+        ),
+        (
+            iterator_to_string_tag_setter_builtin(),
+            builtins.iterator_to_string_tag_setter,
+        ),
+        (
+            iterator_constructor_getter_builtin(),
+            builtins.iterator_constructor_getter,
+        ),
+        (
+            iterator_constructor_setter_builtin(),
+            builtins.iterator_constructor_setter,
+        ),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -78,11 +159,36 @@ pub(in crate::public) fn install_iterator_family_descriptors(
     let map_iterator_tag = descriptor_tag(agent, "Map Iterator");
     let set_iterator_tag = descriptor_tag(agent, "Set Iterator");
 
-    let iterator_prototype_descriptors = [builtin_function_symbol_property(
-        WellKnownSymbolId::Iterator,
-        iterator_prototype_iterator_builtin(),
+    let iterator_constructor_descriptors = [data_atom_property(
+        atoms.from,
+        Value::from_object_ref(builtins.iterator_from),
         writable_builtin_attributes(),
     )];
+    let iterator_prototype_descriptors = [
+        builtin_function_symbol_property(
+            WellKnownSymbolId::Iterator,
+            iterator_prototype_iterator_builtin(),
+            writable_builtin_attributes(),
+        ),
+        builtin_function_atom_property(atoms.reduce, iterator_reduce_builtin()),
+        builtin_function_atom_property(atoms.for_each, iterator_for_each_builtin()),
+        builtin_function_atom_property(atoms.some, iterator_some_builtin()),
+        builtin_function_atom_property(atoms.every, iterator_every_builtin()),
+        builtin_function_atom_property(atoms.find, iterator_find_builtin()),
+        builtin_function_atom_property(atoms.to_array, iterator_to_array_builtin()),
+        accessor_atom_property(
+            atoms.constructor,
+            Some(iterator_constructor_getter_builtin()),
+            Some(iterator_constructor_setter_builtin()),
+            writable_builtin_attributes(),
+        ),
+        accessor_symbol_property(
+            WellKnownSymbolId::ToStringTag,
+            Some(iterator_to_string_tag_getter_builtin()),
+            Some(iterator_to_string_tag_setter_builtin()),
+            writable_builtin_attributes(),
+        ),
+    ];
     let async_iterator_prototype_descriptors = [
         data_symbol_property(
             WellKnownSymbolId::AsyncIterator,
@@ -113,6 +219,10 @@ pub(in crate::public) fn install_iterator_family_descriptors(
     ];
     let tables = [
         BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Iterator),
+            &iterator_constructor_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
             BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::IteratorPrototype),
             &iterator_prototype_descriptors,
         ),
@@ -135,12 +245,29 @@ pub(in crate::public) fn install_iterator_family_descriptors(
 #[derive(Clone, Copy)]
 struct IteratorDescriptorAtoms {
     next: AtomId,
+    constructor: AtomId,
+    from: AtomId,
+    reduce: AtomId,
+    for_each: AtomId,
+    some: AtomId,
+    every: AtomId,
+    find: AtomId,
+    to_array: AtomId,
 }
 
 impl IteratorDescriptorAtoms {
     fn new(agent: &mut Agent) -> Self {
+        let atoms = agent.atoms_mut();
         Self {
-            next: agent.atoms_mut().intern_collectible("next"),
+            next: atoms.intern("next"),
+            constructor: lyng_js_common::WellKnownAtom::constructor.id(),
+            from: atoms.intern("from"),
+            reduce: atoms.intern("reduce"),
+            for_each: atoms.intern("forEach"),
+            some: atoms.intern("some"),
+            every: atoms.intern("every"),
+            find: atoms.intern("find"),
+            to_array: atoms.intern("toArray"),
         }
     }
 }

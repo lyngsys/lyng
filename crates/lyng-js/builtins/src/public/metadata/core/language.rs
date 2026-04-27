@@ -55,6 +55,10 @@ pub(in crate::public::metadata) const PUBLIC_LANGUAGE_SUPPORT_BUILTIN_METADATA:
         BuiltinEntryMetadata::new("SuppressedError", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
+        error_is_error_builtin,
+        BuiltinEntryMetadata::new("isError", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         eval_builtin,
         BuiltinEntryMetadata::new("eval", 1, false, false),
     ),
@@ -185,6 +189,14 @@ pub(in crate::public::metadata) const PUBLIC_LANGUAGE_SUPPORT_BUILTIN_METADATA:
     PublicBuiltinMetadataRow::new(
         promise_any_builtin,
         BuiltinEntryMetadata::new("any", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        promise_try_builtin,
+        BuiltinEntryMetadata::new("try", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        promise_with_resolvers_builtin,
+        BuiltinEntryMetadata::new("withResolvers", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
         promise_species_getter_builtin,

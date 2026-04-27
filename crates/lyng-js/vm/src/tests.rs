@@ -2596,6 +2596,112 @@ fn evaluate_script_array_from_async_uses_intrinsic_iterator_symbols() {
 }
 
 #[test]
+fn evaluate_script_array_from_async_sync_iterator_observes_mutation_after_first_await() {
+    let unit = compile_test_unit(
+        220,
+        r#"
+            async function main() {
+                var items = [1, 2, 3];
+                var promise = Array.fromAsync(items);
+                items.push(4);
+                var result = await promise;
+                return result.join(",");
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("Array.fromAsync mutation test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("Array.fromAsync promise should remain tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    let text = record
+        .result()
+        .as_string_ref()
+        .expect("Array.fromAsync mutation result should be a string");
+    assert_eq!(
+        decode_string(agent.heap().view().string_view(text).unwrap()),
+        "1,2,3,4"
+    );
+}
+
+#[test]
+fn evaluate_script_array_from_async_awaits_async_iterator_values_before_mapping() {
+    let unit = compile_test_unit(
+        220,
+        r#"
+            async function* asyncGen() {
+                for (let i = 0; i < 4; i++) {
+                    yield Promise.resolve(i * 2);
+                }
+            }
+            async function main() {
+                var result = await Array.fromAsync(
+                    { [Symbol.asyncIterator]: asyncGen },
+                    async function(value, index) {
+                        return Promise.resolve(value * index);
+                    }
+                );
+                return result.join(",");
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("Array.fromAsync async iterator test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("Array.fromAsync promise should remain tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    let text = record
+        .result()
+        .as_string_ref()
+        .expect("Array.fromAsync async iterator result should be a string");
+    assert_eq!(
+        decode_string(agent.heap().view().string_view(text).unwrap()),
+        "0,2,8,18"
+    );
+}
+
+#[test]
+fn evaluate_script_array_from_async_rejects_bigint_array_like_length() {
+    let unit = compile_test_unit(
+        220,
+        r#"
+            Array.fromAsync({ length: 1n, 0: 0 });
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("Array.fromAsync BigInt length test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("Array.fromAsync promise should remain tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+}
+
+#[test]
 fn evaluate_script_array_from_async_preserves_custom_constructor_operation_order() {
     let unit = compile_test_unit(
         220,
@@ -6004,6 +6110,38 @@ fn async_generator_next_returns_a_promise_for_iterator_results() {
 
     assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(3));
+}
+
+#[test]
+fn async_generator_yield_unwraps_promises_before_resolving_next() {
+    let unit = compile_test_unit(
+        232,
+        r#"
+            async function main() {
+                var iter = (async function* () {
+                    yield Promise.resolve(7);
+                })();
+                var result = await iter.next();
+                return result.value instanceof Promise ? -1 : result.value;
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("async generator promise-yield test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("async generator promise-yield promise should remain tracked");
+
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.result(), Value::from_smi(7));
 }
 
 #[test]

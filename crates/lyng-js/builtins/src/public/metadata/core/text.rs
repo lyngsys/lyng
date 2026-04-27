@@ -18,6 +18,54 @@ pub(in crate::public::metadata) const PUBLIC_TEXT_BUILTIN_METADATA: &[PublicBuil
         BuiltinEntryMetadata::new("next", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        iterator_builtin,
+        BuiltinEntryMetadata::new("Iterator", 0, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_from_builtin,
+        BuiltinEntryMetadata::new("from", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_reduce_builtin,
+        BuiltinEntryMetadata::new("reduce", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_for_each_builtin,
+        BuiltinEntryMetadata::new("forEach", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_some_builtin,
+        BuiltinEntryMetadata::new("some", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_every_builtin,
+        BuiltinEntryMetadata::new("every", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_find_builtin,
+        BuiltinEntryMetadata::new("find", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_to_array_builtin,
+        BuiltinEntryMetadata::new("toArray", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_to_string_tag_getter_builtin,
+        BuiltinEntryMetadata::new("get [Symbol.toStringTag]", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_to_string_tag_setter_builtin,
+        BuiltinEntryMetadata::new("set [Symbol.toStringTag]", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_constructor_getter_builtin,
+        BuiltinEntryMetadata::new("get constructor", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_constructor_setter_builtin,
+        BuiltinEntryMetadata::new("set constructor", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         string_builtin,
         BuiltinEntryMetadata::new("String", 1, true, true),
     ),

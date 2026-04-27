@@ -93,72 +93,73 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
         Some(bootstrap_atoms.uint8_array()),
         AllocationLifetime::Default,
     ));
-    let last_index_of_atom = agent.atoms_mut().intern_collectible("lastIndexOf");
-    let copy_within_atom = agent.atoms_mut().intern_collectible("copyWithin");
-    let entries_atom = agent.atoms_mut().intern_collectible("entries");
-    let every_atom = agent.atoms_mut().intern_collectible("every");
-    let fill_atom = agent.atoms_mut().intern_collectible("fill");
-    let filter_atom = agent.atoms_mut().intern_collectible("filter");
-    let find_atom = agent.atoms_mut().intern_collectible("find");
-    let find_index_atom = agent.atoms_mut().intern_collectible("findIndex");
-    let find_last_atom = agent.atoms_mut().intern_collectible("findLast");
-    let find_last_index_atom = agent.atoms_mut().intern_collectible("findLastIndex");
-    let from_atom = agent.atoms_mut().intern_collectible("from");
-    let for_each_atom = agent.atoms_mut().intern_collectible("forEach");
-    let includes_atom = agent.atoms_mut().intern_collectible("includes");
-    let index_of_atom = agent.atoms_mut().intern_collectible("indexOf");
-    let join_atom = agent.atoms_mut().intern_collectible("join");
-    let keys_atom = agent.atoms_mut().intern_collectible("keys");
-    let map_atom = agent.atoms_mut().intern_collectible("map");
-    let of_atom = agent.atoms_mut().intern_collectible("of");
-    let reduce_atom = agent.atoms_mut().intern_collectible("reduce");
-    let reduce_right_atom = agent.atoms_mut().intern_collectible("reduceRight");
-    let reverse_atom = agent.atoms_mut().intern_collectible("reverse");
-    let some_atom = agent.atoms_mut().intern_collectible("some");
-    let at_atom = agent.atoms_mut().intern_collectible("at");
-    let slice_atom = agent.atoms_mut().intern_collectible("slice");
-    let buffer_atom = agent.atoms_mut().intern_collectible("buffer");
-    let byte_length_atom = agent.atoms_mut().intern_collectible("byteLength");
-    let byte_offset_atom = agent.atoms_mut().intern_collectible("byteOffset");
-    let bytes_per_element_atom = agent.atoms_mut().intern_collectible("BYTES_PER_ELEMENT");
-    let is_view_atom = agent.atoms_mut().intern_collectible("isView");
-    let sort_atom = agent.atoms_mut().intern_collectible("sort");
-    let to_locale_string_atom = agent.atoms_mut().intern_collectible("toLocaleString");
-    let to_reversed_atom = agent.atoms_mut().intern_collectible("toReversed");
-    let to_sorted_atom = agent.atoms_mut().intern_collectible("toSorted");
-    let values_atom = agent.atoms_mut().intern_collectible("values");
-    let with_atom = agent.atoms_mut().intern_collectible("with");
-    let get_float32_atom = agent.atoms_mut().intern_collectible("getFloat32");
-    let get_float64_atom = agent.atoms_mut().intern_collectible("getFloat64");
-    let get_int16_atom = agent.atoms_mut().intern_collectible("getInt16");
-    let get_int32_atom = agent.atoms_mut().intern_collectible("getInt32");
-    let get_int8_atom = agent.atoms_mut().intern_collectible("getInt8");
-    let get_uint16_atom = agent.atoms_mut().intern_collectible("getUint16");
-    let get_uint32_atom = agent.atoms_mut().intern_collectible("getUint32");
-    let get_uint8_atom = agent.atoms_mut().intern_collectible("getUint8");
-    let add_atom = agent.atoms_mut().intern_collectible("add");
-    let and_atom = agent.atoms_mut().intern_collectible("and");
-    let compare_exchange_atom = agent.atoms_mut().intern_collectible("compareExchange");
-    let exchange_atom = agent.atoms_mut().intern_collectible("exchange");
-    let is_lock_free_atom = agent.atoms_mut().intern_collectible("isLockFree");
-    let load_atom = agent.atoms_mut().intern_collectible("load");
-    let notify_atom = agent.atoms_mut().intern_collectible("notify");
-    let or_atom = agent.atoms_mut().intern_collectible("or");
-    let set_atom = agent.atoms_mut().intern_collectible("set");
-    let set_float32_atom = agent.atoms_mut().intern_collectible("setFloat32");
-    let set_float64_atom = agent.atoms_mut().intern_collectible("setFloat64");
-    let set_int16_atom = agent.atoms_mut().intern_collectible("setInt16");
-    let set_int32_atom = agent.atoms_mut().intern_collectible("setInt32");
-    let set_int8_atom = agent.atoms_mut().intern_collectible("setInt8");
-    let set_uint16_atom = agent.atoms_mut().intern_collectible("setUint16");
-    let set_uint32_atom = agent.atoms_mut().intern_collectible("setUint32");
-    let set_uint8_atom = agent.atoms_mut().intern_collectible("setUint8");
-    let store_atom = agent.atoms_mut().intern_collectible("store");
-    let sub_atom = agent.atoms_mut().intern_collectible("sub");
-    let subarray_atom = agent.atoms_mut().intern_collectible("subarray");
-    let wait_atom = agent.atoms_mut().intern_collectible("wait");
-    let wait_async_atom = agent.atoms_mut().intern_collectible("waitAsync");
-    let xor_atom = agent.atoms_mut().intern_collectible("xor");
+    let last_index_of_atom = agent.atoms_mut().intern("lastIndexOf");
+    let copy_within_atom = agent.atoms_mut().intern("copyWithin");
+    let entries_atom = agent.atoms_mut().intern("entries");
+    let every_atom = agent.atoms_mut().intern("every");
+    let fill_atom = agent.atoms_mut().intern("fill");
+    let filter_atom = agent.atoms_mut().intern("filter");
+    let find_atom = agent.atoms_mut().intern("find");
+    let find_index_atom = agent.atoms_mut().intern("findIndex");
+    let find_last_atom = agent.atoms_mut().intern("findLast");
+    let find_last_index_atom = agent.atoms_mut().intern("findLastIndex");
+    let from_atom = agent.atoms_mut().intern("from");
+    let for_each_atom = agent.atoms_mut().intern("forEach");
+    let includes_atom = agent.atoms_mut().intern("includes");
+    let index_of_atom = agent.atoms_mut().intern("indexOf");
+    let join_atom = agent.atoms_mut().intern("join");
+    let keys_atom = agent.atoms_mut().intern("keys");
+    let map_atom = agent.atoms_mut().intern("map");
+    let of_atom = agent.atoms_mut().intern("of");
+    let reduce_atom = agent.atoms_mut().intern("reduce");
+    let reduce_right_atom = agent.atoms_mut().intern("reduceRight");
+    let reverse_atom = agent.atoms_mut().intern("reverse");
+    let some_atom = agent.atoms_mut().intern("some");
+    let at_atom = agent.atoms_mut().intern("at");
+    let slice_atom = agent.atoms_mut().intern("slice");
+    let buffer_atom = agent.atoms_mut().intern("buffer");
+    let byte_length_atom = agent.atoms_mut().intern("byteLength");
+    let byte_offset_atom = agent.atoms_mut().intern("byteOffset");
+    let bytes_per_element_atom = agent.atoms_mut().intern("BYTES_PER_ELEMENT");
+    let is_view_atom = agent.atoms_mut().intern("isView");
+    let sort_atom = agent.atoms_mut().intern("sort");
+    let to_locale_string_atom = agent.atoms_mut().intern("toLocaleString");
+    let to_reversed_atom = agent.atoms_mut().intern("toReversed");
+    let to_sorted_atom = agent.atoms_mut().intern("toSorted");
+    let values_atom = agent.atoms_mut().intern("values");
+    let with_atom = agent.atoms_mut().intern("with");
+    let get_float32_atom = agent.atoms_mut().intern("getFloat32");
+    let get_float64_atom = agent.atoms_mut().intern("getFloat64");
+    let get_int16_atom = agent.atoms_mut().intern("getInt16");
+    let get_int32_atom = agent.atoms_mut().intern("getInt32");
+    let get_int8_atom = agent.atoms_mut().intern("getInt8");
+    let get_uint16_atom = agent.atoms_mut().intern("getUint16");
+    let get_uint32_atom = agent.atoms_mut().intern("getUint32");
+    let get_uint8_atom = agent.atoms_mut().intern("getUint8");
+    let add_atom = agent.atoms_mut().intern("add");
+    let and_atom = agent.atoms_mut().intern("and");
+    let compare_exchange_atom = agent.atoms_mut().intern("compareExchange");
+    let exchange_atom = agent.atoms_mut().intern("exchange");
+    let is_lock_free_atom = agent.atoms_mut().intern("isLockFree");
+    let load_atom = agent.atoms_mut().intern("load");
+    let notify_atom = agent.atoms_mut().intern("notify");
+    let or_atom = agent.atoms_mut().intern("or");
+    let set_atom = agent.atoms_mut().intern("set");
+    let set_float32_atom = agent.atoms_mut().intern("setFloat32");
+    let set_float64_atom = agent.atoms_mut().intern("setFloat64");
+    let set_int16_atom = agent.atoms_mut().intern("setInt16");
+    let set_int32_atom = agent.atoms_mut().intern("setInt32");
+    let set_int8_atom = agent.atoms_mut().intern("setInt8");
+    let set_uint16_atom = agent.atoms_mut().intern("setUint16");
+    let set_uint32_atom = agent.atoms_mut().intern("setUint32");
+    let set_uint8_atom = agent.atoms_mut().intern("setUint8");
+    let store_atom = agent.atoms_mut().intern("store");
+    let sub_atom = agent.atoms_mut().intern("sub");
+    let subarray_atom = agent.atoms_mut().intern("subarray");
+    let wait_atom = agent.atoms_mut().intern("wait");
+    let wait_async_atom = agent.atoms_mut().intern("waitAsync");
+    let pause_atom = agent.atoms_mut().intern("pause");
+    let xor_atom = agent.atoms_mut().intern("xor");
     let buffer_descriptor_sets = buffers::descriptor_sets(
         builtins,
         buffers::BufferDescriptorAtoms {
@@ -181,6 +182,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
             load: load_atom,
             notify: notify_atom,
             or: or_atom,
+            pause: pause_atom,
             store: store_atom,
             sub: sub_atom,
             wait: wait_atom,

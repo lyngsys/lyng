@@ -302,6 +302,7 @@ pub(super) struct FunctionFamilyBuiltins {
 #[allow(clippy::struct_field_names)]
 pub(super) struct IteratorFamilyPrototypes {
     pub(super) async_iterator_prototype: ObjectRef,
+    pub(super) iterator_prototype: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -311,6 +312,18 @@ pub(super) struct IteratorFamilyBuiltins {
     pub(super) async_iterator_method: ObjectRef,
     pub(super) map_iterator_next: ObjectRef,
     pub(super) set_iterator_next: ObjectRef,
+    pub(super) iterator: ObjectRef,
+    pub(super) iterator_from: ObjectRef,
+    pub(super) iterator_reduce: ObjectRef,
+    pub(super) iterator_for_each: ObjectRef,
+    pub(super) iterator_some: ObjectRef,
+    pub(super) iterator_every: ObjectRef,
+    pub(super) iterator_find: ObjectRef,
+    pub(super) iterator_to_array: ObjectRef,
+    pub(super) iterator_to_string_tag_getter: ObjectRef,
+    pub(super) iterator_to_string_tag_setter: ObjectRef,
+    pub(super) iterator_constructor_getter: ObjectRef,
+    pub(super) iterator_constructor_setter: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -342,6 +355,8 @@ pub(super) struct CollectionFamilyBuiltins {
     pub(super) map_keys: ObjectRef,
     pub(super) map_for_each: ObjectRef,
     pub(super) map_size_getter: ObjectRef,
+    pub(super) map_get_or_insert: ObjectRef,
+    pub(super) map_get_or_insert_computed: ObjectRef,
     pub(super) set_add: ObjectRef,
     pub(super) set_has: ObjectRef,
     pub(super) set_delete: ObjectRef,
@@ -351,10 +366,19 @@ pub(super) struct CollectionFamilyBuiltins {
     pub(super) set_keys: ObjectRef,
     pub(super) set_for_each: ObjectRef,
     pub(super) set_size_getter: ObjectRef,
+    pub(super) set_union: ObjectRef,
+    pub(super) set_intersection: ObjectRef,
+    pub(super) set_difference: ObjectRef,
+    pub(super) set_symmetric_difference: ObjectRef,
+    pub(super) set_is_subset_of: ObjectRef,
+    pub(super) set_is_superset_of: ObjectRef,
+    pub(super) set_is_disjoint_from: ObjectRef,
     pub(super) weak_map_get: ObjectRef,
     pub(super) weak_map_set: ObjectRef,
     pub(super) weak_map_has: ObjectRef,
     pub(super) weak_map_delete: ObjectRef,
+    pub(super) weak_map_get_or_insert: ObjectRef,
+    pub(super) weak_map_get_or_insert_computed: ObjectRef,
     pub(super) weak_set_add: ObjectRef,
     pub(super) weak_set_has: ObjectRef,
     pub(super) weak_set_delete: ObjectRef,
@@ -428,6 +452,7 @@ pub(super) struct BinaryDataFamilyBuiltins {
     pub(super) atomics_notify: ObjectRef,
     pub(super) atomics_wait: ObjectRef,
     pub(super) atomics_wait_async: ObjectRef,
+    pub(super) atomics_pause: ObjectRef,
     pub(super) atomics_is_lock_free: ObjectRef,
     pub(super) data_view_prototype: ObjectRef,
     pub(super) data_view_buffer_getter: ObjectRef,
@@ -871,6 +896,7 @@ pub(super) struct ErrorFamilyBuiltins {
     pub(super) aggregate_error_prototype: ObjectRef,
     pub(super) suppressed_error: ObjectRef,
     pub(super) suppressed_error_prototype: ObjectRef,
+    pub(super) error_is_error: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -916,6 +942,8 @@ pub(super) struct PromiseDisposalFamilyBuiltins {
     pub(super) promise_all_settled: ObjectRef,
     pub(super) promise_race: ObjectRef,
     pub(super) promise_any: ObjectRef,
+    pub(super) promise_try: ObjectRef,
+    pub(super) promise_with_resolvers: ObjectRef,
     pub(super) promise_species_getter: ObjectRef,
 }
 

@@ -103,6 +103,7 @@ fn resolve_intrinsic(
         BuiltinIntrinsic::Uint8ClampedArrayPrototype => intrinsics.uint8_clamped_array_prototype(),
         BuiltinIntrinsic::Uint8Array => intrinsics.uint8_array(),
         BuiltinIntrinsic::Uint8ArrayPrototype => intrinsics.uint8_array_prototype(),
+        BuiltinIntrinsic::Iterator => intrinsics.iterator(),
         BuiltinIntrinsic::IteratorPrototype => intrinsics.iterator_prototype(),
         BuiltinIntrinsic::AsyncIteratorPrototype => intrinsics.async_iterator_prototype(),
         BuiltinIntrinsic::AsyncFromSyncIteratorPrototype => {

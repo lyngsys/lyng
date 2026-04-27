@@ -85,10 +85,10 @@ struct JsonDescriptorAtoms {
 impl JsonDescriptorAtoms {
     fn new(agent: &mut Agent) -> Self {
         Self {
-            parse: agent.atoms_mut().intern_collectible("parse"),
-            stringify: agent.atoms_mut().intern_collectible("stringify"),
-            raw_json: agent.atoms_mut().intern_collectible("rawJSON"),
-            is_raw_json: agent.atoms_mut().intern_collectible("isRawJSON"),
+            parse: agent.atoms_mut().intern("parse"),
+            stringify: agent.atoms_mut().intern("stringify"),
+            raw_json: agent.atoms_mut().intern("rawJSON"),
+            is_raw_json: agent.atoms_mut().intern("isRawJSON"),
         }
     }
 }

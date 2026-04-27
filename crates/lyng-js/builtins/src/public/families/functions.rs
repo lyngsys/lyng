@@ -363,10 +363,10 @@ impl FunctionDescriptorAtoms {
     fn new(agent: &mut Agent) -> Self {
         let atoms = agent.atoms_mut();
         Self {
-            arguments: atoms.intern_collectible("arguments"),
-            caller: atoms.intern_collectible("caller"),
-            next: atoms.intern_collectible("next"),
-            throw: atoms.intern_collectible("throw"),
+            arguments: atoms.intern("arguments"),
+            caller: atoms.intern("caller"),
+            next: atoms.intern("next"),
+            throw: atoms.intern("throw"),
         }
     }
 }

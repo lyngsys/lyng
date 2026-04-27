@@ -53,6 +53,14 @@ pub(in crate::public::metadata) const PUBLIC_KEYED_COLLECTION_BUILTIN_METADATA:
         BuiltinEntryMetadata::new("get size", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        map_get_or_insert_builtin,
+        BuiltinEntryMetadata::new("getOrInsert", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        map_get_or_insert_computed_builtin,
+        BuiltinEntryMetadata::new("getOrInsertComputed", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         set_add_builtin,
         BuiltinEntryMetadata::new("add", 1, false, false),
     ),
@@ -89,6 +97,34 @@ pub(in crate::public::metadata) const PUBLIC_KEYED_COLLECTION_BUILTIN_METADATA:
         BuiltinEntryMetadata::new("get size", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        set_union_builtin,
+        BuiltinEntryMetadata::new("union", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        set_intersection_builtin,
+        BuiltinEntryMetadata::new("intersection", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        set_difference_builtin,
+        BuiltinEntryMetadata::new("difference", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        set_symmetric_difference_builtin,
+        BuiltinEntryMetadata::new("symmetricDifference", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        set_is_subset_of_builtin,
+        BuiltinEntryMetadata::new("isSubsetOf", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        set_is_superset_of_builtin,
+        BuiltinEntryMetadata::new("isSupersetOf", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        set_is_disjoint_from_builtin,
+        BuiltinEntryMetadata::new("isDisjointFrom", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         weak_map_get_builtin,
         BuiltinEntryMetadata::new("get", 1, false, false),
     ),
@@ -103,6 +139,14 @@ pub(in crate::public::metadata) const PUBLIC_KEYED_COLLECTION_BUILTIN_METADATA:
     PublicBuiltinMetadataRow::new(
         weak_map_delete_builtin,
         BuiltinEntryMetadata::new("delete", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        weak_map_get_or_insert_builtin,
+        BuiltinEntryMetadata::new("getOrInsert", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        weak_map_get_or_insert_computed_builtin,
+        BuiltinEntryMetadata::new("getOrInsertComputed", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
         weak_set_add_builtin,

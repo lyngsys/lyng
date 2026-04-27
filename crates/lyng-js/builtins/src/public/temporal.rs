@@ -274,20 +274,20 @@ pub(super) fn install_temporal_public_objects(
     ) = {
         let atoms = agent.atoms_mut();
         (
-            PropertyKey::from_atom(atoms.intern_collectible("Temporal")),
-            PropertyKey::from_atom(atoms.intern_collectible("Now")),
-            PropertyKey::from_atom(atoms.intern_collectible("Instant")),
-            PropertyKey::from_atom(atoms.intern_collectible("Duration")),
-            PropertyKey::from_atom(atoms.intern_collectible("PlainDate")),
-            PropertyKey::from_atom(atoms.intern_collectible("PlainTime")),
-            PropertyKey::from_atom(atoms.intern_collectible("PlainDateTime")),
-            PropertyKey::from_atom(atoms.intern_collectible("PlainYearMonth")),
-            PropertyKey::from_atom(atoms.intern_collectible("PlainMonthDay")),
-            PropertyKey::from_atom(atoms.intern_collectible("ZonedDateTime")),
-            PropertyKey::from_atom(atoms.intern_collectible("from")),
-            PropertyKey::from_atom(atoms.intern_collectible("fromEpochNanoseconds")),
-            PropertyKey::from_atom(atoms.intern_collectible("fromEpochMilliseconds")),
-            PropertyKey::from_atom(atoms.intern_collectible("compare")),
+            PropertyKey::from_atom(atoms.intern("Temporal")),
+            PropertyKey::from_atom(atoms.intern("Now")),
+            PropertyKey::from_atom(atoms.intern("Instant")),
+            PropertyKey::from_atom(atoms.intern("Duration")),
+            PropertyKey::from_atom(atoms.intern("PlainDate")),
+            PropertyKey::from_atom(atoms.intern("PlainTime")),
+            PropertyKey::from_atom(atoms.intern("PlainDateTime")),
+            PropertyKey::from_atom(atoms.intern("PlainYearMonth")),
+            PropertyKey::from_atom(atoms.intern("PlainMonthDay")),
+            PropertyKey::from_atom(atoms.intern("ZonedDateTime")),
+            PropertyKey::from_atom(atoms.intern("from")),
+            PropertyKey::from_atom(atoms.intern("fromEpochNanoseconds")),
+            PropertyKey::from_atom(atoms.intern("fromEpochMilliseconds")),
+            PropertyKey::from_atom(atoms.intern("compare")),
         )
     };
     let (
@@ -308,20 +308,20 @@ pub(super) fn install_temporal_public_objects(
     ) = {
         let atoms = agent.atoms_mut();
         (
-            PropertyKey::from_atom(atoms.intern_collectible("instant")),
-            PropertyKey::from_atom(atoms.intern_collectible("plainDateISO")),
-            PropertyKey::from_atom(atoms.intern_collectible("plainTimeISO")),
-            PropertyKey::from_atom(atoms.intern_collectible("plainDateTimeISO")),
-            PropertyKey::from_atom(atoms.intern_collectible("zonedDateTimeISO")),
-            PropertyKey::from_atom(atoms.intern_collectible("timeZoneId")),
-            PropertyKey::from_atom(atoms.intern_collectible("epochNanoseconds")),
-            PropertyKey::from_atom(atoms.intern_collectible("epochMilliseconds")),
-            PropertyKey::from_atom(atoms.intern_collectible("epochSeconds")),
-            PropertyKey::from_atom(atoms.intern_collectible("offset")),
-            PropertyKey::from_atom(atoms.intern_collectible("offsetNanoseconds")),
-            PropertyKey::from_atom(atoms.intern_collectible("toJSON")),
-            PropertyKey::from_atom(atoms.intern_collectible("toLocaleString")),
-            PropertyKey::from_atom(atoms.intern_collectible("equals")),
+            PropertyKey::from_atom(atoms.intern("instant")),
+            PropertyKey::from_atom(atoms.intern("plainDateISO")),
+            PropertyKey::from_atom(atoms.intern("plainTimeISO")),
+            PropertyKey::from_atom(atoms.intern("plainDateTimeISO")),
+            PropertyKey::from_atom(atoms.intern("zonedDateTimeISO")),
+            PropertyKey::from_atom(atoms.intern("timeZoneId")),
+            PropertyKey::from_atom(atoms.intern("epochNanoseconds")),
+            PropertyKey::from_atom(atoms.intern("epochMilliseconds")),
+            PropertyKey::from_atom(atoms.intern("epochSeconds")),
+            PropertyKey::from_atom(atoms.intern("offset")),
+            PropertyKey::from_atom(atoms.intern("offsetNanoseconds")),
+            PropertyKey::from_atom(atoms.intern("toJSON")),
+            PropertyKey::from_atom(atoms.intern("toLocaleString")),
+            PropertyKey::from_atom(atoms.intern("equals")),
         )
     };
     let (
@@ -342,20 +342,20 @@ pub(super) fn install_temporal_public_objects(
     ) = {
         let atoms = agent.atoms_mut();
         (
-            PropertyKey::from_atom(atoms.intern_collectible("years")),
-            PropertyKey::from_atom(atoms.intern_collectible("months")),
-            PropertyKey::from_atom(atoms.intern_collectible("weeks")),
-            PropertyKey::from_atom(atoms.intern_collectible("days")),
-            PropertyKey::from_atom(atoms.intern_collectible("hours")),
-            PropertyKey::from_atom(atoms.intern_collectible("minutes")),
-            PropertyKey::from_atom(atoms.intern_collectible("seconds")),
-            PropertyKey::from_atom(atoms.intern_collectible("milliseconds")),
-            PropertyKey::from_atom(atoms.intern_collectible("microseconds")),
-            PropertyKey::from_atom(atoms.intern_collectible("nanoseconds")),
-            PropertyKey::from_atom(atoms.intern_collectible("sign")),
-            PropertyKey::from_atom(atoms.intern_collectible("blank")),
-            PropertyKey::from_atom(atoms.intern_collectible("negated")),
-            PropertyKey::from_atom(atoms.intern_collectible("abs")),
+            PropertyKey::from_atom(atoms.intern("years")),
+            PropertyKey::from_atom(atoms.intern("months")),
+            PropertyKey::from_atom(atoms.intern("weeks")),
+            PropertyKey::from_atom(atoms.intern("days")),
+            PropertyKey::from_atom(atoms.intern("hours")),
+            PropertyKey::from_atom(atoms.intern("minutes")),
+            PropertyKey::from_atom(atoms.intern("seconds")),
+            PropertyKey::from_atom(atoms.intern("milliseconds")),
+            PropertyKey::from_atom(atoms.intern("microseconds")),
+            PropertyKey::from_atom(atoms.intern("nanoseconds")),
+            PropertyKey::from_atom(atoms.intern("sign")),
+            PropertyKey::from_atom(atoms.intern("blank")),
+            PropertyKey::from_atom(atoms.intern("negated")),
+            PropertyKey::from_atom(atoms.intern("abs")),
         )
     };
     let (
@@ -379,34 +379,34 @@ pub(super) fn install_temporal_public_objects(
     ) = {
         let atoms = agent.atoms_mut();
         (
-            PropertyKey::from_atom(atoms.intern_collectible("year")),
-            PropertyKey::from_atom(atoms.intern_collectible("month")),
-            PropertyKey::from_atom(atoms.intern_collectible("monthCode")),
-            PropertyKey::from_atom(atoms.intern_collectible("day")),
-            PropertyKey::from_atom(atoms.intern_collectible("dayOfWeek")),
-            PropertyKey::from_atom(atoms.intern_collectible("daysInWeek")),
-            PropertyKey::from_atom(atoms.intern_collectible("weekOfYear")),
-            PropertyKey::from_atom(atoms.intern_collectible("yearOfWeek")),
-            PropertyKey::from_atom(atoms.intern_collectible("era")),
-            PropertyKey::from_atom(atoms.intern_collectible("eraYear")),
-            PropertyKey::from_atom(atoms.intern_collectible("dayOfYear")),
-            PropertyKey::from_atom(atoms.intern_collectible("daysInMonth")),
-            PropertyKey::from_atom(atoms.intern_collectible("daysInYear")),
-            PropertyKey::from_atom(atoms.intern_collectible("monthsInYear")),
-            PropertyKey::from_atom(atoms.intern_collectible("inLeapYear")),
-            PropertyKey::from_atom(atoms.intern_collectible("calendar")),
-            PropertyKey::from_atom(atoms.intern_collectible("calendarId")),
+            PropertyKey::from_atom(atoms.intern("year")),
+            PropertyKey::from_atom(atoms.intern("month")),
+            PropertyKey::from_atom(atoms.intern("monthCode")),
+            PropertyKey::from_atom(atoms.intern("day")),
+            PropertyKey::from_atom(atoms.intern("dayOfWeek")),
+            PropertyKey::from_atom(atoms.intern("daysInWeek")),
+            PropertyKey::from_atom(atoms.intern("weekOfYear")),
+            PropertyKey::from_atom(atoms.intern("yearOfWeek")),
+            PropertyKey::from_atom(atoms.intern("era")),
+            PropertyKey::from_atom(atoms.intern("eraYear")),
+            PropertyKey::from_atom(atoms.intern("dayOfYear")),
+            PropertyKey::from_atom(atoms.intern("daysInMonth")),
+            PropertyKey::from_atom(atoms.intern("daysInYear")),
+            PropertyKey::from_atom(atoms.intern("monthsInYear")),
+            PropertyKey::from_atom(atoms.intern("inLeapYear")),
+            PropertyKey::from_atom(atoms.intern("calendar")),
+            PropertyKey::from_atom(atoms.intern("calendarId")),
         )
     };
     let (hour_key, minute_key, second_key, millisecond_key, microsecond_key, nanosecond_key) = {
         let atoms = agent.atoms_mut();
         (
-            PropertyKey::from_atom(atoms.intern_collectible("hour")),
-            PropertyKey::from_atom(atoms.intern_collectible("minute")),
-            PropertyKey::from_atom(atoms.intern_collectible("second")),
-            PropertyKey::from_atom(atoms.intern_collectible("millisecond")),
-            PropertyKey::from_atom(atoms.intern_collectible("microsecond")),
-            PropertyKey::from_atom(atoms.intern_collectible("nanosecond")),
+            PropertyKey::from_atom(atoms.intern("hour")),
+            PropertyKey::from_atom(atoms.intern("minute")),
+            PropertyKey::from_atom(atoms.intern("second")),
+            PropertyKey::from_atom(atoms.intern("millisecond")),
+            PropertyKey::from_atom(atoms.intern("microsecond")),
+            PropertyKey::from_atom(atoms.intern("nanosecond")),
         )
     };
     let (
@@ -419,69 +419,69 @@ pub(super) fn install_temporal_public_objects(
     ) = {
         let atoms = agent.atoms_mut();
         (
-            PropertyKey::from_atom(atoms.intern_collectible("toInstant")),
-            PropertyKey::from_atom(atoms.intern_collectible("toPlainDateTime")),
-            PropertyKey::from_atom(atoms.intern_collectible("toPlainDate")),
-            PropertyKey::from_atom(atoms.intern_collectible("toPlainTime")),
-            PropertyKey::from_atom(atoms.intern_collectible("toPlainYearMonth")),
-            PropertyKey::from_atom(atoms.intern_collectible("toPlainMonthDay")),
+            PropertyKey::from_atom(atoms.intern("toInstant")),
+            PropertyKey::from_atom(atoms.intern("toPlainDateTime")),
+            PropertyKey::from_atom(atoms.intern("toPlainDate")),
+            PropertyKey::from_atom(atoms.intern("toPlainTime")),
+            PropertyKey::from_atom(atoms.intern("toPlainYearMonth")),
+            PropertyKey::from_atom(atoms.intern("toPlainMonthDay")),
         )
     };
     let to_zoned_date_time_iso_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("toZonedDateTimeISO"))
+        PropertyKey::from_atom(atoms.intern("toZonedDateTimeISO"))
     };
     let to_zoned_date_time_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("toZonedDateTime"))
+        PropertyKey::from_atom(atoms.intern("toZonedDateTime"))
     };
     let with_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("with"))
+        PropertyKey::from_atom(atoms.intern("with"))
     };
     let with_calendar_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("withCalendar"))
+        PropertyKey::from_atom(atoms.intern("withCalendar"))
     };
     let with_time_zone_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("withTimeZone"))
+        PropertyKey::from_atom(atoms.intern("withTimeZone"))
     };
     let with_plain_time_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("withPlainTime"))
+        PropertyKey::from_atom(atoms.intern("withPlainTime"))
     };
     let start_of_day_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("startOfDay"))
+        PropertyKey::from_atom(atoms.intern("startOfDay"))
     };
     let hours_in_day_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("hoursInDay"))
+        PropertyKey::from_atom(atoms.intern("hoursInDay"))
     };
     let add_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("add"))
+        PropertyKey::from_atom(atoms.intern("add"))
     };
     let subtract_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("subtract"))
+        PropertyKey::from_atom(atoms.intern("subtract"))
     };
     let round_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("round"))
+        PropertyKey::from_atom(atoms.intern("round"))
     };
     let since_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("since"))
+        PropertyKey::from_atom(atoms.intern("since"))
     };
     let until_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("until"))
+        PropertyKey::from_atom(atoms.intern("until"))
     };
     let total_key = {
         let atoms = agent.atoms_mut();
-        PropertyKey::from_atom(atoms.intern_collectible("total"))
+        PropertyKey::from_atom(atoms.intern("total"))
     };
 
     define_builtin_data_property(

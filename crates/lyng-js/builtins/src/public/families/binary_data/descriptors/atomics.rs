@@ -5,9 +5,9 @@ use lyng_js_common::AtomId;
 use lyng_js_types::{
     atomics_add_builtin, atomics_and_builtin, atomics_compare_exchange_builtin,
     atomics_exchange_builtin, atomics_is_lock_free_builtin, atomics_load_builtin,
-    atomics_notify_builtin, atomics_or_builtin, atomics_store_builtin, atomics_sub_builtin,
-    atomics_wait_async_builtin, atomics_wait_builtin, atomics_xor_builtin, Value,
-    WellKnownSymbolId,
+    atomics_notify_builtin, atomics_or_builtin, atomics_pause_builtin, atomics_store_builtin,
+    atomics_sub_builtin, atomics_wait_async_builtin, atomics_wait_builtin, atomics_xor_builtin,
+    Value, WellKnownSymbolId,
 };
 
 pub(super) struct AtomicsDescriptorAtoms {
@@ -19,6 +19,7 @@ pub(super) struct AtomicsDescriptorAtoms {
     pub(super) load: AtomId,
     pub(super) notify: AtomId,
     pub(super) or: AtomId,
+    pub(super) pause: AtomId,
     pub(super) store: AtomId,
     pub(super) sub: AtomId,
     pub(super) wait: AtomId,
@@ -29,7 +30,7 @@ pub(super) struct AtomicsDescriptorAtoms {
 pub(super) fn descriptors(
     atoms: AtomicsDescriptorAtoms,
     atomics_tag: Value,
-) -> [BuiltinPropertyDescriptor; 14] {
+) -> [BuiltinPropertyDescriptor; 15] {
     [
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.add),
@@ -69,6 +70,11 @@ pub(super) fn descriptors(
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.or),
             BuiltinPropertyValueSpec::BuiltinFunction(atomics_or_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(atoms.pause),
+            BuiltinPropertyValueSpec::BuiltinFunction(atomics_pause_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(

@@ -213,22 +213,20 @@ struct ObjectReflectionDescriptorAtoms {
 impl ObjectReflectionDescriptorAtoms {
     fn new(agent: &mut Agent) -> Self {
         Self {
-            apply: agent.atoms_mut().intern_collectible("apply"),
-            construct: agent.atoms_mut().intern_collectible("construct"),
-            define_property: agent.atoms_mut().intern_collectible("defineProperty"),
-            delete_property: agent.atoms_mut().intern_collectible("deleteProperty"),
-            get: agent.atoms_mut().intern_collectible("get"),
-            get_own_property_descriptor: agent
-                .atoms_mut()
-                .intern_collectible("getOwnPropertyDescriptor"),
-            get_prototype_of: agent.atoms_mut().intern_collectible("getPrototypeOf"),
-            has: agent.atoms_mut().intern_collectible("has"),
-            is_extensible: agent.atoms_mut().intern_collectible("isExtensible"),
-            own_keys: agent.atoms_mut().intern_collectible("ownKeys"),
-            prevent_extensions: agent.atoms_mut().intern_collectible("preventExtensions"),
-            revocable: agent.atoms_mut().intern_collectible("revocable"),
-            set: agent.atoms_mut().intern_collectible("set"),
-            set_prototype_of: agent.atoms_mut().intern_collectible("setPrototypeOf"),
+            apply: agent.atoms_mut().intern("apply"),
+            construct: agent.atoms_mut().intern("construct"),
+            define_property: agent.atoms_mut().intern("defineProperty"),
+            delete_property: agent.atoms_mut().intern("deleteProperty"),
+            get: agent.atoms_mut().intern("get"),
+            get_own_property_descriptor: agent.atoms_mut().intern("getOwnPropertyDescriptor"),
+            get_prototype_of: agent.atoms_mut().intern("getPrototypeOf"),
+            has: agent.atoms_mut().intern("has"),
+            is_extensible: agent.atoms_mut().intern("isExtensible"),
+            own_keys: agent.atoms_mut().intern("ownKeys"),
+            prevent_extensions: agent.atoms_mut().intern("preventExtensions"),
+            revocable: agent.atoms_mut().intern("revocable"),
+            set: agent.atoms_mut().intern("set"),
+            set_prototype_of: agent.atoms_mut().intern("setPrototypeOf"),
         }
     }
 }
