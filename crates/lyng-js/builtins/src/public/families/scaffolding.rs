@@ -406,6 +406,7 @@ fn allocate_iterator_prototypes(
         ),
         family: IteratorFamilyPrototypes {
             async_iterator_prototype,
+            iterator_prototype,
         },
     }
 }

@@ -63,7 +63,11 @@ use lyng_js_types::{
     function_prototype_builtin, function_symbol_has_instance_builtin, function_to_string_builtin,
     generator_function_builtin, generator_next_builtin, generator_return_builtin,
     generator_throw_builtin, int16_array_builtin, int32_array_builtin, int8_array_builtin,
-    is_finite_builtin, is_nan_builtin, iterator_prototype_iterator_builtin,
+    is_finite_builtin, is_nan_builtin, iterator_builtin, iterator_constructor_getter_builtin,
+    iterator_constructor_setter_builtin, iterator_every_builtin, iterator_find_builtin,
+    iterator_for_each_builtin, iterator_from_builtin, iterator_prototype_iterator_builtin,
+    iterator_reduce_builtin, iterator_some_builtin, iterator_to_array_builtin,
+    iterator_to_string_tag_getter_builtin, iterator_to_string_tag_setter_builtin,
     json_is_raw_json_builtin, json_parse_builtin, json_raw_json_builtin, json_stringify_builtin,
     map_builtin, map_clear_builtin, map_delete_builtin, map_entries_builtin, map_for_each_builtin,
     map_get_builtin, map_get_or_insert_builtin, map_get_or_insert_computed_builtin,
@@ -1405,6 +1409,54 @@ mod tests {
             (
                 set_iterator_next_builtin(),
                 BuiltinEntryMetadata::new("next", 0, false, false),
+            ),
+            (
+                iterator_builtin(),
+                BuiltinEntryMetadata::new("Iterator", 0, true, true),
+            ),
+            (
+                iterator_from_builtin(),
+                BuiltinEntryMetadata::new("from", 1, false, false),
+            ),
+            (
+                iterator_reduce_builtin(),
+                BuiltinEntryMetadata::new("reduce", 1, false, false),
+            ),
+            (
+                iterator_for_each_builtin(),
+                BuiltinEntryMetadata::new("forEach", 1, false, false),
+            ),
+            (
+                iterator_some_builtin(),
+                BuiltinEntryMetadata::new("some", 1, false, false),
+            ),
+            (
+                iterator_every_builtin(),
+                BuiltinEntryMetadata::new("every", 1, false, false),
+            ),
+            (
+                iterator_find_builtin(),
+                BuiltinEntryMetadata::new("find", 1, false, false),
+            ),
+            (
+                iterator_to_array_builtin(),
+                BuiltinEntryMetadata::new("toArray", 0, false, false),
+            ),
+            (
+                iterator_to_string_tag_getter_builtin(),
+                BuiltinEntryMetadata::new("get [Symbol.toStringTag]", 0, false, false),
+            ),
+            (
+                iterator_to_string_tag_setter_builtin(),
+                BuiltinEntryMetadata::new("set [Symbol.toStringTag]", 1, false, false),
+            ),
+            (
+                iterator_constructor_getter_builtin(),
+                BuiltinEntryMetadata::new("get constructor", 0, false, false),
+            ),
+            (
+                iterator_constructor_setter_builtin(),
+                BuiltinEntryMetadata::new("set constructor", 1, false, false),
             ),
             (
                 string_builtin(),

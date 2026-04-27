@@ -70,6 +70,7 @@ fn with_core_intrinsics(
         .with_generator_prototype(Some(builtins.generator_prototype))
         .with_array(Some(builtins.array))
         .with_array_prototype(Some(prototypes.array_prototype))
+        .with_iterator(Some(builtins.iterator))
         .with_iterator_prototype(Some(prototypes.iterator_prototype))
         .with_async_iterator_prototype(Some(builtins.async_iterator_prototype))
         .with_async_from_sync_iterator_prototype(Some(

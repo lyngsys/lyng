@@ -302,6 +302,7 @@ pub(super) struct FunctionFamilyBuiltins {
 #[allow(clippy::struct_field_names)]
 pub(super) struct IteratorFamilyPrototypes {
     pub(super) async_iterator_prototype: ObjectRef,
+    pub(super) iterator_prototype: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -311,6 +312,18 @@ pub(super) struct IteratorFamilyBuiltins {
     pub(super) async_iterator_method: ObjectRef,
     pub(super) map_iterator_next: ObjectRef,
     pub(super) set_iterator_next: ObjectRef,
+    pub(super) iterator: ObjectRef,
+    pub(super) iterator_from: ObjectRef,
+    pub(super) iterator_reduce: ObjectRef,
+    pub(super) iterator_for_each: ObjectRef,
+    pub(super) iterator_some: ObjectRef,
+    pub(super) iterator_every: ObjectRef,
+    pub(super) iterator_find: ObjectRef,
+    pub(super) iterator_to_array: ObjectRef,
+    pub(super) iterator_to_string_tag_getter: ObjectRef,
+    pub(super) iterator_to_string_tag_setter: ObjectRef,
+    pub(super) iterator_constructor_getter: ObjectRef,
+    pub(super) iterator_constructor_setter: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]

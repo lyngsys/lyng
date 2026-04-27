@@ -71,6 +71,7 @@ pub enum BuiltinIntrinsic {
     Uint8ClampedArrayPrototype,
     Uint8Array,
     Uint8ArrayPrototype,
+    Iterator,
     IteratorPrototype,
     AsyncIteratorPrototype,
     AsyncFromSyncIteratorPrototype,

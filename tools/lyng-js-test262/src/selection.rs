@@ -43,7 +43,6 @@ const UNSUPPORTED_FEATURES: &[&str] = &[
     "arraybuffer-transfer",
     "immutable-arraybuffer",
     "ShadowRealm",
-    "iterator-helpers",
 ];
 
 const PROPOSAL_FEATURE_STAGES: &[(&str, ProposalStage)] = &[
