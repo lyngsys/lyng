@@ -27,7 +27,8 @@ use lyng_js_types::{
     promise_all_builtin, promise_all_settled_builtin, promise_any_builtin, promise_builtin,
     promise_catch_builtin, promise_finally_builtin, promise_race_builtin, promise_reject_builtin,
     promise_resolve_builtin, promise_species_getter_builtin, promise_then_builtin,
-    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
+    promise_try_builtin, promise_with_resolvers_builtin, BuiltinFunctionId, ObjectRef, RealmRef,
+    Value, WellKnownSymbolId,
 };
 
 pub(in crate::public) fn install_promise_disposal_family(
@@ -79,6 +80,8 @@ pub(in crate::public) fn install_promise_disposal_family(
         promise_all_settled: promise.all_settled,
         promise_race: promise.race,
         promise_any: promise.any,
+        promise_try: promise.try_method,
+        promise_with_resolvers: promise.with_resolvers,
         promise_species_getter: promise.species_getter,
     }
 }
@@ -310,6 +313,8 @@ struct PromiseDisposalDescriptorAtoms {
     catch: AtomId,
     race: AtomId,
     finally: AtomId,
+    try_method: AtomId,
+    with_resolvers: AtomId,
     disposable_stack_tag: AtomId,
     async_disposable_stack_tag: AtomId,
     adopt: AtomId,
@@ -334,6 +339,8 @@ impl PromiseDisposalDescriptorAtoms {
             catch: agent.atoms_mut().intern("catch"),
             race: agent.atoms_mut().intern("race"),
             finally: agent.atoms_mut().intern("finally"),
+            try_method: agent.atoms_mut().intern("try"),
+            with_resolvers: agent.atoms_mut().intern("withResolvers"),
             disposable_stack_tag: agent.atoms_mut().intern("DisposableStack"),
             async_disposable_stack_tag: agent.atoms_mut().intern("AsyncDisposableStack"),
             adopt: agent.atoms_mut().intern("adopt"),
@@ -349,7 +356,7 @@ impl PromiseDisposalDescriptorAtoms {
 
 fn promise_static_method_specs(
     atoms: &PromiseDisposalDescriptorAtoms,
-) -> [(AtomId, BuiltinFunctionId); 6] {
+) -> [(AtomId, BuiltinFunctionId); 8] {
     [
         (atoms.resolve, promise_resolve_builtin()),
         (atoms.reject, promise_reject_builtin()),
@@ -357,6 +364,8 @@ fn promise_static_method_specs(
         (atoms.all_settled, promise_all_settled_builtin()),
         (atoms.race, promise_race_builtin()),
         (atoms.any, promise_any_builtin()),
+        (atoms.try_method, promise_try_builtin()),
+        (atoms.with_resolvers, promise_with_resolvers_builtin()),
     ]
 }
 
@@ -375,6 +384,11 @@ fn promise_builtin_object(
         (promise_all_settled_builtin(), builtins.promise_all_settled),
         (promise_race_builtin(), builtins.promise_race),
         (promise_any_builtin(), builtins.promise_any),
+        (promise_try_builtin(), builtins.promise_try),
+        (
+            promise_with_resolvers_builtin(),
+            builtins.promise_with_resolvers,
+        ),
         (
             promise_species_getter_builtin(),
             builtins.promise_species_getter,
@@ -498,6 +512,8 @@ struct PromiseFamilyBuiltins {
     all_settled: ObjectRef,
     race: ObjectRef,
     any: ObjectRef,
+    try_method: ObjectRef,
+    with_resolvers: ObjectRef,
     species_getter: ObjectRef,
 }
 
@@ -523,6 +539,13 @@ fn install_promise_family(
         ),
         race: install_public_builtin_function(agent, cx, promise_race_builtin(), None),
         any: install_public_builtin_function(agent, cx, promise_any_builtin(), None),
+        try_method: install_public_builtin_function(agent, cx, promise_try_builtin(), None),
+        with_resolvers: install_public_builtin_function(
+            agent,
+            cx,
+            promise_with_resolvers_builtin(),
+            None,
+        ),
         species_getter: install_public_builtin_function(
             agent,
             cx,

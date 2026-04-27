@@ -151,3 +151,19 @@ pub fn promise_finally_function_builtin() -> BuiltinFunctionId {
         None => unreachable!("builtin id should stay non-zero"),
     }
 }
+
+#[inline]
+pub fn promise_try_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(PROMISE_TRY_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn promise_with_resolvers_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(PROMISE_WITH_RESOLVERS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}

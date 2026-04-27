@@ -871,6 +871,7 @@ pub(super) struct ErrorFamilyBuiltins {
     pub(super) aggregate_error_prototype: ObjectRef,
     pub(super) suppressed_error: ObjectRef,
     pub(super) suppressed_error_prototype: ObjectRef,
+    pub(super) error_is_error: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -916,6 +917,8 @@ pub(super) struct PromiseDisposalFamilyBuiltins {
     pub(super) promise_all_settled: ObjectRef,
     pub(super) promise_race: ObjectRef,
     pub(super) promise_any: ObjectRef,
+    pub(super) promise_try: ObjectRef,
+    pub(super) promise_with_resolvers: ObjectRef,
     pub(super) promise_species_getter: ObjectRef,
 }
 

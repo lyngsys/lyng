@@ -96,6 +96,7 @@ const REFERENCE_ERROR_RAW: u32 = 2_038;
 const SYNTAX_ERROR_RAW: u32 = 2_039;
 const TYPE_ERROR_RAW: u32 = 2_040;
 const URI_ERROR_RAW: u32 = 2_041;
+const ERROR_IS_ERROR_RAW: u32 = 2_285;
 const NUMBER_RAW: u32 = 2_042;
 const NUMBER_IS_FINITE_RAW: u32 = 2_043;
 const NUMBER_IS_INTEGER_RAW: u32 = 2_044;
@@ -712,6 +713,8 @@ const TEMPORAL_ZONED_DATE_TIME_WEEK_OF_YEAR_GETTER_RAW: u32 = 3_524;
 const TEMPORAL_ZONED_DATE_TIME_YEAR_OF_WEEK_GETTER_RAW: u32 = 3_525;
 const TEMPORAL_ZONED_DATE_TIME_ERA_GETTER_RAW: u32 = 3_526;
 const TEMPORAL_ZONED_DATE_TIME_ERA_YEAR_GETTER_RAW: u32 = 3_527;
+const PROMISE_TRY_RAW: u32 = 3_528;
+const PROMISE_WITH_RESOLVERS_RAW: u32 = 3_529;
 const TEMPORAL_PLAIN_YEAR_MONTH_WITH_RAW: u32 = 3_454;
 const TEMPORAL_PLAIN_MONTH_DAY_WITH_RAW: u32 = 3_455;
 const TEMPORAL_PLAIN_DATE_ADD_RAW: u32 = 3_456;
@@ -776,13 +779,13 @@ pub const INTERNAL_BUILTIN_NAMESPACE_END: u32 = INTERNAL_DIRECT_EVAL_RAW;
 pub const CORE_BUILTIN_NAMESPACE_START: u32 = BOOLEAN_RAW;
 
 /// Last reserved builtin-entry payload for the public core builtin namespace.
-pub const CORE_BUILTIN_NAMESPACE_END: u32 = REGEXP_SPECIES_GETTER_RAW;
+pub const CORE_BUILTIN_NAMESPACE_END: u32 = ERROR_IS_ERROR_RAW;
 
 /// First reserved builtin-entry payload for the public completion builtin namespace.
 pub const COMPLETION_BUILTIN_NAMESPACE_START: u32 = PROMISE_RAW;
 
 /// Last reserved builtin-entry payload for the public completion builtin namespace.
-pub const COMPLETION_BUILTIN_NAMESPACE_END: u32 = TEMPORAL_PLAIN_DATE_TO_ZONED_DATE_TIME_RAW;
+pub const COMPLETION_BUILTIN_NAMESPACE_END: u32 = PROMISE_WITH_RESOLVERS_RAW;
 
 /// Returns whether a builtin ID falls inside the reserved internal helper namespace.
 #[inline]

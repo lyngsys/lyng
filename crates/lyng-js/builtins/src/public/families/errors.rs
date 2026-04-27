@@ -12,9 +12,10 @@ use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
 use lyng_js_types::{
-    aggregate_error_builtin, error_builtin, error_to_string_builtin, eval_error_builtin,
-    range_error_builtin, reference_error_builtin, suppressed_error_builtin, syntax_error_builtin,
-    type_error_builtin, uri_error_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
+    aggregate_error_builtin, error_builtin, error_is_error_builtin, error_to_string_builtin,
+    eval_error_builtin, range_error_builtin, reference_error_builtin, suppressed_error_builtin,
+    syntax_error_builtin, type_error_builtin, uri_error_builtin, BuiltinFunctionId, ObjectRef,
+    RealmRef, Value,
 };
 
 pub(in crate::public) fn install_error_family(
@@ -102,6 +103,7 @@ pub(in crate::public) fn install_error_family(
             prototypes.suppressed_error_prototype,
         ),
         suppressed_error_prototype: prototypes.suppressed_error_prototype,
+        error_is_error: install_public_builtin_function(agent, cx, error_is_error_builtin(), None),
     }
 }
 
@@ -120,6 +122,7 @@ pub(in crate::public) fn error_builtin_object(
         (uri_error_builtin(), builtins.uri_error),
         (aggregate_error_builtin(), builtins.aggregate_error),
         (suppressed_error_builtin(), builtins.suppressed_error),
+        (error_is_error_builtin(), builtins.error_is_error),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -148,6 +151,7 @@ pub(in crate::public) fn install_error_family_descriptors(
     builtins: &PublicRealmBuiltins,
 ) -> Result<(), BuiltinBootstrapError> {
     let values = ErrorDescriptorValues::new(agent);
+    install_error_constructor_descriptors(agent, cache, realm, values)?;
     install_error_prototype_descriptors(agent, cache, realm, builtins.error, values)?;
 
     for spec in native_error_prototype_specs(builtins, values) {
@@ -155,6 +159,27 @@ pub(in crate::public) fn install_error_family_descriptors(
     }
 
     Ok(())
+}
+
+fn install_error_constructor_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    values: ErrorDescriptorValues,
+) -> Result<(), BuiltinBootstrapError> {
+    let descriptors = [builtin_function_atom_property(
+        values.is_error,
+        error_is_error_builtin(),
+    )];
+    install_descriptor_tables(
+        agent,
+        cache,
+        realm,
+        &[BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Error),
+            &descriptors,
+        )],
+    )
 }
 
 fn install_error_prototype_descriptors(
@@ -230,12 +255,14 @@ struct ErrorDescriptorValues {
     uri_error_name: Value,
     aggregate_error_name: Value,
     suppressed_error_name: Value,
+    is_error: AtomId,
 }
 
 impl ErrorDescriptorValues {
     fn new(agent: &mut Agent) -> Self {
         let bootstrap_atoms = agent.bootstrap_atoms();
         let suppressed_error_name_atom = agent.atoms_mut().intern("SuppressedError");
+        let is_error_atom = agent.atoms_mut().intern("isError");
 
         Self {
             message: bootstrap_atoms.message(),
@@ -281,6 +308,7 @@ impl ErrorDescriptorValues {
                 "SuppressedError",
                 suppressed_error_name_atom,
             ),
+            is_error: is_error_atom,
         }
     }
 }

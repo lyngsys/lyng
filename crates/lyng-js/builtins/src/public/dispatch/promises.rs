@@ -57,6 +57,12 @@ fn dispatch_promise_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::promise_any_builtin() {
         return promise_any_builtin(context, invocation).map(Some);
     }
+    if entry == super::promise_try_builtin() {
+        return promise_try_builtin(context, invocation).map(Some);
+    }
+    if entry == super::promise_with_resolvers_builtin() {
+        return promise_with_resolvers_builtin(context, invocation).map(Some);
+    }
     if entry == super::promise_species_getter_builtin() {
         return promise_species_getter_builtin(context, invocation).map(Some);
     }
@@ -320,6 +326,59 @@ fn promise_reject_builtin<Cx: PublicBuiltinDispatchContext>(
     let reject = promise_capability_reject(cx, capability)?;
     let _ = cx.call_to_completion(reject, Value::undefined(), &[reason])?;
     Ok(Value::from_object_ref(promise_object))
+}
+
+fn promise_try_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let constructor = require_constructor_object(cx, invocation.this_value())?;
+    let capability = new_promise_capability(cx, constructor)?;
+    let promise_object = promise_capability_promise(cx, capability)?;
+    let arguments = invocation.arguments();
+    let callback = arguments.first().copied().unwrap_or(Value::undefined());
+    let callback_object = cx.require_callable_object(callback)?;
+    let extra_args: Vec<Value> = arguments.iter().skip(1).copied().collect();
+    match cx.call_to_completion(callback_object, Value::undefined(), &extra_args) {
+        Ok(value) => {
+            let resolve = promise_capability_resolve(cx, capability)?;
+            let _ = cx.call_to_completion(resolve, Value::undefined(), &[value])?;
+        }
+        Err(error) => {
+            reject_promise_capability_error(cx, capability, error)?;
+        }
+    }
+    Ok(Value::from_object_ref(promise_object))
+}
+
+fn promise_with_resolvers_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let constructor = require_constructor_object(cx, invocation.this_value())?;
+    let capability = new_promise_capability(cx, constructor)?;
+    let promise_object = promise_capability_promise(cx, capability)?;
+    let resolve = promise_capability_resolve(cx, capability)?;
+    let reject = promise_capability_reject(cx, capability)?;
+    let realm = cx.builtin_realm();
+    let object_prototype = cx
+        .agent()
+        .realm(realm)
+        .and_then(|realm| realm.intrinsics().object_prototype())
+        .ok_or_else(|| type_error(cx))?;
+    let result = cx.allocate_ordinary_object_with_prototype(realm, Some(object_prototype))?;
+    let promise_key = property_key_from_text(cx, "promise");
+    let resolve_key = property_key_from_text(cx, "resolve");
+    let reject_key = property_key_from_text(cx, "reject");
+    create_data_property_or_throw(
+        cx,
+        result,
+        promise_key,
+        Value::from_object_ref(promise_object),
+    )?;
+    create_data_property_or_throw(cx, result, resolve_key, Value::from_object_ref(resolve))?;
+    create_data_property_or_throw(cx, result, reject_key, Value::from_object_ref(reject))?;
+    Ok(Value::from_object_ref(result))
 }
 
 fn promise_all_builtin<Cx: PublicBuiltinDispatchContext>(
