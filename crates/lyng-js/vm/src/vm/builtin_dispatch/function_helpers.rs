@@ -1,0 +1,320 @@
+use super::*;
+
+impl Vm {
+    pub(super) fn create_bound_function(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        target: ObjectRef,
+        bound_this: Value,
+        bound_arguments: &[Value],
+    ) -> VmResult<ObjectRef> {
+        let target_data = agent
+            .objects()
+            .function_data(target)
+            .cloned()
+            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let realm = target_data.realm().unwrap_or(caller.realm());
+        let realm_record = agent
+            .realm(realm)
+            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let root_shape = realm_record
+            .root_shape()
+            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let function_prototype = realm_record
+            .intrinsics()
+            .function_prototype()
+            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let environment = target_data
+            .environment()
+            .unwrap_or(realm_record.global_env());
+        let function_data = FunctionObjectData::bound(
+            realm,
+            environment,
+            target,
+            bound_this,
+            bound_arguments.to_vec().into_boxed_slice(),
+        )
+        .with_has_prototype_property(false)
+        .with_constructor_flags(if target_data.is_constructible() {
+            FunctionConstructorFlags::constructible()
+        } else {
+            FunctionConstructorFlags::empty()
+        })
+        .with_kind_flags(target_data.kind_flags())
+        .with_this_mode(FunctionThisMode::Strict);
+        let function = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::function(root_shape)
+                    .with_prototype(Some(function_prototype))
+                    .with_cold_data(ObjectColdData::Function(function_data)),
+                AllocationLifetime::Default,
+            )
+        });
+
+        let length_key = PropertyKey::from_atom(WellKnownAtom::length.id());
+        let target_has_own_length = object::ordinary_get_own_property(agent, target, length_key)
+            .map_err(VmError::Abrupt)?
+            .is_some();
+        let bound_length = if target_has_own_length {
+            let target_length = self.get_property_from_object(
+                agent,
+                host,
+                registry,
+                caller,
+                target,
+                Value::from_object_ref(target),
+                length_key,
+            )?;
+            bound_function_length_value(target_length, bound_arguments.len())
+        } else {
+            Value::from_smi(0)
+        };
+        let target_name = self.get_property_from_object(
+            agent,
+            host,
+            registry,
+            caller,
+            target,
+            Value::from_object_ref(target),
+            PropertyKey::from_atom(WellKnownAtom::name.id()),
+        )?;
+        let target_name = if target_name.as_string_ref().is_some() {
+            self.value_to_string_text(agent, target_name)?
+        } else {
+            String::new()
+        };
+        self.define_data_property_with_attrs(
+            agent,
+            function,
+            PropertyKey::from_atom(WellKnownAtom::length.id()),
+            bound_length,
+            false,
+            false,
+            true,
+        )?;
+        let bound_name =
+            Value::from_string_ref(alloc_string(agent, &format!("bound {target_name}"), None));
+        self.define_data_property_with_attrs(
+            agent,
+            function,
+            PropertyKey::from_atom(WellKnownAtom::name.id()),
+            bound_name,
+            false,
+            false,
+            true,
+        )?;
+        Ok(function)
+    }
+
+    pub(super) fn collect_array_like_arguments(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller_frame: FrameRecord,
+        realm: RealmRef,
+        value: Value,
+    ) -> VmResult<Vec<Value>> {
+        if value.is_null() || value.is_undefined() {
+            return Ok(Vec::new());
+        }
+        let object = value
+            .as_object_ref()
+            .ok_or_else(|| Self::abrupt_intrinsic_error(agent, realm, errors::ErrorKind::Type))?;
+        let length = self.get_property_from_object(
+            agent,
+            host,
+            registry,
+            caller_frame,
+            object,
+            Value::from_object_ref(object),
+            PropertyKey::from_atom(WellKnownAtom::length.id()),
+        )?;
+        let length = to_f64_number(agent, length)?.max(0.0) as u32;
+        let mut arguments = Vec::with_capacity(usize::try_from(length).unwrap_or(usize::MAX));
+        for index in 0..length {
+            arguments.push(self.get_property_from_object(
+                agent,
+                host,
+                registry,
+                caller_frame,
+                object,
+                Value::from_object_ref(object),
+                PropertyKey::Index(index),
+            )?);
+        }
+        Ok(arguments)
+    }
+
+    pub(super) fn create_dynamic_function(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRef,
+        parameters_source: &str,
+        body_source: &str,
+        strict_caller: bool,
+        kind: DynamicFunctionKind,
+        prototype: ObjectRef,
+    ) -> VmResult<ObjectRef> {
+        let installed = self.install_dynamic_function(
+            agent,
+            realm,
+            parameters_source,
+            body_source,
+            strict_caller,
+            kind,
+        )?;
+        let (lexical_env, variable_env) = if let Some(realm_record) = agent.realm(realm) {
+            (realm_record.global_env(), realm_record.global_env())
+        } else {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        };
+        let function = self
+            .evaluate_installed(agent, installed, lexical_env, variable_env)?
+            .as_object_ref()
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let _ = agent.with_heap_and_objects(|heap, objects| {
+            objects.set_prototype(&mut heap.mutator(), function, Some(prototype))
+        });
+        Ok(function)
+    }
+
+    pub(super) fn native_function_source_text(
+        &mut self,
+        agent: &mut Agent,
+        function: ObjectRef,
+    ) -> VmResult<String> {
+        let name = self.function_name_text(agent, function)?;
+        Ok(if name.is_empty() {
+            "function () { [native code] }".to_owned()
+        } else {
+            format!("function {name}() {{ [native code] }}")
+        })
+    }
+
+    pub(super) fn source_function_source_text(
+        &mut self,
+        agent: &mut Agent,
+        code: lyng_js_types::CodeRef,
+        function: ObjectRef,
+    ) -> VmResult<String> {
+        let Some(installed) = self.installed_function(code) else {
+            return self.native_function_source_text(agent, function);
+        };
+        if let Some(span) = installed.source_span() {
+            if let Some(source_text) = self.source_text(span.source) {
+                let start = usize::try_from(span.range.start.raw()).unwrap_or(usize::MAX);
+                let end = usize::try_from(span.range.end.raw()).unwrap_or(usize::MAX);
+                if start <= end && end <= source_text.len() {
+                    let candidate = &source_text[start..end];
+                    if let Some(trimmed) = Self::trim_function_source_prefix(span.source, candidate)
+                    {
+                        return Ok(trimmed);
+                    }
+                    return Ok(candidate.to_owned());
+                }
+            }
+        }
+        let name = self.function_name_text(agent, function)?;
+        Ok(if name.is_empty() {
+            "function () { [source unavailable] }".to_owned()
+        } else {
+            format!("function {name}() {{ [source unavailable] }}")
+        })
+    }
+
+    fn function_name_text(&mut self, agent: &mut Agent, function: ObjectRef) -> VmResult<String> {
+        let name = object::ordinary_get(
+            agent,
+            function,
+            PropertyKey::from_atom(WellKnownAtom::name.id()),
+        )
+        .map_err(VmError::Abrupt)?;
+        self.value_to_string_text(agent, name)
+    }
+
+    fn trim_function_source_prefix(
+        source: lyng_js_common::SourceId,
+        candidate: &str,
+    ) -> Option<String> {
+        let mut atoms = AtomTable::new();
+        for (index, ch) in candidate.char_indices() {
+            if ch != '}' {
+                continue;
+            }
+            let end = index + ch.len_utf8();
+            let source_text = &candidate[..end];
+            if Self::function_source_candidate_parses(&mut atoms, source, source_text) {
+                return Some(candidate[..end].to_owned());
+            }
+        }
+        None
+    }
+
+    fn function_source_candidate_parses(
+        atoms: &mut AtomTable,
+        source: lyng_js_common::SourceId,
+        source_text: &str,
+    ) -> bool {
+        if !parse_script(atoms, source, source_text)
+            .diagnostics
+            .has_errors()
+        {
+            return true;
+        }
+
+        let expression_text = format!("({source_text});");
+        if !parse_script(atoms, source, &expression_text)
+            .diagnostics
+            .has_errors()
+        {
+            return true;
+        }
+
+        let method_text = format!("({{{source_text}}});");
+        if !parse_script(atoms, source, &method_text)
+            .diagnostics
+            .has_errors()
+        {
+            return true;
+        }
+
+        let class_method_text = format!("(class {{{source_text}}});");
+        !parse_script(atoms, source, &class_method_text)
+            .diagnostics
+            .has_errors()
+    }
+}
+
+fn bound_function_length_value(target_length: Value, bound_argument_count: usize) -> Value {
+    let Some(number) = target_length.as_f64() else {
+        return Value::from_smi(0);
+    };
+
+    let length = if number.is_nan() || number == 0.0 {
+        0.0
+    } else if number.is_infinite() {
+        if number.is_sign_positive() {
+            f64::INFINITY
+        } else {
+            0.0
+        }
+    } else {
+        (number.trunc() - bound_argument_count as f64).max(0.0)
+    };
+
+    if length.is_infinite() {
+        return Value::from_f64(length);
+    }
+    if let Ok(integer) = i32::try_from(length as i64) {
+        if f64::from(integer) == length {
+            return Value::from_smi(integer);
+        }
+    }
+    Value::from_f64(length)
+}

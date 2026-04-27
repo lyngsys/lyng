@@ -1,0 +1,1669 @@
+use super::*;
+
+pub(super) fn dispatch_temporal_plain_date_time_builtin<Cx: PublicBuiltinDispatchContext>(
+    context: &mut Cx,
+    entry: BuiltinFunctionId,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Option<Value>, Cx::Error> {
+    if entry == lyng_js_types::temporal_plain_date_time_builtin() {
+        return temporal_plain_date_time_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_year_getter_builtin() {
+        return temporal_plain_date_time_year_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_month_getter_builtin() {
+        return temporal_plain_date_time_month_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_month_code_getter_builtin() {
+        return temporal_plain_date_time_month_code_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_day_getter_builtin() {
+        return temporal_plain_date_time_day_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_day_of_week_getter_builtin() {
+        return temporal_plain_date_time_day_of_week_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_day_of_year_getter_builtin() {
+        return temporal_plain_date_time_day_of_year_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_days_in_month_getter_builtin() {
+        return temporal_plain_date_time_days_in_month_getter_builtin(context, invocation)
+            .map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_days_in_year_getter_builtin() {
+        return temporal_plain_date_time_days_in_year_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_months_in_year_getter_builtin() {
+        return temporal_plain_date_time_months_in_year_getter_builtin(context, invocation)
+            .map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_in_leap_year_getter_builtin() {
+        return temporal_plain_date_time_in_leap_year_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_days_in_week_getter_builtin() {
+        return temporal_plain_date_time_days_in_week_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_week_of_year_getter_builtin() {
+        return temporal_plain_date_time_week_of_year_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_year_of_week_getter_builtin() {
+        return temporal_plain_date_time_year_of_week_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_era_getter_builtin() {
+        return temporal_plain_date_time_era_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_era_year_getter_builtin() {
+        return temporal_plain_date_time_era_year_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_hour_getter_builtin() {
+        return temporal_plain_date_time_hour_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_minute_getter_builtin() {
+        return temporal_plain_date_time_minute_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_second_getter_builtin() {
+        return temporal_plain_date_time_second_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_millisecond_getter_builtin() {
+        return temporal_plain_date_time_millisecond_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_microsecond_getter_builtin() {
+        return temporal_plain_date_time_microsecond_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_nanosecond_getter_builtin() {
+        return temporal_plain_date_time_nanosecond_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_calendar_id_getter_builtin() {
+        return temporal_plain_date_time_calendar_id_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_to_string_builtin() {
+        return temporal_plain_date_time_to_string_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_to_json_builtin() {
+        return temporal_plain_date_time_to_json_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_to_locale_string_builtin() {
+        return temporal_plain_date_time_to_locale_string_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_value_of_builtin() {
+        return temporal_plain_date_time_value_of_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_equals_builtin() {
+        return temporal_plain_date_time_equals_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_with_builtin() {
+        return temporal_plain_date_time_with_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_with_plain_time_builtin() {
+        return temporal_plain_date_time_with_plain_time_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_with_calendar_builtin() {
+        return temporal_plain_date_time_with_calendar_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_add_builtin() {
+        return temporal_plain_date_time_add_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_subtract_builtin() {
+        return temporal_plain_date_time_subtract_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_round_builtin() {
+        return temporal_plain_date_time_round_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_since_builtin() {
+        return temporal_plain_date_time_since_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_until_builtin() {
+        return temporal_plain_date_time_until_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_to_plain_date_builtin() {
+        return temporal_plain_date_time_to_plain_date_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_to_plain_time_builtin() {
+        return temporal_plain_date_time_to_plain_time_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_to_zoned_date_time_builtin() {
+        return temporal_plain_date_time_to_zoned_date_time_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_from_builtin() {
+        return temporal_plain_date_time_from_builtin(context, invocation).map(Some);
+    }
+    if entry == lyng_js_types::temporal_plain_date_time_compare_builtin() {
+        return temporal_plain_date_time_compare_builtin(context, invocation).map(Some);
+    }
+    Ok(None)
+}
+
+pub(super) fn temporal_plain_date_time_from_parts<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    year: i64,
+    month: i64,
+    day: i64,
+    hour: i64,
+    minute: i64,
+    second: i64,
+    millisecond: i64,
+    microsecond: i64,
+    nanosecond: i64,
+) -> Result<TemporalPlainDateTimeObjectData, Cx::Error> {
+    temporal_plain_date_time_from_parts_with_overflow(
+        cx,
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        millisecond,
+        microsecond,
+        nanosecond,
+        TemporalOverflow::Reject,
+    )
+}
+
+pub(super) fn temporal_plain_date_time_from_parts_with_overflow<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    year: i64,
+    month: i64,
+    day: i64,
+    hour: i64,
+    minute: i64,
+    second: i64,
+    millisecond: i64,
+    microsecond: i64,
+    nanosecond: i64,
+    overflow: TemporalOverflow,
+) -> Result<TemporalPlainDateTimeObjectData, Cx::Error> {
+    let date = temporal_plain_date_from_parts_with_overflow(cx, year, month, day, overflow)?;
+    let time = temporal_plain_time_from_parts_with_overflow(
+        cx,
+        hour,
+        minute,
+        second,
+        millisecond,
+        microsecond,
+        nanosecond,
+        overflow,
+    )?;
+    Ok(TemporalPlainDateTimeObjectData::new(
+        date.year(),
+        date.month(),
+        date.day(),
+        time.hour(),
+        time.minute(),
+        time.second(),
+        time.millisecond(),
+        time.microsecond(),
+        time.nanosecond(),
+        date.calendar(),
+    ))
+}
+
+pub(super) fn allocate_temporal_plain_date_time_object<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    prototype: ObjectRef,
+    data: TemporalPlainDateTimeObjectData,
+) -> Result<Value, Cx::Error> {
+    let realm = cx.builtin_realm();
+    let root_shape = cx
+        .agent()
+        .realm(realm)
+        .and_then(RealmRecord::root_shape)
+        .ok_or_else(|| type_error(cx))?;
+    let object = {
+        let agent = cx.agent();
+        agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape)
+                    .with_prototype(Some(prototype))
+                    .with_cold_data(ObjectColdData::Ordinary(OrdinaryObjectData::Temporal(
+                        TemporalObjectKind::PlainDateTime,
+                    ))),
+                AllocationLifetime::Default,
+            )
+        })
+    };
+    let installed = cx
+        .agent()
+        .objects_mut()
+        .install_temporal_object(object, TemporalObjectData::PlainDateTime(data));
+    if !installed {
+        return Err(type_error(cx));
+    }
+    Ok(Value::from_object_ref(object))
+}
+
+pub(super) fn temporal_plain_date_time_from_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<TemporalPlainDateTimeObjectData, Cx::Error> {
+    if let Some(string_ref) = value.as_string_ref() {
+        let text = string_ref_text(cx, string_ref)?;
+        let parsed = parse_temporal_plain_date_time(&text).ok_or_else(|| range_error(cx))?;
+        let (millisecond, microsecond, nanosecond) =
+            temporal_subsecond_parts_from_nanoseconds(cx, parsed.fraction_nanoseconds)?;
+        return temporal_plain_date_time_from_parts(
+            cx,
+            i64::from(parsed.year),
+            i64::from(parsed.month),
+            i64::from(parsed.day),
+            i64::from(parsed.hour),
+            i64::from(parsed.minute),
+            i64::from(parsed.second),
+            millisecond,
+            microsecond,
+            nanosecond,
+        );
+    }
+
+    let object_ref = value.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let existing = {
+        let agent = cx.agent();
+        agent.objects().temporal_object(object_ref).copied()
+    };
+    match existing {
+        Some(TemporalObjectData::PlainDateTime(data)) => return Ok(data),
+        Some(TemporalObjectData::PlainDate(data)) => {
+            return Ok(TemporalPlainDateTimeObjectData::new(
+                data.year(),
+                data.month(),
+                data.day(),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                data.calendar(),
+            ));
+        }
+        Some(TemporalObjectData::ZonedDateTime(data)) => {
+            let civil = temporal_zoned_date_time_civil(cx, data)?;
+            let date_time = civil.date_time;
+            return temporal_plain_date_time_from_parts(
+                cx,
+                i64::from(date_time.year),
+                i64::from(date_time.month),
+                i64::from(date_time.day),
+                i64::from(date_time.hour),
+                i64::from(date_time.minute),
+                i64::from(date_time.second),
+                i64::from(date_time.millisecond),
+                i64::from(date_time.microsecond),
+                i64::from(date_time.nanosecond),
+            );
+        }
+        _ => {}
+    }
+
+    temporal_validate_optional_iso_calendar_property(cx, object_ref)?;
+    let year = temporal_required_integer_part_from_property(cx, object_ref, "year")?;
+    let month = temporal_month_from_property_bag(cx, object_ref, None)?;
+    let day = temporal_required_integer_part_from_property(cx, object_ref, "day")?;
+    let hour = temporal_time_part_from_property(cx, object_ref, "hour")?;
+    let minute = temporal_time_part_from_property(cx, object_ref, "minute")?;
+    let second = temporal_time_part_from_property(cx, object_ref, "second")?;
+    let millisecond = temporal_time_part_from_property(cx, object_ref, "millisecond")?;
+    let microsecond = temporal_time_part_from_property(cx, object_ref, "microsecond")?;
+    let nanosecond = temporal_time_part_from_property(cx, object_ref, "nanosecond")?;
+    temporal_plain_date_time_from_parts(
+        cx,
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        millisecond,
+        microsecond,
+        nanosecond,
+    )
+}
+
+pub(super) fn temporal_plain_date_time_from_bag_fields<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    fields: TemporalPlainDateTimeBagFields,
+    overflow: TemporalOverflow,
+) -> Result<TemporalPlainDateTimeObjectData, Cx::Error> {
+    let year = fields.year.ok_or_else(|| type_error(cx))?;
+    let day = fields.day.ok_or_else(|| type_error(cx))?;
+    let month = temporal_resolve_month_from_fields(
+        cx,
+        fields.month,
+        fields.month_code_text.as_deref(),
+        None,
+    )?;
+    temporal_plain_date_time_from_parts_with_overflow(
+        cx,
+        year,
+        month,
+        day,
+        fields.hour,
+        fields.minute,
+        fields.second,
+        fields.millisecond,
+        fields.microsecond,
+        fields.nanosecond,
+        overflow,
+    )
+}
+
+pub(super) fn temporal_plain_date_time_data<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    this_value: Value,
+) -> Result<TemporalPlainDateTimeObjectData, Cx::Error> {
+    let payload = {
+        let agent = cx.agent();
+        object::require_temporal_object(agent, this_value, TemporalObjectKind::PlainDateTime)
+    };
+    let payload = map_completion(cx, payload)?;
+    let TemporalObjectData::PlainDateTime(data) = payload else {
+        return Err(type_error(cx));
+    };
+    Ok(data)
+}
+
+pub(super) fn temporal_plain_date_time_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let Some(new_target) = invocation.new_target() else {
+        return Err(type_error(cx));
+    };
+    let year = temporal_integer_part_from_argument(cx, invocation, 0)?;
+    let month = temporal_integer_part_from_argument(cx, invocation, 1)?;
+    let day = temporal_integer_part_from_argument(cx, invocation, 2)?;
+    let hour = temporal_time_part_from_argument(cx, invocation, 3)?;
+    let minute = temporal_time_part_from_argument(cx, invocation, 4)?;
+    let second = temporal_time_part_from_argument(cx, invocation, 5)?;
+    let millisecond = temporal_time_part_from_argument(cx, invocation, 6)?;
+    let microsecond = temporal_time_part_from_argument(cx, invocation, 7)?;
+    let nanosecond = temporal_time_part_from_argument(cx, invocation, 8)?;
+    temporal_validate_optional_iso_calendar_identifier_argument(cx, invocation, 9)?;
+    let data = temporal_plain_date_time_from_parts(
+        cx,
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        millisecond,
+        microsecond,
+        nanosecond,
+    )?;
+    let prototype = temporal_constructor_prototype(cx, new_target)?;
+    allocate_temporal_plain_date_time_object(cx, prototype, data)
+}
+
+pub(super) fn temporal_plain_date_time_year_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(data.year()))
+}
+
+pub(super) fn temporal_plain_date_time_month_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(i32::from(data.month())))
+}
+
+pub(super) fn temporal_plain_date_time_month_code_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(string_value(cx, &format!("M{:02}", data.month())))
+}
+
+pub(super) fn temporal_plain_date_time_day_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(i32::from(data.day())))
+}
+
+pub(super) fn temporal_plain_date_time_day_of_week_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(temporal_iso_day_of_week(
+        data.year(),
+        data.month(),
+        data.day(),
+    )))
+}
+
+pub(super) fn temporal_plain_date_time_day_of_year_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(temporal_iso_day_of_year(
+        data.year(),
+        data.month(),
+        data.day(),
+    )))
+}
+
+pub(super) fn temporal_plain_date_time_days_in_month_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(i32::from(temporal_iso_days_in_month(
+        data.year(),
+        data.month(),
+    ))))
+}
+
+pub(super) fn temporal_plain_date_time_days_in_year_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(temporal_iso_days_in_year(data.year())))
+}
+
+pub(super) fn temporal_plain_date_time_months_in_year_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let _data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(12))
+}
+
+pub(super) fn temporal_plain_date_time_in_leap_year_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_bool(temporal_is_iso_leap_year(data.year())))
+}
+
+pub(super) fn temporal_plain_date_time_days_in_week_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let _data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(7))
+}
+
+pub(super) fn temporal_plain_date_time_week_of_year_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let (week, _) = temporal_iso_week_of_year(data.year(), data.month(), data.day());
+    Ok(Value::from_smi(week))
+}
+
+pub(super) fn temporal_plain_date_time_year_of_week_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let (_, year) = temporal_iso_week_of_year(data.year(), data.month(), data.day());
+    Ok(Value::from_smi(year))
+}
+
+pub(super) fn temporal_plain_date_time_era_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let _data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::undefined())
+}
+
+pub(super) fn temporal_plain_date_time_era_year_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let _data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::undefined())
+}
+
+pub(super) fn temporal_plain_date_time_hour_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(i32::from(data.hour())))
+}
+
+pub(super) fn temporal_plain_date_time_minute_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(i32::from(data.minute())))
+}
+
+pub(super) fn temporal_plain_date_time_second_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(i32::from(data.second())))
+}
+
+pub(super) fn temporal_plain_date_time_millisecond_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(i32::from(data.millisecond())))
+}
+
+pub(super) fn temporal_plain_date_time_microsecond_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(i32::from(data.microsecond())))
+}
+
+pub(super) fn temporal_plain_date_time_nanosecond_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(Value::from_smi(i32::from(data.nanosecond())))
+}
+
+pub(super) fn temporal_plain_date_time_calendar_id_getter_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let _data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(string_value(cx, "iso8601"))
+}
+
+pub(super) fn temporal_plain_date_time_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let options = temporal_plain_date_time_to_string_options(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let data = temporal_plain_date_time_for_string_precision(
+        cx,
+        data,
+        options.precision,
+        options.rounding_mode,
+    )?;
+    Ok(string_value(
+        cx,
+        &format_temporal_plain_date_time_with_options(data, options),
+    ))
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct TemporalPlainDateTimeToStringOptions {
+    pub(super) precision: TemporalInstantStringPrecision,
+    pub(super) rounding_mode: TemporalBuiltinRoundingMode,
+    pub(super) calendar_name: TemporalZonedDateTimeCalendarNameOption,
+}
+
+pub(super) fn temporal_plain_date_time_to_string_options<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<TemporalPlainDateTimeToStringOptions, Cx::Error> {
+    if value.is_undefined() {
+        return Ok(TemporalPlainDateTimeToStringOptions {
+            precision: TemporalInstantStringPrecision::Auto,
+            rounding_mode: TemporalBuiltinRoundingMode::Trunc,
+            calendar_name: TemporalZonedDateTimeCalendarNameOption::Auto,
+        });
+    }
+    let object_ref = value.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let calendar_name_value = temporal_property_value(cx, object_ref, "calendarName")?;
+    let calendar_name = match temporal_string_option(
+        cx,
+        calendar_name_value,
+        &["auto", "always", "never", "critical"],
+        "auto",
+    )?
+    .as_str()
+    {
+        "auto" => TemporalZonedDateTimeCalendarNameOption::Auto,
+        "always" => TemporalZonedDateTimeCalendarNameOption::Always,
+        "never" => TemporalZonedDateTimeCalendarNameOption::Never,
+        "critical" => TemporalZonedDateTimeCalendarNameOption::Critical,
+        _ => unreachable!("temporal_string_option constrained calendarName"),
+    };
+    let fractional_second_digits =
+        temporal_property_value(cx, object_ref, "fractionalSecondDigits")?;
+    let fractional_second_precision =
+        temporal_instant_fractional_second_digits_option(cx, fractional_second_digits)?;
+    let rounding_mode_value = temporal_property_value(cx, object_ref, "roundingMode")?;
+    let rounding_mode = temporal_duration_rounding_mode_option(cx, rounding_mode_value)?;
+    let smallest_unit = temporal_property_value(cx, object_ref, "smallestUnit")?;
+    let precision = if smallest_unit.is_undefined() {
+        fractional_second_precision
+    } else {
+        temporal_instant_smallest_unit_precision(cx, smallest_unit)?
+    };
+    Ok(TemporalPlainDateTimeToStringOptions {
+        precision,
+        rounding_mode,
+        calendar_name,
+    })
+}
+
+pub(super) fn temporal_plain_date_time_for_string_precision<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    data: TemporalPlainDateTimeObjectData,
+    precision: TemporalInstantStringPrecision,
+    rounding_mode: TemporalBuiltinRoundingMode,
+) -> Result<TemporalPlainDateTimeObjectData, Cx::Error> {
+    let total_nanoseconds = match precision {
+        TemporalInstantStringPrecision::Auto => return Ok(data),
+        TemporalInstantStringPrecision::Minute => temporal_round_epoch_nanoseconds_to_increment(
+            temporal_plain_date_time_total_nanoseconds(data).ok_or_else(|| range_error(cx))?,
+            TEMPORAL_NANOS_PER_MINUTE,
+            rounding_mode,
+        )
+        .ok_or_else(|| range_error(cx))?,
+        TemporalInstantStringPrecision::FractionalSecond(digits) => {
+            temporal_round_epoch_nanoseconds_to_fractional_digits(
+                temporal_plain_date_time_total_nanoseconds(data).ok_or_else(|| range_error(cx))?,
+                digits,
+                rounding_mode,
+            )
+            .ok_or_else(|| range_error(cx))?
+        }
+    };
+    temporal_plain_date_time_from_total_nanoseconds(cx, total_nanoseconds)
+}
+
+pub(super) fn format_temporal_plain_date_time_with_options(
+    data: TemporalPlainDateTimeObjectData,
+    options: TemporalPlainDateTimeToStringOptions,
+) -> String {
+    let mut text = {
+        let date = temporal_plain_date_time_date(data);
+        let time = temporal_plain_date_time_time(data);
+        format!(
+            "{}T{}",
+            format_temporal_plain_date(date),
+            format_temporal_plain_time_with_precision(time, options.precision)
+        )
+    };
+    match options.calendar_name {
+        TemporalZonedDateTimeCalendarNameOption::Always => {
+            text.push_str("[u-ca=iso8601]");
+        }
+        TemporalZonedDateTimeCalendarNameOption::Critical => {
+            text.push_str("[!u-ca=iso8601]");
+        }
+        TemporalZonedDateTimeCalendarNameOption::Auto
+        | TemporalZonedDateTimeCalendarNameOption::Never => {}
+    }
+    text
+}
+
+pub(super) fn temporal_plain_date_time_to_json_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    Ok(string_value(
+        cx,
+        &format_temporal_plain_date_time_with_options(
+            data,
+            TemporalPlainDateTimeToStringOptions {
+                precision: TemporalInstantStringPrecision::Auto,
+                rounding_mode: TemporalBuiltinRoundingMode::Trunc,
+                calendar_name: TemporalZonedDateTimeCalendarNameOption::Auto,
+            },
+        ),
+    ))
+}
+
+pub(super) fn temporal_plain_date_time_to_locale_string_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    temporal_plain_date_time_to_json_builtin(cx, invocation)
+}
+
+pub(super) fn temporal_plain_date_time_value_of_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    _invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    Err(type_error(cx))
+}
+
+pub(super) fn temporal_plain_date_time_equals_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let left = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let right = temporal_plain_date_time_from_value(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    Ok(Value::from_bool(left == right))
+}
+
+pub(super) fn temporal_plain_date_time_with_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let date_time = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let object_ref = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined())
+        .as_object_ref()
+        .ok_or_else(|| type_error(cx))?;
+    temporal_reject_calendar_or_time_zone_properties(cx, object_ref)?;
+    let overflow = temporal_overflow_from_options(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let year = temporal_optional_integer_part_from_property(cx, object_ref, "year")?;
+    let month =
+        temporal_month_from_property_bag(cx, object_ref, Some(i64::from(date_time.month())))?;
+    let month_value_missing =
+        temporal_optional_integer_part_from_property(cx, object_ref, "month")?.is_none();
+    let month_code_missing = temporal_property_value(cx, object_ref, "monthCode")?.is_undefined();
+    let day = temporal_optional_integer_part_from_property(cx, object_ref, "day")?
+        .unwrap_or(i64::from(date_time.day()));
+    let hour = temporal_optional_time_part_from_property(cx, object_ref, "hour")?
+        .unwrap_or(i64::from(date_time.hour()));
+    let minute = temporal_optional_time_part_from_property(cx, object_ref, "minute")?
+        .unwrap_or(i64::from(date_time.minute()));
+    let second = temporal_optional_time_part_from_property(cx, object_ref, "second")?
+        .unwrap_or(i64::from(date_time.second()));
+    let millisecond = temporal_optional_time_part_from_property(cx, object_ref, "millisecond")?
+        .unwrap_or(i64::from(date_time.millisecond()));
+    let microsecond = temporal_optional_time_part_from_property(cx, object_ref, "microsecond")?
+        .unwrap_or(i64::from(date_time.microsecond()));
+    let nanosecond = temporal_optional_time_part_from_property(cx, object_ref, "nanosecond")?
+        .unwrap_or(i64::from(date_time.nanosecond()));
+    if year.is_none()
+        && month_value_missing
+        && month_code_missing
+        && day == i64::from(date_time.day())
+        && hour == i64::from(date_time.hour())
+        && minute == i64::from(date_time.minute())
+        && second == i64::from(date_time.second())
+        && millisecond == i64::from(date_time.millisecond())
+        && microsecond == i64::from(date_time.microsecond())
+        && nanosecond == i64::from(date_time.nanosecond())
+    {
+        return Err(type_error(cx));
+    }
+    let data = temporal_plain_date_time_from_parts_with_overflow(
+        cx,
+        year.unwrap_or(i64::from(date_time.year())),
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        millisecond,
+        microsecond,
+        nanosecond,
+        overflow,
+    )?;
+    let prototype = current_temporal_plain_date_time_prototype(cx)?;
+    allocate_temporal_plain_date_time_object(cx, prototype, data)
+}
+
+pub(super) fn temporal_plain_date_time_with_plain_time_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let date_time = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let time = if value.is_undefined() {
+        TemporalPlainTimeObjectData::new(0, 0, 0, 0, 0, 0)
+    } else {
+        temporal_plain_time_from_value(cx, value)?
+    };
+    let checked = temporal_plain_date_time_from_parts(
+        cx,
+        i64::from(date_time.year()),
+        i64::from(date_time.month()),
+        i64::from(date_time.day()),
+        i64::from(time.hour()),
+        i64::from(time.minute()),
+        i64::from(time.second()),
+        i64::from(time.millisecond()),
+        i64::from(time.microsecond()),
+        i64::from(time.nanosecond()),
+    )?;
+    let data = TemporalPlainDateTimeObjectData::new(
+        checked.year(),
+        checked.month(),
+        checked.day(),
+        checked.hour(),
+        checked.minute(),
+        checked.second(),
+        checked.millisecond(),
+        checked.microsecond(),
+        checked.nanosecond(),
+        date_time.calendar(),
+    );
+    let prototype = current_temporal_plain_date_time_prototype(cx)?;
+    allocate_temporal_plain_date_time_object(cx, prototype, data)
+}
+
+pub(super) fn temporal_plain_date_time_with_calendar_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let date_time = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    temporal_validate_iso_calendar_value(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let data = TemporalPlainDateTimeObjectData::new(
+        date_time.year(),
+        date_time.month(),
+        date_time.day(),
+        date_time.hour(),
+        date_time.minute(),
+        date_time.second(),
+        date_time.millisecond(),
+        date_time.microsecond(),
+        date_time.nanosecond(),
+        date_time.calendar(),
+    );
+    let prototype = current_temporal_plain_date_time_prototype(cx)?;
+    allocate_temporal_plain_date_time_object(cx, prototype, data)
+}
+
+pub(super) fn temporal_plain_date_time_date(
+    data: TemporalPlainDateTimeObjectData,
+) -> TemporalPlainDateObjectData {
+    TemporalPlainDateObjectData::new(data.year(), data.month(), data.day(), data.calendar())
+}
+
+pub(super) fn temporal_plain_date_time_time(
+    data: TemporalPlainDateTimeObjectData,
+) -> TemporalPlainTimeObjectData {
+    TemporalPlainTimeObjectData::new(
+        data.hour(),
+        data.minute(),
+        data.second(),
+        data.millisecond(),
+        data.microsecond(),
+        data.nanosecond(),
+    )
+}
+
+pub(super) fn temporal_plain_date_time_total_nanoseconds(
+    data: TemporalPlainDateTimeObjectData,
+) -> Option<i128> {
+    temporal_plain_date_ordinal_day(temporal_plain_date_time_date(data))
+        .checked_mul(TEMPORAL_NANOS_PER_DAY)?
+        .checked_add(temporal_plain_time_nanoseconds(
+            temporal_plain_date_time_time(data),
+        ))
+}
+
+pub(super) fn temporal_plain_date_time_from_total_nanoseconds<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    total_nanoseconds: i128,
+) -> Result<TemporalPlainDateTimeObjectData, Cx::Error> {
+    let ordinal_day = total_nanoseconds.div_euclid(TEMPORAL_NANOS_PER_DAY);
+    let time_nanoseconds = total_nanoseconds.rem_euclid(TEMPORAL_NANOS_PER_DAY);
+    let date = temporal_plain_date_from_ordinal_day(cx, ordinal_day)?;
+    let time = temporal_plain_time_from_nanoseconds(cx, time_nanoseconds)?;
+    Ok(TemporalPlainDateTimeObjectData::new(
+        date.year(),
+        date.month(),
+        date.day(),
+        time.hour(),
+        time.minute(),
+        time.second(),
+        time.millisecond(),
+        time.microsecond(),
+        time.nanosecond(),
+        date.calendar(),
+    ))
+}
+
+pub(super) fn temporal_plain_date_time_add_duration<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    data: TemporalPlainDateTimeObjectData,
+    duration: TemporalDurationObjectData,
+    overflow: TemporalOverflow,
+) -> Result<TemporalPlainDateTimeObjectData, Cx::Error> {
+    let date_duration = TemporalDurationObjectData::new(
+        duration.years(),
+        duration.months(),
+        duration.weeks(),
+        duration.days(),
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    );
+    let date = temporal_plain_date_add_duration(
+        cx,
+        temporal_plain_date_time_date(data),
+        date_duration,
+        overflow,
+    )?;
+    let time_nanoseconds = temporal_plain_time_nanoseconds(temporal_plain_date_time_time(data))
+        .checked_add(temporal_duration_time_nanoseconds(duration))
+        .ok_or_else(|| range_error(cx))?;
+    let day_carry = time_nanoseconds.div_euclid(TEMPORAL_NANOS_PER_DAY);
+    let time = temporal_plain_time_from_nanoseconds(
+        cx,
+        time_nanoseconds.rem_euclid(TEMPORAL_NANOS_PER_DAY),
+    )?;
+    let Some(ordinal_day) = temporal_plain_date_ordinal_day(date).checked_add(day_carry) else {
+        return Err(range_error(cx));
+    };
+    let date = temporal_plain_date_from_ordinal_day(cx, ordinal_day)?;
+    Ok(TemporalPlainDateTimeObjectData::new(
+        date.year(),
+        date.month(),
+        date.day(),
+        time.hour(),
+        time.minute(),
+        time.second(),
+        time.millisecond(),
+        time.microsecond(),
+        time.nanosecond(),
+        date.calendar(),
+    ))
+}
+
+pub(super) fn temporal_plain_date_time_add_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let date_time = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let duration = temporal_duration_from_value(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let overflow = temporal_overflow_from_options(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let data = temporal_plain_date_time_add_duration(cx, date_time, duration, overflow)?;
+    let prototype = current_temporal_plain_date_time_prototype(cx)?;
+    allocate_temporal_plain_date_time_object(cx, prototype, data)
+}
+
+pub(super) fn temporal_plain_date_time_subtract_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let date_time = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let duration = temporal_duration_from_value(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let overflow = temporal_overflow_from_options(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let data = temporal_plain_date_time_add_duration(
+        cx,
+        date_time,
+        negate_temporal_duration(duration),
+        overflow,
+    )?;
+    let prototype = current_temporal_plain_date_time_prototype(cx)?;
+    allocate_temporal_plain_date_time_object(cx, prototype, data)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum TemporalDateTimeDifferenceUnit {
+    Year,
+    Month,
+    Week,
+    Day,
+    Hour,
+    Minute,
+    Second,
+    Millisecond,
+    Microsecond,
+    Nanosecond,
+}
+
+pub(super) fn temporal_date_time_difference_unit_from_text(
+    text: &str,
+) -> Option<TemporalDateTimeDifferenceUnit> {
+    match text {
+        "year" | "years" => Some(TemporalDateTimeDifferenceUnit::Year),
+        "month" | "months" => Some(TemporalDateTimeDifferenceUnit::Month),
+        "week" | "weeks" => Some(TemporalDateTimeDifferenceUnit::Week),
+        "day" | "days" => Some(TemporalDateTimeDifferenceUnit::Day),
+        "hour" | "hours" => Some(TemporalDateTimeDifferenceUnit::Hour),
+        "minute" | "minutes" => Some(TemporalDateTimeDifferenceUnit::Minute),
+        "second" | "seconds" => Some(TemporalDateTimeDifferenceUnit::Second),
+        "millisecond" | "milliseconds" => Some(TemporalDateTimeDifferenceUnit::Millisecond),
+        "microsecond" | "microseconds" => Some(TemporalDateTimeDifferenceUnit::Microsecond),
+        "nanosecond" | "nanoseconds" => Some(TemporalDateTimeDifferenceUnit::Nanosecond),
+        _ => None,
+    }
+}
+
+pub(super) fn temporal_date_time_difference_unit_from_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<TemporalDateTimeDifferenceUnit, Cx::Error> {
+    let string_ref = to_string_string_ref(cx, value)?;
+    let text = string_ref_text(cx, string_ref)?;
+    temporal_date_time_difference_unit_from_text(&text).ok_or_else(|| range_error(cx))
+}
+
+pub(super) fn temporal_date_time_difference_unit_order(unit: TemporalDateTimeDifferenceUnit) -> u8 {
+    match unit {
+        TemporalDateTimeDifferenceUnit::Year => 0,
+        TemporalDateTimeDifferenceUnit::Month => 1,
+        TemporalDateTimeDifferenceUnit::Week => 2,
+        TemporalDateTimeDifferenceUnit::Day => 3,
+        TemporalDateTimeDifferenceUnit::Hour => 4,
+        TemporalDateTimeDifferenceUnit::Minute => 5,
+        TemporalDateTimeDifferenceUnit::Second => 6,
+        TemporalDateTimeDifferenceUnit::Millisecond => 7,
+        TemporalDateTimeDifferenceUnit::Microsecond => 8,
+        TemporalDateTimeDifferenceUnit::Nanosecond => 9,
+    }
+}
+
+pub(super) fn temporal_date_time_difference_unit_nanoseconds(
+    unit: TemporalDateTimeDifferenceUnit,
+) -> Option<i128> {
+    match unit {
+        TemporalDateTimeDifferenceUnit::Week => Some(TEMPORAL_NANOS_PER_DAY * 7),
+        TemporalDateTimeDifferenceUnit::Day => Some(TEMPORAL_NANOS_PER_DAY),
+        TemporalDateTimeDifferenceUnit::Hour => Some(TEMPORAL_NANOS_PER_HOUR),
+        TemporalDateTimeDifferenceUnit::Minute => Some(TEMPORAL_NANOS_PER_MINUTE),
+        TemporalDateTimeDifferenceUnit::Second => Some(TEMPORAL_NANOS_PER_SECOND),
+        TemporalDateTimeDifferenceUnit::Millisecond => Some(TEMPORAL_NANOS_PER_MILLISECOND),
+        TemporalDateTimeDifferenceUnit::Microsecond => Some(TEMPORAL_NANOS_PER_MICROSECOND),
+        TemporalDateTimeDifferenceUnit::Nanosecond => Some(1),
+        TemporalDateTimeDifferenceUnit::Year | TemporalDateTimeDifferenceUnit::Month => None,
+    }
+}
+
+pub(super) fn temporal_date_time_exact_unit(
+    unit: TemporalDateTimeDifferenceUnit,
+) -> Option<TemporalBuiltinDurationExactUnit> {
+    match unit {
+        TemporalDateTimeDifferenceUnit::Hour => Some(TemporalBuiltinDurationExactUnit::Hour),
+        TemporalDateTimeDifferenceUnit::Minute => Some(TemporalBuiltinDurationExactUnit::Minute),
+        TemporalDateTimeDifferenceUnit::Second => Some(TemporalBuiltinDurationExactUnit::Second),
+        TemporalDateTimeDifferenceUnit::Millisecond => {
+            Some(TemporalBuiltinDurationExactUnit::Millisecond)
+        }
+        TemporalDateTimeDifferenceUnit::Microsecond => {
+            Some(TemporalBuiltinDurationExactUnit::Microsecond)
+        }
+        TemporalDateTimeDifferenceUnit::Nanosecond => {
+            Some(TemporalBuiltinDurationExactUnit::Nanosecond)
+        }
+        TemporalDateTimeDifferenceUnit::Year
+        | TemporalDateTimeDifferenceUnit::Month
+        | TemporalDateTimeDifferenceUnit::Week
+        | TemporalDateTimeDifferenceUnit::Day => None,
+    }
+}
+
+pub(super) fn temporal_date_time_rounding_increment_is_valid(
+    smallest_unit: TemporalDateTimeDifferenceUnit,
+    rounding_increment: i128,
+) -> bool {
+    match smallest_unit {
+        TemporalDateTimeDifferenceUnit::Day => rounding_increment == 1,
+        TemporalDateTimeDifferenceUnit::Hour
+        | TemporalDateTimeDifferenceUnit::Minute
+        | TemporalDateTimeDifferenceUnit::Second
+        | TemporalDateTimeDifferenceUnit::Millisecond
+        | TemporalDateTimeDifferenceUnit::Microsecond
+        | TemporalDateTimeDifferenceUnit::Nanosecond => {
+            temporal_exact_time_rounding_increment_is_valid(
+                temporal_date_time_exact_unit(smallest_unit).expect("exact unit"),
+                rounding_increment,
+            )
+        }
+        TemporalDateTimeDifferenceUnit::Year
+        | TemporalDateTimeDifferenceUnit::Month
+        | TemporalDateTimeDifferenceUnit::Week => false,
+    }
+}
+
+pub(super) struct TemporalPlainDateTimeRoundOptions {
+    pub(super) smallest_unit: TemporalDateTimeDifferenceUnit,
+    pub(super) rounding_increment: i128,
+    pub(super) rounding_mode: TemporalBuiltinRoundingMode,
+}
+
+pub(super) fn temporal_plain_date_time_round_options<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<TemporalPlainDateTimeRoundOptions, Cx::Error> {
+    if value.is_string() {
+        let smallest_unit = temporal_date_time_difference_unit_from_value(cx, value)?;
+        if !temporal_date_time_rounding_increment_is_valid(smallest_unit, 1) {
+            return Err(range_error(cx));
+        }
+        return Ok(TemporalPlainDateTimeRoundOptions {
+            smallest_unit,
+            rounding_increment: 1,
+            rounding_mode: TemporalBuiltinRoundingMode::HalfExpand,
+        });
+    }
+    let object_ref = value.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let rounding_increment_value = temporal_property_value(cx, object_ref, "roundingIncrement")?;
+    let rounding_increment =
+        temporal_duration_rounding_increment_option(cx, rounding_increment_value)?;
+    let rounding_mode_value = temporal_property_value(cx, object_ref, "roundingMode")?;
+    let rounding_mode = temporal_duration_rounding_mode_option_with_default(
+        cx,
+        rounding_mode_value,
+        TemporalBuiltinRoundingMode::HalfExpand,
+    )?;
+    let smallest_unit_value = temporal_property_value(cx, object_ref, "smallestUnit")?;
+    if smallest_unit_value.is_undefined() {
+        return Err(range_error(cx));
+    }
+    let smallest_unit = temporal_date_time_difference_unit_from_value(cx, smallest_unit_value)?;
+    if !temporal_date_time_rounding_increment_is_valid(smallest_unit, rounding_increment) {
+        return Err(range_error(cx));
+    }
+    Ok(TemporalPlainDateTimeRoundOptions {
+        smallest_unit,
+        rounding_increment,
+        rounding_mode,
+    })
+}
+
+pub(super) fn temporal_plain_date_time_round_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let date_time = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let options = temporal_plain_date_time_round_options(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let unit_nanoseconds = temporal_date_time_difference_unit_nanoseconds(options.smallest_unit)
+        .ok_or_else(|| range_error(cx))?;
+    let increment = unit_nanoseconds
+        .checked_mul(options.rounding_increment)
+        .ok_or_else(|| range_error(cx))?;
+    let rounded = temporal_round_epoch_nanoseconds_to_increment(
+        temporal_plain_date_time_total_nanoseconds(date_time).ok_or_else(|| range_error(cx))?,
+        increment,
+        options.rounding_mode,
+    )
+    .ok_or_else(|| range_error(cx))?;
+    let data = temporal_plain_date_time_from_total_nanoseconds(cx, rounded)?;
+    let prototype = current_temporal_plain_date_time_prototype(cx)?;
+    allocate_temporal_plain_date_time_object(cx, prototype, data)
+}
+
+pub(super) struct TemporalPlainDateTimeDifferenceOptions {
+    pub(super) largest_unit: TemporalDateTimeDifferenceUnit,
+    pub(super) smallest_unit: TemporalDateTimeDifferenceUnit,
+    pub(super) rounding_increment: i128,
+    pub(super) rounding_mode: TemporalBuiltinRoundingMode,
+}
+
+pub(super) fn temporal_plain_date_time_difference_options<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+    default_largest_unit: TemporalDateTimeDifferenceUnit,
+) -> Result<TemporalPlainDateTimeDifferenceOptions, Cx::Error> {
+    if value.is_undefined() {
+        return Ok(TemporalPlainDateTimeDifferenceOptions {
+            largest_unit: default_largest_unit,
+            smallest_unit: TemporalDateTimeDifferenceUnit::Nanosecond,
+            rounding_increment: 1,
+            rounding_mode: TemporalBuiltinRoundingMode::Trunc,
+        });
+    }
+    let object_ref = value.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let largest_unit_value = temporal_property_value(cx, object_ref, "largestUnit")?;
+    let rounding_increment_value = temporal_property_value(cx, object_ref, "roundingIncrement")?;
+    let rounding_increment =
+        temporal_duration_rounding_increment_option(cx, rounding_increment_value)?;
+    let rounding_mode_value = temporal_property_value(cx, object_ref, "roundingMode")?;
+    let rounding_mode = temporal_duration_rounding_mode_option(cx, rounding_mode_value)?;
+    let smallest_unit_value = temporal_property_value(cx, object_ref, "smallestUnit")?;
+    let smallest_unit = if smallest_unit_value.is_undefined() {
+        TemporalDateTimeDifferenceUnit::Nanosecond
+    } else {
+        temporal_date_time_difference_unit_from_value(cx, smallest_unit_value)?
+    };
+    let largest_unit = if largest_unit_value.is_undefined() {
+        default_largest_unit
+    } else {
+        let string_ref = to_string_string_ref(cx, largest_unit_value)?;
+        let text = string_ref_text(cx, string_ref)?;
+        if text == "auto" {
+            default_largest_unit
+        } else {
+            temporal_date_time_difference_unit_from_text(&text).ok_or_else(|| range_error(cx))?
+        }
+    };
+    if temporal_date_time_difference_unit_order(largest_unit)
+        > temporal_date_time_difference_unit_order(smallest_unit)
+        || !temporal_date_time_rounding_increment_is_valid(smallest_unit, rounding_increment)
+    {
+        return Err(range_error(cx));
+    }
+    Ok(TemporalPlainDateTimeDifferenceOptions {
+        largest_unit,
+        smallest_unit,
+        rounding_increment,
+        rounding_mode,
+    })
+}
+
+pub(super) fn temporal_duration_from_date_time_nanoseconds<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    nanoseconds: i128,
+    largest_unit: TemporalDateTimeDifferenceUnit,
+) -> Result<TemporalDurationObjectData, Cx::Error> {
+    if let Some(exact_largest_unit) = temporal_date_time_exact_unit(largest_unit) {
+        return temporal_duration_from_nanoseconds_with_largest_unit(
+            cx,
+            nanoseconds,
+            exact_largest_unit,
+        );
+    }
+
+    let mut remainder = nanoseconds;
+    let weeks = if largest_unit == TemporalDateTimeDifferenceUnit::Week {
+        let value = remainder / (TEMPORAL_NANOS_PER_DAY * 7);
+        remainder %= TEMPORAL_NANOS_PER_DAY * 7;
+        i64::try_from(value).map_err(|_| range_error(cx))?
+    } else {
+        0
+    };
+    let days = if matches!(
+        largest_unit,
+        TemporalDateTimeDifferenceUnit::Week | TemporalDateTimeDifferenceUnit::Day
+    ) {
+        let value = remainder / TEMPORAL_NANOS_PER_DAY;
+        remainder %= TEMPORAL_NANOS_PER_DAY;
+        i64::try_from(value).map_err(|_| range_error(cx))?
+    } else {
+        0
+    };
+    let time = temporal_duration_from_nanoseconds_with_largest_unit(
+        cx,
+        remainder,
+        TemporalBuiltinDurationExactUnit::Hour,
+    )?;
+    Ok(TemporalDurationObjectData::new(
+        0,
+        0,
+        weeks,
+        days,
+        time.hours(),
+        time.minutes(),
+        time.seconds(),
+        time.milliseconds(),
+        time.microseconds(),
+        time.nanoseconds(),
+    ))
+}
+
+pub(super) fn temporal_plain_date_time_difference_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    sign: i128,
+) -> Result<Value, Cx::Error> {
+    let date_time = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let other = temporal_plain_date_time_from_value(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let options = temporal_plain_date_time_difference_options(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+        TemporalDateTimeDifferenceUnit::Day,
+    )?;
+    let left =
+        temporal_plain_date_time_total_nanoseconds(date_time).ok_or_else(|| range_error(cx))?;
+    let right = temporal_plain_date_time_total_nanoseconds(other).ok_or_else(|| range_error(cx))?;
+    let raw_difference = left
+        .checked_sub(right)
+        .and_then(|difference| difference.checked_mul(sign))
+        .ok_or_else(|| range_error(cx))?;
+    let unit_nanoseconds = temporal_date_time_difference_unit_nanoseconds(options.smallest_unit)
+        .ok_or_else(|| range_error(cx))?;
+    let increment = unit_nanoseconds
+        .checked_mul(options.rounding_increment)
+        .ok_or_else(|| range_error(cx))?;
+    let rounded = temporal_round_epoch_nanoseconds_to_increment(
+        raw_difference,
+        increment,
+        options.rounding_mode,
+    )
+    .ok_or_else(|| range_error(cx))?;
+    let duration = temporal_duration_from_date_time_nanoseconds(cx, rounded, options.largest_unit)?;
+    validate_temporal_duration(cx, duration)?;
+    let prototype = current_temporal_duration_prototype(cx)?;
+    allocate_temporal_duration_object(cx, prototype, duration)
+}
+
+pub(super) fn temporal_plain_date_time_since_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    temporal_plain_date_time_difference_builtin(cx, invocation, 1)
+}
+
+pub(super) fn temporal_plain_date_time_until_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    temporal_plain_date_time_difference_builtin(cx, invocation, -1)
+}
+
+pub(super) fn temporal_plain_date_time_to_plain_date_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let date =
+        TemporalPlainDateObjectData::new(data.year(), data.month(), data.day(), data.calendar());
+    let prototype = current_temporal_plain_date_prototype(cx)?;
+    allocate_temporal_plain_date_object(cx, prototype, date)
+}
+
+pub(super) fn temporal_plain_date_time_to_plain_time_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let data = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let time = TemporalPlainTimeObjectData::new(
+        data.hour(),
+        data.minute(),
+        data.second(),
+        data.millisecond(),
+        data.microsecond(),
+        data.nanosecond(),
+    );
+    let prototype = current_temporal_plain_time_prototype(cx)?;
+    plain_time::allocate_temporal_plain_time_object(cx, prototype, time)
+}
+
+pub(super) fn temporal_plain_date_time_to_zoned_date_time_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let date_time = temporal_plain_date_time_data(cx, invocation.this_value())?;
+    let time_zone_id = temporal_time_zone_id_from_value(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let disambiguation = temporal_disambiguation_from_options(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let instant = cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
+        time_zone_id: time_zone_id.clone(),
+        date_time: temporal_civil_date_time_from_plain_date_time(date_time),
+        disambiguation,
+    })?;
+    let data = temporal_zoned_date_time_from_parts(cx, instant.epoch_nanoseconds, &time_zone_id)?;
+    let prototype = current_temporal_zoned_date_time_prototype(cx)?;
+    allocate_temporal_zoned_date_time_object(cx, prototype, data)
+}
+
+pub(super) fn temporal_disambiguation_from_options<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    options: Value,
+) -> Result<TemporalDisambiguation, Cx::Error> {
+    temporal_validate_options_object(cx, options)?;
+    if options.is_undefined() {
+        return Ok(TemporalDisambiguation::Compatible);
+    }
+    let object_ref = options.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let value = temporal_property_value(cx, object_ref, "disambiguation")?;
+    let disambiguation = temporal_string_option(
+        cx,
+        value,
+        &["compatible", "earlier", "later", "reject"],
+        "compatible",
+    )?;
+    match disambiguation.as_str() {
+        "compatible" => Ok(TemporalDisambiguation::Compatible),
+        "earlier" => Ok(TemporalDisambiguation::Earlier),
+        "later" => Ok(TemporalDisambiguation::Later),
+        "reject" => Ok(TemporalDisambiguation::Reject),
+        _ => unreachable!("temporal_string_option constrained disambiguation"),
+    }
+}
+
+pub(super) fn temporal_plain_date_time_from_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let options = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let data = if value.is_string() {
+        let data = temporal_plain_date_time_from_value(cx, value)?;
+        let _overflow = temporal_overflow_from_options(cx, options)?;
+        data
+    } else {
+        let object_ref = value.as_object_ref().ok_or_else(|| type_error(cx))?;
+        let existing = {
+            let agent = cx.agent();
+            agent.objects().temporal_object(object_ref).copied()
+        };
+        match existing {
+            Some(TemporalObjectData::PlainDateTime(data)) => {
+                let _overflow = temporal_overflow_from_options(cx, options)?;
+                data
+            }
+            Some(TemporalObjectData::PlainDate(data)) => {
+                let _overflow = temporal_overflow_from_options(cx, options)?;
+                TemporalPlainDateTimeObjectData::new(
+                    data.year(),
+                    data.month(),
+                    data.day(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    data.calendar(),
+                )
+            }
+            Some(TemporalObjectData::ZonedDateTime(data)) => {
+                let _overflow = temporal_overflow_from_options(cx, options)?;
+                let civil = temporal_zoned_date_time_civil(cx, data)?;
+                temporal_plain_date_time_from_parts(
+                    cx,
+                    i64::from(civil.date_time.year),
+                    i64::from(civil.date_time.month),
+                    i64::from(civil.date_time.day),
+                    i64::from(civil.date_time.hour),
+                    i64::from(civil.date_time.minute),
+                    i64::from(civil.date_time.second),
+                    i64::from(civil.date_time.millisecond),
+                    i64::from(civil.date_time.microsecond),
+                    i64::from(civil.date_time.nanosecond),
+                )?
+            }
+            _ => {
+                let fields = temporal_plain_date_time_bag_fields(cx, object_ref)?;
+                if fields.year.is_none() || fields.day.is_none() {
+                    return Err(type_error(cx));
+                }
+                if fields.month.is_none() && fields.month_code_text.is_none() {
+                    return Err(type_error(cx));
+                }
+                let overflow = temporal_overflow_from_options(cx, options)?;
+                temporal_plain_date_time_from_bag_fields(cx, fields, overflow)?
+            }
+        }
+    };
+    let prototype = current_temporal_plain_date_time_prototype(cx)?;
+    allocate_temporal_plain_date_time_object(cx, prototype, data)
+}
+
+pub(super) fn temporal_plain_date_time_compare_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let left = temporal_plain_date_time_from_value(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let right = temporal_plain_date_time_from_value(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    Ok(temporal_compare_ordering(
+        (
+            left.year(),
+            left.month(),
+            left.day(),
+            left.hour(),
+            left.minute(),
+            left.second(),
+            left.millisecond(),
+            left.microsecond(),
+            left.nanosecond(),
+        )
+            .cmp(&(
+                right.year(),
+                right.month(),
+                right.day(),
+                right.hour(),
+                right.minute(),
+                right.second(),
+                right.millisecond(),
+                right.microsecond(),
+                right.nanosecond(),
+            )),
+    ))
+}

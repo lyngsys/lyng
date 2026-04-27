@@ -1,0 +1,593 @@
+use super::super::super::{
+    typed_array_copy_within_builtin, typed_array_fill_builtin, typed_array_reverse_builtin,
+    typed_array_sort_builtin, typed_array_to_reversed_builtin, typed_array_to_sorted_builtin,
+    typed_array_with_builtin, uint8_array_set_builtin, uint8_array_slice_builtin,
+    uint8_array_subarray_builtin,
+};
+use super::super::{
+    array_like_index_property_key, array_like_length_u64, arrays, get_property_from_object,
+    length_value_u64, normalize_relative_index_u64, range_error, to_index_for_builtin,
+    to_integer_or_infinity_for_builtin, type_error, PublicBuiltinDispatchContext,
+};
+use super::{
+    typed_array_read_element_value, typed_array_read_storage_bits, typed_array_same_kind_create,
+    typed_array_snapshot_storage_bits, typed_array_species_create,
+    typed_array_species_create_with_arguments, typed_array_storage_bits_from_builtin_value,
+    typed_array_storage_bits_to_value, typed_array_this_object, typed_array_this_record,
+    typed_array_validated_object_and_record, typed_array_validated_record,
+    typed_array_write_storage_bits,
+};
+use crate::BuiltinInvocation;
+use lyng_js_objects::TypedArrayElementKind;
+use lyng_js_types::{BuiltinFunctionId, ObjectRef, Value};
+
+pub(in crate::public::dispatch::binary_data) fn dispatch_typed_array_mutation_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    context: &mut Cx,
+    entry: BuiltinFunctionId,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Option<Value>, Cx::Error> {
+    if entry == uint8_array_set_builtin() {
+        return uint8_array_set_builtin_dispatch(context, invocation).map(Some);
+    }
+    if entry == uint8_array_slice_builtin() {
+        return uint8_array_slice_builtin_dispatch(context, invocation).map(Some);
+    }
+    if entry == uint8_array_subarray_builtin() {
+        return uint8_array_subarray_builtin_dispatch(context, invocation).map(Some);
+    }
+    if entry == typed_array_fill_builtin() {
+        return typed_array_fill_builtin_dispatch(context, invocation).map(Some);
+    }
+    if entry == typed_array_copy_within_builtin() {
+        return typed_array_copy_within_builtin_dispatch(context, invocation).map(Some);
+    }
+    if entry == typed_array_reverse_builtin() {
+        return typed_array_reverse_builtin_dispatch(context, invocation).map(Some);
+    }
+    if entry == typed_array_sort_builtin() {
+        return typed_array_sort_builtin_dispatch(context, invocation).map(Some);
+    }
+    if entry == typed_array_to_reversed_builtin() {
+        return typed_array_to_reversed_builtin_dispatch(context, invocation).map(Some);
+    }
+    if entry == typed_array_to_sorted_builtin() {
+        return typed_array_to_sorted_builtin_dispatch(context, invocation).map(Some);
+    }
+    if entry == typed_array_with_builtin() {
+        return typed_array_with_builtin_dispatch(context, invocation).map(Some);
+    }
+    Ok(None)
+}
+
+fn compare_typed_array_float_values(left: f64, right: f64) -> std::cmp::Ordering {
+    if left.is_nan() {
+        return if right.is_nan() {
+            std::cmp::Ordering::Equal
+        } else {
+            std::cmp::Ordering::Greater
+        };
+    }
+    if right.is_nan() {
+        return std::cmp::Ordering::Less;
+    }
+    if left < right {
+        return std::cmp::Ordering::Less;
+    }
+    if left > right {
+        return std::cmp::Ordering::Greater;
+    }
+    if left == 0.0 && right == 0.0 {
+        return match (left.is_sign_negative(), right.is_sign_negative()) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => std::cmp::Ordering::Equal,
+        };
+    }
+    std::cmp::Ordering::Equal
+}
+
+fn compare_typed_array_default_elements(
+    kind: TypedArrayElementKind,
+    left_bits: u64,
+    right_bits: u64,
+) -> std::cmp::Ordering {
+    match kind {
+        TypedArrayElementKind::BigInt64 => (left_bits as i64).cmp(&(right_bits as i64)),
+        TypedArrayElementKind::BigUint64 => left_bits.cmp(&right_bits),
+        TypedArrayElementKind::Int8 => (left_bits as u8 as i8).cmp(&(right_bits as u8 as i8)),
+        TypedArrayElementKind::Int16 => (left_bits as u16 as i16).cmp(&(right_bits as u16 as i16)),
+        TypedArrayElementKind::Int32 => (left_bits as u32 as i32).cmp(&(right_bits as u32 as i32)),
+        TypedArrayElementKind::Uint8 | TypedArrayElementKind::Uint8Clamped => {
+            (left_bits as u8).cmp(&(right_bits as u8))
+        }
+        TypedArrayElementKind::Uint16 => (left_bits as u16).cmp(&(right_bits as u16)),
+        TypedArrayElementKind::Uint32 => (left_bits as u32).cmp(&(right_bits as u32)),
+        TypedArrayElementKind::Float32 => compare_typed_array_float_values(
+            f64::from(f32::from_bits(left_bits as u32)),
+            f64::from(f32::from_bits(right_bits as u32)),
+        ),
+        TypedArrayElementKind::Float64 => {
+            compare_typed_array_float_values(f64::from_bits(left_bits), f64::from_bits(right_bits))
+        }
+    }
+}
+
+fn compare_typed_array_sort_elements<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    kind: TypedArrayElementKind,
+    compare_fn: Option<ObjectRef>,
+    left_bits: u64,
+    right_bits: u64,
+) -> Result<std::cmp::Ordering, Cx::Error> {
+    if let Some(compare_fn) = compare_fn {
+        let left = typed_array_storage_bits_to_value(cx.agent(), kind, left_bits);
+        let right = typed_array_storage_bits_to_value(cx.agent(), kind, right_bits);
+        return arrays::compare_array_sort_values(cx, Some(compare_fn), left, right);
+    }
+    Ok(compare_typed_array_default_elements(
+        kind, left_bits, right_bits,
+    ))
+}
+
+fn typed_array_reverse_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = typed_array_validated_record(cx, invocation.this_value())?;
+    let half_len = record.length() / 2;
+    let last_index = record.length().saturating_sub(1);
+    for lower in 0..half_len {
+        let upper = last_index - lower;
+        let lower_bits = typed_array_read_storage_bits(cx.agent(), record, lower)
+            .ok_or_else(|| type_error(cx))?;
+        let upper_bits = typed_array_read_storage_bits(cx.agent(), record, upper)
+            .ok_or_else(|| type_error(cx))?;
+        typed_array_write_storage_bits(cx, record, lower, upper_bits)?;
+        typed_array_write_storage_bits(cx, record, upper, lower_bits)?;
+    }
+    Ok(invocation.this_value())
+}
+
+fn typed_array_sort_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = typed_array_validated_record(cx, invocation.this_value())?;
+    let compare_fn = match invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined())
+    {
+        value if value.is_undefined() => None,
+        value => Some(cx.require_callable_object(value)?),
+    };
+    let mut elements = typed_array_snapshot_storage_bits(cx.agent(), record);
+    for i in 1..elements.len() {
+        let mut j = i;
+        while j > 0
+            && compare_typed_array_sort_elements(
+                cx,
+                record.kind(),
+                compare_fn,
+                elements[j - 1],
+                elements[j],
+            )? == std::cmp::Ordering::Greater
+        {
+            elements.swap(j - 1, j);
+            j -= 1;
+        }
+    }
+    if cx
+        .agent()
+        .backing_store_is_detached(record.backing_store())
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Ok(invocation.this_value());
+    }
+    for (index, bits) in elements.into_iter().enumerate() {
+        typed_array_write_storage_bits(cx, record, index, bits)?;
+    }
+    Ok(invocation.this_value())
+}
+
+fn typed_array_to_reversed_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = typed_array_validated_record(cx, invocation.this_value())?;
+    let length = record.length();
+    let (result_object, result_record) = typed_array_same_kind_create(cx, record.kind(), length)?;
+    let source = typed_array_snapshot_storage_bits(cx.agent(), record);
+    for (index, bits) in source.into_iter().rev().enumerate() {
+        typed_array_write_storage_bits(cx, result_record, index, bits)?;
+    }
+    Ok(Value::from_object_ref(result_object))
+}
+
+fn typed_array_to_sorted_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = typed_array_validated_record(cx, invocation.this_value())?;
+    let compare_fn = match invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined())
+    {
+        value if value.is_undefined() => None,
+        value => Some(cx.require_callable_object(value)?),
+    };
+    let length = record.length();
+    let (result_object, result_record) = typed_array_same_kind_create(cx, record.kind(), length)?;
+    let mut elements = typed_array_snapshot_storage_bits(cx.agent(), record);
+    for i in 1..elements.len() {
+        let mut j = i;
+        while j > 0
+            && compare_typed_array_sort_elements(
+                cx,
+                record.kind(),
+                compare_fn,
+                elements[j - 1],
+                elements[j],
+            )? == std::cmp::Ordering::Greater
+        {
+            elements.swap(j - 1, j);
+            j -= 1;
+        }
+    }
+    for (index, bits) in elements.into_iter().enumerate() {
+        typed_array_write_storage_bits(cx, result_record, index, bits)?;
+    }
+    Ok(Value::from_object_ref(result_object))
+}
+
+fn typed_array_with_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = typed_array_validated_record(cx, invocation.this_value())?;
+    let length = record.length();
+    let relative_index = to_integer_or_infinity_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let replacement_bits = typed_array_storage_bits_from_builtin_value(
+        cx,
+        record.kind(),
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let actual_index = if relative_index < 0.0 {
+        length as f64 + relative_index
+    } else {
+        relative_index
+    };
+    if !actual_index.is_finite() || actual_index < 0.0 || actual_index >= length as f64 {
+        return Err(range_error(cx));
+    }
+    let actual_index = usize::try_from(actual_index as u64).map_err(|_| range_error(cx))?;
+    let (result_object, result_record) = typed_array_same_kind_create(cx, record.kind(), length)?;
+    let source = typed_array_snapshot_storage_bits(cx.agent(), record);
+    for (index, mut bits) in source.into_iter().enumerate() {
+        if index == actual_index {
+            bits = replacement_bits;
+        }
+        typed_array_write_storage_bits(cx, result_record, index, bits)?;
+    }
+    Ok(Value::from_object_ref(result_object))
+}
+
+fn typed_array_fill_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = typed_array_this_record(cx, invocation.this_value())?;
+    if cx
+        .agent()
+        .backing_store_is_detached(record.backing_store())
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Err(type_error(cx));
+    }
+    let length = u64::try_from(record.length()).unwrap_or(u64::MAX);
+    let relative_start = to_integer_or_infinity_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let start = normalize_relative_index_u64(length, relative_start);
+    let end = match invocation.arguments().get(2).copied() {
+        Some(value) if !value.is_undefined() => {
+            let relative_end = to_integer_or_infinity_for_builtin(cx, value)?;
+            normalize_relative_index_u64(length, relative_end)
+        }
+        _ => length,
+    };
+    let fill_bits = typed_array_storage_bits_from_builtin_value(
+        cx,
+        record.kind(),
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    if cx
+        .agent()
+        .backing_store_is_detached(record.backing_store())
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Err(type_error(cx));
+    }
+    for index in start..end {
+        let index = usize::try_from(index).map_err(|_| range_error(cx))?;
+        typed_array_write_storage_bits(cx, record, index, fill_bits)?;
+    }
+    Ok(invocation.this_value())
+}
+
+fn typed_array_copy_within_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = typed_array_this_record(cx, invocation.this_value())?;
+    if cx
+        .agent()
+        .backing_store_is_detached(record.backing_store())
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Err(type_error(cx));
+    }
+    let length = u64::try_from(record.length()).unwrap_or(u64::MAX);
+    let relative_target = to_integer_or_infinity_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let to = normalize_relative_index_u64(length, relative_target);
+    let relative_start = to_integer_or_infinity_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let from = normalize_relative_index_u64(length, relative_start);
+    let final_index = match invocation.arguments().get(2).copied() {
+        Some(value) if !value.is_undefined() => {
+            let relative_end = to_integer_or_infinity_for_builtin(cx, value)?;
+            normalize_relative_index_u64(length, relative_end)
+        }
+        _ => length,
+    };
+    let count = final_index
+        .saturating_sub(from)
+        .min(length.saturating_sub(to));
+    if count == 0 {
+        return Ok(invocation.this_value());
+    }
+    if cx
+        .agent()
+        .backing_store_is_detached(record.backing_store())
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Err(type_error(cx));
+    }
+    let from_usize = usize::try_from(from).map_err(|_| range_error(cx))?;
+    let to_usize = usize::try_from(to).map_err(|_| range_error(cx))?;
+    let count_usize = usize::try_from(count).map_err(|_| range_error(cx))?;
+    let mut copied_bits = Vec::with_capacity(count_usize);
+    for offset in 0..count_usize {
+        let index = from_usize
+            .checked_add(offset)
+            .ok_or_else(|| range_error(cx))?;
+        let bits = typed_array_read_storage_bits(cx.agent(), record, index)
+            .ok_or_else(|| type_error(cx))?;
+        copied_bits.push(bits);
+    }
+    for (offset, bits) in copied_bits.into_iter().enumerate() {
+        let index = to_usize
+            .checked_add(offset)
+            .ok_or_else(|| range_error(cx))?;
+        typed_array_write_storage_bits(cx, record, index, bits)?;
+    }
+    Ok(invocation.this_value())
+}
+
+fn uint8_array_set_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = typed_array_this_record(cx, invocation.this_value())?;
+    let source = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let offset = to_index_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let offset = usize::try_from(offset).map_err(|_| range_error(cx))?;
+
+    if cx
+        .agent()
+        .backing_store_is_detached(record.backing_store())
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Err(type_error(cx));
+    }
+
+    if let Some(source_object) = source
+        .as_object_ref()
+        .filter(|object| cx.agent().objects().typed_array(*object).is_some())
+    {
+        let source_record = typed_array_this_record(cx, Value::from_object_ref(source_object))?;
+        if cx
+            .agent()
+            .backing_store_is_detached(source_record.backing_store())
+            .ok_or_else(|| type_error(cx))?
+        {
+            return Err(type_error(cx));
+        }
+        if offset > record.length()
+            || source_record.length() > record.length().saturating_sub(offset)
+        {
+            return Err(range_error(cx));
+        }
+        let mut values = Vec::with_capacity(source_record.length());
+        for index in 0..source_record.length() {
+            values.push(typed_array_read_element_value(
+                cx.agent(),
+                source_record,
+                index,
+            ));
+        }
+        for (index, value) in values.into_iter().enumerate() {
+            let bits = typed_array_storage_bits_from_builtin_value(cx, record.kind(), value)?;
+            let target_index = offset.checked_add(index).ok_or_else(|| range_error(cx))?;
+            typed_array_write_storage_bits(cx, record, target_index, bits)?;
+        }
+        return Ok(Value::undefined());
+    }
+
+    let source_object = cx.to_object_for_builtin_value(cx.builtin_realm(), source)?;
+    let source_length = array_like_length_u64(cx, source_object)?;
+    let source_length = usize::try_from(source_length).map_err(|_| range_error(cx))?;
+    if offset > record.length() || source_length > record.length().saturating_sub(offset) {
+        return Err(range_error(cx));
+    }
+    for index in 0..source_length {
+        let key = array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
+        let value = get_property_from_object(cx, source_object, key)?;
+        let bits = typed_array_storage_bits_from_builtin_value(cx, record.kind(), value)?;
+        if cx
+            .agent()
+            .backing_store_is_detached(record.backing_store())
+            .ok_or_else(|| type_error(cx))?
+        {
+            continue;
+        }
+        let target_index = offset.checked_add(index).ok_or_else(|| range_error(cx))?;
+        typed_array_write_storage_bits(cx, record, target_index, bits)?;
+    }
+    Ok(Value::undefined())
+}
+
+fn uint8_array_slice_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (object, record) = typed_array_validated_object_and_record(cx, invocation.this_value())?;
+    let source_length = u64::try_from(record.length()).unwrap_or(u64::MAX);
+    let start = normalize_relative_index_u64(
+        source_length,
+        to_integer_or_infinity_for_builtin(
+            cx,
+            invocation
+                .arguments()
+                .first()
+                .copied()
+                .unwrap_or(Value::undefined()),
+        )?,
+    );
+    let end = match invocation.arguments().get(1).copied() {
+        Some(value) if value.is_undefined() => source_length,
+        Some(value) => normalize_relative_index_u64(
+            source_length,
+            to_integer_or_infinity_for_builtin(cx, value)?,
+        ),
+        None => source_length,
+    };
+    let new_end = end.max(start);
+    let length = usize::try_from(new_end.saturating_sub(start)).map_err(|_| range_error(cx))?;
+    let start_index = usize::try_from(start).map_err(|_| range_error(cx))?;
+    let (result_object, result_record) =
+        typed_array_species_create(cx, object, record.kind(), length)?;
+    if length > 0
+        && cx
+            .agent()
+            .backing_store_is_detached(record.backing_store())
+            .ok_or_else(|| type_error(cx))?
+    {
+        return Err(type_error(cx));
+    }
+    for offset in 0..length {
+        let source_index = start_index
+            .checked_add(offset)
+            .ok_or_else(|| range_error(cx))?;
+        let value = typed_array_read_element_value(cx.agent(), record, source_index);
+        let bits = typed_array_storage_bits_from_builtin_value(cx, result_record.kind(), value)?;
+        typed_array_write_storage_bits(cx, result_record, offset, bits)?;
+    }
+    Ok(Value::from_object_ref(result_object))
+}
+
+fn uint8_array_subarray_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = typed_array_this_object(cx, invocation.this_value())?;
+    let record = typed_array_this_record(cx, invocation.this_value())?;
+    let source_length = u64::try_from(record.length()).unwrap_or(u64::MAX);
+    let start = normalize_relative_index_u64(
+        source_length,
+        to_integer_or_infinity_for_builtin(
+            cx,
+            invocation
+                .arguments()
+                .first()
+                .copied()
+                .unwrap_or(Value::undefined()),
+        )?,
+    );
+    let end = match invocation.arguments().get(1).copied() {
+        Some(value) if value.is_undefined() => source_length,
+        Some(value) => normalize_relative_index_u64(
+            source_length,
+            to_integer_or_infinity_for_builtin(cx, value)?,
+        ),
+        None => source_length,
+    };
+    let new_end = end.max(start);
+    let byte_offset = record
+        .byte_offset()
+        .checked_add(
+            usize::try_from(start)
+                .map_err(|_| range_error(cx))?
+                .checked_mul(record.kind().bytes_per_element())
+                .ok_or_else(|| range_error(cx))?,
+        )
+        .ok_or_else(|| range_error(cx))?;
+    let length = usize::try_from(new_end.saturating_sub(start)).map_err(|_| range_error(cx))?;
+    let arguments = [
+        Value::from_object_ref(record.viewed_array_buffer()),
+        length_value_u64(u64::try_from(byte_offset).unwrap_or(u64::MAX)),
+        length_value_u64(u64::try_from(length).unwrap_or(u64::MAX)),
+    ];
+    let (result_object, _) =
+        typed_array_species_create_with_arguments(cx, object, record.kind(), &arguments, None)?;
+    Ok(Value::from_object_ref(result_object))
+}

@@ -1,0 +1,350 @@
+use super::*;
+
+impl Vm {
+    pub(super) fn import_meta_builtin(
+        &mut self,
+        agent: &mut Agent,
+        caller_frame: FrameRecord,
+    ) -> VmResult<Value> {
+        let module_key = agent
+            .module_key_for_environment(caller_frame.lexical_env())
+            .ok_or(VmError::MissingModuleRecord)?;
+        let (cached_object, host_properties) = {
+            let record = agent
+                .module_record(&module_key)
+                .ok_or(VmError::MissingModuleRecord)?;
+            (
+                record.import_meta_object(),
+                record.import_meta_properties().cloned(),
+            )
+        };
+        if let Some(import_meta) = cached_object {
+            return Ok(Value::from_object_ref(import_meta));
+        }
+
+        let realm = agent
+            .realm(caller_frame.realm())
+            .ok_or(VmError::MissingRootShape(caller_frame.realm()))?;
+        let root_shape = realm
+            .root_shape()
+            .ok_or(VmError::MissingRootShape(caller_frame.realm()))?;
+        let import_meta = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        if let Some(host_properties) = host_properties {
+            for property in host_properties.properties {
+                let key = agent.atoms_mut().intern_collectible(&property.key);
+                let value = match property.value {
+                    ImportMetaValue::String(text) => {
+                        Value::from_string_ref(alloc_string(agent, &text, None))
+                    }
+                    ImportMetaValue::Boolean(value) => Value::from_bool(value),
+                    ImportMetaValue::Smi(value) => Value::from_smi(value),
+                    ImportMetaValue::Null => Value::null(),
+                };
+                object::ordinary_create_data_property(
+                    agent,
+                    import_meta,
+                    PropertyKey::from_atom(key),
+                    value,
+                    AllocationLifetime::Default,
+                )
+                .map_err(VmError::Abrupt)?;
+            }
+        } else {
+            let url = Value::from_string_ref(alloc_string(agent, module_key.as_str(), None));
+            let url_atom = agent.atoms_mut().intern_collectible("url");
+            object::ordinary_create_data_property(
+                agent,
+                import_meta,
+                PropertyKey::from_atom(url_atom),
+                url,
+                AllocationLifetime::Default,
+            )
+            .map_err(VmError::Abrupt)?;
+        }
+        let _ = agent.set_module_record_import_meta_object(&module_key, Some(import_meta));
+        Ok(Value::from_object_ref(import_meta))
+    }
+
+    pub(super) fn dynamic_import_builtin(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller_frame: FrameRecord,
+        arguments: &[Value],
+    ) -> VmResult<Value> {
+        let realm = caller_frame.realm();
+        let constructor = agent
+            .realm(realm)
+            .and_then(|realm| realm.intrinsics().promise())
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let capability = self.create_dynamic_import_capability(
+            agent,
+            host,
+            registry,
+            caller_frame,
+            constructor,
+        )?;
+        let promise = agent
+            .promise_capability(capability)
+            .and_then(|record| record.promise())
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let specifier = arguments.first().copied().unwrap_or(Value::undefined());
+        let options = arguments.get(1).copied().unwrap_or(Value::undefined());
+        let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
+
+        let outcome = (|| -> Result<Value, Value> {
+            let specifier = self
+                .to_primitive(
+                    agent,
+                    host,
+                    registry,
+                    caller_frame,
+                    specifier,
+                    ToPrimitiveHint::String,
+                )
+                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+            let specifier = self
+                .value_to_string_text(agent, specifier)
+                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+            let attributes = self
+                .normalize_dynamic_import_attributes(agent, host, registry, caller_frame, options)
+                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+            let request = ModuleSourceRequest {
+                specifier,
+                referrer: self.active_script_or_module_referrer(agent),
+                attributes,
+            };
+            let loaded = self
+                .load_module_graph_from_host(agent, realm_record, host, &request)
+                .map_err(|error| self.dynamic_import_module_error_value(agent, error))?;
+            let key = loaded.key().clone();
+            let module_env = self
+                .link_module_graph(agent, realm_record, &key)
+                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+            let _ = self
+                .evaluate_module_graph(agent, realm_record, &key, module_env, host, registry)
+                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+            let namespace = self
+                .module_namespace_object(agent, realm_record, &key)
+                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+            Ok(Value::from_object_ref(namespace))
+        })();
+
+        match outcome {
+            Ok(value) => {
+                self.enqueue_dynamic_import_settle_job(agent, realm, capability, value, false)
+            }
+            Err(reason) => {
+                self.enqueue_dynamic_import_settle_job(agent, realm, capability, reason, true)
+            }
+        }
+        Ok(Value::from_object_ref(promise))
+    }
+
+    fn create_dynamic_import_capability(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller_frame: FrameRecord,
+        constructor: ObjectRef,
+    ) -> VmResult<lyng_js_env::PromiseCapabilityId> {
+        let capability = agent.alloc_promise_capability();
+        let executor = self.allocate_builtin_function_object(
+            agent,
+            caller_frame.realm(),
+            promise_capability_executor_builtin(),
+        )?;
+        let _ = agent.alloc_promise_resolving_function(
+            executor,
+            lyng_js_env::PromiseResolvingFunctionRecord::new(
+                PromiseResolvingFunctionKind::CapabilityExecutor,
+                capability,
+            ),
+        );
+        let promise = self.construct_to_completion(
+            agent,
+            host,
+            registry,
+            caller_frame,
+            constructor,
+            &[Value::from_object_ref(executor)],
+            Some(constructor),
+        )?;
+        let _ = agent.set_promise_capability_promise(capability, promise);
+        if agent
+            .promise_capability(capability)
+            .is_none_or(|record| record.resolve().is_none() || record.reject().is_none())
+        {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        Ok(capability)
+    }
+
+    fn normalize_dynamic_import_attributes(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller_frame: FrameRecord,
+        options: Value,
+    ) -> VmResult<Vec<ModuleImportAttribute>> {
+        if options.is_undefined() {
+            return Ok(Vec::new());
+        }
+        let options_object = self.to_object_for_value(agent, caller_frame.realm(), options)?;
+        let with_key = PropertyKey::from_atom(agent.atoms_mut().intern_collectible("with"));
+        let with_value = self.get_property_from_object(
+            agent,
+            host,
+            registry,
+            caller_frame,
+            options_object,
+            Value::from_object_ref(options_object),
+            with_key,
+        )?;
+        if with_value.is_undefined() {
+            return Ok(Vec::new());
+        }
+        let attributes_object =
+            self.to_object_for_value(agent, caller_frame.realm(), with_value)?;
+        let keys = object::own_property_keys_in_context(
+            &mut VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame: caller_frame,
+            },
+            attributes_object,
+        )?;
+        let mut attributes = Vec::new();
+        for key in keys {
+            let enumerable = object::get_own_property_in_context(
+                &mut VmProxyBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    frame: caller_frame,
+                },
+                attributes_object,
+                key,
+            )?
+            .is_some_and(|descriptor| descriptor.enumerable() == Some(true));
+            if !enumerable {
+                continue;
+            }
+            let Some(attribute_key) = self.dynamic_import_attribute_key(agent, key) else {
+                continue;
+            };
+            let attribute_value = self.get_property_from_object(
+                agent,
+                host,
+                registry,
+                caller_frame,
+                attributes_object,
+                Value::from_object_ref(attributes_object),
+                key,
+            )?;
+            let attribute_value = self.to_primitive(
+                agent,
+                host,
+                registry,
+                caller_frame,
+                attribute_value,
+                ToPrimitiveHint::String,
+            )?;
+            let attribute_value = self.value_to_string_text(agent, attribute_value)?;
+            attributes.push(ModuleImportAttribute {
+                key: attribute_key,
+                value: attribute_value,
+            });
+        }
+        Ok(attributes)
+    }
+
+    fn dynamic_import_attribute_key(&self, agent: &Agent, key: PropertyKey) -> Option<String> {
+        if let Some(index) = key.as_index() {
+            return Some(index.to_string());
+        }
+        key.as_atom()
+            .map(|atom| agent.atoms().resolve(atom).to_owned())
+    }
+
+    pub(crate) fn active_script_or_module_referrer(&self, agent: &Agent) -> Option<ModuleKey> {
+        agent
+            .current_execution_context()
+            .and_then(|context| context.script_or_module_referrer())
+            .map(|atom| ModuleKey::new(agent.atoms().resolve(atom).to_owned().into_boxed_str()))
+    }
+
+    fn enqueue_dynamic_import_settle_job(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRef,
+        capability: lyng_js_env::PromiseCapabilityId,
+        value: Value,
+        rejected: bool,
+    ) {
+        let _ = agent.enqueue_job_with_payload(
+            lyng_js_host::HostJobKind::Promise,
+            lyng_js_env::ExecutableId::Builtin,
+            lyng_js_env::RuntimeJobPayload::DynamicImportSettle {
+                capability,
+                value,
+                rejected,
+            },
+            Some(realm),
+            Some("DynamicImportSettle".into()),
+        );
+    }
+
+    fn dynamic_import_module_error_value(
+        &self,
+        agent: &mut Agent,
+        error: crate::error::ModuleLoadError,
+    ) -> Value {
+        match error {
+            crate::error::ModuleLoadError::Vm(error) => {
+                self.dynamic_import_error_value(agent, error)
+            }
+            crate::error::ModuleLoadError::Host(error) => {
+                self.dynamic_import_host_error_value(agent, error)
+            }
+            crate::error::ModuleLoadError::Parse => {
+                Value::from_string_ref(alloc_string(agent, "dynamic import parse failure", None))
+            }
+            crate::error::ModuleLoadError::Sema => {
+                Value::from_string_ref(alloc_string(agent, "dynamic import semantic failure", None))
+            }
+            crate::error::ModuleLoadError::Lowering => {
+                Value::from_string_ref(alloc_string(agent, "dynamic import lowering failure", None))
+            }
+        }
+    }
+
+    fn dynamic_import_error_value(&self, agent: &mut Agent, error: VmError) -> Value {
+        match error {
+            VmError::Abrupt(completion) => completion.thrown_value().unwrap_or(Value::undefined()),
+            VmError::Host(error) => self.dynamic_import_host_error_value(agent, error),
+            other => Value::from_string_ref(alloc_string(agent, &format!("{other:?}"), None)),
+        }
+    }
+
+    fn dynamic_import_host_error_value(
+        &self,
+        agent: &mut Agent,
+        error: lyng_js_host::HostError,
+    ) -> Value {
+        Value::from_string_ref(alloc_string(agent, &error.to_string(), None))
+    }
+}

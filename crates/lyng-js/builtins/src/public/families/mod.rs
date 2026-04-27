@@ -7,6 +7,7 @@ mod errors;
 mod functions;
 mod globals;
 mod installed;
+mod intrinsics;
 mod iterators;
 mod json;
 mod modules;
@@ -14,6 +15,7 @@ mod object_reflection;
 mod objects;
 mod primitives;
 mod promises;
+mod prototype_links;
 mod regexp;
 mod scaffolding;
 mod strings;
@@ -32,10 +34,8 @@ pub(super) use date::date_builtin_object;
 pub(super) use errors::error_builtin_object;
 pub(super) use functions::function_builtin_object;
 pub(super) use globals::global_function_builtin_object;
-pub(super) use installed::{
-    install_public_realm_intrinsics, link_installed_family_prototypes, InstalledBuiltinFamilies,
-    PublicRealmPrototypeHandles,
-};
+pub(super) use installed::InstalledBuiltinFamilies;
+pub(super) use intrinsics::{install_public_realm_intrinsics, PublicRealmPrototypeHandles};
 pub(super) use iterators::iterator_builtin_object;
 pub(super) use json::json_builtin_object;
 pub(super) use modules::module_builtin_object;
@@ -43,6 +43,7 @@ pub(super) use object_reflection::object_reflection_builtin_object;
 pub(super) use objects::object_builtin_object;
 pub(super) use primitives::primitive_builtin_object;
 pub(super) use promises::promise_disposal_builtin_object;
+pub(super) use prototype_links::link_installed_family_prototypes;
 pub(super) use regexp::regexp_builtin_object;
 pub(super) use scaffolding::{
     allocate_public_realm_scaffolding, PublicRealmScaffolding, ScaffoldingRequest,

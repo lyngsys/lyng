@@ -3,9 +3,9 @@ mod families;
 mod metadata;
 mod temporal;
 
-pub use metadata::public_builtin_metadata;
+pub use metadata::{builtin_metadata, public_builtin_metadata};
 
-use crate::internal::{internal_builtin_metadata, InternalBuiltinCache, InternalRealmBuiltins};
+use crate::internal::{InternalBuiltinCache, InternalRealmBuiltins};
 use crate::BuiltinEntryMetadata;
 use lyng_js_common::WellKnownAtom;
 use lyng_js_env::Agent;
@@ -955,11 +955,6 @@ impl BuiltinCache {
 
         Some(builtins)
     }
-}
-
-#[inline]
-pub fn builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
-    public_builtin_metadata(entry).or_else(|| internal_builtin_metadata(entry))
 }
 
 pub(crate) fn allocate_builtin_ordinary_object(
