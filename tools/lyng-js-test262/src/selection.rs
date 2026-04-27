@@ -44,8 +44,6 @@ const UNSUPPORTED_FEATURES: &[&str] = &[
     "immutable-arraybuffer",
     "ShadowRealm",
     "iterator-helpers",
-    "Atomics.pause",
-    "Atomics.waitAsync",
 ];
 
 const PROPOSAL_FEATURE_STAGES: &[(&str, ProposalStage)] = &[

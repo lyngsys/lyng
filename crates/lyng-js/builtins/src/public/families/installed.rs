@@ -242,6 +242,7 @@ impl InstalledBuiltinFamilies {
             atomics_notify: binary_data_family.atomics_notify,
             atomics_wait: binary_data_family.atomics_wait,
             atomics_wait_async: binary_data_family.atomics_wait_async,
+            atomics_pause: binary_data_family.atomics_pause,
             atomics_is_lock_free: binary_data_family.atomics_is_lock_free,
             data_view_prototype: binary_data_family.data_view_prototype,
             data_view_buffer_getter: binary_data_family.data_view_buffer_getter,

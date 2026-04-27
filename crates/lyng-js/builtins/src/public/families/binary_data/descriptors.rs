@@ -158,6 +158,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
     let subarray_atom = agent.atoms_mut().intern("subarray");
     let wait_atom = agent.atoms_mut().intern("wait");
     let wait_async_atom = agent.atoms_mut().intern("waitAsync");
+    let pause_atom = agent.atoms_mut().intern("pause");
     let xor_atom = agent.atoms_mut().intern("xor");
     let buffer_descriptor_sets = buffers::descriptor_sets(
         builtins,
@@ -181,6 +182,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
             load: load_atom,
             notify: notify_atom,
             or: or_atom,
+            pause: pause_atom,
             store: store_atom,
             sub: sub_atom,
             wait: wait_atom,

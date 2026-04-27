@@ -439,6 +439,7 @@ pub(super) struct BinaryDataFamilyBuiltins {
     pub(super) atomics_notify: ObjectRef,
     pub(super) atomics_wait: ObjectRef,
     pub(super) atomics_wait_async: ObjectRef,
+    pub(super) atomics_pause: ObjectRef,
     pub(super) atomics_is_lock_free: ObjectRef,
     pub(super) data_view_prototype: ObjectRef,
     pub(super) data_view_buffer_getter: ObjectRef,

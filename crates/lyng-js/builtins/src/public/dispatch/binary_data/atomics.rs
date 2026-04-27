@@ -52,10 +52,31 @@ pub(super) fn dispatch_atomics_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::super::atomics_wait_async_builtin() {
         return atomics_wait_async_builtin(context, invocation).map(Some);
     }
+    if entry == super::super::atomics_pause_builtin() {
+        return atomics_pause_builtin(context, invocation).map(Some);
+    }
     if entry == super::super::atomics_is_lock_free_builtin() {
         return atomics_is_lock_free_builtin(context, invocation).map(Some);
     }
     Ok(None)
+}
+
+fn atomics_pause_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    if let Some(argument) = invocation.arguments().first().copied() {
+        if !argument.is_undefined() {
+            if !argument.is_number() {
+                return Err(type_error(cx));
+            }
+            let number = argument.as_f64().ok_or_else(|| type_error(cx))?;
+            if !number.is_finite() || number.fract() != 0.0 {
+                return Err(type_error(cx));
+            }
+        }
+    }
+    Ok(Value::undefined())
 }
 
 fn atomics_typed_array<Cx: PublicBuiltinDispatchContext>(
@@ -450,16 +471,12 @@ fn atomics_wait_async_builtin<Cx: PublicBuiltinDispatchContext>(
     let promise_constructor = promises::promise_default_constructor(cx)?;
     let capability = promises::new_promise_capability(cx, promise_constructor)?;
     let promise_object = promises::promise_capability_promise(cx, capability)?;
-    if timeout_ns.is_some() {
-        fulfill_wait_async_promise(cx, promise_object, "timed-out")?;
-    } else {
-        let location = shared_memory_ops::wait_location(record);
-        let agent_id = cx.agent().id();
-        let _ = cx.agent().park_async_shared_memory_waiter(
-            location,
-            AsyncWaiterRecord::new(agent_id, promise_object),
-        );
-    }
+    let location = shared_memory_ops::wait_location(record);
+    let agent_id = cx.agent().id();
+    let _ = cx.agent().park_async_shared_memory_waiter(
+        location,
+        AsyncWaiterRecord::new(agent_id, promise_object),
+    );
     wait_async_result_object(cx, true, Value::from_object_ref(promise_object))
 }
 

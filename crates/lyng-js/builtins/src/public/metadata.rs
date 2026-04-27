@@ -23,11 +23,11 @@ use lyng_js_types::{
     async_generator_function_builtin, async_generator_next_builtin, async_generator_return_builtin,
     async_generator_throw_builtin, atomics_add_builtin, atomics_and_builtin,
     atomics_compare_exchange_builtin, atomics_exchange_builtin, atomics_is_lock_free_builtin,
-    atomics_load_builtin, atomics_notify_builtin, atomics_or_builtin, atomics_store_builtin,
-    atomics_sub_builtin, atomics_wait_async_builtin, atomics_wait_builtin, atomics_xor_builtin,
-    big_int64_array_builtin, big_uint64_array_builtin, bigint_as_int_n_builtin,
-    bigint_as_uint_n_builtin, bigint_builtin, bigint_to_string_builtin, bigint_value_of_builtin,
-    boolean_builtin, boolean_to_string_builtin, boolean_value_of_builtin,
+    atomics_load_builtin, atomics_notify_builtin, atomics_or_builtin, atomics_pause_builtin,
+    atomics_store_builtin, atomics_sub_builtin, atomics_wait_async_builtin, atomics_wait_builtin,
+    atomics_xor_builtin, big_int64_array_builtin, big_uint64_array_builtin,
+    bigint_as_int_n_builtin, bigint_as_uint_n_builtin, bigint_builtin, bigint_to_string_builtin,
+    bigint_value_of_builtin, boolean_builtin, boolean_to_string_builtin, boolean_value_of_builtin,
     create_async_disposal_scope_builtin, create_sync_disposal_scope_builtin,
     data_view_buffer_getter_builtin, data_view_builtin, data_view_byte_length_getter_builtin,
     data_view_byte_offset_getter_builtin, data_view_get_float32_builtin,
@@ -1147,6 +1147,10 @@ mod tests {
             (
                 atomics_wait_async_builtin(),
                 BuiltinEntryMetadata::new("waitAsync", 4, false, false),
+            ),
+            (
+                atomics_pause_builtin(),
+                BuiltinEntryMetadata::new("pause", 0, false, false),
             ),
             (
                 atomics_is_lock_free_builtin(),

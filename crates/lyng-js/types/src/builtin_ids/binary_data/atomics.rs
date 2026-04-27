@@ -97,6 +97,14 @@ pub fn atomics_wait_async_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn atomics_pause_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ATOMICS_PAUSE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn atomics_is_lock_free_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(ATOMICS_IS_LOCK_FREE_RAW) {
         Some(id) => id,

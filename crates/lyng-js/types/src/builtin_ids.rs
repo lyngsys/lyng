@@ -726,6 +726,7 @@ const SET_SYMMETRIC_DIFFERENCE_RAW: u32 = 3_537;
 const SET_IS_SUBSET_OF_RAW: u32 = 3_538;
 const SET_IS_SUPERSET_OF_RAW: u32 = 3_539;
 const SET_IS_DISJOINT_FROM_RAW: u32 = 3_540;
+const ATOMICS_PAUSE_RAW: u32 = 3_541;
 const TEMPORAL_PLAIN_YEAR_MONTH_WITH_RAW: u32 = 3_454;
 const TEMPORAL_PLAIN_MONTH_DAY_WITH_RAW: u32 = 3_455;
 const TEMPORAL_PLAIN_DATE_ADD_RAW: u32 = 3_456;
@@ -796,7 +797,7 @@ pub const CORE_BUILTIN_NAMESPACE_END: u32 = ERROR_IS_ERROR_RAW;
 pub const COMPLETION_BUILTIN_NAMESPACE_START: u32 = PROMISE_RAW;
 
 /// Last reserved builtin-entry payload for the public completion builtin namespace.
-pub const COMPLETION_BUILTIN_NAMESPACE_END: u32 = SET_IS_DISJOINT_FROM_RAW;
+pub const COMPLETION_BUILTIN_NAMESPACE_END: u32 = ATOMICS_PAUSE_RAW;
 
 /// Returns whether a builtin ID falls inside the reserved internal helper namespace.
 #[inline]
