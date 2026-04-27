@@ -396,6 +396,9 @@ function getMethod(value, key) {
 }
 
 function toLength(value) {
+    if (typeof value === "bigint") {
+        throw new TypeError();
+    }
     let length = Number(value);
     if (length !== length || length <= 0) {
         return 0;
@@ -449,7 +452,7 @@ async function collectIterator(iterator, nextMethod, array, mapping, mapfn, this
         }
 
         let value = next.value;
-        if (syncIterator && isObject(value)) {
+        if (syncIterator || mapping) {
             try {
                 value = await value;
             } catch (error) {
@@ -468,12 +471,10 @@ async function collectIterator(iterator, nextMethod, array, mapping, mapfn, this
             } catch (error) {
                 await closeIterator(iterator, error);
             }
-            if (isObject(mapped)) {
-                try {
-                    mapped = await mapped;
-                } catch (error) {
-                    await closeIterator(iterator, error);
-                }
+            try {
+                mapped = await mapped;
+            } catch (error) {
+                await closeIterator(iterator, error);
             }
         }
 
@@ -520,14 +521,10 @@ const length = toLength(arrayLike.length);
 const array = constructor ? Reflect.construct(this, [length]) : new Array(length);
 for (let index = 0; index < length; index += 1) {
     let value = arrayLike[index];
-    if (isObject(value)) {
-        value = await value;
-    }
+    value = await value;
     if (mapping) {
         value = mapfn.call(thisArg, value, index);
-        if (isObject(value)) {
-            value = await value;
-        }
+        value = await value;
     }
     createDataProperty(array, index, value);
 }

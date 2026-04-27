@@ -217,6 +217,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.emit_load_undefined(value)?;
             value
         };
+        if self.current_function.is_some_and(|function| {
+            self.state.function_kind(function) == FunctionKind::AsyncGenerator
+        }) {
+            self.builder.emit_ax(Opcode::Await, i32::from(value))?;
+        }
         self.builder.emit_ax(Opcode::Yield, i32::from(value))?;
         self.emit_generator_resume_dispatch(dest)
     }

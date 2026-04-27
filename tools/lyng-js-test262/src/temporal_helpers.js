@@ -341,7 +341,13 @@ var TemporalHelpers = {};
       objectName = "";
     }
     if (typeof propertyName === "symbol") {
-      return objectName + "[" + String(propertyName) + "]";
+      if (Symbol.keyFor(propertyName) !== undefined) {
+        return objectName + "[Symbol.for('" + Symbol.keyFor(propertyName) + "')]";
+      }
+      if (propertyName.description.startsWith("Symbol.")) {
+        return objectName + "[" + propertyName.description + "]";
+      }
+      return objectName + "[Symbol('" + propertyName.description + "')]";
     }
     if (typeof propertyName === "string" && propertyName !== String(Number(propertyName))) {
       return objectName ? objectName + "." + propertyName : propertyName;

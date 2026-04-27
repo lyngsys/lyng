@@ -438,6 +438,28 @@ fn runner_passes_well_known_intrinsics_helper_smoke_test() {
 }
 
 #[test]
+fn runner_temporal_helper_formats_well_known_symbol_property_names() {
+    let root = make_temp_dir();
+    let entry_path = root.join("temporal-symbol-formatting.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r#"
+        /*---
+        includes: [temporalHelpers.js, compareArray.js]
+        ---*/
+        const calls = [];
+        const object = {};
+        TemporalHelpers.observeProperty(calls, object, Symbol.asyncIterator, 1, "items");
+        object[Symbol.asyncIterator];
+        assert.compareArray(calls, ["get items[Symbol.asyncIterator]"]);
+        "#,
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn runner_passes_well_known_intrinsics_harness_self_test() {
     let report = run_filtered_test("harness/wellKnownIntrinsicObjects.js");
     assert!(
