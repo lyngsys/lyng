@@ -140,7 +140,7 @@ struct IteratorDescriptorAtoms {
 impl IteratorDescriptorAtoms {
     fn new(agent: &mut Agent) -> Self {
         Self {
-            next: agent.atoms_mut().intern_collectible("next"),
+            next: agent.atoms_mut().intern("next"),
         }
     }
 }

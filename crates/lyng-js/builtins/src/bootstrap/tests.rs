@@ -1,5 +1,6 @@
 use super::*;
-use lyng_js_gc::AllocationLifetime;
+use lyng_js_common::{AtomId, AtomLifetime};
+use lyng_js_gc::{AllocationLifetime, AtomGcSweep};
 use lyng_js_host::NoopHostHooks;
 use lyng_js_types::{
     array_buffer_byte_length_getter_builtin, array_buffer_is_view_builtin,
@@ -23,6 +24,53 @@ use lyng_js_types::{
     uint8_array_values_builtin, weak_ref_deref_builtin, PropertyKey, Value,
 };
 
+fn assert_reachable_object_atom_keys_are_permanent(
+    agent: &Agent,
+    roots: &[ObjectRef],
+    atoms: &mut Vec<AtomId>,
+) {
+    let mut stack = roots.to_vec();
+    let mut visited = Vec::new();
+
+    while let Some(object) = stack.pop() {
+        if visited.contains(&object) {
+            continue;
+        }
+        visited.push(object);
+
+        let keys = agent
+            .objects()
+            .own_property_keys(agent.heap().view(), object)
+            .unwrap_or_else(|err| panic!("{object:?} own keys should be queryable: {err:?}"));
+
+        for key in keys {
+            if let PropertyKey::Atom(atom) = key {
+                let name = agent.atoms().get(atom).unwrap_or("<utf16>");
+                assert_eq!(
+                    agent.atoms().lifetime(atom),
+                    Some(AtomLifetime::Permanent),
+                    "{object:?}.{name} should be a permanent bootstrap atom",
+                );
+                atoms.push(atom);
+            }
+
+            let descriptor = agent
+                .objects()
+                .get_own_property(agent.heap().view(), object, key)
+                .unwrap_or_else(|err| panic!("{object:?} descriptor should be queryable: {err:?}"))
+                .unwrap_or_else(|| panic!("{object:?} descriptor should exist for {key:?}"));
+            for value in [descriptor.value(), descriptor.getter(), descriptor.setter()]
+                .into_iter()
+                .flatten()
+            {
+                if let Some(child) = value.as_object_ref() {
+                    stack.push(child);
+                }
+            }
+        }
+    }
+}
+
 fn own_descriptor(
     agent: &Agent,
     object: ObjectRef,
@@ -34,6 +82,98 @@ fn own_descriptor(
         .get_own_property(agent.heap().view(), object, key)
         .unwrap()
         .unwrap_or_else(|| panic!("{name} should be installed"))
+}
+
+#[test]
+fn bootstrap_atom_property_keys_are_permanent_after_sweep() {
+    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let mut cache = BuiltinCache::new();
+
+    let artifacts = bootstrap_default_realm(
+        agent,
+        &mut cache,
+        BootstrapRequest::new(BootstrapMode::SpecOnly),
+    )
+    .expect("spec bootstrap should succeed");
+    let intrinsics = agent
+        .realm(artifacts.realm())
+        .expect("default realm should exist")
+        .intrinsics();
+    let unscopables_symbol = agent
+        .well_known_symbol(WellKnownSymbolId::Unscopables)
+        .expect("Symbol.unscopables should exist");
+    let array_unscopables = own_descriptor(
+        agent,
+        intrinsics
+            .array_prototype()
+            .expect("Array.prototype intrinsic should exist"),
+        PropertyKey::from_symbol(unscopables_symbol),
+        "Array.prototype[Symbol.unscopables]",
+    )
+    .value()
+    .and_then(Value::as_object_ref)
+    .expect("Array.prototype[Symbol.unscopables] should be an object");
+
+    let roots = [
+        Some(artifacts.global_object()),
+        intrinsics.object(),
+        intrinsics.object_prototype(),
+        intrinsics.function(),
+        intrinsics.function_prototype(),
+        intrinsics.array(),
+        intrinsics.array_prototype(),
+        intrinsics.array_iterator_prototype(),
+        Some(array_unscopables),
+        intrinsics.map(),
+        intrinsics.map_prototype(),
+        intrinsics.set_prototype(),
+        intrinsics.weak_ref_prototype(),
+        intrinsics.json(),
+        intrinsics.reflect(),
+        intrinsics.regexp(),
+        intrinsics.regexp_prototype(),
+        intrinsics.date(),
+        intrinsics.date_prototype(),
+        intrinsics.number(),
+        intrinsics.math(),
+        intrinsics.bigint(),
+        intrinsics.symbol_prototype(),
+        intrinsics.string(),
+        intrinsics.string_prototype(),
+        intrinsics.string_iterator_prototype(),
+        intrinsics.promise(),
+        intrinsics.promise_prototype(),
+        intrinsics.disposable_stack_prototype(),
+        intrinsics.async_disposable_stack_prototype(),
+        intrinsics.array_buffer(),
+        intrinsics.array_buffer_prototype(),
+        intrinsics.data_view_prototype(),
+        intrinsics.atomics(),
+        intrinsics.typed_array(),
+        intrinsics.typed_array_prototype(),
+        intrinsics.uint8_array(),
+        intrinsics.uint8_array_prototype(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+    let mut retained_atoms = Vec::new();
+    assert_reachable_object_atom_keys_are_permanent(agent, &roots, &mut retained_atoms);
+
+    let _ = AtomGcSweep::new(agent.atoms_mut()).sweep();
+
+    for atom in retained_atoms {
+        assert_eq!(
+            agent.atoms().lifetime(atom),
+            Some(AtomLifetime::Permanent),
+            "bootstrap atom {atom:?} should stay permanent after sweep",
+        );
+        assert!(
+            agent.atoms().get(atom).is_some(),
+            "bootstrap atom {atom:?} should resolve after sweep",
+        );
+    }
 }
 
 #[test]

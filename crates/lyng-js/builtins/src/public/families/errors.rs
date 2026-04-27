@@ -235,7 +235,7 @@ struct ErrorDescriptorValues {
 impl ErrorDescriptorValues {
     fn new(agent: &mut Agent) -> Self {
         let bootstrap_atoms = agent.bootstrap_atoms();
-        let suppressed_error_name_atom = agent.atoms_mut().intern_collectible("SuppressedError");
+        let suppressed_error_name_atom = agent.atoms_mut().intern("SuppressedError");
 
         Self {
             message: bootstrap_atoms.message(),

@@ -5,11 +5,11 @@ pub(super) fn default_global_descriptors(
     artifacts: BootstrapArtifacts,
 ) -> [BuiltinPropertyDescriptor; 61] {
     let atoms = agent.bootstrap_atoms();
-    let reflect_atom = agent.atoms_mut().intern_collectible("Reflect");
-    let proxy_atom = agent.atoms_mut().intern_collectible("Proxy");
-    let suppressed_error_atom = agent.atoms_mut().intern_collectible("SuppressedError");
-    let disposable_stack_atom = agent.atoms_mut().intern_collectible("DisposableStack");
-    let async_disposable_stack_atom = agent.atoms_mut().intern_collectible("AsyncDisposableStack");
+    let reflect_atom = agent.atoms_mut().intern("Reflect");
+    let proxy_atom = agent.atoms_mut().intern("Proxy");
+    let suppressed_error_atom = agent.atoms_mut().intern("SuppressedError");
+    let disposable_stack_atom = agent.atoms_mut().intern("DisposableStack");
+    let async_disposable_stack_atom = agent.atoms_mut().intern("AsyncDisposableStack");
     let intrinsics = agent
         .realm(artifacts.realm())
         .map(RealmRecord::intrinsics)

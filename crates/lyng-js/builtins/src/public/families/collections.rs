@@ -464,20 +464,20 @@ impl CollectionDescriptorAtoms {
     fn new(agent: &mut Agent) -> Self {
         let atoms = agent.atoms_mut();
         Self {
-            add: atoms.intern_collectible("add"),
-            clear: atoms.intern_collectible("clear"),
-            delete: atoms.intern_collectible("delete"),
-            deref: atoms.intern_collectible("deref"),
-            entries: atoms.intern_collectible("entries"),
-            for_each: atoms.intern_collectible("forEach"),
-            get: atoms.intern_collectible("get"),
-            has: atoms.intern_collectible("has"),
-            keys: atoms.intern_collectible("keys"),
-            register: atoms.intern_collectible("register"),
-            set: atoms.intern_collectible("set"),
-            size: atoms.intern_collectible("size"),
-            unregister: atoms.intern_collectible("unregister"),
-            values: atoms.intern_collectible("values"),
+            add: atoms.intern("add"),
+            clear: atoms.intern("clear"),
+            delete: atoms.intern("delete"),
+            deref: atoms.intern("deref"),
+            entries: atoms.intern("entries"),
+            for_each: atoms.intern("forEach"),
+            get: atoms.intern("get"),
+            has: atoms.intern("has"),
+            keys: atoms.intern("keys"),
+            register: atoms.intern("register"),
+            set: atoms.intern("set"),
+            size: atoms.intern("size"),
+            unregister: atoms.intern("unregister"),
+            values: atoms.intern("values"),
         }
     }
 }

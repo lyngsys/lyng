@@ -324,27 +324,25 @@ struct PromiseDisposalDescriptorAtoms {
 impl PromiseDisposalDescriptorAtoms {
     fn new(agent: &mut Agent) -> Self {
         Self {
-            promise_tag: agent.atoms_mut().intern_collectible("Promise"),
-            all: agent.atoms_mut().intern_collectible("all"),
-            all_settled: agent.atoms_mut().intern_collectible("allSettled"),
-            any: agent.atoms_mut().intern_collectible("any"),
-            resolve: agent.atoms_mut().intern_collectible("resolve"),
-            reject: agent.atoms_mut().intern_collectible("reject"),
-            then: agent.atoms_mut().intern_collectible("then"),
-            catch: agent.atoms_mut().intern_collectible("catch"),
-            race: agent.atoms_mut().intern_collectible("race"),
-            finally: agent.atoms_mut().intern_collectible("finally"),
-            disposable_stack_tag: agent.atoms_mut().intern_collectible("DisposableStack"),
-            async_disposable_stack_tag: agent
-                .atoms_mut()
-                .intern_collectible("AsyncDisposableStack"),
-            adopt: agent.atoms_mut().intern_collectible("adopt"),
-            defer: agent.atoms_mut().intern_collectible("defer"),
-            dispose: agent.atoms_mut().intern_collectible("dispose"),
-            dispose_async: agent.atoms_mut().intern_collectible("disposeAsync"),
-            disposed: agent.atoms_mut().intern_collectible("disposed"),
-            move_method: agent.atoms_mut().intern_collectible("move"),
-            use_method: agent.atoms_mut().intern_collectible("use"),
+            promise_tag: agent.atoms_mut().intern("Promise"),
+            all: agent.atoms_mut().intern("all"),
+            all_settled: agent.atoms_mut().intern("allSettled"),
+            any: agent.atoms_mut().intern("any"),
+            resolve: agent.atoms_mut().intern("resolve"),
+            reject: agent.atoms_mut().intern("reject"),
+            then: agent.atoms_mut().intern("then"),
+            catch: agent.atoms_mut().intern("catch"),
+            race: agent.atoms_mut().intern("race"),
+            finally: agent.atoms_mut().intern("finally"),
+            disposable_stack_tag: agent.atoms_mut().intern("DisposableStack"),
+            async_disposable_stack_tag: agent.atoms_mut().intern("AsyncDisposableStack"),
+            adopt: agent.atoms_mut().intern("adopt"),
+            defer: agent.atoms_mut().intern("defer"),
+            dispose: agent.atoms_mut().intern("dispose"),
+            dispose_async: agent.atoms_mut().intern("disposeAsync"),
+            disposed: agent.atoms_mut().intern("disposed"),
+            move_method: agent.atoms_mut().intern("move"),
+            use_method: agent.atoms_mut().intern("use"),
         }
     }
 }

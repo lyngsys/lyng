@@ -1044,9 +1044,7 @@ pub(crate) fn allocate_builtin_function_object(
             AllocationLifetime::Default,
         )
     });
-    let display_name_atom = agent
-        .atoms_mut()
-        .intern_collectible(metadata.display_name());
+    let display_name_atom = agent.atoms_mut().intern(metadata.display_name());
     let display_name = Value::from_string_ref(agent.alloc_runtime_string(
         metadata.display_name(),
         Some(display_name_atom),

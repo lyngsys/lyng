@@ -448,11 +448,11 @@ impl InternalBuiltinCache {
             return None;
         }
 
-        let index_of = agent.atoms_mut().intern_collectible("indexOf");
-        let pop = agent.atoms_mut().intern_collectible("pop");
-        let push = agent.atoms_mut().intern_collectible("push");
-        let replace = agent.atoms_mut().intern_collectible("replace");
-        let has_own_property = agent.atoms_mut().intern_collectible("hasOwnProperty");
+        let index_of = agent.atoms_mut().intern("indexOf");
+        let pop = agent.atoms_mut().intern("pop");
+        let push = agent.atoms_mut().intern("push");
+        let replace = agent.atoms_mut().intern("replace");
+        let has_own_property = agent.atoms_mut().intern("hasOwnProperty");
 
         define_builtin_method(
             agent,
