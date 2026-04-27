@@ -66,7 +66,8 @@ use lyng_js_types::{
     is_finite_builtin, is_nan_builtin, iterator_prototype_iterator_builtin,
     json_is_raw_json_builtin, json_parse_builtin, json_raw_json_builtin, json_stringify_builtin,
     map_builtin, map_clear_builtin, map_delete_builtin, map_entries_builtin, map_for_each_builtin,
-    map_get_builtin, map_has_builtin, map_iterator_next_builtin, map_keys_builtin, map_set_builtin,
+    map_get_builtin, map_get_or_insert_builtin, map_get_or_insert_computed_builtin,
+    map_has_builtin, map_iterator_next_builtin, map_keys_builtin, map_set_builtin,
     map_size_getter_builtin, map_values_builtin, math_abs_builtin, math_acos_builtin,
     math_acosh_builtin, math_asin_builtin, math_asinh_builtin, math_atan2_builtin,
     math_atan_builtin, math_atanh_builtin, math_cbrt_builtin, math_ceil_builtin,
@@ -113,8 +114,10 @@ use lyng_js_types::{
     regexp_symbol_match_all_builtin, regexp_symbol_match_builtin, regexp_symbol_replace_builtin,
     regexp_symbol_search_builtin, regexp_symbol_split_builtin, regexp_test_builtin,
     regexp_to_string_builtin, regexp_unicode_getter_builtin, set_add_builtin, set_builtin,
-    set_clear_builtin, set_delete_builtin, set_entries_builtin, set_for_each_builtin,
-    set_has_builtin, set_iterator_next_builtin, set_keys_builtin, set_size_getter_builtin,
+    set_clear_builtin, set_delete_builtin, set_difference_builtin, set_entries_builtin,
+    set_for_each_builtin, set_has_builtin, set_intersection_builtin, set_is_disjoint_from_builtin,
+    set_is_subset_of_builtin, set_is_superset_of_builtin, set_iterator_next_builtin,
+    set_keys_builtin, set_size_getter_builtin, set_symmetric_difference_builtin, set_union_builtin,
     set_values_builtin, shared_array_buffer_builtin,
     shared_array_buffer_byte_length_getter_builtin, shared_array_buffer_slice_builtin,
     string_at_builtin, string_builtin, string_char_at_builtin, string_char_code_at_builtin,
@@ -148,7 +151,8 @@ use lyng_js_types::{
     uint8_array_entries_builtin, uint8_array_keys_builtin, uint8_array_length_getter_builtin,
     uint8_array_set_builtin, uint8_array_slice_builtin, uint8_array_subarray_builtin,
     uint8_array_values_builtin, uint8_clamped_array_builtin, uri_error_builtin, weak_map_builtin,
-    weak_map_delete_builtin, weak_map_get_builtin, weak_map_has_builtin, weak_map_set_builtin,
+    weak_map_delete_builtin, weak_map_get_builtin, weak_map_get_or_insert_builtin,
+    weak_map_get_or_insert_computed_builtin, weak_map_has_builtin, weak_map_set_builtin,
     weak_ref_builtin, weak_ref_deref_builtin, weak_set_add_builtin, weak_set_builtin,
     weak_set_delete_builtin, weak_set_has_builtin, BuiltinFunctionId,
 };
@@ -787,6 +791,14 @@ mod tests {
                 BuiltinEntryMetadata::new("get size", 0, false, false),
             ),
             (
+                map_get_or_insert_builtin(),
+                BuiltinEntryMetadata::new("getOrInsert", 2, false, false),
+            ),
+            (
+                map_get_or_insert_computed_builtin(),
+                BuiltinEntryMetadata::new("getOrInsertComputed", 2, false, false),
+            ),
+            (
                 set_add_builtin(),
                 BuiltinEntryMetadata::new("add", 1, false, false),
             ),
@@ -823,6 +835,34 @@ mod tests {
                 BuiltinEntryMetadata::new("get size", 0, false, false),
             ),
             (
+                set_union_builtin(),
+                BuiltinEntryMetadata::new("union", 1, false, false),
+            ),
+            (
+                set_intersection_builtin(),
+                BuiltinEntryMetadata::new("intersection", 1, false, false),
+            ),
+            (
+                set_difference_builtin(),
+                BuiltinEntryMetadata::new("difference", 1, false, false),
+            ),
+            (
+                set_symmetric_difference_builtin(),
+                BuiltinEntryMetadata::new("symmetricDifference", 1, false, false),
+            ),
+            (
+                set_is_subset_of_builtin(),
+                BuiltinEntryMetadata::new("isSubsetOf", 1, false, false),
+            ),
+            (
+                set_is_superset_of_builtin(),
+                BuiltinEntryMetadata::new("isSupersetOf", 1, false, false),
+            ),
+            (
+                set_is_disjoint_from_builtin(),
+                BuiltinEntryMetadata::new("isDisjointFrom", 1, false, false),
+            ),
+            (
                 weak_map_get_builtin(),
                 BuiltinEntryMetadata::new("get", 1, false, false),
             ),
@@ -837,6 +877,14 @@ mod tests {
             (
                 weak_map_delete_builtin(),
                 BuiltinEntryMetadata::new("delete", 1, false, false),
+            ),
+            (
+                weak_map_get_or_insert_builtin(),
+                BuiltinEntryMetadata::new("getOrInsert", 2, false, false),
+            ),
+            (
+                weak_map_get_or_insert_computed_builtin(),
+                BuiltinEntryMetadata::new("getOrInsertComputed", 2, false, false),
             ),
             (
                 weak_set_add_builtin(),

@@ -95,3 +95,19 @@ pub fn map_for_each_builtin() -> BuiltinFunctionId {
         None => unreachable!("builtin id should stay non-zero"),
     }
 }
+
+#[inline]
+pub fn map_get_or_insert_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(MAP_GET_OR_INSERT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn map_get_or_insert_computed_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(MAP_GET_OR_INSERT_COMPUTED_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
