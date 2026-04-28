@@ -8,31 +8,34 @@ use lyng_js_types::{
     atomics_xor_builtin, big_int64_array_builtin, big_uint64_array_builtin,
     data_view_buffer_getter_builtin, data_view_builtin, data_view_byte_length_getter_builtin,
     data_view_byte_offset_getter_builtin, data_view_get_big_int64_builtin,
-    data_view_get_big_uint64_builtin, data_view_get_float32_builtin, data_view_get_float64_builtin,
-    data_view_get_int16_builtin, data_view_get_int32_builtin, data_view_get_int8_builtin,
-    data_view_get_uint16_builtin, data_view_get_uint32_builtin, data_view_get_uint8_builtin,
-    data_view_set_big_int64_builtin, data_view_set_big_uint64_builtin,
-    data_view_set_float32_builtin, data_view_set_float64_builtin, data_view_set_int16_builtin,
-    data_view_set_int32_builtin, data_view_set_int8_builtin, data_view_set_uint16_builtin,
-    data_view_set_uint32_builtin, data_view_set_uint8_builtin, float32_array_builtin,
-    float64_array_builtin, int16_array_builtin, int32_array_builtin, int8_array_builtin,
-    shared_array_buffer_builtin, shared_array_buffer_byte_length_getter_builtin,
-    shared_array_buffer_slice_builtin, typed_array_at_builtin, typed_array_builtin,
-    typed_array_copy_within_builtin, typed_array_every_builtin, typed_array_fill_builtin,
-    typed_array_filter_builtin, typed_array_find_builtin, typed_array_find_index_builtin,
-    typed_array_find_last_builtin, typed_array_find_last_index_builtin,
-    typed_array_for_each_builtin, typed_array_from_builtin, typed_array_includes_builtin,
-    typed_array_index_of_builtin, typed_array_join_builtin, typed_array_last_index_of_builtin,
-    typed_array_map_builtin, typed_array_of_builtin, typed_array_reduce_builtin,
-    typed_array_reduce_right_builtin, typed_array_reverse_builtin, typed_array_some_builtin,
-    typed_array_sort_builtin, typed_array_to_locale_string_builtin,
+    data_view_get_big_uint64_builtin, data_view_get_float16_builtin, data_view_get_float32_builtin,
+    data_view_get_float64_builtin, data_view_get_int16_builtin, data_view_get_int32_builtin,
+    data_view_get_int8_builtin, data_view_get_uint16_builtin, data_view_get_uint32_builtin,
+    data_view_get_uint8_builtin, data_view_set_big_int64_builtin, data_view_set_big_uint64_builtin,
+    data_view_set_float16_builtin, data_view_set_float32_builtin, data_view_set_float64_builtin,
+    data_view_set_int16_builtin, data_view_set_int32_builtin, data_view_set_int8_builtin,
+    data_view_set_uint16_builtin, data_view_set_uint32_builtin, data_view_set_uint8_builtin,
+    float32_array_builtin, float64_array_builtin, int16_array_builtin, int32_array_builtin,
+    int8_array_builtin, shared_array_buffer_builtin,
+    shared_array_buffer_byte_length_getter_builtin, shared_array_buffer_slice_builtin,
+    typed_array_at_builtin, typed_array_builtin, typed_array_copy_within_builtin,
+    typed_array_every_builtin, typed_array_fill_builtin, typed_array_filter_builtin,
+    typed_array_find_builtin, typed_array_find_index_builtin, typed_array_find_last_builtin,
+    typed_array_find_last_index_builtin, typed_array_for_each_builtin, typed_array_from_builtin,
+    typed_array_includes_builtin, typed_array_index_of_builtin, typed_array_join_builtin,
+    typed_array_last_index_of_builtin, typed_array_map_builtin, typed_array_of_builtin,
+    typed_array_reduce_builtin, typed_array_reduce_right_builtin, typed_array_reverse_builtin,
+    typed_array_some_builtin, typed_array_sort_builtin, typed_array_to_locale_string_builtin,
     typed_array_to_reversed_builtin, typed_array_to_sorted_builtin, typed_array_to_string_builtin,
     typed_array_to_string_tag_getter_builtin, typed_array_with_builtin, uint16_array_builtin,
     uint32_array_builtin, uint8_array_buffer_getter_builtin, uint8_array_builtin,
     uint8_array_byte_length_getter_builtin, uint8_array_byte_offset_getter_builtin,
-    uint8_array_entries_builtin, uint8_array_keys_builtin, uint8_array_length_getter_builtin,
-    uint8_array_set_builtin, uint8_array_slice_builtin, uint8_array_subarray_builtin,
-    uint8_array_values_builtin, uint8_clamped_array_builtin, BuiltinFunctionId, ObjectRef,
+    uint8_array_entries_builtin, uint8_array_from_base64_builtin, uint8_array_from_hex_builtin,
+    uint8_array_keys_builtin, uint8_array_length_getter_builtin, uint8_array_set_builtin,
+    uint8_array_set_from_base64_builtin, uint8_array_set_from_hex_builtin,
+    uint8_array_slice_builtin, uint8_array_subarray_builtin, uint8_array_to_base64_builtin,
+    uint8_array_to_hex_builtin, uint8_array_values_builtin, uint8_clamped_array_builtin,
+    BuiltinFunctionId, ObjectRef,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -217,6 +220,12 @@ pub(in crate::public) fn binary_data_builtin_object(
     if entry == data_view_set_big_uint64_builtin() {
         return Some(builtins.data_view_set_big_uint64);
     }
+    if entry == data_view_get_float16_builtin() {
+        return Some(builtins.data_view_get_float16);
+    }
+    if entry == data_view_set_float16_builtin() {
+        return Some(builtins.data_view_set_float16);
+    }
     if entry == uint8_array_buffer_getter_builtin() {
         return Some(builtins.uint8_array_buffer_getter);
     }
@@ -246,6 +255,24 @@ pub(in crate::public) fn binary_data_builtin_object(
     }
     if entry == uint8_array_subarray_builtin() {
         return Some(builtins.uint8_array_subarray);
+    }
+    if entry == uint8_array_from_base64_builtin() {
+        return Some(builtins.uint8_array_from_base64);
+    }
+    if entry == uint8_array_from_hex_builtin() {
+        return Some(builtins.uint8_array_from_hex);
+    }
+    if entry == uint8_array_set_from_base64_builtin() {
+        return Some(builtins.uint8_array_set_from_base64);
+    }
+    if entry == uint8_array_set_from_hex_builtin() {
+        return Some(builtins.uint8_array_set_from_hex);
+    }
+    if entry == uint8_array_to_base64_builtin() {
+        return Some(builtins.uint8_array_to_base64);
+    }
+    if entry == uint8_array_to_hex_builtin() {
+        return Some(builtins.uint8_array_to_hex);
     }
     if entry == typed_array_every_builtin() {
         return Some(builtins.typed_array_every);

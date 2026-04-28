@@ -95,3 +95,51 @@ pub fn uint8_array_slice_builtin() -> BuiltinFunctionId {
         None => unreachable!("builtin id should stay non-zero"),
     }
 }
+
+#[inline]
+pub fn uint8_array_from_base64_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(UINT8_ARRAY_FROM_BASE64_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn uint8_array_from_hex_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(UINT8_ARRAY_FROM_HEX_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn uint8_array_set_from_base64_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(UINT8_ARRAY_SET_FROM_BASE64_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn uint8_array_set_from_hex_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(UINT8_ARRAY_SET_FROM_HEX_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn uint8_array_to_base64_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(UINT8_ARRAY_TO_BASE64_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn uint8_array_to_hex_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(UINT8_ARRAY_TO_HEX_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}

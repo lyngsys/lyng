@@ -16,9 +16,12 @@ use lyng_js_types::{
     typed_array_to_reversed_builtin, typed_array_to_sorted_builtin,
     typed_array_to_string_tag_getter_builtin, typed_array_with_builtin,
     uint8_array_buffer_getter_builtin, uint8_array_byte_length_getter_builtin,
-    uint8_array_byte_offset_getter_builtin, uint8_array_entries_builtin, uint8_array_keys_builtin,
-    uint8_array_length_getter_builtin, uint8_array_set_builtin, uint8_array_slice_builtin,
-    uint8_array_subarray_builtin, uint8_array_values_builtin, Value, WellKnownSymbolId,
+    uint8_array_byte_offset_getter_builtin, uint8_array_entries_builtin,
+    uint8_array_from_base64_builtin, uint8_array_from_hex_builtin, uint8_array_keys_builtin,
+    uint8_array_length_getter_builtin, uint8_array_set_builtin,
+    uint8_array_set_from_base64_builtin, uint8_array_set_from_hex_builtin,
+    uint8_array_slice_builtin, uint8_array_subarray_builtin, uint8_array_to_base64_builtin,
+    uint8_array_to_hex_builtin, uint8_array_values_builtin, Value, WellKnownSymbolId,
 };
 
 pub(super) struct TypedArrayDescriptorAtoms {
@@ -58,6 +61,12 @@ pub(super) struct TypedArrayDescriptorAtoms {
     pub(super) with: AtomId,
     pub(super) set: AtomId,
     pub(super) subarray: AtomId,
+    pub(super) from_base64: AtomId,
+    pub(super) from_hex: AtomId,
+    pub(super) set_from_base64: AtomId,
+    pub(super) set_from_hex: AtomId,
+    pub(super) to_base64: AtomId,
+    pub(super) to_hex: AtomId,
 }
 
 pub(super) struct TypedArrayDescriptorTags {
@@ -97,8 +106,8 @@ pub(super) struct TypedArrayDescriptorSets {
     pub(super) uint16_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
     pub(super) uint8_clamped_array_descriptors: [BuiltinPropertyDescriptor; 1],
     pub(super) uint8_clamped_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
-    pub(super) uint8_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) uint8_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) uint8_array_descriptors: [BuiltinPropertyDescriptor; 3],
+    pub(super) uint8_array_prototype_descriptors: [BuiltinPropertyDescriptor; 18],
 }
 
 #[allow(clippy::too_many_lines)]
@@ -144,6 +153,12 @@ pub(super) fn descriptor_sets(
         with: with_atom,
         set: set_atom,
         subarray: subarray_atom,
+        from_base64: from_base64_atom,
+        from_hex: from_hex_atom,
+        set_from_base64: set_from_base64_atom,
+        set_from_hex: set_from_hex_atom,
+        to_base64: to_base64_atom,
+        to_hex: to_hex_atom,
     } = atoms;
     let TypedArrayDescriptorTags {
         int8_array: int8_array_tag,
@@ -1279,11 +1294,23 @@ pub(super) fn descriptor_sets(
                 BuiltinAttributes::new(false, false, true),
             ),
         ],
-        uint8_array_descriptors: [BuiltinPropertyDescriptor::new(
-            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-            BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
-            BuiltinAttributes::new(false, false, false),
-        )],
+        uint8_array_descriptors: [
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+                BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
+                BuiltinAttributes::new(false, false, false),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(from_base64_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_from_base64_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(from_hex_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_from_hex_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+        ],
         uint8_array_prototype_descriptors: [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
@@ -1355,6 +1382,26 @@ pub(super) fn descriptor_sets(
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(subarray_atom),
                 BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_from_base64_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_from_base64_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(set_from_hex_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_from_hex_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_base64_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_to_base64_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(to_hex_atom),
+                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_to_hex_builtin()),
                 BuiltinAttributes::new(true, false, true),
             ),
             BuiltinPropertyDescriptor::new(

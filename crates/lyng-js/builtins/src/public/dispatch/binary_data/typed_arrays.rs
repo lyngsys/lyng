@@ -1,10 +1,12 @@
 mod access;
+mod base64_hex;
 mod construction;
 mod iteration;
 mod mutation;
 mod search;
 
 pub(super) use access::dispatch_typed_array_access_builtin;
+pub(super) use base64_hex::dispatch_uint8_array_base64_hex_builtin;
 pub(super) use construction::dispatch_typed_array_constructor_builtin;
 pub(super) use iteration::dispatch_typed_array_iteration_builtin;
 pub(super) use mutation::dispatch_typed_array_mutation_builtin;
