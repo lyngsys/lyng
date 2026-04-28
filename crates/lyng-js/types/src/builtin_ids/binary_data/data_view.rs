@@ -191,3 +191,19 @@ pub fn data_view_set_big_uint64_builtin() -> BuiltinFunctionId {
         None => unreachable!("builtin id should stay non-zero"),
     }
 }
+
+#[inline]
+pub fn data_view_get_float16_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(DATA_VIEW_GET_FLOAT16_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn data_view_set_float16_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(DATA_VIEW_SET_FLOAT16_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}

@@ -130,6 +130,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
     let with_atom = agent.atoms_mut().intern("with");
     let get_big_int64_atom = agent.atoms_mut().intern("getBigInt64");
     let get_big_uint64_atom = agent.atoms_mut().intern("getBigUint64");
+    let get_float16_atom = agent.atoms_mut().intern("getFloat16");
     let get_float32_atom = agent.atoms_mut().intern("getFloat32");
     let get_float64_atom = agent.atoms_mut().intern("getFloat64");
     let get_int16_atom = agent.atoms_mut().intern("getInt16");
@@ -149,6 +150,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
     let set_atom = agent.atoms_mut().intern("set");
     let set_big_int64_atom = agent.atoms_mut().intern("setBigInt64");
     let set_big_uint64_atom = agent.atoms_mut().intern("setBigUint64");
+    let set_float16_atom = agent.atoms_mut().intern("setFloat16");
     let set_float32_atom = agent.atoms_mut().intern("setFloat32");
     let set_float64_atom = agent.atoms_mut().intern("setFloat64");
     let set_int16_atom = agent.atoms_mut().intern("setInt16");
@@ -209,6 +211,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
             byte_offset: byte_offset_atom,
             get_big_int64: get_big_int64_atom,
             get_big_uint64: get_big_uint64_atom,
+            get_float16: get_float16_atom,
             get_float32: get_float32_atom,
             get_float64: get_float64_atom,
             get_int16: get_int16_atom,
@@ -219,6 +222,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
             get_uint8: get_uint8_atom,
             set_big_int64: set_big_int64_atom,
             set_big_uint64: set_big_uint64_atom,
+            set_float16: set_float16_atom,
             set_float32: set_float32_atom,
             set_float64: set_float64_atom,
             set_int16: set_int16_atom,

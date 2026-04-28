@@ -268,6 +268,8 @@ impl InstalledBuiltinFamilies {
             data_view_get_big_uint64: binary_data_family.data_view_get_big_uint64,
             data_view_set_big_int64: binary_data_family.data_view_set_big_int64,
             data_view_set_big_uint64: binary_data_family.data_view_set_big_uint64,
+            data_view_get_float16: binary_data_family.data_view_get_float16,
+            data_view_set_float16: binary_data_family.data_view_set_float16,
             typed_array_prototype: binary_data_family.typed_array_prototype,
             int8_array_prototype: binary_data_family.int8_array_prototype,
             int16_array_prototype: binary_data_family.int16_array_prototype,

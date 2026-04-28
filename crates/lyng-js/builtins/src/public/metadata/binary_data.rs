@@ -334,6 +334,14 @@ pub(super) const PUBLIC_BINARY_DATA_BUILTIN_METADATA: &[PublicBuiltinMetadataRow
         BuiltinEntryMetadata::new("setBigUint64", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        data_view_get_float16_builtin,
+        BuiltinEntryMetadata::new("getFloat16", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        data_view_set_float16_builtin,
+        BuiltinEntryMetadata::new("setFloat16", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         uint8_array_buffer_getter_builtin,
         BuiltinEntryMetadata::new("get buffer", 0, false, false),
     ),

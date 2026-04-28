@@ -478,6 +478,8 @@ pub(super) struct BinaryDataFamilyBuiltins {
     pub(super) data_view_get_big_uint64: ObjectRef,
     pub(super) data_view_set_big_int64: ObjectRef,
     pub(super) data_view_set_big_uint64: ObjectRef,
+    pub(super) data_view_get_float16: ObjectRef,
+    pub(super) data_view_set_float16: ObjectRef,
     pub(super) typed_array_prototype: ObjectRef,
     pub(super) int8_array_prototype: ObjectRef,
     pub(super) int16_array_prototype: ObjectRef,
