@@ -318,6 +318,22 @@ pub(super) const PUBLIC_BINARY_DATA_BUILTIN_METADATA: &[PublicBuiltinMetadataRow
         BuiltinEntryMetadata::new("setUint8", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        data_view_get_big_int64_builtin,
+        BuiltinEntryMetadata::new("getBigInt64", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        data_view_get_big_uint64_builtin,
+        BuiltinEntryMetadata::new("getBigUint64", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        data_view_set_big_int64_builtin,
+        BuiltinEntryMetadata::new("setBigInt64", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        data_view_set_big_uint64_builtin,
+        BuiltinEntryMetadata::new("setBigUint64", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         uint8_array_buffer_getter_builtin,
         BuiltinEntryMetadata::new("get buffer", 0, false, false),
     ),

@@ -1,10 +1,11 @@
 use super::{
-    length_value_u64, range_error, to_boolean_for_builtin, to_index_for_builtin,
-    to_number_for_builtin, to_uint32_for_builtin, to_uint8_for_builtin, type_error,
-    PublicBuiltinDispatchContext,
+    length_value_u64, range_error, to_bigint_for_builtin, to_boolean_for_builtin,
+    to_index_for_builtin, to_number_for_builtin, to_uint32_for_builtin, to_uint8_for_builtin,
+    type_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_gc::AllocationLifetime;
+use lyng_js_env::Agent;
+use lyng_js_gc::{AllocationLifetime, BigIntSign};
 use lyng_js_objects::{DataViewObjectData, ObjectAllocation, ObjectColdData, OrdinaryObjectData};
 use lyng_js_types::{BuiltinFunctionId, RealmRef, Value};
 
@@ -72,6 +73,18 @@ pub(super) fn dispatch_data_view_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == super::super::data_view_set_uint8_builtin() {
         return data_view_set_uint8_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::data_view_get_big_int64_builtin() {
+        return data_view_get_big_int64_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::data_view_get_big_uint64_builtin() {
+        return data_view_get_big_uint64_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::data_view_set_big_int64_builtin() {
+        return data_view_set_big_int64_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::data_view_set_big_uint64_builtin() {
+        return data_view_set_big_uint64_builtin(context, invocation).map(Some);
     }
     Ok(None)
 }
@@ -812,5 +825,159 @@ fn data_view_set_uint32_builtin<Cx: PublicBuiltinDispatchContext>(
         u64::from(value),
         little_endian,
     )?;
+    Ok(Value::undefined())
+}
+
+fn bigint_to_uint64_bits(agent: &Agent, value: Value) -> Option<u64> {
+    let bigint = value.as_bigint_ref()?;
+    let view = agent.heap().view().bigint_view(bigint)?;
+    let low = view.limb_at(0).unwrap_or(0);
+    Some(match view.sign() {
+        BigIntSign::NonNegative => low,
+        BigIntSign::Negative => 0_u64.wrapping_sub(low),
+    })
+}
+
+fn data_view_biguint64_value(agent: &mut Agent, bits: u64) -> Value {
+    let bigint = agent.heap_mut().mutator().alloc_bigint(
+        BigIntSign::NonNegative,
+        &[bits],
+        AllocationLifetime::Default,
+    );
+    Value::from_bigint_ref(bigint)
+}
+
+fn data_view_bigint64_value(agent: &mut Agent, bits: u64) -> Value {
+    let (sign, limbs) = if bits >> 63 == 0 {
+        (BigIntSign::NonNegative, [bits])
+    } else {
+        (BigIntSign::Negative, [bits.wrapping_neg()])
+    };
+    let bigint = agent
+        .heap_mut()
+        .mutator()
+        .alloc_bigint(sign, &limbs, AllocationLifetime::Default);
+    Value::from_bigint_ref(bigint)
+}
+
+fn data_view_get_big_int64_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = data_view_this_record(cx, invocation.this_value())?;
+    let index = data_view_checked_access(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let absolute_index = data_view_checked_byte_offset(cx, record, index, 8)?;
+    let little_endian = to_boolean_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let bits = data_view_read_unsigned(cx, record, absolute_index, 8, little_endian)?;
+    Ok(data_view_bigint64_value(cx.agent(), bits))
+}
+
+fn data_view_get_big_uint64_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = data_view_this_record(cx, invocation.this_value())?;
+    let index = data_view_checked_access(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let absolute_index = data_view_checked_byte_offset(cx, record, index, 8)?;
+    let little_endian = to_boolean_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let bits = data_view_read_unsigned(cx, record, absolute_index, 8, little_endian)?;
+    Ok(data_view_biguint64_value(cx.agent(), bits))
+}
+
+fn data_view_set_big_int64_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = data_view_this_record(cx, invocation.this_value())?;
+    let index = data_view_checked_access(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let bigint_value = to_bigint_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let bits = bigint_to_uint64_bits(cx.agent(), bigint_value).ok_or_else(|| type_error(cx))?;
+    let absolute_index = data_view_checked_byte_offset(cx, record, index, 8)?;
+    let little_endian = to_boolean_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .get(2)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    data_view_write_unsigned(cx, record, absolute_index, 8, bits, little_endian)?;
+    Ok(Value::undefined())
+}
+
+fn data_view_set_big_uint64_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let record = data_view_this_record(cx, invocation.this_value())?;
+    let index = data_view_checked_access(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let bigint_value = to_bigint_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let bits = bigint_to_uint64_bits(cx.agent(), bigint_value).ok_or_else(|| type_error(cx))?;
+    let absolute_index = data_view_checked_byte_offset(cx, record, index, 8)?;
+    let little_endian = to_boolean_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .get(2)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    data_view_write_unsigned(cx, record, absolute_index, 8, bits, little_endian)?;
     Ok(Value::undefined())
 }
