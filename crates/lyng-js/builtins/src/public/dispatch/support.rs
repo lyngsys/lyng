@@ -1594,14 +1594,15 @@ pub(super) fn to_length_for_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
 ) -> Result<usize, Cx::Error> {
+    const MAX_LENGTH: f64 = 9_007_199_254_740_991.0;
     let integer = to_integer_or_infinity_for_builtin(cx, value)?;
     if integer <= 0.0 {
         return Ok(0);
     }
     if !integer.is_finite() {
-        return Ok(usize::MAX);
+        return Ok(MAX_LENGTH as usize);
     }
-    Ok(integer.min(usize::MAX as f64) as usize)
+    Ok(integer.min(MAX_LENGTH).min(usize::MAX as f64) as usize)
 }
 
 pub(super) fn to_index_for_builtin<Cx: PublicBuiltinDispatchContext>(

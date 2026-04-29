@@ -418,6 +418,7 @@ pub enum OrdinaryObjectData {
     MapIterator,
     SetIterator,
     StringIterator,
+    RegExpStringIterator,
 }
 
 impl OrdinaryObjectData {
@@ -445,6 +446,7 @@ impl OrdinaryObjectData {
             Self::MapIterator => None,
             Self::SetIterator => None,
             Self::StringIterator => None,
+            Self::RegExpStringIterator => None,
         }
     }
 

@@ -1,7 +1,7 @@
 use super::descriptors::{
     accessor_atom_property, accessor_symbol_property, builtin_function_atom_property,
-    builtin_function_symbol_property, data_atom_property, readonly_builtin_attributes,
-    writable_builtin_attributes,
+    builtin_function_symbol_property, data_atom_property, data_symbol_property, descriptor_tag,
+    readonly_builtin_attributes, writable_builtin_attributes,
 };
 use super::{
     install_public_builtin_function, FamilyInstallContext, RegExpFamilyBuiltins,
@@ -19,10 +19,11 @@ use lyng_js_types::{
     regexp_flags_getter_builtin, regexp_global_getter_builtin, regexp_has_indices_getter_builtin,
     regexp_ignore_case_getter_builtin, regexp_multiline_getter_builtin,
     regexp_source_getter_builtin, regexp_species_getter_builtin, regexp_sticky_getter_builtin,
-    regexp_symbol_match_all_builtin, regexp_symbol_match_builtin, regexp_symbol_replace_builtin,
-    regexp_symbol_search_builtin, regexp_symbol_split_builtin, regexp_test_builtin,
-    regexp_to_string_builtin, regexp_unicode_getter_builtin, BuiltinFunctionId, ObjectRef,
-    RealmRef, Value, WellKnownSymbolId,
+    regexp_string_iterator_next_builtin, regexp_symbol_match_all_builtin,
+    regexp_symbol_match_builtin, regexp_symbol_replace_builtin, regexp_symbol_search_builtin,
+    regexp_symbol_split_builtin, regexp_test_builtin, regexp_to_string_builtin,
+    regexp_unicode_getter_builtin, regexp_unicode_sets_getter_builtin, BuiltinFunctionId,
+    ObjectRef, RealmRef, Value, WellKnownSymbolId,
 };
 
 pub(in crate::public) fn install_regexp_family(
@@ -55,6 +56,7 @@ pub(in crate::public) fn install_regexp_family(
         regexp_multiline_getter: flag_accessors.multiline,
         regexp_dot_all_getter: flag_accessors.dot_all,
         regexp_unicode_getter: flag_accessors.unicode,
+        regexp_unicode_sets_getter: flag_accessors.unicode_sets,
         regexp_sticky_getter: flag_accessors.sticky,
         regexp_source_getter: flag_accessors.source,
         regexp_flags_getter: flag_accessors.flags,
@@ -70,6 +72,12 @@ pub(in crate::public) fn install_regexp_family(
         regexp_symbol_search: symbol_methods.search,
         regexp_symbol_split: symbol_methods.split,
         regexp_symbol_match_all: symbol_methods.match_all,
+        regexp_string_iterator_next: install_public_builtin_function(
+            agent,
+            cx,
+            regexp_string_iterator_next_builtin(),
+            None,
+        ),
     }
 }
 
@@ -104,6 +112,10 @@ pub(in crate::public) fn regexp_builtin_object(
             builtins.regexp_unicode_getter,
         ),
         (
+            regexp_unicode_sets_getter_builtin(),
+            builtins.regexp_unicode_sets_getter,
+        ),
+        (
             regexp_sticky_getter_builtin(),
             builtins.regexp_sticky_getter,
         ),
@@ -134,6 +146,10 @@ pub(in crate::public) fn regexp_builtin_object(
             regexp_symbol_match_all_builtin(),
             builtins.regexp_symbol_match_all,
         ),
+        (
+            regexp_string_iterator_next_builtin(),
+            builtins.regexp_string_iterator_next,
+        ),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))
@@ -146,6 +162,7 @@ struct RegExpFlagAccessors {
     multiline: ObjectRef,
     dot_all: ObjectRef,
     unicode: ObjectRef,
+    unicode_sets: ObjectRef,
     sticky: ObjectRef,
     source: ObjectRef,
     flags: ObjectRef,
@@ -172,6 +189,12 @@ fn install_regexp_flag_accessors(
         ),
         dot_all: install_public_builtin_function(agent, cx, regexp_dot_all_getter_builtin(), None),
         unicode: install_public_builtin_function(agent, cx, regexp_unicode_getter_builtin(), None),
+        unicode_sets: install_public_builtin_function(
+            agent,
+            cx,
+            regexp_unicode_sets_getter_builtin(),
+            None,
+        ),
         sticky: install_public_builtin_function(agent, cx, regexp_sticky_getter_builtin(), None),
         source: install_public_builtin_function(agent, cx, regexp_source_getter_builtin(), None),
         flags: install_public_builtin_function(agent, cx, regexp_flags_getter_builtin(), None),
@@ -223,8 +246,16 @@ pub(in crate::public) fn install_regexp_family_descriptors(
     builtins: &PublicRealmBuiltins,
 ) -> Result<(), BuiltinBootstrapError> {
     let atoms = RegExpDescriptorAtoms::new(agent);
+    let regexp_string_iterator_tag = descriptor_tag(agent, "RegExp String Iterator");
     install_regexp_constructor_descriptors(agent, cache, realm, atoms)?;
-    install_regexp_prototype_descriptors(agent, cache, realm, builtins.regexp, atoms)
+    install_regexp_prototype_descriptors(agent, cache, realm, builtins.regexp, atoms)?;
+    install_regexp_string_iterator_prototype_descriptors(
+        agent,
+        cache,
+        realm,
+        atoms,
+        regexp_string_iterator_tag,
+    )
 }
 
 fn install_regexp_constructor_descriptors(
@@ -298,6 +329,30 @@ fn install_regexp_prototype_descriptors(
     )
 }
 
+fn install_regexp_string_iterator_prototype_descriptors(
+    agent: &mut Agent,
+    cache: &mut BuiltinCache,
+    realm: RealmRef,
+    atoms: RegExpDescriptorAtoms,
+    regexp_string_iterator_tag: Value,
+) -> Result<(), BuiltinBootstrapError> {
+    let descriptors = [
+        builtin_function_atom_property(atoms.next, regexp_string_iterator_next_builtin()),
+        data_symbol_property(
+            WellKnownSymbolId::ToStringTag,
+            regexp_string_iterator_tag,
+            readonly_builtin_attributes(),
+        ),
+    ];
+    install_intrinsic_descriptor_table(
+        agent,
+        cache,
+        realm,
+        BuiltinIntrinsic::RegExpStringIteratorPrototype,
+        &descriptors,
+    )
+}
+
 fn install_intrinsic_descriptor_table(
     agent: &mut Agent,
     cache: &mut BuiltinCache,
@@ -319,6 +374,7 @@ fn install_intrinsic_descriptor_table(
 #[derive(Clone, Copy)]
 struct RegExpDescriptorAtoms {
     escape: AtomId,
+    next: AtomId,
     exec: AtomId,
     test: AtomId,
     source: AtomId,
@@ -329,6 +385,7 @@ struct RegExpDescriptorAtoms {
     multiline: AtomId,
     dot_all: AtomId,
     unicode: AtomId,
+    unicode_sets: AtomId,
     sticky: AtomId,
 }
 
@@ -337,6 +394,7 @@ impl RegExpDescriptorAtoms {
         let bootstrap_atoms = agent.bootstrap_atoms();
         Self {
             escape: agent.atoms_mut().intern("escape"),
+            next: agent.atoms_mut().intern("next"),
             exec: agent.atoms_mut().intern("exec"),
             test: agent.atoms_mut().intern("test"),
             source: bootstrap_atoms.source(),
@@ -347,6 +405,7 @@ impl RegExpDescriptorAtoms {
             multiline: agent.atoms_mut().intern("multiline"),
             dot_all: agent.atoms_mut().intern("dotAll"),
             unicode: agent.atoms_mut().intern("unicode"),
+            unicode_sets: agent.atoms_mut().intern("unicodeSets"),
             sticky: agent.atoms_mut().intern("sticky"),
         }
     }
@@ -377,7 +436,7 @@ fn regexp_prototype_symbol_method_specs() -> [(WellKnownSymbolId, BuiltinFunctio
 
 fn regexp_prototype_accessor_specs(
     atoms: RegExpDescriptorAtoms,
-) -> [(AtomId, BuiltinFunctionId); 9] {
+) -> [(AtomId, BuiltinFunctionId); 10] {
     [
         (atoms.source, regexp_source_getter_builtin()),
         (atoms.flags, regexp_flags_getter_builtin()),
@@ -387,6 +446,7 @@ fn regexp_prototype_accessor_specs(
         (atoms.multiline, regexp_multiline_getter_builtin()),
         (atoms.dot_all, regexp_dot_all_getter_builtin()),
         (atoms.unicode, regexp_unicode_getter_builtin()),
+        (atoms.unicode_sets, regexp_unicode_sets_getter_builtin()),
         (atoms.sticky, regexp_sticky_getter_builtin()),
     ]
 }

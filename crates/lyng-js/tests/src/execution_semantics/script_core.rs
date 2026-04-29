@@ -399,6 +399,214 @@ fn phase6_string_match_all_returns_match_iterator() {
 }
 
 #[test]
+fn phase6_string_match_all_empty_pattern_visits_each_boundary() {
+    let result = compile_and_run_string(
+        r#"
+        let iterator = "a".matchAll(undefined);
+        let first = iterator.next();
+        let second = iterator.next();
+        let third = iterator.next();
+        function show(result) {
+            if (result.done) {
+                return "done";
+            }
+            return result.value[0].length + ":" + result.value.index;
+        }
+        [
+            show(first),
+            show(second),
+            third.done
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "0:0|0:1|true");
+}
+
+#[test]
+fn phase6_regexp_match_all_iterator_uses_late_bound_exec() {
+    let result = compile_and_run_string(
+        r#"
+        let iterator = /./g[Symbol.matchAll]("abc");
+        let calls = 0;
+        RegExp.prototype.exec = function(input) {
+            calls = calls + 1;
+            if (calls === 1) {
+                return ["xy"];
+            }
+            return null;
+        };
+        let first = iterator.next();
+        let second = iterator.next();
+        [
+            first.value[0],
+            first.done,
+            String(second.value),
+            second.done,
+            calls
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "xy|false|undefined|true|2");
+}
+
+#[test]
+fn phase6_regexp_search_uses_custom_exec_and_restores_last_index() {
+    let result = compile_and_run_string(
+        r#"
+        let lastIndexValue = 7;
+        let reads = 0;
+        let writes = 0;
+        let duringExec = -1;
+        let fake = {
+            get lastIndex() {
+                reads = reads + 1;
+                return lastIndexValue;
+            },
+            set lastIndex(value) {
+                writes = writes + 1;
+                lastIndexValue = value;
+            },
+            exec: function(input) {
+                duringExec = this.lastIndex;
+                this.lastIndex = 11;
+                return { index: 86 };
+            }
+        };
+        let result = RegExp.prototype[Symbol.search].call(fake, "abc");
+        [
+            result,
+            duringExec,
+            lastIndexValue,
+            reads,
+            writes
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "86|0|7|3|3");
+}
+
+#[test]
+fn phase6_regexp_match_uses_flags_and_custom_exec() {
+    let result = compile_and_run_string(
+        r#"
+        let calls = 0;
+        let fake = {
+            flags: "g",
+            lastIndex: 0,
+            exec: function(input) {
+                calls = calls + 1;
+                if (calls === 1) {
+                    return [""];
+                }
+                return null;
+            }
+        };
+        let matched = RegExp.prototype[Symbol.match].call(fake, "abc");
+        [
+            matched.length,
+            matched[0],
+            fake.lastIndex,
+            calls
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "1||1|2");
+}
+
+#[test]
+fn phase6_regexp_replace_uses_custom_exec_result_properties() {
+    let result = compile_and_run_string(
+        r#"
+        let calls = 0;
+        let fake = {
+            flags: "g",
+            lastIndex: 0,
+            exec: function(input) {
+                calls = calls + 1;
+                if (calls === 1) {
+                    return {
+                        length: 2,
+                        0: "b",
+                        1: "B",
+                        index: 1,
+                        groups: { name: "group" }
+                    };
+                }
+                return null;
+            }
+        };
+        RegExp.prototype[Symbol.replace].call(fake, "abc", function(match, capture, index, input, groups) {
+            return match + capture + index + input + groups.name;
+        });
+        "#,
+    );
+
+    assert_eq!(result, "abB1abcgroupc");
+}
+
+#[test]
+fn phase6_regexp_split_limit_zero_bails_before_matching() {
+    let result = compile_and_run_string(
+        r#"
+        let fake = {
+            constructor: function() {}
+        };
+        fake.constructor[Symbol.species] = function() {
+            throw new Error("species should not run");
+        };
+        let split = RegExp.prototype[Symbol.split].call(fake, "abc", 0);
+        [Array.isArray(split), split.length].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|0");
+}
+
+#[test]
+fn phase6_regexp_split_uses_species_sticky_exec_and_captures() {
+    let result = compile_and_run_string(
+        r#"
+        let rx = /x/i;
+        let sawPattern = false;
+        let sawFlags = "";
+        let calls = 0;
+        rx.constructor = function() {};
+        rx.constructor[Symbol.species] = function(pattern, flags) {
+            sawPattern = pattern === rx;
+            sawFlags = flags;
+            return {
+                lastIndex: 0,
+                exec: function(input) {
+                    calls = calls + 1;
+                    if (this.lastIndex === 1) {
+                        this.lastIndex = 2;
+                        return { length: 2, 0: "b", 1: "B" };
+                    }
+                    return null;
+                }
+            };
+        };
+        let split = RegExp.prototype[Symbol.split].call(rx, "abc", 5);
+        [
+            sawPattern,
+            sawFlags,
+            calls,
+            split.length,
+            split[0],
+            split[1],
+            split[2]
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|iy|3|3|a|B|c");
+}
+
+#[test]
 fn phase6_string_edge_cases_cover_remaining_text_failures() {
     let result = compile_and_run_string(
         r#"
@@ -3856,6 +4064,40 @@ fn script_core_supports_phase6_regexp_literals_and_constructor_state() {
 }
 
 #[test]
+fn script_core_regexp_constructor_reads_regexp_like_source_and_flags() {
+    let result = compile_and_run_string(
+        r#"
+        let regexpLike = {
+            source: "source text",
+            flags: "i"
+        };
+        regexpLike[Symbol.match] = true;
+        let fromLike = new RegExp(regexpLike);
+
+        let overrideFlags = {
+            source: "override text"
+        };
+        overrideFlags[Symbol.match] = true;
+        Object.defineProperty(overrideFlags, "flags", {
+            get: function() {
+                throw new Error("flags getter should not run");
+            }
+        });
+        let fromOverride = new RegExp(overrideFlags, "g");
+
+        [
+            fromLike.source,
+            fromLike.flags,
+            fromOverride.source,
+            fromOverride.flags
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "source text|i|override text|g");
+}
+
+#[test]
 fn script_core_supports_regexp_exec_test_and_flag_getters() {
     let result = compile_and_run(
         r#"
@@ -3905,8 +4147,10 @@ fn script_core_supports_regexp_source_flags_and_indices_getters() {
         let sourceDescriptor = Object.getOwnPropertyDescriptor(RegExp.prototype, "source");
         let flagsDescriptor = Object.getOwnPropertyDescriptor(RegExp.prototype, "flags");
         let hasIndicesDescriptor = Object.getOwnPropertyDescriptor(RegExp.prototype, "hasIndices");
+        let unicodeSetsDescriptor = Object.getOwnPropertyDescriptor(RegExp.prototype, "unicodeSets");
         let empty = new RegExp();
         let indexed = /(?<head>a)(b)?/d;
+        let unicodeSets = /./v;
         let match = indexed.exec("ac");
         let total = 0;
         total += (typeof sourceDescriptor.get === "function" ? 1 : 0);
@@ -3921,29 +4165,216 @@ fn script_core_supports_regexp_source_flags_and_indices_getters() {
         total += (match !== null && match.indices[1][0] === 0 && match.indices[1][1] === 1 ? 512 : 0);
         total += (match !== null && match.indices[2] === undefined ? 1024 : 0);
         total += (match !== null && match.indices.groups.head[0] === 0 && match.indices.groups.head[1] === 1 ? 2048 : 0);
+        total += (unicodeSetsDescriptor && typeof unicodeSetsDescriptor.get === "function" ? 4096 : 0);
+        total += (unicodeSets.unicodeSets === true && /./.unicodeSets === false ? 8192 : 0);
         total;
         "#,
     );
 
-    assert_eq!(result, Value::from_smi(4095));
+    assert_eq!(result, Value::from_smi(16383));
 }
 
 #[test]
-fn script_core_advances_unicode_zero_length_regexp_matches_by_code_point() {
+fn script_core_regexp_source_escapes_literal_delimiters() {
+    let result = compile_and_run_string(
+        r#"
+        let slash = new RegExp("/");
+        let newline = new RegExp("\n");
+        [slash.source, newline.source].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "\\/|\\n");
+}
+
+#[test]
+fn script_core_regexp_unknown_script_property_aliases_match_generated_sets() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            /^\p{Script=Unknown}+$/u.test(String.fromCodePoint(0x038B)),
+            /^\p{Script=Zzzz}+$/u.test(String.fromCodePoint(0x038B)),
+            /^\p{sc=Unknown}+$/u.test(String.fromCodePoint(0x038B)),
+            /^\p{sc=Zzzz}+$/u.test(String.fromCodePoint(0x038B)),
+            /^\P{Script=Unknown}+$/u.test(String.fromCodePoint(0x038C)),
+            /^\P{Script=Zzzz}+$/u.test(String.fromCodePoint(0x038C)),
+            /^\P{sc=Unknown}+$/u.test(String.fromCodePoint(0x038C)),
+            /^\P{sc=Zzzz}+$/u.test(String.fromCodePoint(0x038C)),
+            /^\p{Script_Extensions=Unknown}+$/u.test(String.fromCodePoint(0x038B)),
+            /^\p{Script_Extensions=Zzzz}+$/u.test(String.fromCodePoint(0x038B)),
+            /^\p{scx=Unknown}+$/u.test(String.fromCodePoint(0x038B)),
+            /^\p{scx=Zzzz}+$/u.test(String.fromCodePoint(0x038B)),
+            /^\P{Script_Extensions=Unknown}+$/u.test(String.fromCodePoint(0x038C)),
+            /^\P{Script_Extensions=Zzzz}+$/u.test(String.fromCodePoint(0x038C)),
+            /^\P{scx=Unknown}+$/u.test(String.fromCodePoint(0x038C)),
+            /^\P{scx=Zzzz}+$/u.test(String.fromCodePoint(0x038C)),
+            /^\p{Script=Unknown}+$/u.test(String.fromCharCode(0xDC00)),
+            /^\p{Script_Extensions=Unknown}+$/u.test(String.fromCharCode(0xDC00)),
+            /^\p{Script=Unknown}+$/u.test(String.fromCodePoint(0xE000)),
+            /^\p{Script_Extensions=Unknown}+$/u.test(String.fromCodePoint(0xE000))
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "true|true|true|true|true|true|true|true|true|true|true|true|true|true|true|true|true|true|true|true"
+    );
+}
+
+#[test]
+fn script_core_regexp_unicode_sets_exec_uses_unicode_aware_matching() {
+    let result = compile_and_run(
+        r#"
+        let text = String.fromCodePoint(0x20BB7) + "a" + String.fromCodePoint(0x20BB7);
+        let total = 0;
+
+        let literal = /\u{20BB7}/v.exec(text);
+        total += (literal && literal[0].length === 2 && literal.index === 0) ? 1 : 0;
+
+        let property = /\p{Script=Han}/v.exec(text);
+        total += (property && property[0].length === 2 && property.index === 0) ? 2 : 0;
+
+        let dot = /./v.exec(text);
+        total += (dot && dot[0].length === 2 && dot.index === 0) ? 4 : 0;
+
+        let ascii = /\p{ASCII}/v.exec(text);
+        total += (ascii && ascii[0] === "a" && ascii.index === 2) ? 8 : 0;
+
+        let groups = /(\p{Script=Han})(.)/v.exec(text);
+        total += (groups && groups[0].length === 3 && groups[1].length === 2 && groups[2] === "a" && groups.index === 0) ? 16 : 0;
+
+        let literalText = '𠮷a𠮷b𠮷';
+        let literalSource = /𠮷/v.exec(literalText);
+        total += (literalSource && literalSource[0].length === 2 && literalSource.index === 0) ? 32 : 0;
+
+        let miss = /x/v.exec(text);
+        total += (miss === null) ? 64 : 0;
+
+        let complexText = 'a\u{20BB7}b\u{10FFFF}c';
+        let nonAscii = /\P{ASCII}/v.exec(complexText);
+        total += (nonAscii && nonAscii[0].length === 2 && nonAscii.index === 1) ? 128 : 0;
+
+        let unicodeLiteral = /\u{20BB7}/u.exec(text);
+        total += (unicodeLiteral && unicodeLiteral[0].length === 2 && unicodeLiteral.index === 0) ? 256 : 0;
+
+        let unicodeProperty = /\p{Script=Han}/u.exec(text);
+        total += (unicodeProperty && unicodeProperty[0].length === 2 && unicodeProperty.index === 0) ? 512 : 0;
+
+        let unicodeDot = /./u.exec(text);
+        total += (unicodeDot && unicodeDot[0].length === 2 && unicodeDot.index === 0) ? 1024 : 0;
+
+        let unicodeGroups = /(\p{Script=Han})(.)/u.exec(text);
+        total += (unicodeGroups && unicodeGroups[0].length === 3 && unicodeGroups[1].length === 2 && unicodeGroups[2] === "a" && unicodeGroups.index === 0) ? 2048 : 0;
+
+        let unicodeNonAscii = /\P{ASCII}/u.exec(complexText);
+        total += (unicodeNonAscii && unicodeNonAscii[0].length === 2 && unicodeNonAscii.index === 1) ? 4096 : 0;
+
+        function doExec(regex) {
+            let result = regex.exec(text);
+            return result ? [result[0], result.index] : null;
+        }
+        function sameArray(a, b) {
+            if (a === null || b === null || a.length !== b.length) {
+                return false;
+            }
+            for (let i = 0; i < a.length; ++i) {
+                if (a[i] !== b[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        total += sameArray(doExec(/𠮷/v), ["𠮷", 0]) ? 8192 : 0;
+        total += sameArray(doExec(/\p{Script=Han}/v), ["𠮷", 0]) ? 16384 : 0;
+        total += sameArray(doExec(/./v), ["𠮷", 0]) ? 32768 : 0;
+        total += sameArray(doExec(/\p{ASCII}/v), ["a", 2]) ? 65536 : 0;
+        total += doExec(/x/v) === null ? 131072 : 0;
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(262143));
+}
+
+#[test]
+fn script_core_regexp_non_unicode_astral_named_groups_survive_backend_normalization() {
+    let result = compile_and_run_string(
+        r#"
+        let match = "fox dog".match(/(?<𝑓𝑜𝑥>fox).*(?<𝓓𝓸𝓰>dog)/);
+        match.groups.𝑓𝑜𝑥 + ":" + match.groups.𝓓𝓸𝓰;
+        "#,
+    );
+
+    assert_eq!(result, "fox:dog");
+}
+
+#[test]
+fn script_core_regexp_constructor_rejects_unicode_annex_b_identity_escape() {
+    let result = compile_and_run_string(
+        r#"
+        function isSyntaxCharacter(c) {
+            return "^$\\.*+?()[]{}|".indexOf(c) !== -1;
+        }
+        function isAlphaDigit(c) {
+            return ("0" <= c && c <= "9") ||
+                ("A" <= c && c <= "Z") ||
+                ("a" <= c && c <= "z");
+        }
+        let bad = "none";
+        for (let cu = 0; cu <= 0x7f && bad === "none"; ++cu) {
+            let s = String.fromCharCode(cu);
+            if (!isAlphaDigit(s) && !isSyntaxCharacter(s) && s !== "/") {
+                try {
+                    RegExp("\\" + s, "u");
+                    bad = "atom:" + cu;
+                } catch (error) {
+                    if (Object.getPrototypeOf(error) !== SyntaxError.prototype) {
+                        bad = "atom-other:" + cu;
+                    }
+                }
+            }
+        }
+        for (let cu = 0; cu <= 0x7f && bad === "none"; ++cu) {
+            let s = String.fromCharCode(cu);
+            if (!isAlphaDigit(s) && !isSyntaxCharacter(s) && s !== "/" && s !== "-") {
+                try {
+                    RegExp("[\\" + s + "]", "u");
+                    bad = "class:" + cu;
+                } catch (error) {
+                    if (Object.getPrototypeOf(error) !== SyntaxError.prototype) {
+                        bad = "class-other:" + cu;
+                    }
+                }
+            }
+        }
+        bad;
+        "#,
+    );
+
+    assert_eq!(result, "none");
+}
+
+#[test]
+fn script_core_regexp_exec_preserves_zero_length_last_index_at_match_end() {
     let result = compile_and_run(
         r#"
         let re = /(?:)/uy;
         let input = "\uD83D\uDE00a";
         let first = re.exec(input);
         let afterFirst = re.lastIndex;
+        re.lastIndex = 2;
         let second = re.exec(input);
         let afterSecond = re.lastIndex;
+        re.lastIndex = 3;
         let third = re.exec(input);
         let afterThird = re.lastIndex;
         let total = 0;
-        total += (first !== null && afterFirst === 2 ? 1 : 0);
-        total += (second !== null && afterSecond === 3 ? 2 : 0);
-        total += (third !== null && afterThird === 4 ? 4 : 0);
+        total += (first !== null && first.index === 0 && afterFirst === 0 ? 1 : 0);
+        total += (second !== null && second.index === 2 && afterSecond === 2 ? 2 : 0);
+        total += (third !== null && third.index === 3 && afterThird === 3 ? 4 : 0);
+        re.lastIndex = 4;
         let fourth = re.exec(input);
         total += (fourth === null && re.lastIndex === 0 ? 8 : 0);
         total;
@@ -3951,6 +4382,27 @@ fn script_core_advances_unicode_zero_length_regexp_matches_by_code_point() {
     );
 
     assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_regexp_match_all_advances_unicode_empty_matches_by_code_point() {
+    let result = compile_and_run_string(
+        r#"
+        let iterator = /(?:)/gu[Symbol.matchAll]("\uD83D\uDE00a");
+        let first = iterator.next();
+        let second = iterator.next();
+        let third = iterator.next();
+        let fourth = iterator.next();
+        [
+            first.value.index,
+            second.value.index,
+            third.value.index,
+            fourth.done
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "0|2|3|true");
 }
 
 #[test]

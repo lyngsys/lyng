@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::regexp_tables::is_valid_unicode_property_escape;
 
@@ -21,6 +21,18 @@ enum ClassAtomKind {
     Set,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct AlternativePath {
+    segments: Vec<(usize, usize)>,
+}
+
+impl AlternativePath {
+    fn conflicts_with(&self, other: &Self) -> bool {
+        let common = self.segments.len().min(other.segments.len());
+        self.segments[..common] == other.segments[..common]
+    }
+}
+
 #[derive(Clone, Copy)]
 struct RegExpFlags {
     unicode: bool,
@@ -35,6 +47,8 @@ pub fn validate_regexp_literal(pattern: &str, flags: &str) -> Result<(), &'stati
 
 fn validate_flags(flags: &str) -> Result<RegExpFlags, &'static str> {
     let mut seen = HashSet::new();
+    let mut saw_unicode_flag = false;
+    let mut saw_unicode_sets_flag = false;
     let mut parsed = RegExpFlags {
         unicode: false,
         unicode_sets: false,
@@ -48,11 +62,16 @@ fn validate_flags(flags: &str) -> Result<RegExpFlags, &'static str> {
             return Err("duplicate regular expression flags");
         }
         if ch == 'u' {
+            saw_unicode_flag = true;
             parsed.unicode = true;
         } else if ch == 'v' {
+            saw_unicode_sets_flag = true;
             parsed.unicode = true;
             parsed.unicode_sets = true;
         }
+    }
+    if saw_unicode_flag && saw_unicode_sets_flag {
+        return Err("invalid regular expression flags");
     }
 
     Ok(parsed)
@@ -108,6 +127,8 @@ fn validate_pattern(
     total_captures: usize,
 ) -> Result<(), &'static str> {
     let chars: Vec<char> = pattern.chars().collect();
+    validate_duplicate_named_groups(&chars)?;
+
     let mut i = 0;
     let mut last_atom = AtomKind::None;
     let mut groups = Vec::new();
@@ -128,6 +149,7 @@ fn validate_pattern(
                     &chars,
                     i,
                     flags,
+                    false,
                     false,
                     total_captures,
                     &all_named_groups,
@@ -217,6 +239,7 @@ fn parse_group_start(
     match chars.get(start + 2) {
         Some(':') => Ok((start + 3, GroupKind::Atom)),
         Some('=') | Some('!') => Ok((start + 3, GroupKind::Assertion)),
+        Some('i' | 'm' | 's' | '-') => parse_modifier_group_start(chars, start),
         Some('<') => match chars.get(start + 3) {
             Some('=') | Some('!') => Ok((start + 4, GroupKind::Assertion)),
             _ => {
@@ -235,15 +258,60 @@ fn parse_group_start(
                 let Some(name) = parse_group_name_contents(&chars[start + 3..end]) else {
                     return Err("invalid regular expression pattern");
                 };
-                if !named_groups.insert(name) {
-                    return Err("invalid regular expression pattern");
-                }
+                named_groups.insert(name);
 
                 Ok((end + 1, GroupKind::Atom))
             }
         },
         _ => Ok((start + 1, GroupKind::Atom)),
     }
+}
+
+fn parse_modifier_group_start(
+    chars: &[char],
+    start: usize,
+) -> Result<(usize, GroupKind), &'static str> {
+    let mut index = start + 2;
+    let mut seen_hyphen = false;
+    let mut saw_flag = false;
+    let mut ignore_case = None;
+    let mut multiline = None;
+    let mut dot_all = None;
+
+    while let Some(&ch) = chars.get(index) {
+        match ch {
+            'i' | 'm' | 's' => {
+                let enabled = !seen_hyphen;
+                let slot = match ch {
+                    'i' => &mut ignore_case,
+                    'm' => &mut multiline,
+                    's' => &mut dot_all,
+                    _ => unreachable!(),
+                };
+                if slot.replace(enabled).is_some() {
+                    return Err("invalid regular expression pattern");
+                }
+                saw_flag = true;
+            }
+            '-' => {
+                if seen_hyphen {
+                    return Err("invalid regular expression pattern");
+                }
+                seen_hyphen = true;
+            }
+            ':' => {
+                if !saw_flag {
+                    return Err("invalid regular expression pattern");
+                }
+                return Ok((index + 1, GroupKind::Atom));
+            }
+            _ => return Err("invalid regular expression pattern"),
+        }
+
+        index += 1;
+    }
+
+    Err("invalid regular expression pattern")
 }
 
 fn parse_braced_quantifier(chars: &[char], start: usize) -> Option<(usize, bool)> {
@@ -291,16 +359,33 @@ fn parse_character_class(
     let mut i = start + 1;
     let mut prev_atom = None;
     let mut pending_range_left = None;
+    let mut pending_operator = false;
     let mut first = true;
+    let mut class_complemented = false;
 
     if chars.get(i) == Some(&'^') {
+        class_complemented = true;
         i += 1;
         first = false;
     }
 
     while i < chars.len() {
         if chars[i] == ']' && (!first || !has_unescaped_class_closer(chars, i + 1)) {
+            if pending_operator {
+                return Err("invalid regular expression pattern");
+            }
             return Ok(i + 1);
+        }
+
+        if flags.unicode_sets && is_class_set_operator(chars, i) {
+            if prev_atom.is_none() || pending_range_left.is_some() {
+                return Err("invalid regular expression pattern");
+            }
+            prev_atom = None;
+            pending_operator = true;
+            i += 2;
+            first = false;
+            continue;
         }
 
         if chars[i] == '-' && prev_atom.is_some() && chars.get(i + 1) != Some(&']') {
@@ -310,19 +395,28 @@ fn parse_character_class(
             continue;
         }
 
-        let (next, atom_kind) = if chars[i] == '\\' {
+        let (next, atom_kind) = if flags.unicode_sets && chars[i] == '[' {
+            (
+                parse_character_class(chars, i, flags, total_captures, all_named_groups)?,
+                ClassAtomKind::Set,
+            )
+        } else if chars[i] == '\\' {
             let mut named_references = Vec::new();
             parse_escape(
                 chars,
                 i,
                 flags,
                 true,
+                class_complemented,
                 total_captures,
                 all_named_groups,
                 &mut named_references,
             )?
         } else {
             if is_line_terminator(chars[i]) {
+                return Err("invalid regular expression pattern");
+            }
+            if flags.unicode_sets && is_unescaped_class_set_reserved_syntax(chars, i) {
                 return Err("invalid regular expression pattern");
             }
             (i + 1, ClassAtomKind::Single)
@@ -337,6 +431,7 @@ fn parse_character_class(
         }
 
         prev_atom = Some(atom_kind);
+        pending_operator = false;
         i = next;
         first = false;
     }
@@ -344,11 +439,68 @@ fn parse_character_class(
     Err("invalid regular expression pattern")
 }
 
+fn is_class_set_operator(chars: &[char], index: usize) -> bool {
+    matches!(
+        (chars.get(index), chars.get(index + 1)),
+        (Some('&'), Some('&')) | (Some('-'), Some('-'))
+    )
+}
+
+fn is_unescaped_class_set_reserved_syntax(chars: &[char], index: usize) -> bool {
+    let Some(&ch) = chars.get(index) else {
+        return false;
+    };
+
+    if is_class_set_syntax_character(ch) || is_class_set_reserved_punctuator(ch) {
+        return true;
+    }
+
+    chars
+        .get(index + 1)
+        .is_some_and(|&next| next == ch && is_class_set_reserved_double_punctuator(ch))
+}
+
+fn is_class_set_syntax_character(ch: char) -> bool {
+    matches!(ch, '(' | ')' | '[' | '{' | '}' | '/' | '-' | '|')
+}
+
+fn is_class_set_reserved_punctuator(ch: char) -> bool {
+    matches!(
+        ch,
+        '&' | '!' | '#' | '%' | ',' | ':' | ';' | '<' | '=' | '>' | '@' | '`' | '~'
+    )
+}
+
+fn is_class_set_reserved_double_punctuator(ch: char) -> bool {
+    matches!(
+        ch,
+        '!' | '#'
+            | '$'
+            | '%'
+            | '&'
+            | '*'
+            | '+'
+            | ','
+            | '.'
+            | ':'
+            | ';'
+            | '<'
+            | '='
+            | '>'
+            | '?'
+            | '@'
+            | '^'
+            | '`'
+            | '~'
+    )
+}
+
 fn parse_escape(
     chars: &[char],
     start: usize,
     flags: RegExpFlags,
     in_class: bool,
+    class_complemented: bool,
     total_captures: usize,
     all_named_groups: &HashSet<String>,
     named_references: &mut Vec<String>,
@@ -371,6 +523,7 @@ fn parse_escape(
         }
         'd' | 'D' | 's' | 'S' | 'w' | 'W' => Ok((start + 2, ClassAtomKind::Set)),
         'f' | 'n' | 'r' | 't' | 'v' => Ok((start + 2, ClassAtomKind::Single)),
+        'q' if in_class && flags.unicode_sets => parse_class_string_disjunction(chars, start),
         'c' => {
             let Some(control) = chars.get(start + 2) else {
                 return Err("invalid regular expression pattern");
@@ -441,7 +594,12 @@ fn parse_escape(
                 return Err("invalid regular expression pattern");
             }
             let body: String = chars[start + 3..end].iter().collect();
-            if !is_valid_unicode_property_escape(&body, flags.unicode_sets, ch == 'P', in_class) {
+            if !is_valid_unicode_property_escape(
+                &body,
+                flags.unicode_sets,
+                ch == 'P',
+                in_class && class_complemented,
+            ) {
                 return Err("invalid regular expression pattern");
             }
             Ok((end + 1, ClassAtomKind::Set))
@@ -453,6 +611,32 @@ fn parse_escape(
             Ok((start + 2, ClassAtomKind::Single))
         }
     }
+}
+
+fn parse_class_string_disjunction(
+    chars: &[char],
+    start: usize,
+) -> Result<(usize, ClassAtomKind), &'static str> {
+    if chars.get(start + 2) != Some(&'{') {
+        return Err("invalid regular expression pattern");
+    }
+
+    let mut index = start + 3;
+    while index < chars.len() {
+        match chars[index] {
+            '}' => return Ok((index + 1, ClassAtomKind::Set)),
+            '\\' => {
+                if chars.get(index + 1).is_none() {
+                    return Err("invalid regular expression pattern");
+                }
+                index += 2;
+            }
+            ch if is_line_terminator(ch) => return Err("invalid regular expression pattern"),
+            _ => index += 1,
+        }
+    }
+
+    Err("invalid regular expression pattern")
 }
 
 fn parse_unicode_escape(
@@ -493,6 +677,95 @@ fn parse_unicode_escape(
         }
         Ok((start + 6, ClassAtomKind::Single))
     }
+}
+
+fn validate_duplicate_named_groups(chars: &[char]) -> Result<(), &'static str> {
+    let mut i = 0;
+    let mut paren_depth = 0usize;
+    let mut alt_indices = HashMap::from([(0usize, 0usize)]);
+    let mut locations: HashMap<String, Vec<AlternativePath>> = HashMap::new();
+
+    while i < chars.len() {
+        match chars[i] {
+            '\\' => i += 2,
+            '[' => {
+                i += 1;
+                while i < chars.len() {
+                    match chars[i] {
+                        '\\' => i += 2,
+                        ']' => {
+                            i += 1;
+                            break;
+                        }
+                        _ => i += 1,
+                    }
+                }
+            }
+            '(' => {
+                if let Some((end, name)) = named_capture_group_at(chars, i) {
+                    let segments = (0..=paren_depth)
+                        .map(|depth| (depth, *alt_indices.get(&depth).unwrap_or(&0)))
+                        .collect();
+                    locations
+                        .entry(name)
+                        .or_default()
+                        .push(AlternativePath { segments });
+                    i = end;
+                } else {
+                    i += 1;
+                }
+                paren_depth += 1;
+                alt_indices.insert(paren_depth, 0);
+            }
+            ')' => {
+                if paren_depth > 0 {
+                    alt_indices.remove(&paren_depth);
+                    paren_depth -= 1;
+                }
+                i += 1;
+            }
+            '|' => {
+                *alt_indices.entry(paren_depth).or_insert(0) += 1;
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+
+    for paths in locations.values() {
+        for index in 0..paths.len() {
+            if paths[index + 1..]
+                .iter()
+                .any(|candidate| paths[index].conflicts_with(candidate))
+            {
+                return Err("invalid regular expression pattern");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn named_capture_group_at(chars: &[char], start: usize) -> Option<(usize, String)> {
+    if chars.get(start + 1) != Some(&'?') || chars.get(start + 2) != Some(&'<') {
+        return None;
+    }
+    if matches!(chars.get(start + 3), Some('=') | Some('!')) {
+        return None;
+    }
+
+    let mut end = start + 3;
+    while end < chars.len() && chars[end] != '>' {
+        if is_line_terminator(chars[end]) {
+            return None;
+        }
+        end += 1;
+    }
+    if end >= chars.len() {
+        return None;
+    }
+
+    parse_group_name_contents(&chars[start + 3..end]).map(|name| (end + 1, name))
 }
 
 fn collect_named_group_names(pattern: &str) -> HashSet<String> {

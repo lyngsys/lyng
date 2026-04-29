@@ -33,6 +33,7 @@ pub(in crate::public) struct PublicRealmPrototypeHandles {
     pub(in crate::public) async_from_sync_iterator_prototype: ObjectRef,
     pub(in crate::public) array_iterator_prototype: ObjectRef,
     pub(in crate::public) string_iterator_prototype: ObjectRef,
+    pub(in crate::public) regexp_string_iterator_prototype: ObjectRef,
 }
 
 pub(in crate::public) fn install_public_realm_intrinsics(
@@ -151,6 +152,7 @@ fn with_namespace_intrinsics(
         .with_string_iterator_prototype(Some(prototypes.string_iterator_prototype))
         .with_regexp(Some(builtins.regexp))
         .with_regexp_prototype(Some(builtins.regexp_prototype))
+        .with_regexp_string_iterator_prototype(Some(prototypes.regexp_string_iterator_prototype))
         .with_date(Some(builtins.date))
         .with_date_prototype(Some(builtins.date_prototype))
         .with_number(Some(builtins.number))

@@ -5,10 +5,10 @@ pub(crate) fn is_valid_unicode_property_escape(
     body: &str,
     unicode_sets: bool,
     negated: bool,
-    in_class: bool,
+    in_complemented_class: bool,
 ) -> bool {
     if string_property_names().contains(body) {
-        return unicode_sets && !negated && !in_class;
+        return unicode_sets && !negated && !in_complemented_class;
     }
 
     if let Some((property, value)) = body.split_once('=') {

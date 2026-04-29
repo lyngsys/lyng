@@ -43,6 +43,10 @@ pub(in crate::public::metadata) const PUBLIC_REGEXP_BUILTIN_METADATA:
         BuiltinEntryMetadata::new("get unicode", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        regexp_unicode_sets_getter_builtin,
+        BuiltinEntryMetadata::new("get unicodeSets", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         regexp_sticky_getter_builtin,
         BuiltinEntryMetadata::new("get sticky", 0, false, false),
     ),
@@ -81,5 +85,9 @@ pub(in crate::public::metadata) const PUBLIC_REGEXP_BUILTIN_METADATA:
     PublicBuiltinMetadataRow::new(
         regexp_symbol_match_all_builtin,
         BuiltinEntryMetadata::new("[Symbol.matchAll]", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_string_iterator_next_builtin,
+        BuiltinEntryMetadata::new("next", 0, false, false),
     ),
 ];

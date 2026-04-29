@@ -81,6 +81,7 @@ pub enum BuiltinIntrinsic {
     StringIteratorPrototype,
     RegExp,
     RegExpPrototype,
+    RegExpStringIteratorPrototype,
     Date,
     DatePrototype,
     Number,

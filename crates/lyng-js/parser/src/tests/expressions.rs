@@ -121,6 +121,20 @@ fn regexp_named_group_names_accept_unicode_identifier_forms() {
 }
 
 #[test]
+fn regexp_duplicate_named_groups_are_allowed_across_alternatives() {
+    assert!(!script("/(?<x>a)|(?<x>b)/;").diagnostics.has_errors());
+    assert!(!script("/(?:(?<x>a)|(?<x>b))\\k<x>/;")
+        .diagnostics
+        .has_errors());
+}
+
+#[test]
+fn regexp_duplicate_named_groups_are_rejected_in_the_same_alternative() {
+    assert!(script("/(?<x>a)(?<x>b)/;").diagnostics.has_errors());
+    assert!(script("/(?<x>a(?<x>b)|c)/;").diagnostics.has_errors());
+}
+
+#[test]
 fn invalid_unicode_property_escape_is_rejected() {
     assert!(script("/\\p{Line_Break}/u;").diagnostics.has_errors());
 }
@@ -129,6 +143,99 @@ fn invalid_unicode_property_escape_is_rejected() {
 fn valid_unicode_sets_string_property_escape_is_accepted() {
     assert!(!script("/\\p{Basic_Emoji}/v;").diagnostics.has_errors());
     assert!(script("/\\P{Basic_Emoji}/v;").diagnostics.has_errors());
+    assert!(script("/[^\\p{Basic_Emoji}]/v;").diagnostics.has_errors());
+}
+
+#[test]
+fn regexp_unicode_and_unicode_sets_flags_are_mutually_exclusive() {
+    assert!(script("/./uv;").diagnostics.has_errors());
+    assert!(script("/./vu;").diagnostics.has_errors());
+}
+
+#[test]
+fn regexp_modifier_groups_are_accepted_and_validated() {
+    let valid = [
+        "/(?i:a)b/;",
+        "/(?i-s:a)/;",
+        "/(?-i:a)/i;",
+        "/(?i-:a)/;",
+        "/(?ims:a)/;",
+    ];
+    for case in valid {
+        let parsed = script(case);
+        assert!(
+            !parsed.diagnostics.has_errors(),
+            "unexpected regexp parse error for {case}: {:?}",
+            parsed.diagnostics.as_slice()
+        );
+    }
+
+    for case in ["/(?a:a)/;", "/(?ii:a)/;", "/(?i-i:a)/;", "/(?-:a)/;"] {
+        assert!(
+            script(case).diagnostics.has_errors(),
+            "expected regexp parse error for {case}"
+        );
+    }
+}
+
+#[test]
+fn regexp_unicode_sets_rejects_unescaped_class_set_reserved_syntax() {
+    let cases = [
+        "/[(]/v;",
+        "/[)]/v;",
+        "/[[]/v;",
+        "/[{]/v;",
+        "/[}]/v;",
+        "/[/]/v;",
+        "/[-]/v;",
+        "/[|]/v;",
+        "/[&&]/v;",
+        "/[!!]/v;",
+        "/[##]/v;",
+        "/[$$]/v;",
+        "/[%%]/v;",
+        "/[**]/v;",
+        "/[++]/v;",
+        "/[,,]/v;",
+        "/[..]/v;",
+        "/[::]/v;",
+        "/[;;]/v;",
+        "/[<<]/v;",
+        "/[==]/v;",
+        "/[>>]/v;",
+        "/[??]/v;",
+        "/[@@]/v;",
+        "/[``]/v;",
+        "/[~~]/v;",
+        "/[^^^]/v;",
+        "/[_^^]/v;",
+    ];
+
+    for case in cases {
+        assert!(
+            script(case).diagnostics.has_errors(),
+            "expected regexp parse error for {case}"
+        );
+    }
+}
+
+#[test]
+fn regexp_unicode_sets_accepts_generated_class_set_expression_syntax() {
+    let cases = [
+        r"/^[[0-9]&&_]+$/v;",
+        r"/^[\p{ASCII_Hex_Digit}--_]+$/v;",
+        r"/^[\q{0|2|4|9\uFE0F\u20E3}\q{0|2|4|9\uFE0F\u20E3}]+$/v;",
+        r"/^[\p{Basic_Emoji}--_]+$/v;",
+    ];
+
+    for case in cases {
+        let parsed = script(case);
+        assert!(
+            !parsed.diagnostics.has_errors(),
+            "unexpected regexp parse error for {case}: {:?}",
+            parsed.diagnostics.as_slice()
+        );
+    }
 }
 
 #[test]

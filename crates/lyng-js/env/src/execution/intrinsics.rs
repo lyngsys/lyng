@@ -72,6 +72,7 @@ pub struct Intrinsics {
     string_iterator_prototype: Option<ObjectRef>,
     regexp: Option<ObjectRef>,
     regexp_prototype: Option<ObjectRef>,
+    regexp_string_iterator_prototype: Option<ObjectRef>,
     date: Option<ObjectRef>,
     date_prototype: Option<ObjectRef>,
     number: Option<ObjectRef>,
@@ -186,6 +187,7 @@ impl Intrinsics {
             string_iterator_prototype: None,
             regexp: None,
             regexp_prototype: None,
+            regexp_string_iterator_prototype: None,
             date: None,
             date_prototype: None,
             number: None,
@@ -571,6 +573,11 @@ impl Intrinsics {
     #[inline]
     pub const fn regexp_prototype(self) -> Option<ObjectRef> {
         self.regexp_prototype
+    }
+
+    #[inline]
+    pub const fn regexp_string_iterator_prototype(self) -> Option<ObjectRef> {
+        self.regexp_string_iterator_prototype
     }
 
     #[inline]
@@ -1185,6 +1192,12 @@ impl Intrinsics {
     #[inline]
     pub const fn with_regexp_prototype(mut self, value: Option<ObjectRef>) -> Self {
         self.regexp_prototype = value;
+        self
+    }
+
+    #[inline]
+    pub const fn with_regexp_string_iterator_prototype(mut self, value: Option<ObjectRef>) -> Self {
+        self.regexp_string_iterator_prototype = value;
         self
     }
 

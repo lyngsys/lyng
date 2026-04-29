@@ -764,6 +764,48 @@ fn regexp_payload_compile_accepts_unknown_script_extension_aliases() {
 }
 
 #[test]
+fn regexp_payload_non_unicode_astral_source_matches_surrogate_code_units() {
+    let payload = RegExpPayload::compile("𠮷", "").unwrap();
+    let text = "𠮷".encode_utf16().collect::<Vec<_>>();
+    let matched = payload.find_from_code_units(&text, 0);
+
+    assert_eq!(matched.map(|record| record.range()), Some(0..2));
+}
+
+#[test]
+fn regexp_payload_fast_digit_class_scan_handles_large_generated_strings() {
+    use std::time::{Duration, Instant};
+
+    let text = (0u16..=u16::MAX)
+        .filter(|unit| !(0x30..=0x39).contains(unit))
+        .cycle()
+        .take(1_048_576)
+        .collect::<Vec<_>>();
+
+    let digit = RegExpPayload::compile(r"\d", "").unwrap();
+    let started = Instant::now();
+    let matched = digit.find_from_code_units(&text, 0);
+    let elapsed = started.elapsed();
+
+    assert_eq!(matched, None);
+    assert!(
+        elapsed < Duration::from_millis(25),
+        "digit-class scan took {elapsed:?}"
+    );
+
+    let non_digit_run = RegExpPayload::compile(r"^\D+$", "").unwrap();
+    let started = Instant::now();
+    let matched = non_digit_run.find_from_code_units(&text, 0);
+    let elapsed = started.elapsed();
+
+    assert_eq!(matched.map(|record| record.range()), Some(0..text.len()));
+    assert!(
+        elapsed < Duration::from_millis(25),
+        "anchored non-digit scan took {elapsed:?}"
+    );
+}
+
+#[test]
 fn named_property_load_cache_reads_current_receiver_for_same_shaped_own_data_objects() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();

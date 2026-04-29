@@ -63,6 +63,7 @@ struct IteratorScaffolding {
     map_iterator_prototype: ObjectRef,
     set_iterator_prototype: ObjectRef,
     string_iterator_prototype: ObjectRef,
+    regexp_string_iterator_prototype: ObjectRef,
     family: IteratorFamilyPrototypes,
 }
 
@@ -404,6 +405,12 @@ fn allocate_iterator_prototypes(
             request.intrinsics.string_iterator_prototype(),
             iterator_prototype,
         ),
+        regexp_string_iterator_prototype: ordinary_intrinsic(
+            agent,
+            request,
+            request.intrinsics.regexp_string_iterator_prototype(),
+            iterator_prototype,
+        ),
         family: IteratorFamilyPrototypes {
             async_iterator_prototype,
             iterator_prototype,
@@ -644,6 +651,7 @@ fn public_intrinsic_handles(
         async_from_sync_iterator_prototype: iterators.async_from_sync_iterator_prototype,
         array_iterator_prototype: iterators.array_iterator_prototype,
         string_iterator_prototype: iterators.string_iterator_prototype,
+        regexp_string_iterator_prototype: iterators.regexp_string_iterator_prototype,
     }
 }
 

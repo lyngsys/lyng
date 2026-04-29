@@ -172,7 +172,7 @@ mod tests {
         assert_eq!(INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
         assert_eq!(INTERNAL_BUILTIN_NAMESPACE_END, 1_036);
         assert_eq!(CORE_BUILTIN_NAMESPACE_START, 2_001);
-        assert_eq!(CORE_BUILTIN_NAMESPACE_END, 2_285);
+        assert_eq!(CORE_BUILTIN_NAMESPACE_END, 2_287);
         assert_eq!(COMPLETION_BUILTIN_NAMESPACE_START, 3_101);
         assert_eq!(COMPLETION_BUILTIN_NAMESPACE_END, 3_553);
     }

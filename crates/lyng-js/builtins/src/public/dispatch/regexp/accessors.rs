@@ -46,6 +46,41 @@ enum RegExpSource {
     Units(Vec<u16>),
 }
 
+fn escape_regexp_pattern_units(units: &[u16]) -> Vec<u16> {
+    let mut escaped = Vec::with_capacity(units.len());
+    for unit in units {
+        match *unit {
+            0x002F => escaped.extend_from_slice(&[b'\\' as u16, b'/' as u16]),
+            0x000A => escaped.extend_from_slice(&[b'\\' as u16, b'n' as u16]),
+            0x000D => escaped.extend_from_slice(&[b'\\' as u16, b'r' as u16]),
+            0x2028 => escaped.extend_from_slice(&[
+                b'\\' as u16,
+                b'u' as u16,
+                b'2' as u16,
+                b'0' as u16,
+                b'2' as u16,
+                b'8' as u16,
+            ]),
+            0x2029 => escaped.extend_from_slice(&[
+                b'\\' as u16,
+                b'u' as u16,
+                b'2' as u16,
+                b'0' as u16,
+                b'2' as u16,
+                b'9' as u16,
+            ]),
+            unit => escaped.push(unit),
+        }
+    }
+    escaped
+}
+
+fn escape_regexp_pattern_text(source: &str) -> RegExpSource {
+    RegExpSource::Units(escape_regexp_pattern_units(
+        &source.encode_utf16().collect::<Vec<_>>(),
+    ))
+}
+
 pub(super) fn regexp_source_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -61,12 +96,12 @@ pub(super) fn regexp_source_getter_builtin<Cx: PublicBuiltinDispatchContext>(
                 if units.is_empty() {
                     RegExpSource::Text("(?:)".to_owned())
                 } else {
-                    RegExpSource::Units(units.to_vec())
+                    RegExpSource::Units(escape_regexp_pattern_units(units))
                 }
             } else if payload.source().is_empty() {
                 RegExpSource::Text("(?:)".to_owned())
             } else {
-                RegExpSource::Text(payload.source().to_owned())
+                escape_regexp_pattern_text(payload.source())
             }
         })
     };

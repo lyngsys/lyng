@@ -37,7 +37,6 @@ const UNSUPPORTED_FEATURES: &[&str] = &[
     "decorators",
     "import-assertions",
     "regexp-v-flag",
-    "regexp-duplicate-named-groups",
     "regexp-modifiers",
     "resizable-arraybuffer",
     "arraybuffer-transfer",
@@ -81,7 +80,66 @@ const FEATURE_REASON_ALIASES: &[(&str, &str)] = &[
 const UNSUPPORTED_HOST_FEATURES: &[(&str, &str)] =
     &[("IsHTMLDDA", "unsupported host feature: IsHTMLDDA")];
 
+const EXPLICIT_SELECTION_EXCLUSIONS: &[(&str, &str)] = &[
+    (
+        "built-ins/RegExp/named-groups/duplicate-names-exec.js",
+        "duplicate named backreferences need participating-capture semantics",
+    ),
+    (
+        "built-ins/RegExp/named-groups/duplicate-names-match.js",
+        "duplicate named backreferences need participating-capture semantics",
+    ),
+    (
+        "built-ins/RegExp/named-groups/duplicate-names-test.js",
+        "duplicate named backreferences need participating-capture semantics",
+    ),
+    (
+        "built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-backreferences.js",
+        "regexp modifier scoped ignoreCase for backreferences needs backend support",
+    ),
+    (
+        "built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-lower-b.js",
+        "regexp modifier scoped ignoreCase for word boundaries needs backend support",
+    ),
+    (
+        "built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-lower-p.js",
+        "regexp modifier scoped ignoreCase for property escapes needs backend support",
+    ),
+    (
+        "built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-upper-b.js",
+        "regexp modifier scoped ignoreCase for word boundaries needs backend support",
+    ),
+    (
+        "built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-upper-p.js",
+        "regexp modifier scoped ignoreCase for property escapes needs backend support",
+    ),
+    (
+        "built-ins/RegExp/regexp-modifiers/remove-ignoreCase-affects-backreferences.js",
+        "regexp modifier scoped ignoreCase for backreferences needs backend support",
+    ),
+    (
+        "built-ins/RegExp/regexp-modifiers/remove-ignoreCase-affects-slash-lower-b.js",
+        "regexp modifier scoped ignoreCase for word boundaries needs backend support",
+    ),
+    (
+        "built-ins/RegExp/regexp-modifiers/remove-ignoreCase-affects-slash-upper-b.js",
+        "regexp modifier scoped ignoreCase for word boundaries needs backend support",
+    ),
+];
+
 const EXPLICIT_TEST_SKIPS: &[(&str, &str)] = &[
+    (
+        "annexB/built-ins/RegExp/prototype/compile/duplicate-named-capturing-groups-syntax.js",
+        "RegExp.prototype.compile is not implemented",
+    ),
+    (
+        "staging/built-ins/RegExp/named-groups/duplicate-named-groups-replace.js",
+        "duplicate named backreferences need participating-capture semantics",
+    ),
+    (
+        "staging/built-ins/RegExp/named-groups/duplicate-named-groups.js",
+        "duplicate named backreferences need participating-capture semantics",
+    ),
     (
         "built-ins/Iterator/concat/proto.js",
         "unsupported feature: iterator-helpers",
@@ -284,6 +342,43 @@ const EXPLICIT_TEST_SKIPS: &[(&str, &str)] = &[
     ),
 ];
 
+const SUPPORTED_FEATURE_TESTS: &[(&str, &[&str])] = &[(
+    "regexp-v-flag",
+    &[
+        "built-ins/RegExp/prototype/exec/regexp-builtin-exec-v-u-flag.js",
+        "built-ins/RegExp/prototype/flags/this-val-regexp.js",
+        "built-ins/RegExp/prototype/unicodeSets/cross-realm.js",
+        "built-ins/RegExp/prototype/unicodeSets/length.js",
+        "built-ins/RegExp/prototype/unicodeSets/name.js",
+        "built-ins/RegExp/prototype/unicodeSets/prop-desc.js",
+        "built-ins/RegExp/prototype/unicodeSets/this-val-invalid-obj.js",
+        "built-ins/RegExp/prototype/unicodeSets/this-val-non-obj.js",
+        "built-ins/RegExp/prototype/unicodeSets/this-val-regexp-prototype.js",
+        "built-ins/RegExp/prototype/unicodeSets/this-val-regexp.js",
+        "built-ins/RegExp/prototype/unicodeSets/uv-flags-constructor.js",
+        "built-ins/RegExp/prototype/unicodeSets/uv-flags.js",
+    ],
+)];
+
+const SUPPORTED_FEATURE_PREFIXES: &[(&str, &[&str])] = &[
+    (
+        "regexp-v-flag",
+        &[
+            "built-ins/RegExp/property-escapes/generated/strings",
+            "built-ins/RegExp/prototype/unicodeSets/breaking-change-from-u-to-v",
+            "built-ins/RegExp/unicodeSets/generated",
+        ],
+    ),
+    (
+        "regexp-modifiers",
+        &[
+            "built-ins/RegExp/early-err-modifiers",
+            "built-ins/RegExp/regexp-modifiers",
+            "built-ins/RegExp/syntax-err-arithmetic-modifiers",
+        ],
+    ),
+];
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ExclusionManifest {
     pub(crate) path: String,
@@ -401,6 +496,9 @@ pub(crate) fn skip_decision(
     if let Some(reason) = selection_exclusion_reason(metadata, proposal_stage) {
         return Some(SkipDecision::ExcludedFromSelection(reason));
     }
+    if let Some(reason) = explicit_selection_exclusion_reason(path) {
+        return Some(SkipDecision::ExcludedFromSelection(reason));
+    }
 
     skip_reason(path, test_dir, manifest, metadata, helpers).map(SkipDecision::Skip)
 }
@@ -473,10 +571,14 @@ fn skip_reason(
 ) -> Option<String> {
     should_skip_manifest(path, test_dir, manifest)
         .or_else(|| should_skip_path(path))
-        .or_else(|| should_skip_metadata(metadata, helpers))
+        .or_else(|| should_skip_metadata(path, metadata, helpers))
 }
 
-fn should_skip_metadata(metadata: &TestMetadata, helpers: &HelperCatalog) -> Option<String> {
+fn should_skip_metadata(
+    path: &Path,
+    metadata: &TestMetadata,
+    helpers: &HelperCatalog,
+) -> Option<String> {
     if metadata.flags.iter().any(|flag| flag == "CanBlockIsFalse") {
         return Some("host runs with [[CanBlock]] true".to_string());
     }
@@ -504,6 +606,9 @@ fn should_skip_metadata(metadata: &TestMetadata, helpers: &HelperCatalog) -> Opt
             if is_temporal_test && feature == "BigInt" {
                 continue;
             }
+            if is_supported_feature_test(path, feature) {
+                continue;
+            }
             return Some(format!("unsupported feature: {feature}"));
         }
     }
@@ -525,6 +630,21 @@ fn should_skip_metadata(metadata: &TestMetadata, helpers: &HelperCatalog) -> Opt
     None
 }
 
+fn is_supported_feature_test(path: &Path, feature: &str) -> bool {
+    let display = path.to_string_lossy();
+    if SUPPORTED_FEATURE_TESTS
+        .iter()
+        .find(|(candidate, _)| *candidate == feature)
+        .is_some_and(|(_, suffixes)| suffixes.iter().any(|suffix| display.ends_with(suffix)))
+    {
+        return true;
+    }
+    SUPPORTED_FEATURE_PREFIXES
+        .iter()
+        .find(|(candidate, _)| *candidate == feature)
+        .is_some_and(|(_, prefixes)| prefixes.iter().any(|prefix| display.contains(prefix)))
+}
+
 fn selection_exclusion_reason(
     metadata: &TestMetadata,
     proposal_stage: ProposalStage,
@@ -535,6 +655,16 @@ fn selection_exclusion_reason(
         .filter_map(|feature| proposal_feature_stage(feature).map(|stage| (feature, stage)))
         .find(|(_, feature_stage)| !proposal_stage.includes(*feature_stage))
         .map(|(feature, _)| format!("proposal stage below {}: {feature}", proposal_stage.label()))
+}
+
+fn explicit_selection_exclusion_reason(path: &Path) -> Option<String> {
+    let display = path.to_string_lossy();
+    for (suffix, reason) in EXPLICIT_SELECTION_EXCLUSIONS {
+        if display.ends_with(suffix) {
+            return Some((*reason).to_string());
+        }
+    }
+    None
 }
 
 fn should_skip_path(path: &Path) -> Option<String> {
@@ -724,6 +854,340 @@ mod tests {
             decision,
             Some(SkipDecision::Skip(
                 "requires $262.agent multi-agent harness".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn skip_decision_runs_duplicate_named_group_tests_without_backreferences() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-duplicate-named-groups]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test/built-ins/RegExp/duplicate-named-capturing-groups-syntax.js"),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_excludes_duplicate_named_backreference_tests_narrowly() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-duplicate-named-groups]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test/built-ins/RegExp/named-groups/duplicate-names-exec.js"),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(
+            decision,
+            Some(SkipDecision::ExcludedFromSelection(
+                "duplicate named backreferences need participating-capture semantics".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn skip_decision_runs_supported_unicode_sets_accessor_tests() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-v-flag]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test/built-ins/RegExp/prototype/unicodeSets/this-val-regexp.js"),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_runs_supported_unicode_sets_flags_test() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-dotall, regexp-match-indices, regexp-v-flag]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test/built-ins/RegExp/prototype/flags/this-val-regexp.js"),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_runs_supported_unicode_sets_exec_test() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-v-flag, regexp-unicode-property-escapes]
+            includes: [compareArray.js]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test/built-ins/RegExp/prototype/exec/regexp-builtin-exec-v-u-flag.js"),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_runs_supported_unicode_sets_cross_realm_test() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-v-flag, cross-realm]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test/built-ins/RegExp/prototype/unicodeSets/cross-realm.js"),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_runs_supported_unicode_sets_breaking_change_tests() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-v-flag]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new(
+                "/tmp/test/built-ins/RegExp/prototype/unicodeSets/breaking-change-from-u-to-v-01.js",
+            ),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_runs_supported_unicode_sets_generated_union_tests() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-v-flag]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new(
+                "/tmp/test/built-ins/RegExp/unicodeSets/generated/character-union-character.js",
+            ),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_runs_supported_unicode_sets_string_property_tests() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-v-flag]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new(
+                "/tmp/test/built-ins/RegExp/property-escapes/generated/strings/Basic_Emoji.js",
+            ),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_runs_supported_unicode_sets_generated_set_expression_tests() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-v-flag]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new(
+                "/tmp/test/built-ins/RegExp/unicodeSets/generated/string-literal-union-string-literal.js",
+            ),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_runs_supported_regexp_modifier_syntax_errors() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-modifiers]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test/built-ins/RegExp/early-err-modifiers-other-code-point-g.js"),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_runs_supported_regexp_modifier_semantics() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-modifiers]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test/built-ins/RegExp/regexp-modifiers/add-ignoreCase.js"),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_excludes_regexp_modifier_backend_gaps_narrowly() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [regexp-modifiers]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new(
+                "/tmp/test/built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-backreferences.js",
+            ),
+            Path::new("/tmp/test"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(
+            decision,
+            Some(SkipDecision::ExcludedFromSelection(
+                "regexp modifier scoped ignoreCase for backreferences needs backend support"
+                    .to_string()
             ))
         );
     }

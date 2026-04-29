@@ -145,7 +145,11 @@ fn compute_totals(report: &SuiteReport<'_>) -> ReportTotals {
         total_skip,
         total_panic,
         runnable,
-        excluded_from_selection: report.candidate_total.saturating_sub(report.selected_total),
+        excluded_from_selection: report
+            .exclusion_reasons
+            .values()
+            .map(|count| *count as usize)
+            .sum(),
         pass_rate,
     }
 }
@@ -738,7 +742,7 @@ mod tests {
         );
 
         let skip_reasons = HashMap::new();
-        let exclusion_reasons = HashMap::new();
+        let exclusion_reasons = HashMap::from([("deferred feature".to_string(), 1)]);
         let failures = Vec::new();
         let manifest = ExclusionManifest {
             path: "reports/js/lyng-js/test262-exclusions.txt".to_string(),

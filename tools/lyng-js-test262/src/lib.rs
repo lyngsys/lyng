@@ -409,7 +409,33 @@ fn timeout_for_test(test: &PreparedTest, default: Duration) -> Duration {
     if is_exhaustive_uri_legacy_test(&test.path) {
         return default.max(Duration::from_secs(30));
     }
+    if is_generated_regexp_test(test) || is_exhaustive_regexp_legacy_test(&test.path) {
+        return default.max(Duration::from_secs(30));
+    }
     default
+}
+
+fn is_generated_regexp_test(test: &PreparedTest) -> bool {
+    let has_regexp_component = test
+        .path
+        .components()
+        .any(|component| component.as_os_str() == "RegExp");
+    has_regexp_component && test.metadata.flags.iter().any(|flag| flag == "generated")
+        || test
+            .path
+            .components()
+            .collect::<Vec<_>>()
+            .windows(3)
+            .any(|components| {
+                components[0].as_os_str() == "RegExp"
+                    && components[1].as_os_str() == "property-escapes"
+                    && components[2].as_os_str() == "generated"
+            })
+}
+
+fn is_exhaustive_regexp_legacy_test(path: &Path) -> bool {
+    path.file_name().and_then(|name| name.to_str())
+        == Some("character-class-escape-non-whitespace.js")
 }
 
 fn relative_prepared_test_name(test: &PreparedTest, test_dir: &Path) -> String {
@@ -642,6 +668,55 @@ mod tests {
         assert_eq!(
             timeout_for_test(&test, Duration::from_secs(1)),
             Duration::from_secs(1)
+        );
+    }
+
+    #[test]
+    fn generated_regexp_tests_receive_extended_timeout() {
+        let test = PreparedTest {
+            path: PathBuf::from(
+                "test/built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js",
+            ),
+            category: "built-ins".to_string(),
+            metadata: parse_metadata("/*---\nflags: [generated]\n---*/"),
+            variant: crate::metadata::TestVariant::Default,
+        };
+
+        assert_eq!(
+            timeout_for_test(&test, Duration::from_secs(1)),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn generated_regexp_property_escape_tests_receive_extended_timeout() {
+        let test = PreparedTest {
+            path: PathBuf::from(
+                "test/built-ins/RegExp/property-escapes/generated/General_Category_-_Mark.js",
+            ),
+            category: "built-ins".to_string(),
+            metadata: parse_metadata("/*---\nfeatures: [regexp-unicode-property-escapes]\n---*/"),
+            variant: crate::metadata::TestVariant::Default,
+        };
+
+        assert_eq!(
+            timeout_for_test(&test, Duration::from_secs(1)),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn exhaustive_regexp_legacy_tests_receive_extended_timeout() {
+        let test = PreparedTest {
+            path: PathBuf::from("test/built-ins/RegExp/character-class-escape-non-whitespace.js"),
+            category: "built-ins".to_string(),
+            metadata: parse_metadata("/*---\nesid: sec-characterclassescape\n---*/"),
+            variant: crate::metadata::TestVariant::Default,
+        };
+
+        assert_eq!(
+            timeout_for_test(&test, Duration::from_secs(1)),
+            Duration::from_secs(30)
         );
     }
 }

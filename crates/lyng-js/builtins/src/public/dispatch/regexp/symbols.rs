@@ -1,14 +1,14 @@
 use super::super::{
-    allocate_array_like_result, code_unit_range_value, define_data_property_with_attrs,
-    string_ref_code_units, to_string_string_ref, to_uint32_for_builtin, type_error,
-    PublicBuiltinDispatchContext,
+    code_unit_range_value, create_array_from_values, map_completion, string_ref_code_units,
+    string_value, to_length_for_builtin, to_string_string_ref, to_uint32_for_builtin, type_error,
+    usize_index_value, PublicBuiltinDispatchContext,
 };
 use super::{
-    advance_string_index, regexp_match_all_with_string, regexp_match_with_string,
-    regexp_matcher_this_object, regexp_object_flags, regexp_replace_with_string,
-    regexp_search_with_string,
+    advance_string_index, regexp_exec, regexp_match_all_with_string, regexp_replace_with_string,
+    regexp_result_capture_count, regexp_species_constructor, set_property_on_object_or_throw,
 };
 use crate::BuiltinInvocation;
+use lyng_js_ops::read;
 use lyng_js_types::{BuiltinFunctionId, PropertyKey, Value};
 
 pub(super) fn dispatch_regexp_symbol_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -38,7 +38,8 @@ fn regexp_symbol_match_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let object_ref = regexp_matcher_this_object(cx, invocation.this_value())?;
+    let receiver = invocation.this_value();
+    let object_ref = receiver.as_object_ref().ok_or_else(|| type_error(cx))?;
     let input_ref = to_string_string_ref(
         cx,
         invocation
@@ -47,14 +48,59 @@ fn regexp_symbol_match_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    regexp_match_with_string(cx, object_ref, input_ref)
+    let input_units = string_ref_code_units(cx, input_ref)?;
+    let flags_key = {
+        let agent = cx.agent();
+        PropertyKey::from_atom(agent.bootstrap_atoms().flags())
+    };
+    let flags_value = cx.get_property_value(receiver, flags_key)?;
+    let flags_text = cx.value_to_string_text(flags_value)?;
+    if !flags_text.contains('g') {
+        return regexp_exec(cx, object_ref, input_ref, &input_units);
+    }
+
+    let full_unicode = flags_text.contains('u') || flags_text.contains('v');
+    let last_index_key = {
+        let agent = cx.agent();
+        PropertyKey::from_atom(agent.bootstrap_atoms().last_index())
+    };
+    set_property_on_object_or_throw(cx, object_ref, last_index_key, Value::from_smi(0))?;
+
+    let mut matches = Vec::new();
+    loop {
+        let result = regexp_exec(cx, object_ref, input_ref, &input_units)?;
+        if result.is_null() {
+            break;
+        }
+        let matched = cx.get_property_value(result, PropertyKey::Index(0))?;
+        let matched_ref = to_string_string_ref(cx, matched)?;
+        let matched_units = string_ref_code_units(cx, matched_ref)?;
+        matches.push(Value::from_string_ref(matched_ref));
+        if matched_units.is_empty() {
+            let this_index = cx.get_property_value(receiver, last_index_key)?;
+            let this_index = to_length_for_builtin(cx, this_index)?;
+            let next_index = advance_string_index(&input_units, this_index, full_unicode);
+            set_property_on_object_or_throw(
+                cx,
+                object_ref,
+                last_index_key,
+                usize_index_value(next_index),
+            )?;
+        }
+    }
+    if matches.is_empty() {
+        return Ok(Value::null());
+    }
+    let array = create_array_from_values(cx, &matches)?;
+    Ok(Value::from_object_ref(array))
 }
 
 fn regexp_symbol_replace_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let object_ref = regexp_matcher_this_object(cx, invocation.this_value())?;
+    let receiver = invocation.this_value();
+    receiver.as_object_ref().ok_or_else(|| type_error(cx))?;
     let input_ref = to_string_string_ref(
         cx,
         invocation
@@ -68,14 +114,15 @@ fn regexp_symbol_replace_builtin<Cx: PublicBuiltinDispatchContext>(
         .get(1)
         .copied()
         .unwrap_or(Value::undefined());
-    regexp_replace_with_string(cx, object_ref, input_ref, replacement)
+    regexp_replace_with_string(cx, receiver, input_ref, replacement)
 }
 
 fn regexp_symbol_search_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let object_ref = regexp_matcher_this_object(cx, invocation.this_value())?;
+    let receiver = invocation.this_value();
+    let object_ref = receiver.as_object_ref().ok_or_else(|| type_error(cx))?;
     let input_ref = to_string_string_ref(
         cx,
         invocation
@@ -84,14 +131,49 @@ fn regexp_symbol_search_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    regexp_search_with_string(cx, object_ref, input_ref)
+    let last_index_key = {
+        let agent = cx.agent();
+        PropertyKey::from_atom(agent.bootstrap_atoms().last_index())
+    };
+    let previous_last_index = cx.get_property_value(receiver, last_index_key)?;
+    if !same_value_for_builtin(cx, previous_last_index, Value::from_smi(0))? {
+        set_property_on_object_or_throw(cx, object_ref, last_index_key, Value::from_smi(0))?;
+    }
+
+    let input_units = string_ref_code_units(cx, input_ref)?;
+    let result = regexp_exec(cx, object_ref, input_ref, &input_units)?;
+    let current_last_index = cx.get_property_value(receiver, last_index_key)?;
+    if !same_value_for_builtin(cx, current_last_index, previous_last_index)? {
+        set_property_on_object_or_throw(cx, object_ref, last_index_key, previous_last_index)?;
+    }
+    if result.is_null() {
+        return Ok(Value::from_smi(-1));
+    }
+    let index_key = {
+        let agent = cx.agent();
+        PropertyKey::from_atom(agent.atoms_mut().intern_collectible("index"))
+    };
+    cx.get_property_value(result, index_key)
+}
+
+fn same_value_for_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    left: Value,
+    right: Value,
+) -> Result<bool, Cx::Error> {
+    let same = {
+        let agent = cx.agent();
+        read::same_value(agent.heap().view(), left, right)
+    };
+    map_completion(cx, same)
 }
 
 fn regexp_symbol_split_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let object_ref = regexp_matcher_this_object(cx, invocation.this_value())?;
+    let receiver = invocation.this_value();
+    let object_ref = receiver.as_object_ref().ok_or_else(|| type_error(cx))?;
     let input_ref = to_string_string_ref(
         cx,
         invocation
@@ -110,97 +192,97 @@ fn regexp_symbol_split_builtin<Cx: PublicBuiltinDispatchContext>(
         u32::MAX
     };
     if limit == 0 {
-        return Ok(Value::from_object_ref(allocate_array_like_result(cx, 0)?));
+        let empty = create_array_from_values(cx, &[])?;
+        return Ok(Value::from_object_ref(empty));
     }
 
     let source_units = string_ref_code_units(cx, input_ref)?;
-    let flags = regexp_object_flags(cx, object_ref)?;
-    let payload = {
+    let flags_key = {
         let agent = cx.agent();
-        agent.objects().regexp_payload(object_ref).cloned()
-    }
-    .ok_or_else(|| type_error(cx))?;
+        PropertyKey::from_atom(agent.bootstrap_atoms().flags())
+    };
+    let flags_value = cx.get_property_value(receiver, flags_key)?;
+    let flags_text = cx.value_to_string_text(flags_value)?;
+    let unicode_matching = flags_text.contains('u') || flags_text.contains('v');
+    let new_flags = if flags_text.contains('y') {
+        flags_text
+    } else {
+        format!("{flags_text}y")
+    };
+    let constructor = regexp_species_constructor(cx, object_ref)?;
+    let flags_arg = string_value(cx, &new_flags);
+    let splitter =
+        cx.construct_to_completion(constructor, &[receiver, flags_arg], Some(constructor))?;
+    let last_index_key = {
+        let agent = cx.agent();
+        PropertyKey::from_atom(agent.bootstrap_atoms().last_index())
+    };
 
-    if payload.source().is_empty() {
-        let part_count = source_units
-            .len()
-            .min(usize::try_from(limit).unwrap_or(usize::MAX));
-        let object = allocate_array_like_result(cx, u32::try_from(part_count).unwrap_or(u32::MAX))?;
-        for index in 0..part_count {
-            let value = code_unit_range_value(cx, &source_units, index..index + 1);
-            define_data_property_with_attrs(
-                cx,
-                object,
-                PropertyKey::Index(u32::try_from(index).unwrap_or(u32::MAX)),
-                value,
-                true,
-                true,
-                true,
-            )?;
+    if source_units.is_empty() {
+        let matched = regexp_exec(cx, splitter, input_ref, &source_units)?;
+        if !matched.is_null() {
+            let empty = create_array_from_values(cx, &[])?;
+            return Ok(Value::from_object_ref(empty));
         }
-        return Ok(Value::from_object_ref(object));
+        let parts = [Value::from_string_ref(input_ref)];
+        let array = create_array_from_values(cx, &parts)?;
+        return Ok(Value::from_object_ref(array));
     }
 
-    let mut parts = Vec::new();
-    let mut last_end = 0;
-    let mut search_start = 0;
-    let mut suppress_trailing_empty = false;
     let limit_len = usize::try_from(limit).unwrap_or(usize::MAX);
-    while search_start <= source_units.len() && parts.len() < limit_len {
-        let Some(matched) = payload.find_from_code_units(&source_units, search_start) else {
-            break;
-        };
-        if matched.start() < last_end {
-            search_start = advance_string_index(&source_units, search_start, flags.unicode_aware());
-            continue;
-        }
-        if matched.start() == matched.end() && matched.start() == search_start {
-            search_start = advance_string_index(&source_units, search_start, flags.unicode_aware());
+    let mut parts = Vec::new();
+    let mut p = 0;
+    let mut q = 0;
+    while q < source_units.len() {
+        set_property_on_object_or_throw(cx, splitter, last_index_key, usize_index_value(q))?;
+        let matched = regexp_exec(cx, splitter, input_ref, &source_units)?;
+        if matched.is_null() {
+            q = advance_string_index(&source_units, q, unicode_matching);
             continue;
         }
 
-        parts.push(Some(last_end..matched.start()));
-        if parts.len() >= limit_len {
-            break;
+        let e = cx.get_property_value(Value::from_object_ref(splitter), last_index_key)?;
+        let e = to_length_for_builtin(cx, e)?.min(source_units.len());
+        if e == p {
+            q = advance_string_index(&source_units, q, unicode_matching);
+            continue;
         }
-        for capture in matched.captures() {
-            parts.push(capture.clone());
-            if parts.len() >= limit_len {
-                break;
+
+        parts.push(code_unit_range_value(cx, &source_units, p..q));
+        if parts.len() == limit_len {
+            let array = create_array_from_values(cx, &parts)?;
+            return Ok(Value::from_object_ref(array));
+        }
+        p = e;
+
+        let capture_count = regexp_result_capture_count(cx, matched)?;
+        for index in 1..=capture_count {
+            let capture = cx.get_property_value(
+                matched,
+                PropertyKey::Index(u32::try_from(index).unwrap_or(u32::MAX)),
+            )?;
+            parts.push(capture);
+            if parts.len() == limit_len {
+                let array = create_array_from_values(cx, &parts)?;
+                return Ok(Value::from_object_ref(array));
             }
         }
-        last_end = matched.end();
-        search_start = matched.end();
-        suppress_trailing_empty =
-            matched.start() == matched.end() && matched.end() == source_units.len();
+        q = p;
     }
-    if parts.len() < limit_len && !suppress_trailing_empty {
-        parts.push(Some(last_end..source_units.len()));
-    }
-
-    let object = allocate_array_like_result(cx, u32::try_from(parts.len()).unwrap_or(u32::MAX))?;
-    for (index, part) in parts.into_iter().enumerate() {
-        let value = part.map_or(Value::undefined(), |range| {
-            code_unit_range_value(cx, &source_units, range)
-        });
-        define_data_property_with_attrs(
-            cx,
-            object,
-            PropertyKey::Index(u32::try_from(index).unwrap_or(u32::MAX)),
-            value,
-            true,
-            true,
-            true,
-        )?;
-    }
-    Ok(Value::from_object_ref(object))
+    parts.push(code_unit_range_value(
+        cx,
+        &source_units,
+        p..source_units.len(),
+    ));
+    let array = create_array_from_values(cx, &parts)?;
+    Ok(Value::from_object_ref(array))
 }
 
 fn regexp_symbol_match_all_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let object_ref = regexp_matcher_this_object(cx, invocation.this_value())?;
+    let receiver = invocation.this_value();
     let input_ref = to_string_string_ref(
         cx,
         invocation
@@ -209,5 +291,5 @@ fn regexp_symbol_match_all_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    regexp_match_all_with_string(cx, object_ref, input_ref)
+    regexp_match_all_with_string(cx, receiver, input_ref)
 }

@@ -3,6 +3,7 @@ mod families;
 mod metadata;
 mod temporal;
 
+pub(crate) use lyng_js_types::regexp_unicode_sets_getter_builtin;
 pub use metadata::{builtin_metadata, public_builtin_metadata};
 
 use crate::internal::{InternalBuiltinCache, InternalRealmBuiltins};
@@ -118,11 +119,12 @@ use lyng_js_types::{
     regexp_flags_getter_builtin, regexp_global_getter_builtin, regexp_has_indices_getter_builtin,
     regexp_ignore_case_getter_builtin, regexp_multiline_getter_builtin,
     regexp_source_getter_builtin, regexp_species_getter_builtin, regexp_sticky_getter_builtin,
-    regexp_symbol_match_all_builtin, regexp_symbol_match_builtin, regexp_symbol_replace_builtin,
-    regexp_symbol_search_builtin, regexp_symbol_split_builtin, regexp_test_builtin,
-    regexp_to_string_builtin, regexp_unicode_getter_builtin, set_add_builtin, set_builtin,
-    set_clear_builtin, set_delete_builtin, set_difference_builtin, set_entries_builtin,
-    set_for_each_builtin, set_has_builtin, set_intersection_builtin, set_is_disjoint_from_builtin,
+    regexp_string_iterator_next_builtin, regexp_symbol_match_all_builtin,
+    regexp_symbol_match_builtin, regexp_symbol_replace_builtin, regexp_symbol_search_builtin,
+    regexp_symbol_split_builtin, regexp_test_builtin, regexp_to_string_builtin,
+    regexp_unicode_getter_builtin, set_add_builtin, set_builtin, set_clear_builtin,
+    set_delete_builtin, set_difference_builtin, set_entries_builtin, set_for_each_builtin,
+    set_has_builtin, set_intersection_builtin, set_is_disjoint_from_builtin,
     set_is_subset_of_builtin, set_is_superset_of_builtin, set_iterator_next_builtin,
     set_keys_builtin, set_size_getter_builtin, set_symmetric_difference_builtin, set_union_builtin,
     set_values_builtin, shared_array_buffer_builtin,
@@ -534,6 +536,7 @@ pub struct PublicRealmBuiltins {
     regexp_multiline_getter: ObjectRef,
     regexp_dot_all_getter: ObjectRef,
     regexp_unicode_getter: ObjectRef,
+    regexp_unicode_sets_getter: ObjectRef,
     regexp_sticky_getter: ObjectRef,
     regexp_source_getter: ObjectRef,
     regexp_flags_getter: ObjectRef,
@@ -544,6 +547,7 @@ pub struct PublicRealmBuiltins {
     regexp_symbol_search: ObjectRef,
     regexp_symbol_split: ObjectRef,
     regexp_symbol_match_all: ObjectRef,
+    regexp_string_iterator_next: ObjectRef,
     date: ObjectRef,
     date_prototype: ObjectRef,
     date_now: ObjectRef,

@@ -41,6 +41,14 @@ pub fn regexp_symbol_match_all_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn regexp_string_iterator_next_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_STRING_ITERATOR_NEXT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn regexp_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(REGEXP_RAW) {
         Some(id) => id,
@@ -107,6 +115,14 @@ pub fn regexp_dot_all_getter_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn regexp_unicode_getter_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(REGEXP_UNICODE_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_unicode_sets_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_UNICODE_SETS_GETTER_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }

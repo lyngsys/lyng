@@ -662,6 +662,7 @@ pub(super) struct RegExpFamilyBuiltins {
     pub(super) regexp_multiline_getter: ObjectRef,
     pub(super) regexp_dot_all_getter: ObjectRef,
     pub(super) regexp_unicode_getter: ObjectRef,
+    pub(super) regexp_unicode_sets_getter: ObjectRef,
     pub(super) regexp_sticky_getter: ObjectRef,
     pub(super) regexp_source_getter: ObjectRef,
     pub(super) regexp_flags_getter: ObjectRef,
@@ -672,6 +673,7 @@ pub(super) struct RegExpFamilyBuiltins {
     pub(super) regexp_symbol_search: ObjectRef,
     pub(super) regexp_symbol_split: ObjectRef,
     pub(super) regexp_symbol_match_all: ObjectRef,
+    pub(super) regexp_string_iterator_next: ObjectRef,
 }
 
 #[derive(Clone, Copy, Debug)]

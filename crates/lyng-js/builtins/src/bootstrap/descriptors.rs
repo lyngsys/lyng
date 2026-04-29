@@ -115,6 +115,9 @@ fn resolve_intrinsic(
         BuiltinIntrinsic::StringIteratorPrototype => intrinsics.string_iterator_prototype(),
         BuiltinIntrinsic::RegExp => intrinsics.regexp(),
         BuiltinIntrinsic::RegExpPrototype => intrinsics.regexp_prototype(),
+        BuiltinIntrinsic::RegExpStringIteratorPrototype => {
+            intrinsics.regexp_string_iterator_prototype()
+        }
         BuiltinIntrinsic::Date => intrinsics.date(),
         BuiltinIntrinsic::DatePrototype => intrinsics.date_prototype(),
         BuiltinIntrinsic::Number => intrinsics.number(),

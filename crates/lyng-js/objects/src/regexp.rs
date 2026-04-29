@@ -1,5 +1,5 @@
 use regress::Regex;
-use std::{mem::size_of, ops::Range};
+use std::{fmt::Write as _, mem::size_of, ops::Range};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RegExpObjectFlags(u8);
@@ -264,18 +264,28 @@ pub struct RegExpPayload {
     flags: RegExpObjectFlags,
     flag_text: Box<str>,
     backend: Regex,
+    fast_pattern: Option<RegExpFastPattern>,
 }
 
-fn normalize_backend_pattern(pattern: &str) -> String {
-    [
-        (r"\p{Script=Unknown}", r"\P{Assigned}"),
-        (r"\p{Script=Zzzz}", r"\P{Assigned}"),
-        (r"\p{sc=Unknown}", r"\P{Assigned}"),
-        (r"\p{sc=Zzzz}", r"\P{Assigned}"),
-        (r"\p{Script_Extensions=Unknown}", r"\P{Assigned}"),
-        (r"\p{Script_Extensions=Zzzz}", r"\P{Assigned}"),
-        (r"\p{scx=Unknown}", r"\P{Assigned}"),
-        (r"\p{scx=Zzzz}", r"\P{Assigned}"),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RegExpFastPattern {
+    AsciiDigit,
+    AnchoredAsciiNonDigitRun,
+}
+
+fn normalize_backend_pattern(pattern: &str, flags: RegExpObjectFlags) -> String {
+    const UNKNOWN_SCRIPT_SET: &str =
+        r"[\P{Assigned}\p{General_Category=Surrogate}\p{General_Category=Private_Use}]";
+
+    let normalized = [
+        (r"\p{Script=Unknown}", UNKNOWN_SCRIPT_SET),
+        (r"\p{Script=Zzzz}", UNKNOWN_SCRIPT_SET),
+        (r"\p{sc=Unknown}", UNKNOWN_SCRIPT_SET),
+        (r"\p{sc=Zzzz}", UNKNOWN_SCRIPT_SET),
+        (r"\p{Script_Extensions=Unknown}", UNKNOWN_SCRIPT_SET),
+        (r"\p{Script_Extensions=Zzzz}", UNKNOWN_SCRIPT_SET),
+        (r"\p{scx=Unknown}", UNKNOWN_SCRIPT_SET),
+        (r"\p{scx=Zzzz}", UNKNOWN_SCRIPT_SET),
         (r"\P{Script=Unknown}", r"\p{Assigned}"),
         (r"\P{Script=Zzzz}", r"\p{Assigned}"),
         (r"\P{sc=Unknown}", r"\p{Assigned}"),
@@ -288,20 +298,129 @@ fn normalize_backend_pattern(pattern: &str) -> String {
     .into_iter()
     .fold(pattern.to_owned(), |current, (from, to)| {
         current.replace(from, to)
-    })
+    });
+
+    if flags.unicode_aware() {
+        normalized
+    } else {
+        expand_astral_source_for_ucs2(&normalized)
+    }
+}
+
+fn expand_astral_source_for_ucs2(pattern: &str) -> String {
+    if !pattern.chars().any(|ch| u32::from(ch) > 0xFFFF) {
+        return pattern.to_owned();
+    }
+
+    let chars = pattern.chars().collect::<Vec<_>>();
+    let mut expanded = String::with_capacity(pattern.len());
+    let mut in_class = false;
+    let mut index = 0;
+    while index < chars.len() {
+        if !in_class {
+            if let Some(end) = named_capture_span_end(&chars, index) {
+                expanded.extend(chars[index..end].iter());
+                index = end;
+                continue;
+            }
+            if let Some(end) = named_reference_span_end(&chars, index) {
+                expanded.extend(chars[index..end].iter());
+                index = end;
+                continue;
+            }
+        }
+
+        let ch = chars[index];
+        if ch == '\\' {
+            expanded.push(ch);
+            index += 1;
+            if let Some(&escaped) = chars.get(index) {
+                expanded.push(escaped);
+                index += 1;
+            }
+            continue;
+        }
+
+        if ch == '[' && !in_class {
+            expanded.push(ch);
+            in_class = true;
+            index += 1;
+            continue;
+        }
+
+        if ch == ']' && in_class {
+            expanded.push(ch);
+            in_class = false;
+            index += 1;
+            continue;
+        }
+
+        let code_point = u32::from(ch);
+        if code_point <= 0xFFFF {
+            expanded.push(ch);
+            index += 1;
+            continue;
+        }
+
+        let scalar = code_point - 0x1_0000;
+        let high = 0xD800 + (scalar >> 10);
+        let low = 0xDC00 + (scalar & 0x3FF);
+        if in_class {
+            write!(&mut expanded, r"\u{high:04X}\u{low:04X}")
+                .expect("writing to String cannot fail");
+        } else {
+            write!(&mut expanded, r"[\u{high:04X}][\u{low:04X}]")
+                .expect("writing to String cannot fail");
+        }
+        index += 1;
+    }
+    expanded
+}
+
+fn named_capture_span_end(chars: &[char], start: usize) -> Option<usize> {
+    if chars.get(start) != Some(&'(')
+        || chars.get(start + 1) != Some(&'?')
+        || chars.get(start + 2) != Some(&'<')
+        || matches!(chars.get(start + 3), Some('=') | Some('!'))
+    {
+        return None;
+    }
+    angle_name_span_end(chars, start + 3)
+}
+
+fn named_reference_span_end(chars: &[char], start: usize) -> Option<usize> {
+    if chars.get(start) != Some(&'\\')
+        || chars.get(start + 1) != Some(&'k')
+        || chars.get(start + 2) != Some(&'<')
+    {
+        return None;
+    }
+    angle_name_span_end(chars, start + 3)
+}
+
+fn angle_name_span_end(chars: &[char], mut index: usize) -> Option<usize> {
+    while index < chars.len() {
+        if chars[index] == '>' {
+            return Some(index + 1);
+        }
+        index += 1;
+    }
+    None
 }
 
 impl RegExpPayload {
     pub fn compile(pattern: &str, flags: &str) -> Result<Self, regress::Error> {
         let parsed_flags = RegExpObjectFlags::from_flag_text(flags);
-        let backend_pattern = normalize_backend_pattern(pattern);
+        let backend_pattern = normalize_backend_pattern(pattern, parsed_flags);
         let backend = Regex::with_flags(&backend_pattern, parsed_flags.compile_flags())?;
+        let fast_pattern = detect_fast_pattern(pattern, parsed_flags);
         Ok(Self {
             source: pattern.into(),
             source_units: None,
             flags: parsed_flags,
             flag_text: parsed_flags.ordered_flag_text().into_boxed_str(),
             backend,
+            fast_pattern,
         })
     }
 
@@ -347,6 +466,9 @@ impl RegExpPayload {
     }
 
     pub fn find_from_code_units(&self, text: &[u16], start: usize) -> Option<RegExpMatchRecord> {
+        if let Some(matched) = self.find_fast_from_code_units(text, start) {
+            return matched;
+        }
         let matched = if self.flags.unicode_aware() {
             self.backend.find_from_utf16(text, start).next()?
         } else {
@@ -364,4 +486,51 @@ impl RegExpPayload {
             named_captures,
         ))
     }
+
+    fn find_fast_from_code_units(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<Option<RegExpMatchRecord>> {
+        match self.fast_pattern? {
+            RegExpFastPattern::AsciiDigit => {
+                let matched = text.get(start..).and_then(|tail| {
+                    tail.iter()
+                        .position(|unit| is_ascii_digit_code_unit(*unit))
+                        .map(|offset| start + offset)
+                });
+                Some(matched.map(|index| simple_match_record(index..index + 1)))
+            }
+            RegExpFastPattern::AnchoredAsciiNonDigitRun => {
+                if start != 0
+                    || text.is_empty()
+                    || text.iter().any(|unit| is_ascii_digit_code_unit(*unit))
+                {
+                    return Some(None);
+                }
+                Some(Some(simple_match_record(0..text.len())))
+            }
+        }
+    }
+}
+
+fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExpFastPattern> {
+    match pattern {
+        r"\d" => Some(RegExpFastPattern::AsciiDigit),
+        r"^\D+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAsciiNonDigitRun),
+        _ => None,
+    }
+}
+
+#[inline]
+fn is_ascii_digit_code_unit(unit: u16) -> bool {
+    (0x30..=0x39).contains(&unit)
+}
+
+fn simple_match_record(range: Range<usize>) -> RegExpMatchRecord {
+    RegExpMatchRecord::new(
+        range,
+        Vec::<Option<Range<usize>>>::new().into_boxed_slice(),
+        Vec::<RegExpNamedCapture>::new().into_boxed_slice(),
+    )
 }
