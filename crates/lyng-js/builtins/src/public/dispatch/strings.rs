@@ -103,6 +103,9 @@ fn dispatch_string_transform_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::string_slice_builtin() {
         return string_slice_builtin(context, invocation).map(Some);
     }
+    if entry == super::string_substr_builtin() {
+        return string_substr_builtin(context, invocation).map(Some);
+    }
     if entry == super::string_substring_builtin() {
         return string_substring_builtin(context, invocation).map(Some);
     }
@@ -1191,6 +1194,52 @@ fn string_substring_builtin<Cx: PublicBuiltinDispatchContext>(
         (end_index, start_index)
     };
     Ok(string_from_code_units(cx, &units[from..to]))
+}
+
+fn string_substr_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let string = string_this_ref(cx, invocation.this_value())?;
+    let units = string_ref_code_units(cx, string)?;
+    let size = units.len();
+    let start = to_integer_or_infinity_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let start_index = if start == f64::NEG_INFINITY {
+        0
+    } else if start < 0.0 {
+        size.saturating_sub((-start).min(size as f64) as usize)
+    } else if !start.is_finite() {
+        size
+    } else {
+        (start as usize).min(size)
+    };
+
+    let substring_length = if let Some(value) = invocation.arguments().get(1).copied() {
+        if value.is_undefined() {
+            size as f64
+        } else {
+            to_integer_or_infinity_for_builtin(cx, value)?
+        }
+    } else {
+        size as f64
+    };
+    let remaining = size.saturating_sub(start_index);
+    let count = if substring_length <= 0.0 {
+        0
+    } else if !substring_length.is_finite() {
+        remaining
+    } else {
+        (substring_length as usize).min(remaining)
+    };
+    let end = start_index + count;
+    Ok(string_from_code_units(cx, &units[start_index..end]))
 }
 
 fn string_starts_with_builtin<Cx: PublicBuiltinDispatchContext>(

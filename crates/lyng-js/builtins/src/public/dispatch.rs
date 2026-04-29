@@ -183,7 +183,7 @@ use super::{
     string_normalize_builtin, string_pad_end_builtin, string_pad_start_builtin, string_raw_builtin,
     string_repeat_builtin, string_replace_all_builtin, string_replace_builtin,
     string_search_builtin, string_slice_builtin, string_split_builtin, string_starts_with_builtin,
-    string_substring_builtin, string_to_locale_lower_case_builtin,
+    string_substr_builtin, string_substring_builtin, string_to_locale_lower_case_builtin,
     string_to_locale_upper_case_builtin, string_to_lower_case_builtin, string_to_string_builtin,
     string_to_upper_case_builtin, string_to_well_formed_builtin, string_trim_builtin,
     string_trim_end_builtin, string_trim_start_builtin, string_value_of_builtin, symbol_builtin,

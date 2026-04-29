@@ -162,6 +162,14 @@ pub(super) fn zoned_date_time_public_builtin_metadata(
     if entry == lyng_js_types::temporal_zoned_date_time_start_of_day_builtin() {
         return Some(BuiltinEntryMetadata::new("startOfDay", 0, false, false));
     }
+    if entry == lyng_js_types::temporal_zoned_date_time_get_time_zone_transition_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "getTimeZoneTransition",
+            1,
+            false,
+            false,
+        ));
+    }
     if entry == lyng_js_types::temporal_zoned_date_time_hours_in_day_getter_builtin() {
         return Some(BuiltinEntryMetadata::new("get hoursInDay", 0, false, false));
     }

@@ -776,6 +776,32 @@ fn temporal_instant_round_since_and_until_are_exact_time_operations() {
 }
 
 #[test]
+fn temporal_instant_difference_uses_number_precision_duration_fields() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let i1 = new Temporal.Instant(0n);
+        let i2 = new Temporal.Instant(18446744073_709_551_616n);
+        let since = i1.since(i2, { largestUnit: "microseconds" });
+        let until = i1.until(i2, { largestUnit: "microseconds" });
+        [
+            since.microseconds,
+            since.toString(),
+            Temporal.Duration.compare(since.add({ microseconds: 1 }), since),
+            until.microseconds,
+            until.toString(),
+            Temporal.Duration.compare(until.add({ microseconds: 1 }), until),
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "-18446744073709550|-PT18446744073.709552616S|0|18446744073709550|PT18446744073.709552616S|0"
+    );
+}
+
+#[test]
 fn temporal_instant_round_accepts_day_dividing_increments() {
     let result = compile_and_run_string_with_host(
         r#"

@@ -22,7 +22,7 @@ use lyng_js_types::{
     string_match_all_builtin, string_match_builtin, string_normalize_builtin,
     string_pad_end_builtin, string_pad_start_builtin, string_raw_builtin, string_repeat_builtin,
     string_replace_all_builtin, string_replace_builtin, string_search_builtin,
-    string_slice_builtin, string_split_builtin, string_starts_with_builtin,
+    string_slice_builtin, string_split_builtin, string_starts_with_builtin, string_substr_builtin,
     string_substring_builtin, string_to_locale_lower_case_builtin,
     string_to_locale_upper_case_builtin, string_to_lower_case_builtin, string_to_string_builtin,
     string_to_upper_case_builtin, string_to_well_formed_builtin, string_trim_builtin,
@@ -163,6 +163,7 @@ pub(in crate::public) fn install_string_family(
         string_search: install_public_builtin_function(agent, cx, string_search_builtin(), None),
         string_split: install_public_builtin_function(agent, cx, string_split_builtin(), None),
         string_slice: install_public_builtin_function(agent, cx, string_slice_builtin(), None),
+        string_substr: install_public_builtin_function(agent, cx, string_substr_builtin(), None),
         string_substring: install_public_builtin_function(
             agent,
             cx,
@@ -277,6 +278,7 @@ pub(in crate::public) fn string_builtin_object(
         (string_search_builtin(), builtins.string_search),
         (string_split_builtin(), builtins.string_split),
         (string_slice_builtin(), builtins.string_slice),
+        (string_substr_builtin(), builtins.string_substr),
         (string_substring_builtin(), builtins.string_substring),
         (string_starts_with_builtin(), builtins.string_starts_with),
         (
@@ -442,6 +444,7 @@ struct StringDescriptorAtoms {
     search: AtomId,
     split: AtomId,
     slice: AtomId,
+    substr: AtomId,
     substring: AtomId,
     starts_with: AtomId,
     to_locale_lower_case: AtomId,
@@ -484,6 +487,7 @@ impl StringDescriptorAtoms {
             search: agent.atoms_mut().intern("search"),
             split: agent.atoms_mut().intern("split"),
             slice: agent.atoms_mut().intern("slice"),
+            substr: agent.atoms_mut().intern("substr"),
             substring: agent.atoms_mut().intern("substring"),
             starts_with: agent.atoms_mut().intern("startsWith"),
             to_locale_lower_case: agent.atoms_mut().intern("toLocaleLowerCase"),
@@ -512,7 +516,7 @@ fn string_constructor_method_specs(
 
 fn string_prototype_method_specs(
     atoms: StringDescriptorAtoms,
-) -> [(AtomId, BuiltinFunctionId); 34] {
+) -> [(AtomId, BuiltinFunctionId); 35] {
     [
         (WellKnownAtom::toString.id(), string_to_string_builtin()),
         (WellKnownAtom::valueOf.id(), string_value_of_builtin()),
@@ -538,6 +542,7 @@ fn string_prototype_method_specs(
         (atoms.search, string_search_builtin()),
         (atoms.split, string_split_builtin()),
         (atoms.slice, string_slice_builtin()),
+        (atoms.substr, string_substr_builtin()),
         (atoms.substring, string_substring_builtin()),
         (atoms.starts_with, string_starts_with_builtin()),
         (

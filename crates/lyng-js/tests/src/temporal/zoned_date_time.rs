@@ -322,6 +322,57 @@ fn temporal_zoned_date_time_start_of_day_and_hours_in_day_use_zone_resolution() 
 }
 
 #[test]
+fn temporal_zoned_date_time_get_time_zone_transition_validates_direction_and_no_transition_zones() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let utc = new Temporal.ZonedDateTime(0n, "UTC");
+        let offset = new Temporal.ZonedDateTime(0n, "-10:00");
+        let method = Temporal.ZonedDateTime.prototype.getTimeZoneTransition;
+        let missingDirectionThrew = (() => {
+            try {
+                utc.getTimeZoneTransition();
+                return false;
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        })();
+        let invalidDirectionThrew = (() => {
+            try {
+                utc.getTimeZoneTransition({ direction: "following" });
+                return false;
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        })();
+        let invalidReceiverThrew = (() => {
+            try {
+                method.call({}, "next");
+                return false;
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        })();
+        [
+            method.name,
+            method.length,
+            utc.getTimeZoneTransition("next") === null,
+            utc.getTimeZoneTransition({ direction: "previous" }) === null,
+            offset.getTimeZoneTransition("next") === null,
+            missingDirectionThrew,
+            invalidDirectionThrew,
+            invalidReceiverThrew
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "getTimeZoneTransition|1|true|true|true|true|true|true"
+    );
+}
+
+#[test]
 fn temporal_zoned_date_time_to_string_honors_precision_and_annotation_options() {
     let result = compile_and_run_string_with_host(
         r#"

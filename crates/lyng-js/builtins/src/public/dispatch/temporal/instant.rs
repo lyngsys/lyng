@@ -730,7 +730,7 @@ fn temporal_instant_difference_builtin<Cx: PublicBuiltinDispatchContext>(
     let increment = temporal_exact_time_unit_nanoseconds(options.smallest_unit)
         .checked_mul(options.rounding_increment)
         .ok_or_else(|| range_error(cx))?;
-    let rounded = temporal_round_epoch_nanoseconds_to_increment(
+    let rounded = temporal_round_duration_nanoseconds_to_increment(
         raw_difference,
         increment,
         options.rounding_mode,

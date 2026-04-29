@@ -273,6 +273,14 @@ pub fn string_substring_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn string_substr_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_SUBSTR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn string_starts_with_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(STRING_STARTS_WITH_RAW) {
         Some(id) => id,

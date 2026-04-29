@@ -34,94 +34,94 @@ impl TemporalInstantObjectData {
 /// One `Temporal.Duration` payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct TemporalDurationObjectData {
-    years: i64,
-    months: i64,
-    weeks: i64,
-    days: i64,
-    hours: i64,
-    minutes: i64,
-    seconds: i64,
-    milliseconds: i64,
-    microseconds: i64,
-    nanoseconds: i64,
+    years: i128,
+    months: i128,
+    weeks: i128,
+    days: i128,
+    hours: i128,
+    minutes: i128,
+    seconds: i128,
+    milliseconds: i128,
+    microseconds: i128,
+    nanoseconds: i128,
 }
 
 impl TemporalDurationObjectData {
     #[inline]
     #[allow(clippy::too_many_arguments)]
-    pub const fn new(
-        years: i64,
-        months: i64,
-        weeks: i64,
-        days: i64,
-        hours: i64,
-        minutes: i64,
-        seconds: i64,
-        milliseconds: i64,
-        microseconds: i64,
-        nanoseconds: i64,
+    pub fn new(
+        years: impl Into<i128>,
+        months: impl Into<i128>,
+        weeks: impl Into<i128>,
+        days: impl Into<i128>,
+        hours: impl Into<i128>,
+        minutes: impl Into<i128>,
+        seconds: impl Into<i128>,
+        milliseconds: impl Into<i128>,
+        microseconds: impl Into<i128>,
+        nanoseconds: impl Into<i128>,
     ) -> Self {
         Self {
-            years,
-            months,
-            weeks,
-            days,
-            hours,
-            minutes,
-            seconds,
-            milliseconds,
-            microseconds,
-            nanoseconds,
+            years: years.into(),
+            months: months.into(),
+            weeks: weeks.into(),
+            days: days.into(),
+            hours: hours.into(),
+            minutes: minutes.into(),
+            seconds: seconds.into(),
+            milliseconds: milliseconds.into(),
+            microseconds: microseconds.into(),
+            nanoseconds: nanoseconds.into(),
         }
     }
 
     #[inline]
-    pub const fn years(self) -> i64 {
+    pub const fn years(self) -> i128 {
         self.years
     }
 
     #[inline]
-    pub const fn months(self) -> i64 {
+    pub const fn months(self) -> i128 {
         self.months
     }
 
     #[inline]
-    pub const fn weeks(self) -> i64 {
+    pub const fn weeks(self) -> i128 {
         self.weeks
     }
 
     #[inline]
-    pub const fn days(self) -> i64 {
+    pub const fn days(self) -> i128 {
         self.days
     }
 
     #[inline]
-    pub const fn hours(self) -> i64 {
+    pub const fn hours(self) -> i128 {
         self.hours
     }
 
     #[inline]
-    pub const fn minutes(self) -> i64 {
+    pub const fn minutes(self) -> i128 {
         self.minutes
     }
 
     #[inline]
-    pub const fn seconds(self) -> i64 {
+    pub const fn seconds(self) -> i128 {
         self.seconds
     }
 
     #[inline]
-    pub const fn milliseconds(self) -> i64 {
+    pub const fn milliseconds(self) -> i128 {
         self.milliseconds
     }
 
     #[inline]
-    pub const fn microseconds(self) -> i64 {
+    pub const fn microseconds(self) -> i128 {
         self.microseconds
     }
 
     #[inline]
-    pub const fn nanoseconds(self) -> i64 {
+    pub const fn nanoseconds(self) -> i128 {
         self.nanoseconds
     }
 }

@@ -62,6 +62,7 @@ use lyng_js_ops::temporal::{
     plain_date_ordinal_day as temporal_plain_date_ordinal_day,
     plain_time_nanoseconds as temporal_plain_time_nanoseconds,
     round_duration_exact as temporal_round_duration_exact,
+    round_duration_nanoseconds_to_increment as temporal_round_duration_nanoseconds_to_increment,
     round_epoch_nanoseconds_to_fractional_digits as temporal_round_epoch_nanoseconds_to_fractional_digits,
     round_epoch_nanoseconds_to_increment as temporal_round_epoch_nanoseconds_to_increment,
     total_duration_exact as temporal_total_duration_exact,

@@ -361,6 +361,14 @@ pub fn temporal_zoned_date_time_start_of_day_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn temporal_zoned_date_time_get_time_zone_transition_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(TEMPORAL_ZONED_DATE_TIME_GET_TIME_ZONE_TRANSITION_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn temporal_zoned_date_time_hours_in_day_getter_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(TEMPORAL_ZONED_DATE_TIME_HOURS_IN_DAY_GETTER_RAW) {
         Some(id) => id,

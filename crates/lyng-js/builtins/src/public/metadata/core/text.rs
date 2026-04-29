@@ -186,6 +186,10 @@ pub(in crate::public::metadata) const PUBLIC_TEXT_BUILTIN_METADATA: &[PublicBuil
         BuiltinEntryMetadata::new("slice", 2, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        string_substr_builtin,
+        BuiltinEntryMetadata::new("substr", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         string_substring_builtin,
         BuiltinEntryMetadata::new("substring", 2, false, false),
     ),

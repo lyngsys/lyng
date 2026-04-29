@@ -645,6 +645,43 @@ fn phase6_string_edge_cases_cover_remaining_text_failures() {
 }
 
 #[test]
+fn script_core_supports_annex_b_string_substr() {
+    let result = compile_and_run_string(
+        r#"
+        let method = String.prototype.substr;
+        let nullThis = "no-throw";
+        try {
+            method.call(null, 0, 1);
+        } catch (error) {
+            nullThis = error.constructor === TypeError;
+        }
+
+        [
+            typeof method,
+            method.length,
+            method.name,
+            "abcdef".substr(1, 3),
+            "abcdef".substr(-2),
+            "abcdef".substr(-20, 2),
+            "abcdef".substr(2, 0),
+            "abcdef".substr(2, -1),
+            "abcdef".substr(2, undefined),
+            "abcdef".substr(NaN, Infinity),
+            "abcdef".substr(-Infinity, 1),
+            "abcdef".substr(Infinity, 1),
+            method.call(new Boolean(true), 1, 2),
+            nullThis
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "function|2|substr|bcd|ef|ab|||cdef|abcdef|a||ru|true"
+    );
+}
+
+#[test]
 fn script_core_supports_for_of_destructuring_assignment_heads() {
     let result = compile_and_run_string(
         r#"
@@ -4851,4 +4888,21 @@ fn script_core_reads_default_nan_global() {
     let result = compile_and_run("NaN;");
 
     assert!(result.is_nan());
+}
+
+#[test]
+fn script_core_captures_loop_body_lexicals_in_arrow_without_invoking_closure() {
+    let result = compile_and_run_string(
+        r#"
+        var sink = function (f) { return; };
+        const units = ["a", "b"];
+        for (let i = 0; i < units.length; i++) {
+            const value = units[i];
+            sink(() => value);
+        }
+        "ok";
+        "#,
+    );
+
+    assert_eq!(result, "ok");
 }

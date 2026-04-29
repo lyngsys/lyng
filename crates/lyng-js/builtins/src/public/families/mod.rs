@@ -631,6 +631,7 @@ pub(super) struct StringFamilyBuiltins {
     pub(super) string_search: ObjectRef,
     pub(super) string_split: ObjectRef,
     pub(super) string_slice: ObjectRef,
+    pub(super) string_substr: ObjectRef,
     pub(super) string_substring: ObjectRef,
     pub(super) string_starts_with: ObjectRef,
     pub(super) string_to_locale_lower_case: ObjectRef,

@@ -1027,6 +1027,11 @@ pub(super) fn temporal_exact_time_round_options_with_validator<Cx: PublicBuiltin
     })
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    reason = "Temporal Duration fields are stored as float64-representable integer values."
+)]
 pub(super) fn temporal_duration_from_nanoseconds_with_largest_unit<
     Cx: PublicBuiltinDispatchContext,
 >(
@@ -1038,7 +1043,8 @@ pub(super) fn temporal_duration_from_nanoseconds_with_largest_unit<
     let mut part = |unit: i128| -> Result<i64, Cx::Error> {
         let value = remainder / unit;
         remainder %= unit;
-        i64::try_from(value).map_err(|_| range_error(cx))
+        let value = i64::try_from(value).map_err(|_| range_error(cx))?;
+        Ok((value as f64) as i64)
     };
     let hours = if temporal_exact_time_largest_unit_includes(
         largest_unit,

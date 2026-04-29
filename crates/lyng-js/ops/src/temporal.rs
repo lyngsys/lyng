@@ -90,7 +90,7 @@ enum DurationLargestTimeUnit {
     Second,
 }
 
-pub fn duration_components(data: TemporalDurationObjectData) -> [i64; 10] {
+pub fn duration_components(data: TemporalDurationObjectData) -> [i128; 10] {
     [
         data.years(),
         data.months(),
@@ -283,14 +283,38 @@ pub fn add_durations(
     left: TemporalDurationObjectData,
     right: TemporalDurationObjectData,
 ) -> Option<TemporalDurationObjectData> {
-    combine_durations(left, right, 1)
+    add_durations_with_largest_unit(
+        left,
+        right,
+        duration_largest_exact_unit_for_addition(left, duration_largest_exact_unit(right)),
+    )
 }
 
 pub fn subtract_durations(
     left: TemporalDurationObjectData,
     right: TemporalDurationObjectData,
 ) -> Option<TemporalDurationObjectData> {
-    combine_durations(left, right, -1)
+    subtract_durations_with_largest_unit(
+        left,
+        right,
+        duration_largest_exact_unit_for_addition(left, duration_largest_exact_unit(right)),
+    )
+}
+
+pub fn add_durations_with_largest_unit(
+    left: TemporalDurationObjectData,
+    right: TemporalDurationObjectData,
+    largest_unit: TemporalDurationExactUnit,
+) -> Option<TemporalDurationObjectData> {
+    combine_durations(left, right, 1, largest_unit)
+}
+
+pub fn subtract_durations_with_largest_unit(
+    left: TemporalDurationObjectData,
+    right: TemporalDurationObjectData,
+    largest_unit: TemporalDurationExactUnit,
+) -> Option<TemporalDurationObjectData> {
+    combine_durations(left, right, -1, largest_unit)
 }
 
 pub fn balance_duration_subsecond_fields(
@@ -322,17 +346,17 @@ fn combine_durations(
     left: TemporalDurationObjectData,
     right: TemporalDurationObjectData,
     right_sign: i128,
+    largest_unit: TemporalDurationExactUnit,
 ) -> Option<TemporalDurationObjectData> {
     let years = combine_component(left.years(), right.years(), right_sign)?;
     let months = combine_component(left.months(), right.months(), right_sign)?;
     let weeks = combine_component(left.weeks(), right.weeks(), right_sign)?;
-    let day_time_nanoseconds =
-        i128::from(combine_component(left.days(), right.days(), right_sign)?)
-            .checked_mul(NANOS_PER_DAY)?
-            .checked_add(duration_time_nanoseconds(left))?
-            .checked_add(duration_time_nanoseconds(right).checked_mul(right_sign)?)?;
+    let day_time_nanoseconds = combine_component(left.days(), right.days(), right_sign)?
+        .checked_mul(NANOS_PER_DAY)?
+        .checked_add(duration_time_nanoseconds(left))?
+        .checked_add(duration_time_nanoseconds(right).checked_mul(right_sign)?)?;
     let [days, hours, minutes, seconds, milliseconds, microseconds, nanoseconds] =
-        distribute_day_time_nanoseconds(day_time_nanoseconds)?;
+        distribute_additive_duration_nanoseconds(day_time_nanoseconds, largest_unit)?;
     Some(TemporalDurationObjectData::new(
         years,
         months,
@@ -347,33 +371,18 @@ fn combine_durations(
     ))
 }
 
-fn combine_component(left: i64, right: i64, right_sign: i128) -> Option<i64> {
-    let value = i128::from(left).checked_add(i128::from(right).checked_mul(right_sign)?)?;
-    i64::try_from(value).ok()
+fn combine_component(left: i128, right: i128, right_sign: i128) -> Option<i128> {
+    let value = left.checked_add(right.checked_mul(right_sign)?)?;
+    duration_component_from_integer(value)
 }
 
-fn distribute_day_time_nanoseconds(nanoseconds: i128) -> Option<[i64; 7]> {
-    let days = nanoseconds / NANOS_PER_DAY;
-    let nanoseconds = nanoseconds % NANOS_PER_DAY;
-    let hours = nanoseconds / NANOS_PER_HOUR;
-    let nanoseconds = nanoseconds % NANOS_PER_HOUR;
-    let minutes = nanoseconds / NANOS_PER_MINUTE;
-    let nanoseconds = nanoseconds % NANOS_PER_MINUTE;
-    let seconds = nanoseconds / NANOS_PER_SECOND;
-    let nanoseconds = nanoseconds % NANOS_PER_SECOND;
-    let milliseconds = nanoseconds / NANOS_PER_MILLISECOND;
-    let nanoseconds = nanoseconds % NANOS_PER_MILLISECOND;
-    let microseconds = nanoseconds / NANOS_PER_MICROSECOND;
-    let nanoseconds = nanoseconds % NANOS_PER_MICROSECOND;
-    Some([
-        i64::try_from(days).ok()?,
-        i64::try_from(hours).ok()?,
-        i64::try_from(minutes).ok()?,
-        i64::try_from(seconds).ok()?,
-        i64::try_from(milliseconds).ok()?,
-        i64::try_from(microseconds).ok()?,
-        i64::try_from(nanoseconds).ok()?,
-    ])
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    reason = "Temporal Duration fields are stored as float64-representable integer values."
+)]
+fn duration_component_from_integer(value: i128) -> Option<i128> {
+    Some((value as f64) as i128)
 }
 
 pub fn parse_duration(text: &str) -> Option<TemporalDurationObjectData> {
@@ -648,7 +657,15 @@ pub fn round_epoch_nanoseconds_to_increment(
     increment: i128,
     rounding_mode: TemporalRoundingMode,
 ) -> Option<i128> {
-    round_i128_to_increment(epoch_nanoseconds, increment, rounding_mode)
+    round_i128_to_increment_as_if_positive(epoch_nanoseconds, increment, rounding_mode)
+}
+
+pub fn round_duration_nanoseconds_to_increment(
+    duration_nanoseconds: i128,
+    increment: i128,
+    rounding_mode: TemporalRoundingMode,
+) -> Option<i128> {
+    round_i128_to_increment(duration_nanoseconds, increment, rounding_mode)
 }
 
 fn round_i128_to_increment(
@@ -724,6 +741,51 @@ fn round_i128_to_increment(
     Some(rounded)
 }
 
+fn round_i128_to_increment_as_if_positive(
+    value: i128,
+    increment: i128,
+    rounding_mode: TemporalRoundingMode,
+) -> Option<i128> {
+    let quotient = value.div_euclid(increment);
+    let remainder = value.rem_euclid(increment);
+    let lower = quotient.checked_mul(increment)?;
+    if remainder == 0 {
+        return Some(lower);
+    }
+    let upper = quotient.checked_add(1)?.checked_mul(increment)?;
+    let rounded = match rounding_mode {
+        TemporalRoundingMode::Ceil | TemporalRoundingMode::Expand => upper,
+        TemporalRoundingMode::Floor | TemporalRoundingMode::Trunc => lower,
+        TemporalRoundingMode::HalfCeil
+        | TemporalRoundingMode::HalfFloor
+        | TemporalRoundingMode::HalfExpand
+        | TemporalRoundingMode::HalfTrunc
+        | TemporalRoundingMode::HalfEven => {
+            let twice = remainder.checked_mul(2)?;
+            match twice.cmp(&increment) {
+                std::cmp::Ordering::Less => lower,
+                std::cmp::Ordering::Greater => upper,
+                std::cmp::Ordering::Equal => match rounding_mode {
+                    TemporalRoundingMode::HalfCeil | TemporalRoundingMode::HalfExpand => upper,
+                    TemporalRoundingMode::HalfFloor | TemporalRoundingMode::HalfTrunc => lower,
+                    TemporalRoundingMode::HalfEven => {
+                        if quotient.rem_euclid(2) == 0 {
+                            lower
+                        } else {
+                            upper
+                        }
+                    }
+                    TemporalRoundingMode::Ceil
+                    | TemporalRoundingMode::Floor
+                    | TemporalRoundingMode::Expand
+                    | TemporalRoundingMode::Trunc => unreachable!("filtered to half modes"),
+                },
+            }
+        }
+    };
+    Some(rounded)
+}
+
 fn duration_largest_time_unit(data: TemporalDurationObjectData) -> DurationLargestTimeUnit {
     if data.days() != 0 {
         DurationLargestTimeUnit::Day
@@ -736,10 +798,49 @@ fn duration_largest_time_unit(data: TemporalDurationObjectData) -> DurationLarge
     }
 }
 
+pub fn duration_largest_exact_unit(data: TemporalDurationObjectData) -> TemporalDurationExactUnit {
+    if data.days() != 0 {
+        TemporalDurationExactUnit::Day
+    } else if data.hours() != 0 {
+        TemporalDurationExactUnit::Hour
+    } else if data.minutes() != 0 {
+        TemporalDurationExactUnit::Minute
+    } else if data.seconds() != 0 {
+        TemporalDurationExactUnit::Second
+    } else if data.milliseconds() != 0 {
+        TemporalDurationExactUnit::Millisecond
+    } else if data.microseconds() != 0 {
+        TemporalDurationExactUnit::Microsecond
+    } else {
+        TemporalDurationExactUnit::Nanosecond
+    }
+}
+
+pub fn duration_largest_exact_unit_for_addition(
+    left: TemporalDurationObjectData,
+    right: TemporalDurationExactUnit,
+) -> TemporalDurationExactUnit {
+    if left.days() != 0 || right == TemporalDurationExactUnit::Day {
+        TemporalDurationExactUnit::Day
+    } else if left.hours() != 0 || right == TemporalDurationExactUnit::Hour {
+        TemporalDurationExactUnit::Hour
+    } else if left.minutes() != 0 || right == TemporalDurationExactUnit::Minute {
+        TemporalDurationExactUnit::Minute
+    } else if left.seconds() != 0 || right == TemporalDurationExactUnit::Second {
+        TemporalDurationExactUnit::Second
+    } else if left.milliseconds() != 0 || right == TemporalDurationExactUnit::Millisecond {
+        TemporalDurationExactUnit::Millisecond
+    } else if left.microseconds() != 0 || right == TemporalDurationExactUnit::Microsecond {
+        TemporalDurationExactUnit::Microsecond
+    } else {
+        TemporalDurationExactUnit::Nanosecond
+    }
+}
+
 fn distribute_duration_nanoseconds_for_largest_unit(
     nanoseconds: i128,
     largest_unit: DurationLargestTimeUnit,
-) -> Option<[i64; 7]> {
+) -> Option<[i128; 7]> {
     let units: &[(usize, i128)] = match largest_unit {
         DurationLargestTimeUnit::Day => &[
             (0, NANOS_PER_DAY),
@@ -772,19 +873,19 @@ fn distribute_duration_nanoseconds_for_largest_unit(
             (6, 1),
         ],
     };
-    let mut parts = [0_i64; 7];
+    let mut parts = [0_i128; 7];
     let mut remainder = nanoseconds;
     for (index, unit) in units {
-        parts[*index] = i64::try_from(remainder / *unit).ok()?;
+        parts[*index] = duration_component_from_integer(remainder / *unit)?;
         remainder %= *unit;
     }
     Some(parts)
 }
 
-fn distribute_duration_nanoseconds_for_exact_largest_unit(
+fn distribute_additive_duration_nanoseconds(
     nanoseconds: i128,
     largest_unit: TemporalDurationExactUnit,
-) -> Option<[i64; 7]> {
+) -> Option<[i128; 7]> {
     const UNITS: [(TemporalDurationExactUnit, usize, i128); 7] = [
         (TemporalDurationExactUnit::Day, 0, NANOS_PER_DAY),
         (TemporalDurationExactUnit::Hour, 1, NANOS_PER_HOUR),
@@ -802,11 +903,42 @@ fn distribute_duration_nanoseconds_for_exact_largest_unit(
         ),
         (TemporalDurationExactUnit::Nanosecond, 6, 1),
     ];
-    let mut parts = [0_i64; 7];
+    let mut parts = [0_i128; 7];
     let mut remainder = nanoseconds;
     let start = usize::from(largest_unit.order());
     for (_, index, unit) in &UNITS[start..] {
-        parts[*index] = i64::try_from(remainder / *unit).ok()?;
+        parts[*index] = duration_component_from_integer(remainder / *unit)?;
+        remainder %= *unit;
+    }
+    Some(parts)
+}
+
+fn distribute_duration_nanoseconds_for_exact_largest_unit(
+    nanoseconds: i128,
+    largest_unit: TemporalDurationExactUnit,
+) -> Option<[i128; 7]> {
+    const UNITS: [(TemporalDurationExactUnit, usize, i128); 7] = [
+        (TemporalDurationExactUnit::Day, 0, NANOS_PER_DAY),
+        (TemporalDurationExactUnit::Hour, 1, NANOS_PER_HOUR),
+        (TemporalDurationExactUnit::Minute, 2, NANOS_PER_MINUTE),
+        (TemporalDurationExactUnit::Second, 3, NANOS_PER_SECOND),
+        (
+            TemporalDurationExactUnit::Millisecond,
+            4,
+            NANOS_PER_MILLISECOND,
+        ),
+        (
+            TemporalDurationExactUnit::Microsecond,
+            5,
+            NANOS_PER_MICROSECOND,
+        ),
+        (TemporalDurationExactUnit::Nanosecond, 6, 1),
+    ];
+    let mut parts = [0_i128; 7];
+    let mut remainder = nanoseconds;
+    let start = usize::from(largest_unit.order());
+    for (_, index, unit) in &UNITS[start..] {
+        parts[*index] = duration_component_from_integer(remainder / *unit)?;
         remainder %= *unit;
     }
     Some(parts)
@@ -1163,19 +1295,19 @@ mod tests {
             0,
             0,
             0,
-            104_249_991_374,
+            104_249_991_374_i128,
             0,
             0,
             0,
             0,
             0,
-            27_391_999_999_999,
+            27_391_999_999_999_i128,
         )));
         assert!(!duration_is_within_limits(TemporalDurationObjectData::new(
             0,
             0,
             0,
-            104_249_991_375,
+            104_249_991_375_i128,
             0,
             0,
             0,
@@ -1211,7 +1343,7 @@ mod tests {
             0,
             0,
             0,
-            -104_249_991_375,
+            -104_249_991_375_i128,
             0,
             0,
             0,
@@ -1257,6 +1389,114 @@ mod tests {
                 0,
             ),
             Some([-9_007_199_254_740_991, -975, -424, 0])
+        );
+    }
+
+    #[test]
+    fn epoch_nanosecond_rounding_uses_as_if_positive_modes_for_negative_values() {
+        let half_second_before_epoch_year = -65_261_246_399_500_000_000_i128;
+        assert_eq!(
+            round_epoch_nanoseconds_to_increment(
+                half_second_before_epoch_year,
+                NANOS_PER_SECOND,
+                TemporalRoundingMode::Floor,
+            ),
+            Some(-65_261_246_400_000_000_000)
+        );
+        assert_eq!(
+            round_epoch_nanoseconds_to_increment(
+                half_second_before_epoch_year,
+                NANOS_PER_SECOND,
+                TemporalRoundingMode::Trunc,
+            ),
+            Some(-65_261_246_400_000_000_000)
+        );
+        assert_eq!(
+            round_epoch_nanoseconds_to_increment(
+                half_second_before_epoch_year,
+                NANOS_PER_SECOND,
+                TemporalRoundingMode::Ceil,
+            ),
+            Some(-65_261_246_399_000_000_000)
+        );
+        assert_eq!(
+            round_epoch_nanoseconds_to_increment(
+                half_second_before_epoch_year,
+                NANOS_PER_SECOND,
+                TemporalRoundingMode::HalfExpand,
+            ),
+            Some(-65_261_246_399_000_000_000)
+        );
+
+        let instant = -1_000_000_000_000_000_000_i128;
+        assert_eq!(
+            round_epoch_nanoseconds_to_increment(
+                instant,
+                NANOS_PER_HOUR,
+                TemporalRoundingMode::HalfExpand,
+            ),
+            Some(-1_000_000_800_000_000_000)
+        );
+        assert_eq!(
+            round_epoch_nanoseconds_to_increment(
+                instant,
+                NANOS_PER_HOUR,
+                TemporalRoundingMode::Expand,
+            ),
+            Some(-999_997_200_000_000_000)
+        );
+    }
+
+    #[test]
+    fn duration_nanosecond_rounding_keeps_signed_modes_for_negative_values() {
+        let negative_duration = -1_500_000_000_i128;
+        assert_eq!(
+            round_duration_nanoseconds_to_increment(
+                negative_duration,
+                NANOS_PER_SECOND,
+                TemporalRoundingMode::Floor,
+            ),
+            Some(-2_000_000_000)
+        );
+        assert_eq!(
+            round_duration_nanoseconds_to_increment(
+                negative_duration,
+                NANOS_PER_SECOND,
+                TemporalRoundingMode::Trunc,
+            ),
+            Some(-1_000_000_000)
+        );
+        assert_eq!(
+            round_duration_nanoseconds_to_increment(
+                negative_duration,
+                NANOS_PER_SECOND,
+                TemporalRoundingMode::Ceil,
+            ),
+            Some(-1_000_000_000)
+        );
+        assert_eq!(
+            round_duration_nanoseconds_to_increment(
+                negative_duration,
+                NANOS_PER_SECOND,
+                TemporalRoundingMode::Expand,
+            ),
+            Some(-2_000_000_000)
+        );
+        assert_eq!(
+            round_duration_nanoseconds_to_increment(
+                negative_duration,
+                NANOS_PER_SECOND,
+                TemporalRoundingMode::HalfExpand,
+            ),
+            Some(-2_000_000_000)
+        );
+        assert_eq!(
+            round_duration_nanoseconds_to_increment(
+                negative_duration,
+                NANOS_PER_SECOND,
+                TemporalRoundingMode::HalfTrunc,
+            ),
+            Some(-1_000_000_000)
         );
     }
 
@@ -1473,7 +1713,8 @@ mod tests {
             [0, 0, 0, 104, 5, 41, 41, 1, 1, 0]
         );
         let left = TemporalDurationObjectData::new(0, 0, 0, 0, 1, 0, 3721, 0, 0, 0);
-        let right = TemporalDurationObjectData::new(0, 0, 0, 0, 0, 61, 0, 0, 0, 3_722_000_000_001);
+        let right =
+            TemporalDurationObjectData::new(0, 0, 0, 0, 0, 61, 0, 0, 0, 3_722_000_000_001_i128);
         assert_eq!(
             duration_components(subtract_durations(left, right).unwrap()),
             [0, 0, 0, 0, 0, -1, -1, 0, 0, -1]

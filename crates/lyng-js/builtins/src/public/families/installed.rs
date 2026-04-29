@@ -372,6 +372,7 @@ impl InstalledBuiltinFamilies {
             string_search: string_family.string_search,
             string_split: string_family.string_split,
             string_slice: string_family.string_slice,
+            string_substr: string_family.string_substr,
             string_substring: string_family.string_substring,
             string_starts_with: string_family.string_starts_with,
             string_to_locale_lower_case: string_family.string_to_locale_lower_case,

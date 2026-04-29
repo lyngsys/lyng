@@ -151,9 +151,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         } else {
             None
         };
+        let loop_iteration_plan = self.loop_body_iteration_plan(body)?;
+        if let Some(plan) = &loop_iteration_plan {
+            let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
+            self.builder.add_loop_iteration_environment_site(
+                push,
+                plan.iteration_slots.clone(),
+                plan.shared_slots.clone(),
+            );
+        }
         self.lower_statement(body)?;
         let continue_target = self.builder.current_offset()?;
         self.patch_continue_placeholders(target, continue_target)?;
+        if loop_iteration_plan.is_some() {
+            self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
+        }
         if let Some(update) = update {
             let update_register = self.alloc_temp()?;
             self.lower_expr_into(update, update_register)?;
@@ -161,11 +173,15 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
         self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge)?;
         self.builder.patch_jump_to(jump_back, loop_start)?;
+        let break_cleanup = self.builder.current_offset()?;
+        if loop_iteration_plan.is_some() {
+            self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
+        }
         let end = self.builder.current_offset()?;
         if let Some(exit_jump) = exit_jump {
             self.builder.patch_jump_to(exit_jump, end)?;
         }
-        self.patch_break_placeholders(target, end)?;
+        self.patch_break_placeholders(target, break_cleanup)?;
         self.pop_control_target(target);
         Ok(())
     }
@@ -620,6 +636,58 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             (!iteration_slots.is_empty()).then_some(LoopIterationEnvironmentPlan {
                 iteration_slots,
                 shared_slots: Vec::new(),
+            }),
+        )
+    }
+
+    fn loop_body_iteration_plan(
+        &self,
+        body: StmtId,
+    ) -> LoweringResult<Option<LoopIterationEnvironmentPlan>> {
+        let mut nested_functions = Vec::new();
+        self.collect_functions_in_statement(body, &mut nested_functions);
+
+        let mut iteration_slots = Vec::new();
+        let mut shared_slots = Vec::new();
+        for function in nested_functions {
+            let sema_id = self
+                .state
+                .ast_to_sema
+                .get(&function)
+                .copied()
+                .ok_or(LoweringError::MissingFunctionRecord { function })?;
+            for &capture in &self.state.sema.function_table.get(sema_id).captures {
+                let capture_scope = self.binding(capture)?.scope;
+                if !self.binding_belongs_to_owner(capture_scope, self.current_function) {
+                    continue;
+                }
+                let Some((depth, slot)) = self.binding_env_access(capture)? else {
+                    continue;
+                };
+                if depth != 0 {
+                    continue;
+                }
+                let slot = u16::try_from(slot)
+                    .map_err(|_| LoweringError::ConstantIndexOverflow { index: slot })?;
+                if capture_scope != self.current_scope
+                    && self.scope_is_same_or_descendant(capture_scope, self.current_scope)
+                {
+                    iteration_slots.push(slot);
+                } else {
+                    shared_slots.push(slot);
+                }
+            }
+        }
+
+        iteration_slots.sort_unstable();
+        iteration_slots.dedup();
+        shared_slots.sort_unstable();
+        shared_slots.dedup();
+
+        Ok(
+            (!iteration_slots.is_empty()).then_some(LoopIterationEnvironmentPlan {
+                iteration_slots,
+                shared_slots,
             }),
         )
     }

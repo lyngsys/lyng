@@ -455,6 +455,10 @@ pub(super) fn install_temporal_public_objects(
         let atoms = agent.atoms_mut();
         PropertyKey::from_atom(atoms.intern("startOfDay"))
     };
+    let get_time_zone_transition_key = {
+        let atoms = agent.atoms_mut();
+        PropertyKey::from_atom(atoms.intern("getTimeZoneTransition"))
+    };
     let hours_in_day_key = {
         let atoms = agent.atoms_mut();
         PropertyKey::from_atom(atoms.intern("hoursInDay"))
@@ -905,6 +909,7 @@ pub(super) fn install_temporal_public_objects(
             with_calendar_key,
             with_plain_time_key,
             start_of_day_key,
+            get_time_zone_transition_key,
             hours_in_day_key,
             since_key,
             until_key,

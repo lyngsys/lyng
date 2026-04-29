@@ -923,7 +923,7 @@ pub(super) fn temporal_round_i128_to_increment<Cx: PublicBuiltinDispatchContext>
     increment: i128,
     rounding_mode: TemporalBuiltinRoundingMode,
 ) -> Result<i128, Cx::Error> {
-    temporal_round_epoch_nanoseconds_to_increment(value, increment, rounding_mode)
+    temporal_round_duration_nanoseconds_to_increment(value, increment, rounding_mode)
         .ok_or_else(|| range_error(cx))
 }
 
@@ -943,7 +943,9 @@ pub(super) fn temporal_plain_date_balanced_positive_months_until<
 ) -> Result<(i128, TemporalPlainDateObjectData), Cx::Error> {
     let mut months = (i128::from(end.year()) - i128::from(start.year()))
         .checked_mul(12)
-        .and_then(|difference| difference.checked_add(i128::from(end.month() - start.month())))
+        .and_then(|difference| {
+            difference.checked_add(i128::from(end.month()) - i128::from(start.month()))
+        })
         .ok_or_else(|| range_error(cx))?;
     let initial_months = i64::try_from(months).map_err(|_| range_error(cx))?;
     let mut candidate = temporal_plain_date_add_duration(
@@ -965,6 +967,37 @@ pub(super) fn temporal_plain_date_balanced_positive_months_until<
     Ok((months, candidate))
 }
 
+fn temporal_plain_date_balanced_negative_months_until<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    start: TemporalPlainDateObjectData,
+    end: TemporalPlainDateObjectData,
+) -> Result<(i128, TemporalPlainDateObjectData), Cx::Error> {
+    let mut months = (i128::from(start.year()) - i128::from(end.year()))
+        .checked_mul(12)
+        .and_then(|difference| {
+            difference.checked_add(i128::from(start.month()) - i128::from(end.month()))
+        })
+        .ok_or_else(|| range_error(cx))?;
+    let initial_months = i64::try_from(-months).map_err(|_| range_error(cx))?;
+    let mut candidate = temporal_plain_date_add_duration(
+        cx,
+        start,
+        TemporalDurationObjectData::new(0, initial_months, 0, 0, 0, 0, 0, 0, 0, 0),
+        TemporalOverflow::Constrain,
+    )?;
+    if temporal_plain_date_ordering(candidate, end).is_lt() {
+        months = months.checked_sub(1).ok_or_else(|| range_error(cx))?;
+        let adjusted_months = i64::try_from(-months).map_err(|_| range_error(cx))?;
+        candidate = temporal_plain_date_add_duration(
+            cx,
+            start,
+            TemporalDurationObjectData::new(0, adjusted_months, 0, 0, 0, 0, 0, 0, 0, 0),
+            TemporalOverflow::Constrain,
+        )?;
+    }
+    Ok((months, candidate))
+}
+
 pub(super) fn temporal_plain_date_difference_trunc<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     start: TemporalPlainDateObjectData,
@@ -972,6 +1005,42 @@ pub(super) fn temporal_plain_date_difference_trunc<Cx: PublicBuiltinDispatchCont
     largest_unit: TemporalDateDifferenceUnit,
     smallest_unit: TemporalDateDifferenceUnit,
 ) -> Result<TemporalDurationObjectData, Cx::Error> {
+    if temporal_plain_date_ordering(start, end).is_gt()
+        && matches!(
+            largest_unit,
+            TemporalDateDifferenceUnit::Year | TemporalDateDifferenceUnit::Month
+        )
+    {
+        let (total_months, after_months) =
+            temporal_plain_date_balanced_negative_months_until(cx, start, end)?;
+        let remainder_days = temporal_plain_date_ordinal_day(after_months)
+            .checked_sub(temporal_plain_date_ordinal_day(end))
+            .ok_or_else(|| range_error(cx))?;
+        let (years, months) = if largest_unit == TemporalDateDifferenceUnit::Year {
+            (total_months.div_euclid(12), total_months.rem_euclid(12))
+        } else {
+            (0, total_months)
+        };
+        let (years, months, weeks, days) = match smallest_unit {
+            TemporalDateDifferenceUnit::Year => (years, 0, 0, 0),
+            TemporalDateDifferenceUnit::Month => (years, months, 0, 0),
+            TemporalDateDifferenceUnit::Week => (years, months, remainder_days / 7, 0),
+            TemporalDateDifferenceUnit::Day => (years, months, 0, remainder_days),
+        };
+        return Ok(TemporalDurationObjectData::new(
+            i64::try_from(-years).map_err(|_| range_error(cx))?,
+            i64::try_from(-months).map_err(|_| range_error(cx))?,
+            i64::try_from(-weeks).map_err(|_| range_error(cx))?,
+            i64::try_from(-days).map_err(|_| range_error(cx))?,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ));
+    }
+
     let (sign, start, end) = match temporal_plain_date_ordering(start, end) {
         std::cmp::Ordering::Less | std::cmp::Ordering::Equal => (1_i64, start, end),
         std::cmp::Ordering::Greater => (-1_i64, end, start),

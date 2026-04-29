@@ -76,6 +76,7 @@ pub(super) struct ZonedDateTimeFunctions {
     with_calendar: ObjectRef,
     with_plain_time: ObjectRef,
     start_of_day: ObjectRef,
+    get_time_zone_transition: ObjectRef,
     hours_in_day_getter: ObjectRef,
     since: ObjectRef,
     until: ObjectRef,
@@ -128,6 +129,7 @@ pub(super) struct ZonedDateTimePrototypeProperties {
     pub(super) with_calendar_key: PropertyKey,
     pub(super) with_plain_time_key: PropertyKey,
     pub(super) start_of_day_key: PropertyKey,
+    pub(super) get_time_zone_transition_key: PropertyKey,
     pub(super) hours_in_day_key: PropertyKey,
     pub(super) since_key: PropertyKey,
     pub(super) until_key: PropertyKey,
@@ -633,6 +635,19 @@ pub(super) fn allocate_functions(
         public_builtin_metadata(lyng_js_types::temporal_zoned_date_time_start_of_day_builtin())?,
         None,
     );
+    let get_time_zone_transition = allocate_builtin_function_object(
+        agent,
+        context.realm,
+        context.global_env,
+        context.root_shape,
+        context.function_prototype,
+        context.object_prototype,
+        lyng_js_types::temporal_zoned_date_time_get_time_zone_transition_builtin(),
+        public_builtin_metadata(
+            lyng_js_types::temporal_zoned_date_time_get_time_zone_transition_builtin(),
+        )?,
+        None,
+    );
     let hours_in_day_getter = allocate_builtin_function_object(
         agent,
         context.realm,
@@ -779,6 +794,7 @@ pub(super) fn allocate_functions(
         with_calendar,
         with_plain_time,
         start_of_day,
+        get_time_zone_transition,
         hours_in_day_getter,
         since,
         until,
@@ -1205,6 +1221,15 @@ pub(super) fn install_prototype_properties(
         zoned_date_time_prototype,
         properties.start_of_day_key,
         Value::from_object_ref(functions.start_of_day),
+        true,
+        false,
+        true,
+    );
+    define_builtin_data_property(
+        agent,
+        zoned_date_time_prototype,
+        properties.get_time_zone_transition_key,
+        Value::from_object_ref(functions.get_time_zone_transition),
         true,
         false,
         true,

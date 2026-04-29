@@ -133,6 +133,10 @@ pub(super) fn dispatch_temporal_zoned_date_time_builtin<Cx: PublicBuiltinDispatc
     if entry == lyng_js_types::temporal_zoned_date_time_start_of_day_builtin() {
         return temporal_zoned_date_time_start_of_day_builtin(context, invocation).map(Some);
     }
+    if entry == lyng_js_types::temporal_zoned_date_time_get_time_zone_transition_builtin() {
+        return temporal_zoned_date_time_get_time_zone_transition_builtin(context, invocation)
+            .map(Some);
+    }
     if entry == lyng_js_types::temporal_zoned_date_time_hours_in_day_getter_builtin() {
         return temporal_zoned_date_time_hours_in_day_getter_builtin(context, invocation).map(Some);
     }
@@ -196,6 +200,10 @@ pub(super) fn temporal_time_zone_id_from_string(text: &str) -> Option<String> {
 }
 
 pub(super) fn temporal_parse_fixed_offset_time_zone_id(text: &str) -> Option<i64> {
+    temporal_parse_offset_string(text, false)
+}
+
+pub(super) fn temporal_parse_offset_string(text: &str, allow_subminute: bool) -> Option<i64> {
     fn parse_two_digits(bytes: &[u8], index: &mut usize) -> Option<i128> {
         let tens = *bytes.get(*index)?;
         let ones = *bytes.get(*index + 1)?;
@@ -215,17 +223,55 @@ pub(super) fn temporal_parse_fixed_offset_time_zone_id(text: &str) -> Option<i64
     let mut index = 1;
     let hours = parse_two_digits(bytes, &mut index)?;
     let mut minutes = 0_i128;
+    let mut seconds = 0_i128;
+    let mut fraction = 0_i128;
+    let mut has_subminute_syntax = false;
+    let separated = matches!(bytes.get(index).copied(), Some(b':'));
     if index < bytes.len() {
-        if bytes[index] == b':' {
+        if separated {
             index += 1;
         }
         minutes = parse_two_digits(bytes, &mut index)?;
     }
-    if index != bytes.len() || hours > 23 || minutes > 59 {
+    if index < bytes.len() {
+        has_subminute_syntax = true;
+        if separated {
+            if !matches!(bytes.get(index).copied(), Some(b':')) {
+                return None;
+            }
+            index += 1;
+        }
+        seconds = parse_two_digits(bytes, &mut index)?;
+        if matches!(bytes.get(index).copied(), Some(b'.')) {
+            index += 1;
+            let start = index;
+            while index < bytes.len() && index - start < 9 && bytes[index].is_ascii_digit() {
+                fraction = fraction
+                    .checked_mul(10)?
+                    .checked_add(i128::from(bytes[index] - b'0'))?;
+                index += 1;
+            }
+            if index == start {
+                return None;
+            }
+            for _ in (index - start)..9 {
+                fraction = fraction.checked_mul(10)?;
+            }
+        }
+    }
+    if index != bytes.len() || hours > 23 || minutes > 59 || seconds > 59 {
         return None;
     }
-    let total = (hours * 60 + minutes)
-        .checked_mul(TEMPORAL_NANOS_PER_MINUTE)?
+    if !allow_subminute && has_subminute_syntax {
+        return None;
+    }
+    let total = hours
+        .checked_mul(60)?
+        .checked_add(minutes)?
+        .checked_mul(60)?
+        .checked_add(seconds)?
+        .checked_mul(TEMPORAL_NANOS_PER_SECOND)?
+        .checked_add(fraction)?
         .checked_mul(sign)?;
     i64::try_from(total).ok()
 }
@@ -351,8 +397,21 @@ pub(super) fn temporal_zoned_date_time_from_value<Cx: PublicBuiltinDispatchConte
 ) -> Result<TemporalZonedDateTimeObjectData, Cx::Error> {
     if let Some(string_ref) = value.as_string_ref() {
         let text = string_ref_text(cx, string_ref)?;
-        let time_zone_id =
+        let mut time_zone_id =
             temporal_zoned_date_time_zone_annotation(&text).ok_or_else(|| range_error(cx))?;
+        if let Some(explicit_offset) = temporal_zoned_date_time_explicit_offset(&text) {
+            let actual_offset = if time_zone_id == TEMPORAL_UTC_TIME_ZONE_ID {
+                Some(0)
+            } else {
+                temporal_parse_fixed_offset_time_zone_id(&time_zone_id)
+            };
+            if matches!(actual_offset, Some(actual_offset) if actual_offset != explicit_offset) {
+                return Err(range_error(cx));
+            }
+            if actual_offset.is_none() {
+                time_zone_id = format_temporal_offset(explicit_offset);
+            }
+        }
         let epoch_nanoseconds = if let Some(epoch_nanoseconds) = parse_temporal_instant(&text) {
             epoch_nanoseconds
         } else {
@@ -403,6 +462,21 @@ pub(super) fn temporal_zoned_date_time_from_value<Cx: PublicBuiltinDispatchConte
         return Err(type_error(cx));
     }
     let time_zone_id = temporal_time_zone_id_from_value(cx, time_zone)?;
+    let offset = temporal_property_value(cx, object_ref, "offset")?;
+    if !offset.is_undefined() {
+        let offset_ref = if let Some(offset_ref) = offset.as_string_ref() {
+            offset_ref
+        } else {
+            if offset.as_object_ref().is_none() {
+                return Err(type_error(cx));
+            }
+            to_string_string_ref(cx, offset)?
+        };
+        let offset_text = string_ref_text(cx, offset_ref)?;
+        if temporal_parse_offset_string(&offset_text, true).is_none() {
+            return Err(range_error(cx));
+        }
+    }
     let date = temporal_plain_date_from_property_bag(cx, object_ref, false)?;
     let hour = temporal_optional_time_part_from_property(cx, object_ref, "hour")?.unwrap_or(0);
     let minute = temporal_optional_time_part_from_property(cx, object_ref, "minute")?.unwrap_or(0);
@@ -419,9 +493,13 @@ pub(super) fn temporal_zoned_date_time_from_value<Cx: PublicBuiltinDispatchConte
     let Ok(minute) = u8::try_from(minute) else {
         return Err(range_error(cx));
     };
-    let Ok(second) = u8::try_from(second) else {
+    let Ok(mut second) = u8::try_from(second) else {
         return Err(range_error(cx));
     };
+    if second > 60 {
+        return Err(range_error(cx));
+    }
+    second = second.min(59);
     let Ok(millisecond) = u16::try_from(millisecond) else {
         return Err(range_error(cx));
     };
@@ -450,6 +528,22 @@ pub(super) fn temporal_zoned_date_time_from_value<Cx: PublicBuiltinDispatchConte
     temporal_zoned_date_time_from_parts(cx, instant.epoch_nanoseconds, &time_zone_id)
 }
 
+pub(super) fn temporal_zoned_date_time_explicit_offset(text: &str) -> Option<i64> {
+    let prefix = text.split_once('[').map_or(text, |(prefix, _)| prefix);
+    let bytes = prefix.as_bytes();
+    let time_separator = bytes
+        .iter()
+        .position(|byte| matches!(byte, b'T' | b't' | b' '))?;
+    let offset_start = bytes
+        .iter()
+        .enumerate()
+        .skip(time_separator + 1)
+        .rev()
+        .find_map(|(index, byte)| matches!(byte, b'+' | b'-').then_some(index))?;
+    parse_temporal_plain_date_time(&prefix[..offset_start])?;
+    temporal_parse_offset_string(&prefix[offset_start..], true)
+}
+
 pub(super) fn temporal_zoned_date_time_zone_annotation(text: &str) -> Option<String> {
     let mut remaining = text;
     while let Some(start) = remaining.find('[') {
@@ -461,6 +555,12 @@ pub(super) fn temporal_zoned_date_time_zone_annotation(text: &str) -> Option<Str
         }
         if let Some(offset_nanoseconds) = temporal_parse_fixed_offset_time_zone_id(body) {
             return Some(format_temporal_offset(offset_nanoseconds));
+        }
+        if matches!(body.as_bytes().first(), Some(b'+' | b'-')) {
+            return None;
+        }
+        if !body.is_empty() && !body.contains('=') {
+            return Some(body.to_string());
         }
         remaining = &after_start[end + 1..];
     }
@@ -1415,6 +1515,57 @@ pub(super) fn temporal_zoned_date_time_start_of_day_builtin<Cx: PublicBuiltinDis
     allocate_temporal_zoned_date_time_object(cx, prototype, data)
 }
 
+fn temporal_validate_time_zone_transition_direction<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    direction_param: Value,
+) -> Result<(), Cx::Error> {
+    if direction_param.is_undefined() {
+        return Err(type_error(cx));
+    }
+    let direction_value = if direction_param.is_string() {
+        direction_param
+    } else {
+        let object_ref = direction_param
+            .as_object_ref()
+            .ok_or_else(|| type_error(cx))?;
+        temporal_property_value(cx, object_ref, "direction")?
+    };
+    if direction_value.is_undefined() {
+        return Err(range_error(cx));
+    }
+    let string_ref = to_string_string_ref(cx, direction_value)?;
+    match string_ref_text(cx, string_ref)?.as_str() {
+        "next" | "previous" => Ok(()),
+        _ => Err(range_error(cx)),
+    }
+}
+
+pub(super) fn temporal_zoned_date_time_get_time_zone_transition_builtin<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let zoned = temporal_zoned_date_time_data(cx, invocation.this_value())?;
+    temporal_validate_time_zone_transition_direction(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+
+    let time_zone_id = temporal_atom_text(cx, zoned.time_zone())?;
+    if time_zone_id == TEMPORAL_UTC_TIME_ZONE_ID
+        || temporal_parse_fixed_offset_time_zone_id(&time_zone_id).is_some()
+    {
+        return Ok(Value::null());
+    }
+
+    Err(type_error(cx))
+}
+
 pub(super) fn temporal_zoned_date_time_hours_in_day_getter_builtin<
     Cx: PublicBuiltinDispatchContext,
 >(
@@ -1488,7 +1639,7 @@ pub(super) fn temporal_zoned_date_time_difference_builtin<Cx: PublicBuiltinDispa
     let increment = unit_nanoseconds
         .checked_mul(options.rounding_increment)
         .ok_or_else(|| range_error(cx))?;
-    let rounded = temporal_round_epoch_nanoseconds_to_increment(
+    let rounded = temporal_round_duration_nanoseconds_to_increment(
         raw_difference,
         increment,
         options.rounding_mode,

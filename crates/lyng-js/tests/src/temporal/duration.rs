@@ -664,6 +664,44 @@ fn temporal_duration_add_and_subtract_validate_argument_signs() {
 }
 
 #[test]
+fn temporal_duration_add_and_subtract_reject_calendar_units() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        function throwsRangeError(callback) {
+            try {
+                callback();
+                return false;
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        }
+        let blank = new Temporal.Duration();
+        let days = new Temporal.Duration(0, 0, 0, 1);
+        [
+            throwsRangeError(() => new Temporal.Duration(1).add(blank)),
+            throwsRangeError(() => new Temporal.Duration(0, 1).add(blank)),
+            throwsRangeError(() => new Temporal.Duration(0, 0, 1).add(blank)),
+            throwsRangeError(() => days.add(new Temporal.Duration(1))),
+            throwsRangeError(() => days.add({ months: 1 })),
+            throwsRangeError(() => days.add("P1W")),
+            throwsRangeError(() => new Temporal.Duration(1).subtract(blank)),
+            throwsRangeError(() => new Temporal.Duration(0, 1).subtract(blank)),
+            throwsRangeError(() => new Temporal.Duration(0, 0, 1).subtract(blank)),
+            throwsRangeError(() => days.subtract(new Temporal.Duration(1))),
+            throwsRangeError(() => days.subtract({ months: 1 })),
+            throwsRangeError(() => days.subtract("P1W")),
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "true|true|true|true|true|true|true|true|true|true|true|true"
+    );
+}
+
+#[test]
 fn temporal_duration_with_merges_partial_duration_fields() {
     let result = compile_and_run_string_with_host(
         r#"
@@ -799,6 +837,480 @@ fn temporal_duration_round_and_total_use_iso_relative_to_for_calendar_units() {
     );
 
     assert_eq!(result, "29|28|708|P29D|PT36H");
+}
+
+#[test]
+fn temporal_duration_round_balances_calendar_relative_units() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let almostWeek = new Temporal.Duration(0, 0, 0, 6, 20);
+        let roundedWeek = almostWeek.round({
+            largestUnit: "weeks",
+            smallestUnit: "days",
+            relativeTo: new Temporal.PlainDate(2020, 1, 1)
+        });
+        let twoYears = new Temporal.Duration(0, 11, 0, 396);
+        let roundedYears = twoYears.round({
+            largestUnit: "years",
+            relativeTo: new Temporal.PlainDate(2017, 1, 1)
+        });
+        let roundedMonth = Temporal.Duration.from({ days: 27 }).round({
+            smallestUnit: "months",
+            relativeTo: new Temporal.PlainDate(2020, 1, 1)
+        });
+        [
+            roundedWeek.years,
+            roundedWeek.months,
+            roundedWeek.weeks,
+            roundedWeek.days,
+            roundedYears.years,
+            roundedYears.months,
+            roundedYears.weeks,
+            roundedYears.days,
+            roundedMonth.years,
+            roundedMonth.months,
+            roundedMonth.weeks,
+            roundedMonth.days,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "0|0|1|0|2|0|0|0|0|1|0|0");
+}
+
+#[test]
+fn temporal_duration_round_largest_calendar_unit_preserves_smaller_date_units() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        function fields(duration) {
+            return [
+                duration.years,
+                duration.months,
+                duration.weeks,
+                duration.days
+            ].join(",");
+        }
+        let relativeTo = new Temporal.PlainDate(2021, 12, 15);
+        let oneYear = new Temporal.Duration(1);
+        let fiveWeeks = new Temporal.Duration(0, 0, 5);
+        let fortyTwoDays = new Temporal.Duration(0, 0, 0, 42);
+        [
+            fields(oneYear.round({ relativeTo, largestUnit: "years" })),
+            fields(oneYear.round({ relativeTo, largestUnit: "months" })),
+            fields(oneYear.round({ relativeTo, largestUnit: "weeks" })),
+            fields(oneYear.round({ relativeTo, largestUnit: "days" })),
+            fields(fiveWeeks.round({ relativeTo, largestUnit: "years" })),
+            fields(fiveWeeks.round({ relativeTo, largestUnit: "months" })),
+            fields(fiveWeeks.round({ relativeTo, largestUnit: "weeks" })),
+            fields(fiveWeeks.round({ relativeTo, largestUnit: "days" })),
+            fields(fortyTwoDays.round({ relativeTo, largestUnit: "years" })),
+            fields(fortyTwoDays.round({ relativeTo, largestUnit: "months" })),
+            fields(fortyTwoDays.round({ relativeTo, largestUnit: "weeks" })),
+            fields(fortyTwoDays.round({ relativeTo, largestUnit: "days" }))
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "1,0,0,0|0,12,0,0|0,0,52,1|0,0,0,365|0,1,0,4|0,1,0,4|0,0,5,0|0,0,0,35|0,1,0,11|0,1,0,11|0,0,6,0|0,0,0,42"
+    );
+}
+
+#[test]
+fn temporal_duration_round_zero_duration_allows_relative_calendar_largest_units() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let zero = new Temporal.Duration();
+        let relativeTo = new Temporal.PlainDateTime(1970, 1, 1);
+        let rounded = zero.round({
+            relativeTo,
+            largestUnit: "years",
+            smallestUnit: "hours"
+        });
+        [
+            rounded.years,
+            rounded.months,
+            rounded.weeks,
+            rounded.days,
+            rounded.hours,
+            rounded.toString()
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "0|0|0|0|0|PT0S");
+}
+
+#[test]
+fn temporal_duration_round_zoned_relative_days_rounds_time_remainder() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let duration = new Temporal.Duration(0, 0, 0, 3, 12);
+        let common = {
+            smallestUnit: "hours",
+            roundingIncrement: 8,
+            roundingMode: "halfEven"
+        };
+        let plain = duration.round({
+            ...common,
+            relativeTo: new Temporal.PlainDate(1970, 1, 1)
+        });
+        let zoned = duration.round({
+            ...common,
+            relativeTo: new Temporal.ZonedDateTime(0n, "UTC")
+        });
+        [
+            plain.days,
+            plain.hours,
+            zoned.days,
+            zoned.hours
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "3|8|3|16");
+}
+
+#[test]
+fn temporal_duration_round_with_calendar_units_and_day_smallest_keeps_calendar_largest_unit() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let rounded = new Temporal.Duration(0, 1, 0, 6, 20).round({
+            smallestUnit: "days",
+            relativeTo: new Temporal.PlainDate(2020, 1, 1)
+        });
+        [
+            rounded.years,
+            rounded.months,
+            rounded.weeks,
+            rounded.days,
+            rounded.hours
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "0|1|0|7|0");
+}
+
+#[test]
+fn temporal_duration_round_calendar_duration_to_time_unit_rebalances_relative_date() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let duration = new Temporal.Duration(5, 6, 7, 8, 40, 30, 20, 123, 987, 500);
+        let rounded = duration.round({
+            smallestUnit: "hours",
+            relativeTo: new Temporal.PlainDate(2020, 4, 1),
+            roundingMode: "halfExpand"
+        });
+        [
+            rounded.years,
+            rounded.months,
+            rounded.weeks,
+            rounded.days,
+            rounded.hours,
+            rounded.minutes
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "5|7|0|27|17|0");
+}
+
+#[test]
+fn temporal_duration_round_negative_calendar_month_remainder_honors_directional_modes() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let duration = new Temporal.Duration(5, 6, 7, 8, 40, 30, 20, 123, 987, 500).negated();
+        let relativeTo = new Temporal.PlainDate(2020, 12, 1);
+        let ceil = duration.round({
+            smallestUnit: "months",
+            relativeTo,
+            roundingMode: "ceil"
+        });
+        let halfExpand = duration.round({
+            smallestUnit: "months",
+            relativeTo,
+            roundingMode: "halfExpand"
+        });
+        [
+            ceil.years,
+            ceil.months,
+            halfExpand.years,
+            halfExpand.months
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "-5|-7|-5|-8");
+}
+
+#[test]
+fn temporal_duration_round_negative_days_balances_against_relative_start_date() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        function fields(duration) {
+            return [
+                duration.years,
+                duration.months,
+                duration.weeks,
+                duration.days
+            ].join(",");
+        }
+        let minusForty = new Temporal.Duration(0, 0, 0, -40);
+        [
+            fields(minusForty.round({
+                largestUnit: "years",
+                relativeTo: new Temporal.PlainDate(2020, 1, 1)
+            })),
+            fields(minusForty.round({
+                largestUnit: "years",
+                relativeTo: new Temporal.PlainDate(2020, 3, 1)
+            }))
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "0,-1,0,-9|0,-1,0,-11");
+}
+
+#[test]
+fn temporal_duration_round_years_uses_relative_year_length() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        function years(relativeTo) {
+            return new Temporal.Duration(0, 0, 0, 547, 12).round({
+                relativeTo,
+                smallestUnit: "years"
+            }).years;
+        }
+        [
+            years(new Temporal.PlainDate(2018, 1, 1)),
+            years(new Temporal.PlainDate(2018, 7, 1)),
+            years(new Temporal.PlainDate(2019, 1, 1)),
+            years(new Temporal.PlainDate(2020, 1, 1)),
+            years(new Temporal.PlainDate(2020, 7, 1))
+        ].join(",");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "2,1,1,1,2");
+}
+
+#[test]
+fn temporal_duration_round_rejects_null_relative_to_as_wrong_type() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        try {
+            new Temporal.Duration(1).round({
+                largestUnit: "years",
+                relativeTo: null
+            });
+            "ok";
+        } catch (error) {
+            error.constructor.name;
+        }
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "TypeError");
+}
+
+#[test]
+fn temporal_duration_round_validates_relative_to_property_bag_offset() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        function outcome(offset) {
+            try {
+                new Temporal.Duration(1).round({
+                    largestUnit: "years",
+                    relativeTo: {
+                        year: 2021,
+                        month: 10,
+                        day: 28,
+                        offset,
+                        timeZone: "UTC"
+                    }
+                });
+                return "ok";
+            } catch (error) {
+                return error.constructor.name;
+            }
+        }
+        [
+            outcome("00:00"),
+            outcome(0),
+            outcome({ toString: function() { return "+00:00"; } })
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "RangeError|TypeError|ok");
+}
+
+#[test]
+fn temporal_duration_round_rejects_relative_to_string_offset_mismatch() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        try {
+            new Temporal.Duration(1).round({
+                largestUnit: "years",
+                relativeTo: "2000-01-01T00:00+05:30[UTC]"
+            });
+            "ok";
+        } catch (error) {
+            error.constructor.name;
+        }
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "RangeError");
+}
+
+#[test]
+fn temporal_duration_round_validates_relative_to_time_zone_string_annotation() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        function outcome(timeZone) {
+            try {
+                new Temporal.Duration(1).round({
+                    largestUnit: "months",
+                    relativeTo: {
+                        year: 2000,
+                        month: 5,
+                        day: 2,
+                        timeZone
+                    }
+                });
+                return "ok";
+            } catch (error) {
+                return error.constructor.name;
+            }
+        }
+        [
+            outcome("2016-12-31T23:59:60+00:00[UTC]"),
+            outcome("2021-08-19T17:30:45.123456789+23:59[+23:59:60]"),
+            outcome("2021-08-19T17:30-07:00"),
+            outcome("2021-08-19T17:30-07:00:00")
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "ok|RangeError|ok|RangeError");
+}
+
+#[test]
+fn temporal_duration_round_zero_zoned_day_largest_validates_next_day_boundary() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        try {
+            let relativeTo = new Temporal.ZonedDateTime(8640000000000000000000n, "UTC");
+            new Temporal.Duration().round({
+                largestUnit: "days",
+                smallestUnit: "minutes",
+                relativeTo
+            });
+            "ok";
+        } catch (error) {
+            error.constructor.name;
+        }
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "RangeError");
+}
+
+#[test]
+fn temporal_duration_round_zoned_day_rejects_total_nanoseconds_outside_instant_range() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        try {
+            let duration = Temporal.Duration.from({ seconds: Number.MAX_SAFE_INTEGER });
+            duration.round({
+                largestUnit: "day",
+                smallestUnit: "day",
+                relativeTo: new Temporal.ZonedDateTime(0n, "UTC")
+            });
+            "ok";
+        } catch (error) {
+            error.constructor.name;
+        }
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "RangeError");
+}
+
+#[test]
+fn temporal_duration_round_relative_to_edge_strings_validate_after_early_return() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        function outcome(duration, relativeTo) {
+            try {
+                duration.round({ smallestUnit: "minutes", relativeTo });
+                return "ok";
+            } catch (error) {
+                return error.constructor.name;
+            }
+        }
+        let duration = new Temporal.Duration(0, 0, 0, 0, 0, 5);
+        let blank = new Temporal.Duration();
+        [
+            outcome(blank, "+275760-09-13T00:00Z[UTC]"),
+            outcome(duration, "+275760-09-13T00:00Z[UTC]"),
+            outcome(blank, "-271821-04-19T23:00-01:00[-01:00]"),
+            outcome(duration, "-271821-04-19"),
+            outcome(duration, "-271821-04-19T01:00")
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "ok|RangeError|RangeError|RangeError|RangeError");
+}
+
+#[test]
+fn temporal_duration_round_stores_float64_representable_exact_components() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let duration = new Temporal.Duration(0, 0, 0, 0, 0, 0, 0, 18014398509481, 981);
+        let rounded = duration.round({ largestUnit: "microseconds" });
+        let rerounded = rounded.round({
+            largestUnit: "seconds",
+            smallestUnit: "microseconds",
+            roundingMode: "halfTrunc",
+            roundingIncrement: 8
+        });
+        [
+            rounded.microseconds,
+            rounded.toString(),
+            rerounded.seconds,
+            rerounded.milliseconds,
+            rerounded.microseconds
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "18014398509481980|PT18014398509.48198S|18014398509|481|976"
+    );
 }
 
 #[test]

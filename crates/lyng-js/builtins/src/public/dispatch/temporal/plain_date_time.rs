@@ -1433,7 +1433,7 @@ pub(super) fn temporal_plain_date_time_difference_builtin<Cx: PublicBuiltinDispa
     let increment = unit_nanoseconds
         .checked_mul(options.rounding_increment)
         .ok_or_else(|| range_error(cx))?;
-    let rounded = temporal_round_epoch_nanoseconds_to_increment(
+    let rounded = temporal_round_duration_nanoseconds_to_increment(
         raw_difference,
         increment,
         options.rounding_mode,
