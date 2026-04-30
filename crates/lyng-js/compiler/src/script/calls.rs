@@ -33,11 +33,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let mut direct_eval_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
         direct_eval_arguments.push(callee_register);
         direct_eval_arguments.extend(argument_values.registers.iter().copied());
-        let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
+        let instruction_offset = self.emit_internal_builtin_call_into_with_offset_and_this(
             internal_direct_eval_builtin(),
             &direct_eval_arguments,
             self.ast().get_expr(expr_id).span(),
             dest,
+            self.this_override_register,
         )?;
         let lexical_scopes = self.active_direct_eval_lexical_scopes();
         let flags = self.active_direct_eval_site_flags();
@@ -84,11 +85,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let mut direct_eval_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
         direct_eval_arguments.push(callee_register);
         direct_eval_arguments.extend(argument_values.registers.iter().copied());
-        let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
+        let instruction_offset = self.emit_internal_builtin_call_into_with_offset_and_this(
             internal_direct_eval_builtin(),
             &direct_eval_arguments,
             self.ast().get_expr(expr_id).span(),
             direct_eval_result,
+            self.this_override_register,
         )?;
         let lexical_scopes = self.active_direct_eval_lexical_scopes();
         let flags = self.active_direct_eval_site_flags();

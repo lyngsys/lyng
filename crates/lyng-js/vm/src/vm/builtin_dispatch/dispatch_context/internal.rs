@@ -69,12 +69,15 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             return Ok(value);
         }
         let source_text = self.builtin_value_to_string_text(Value::from_string_ref(source_ref))?;
+        let this_override =
+            (!invocation.this_value().is_undefined()).then_some(invocation.this_value());
         self.vm.evaluate_direct_eval_source(
             self.agent,
             self.host,
             self.registry,
             self.caller_frame,
             &source_text,
+            this_override,
         )
     }
 

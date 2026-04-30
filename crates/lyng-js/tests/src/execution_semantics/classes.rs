@@ -119,6 +119,23 @@ fn phase6_static_field_initializers_bind_this_to_the_class_object() {
 }
 
 #[test]
+fn phase6_direct_eval_in_static_field_initializer_uses_class_this() {
+    let result = compile_and_run_string(
+        r#"
+        class C {
+            static f = "test";
+            static g = this.f + "262";
+            static h = eval("this.g") + "test";
+        }
+
+        C.h;
+        "#,
+    );
+
+    assert_eq!(result, "test262test");
+}
+
+#[test]
 fn phase6_anonymous_class_expressions_infer_names_before_static_initializers() {
     let result = compile_and_run_string(
         r#"

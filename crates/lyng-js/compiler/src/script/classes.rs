@@ -1454,10 +1454,28 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         span: Span,
         dest: u16,
     ) -> LoweringResult<u32> {
+        self.emit_internal_builtin_call_into_with_offset_and_this(
+            builtin, arguments, span, dest, None,
+        )
+    }
+
+    pub(super) fn emit_internal_builtin_call_into_with_offset_and_this(
+        &mut self,
+        builtin: BuiltinFunctionId,
+        arguments: &[u16],
+        span: Span,
+        dest: u16,
+        this_override: Option<u16>,
+    ) -> LoweringResult<u32> {
         let callee = self.alloc_temp()?;
         self.emit_load_builtin(callee, builtin)?;
-        let this_value = self.alloc_temp()?;
-        self.emit_load_undefined(this_value)?;
+        let this_value = if let Some(this_override) = this_override {
+            this_override
+        } else {
+            let this_value = self.alloc_temp()?;
+            self.emit_load_undefined(this_value)?;
+            this_value
+        };
         let argument_range = self.materialize_argument_block(arguments)?;
         let (call_result, call_callee, call_this, move_back) =
             self.bridge_call_registers(dest, callee, this_value)?;

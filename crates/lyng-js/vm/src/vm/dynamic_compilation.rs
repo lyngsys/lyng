@@ -1112,6 +1112,7 @@ impl Vm {
         registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
         source_text: &str,
+        this_override: Option<Value>,
     ) -> VmResult<Value> {
         let realm = caller.realm();
         if let Some(value) =
@@ -1248,8 +1249,11 @@ impl Vm {
         let script_referrer = self
             .active_script_or_module_referrer(agent)
             .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
-        let (entry_this_value, entry_new_target) =
-            self.caller_direct_eval_call_state(agent, caller_name_env_start, caller)?;
+        let (entry_this_value, entry_new_target) = if let Some(this_override) = this_override {
+            (this_override, None)
+        } else {
+            self.caller_direct_eval_call_state(agent, caller_name_env_start, caller)?
+        };
         let entry_home_object =
             self.caller_direct_eval_home_object(agent, caller_name_env_start, caller);
         let entry_private_env = self.caller_direct_eval_private_env(agent, caller);
