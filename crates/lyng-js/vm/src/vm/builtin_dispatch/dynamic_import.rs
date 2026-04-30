@@ -98,6 +98,7 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let specifier = arguments.first().copied().unwrap_or(Value::undefined());
         let options = arguments.get(1).copied().unwrap_or(Value::undefined());
+        let phase = DynamicImportPhase::from_value(arguments.get(2).copied());
         let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
 
         let outcome = (|| -> Result<Value, Value> {
@@ -117,6 +118,9 @@ impl Vm {
             let attributes = self
                 .normalize_dynamic_import_attributes(agent, host, registry, caller_frame, options)
                 .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+            if phase == DynamicImportPhase::Source {
+                return Err(errors::syntax_error_value(agent));
+            }
             let request = ModuleSourceRequest {
                 specifier,
                 referrer: self.active_script_or_module_referrer(agent),
@@ -200,7 +204,9 @@ impl Vm {
         if options.is_undefined() {
             return Ok(Vec::new());
         }
-        let options_object = self.to_object_for_value(agent, caller_frame.realm(), options)?;
+        let Some(options_object) = options.as_object_ref() else {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        };
         let with_key = PropertyKey::from_atom(agent.atoms_mut().intern_collectible("with"));
         let with_value = self.get_property_from_object(
             agent,
@@ -214,8 +220,9 @@ impl Vm {
         if with_value.is_undefined() {
             return Ok(Vec::new());
         }
-        let attributes_object =
-            self.to_object_for_value(agent, caller_frame.realm(), with_value)?;
+        let Some(attributes_object) = with_value.as_object_ref() else {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        };
         let keys = object::own_property_keys_in_context(
             &mut VmProxyBridge {
                 vm: self,
@@ -255,14 +262,9 @@ impl Vm {
                 Value::from_object_ref(attributes_object),
                 key,
             )?;
-            let attribute_value = self.to_primitive(
-                agent,
-                host,
-                registry,
-                caller_frame,
-                attribute_value,
-                ToPrimitiveHint::String,
-            )?;
+            if attribute_value.as_string_ref().is_none() {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
             let attribute_value = self.value_to_string_text(agent, attribute_value)?;
             attributes.push(ModuleImportAttribute {
                 key: attribute_key,
@@ -346,5 +348,22 @@ impl Vm {
         error: lyng_js_host::HostError,
     ) -> Value {
         Value::from_string_ref(alloc_string(agent, &error.to_string(), None))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DynamicImportPhase {
+    Evaluation,
+    Source,
+    Defer,
+}
+
+impl DynamicImportPhase {
+    fn from_value(value: Option<Value>) -> Self {
+        match value.and_then(Value::as_smi) {
+            Some(1) => Self::Source,
+            Some(2) => Self::Defer,
+            _ => Self::Evaluation,
+        }
     }
 }

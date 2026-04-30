@@ -2338,6 +2338,110 @@ fn dynamic_import_rejects_module_parse_errors_with_syntax_error() {
 }
 
 #[test]
+fn dynamic_import_source_phase_rejects_source_text_modules_with_syntax_error() {
+    let unit = compile_test_unit(223, "import.source('./dep.mjs');");
+    let host = TestHost::new();
+    let script_referrer = ModuleKey::new("/tmp/main.js");
+    let module_key = ModuleKey::new("/tmp/dep.mjs");
+    host.define_module_source(
+        "./dep.mjs",
+        LoadedModuleSource::new(module_key, "/tmp/dep.mjs", "export default 7;"),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host_referrer(
+            agent,
+            realm,
+            &unit,
+            Some(&script_referrer),
+            &host,
+            &mut registry,
+        )
+        .expect("dynamic source import rejection should evaluate");
+
+    let promise = result
+        .as_object_ref()
+        .expect("dynamic source import should return a promise object");
+    let record = agent
+        .promise_record(promise)
+        .expect("dynamic source import promise should stay tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+    let reason = record
+        .result()
+        .as_object_ref()
+        .expect("dynamic source import should reject with an error object");
+    let name_atom = agent.atoms_mut().intern_collectible("name");
+    let name = ordinary_get(agent, reason, PropertyKey::from_atom(name_atom))
+        .expect("error name should be readable")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("error name should be a string");
+    assert_eq!(name, "SyntaxError");
+}
+
+#[test]
+fn dynamic_import_attributes_reject_non_object_and_non_string_values() {
+    let cases = [
+        "import('./dep.mjs', false);",
+        "import('./dep.mjs', { with: false });",
+        "import('./dep.mjs', { with: { type: 1 } });",
+    ];
+
+    for (index, source) in cases.into_iter().enumerate() {
+        let unit = compile_test_unit(224 + u32::try_from(index).unwrap(), source);
+        let host = TestHost::new();
+        let script_referrer = ModuleKey::new("/tmp/main.js");
+        let module_key = ModuleKey::new("/tmp/dep.mjs");
+        host.define_module_source(
+            "./dep.mjs",
+            LoadedModuleSource::new(module_key, "/tmp/dep.mjs", "export default 7;"),
+        );
+        let mut runtime = Runtime::new(host.clone());
+        let agent = runtime.root_agent_mut();
+        let realm = agent.default_realm().expect("default realm should exist");
+        let mut vm = Vm::new();
+        let mut registry = RejectingRegistry;
+
+        let result = vm
+            .evaluate_script_with_registry_and_host_referrer(
+                agent,
+                realm,
+                &unit,
+                Some(&script_referrer),
+                &host,
+                &mut registry,
+            )
+            .expect("dynamic import attribute validation should evaluate");
+
+        let promise = result
+            .as_object_ref()
+            .expect("dynamic import should return a promise object");
+        let record = agent
+            .promise_record(promise)
+            .expect("dynamic import promise should stay tracked");
+        assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+        let reason = record
+            .result()
+            .as_object_ref()
+            .expect("dynamic import should reject with an error object");
+        let name_atom = agent.atoms_mut().intern_collectible("name");
+        let name = ordinary_get(agent, reason, PropertyKey::from_atom(name_atom))
+            .expect("error name should be readable")
+            .as_string_ref()
+            .and_then(|string| agent.heap().view().string_view(string))
+            .map(decode_string)
+            .expect("error name should be a string");
+        assert_eq!(name, "TypeError");
+    }
+}
+
+#[test]
 fn dynamic_import_rejects_ambiguous_module_exports_with_syntax_error() {
     let unit = compile_test_unit(222, "import('./entry.mjs');");
     let host = TestHost::new();

@@ -4,7 +4,9 @@ mod left_hand_side;
 mod operators;
 mod primary;
 
-use lyng_js_ast::{AssignOp, Expr, ExprId, FunctionKind, LogicalOp, TemplateQuasi};
+use lyng_js_ast::{
+    AssignOp, Expr, ExprId, FunctionKind, ImportExpressionPhase, LogicalOp, TemplateQuasi,
+};
 use lyng_js_common::{AtomId, Span, WellKnownAtom};
 use lyng_js_lexer::{LexerMode, TokenKind, TokenPayload};
 
@@ -440,26 +442,44 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let start = self.current_span();
         self.advance(); // eat `import`
 
-        // import.meta
         if self.eat(TokenKind::Dot) {
             let prop_token = self.current();
             let prop_span = self.current_span();
             let prop = self.parse_identifier_name();
-            if !self.is_module() {
-                self.error_at(start, "import.meta is only valid in modules".to_string());
+
+            if prop == WellKnownAtom::meta.id() {
+                if !self.is_module() {
+                    self.error_at(start, "import.meta is only valid in modules".to_string());
+                }
+                if prop_token.contains_escape() {
+                    self.error_at(prop_span, "expected 'meta' after 'import.'".to_string());
+                }
+                let span = start.cover(self.current_span());
+                return self.ast_mut().alloc_expr(Expr::MetaProperty {
+                    span,
+                    meta: WellKnownAtom::import.id(),
+                    property: prop,
+                });
             }
-            if prop != WellKnownAtom::meta.id() || prop_token.contains_escape() {
-                self.error_at(prop_span, "expected 'meta' after 'import.'".to_string());
-            }
-            let span = start.cover(self.current_span());
-            return self.ast_mut().alloc_expr(Expr::MetaProperty {
-                span,
-                meta: WellKnownAtom::import.id(),
-                property: prop,
-            });
+
+            let phase = match self.lexer.resolve_atom(prop) {
+                "source" if !prop_token.contains_escape() => ImportExpressionPhase::Source,
+                "defer" if !prop_token.contains_escape() => ImportExpressionPhase::Defer,
+                _ => {
+                    self.error_at(
+                        prop_span,
+                        "expected 'meta', 'source', or 'defer' after 'import.'".to_string(),
+                    );
+                    ImportExpressionPhase::Evaluation
+                }
+            };
+            return self.parse_import_call(start, phase);
         }
 
-        // import(source)
+        self.parse_import_call(start, ImportExpressionPhase::Evaluation)
+    }
+
+    fn parse_import_call(&mut self, start: Span, phase: ImportExpressionPhase) -> ExprId {
         self.expect(TokenKind::LParen);
         let source = self.parse_assignment_expression_allow_in();
         let mut options = None;
@@ -471,6 +491,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let span = start.cover(end.span);
         self.ast_mut().alloc_expr(Expr::ImportExpression {
             span,
+            phase,
             source,
             options,
         })

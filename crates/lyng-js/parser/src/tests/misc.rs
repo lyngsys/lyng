@@ -1,4 +1,5 @@
 use super::*;
+use lyng_js_ast::ImportExpressionPhase;
 
 // ===========================================================================
 // ASI (Automatic Semicolon Insertion)
@@ -179,6 +180,25 @@ fn parse_import_expression() {
             p.ast.get_expr(*expression),
             Expr::ImportExpression { .. }
         ));
+    }
+}
+
+#[test]
+fn parse_import_expression_phases() {
+    let source = r#"import.defer("./module.js"); import.source("<module source>");"#;
+    let p = script_ok(source);
+    let stmts = body(&p);
+    assert_eq!(stmts.len(), 2);
+    let expected_phases = [ImportExpressionPhase::Defer, ImportExpressionPhase::Source];
+    for (stmt, expected_phase) in stmts.iter().zip(expected_phases) {
+        if let Stmt::Expression { expression, .. } = p.ast.get_stmt(*stmt) {
+            assert!(matches!(
+                p.ast.get_expr(*expression),
+                Expr::ImportExpression { phase, .. } if *phase == expected_phase
+            ));
+        } else {
+            panic!("expected import phase expression statement");
+        }
     }
 }
 

@@ -41,7 +41,7 @@ pub use decl::{
     Decl, ExportDefaultDecl, ExportKind, ExportSpecifier, ImportAttribute, ImportSpecifier,
     VariableDeclarator,
 };
-pub use expr::{Expr, Property};
+pub use expr::{Expr, ImportExpressionPhase, Property};
 pub use function::{ClassElement, FormalParameters, Function};
 pub use ids::*;
 pub use literal::{

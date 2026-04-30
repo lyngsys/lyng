@@ -107,8 +107,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             } => self.lower_yield_expression(argument, delegate, dest),
             Expr::AwaitExpression { argument, .. } => self.lower_await_expression(argument, dest),
             Expr::ImportExpression {
-                source, options, ..
-            } => self.lower_dynamic_import_expression(source, options, dest),
+                phase,
+                source,
+                options,
+                ..
+            } => self.lower_dynamic_import_expression(phase, source, options, dest),
             Expr::ParenthesizedExpression { expression, .. } => {
                 self.lower_expr_into(expression, dest)
             }
@@ -180,6 +183,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
     pub(super) fn lower_dynamic_import_expression(
         &mut self,
+        phase: ImportExpressionPhase,
         source: ExprId,
         options: Option<ExprId>,
         dest: u16,
@@ -192,9 +196,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.emit_load_undefined(undefined)?;
             undefined
         };
+        let phase_value = self.alloc_temp()?;
+        self.emit_load_smi(phase_value, phase.encoded())?;
         self.emit_internal_builtin_call_into(
             lyng_js_types::internal_dynamic_import_builtin(),
-            &[source_value, options_value],
+            &[source_value, options_value, phase_value],
             self.ast().get_expr(source).span(),
             dest,
         )

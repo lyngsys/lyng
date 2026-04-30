@@ -956,6 +956,7 @@ fn collect_expression_sites_from_expr(
             span,
             source,
             options,
+            ..
         } => {
             metadata
                 .dynamic_import_sites

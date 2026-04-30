@@ -219,9 +219,11 @@ pub enum Expr {
         property: AtomId,
     },
 
-    /// `import("module")`
+    /// `import("module")`, `import.defer("module")`, or
+    /// `import.source("module")`.
     ImportExpression {
         span: Span,
+        phase: ImportExpressionPhase,
         source: ExprId,
         options: Option<ExprId>,
     },
@@ -233,6 +235,24 @@ pub enum Expr {
     // -- Error recovery ----------------------------------------------------
     /// A placeholder for expressions that failed to parse.
     InvalidExpression { span: Span },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ImportExpressionPhase {
+    Evaluation,
+    Source,
+    Defer,
+}
+
+impl ImportExpressionPhase {
+    #[must_use]
+    pub const fn encoded(self) -> i16 {
+        match self {
+            Self::Evaluation => 0,
+            Self::Source => 1,
+            Self::Defer => 2,
+        }
+    }
 }
 
 /// An object property: `key: value`, `get key() {}`, shorthand, computed, spread.

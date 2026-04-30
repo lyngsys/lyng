@@ -160,6 +160,47 @@ impl Test262Host {
                 ),
             })
     }
+
+    fn source_text_from_import_attributes(
+        raw_source: &str,
+        attributes: &[lyng_js_host::ModuleImportAttribute],
+    ) -> Option<String> {
+        let module_type = attributes
+            .iter()
+            .find(|attribute| attribute.key == "type")
+            .map(|attribute| attribute.value.as_str())?;
+        match module_type {
+            "json" => Some(format!("export default ({raw_source});")),
+            "text" => Some(format!(
+                "export default {};",
+                Self::js_string_literal(raw_source)
+            )),
+            _ => None,
+        }
+    }
+
+    fn js_string_literal(source: &str) -> String {
+        let mut literal = String::with_capacity(source.len() + 2);
+        literal.push('"');
+        for ch in source.chars() {
+            match ch {
+                '"' => literal.push_str("\\\""),
+                '\\' => literal.push_str("\\\\"),
+                '\n' => literal.push_str("\\n"),
+                '\r' => literal.push_str("\\r"),
+                '\t' => literal.push_str("\\t"),
+                '\u{2028}' => literal.push_str("\\u2028"),
+                '\u{2029}' => literal.push_str("\\u2029"),
+                ch if ch.is_control() => {
+                    use std::fmt::Write as _;
+                    let _ = write!(literal, "\\u{:04x}", ch as u32);
+                }
+                ch => literal.push(ch),
+            }
+        }
+        literal.push('"');
+        literal
+    }
 }
 
 impl HostHooks for Test262Host {
@@ -169,7 +210,11 @@ impl HostHooks for Test262Host {
             self.entry_source.clone()
         } else {
             let raw_source = Self::read_utf8_file("load_module_source", &path)?;
-            if raw_source.contains("/*---") {
+            if let Some(source_text) =
+                Self::source_text_from_import_attributes(&raw_source, &request.attributes)
+            {
+                source_text
+            } else if raw_source.contains("/*---") {
                 self.helpers
                     .build_runtime_source(&parse_metadata(&raw_source), &raw_source)
                     .map_err(|error| HostError::internal("load_module_source", error))?
@@ -551,5 +596,28 @@ mod tests {
             }
         }
         assert_eq!(host.temporal_default_time_zone, "Europe/Berlin");
+    }
+
+    #[test]
+    fn import_attribute_source_transform_wraps_json_and_text_modules() {
+        let json = Test262Host::source_text_from_import_attributes(
+            "262",
+            &[lyng_js_host::ModuleImportAttribute {
+                key: "type".to_string(),
+                value: "json".to_string(),
+            }],
+        )
+        .expect("json import attribute should transform source");
+        assert_eq!(json, "export default (262);");
+
+        let text = Test262Host::source_text_from_import_attributes(
+            "line \"one\"\nline \\two",
+            &[lyng_js_host::ModuleImportAttribute {
+                key: "type".to_string(),
+                value: "text".to_string(),
+            }],
+        )
+        .expect("text import attribute should transform source");
+        assert_eq!(text, "export default \"line \\\"one\\\"\\nline \\\\two\";");
     }
 }

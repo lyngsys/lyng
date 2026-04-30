@@ -3,8 +3,8 @@ use std::num::NonZeroU32;
 
 use lyng_js_ast::{
     AssignOp, Ast, BinaryOp, CatchClause, Decl, DeclId, Expr, ExprId, ForInOfLeft, ForInit,
-    FunctionId, FunctionKind, NodeList, Pattern, Property, PropertyKind, Stmt, StmtId, SwitchCase,
-    VariableKind,
+    FunctionId, FunctionKind, ImportExpressionPhase, NodeList, Pattern, Property, PropertyKind,
+    Stmt, StmtId, SwitchCase, VariableKind,
 };
 use lyng_js_bytecode::{
     ArgumentsMode, BytecodeBuildError, BytecodeBuilder, BytecodeEnvironmentBinding,
