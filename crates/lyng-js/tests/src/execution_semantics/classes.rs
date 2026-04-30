@@ -584,6 +584,69 @@ fn phase6_method_and_accessor_name_descriptors_match_test262_symbol_rows() {
 }
 
 #[test]
+fn phase6_private_method_names_include_hash_prefix() {
+    let result = compile_and_run_string(
+        r#"
+        class C {
+            #method() {}
+            *#generator() {}
+            async #asyncMethod() {}
+            static #staticMethod() {}
+
+            static names(instance) {
+                return [
+                    instance.#method.name,
+                    instance.#generator.name,
+                    instance.#asyncMethod.name,
+                    this.#staticMethod.name
+                ].join("|");
+            }
+        }
+
+        C.names(new C());
+        "#,
+    );
+
+    assert_eq!(result, "#method|#generator|#asyncMethod|#staticMethod");
+}
+
+#[test]
+fn phase6_class_field_anonymous_function_names_follow_field_keys() {
+    let result = compile_and_run_string(
+        r#"
+        class C {
+            field = function() {};
+            arrow = () => {};
+            #privateField = function() {};
+            static staticField = function() {};
+            static #staticPrivateField = () => {};
+
+            privateName() {
+                return this.#privateField.name;
+            }
+
+            static names(instance) {
+                return [
+                    instance.field.name,
+                    instance.arrow.name,
+                    instance.privateName(),
+                    this.staticField.name,
+                    this.#staticPrivateField.name
+                ].join("|");
+            }
+        }
+
+        C.names(new C());
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "field|arrow|#privateField|staticField|#staticPrivateField"
+    );
+}
+
+#[test]
 fn phase6_private_method_initialization_throws_on_duplicate_install() {
     let result = compile_and_run(
         r#"

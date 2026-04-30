@@ -301,7 +301,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     let child_index = self.ensure_child_index(value)?;
                     self.emit_create_closure(method, child_index, span)?;
                     let name_register = self.alloc_temp()?;
-                    self.emit_load_atom_string(name_register, private_name)?;
+                    self.emit_load_private_function_name(name_register, private_name, kind)?;
                     self.emit_set_function_name(method, name_register)?;
                     let home_object = if r#static { dest } else { prototype };
                     self.bind_function_home_object(method, home_object, span)?;
@@ -339,6 +339,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             descriptor_index,
                             None,
                             span,
+                            None,
                             None,
                             None,
                             private_initializer_scratch.expect(
@@ -545,6 +546,29 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(None)
     }
 
+    fn emit_load_private_function_name(
+        &mut self,
+        dest: u16,
+        private_name: AtomId,
+        kind: lyng_js_ast::MethodKind,
+    ) -> LoweringResult<()> {
+        let raw_name = self.state.atoms.resolve(private_name).to_owned();
+        let text = match kind {
+            lyng_js_ast::MethodKind::Get => format!("get #{raw_name}"),
+            lyng_js_ast::MethodKind::Set => format!("set #{raw_name}"),
+            lyng_js_ast::MethodKind::Method | lyng_js_ast::MethodKind::Constructor => {
+                format!("#{raw_name}")
+            }
+        };
+        let name = self.state.atoms.intern(&text);
+        self.emit_load_atom_string(dest, name)
+    }
+
+    fn private_name_with_hash_atom(&mut self, private_name: AtomId) -> AtomId {
+        let raw_name = self.state.atoms.resolve(private_name).to_owned();
+        self.state.atoms.intern(&format!("#{raw_name}"))
+    }
+
     fn class_self_binding(
         &self,
         body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
@@ -613,8 +637,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         match element {
             PendingStaticClassElement::PublicField { key, value } => {
-                let value_register =
-                    self.lower_class_field_value(value, Some(class_object), Some(class_object))?;
+                let inferred_name = match key {
+                    StaticPublicFieldKey::Atom(atom) => Some(atom),
+                    StaticPublicFieldKey::Register(_) => None,
+                };
+                let value_register = self.lower_class_field_value(
+                    value,
+                    inferred_name,
+                    Some(class_object),
+                    Some(class_object),
+                )?;
                 match key {
                     StaticPublicFieldKey::Atom(atom) => {
                         self.emit_define_property_by_atom(class_object, value_register, atom)
@@ -625,6 +657,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 }
             }
             PendingStaticClassElement::PrivateField { name, value, span } => {
+                let inferred_name = Some(self.private_name_with_hash_atom(name));
                 let descriptor_index = self.private_element_descriptor_index(
                     class_body,
                     name,
@@ -635,6 +668,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     descriptor_index,
                     value,
                     span,
+                    inferred_name,
                     Some(class_object),
                     Some(class_object),
                     private_initializer_scratch.ok_or(LoweringError::UnsupportedDeclaration {
@@ -656,6 +690,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     fn lower_class_field_value(
         &mut self,
         value: Option<ExprId>,
+        inferred_name: Option<AtomId>,
         this_override: Option<u16>,
         home_object_override: Option<u16>,
     ) -> LoweringResult<u16> {
@@ -665,8 +700,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .and_then(|home_object| self.super_home_object_override.replace(home_object));
         let previous_in_class_field_initializer =
             std::mem::replace(&mut self.in_class_field_initializer, true);
-        let value_register = if let Some(value) = value {
-            self.lower_expr_to_temp(value)
+        let value_register: LoweringResult<u16> = if let Some(value) = value {
+            let value_register = self.alloc_temp()?;
+            self.lower_initializer_with_inferred_name(value, inferred_name, value_register)?;
+            Ok(value_register)
         } else {
             let undefined = self.alloc_temp()?;
             self.emit_load_undefined(undefined)?;
@@ -691,13 +728,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         this_override: Option<u16>,
         home_object_override: Option<u16>,
     ) -> LoweringResult<()> {
+        let named_atom = if computed {
+            None
+        } else {
+            self.named_property_atom(key)?
+        };
         let value_register =
-            self.lower_class_field_value(value, this_override, home_object_override)?;
+            self.lower_class_field_value(value, named_atom, this_override, home_object_override)?;
 
-        if !computed {
-            if let Some(atom) = self.named_property_atom(key)? {
-                return self.emit_define_property_by_atom(target, value_register, atom);
-            }
+        if let Some(atom) = named_atom {
+            return self.emit_define_property_by_atom(target, value_register, atom);
         }
 
         let key_register = self.lower_expr_to_temp(key)?;
@@ -744,6 +784,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         descriptor_index: u32,
         value: Option<ExprId>,
         span: Span,
+        inferred_name: Option<AtomId>,
         this_override: Option<u16>,
         home_object_override: Option<u16>,
         scratch: PrivateElementInitializerScratch,
@@ -761,8 +802,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .and_then(|home_object| self.super_home_object_override.replace(home_object));
         let previous_in_class_field_initializer =
             std::mem::replace(&mut self.in_class_field_initializer, true);
-        let value_register = if let Some(value) = value {
-            self.lower_expr_to_temp(value)
+        let value_register: LoweringResult<u16> = if let Some(value) = value {
+            let value_register = self.alloc_temp()?;
+            self.lower_initializer_with_inferred_name(value, inferred_name, value_register)?;
+            Ok(value_register)
         } else {
             self.emit_load_undefined(arguments + 2)?;
             Ok(arguments + 2)
@@ -1026,6 +1069,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 span,
                 None,
                 None,
+                None,
                 private_initializer_scratch
                     .expect("private initializer scratch should exist for private elements"),
             )?;
@@ -1087,6 +1131,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     if kind != lyng_js_sema::ClassPrivateElementKind::Field {
                         continue;
                     }
+                    let inferred_name = Some(self.private_name_with_hash_atom(name));
                     let (descriptor_index, span) = Self::private_element_descriptor_from_lookup(
                         &private_descriptors,
                         name,
@@ -1097,6 +1142,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         descriptor_index,
                         value,
                         span,
+                        inferred_name,
                         Some(this_register),
                         None,
                         private_initializer_scratch.expect(
