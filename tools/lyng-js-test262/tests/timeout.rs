@@ -7,6 +7,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+fn assert_report_count(report: &str, metric: &str, count: u32) {
+    assert!(
+        report.contains(&format!("| {metric} | `{count}` |")),
+        "unexpected report:\n{report}"
+    );
+}
+
 fn make_temp_dir() -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -37,7 +44,7 @@ fn whole_suite_runner_times_out_hanging_tests() {
             "--report",
             report_path.to_str().expect("path should be utf-8"),
             "--timeout-ms",
-            "50",
+            "250",
             "-j1",
         ])
         .output()
@@ -53,7 +60,8 @@ fn whole_suite_runner_times_out_hanging_tests() {
 
     let report = fs::read_to_string(&report_path).expect("report should be written");
     assert!(report.contains("timeout after"));
-    assert!(report.contains("| Failed | `2` |"));
+    assert_report_count(&report, "Failed files", 1);
+    assert_report_count(&report, "Failed variants", 2);
 
     let _ = fs::remove_dir_all(root);
 }
@@ -154,8 +162,10 @@ fn whole_suite_runner_recovers_after_timed_out_test() {
 
     let report = fs::read_to_string(&report_path).expect("report should be written");
     assert!(report.contains("timeout after"));
-    assert!(report.contains("| Passed | `2` |"));
-    assert!(report.contains("| Failed | `2` |"));
+    assert_report_count(&report, "Passed files", 1);
+    assert_report_count(&report, "Passed variants", 2);
+    assert_report_count(&report, "Failed files", 1);
+    assert_report_count(&report, "Failed variants", 2);
 
     let _ = fs::remove_dir_all(root);
 }

@@ -50,8 +50,11 @@ pub(crate) struct SuiteReport<'a> {
     pub(crate) timeout: Duration,
     pub(crate) candidate_total: usize,
     pub(crate) selected_total: usize,
+    pub(crate) selected_variant_total: usize,
     pub(crate) selected_counts: &'a HashMap<String, usize>,
     pub(crate) category_stats: &'a HashMap<String, CategoryStats>,
+    pub(crate) selected_variant_counts: &'a HashMap<String, usize>,
+    pub(crate) variant_category_stats: &'a HashMap<String, CategoryStats>,
     pub(crate) skip_reasons: &'a HashMap<String, u32>,
     pub(crate) exclusion_reasons: &'a HashMap<String, u32>,
     pub(crate) failures: &'a [String],
@@ -69,6 +72,12 @@ struct ReportTotals {
     runnable: u32,
     excluded_from_selection: usize,
     pass_rate: f64,
+    selected_variant_total: usize,
+    runnable_variant_total: u32,
+    variant_pass: u32,
+    variant_fail: u32,
+    variant_skip: u32,
+    variant_panic: u32,
 }
 
 pub(crate) fn write_report(report: &SuiteReport<'_>) {
@@ -88,6 +97,7 @@ pub(crate) fn write_report(report: &SuiteReport<'_>) {
     write_delta_section(&mut out, previous_totals.as_ref(), &totals);
     write_selection_exclusion_section(&mut out, report, &totals);
     write_category_section(&mut out, report);
+    write_variant_execution_section(&mut out, report, &totals);
     write_skip_section(&mut out, report);
     write_manifest_section(&mut out, report);
     write_failure_cluster_section(&mut out, report);
@@ -136,6 +146,31 @@ fn compute_totals(report: &SuiteReport<'_>) -> ReportTotals {
     } else {
         f64::from(total_pass) / f64::from(selected) * 100.0
     };
+    let variant_pass = report
+        .variant_category_stats
+        .values()
+        .map(|stats| stats.pass)
+        .sum::<u32>();
+    let variant_fail = report
+        .variant_category_stats
+        .values()
+        .map(CategoryStats::reported_failures)
+        .sum::<u32>();
+    let variant_skip = report
+        .variant_category_stats
+        .values()
+        .map(|stats| stats.skip)
+        .sum::<u32>();
+    let variant_panic = report
+        .variant_category_stats
+        .values()
+        .map(|stats| stats.panic)
+        .sum::<u32>();
+    let runnable_variant_total = report
+        .variant_category_stats
+        .values()
+        .map(CategoryStats::attempted)
+        .sum::<u32>();
 
     ReportTotals {
         candidate_total: report.candidate_total,
@@ -151,6 +186,12 @@ fn compute_totals(report: &SuiteReport<'_>) -> ReportTotals {
             .map(|count| *count as usize)
             .sum(),
         pass_rate,
+        selected_variant_total: report.selected_variant_total,
+        runnable_variant_total,
+        variant_pass,
+        variant_fail,
+        variant_skip,
+        variant_panic,
     }
 }
 
@@ -196,11 +237,15 @@ fn write_run_section(out: &mut String, report: &SuiteReport<'_>) {
     let _ = writeln!(out, "- Exclusion manifest: `{}`", report.manifest.path);
     let _ = writeln!(
         out,
-        "- Category breakdown groups tests by the first path component under `testdata/test262/test/`."
+        "- Category breakdown groups source files by the first path component under `testdata/test262/test/`."
     );
     let _ = writeln!(
         out,
-        "- Skipped tests are reported separately and still count against the selected-test pass rate."
+        "- Default script files may execute strict and non-strict variants; file totals aggregate those variants into one Test262 file result."
+    );
+    let _ = writeln!(
+        out,
+        "- Skipped files are reported separately and still count against the selected-file pass rate."
     );
     let _ = writeln!(out);
 }
@@ -210,22 +255,32 @@ fn write_summary_section(out: &mut String, report: &SuiteReport<'_>, totals: &Re
     let _ = writeln!(out);
     let _ = writeln!(out, "| Metric | Count |");
     let _ = writeln!(out, "| --- | ---: |");
-    let _ = writeln!(out, "| Candidate tests | `{}` |", report.candidate_total);
+    let _ = writeln!(out, "| Candidate files | `{}` |", report.candidate_total);
     let _ = writeln!(
         out,
-        "| Excluded from selection | `{}` |",
+        "| Excluded files from selection | `{}` |",
         totals.excluded_from_selection
     );
-    let _ = writeln!(out, "| Selected tests | `{}` |", report.selected_total);
-    let _ = writeln!(out, "| Runnable | `{}` |", totals.runnable);
-    let _ = writeln!(out, "| Passed | `{}` |", totals.total_pass);
-    let _ = writeln!(out, "| Failed | `{}` |", totals.total_fail);
-    let _ = writeln!(out, "| Panicked | `{}` |", totals.total_panic);
-    let _ = writeln!(out, "| Skipped | `{}` |", totals.total_skip);
+    let _ = writeln!(out, "| Selected files | `{}` |", report.selected_total);
+    let _ = writeln!(out, "| Runnable files | `{}` |", totals.runnable);
+    let _ = writeln!(out, "| Passed files | `{}` |", totals.total_pass);
+    let _ = writeln!(out, "| Failed files | `{}` |", totals.total_fail);
+    let _ = writeln!(out, "| Panicked files | `{}` |", totals.total_panic);
+    let _ = writeln!(out, "| Skipped files | `{}` |", totals.total_skip);
     let _ = writeln!(
         out,
-        "| Pass rate (selected) | `{}%` |",
+        "| Pass rate (selected files) | `{}%` |",
         format_pass_rate(totals.pass_rate)
+    );
+    let _ = writeln!(
+        out,
+        "| Selected variant executions | `{}` |",
+        totals.selected_variant_total
+    );
+    let _ = writeln!(
+        out,
+        "| Runnable variant executions | `{}` |",
+        totals.runnable_variant_total
     );
     let _ = writeln!(out, "| Time | `{:.1}s` |", report.elapsed.as_secs_f64());
     let _ = writeln!(out);
@@ -251,58 +306,70 @@ fn write_delta_section(
     let _ = writeln!(out, "| --- | ---: | ---: | ---: |");
     write_delta_count_row(
         out,
-        "Candidate tests",
+        "Candidate files",
         previous.candidate_total as i128,
         totals.candidate_total as i128,
     );
     write_delta_count_row(
         out,
-        "Excluded from selection",
+        "Excluded files from selection",
         previous.excluded_from_selection as i128,
         totals.excluded_from_selection as i128,
     );
     write_delta_count_row(
         out,
-        "Selected tests",
+        "Selected files",
         previous.selected_total as i128,
         totals.selected_total as i128,
     );
     write_delta_count_row(
         out,
-        "Runnable",
+        "Runnable files",
         i128::from(previous.runnable),
         i128::from(totals.runnable),
     );
     write_delta_count_row(
         out,
-        "Passed",
+        "Passed files",
         i128::from(previous.total_pass),
         i128::from(totals.total_pass),
     );
     write_delta_count_row(
         out,
-        "Failed",
+        "Failed files",
         i128::from(previous.total_fail),
         i128::from(totals.total_fail),
     );
     write_delta_count_row(
         out,
-        "Panicked",
+        "Panicked files",
         i128::from(previous.total_panic),
         i128::from(totals.total_panic),
     );
     write_delta_count_row(
         out,
-        "Skipped",
+        "Skipped files",
         i128::from(previous.total_skip),
         i128::from(totals.total_skip),
     );
     let _ = writeln!(
         out,
-        "| Pass rate (selected) | `{}%` | `{}%` | `{:+.2}pp` |",
+        "| Pass rate (selected files) | `{}%` | `{}%` | `{:+.2}pp` |",
         format_pass_rate(previous.pass_rate),
         format_pass_rate(totals.pass_rate),
         totals.pass_rate - previous.pass_rate
+    );
+    write_delta_count_row(
+        out,
+        "Selected variant executions",
+        previous.selected_variant_total as i128,
+        totals.selected_variant_total as i128,
+    );
+    write_delta_count_row(
+        out,
+        "Runnable variant executions",
+        i128::from(previous.runnable_variant_total),
+        i128::from(totals.runnable_variant_total),
     );
     let _ = writeln!(out);
 }
@@ -311,8 +378,7 @@ fn write_delta_count_row(out: &mut String, metric: &str, previous: i128, current
     let delta = current - previous;
     let _ = writeln!(
         out,
-        "| {metric} | `{}` | `{}` | `{delta:+}` |",
-        previous, current
+        "| {metric} | `{previous}` | `{current}` | `{delta:+}` |"
     );
 }
 
@@ -325,7 +391,7 @@ fn write_selection_exclusion_section(
     let _ = writeln!(out);
     if report.exclusion_reasons.is_empty() {
         if totals.excluded_from_selection == 0 {
-            let _ = writeln!(out, "No tests were excluded from selection.");
+            let _ = writeln!(out, "No files were excluded from selection.");
         } else {
             let _ = writeln!(out, "No exclusion reason detail was recorded.");
         }
@@ -346,7 +412,7 @@ fn write_category_section(out: &mut String, report: &SuiteReport<'_>) {
     let _ = writeln!(out);
     let _ = writeln!(
         out,
-        "| Category | Selected | Runnable | Pass | Fail | Skip | Panic | Rate |"
+        "| Category | Selected files | Runnable files | Pass | Fail | Skip | Panic | Rate |"
     );
     let _ = writeln!(
         out,
@@ -356,6 +422,63 @@ fn write_category_section(out: &mut String, report: &SuiteReport<'_>) {
     category_rows.sort_by(|left, right| left.0.cmp(right.0));
     for (category, stats) in category_rows {
         let selected = report.selected_counts.get(category).copied().unwrap_or(0);
+        let _ = writeln!(
+            out,
+            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}%` |",
+            category,
+            selected,
+            stats.attempted(),
+            stats.pass,
+            stats.reported_failures(),
+            stats.skip,
+            stats.panic,
+            format_pass_rate(stats.pass_rate())
+        );
+    }
+    let _ = writeln!(out);
+}
+
+fn write_variant_execution_section(
+    out: &mut String,
+    report: &SuiteReport<'_>,
+    totals: &ReportTotals,
+) {
+    let _ = writeln!(out, "## Variant Execution Breakdown");
+    let _ = writeln!(out);
+    let _ = writeln!(out, "| Metric | Count |");
+    let _ = writeln!(out, "| --- | ---: |");
+    let _ = writeln!(
+        out,
+        "| Selected variant executions | `{}` |",
+        totals.selected_variant_total
+    );
+    let _ = writeln!(
+        out,
+        "| Runnable variant executions | `{}` |",
+        totals.runnable_variant_total
+    );
+    let _ = writeln!(out, "| Passed variants | `{}` |", totals.variant_pass);
+    let _ = writeln!(out, "| Failed variants | `{}` |", totals.variant_fail);
+    let _ = writeln!(out, "| Panicked variants | `{}` |", totals.variant_panic);
+    let _ = writeln!(out, "| Skipped variants | `{}` |", totals.variant_skip);
+    let _ = writeln!(out);
+
+    let _ = writeln!(
+        out,
+        "| Category | Selected variants | Runnable variants | Pass | Fail | Skip | Panic | Rate |"
+    );
+    let _ = writeln!(
+        out,
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+    );
+    let mut category_rows: Vec<_> = report.variant_category_stats.iter().collect();
+    category_rows.sort_by(|left, right| left.0.cmp(right.0));
+    for (category, stats) in category_rows {
+        let selected = report
+            .selected_variant_counts
+            .get(category)
+            .copied()
+            .unwrap_or(0);
         let _ = writeln!(
             out,
             "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}%` |",
@@ -543,6 +666,12 @@ fn parse_previous_totals(source: &str) -> Option<ReportTotals> {
     let mut total_panic = None;
     let mut total_skip = None;
     let mut pass_rate = None;
+    let mut selected_variant_total = None;
+    let mut runnable_variant_total = None;
+    let mut variant_pass = None;
+    let mut variant_fail = None;
+    let mut variant_panic = None;
+    let mut variant_skip = None;
 
     for line in source.lines() {
         if line.trim() == "## Summary" {
@@ -565,15 +694,21 @@ fn parse_previous_totals(source: &str) -> Option<ReportTotals> {
         };
 
         match metric {
-            "Candidate tests" => candidate_total = parse_usize_cell(value),
-            "Excluded from selection" => excluded_from_selection = parse_usize_cell(value),
-            "Selected tests" => selected_total = parse_usize_cell(value),
-            "Runnable" => runnable = parse_u32_cell(value),
-            "Passed" => total_pass = parse_u32_cell(value),
-            "Failed" => total_fail = parse_u32_cell(value),
-            "Panicked" => total_panic = parse_u32_cell(value),
-            "Skipped" => total_skip = parse_u32_cell(value),
-            "Pass rate (selected)" => pass_rate = parse_percent_cell(value),
+            "Candidate files" => candidate_total = parse_usize_cell(value),
+            "Excluded files from selection" => excluded_from_selection = parse_usize_cell(value),
+            "Selected files" => selected_total = parse_usize_cell(value),
+            "Runnable files" => runnable = parse_u32_cell(value),
+            "Passed files" => total_pass = parse_u32_cell(value),
+            "Failed files" => total_fail = parse_u32_cell(value),
+            "Panicked files" => total_panic = parse_u32_cell(value),
+            "Skipped files" => total_skip = parse_u32_cell(value),
+            "Pass rate (selected files)" => pass_rate = parse_percent_cell(value),
+            "Selected variant executions" => selected_variant_total = parse_usize_cell(value),
+            "Runnable variant executions" => runnable_variant_total = parse_u32_cell(value),
+            "Passed variants" => variant_pass = parse_u32_cell(value),
+            "Failed variants" => variant_fail = parse_u32_cell(value),
+            "Panicked variants" => variant_panic = parse_u32_cell(value),
+            "Skipped variants" => variant_skip = parse_u32_cell(value),
             _ => {}
         }
     }
@@ -588,6 +723,12 @@ fn parse_previous_totals(source: &str) -> Option<ReportTotals> {
         runnable: runnable?,
         excluded_from_selection: excluded_from_selection?,
         pass_rate: pass_rate?,
+        selected_variant_total: selected_variant_total?,
+        runnable_variant_total: runnable_variant_total?,
+        variant_pass: variant_pass.unwrap_or(0),
+        variant_fail: variant_fail.unwrap_or(0),
+        variant_skip: variant_skip.unwrap_or(0),
+        variant_panic: variant_panic.unwrap_or(0),
     })
 }
 
@@ -709,8 +850,11 @@ mod tests {
             timeout: Duration::from_secs(1),
             candidate_total: 2,
             selected_total: 2,
+            selected_variant_total: 2,
             selected_counts: &selected_counts,
             category_stats: &category_stats,
+            selected_variant_counts: &selected_counts,
+            variant_category_stats: &category_stats,
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
@@ -721,9 +865,11 @@ mod tests {
         let _ = fs::remove_file(&report_path);
 
         assert!(output.contains("first path component under `testdata/test262/test/`"));
-        assert!(output.contains("| Failed | `0` |"));
-        assert!(output.contains("| Skipped | `1` |"));
-        assert!(output.contains("| Pass rate (selected) | `50.00%` |"));
+        assert!(output.contains("| Candidate files | `2` |"));
+        assert!(output.contains("| Selected files | `2` |"));
+        assert!(output.contains("| Failed files | `0` |"));
+        assert!(output.contains("| Skipped files | `1` |"));
+        assert!(output.contains("| Pass rate (selected files) | `50.00%` |"));
         assert!(output.contains("- Proposal stage: `Stage 3+`"));
         assert!(output.contains("Stage 4 implementation gaps remain visible"));
         assert!(!output.contains("Tests carrying `Error.isError` remain excluded"));
@@ -761,15 +907,17 @@ mod tests {
 
 | Metric | Count |
 | --- | ---: |
-| Candidate tests | `3` |
-| Excluded from selection | `2` |
-| Selected tests | `1` |
-| Runnable | `1` |
-| Passed | `0` |
-| Failed | `1` |
-| Panicked | `0` |
-| Skipped | `0` |
-| Pass rate (selected) | `0.00%` |
+| Candidate files | `3` |
+| Excluded files from selection | `2` |
+| Selected files | `1` |
+| Runnable files | `1` |
+| Passed files | `0` |
+| Failed files | `1` |
+| Panicked files | `0` |
+| Skipped files | `0` |
+| Pass rate (selected files) | `0.00%` |
+| Selected variant executions | `1` |
+| Runnable variant executions | `1` |
 ",
         )
         .expect("previous report should be writable");
@@ -784,8 +932,11 @@ mod tests {
             timeout: Duration::from_secs(1),
             candidate_total: 3,
             selected_total: 2,
+            selected_variant_total: 2,
             selected_counts: &selected_counts,
             category_stats: &category_stats,
+            selected_variant_counts: &selected_counts,
+            variant_category_stats: &category_stats,
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
@@ -796,9 +947,10 @@ mod tests {
         let _ = fs::remove_file(&report_path);
 
         assert!(output.contains("## Delta From Previous Report"));
-        assert!(output.contains("| Passed | `0` | `1` | `+1` |"));
-        assert!(output.contains("| Excluded from selection | `2` | `1` | `-1` |"));
-        assert!(output.contains("| Pass rate (selected) | `0.00%` | `50.00%` | `+50.00pp` |"));
+        assert!(output.contains("| Passed files | `0` | `1` | `+1` |"));
+        assert!(output.contains("| Excluded files from selection | `2` | `1` | `-1` |"));
+        assert!(output.contains("| Pass rate (selected files) | `0.00%` | `50.00%` | `+50.00pp` |"));
+        assert!(output.contains("| Selected variant executions | `1` | `2` | `+1` |"));
         assert!(output.contains("- Jobs: `4`"));
     }
 
@@ -826,8 +978,11 @@ mod tests {
             timeout: Duration::from_secs(1),
             candidate_total: 64,
             selected_total: 0,
+            selected_variant_total: 0,
             selected_counts: &selected_counts,
             category_stats: &category_stats,
+            selected_variant_counts: &selected_counts,
+            variant_category_stats: &category_stats,
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
@@ -888,8 +1043,11 @@ mod tests {
             timeout: Duration::from_secs(1),
             candidate_total: 10,
             selected_total: 10,
+            selected_variant_total: 10,
             selected_counts: &selected_counts,
             category_stats: &category_stats,
+            selected_variant_counts: &selected_counts,
+            variant_category_stats: &category_stats,
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
@@ -1011,8 +1169,11 @@ mod tests {
             timeout: Duration::from_secs(1),
             candidate_total: 1,
             selected_total: 1,
+            selected_variant_total: 1,
             selected_counts: &selected_counts,
             category_stats: &category_stats,
+            selected_variant_counts: &selected_counts,
+            variant_category_stats: &category_stats,
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
@@ -1077,8 +1238,11 @@ mod tests {
             timeout: Duration::from_secs(1),
             candidate_total: 3,
             selected_total: 3,
+            selected_variant_total: 3,
             selected_counts: &selected_counts,
             category_stats: &category_stats,
+            selected_variant_counts: &selected_counts,
+            variant_category_stats: &category_stats,
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
