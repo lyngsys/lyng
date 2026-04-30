@@ -729,6 +729,19 @@ impl Vm {
                         PropertyKey::from_atom(WellKnownAtom::r#return.id()),
                     )?;
                     if return_method.is_undefined() || return_method.is_null() {
+                        if record.is_async() {
+                            return self.start_async_delegate_value_await(
+                                agent,
+                                host,
+                                registry,
+                                frame,
+                                iterator_register,
+                                record,
+                                resume_value,
+                                true,
+                                true,
+                            );
+                        }
                         DelegateYieldOutcome::Complete {
                             value: resume_value,
                         }
@@ -984,16 +997,33 @@ impl Vm {
                         iterator::iterator_value(&mut bridge, iter_result)?,
                     )
                 };
-                self.start_async_delegate_value_await(
+                if record.is_async_from_sync() || (done && return_completion) {
+                    return self.start_async_delegate_value_await(
+                        agent,
+                        host,
+                        registry,
+                        frame,
+                        iterator_register,
+                        record,
+                        value,
+                        done,
+                        return_completion && done,
+                    );
+                }
+                let outcome = if done {
+                    record.set_done(true);
+                    DelegateYieldOutcome::Complete { value }
+                } else {
+                    DelegateYieldOutcome::Suspend { value, record }
+                };
+                self.finish_delegate_yield_outcome(
                     agent,
-                    host,
-                    registry,
                     frame,
+                    result_register,
+                    done_register,
+                    frame.registers().base(),
                     iterator_register,
-                    record,
-                    value,
-                    done,
-                    return_completion && done,
+                    outcome,
                 )
             }
             iterator::DelegateYieldAwaitState::Value {

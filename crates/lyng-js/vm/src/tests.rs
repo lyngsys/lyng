@@ -6519,6 +6519,7 @@ fn async_generator_private_yield_star_awaits_async_iterator_next_results() {
         r#"
             async function main() {
                 var log = "";
+                var yielded = Promise.resolve(5);
                 var iterable = {
                     [Symbol.asyncIterator]() {
                         var count = 0;
@@ -6528,7 +6529,7 @@ fn async_generator_private_yield_star_awaits_async_iterator_next_results() {
                                 count += 1;
                                 if (count === 1) {
                                     return Promise.resolve({
-                                        value: Promise.resolve(5),
+                                        value: yielded,
                                         done: false
                                     });
                                 }
@@ -6552,7 +6553,7 @@ fn async_generator_private_yield_star_awaits_async_iterator_next_results() {
                 var iter = new C().gen();
                 var first = await iter.next("ignored");
                 var second = await iter.next("sent");
-                return String(first.value) + ":" + first.done
+                return String(first.value === yielded) + ":" + first.done
                     + "|" + second.value + ":" + second.done
                     + "|" + log;
             }
@@ -6578,7 +6579,52 @@ fn async_generator_private_yield_star_awaits_async_iterator_next_results() {
         .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
         .expect("async generator delegated yield-star result should be a string");
 
-    assert_eq!(text, "5:false|ret:done:true|next:undefined;next:sent;");
+    assert_eq!(text, "true:false|ret:done:true|next:undefined;next:sent;");
+}
+
+#[test]
+fn async_generator_yield_star_missing_return_method_awaits_return_value() {
+    let unit = compile_test_unit(
+        335,
+        r#"
+            async function main() {
+                var iterable = {
+                    [Symbol.asyncIterator]() {
+                        return this;
+                    },
+                    next() {
+                        return {
+                            value: 1,
+                            done: false
+                        };
+                    }
+                };
+                var iter = (async function* () {
+                    yield* iterable;
+                })();
+                await iter.next();
+                var returnValue = Promise.resolve(2).then(() => 3);
+                var result = await iter.return(returnValue);
+                return result.value === returnValue ? -1 : result.value;
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("async generator return-value await test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("async generator return-value await promise should remain tracked");
+
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.result(), Value::from_smi(3));
 }
 
 #[test]
