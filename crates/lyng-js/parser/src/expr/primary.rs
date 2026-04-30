@@ -638,7 +638,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         );
 
         let kind = if is_async {
-            FunctionKind::Async
+            FunctionKind::AsyncArrow
         } else {
             FunctionKind::Arrow
         };
@@ -908,7 +908,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 self.validate_arrow_parameters(
                     &params,
                     function.params.rest,
-                    matches!(function.kind, FunctionKind::Async),
+                    matches!(function.kind, FunctionKind::AsyncArrow),
                     await_restricted,
                     yield_restricted,
                 );

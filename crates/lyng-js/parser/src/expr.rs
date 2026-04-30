@@ -549,8 +549,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             );
         }
 
-        if matches!(kind, FunctionKind::Async | FunctionKind::AsyncGenerator)
-            && name == WellKnownAtom::r#await.id()
+        if matches!(
+            kind,
+            FunctionKind::Async | FunctionKind::AsyncArrow | FunctionKind::AsyncGenerator
+        ) && name == WellKnownAtom::r#await.id()
         {
             self.error_at(
                 span,

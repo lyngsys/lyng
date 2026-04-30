@@ -98,7 +98,10 @@ fn nearest_non_arrow_owner_for(
     let mut current = Some(function);
     while let Some(candidate) = current {
         let ast_function = sema.function_table.get(candidate).function_id;
-        if program.ast.get_function(ast_function).kind != FunctionKind::Arrow {
+        if !matches!(
+            program.ast.get_function(ast_function).kind,
+            FunctionKind::Arrow | FunctionKind::AsyncArrow
+        ) {
             return Some(candidate);
         }
         current = parent_functions[candidate.raw() as usize];
@@ -118,7 +121,10 @@ fn has_direct_arrow_child_for(
         .enumerate()
         .any(|(index, record)| {
             parent_functions[index] == Some(parent)
-                && program.ast.get_function(record.function_id).kind == FunctionKind::Arrow
+                && matches!(
+                    program.ast.get_function(record.function_id).kind,
+                    FunctionKind::Arrow | FunctionKind::AsyncArrow
+                )
         })
 }
 
@@ -171,14 +177,17 @@ pub(super) fn build_function_activation_plan(
     parent_functions: &[Option<FunctionSemaId>],
 ) -> LoweringResult<FunctionActivationPlan> {
     let ast_function = program.ast.get_function(record.function_id).clone();
-    let arguments_mode =
-        if ast_function.kind == FunctionKind::Arrow || !arguments_owners.contains(&sema_id) {
-            ArgumentsMode::None
-        } else if record.strict || function_has_non_simple_params(program.ast, &ast_function) {
-            ArgumentsMode::Unmapped
-        } else {
-            ArgumentsMode::Mapped
-        };
+    let arguments_mode = if matches!(
+        ast_function.kind,
+        FunctionKind::Arrow | FunctionKind::AsyncArrow
+    ) || !arguments_owners.contains(&sema_id)
+    {
+        ArgumentsMode::None
+    } else if record.strict || function_has_non_simple_params(program.ast, &ast_function) {
+        ArgumentsMode::Unmapped
+    } else {
+        ArgumentsMode::Mapped
+    };
 
     let mut parameter_ordinals = HashMap::new();
     let mut used_bindings = HashSet::new();

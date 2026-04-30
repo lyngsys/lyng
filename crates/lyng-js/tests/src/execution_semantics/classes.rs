@@ -228,6 +228,58 @@ fn phase6_private_elements_reject_non_extensible_receivers() {
 }
 
 #[test]
+fn phase6_async_private_methods_async_arrows_capture_parent_arguments() {
+    let mut atoms = AtomTable::new();
+    let unit = compile_unit(
+        r#"
+        class C {
+            async #method(x) {
+                let captured = arguments;
+                return async () => captured === arguments;
+            }
+
+            async method(x) {
+                return this.#method(x);
+            }
+
+            static async #staticMethod(x) {
+                let captured = arguments;
+                return async () => captured === arguments;
+            }
+
+            static async staticMethod(x) {
+                return this.#staticMethod(x);
+            }
+        }
+
+        let c = new C();
+        Promise.all([
+            c.method("instance").then(callback => callback()),
+            C.staticMethod("static").then(callback => callback()),
+        ]).then(results => results[0] === true && results[1] === true);
+        "#,
+        &mut atoms,
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .expect("compiled script should execute");
+    let promise = result
+        .as_object_ref()
+        .expect("script should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("promise should remain tracked after evaluation");
+
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.result(), Value::from_bool(true));
+}
+
+#[test]
 fn phase6_anonymous_class_expressions_infer_names_before_static_initializers() {
     let result = compile_and_run_string(
         r#"

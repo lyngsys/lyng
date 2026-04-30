@@ -24,7 +24,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         // Set flags for parameter parsing: await/yield only allowed in
         // async/generator functions, not inherited from enclosing scope.
         self.allow_yield = matches!(kind, FunctionKind::Generator | FunctionKind::AsyncGenerator);
-        self.allow_await = matches!(kind, FunctionKind::Async | FunctionKind::AsyncGenerator);
+        self.allow_await = matches!(
+            kind,
+            FunctionKind::Async | FunctionKind::AsyncArrow | FunctionKind::AsyncGenerator
+        );
         self.in_static_block = false;
 
         let params = self.parse_formal_parameters();
@@ -61,7 +64,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let prev_in_static_block = self.in_static_block;
 
         self.allow_yield = matches!(kind, FunctionKind::Generator | FunctionKind::AsyncGenerator);
-        self.allow_await = matches!(kind, FunctionKind::Async | FunctionKind::AsyncGenerator);
+        self.allow_await = matches!(
+            kind,
+            FunctionKind::Async | FunctionKind::AsyncArrow | FunctionKind::AsyncGenerator
+        );
         self.in_static_block = false;
 
         let params = self.parse_formal_parameters();
@@ -152,7 +158,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         params: &FormalParameters,
         kind: FunctionKind,
     ) {
-        let check_await = matches!(kind, FunctionKind::Async | FunctionKind::AsyncGenerator);
+        let check_await = matches!(
+            kind,
+            FunctionKind::Async | FunctionKind::AsyncArrow | FunctionKind::AsyncGenerator
+        );
         let check_yield = matches!(kind, FunctionKind::Generator | FunctionKind::AsyncGenerator);
 
         if !check_await && !check_yield {

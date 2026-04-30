@@ -166,6 +166,8 @@ pub enum FunctionKind {
     Normal,
     /// An arrow function (`=>`).
     Arrow,
+    /// An async arrow function (`async (...) =>`).
+    AsyncArrow,
     /// A generator function (`function*`).
     Generator,
     /// An async function (`async function`).

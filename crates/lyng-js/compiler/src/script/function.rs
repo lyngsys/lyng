@@ -194,7 +194,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 ))
                 .with_async_function(matches!(
                     ast_function.kind,
-                    FunctionKind::Async | FunctionKind::AsyncGenerator
+                    FunctionKind::Async | FunctionKind::AsyncArrow | FunctionKind::AsyncGenerator
                 )),
         );
         builder.set_this_mode(this_mode);
@@ -809,7 +809,7 @@ fn bytecode_function_kind(
         | FunctionKind::Generator
         | FunctionKind::Async
         | FunctionKind::AsyncGenerator => Ok(BytecodeFunctionKind::Function),
-        FunctionKind::Arrow => Ok(BytecodeFunctionKind::Arrow),
+        FunctionKind::Arrow | FunctionKind::AsyncArrow => Ok(BytecodeFunctionKind::Arrow),
     }
 }
 
@@ -823,6 +823,7 @@ fn function_constructible(
             .unwrap_or(true),
         FunctionKind::Generator
         | FunctionKind::Arrow
+        | FunctionKind::AsyncArrow
         | FunctionKind::Async
         | FunctionKind::AsyncGenerator => false,
     }

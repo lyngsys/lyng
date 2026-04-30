@@ -348,7 +348,10 @@ impl<'a> CompilationState<'a> {
     ) -> Option<FunctionSemaId> {
         let mut current = Some(function);
         while let Some(candidate) = current {
-            if self.function_kind(candidate) != FunctionKind::Arrow {
+            if !matches!(
+                self.function_kind(candidate),
+                FunctionKind::Arrow | FunctionKind::AsyncArrow
+            ) {
                 return Some(candidate);
             }
             current = self.parent_function(candidate);
@@ -480,7 +483,10 @@ impl<'a> CompilationState<'a> {
                     .copied()
                     .flatten()
                     .is_none()
-                    && self.program.ast.get_function(record.function_id).kind == FunctionKind::Arrow
+                    && matches!(
+                        self.program.ast.get_function(record.function_id).kind,
+                        FunctionKind::Arrow | FunctionKind::AsyncArrow
+                    )
             })
     }
 
