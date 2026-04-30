@@ -6,13 +6,15 @@ use crate::regexp_tables::is_valid_unicode_property_escape;
 enum AtomKind {
     None,
     Atom,
-    Assertion,
+    LookaheadAssertion,
+    LookbehindAssertion,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum GroupKind {
     Atom,
-    Assertion,
+    LookaheadAssertion,
+    LookbehindAssertion,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -181,7 +183,8 @@ fn validate_pattern(
                 let kind = groups.pop().unwrap_or(GroupKind::Atom);
                 last_atom = match kind {
                     GroupKind::Atom => AtomKind::Atom,
-                    GroupKind::Assertion => AtomKind::Assertion,
+                    GroupKind::LookaheadAssertion => AtomKind::LookaheadAssertion,
+                    GroupKind::LookbehindAssertion => AtomKind::LookbehindAssertion,
                 };
                 i += 1;
             }
@@ -191,7 +194,7 @@ fn validate_pattern(
             }
             '*' | '+' | '?' => {
                 if last_atom != AtomKind::Atom
-                    && !(last_atom == AtomKind::Assertion && !flags.unicode)
+                    && !(last_atom == AtomKind::LookaheadAssertion && !flags.unicode)
                 {
                     return Err("invalid regular expression pattern");
                 }
@@ -213,7 +216,7 @@ fn validate_pattern(
                         continue;
                     }
                     if last_atom != AtomKind::Atom
-                        && !(last_atom == AtomKind::Assertion && !flags.unicode)
+                        && !(last_atom == AtomKind::LookaheadAssertion && !flags.unicode)
                     {
                         return Err("invalid regular expression pattern");
                     }
@@ -257,10 +260,10 @@ fn parse_group_start(
 
     match chars.get(start + 2) {
         Some(':') => Ok((start + 3, GroupKind::Atom)),
-        Some('=') | Some('!') => Ok((start + 3, GroupKind::Assertion)),
+        Some('=') | Some('!') => Ok((start + 3, GroupKind::LookaheadAssertion)),
         Some('i' | 'm' | 's' | '-') => parse_modifier_group_start(chars, start),
         Some('<') => match chars.get(start + 3) {
-            Some('=') | Some('!') => Ok((start + 4, GroupKind::Assertion)),
+            Some('=') | Some('!') => Ok((start + 4, GroupKind::LookbehindAssertion)),
             _ => {
                 let mut end = start + 3;
                 while end < chars.len() && chars[end] != '>' {

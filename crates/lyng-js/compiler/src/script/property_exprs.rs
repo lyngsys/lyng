@@ -147,6 +147,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         property.span,
                     );
                 }
+                if property.method || self.is_anonymous_function_definition(property.value) {
+                    let name_value = if let Some(atom) = named_atom {
+                        let name_value = self.alloc_temp()?;
+                        self.emit_load_atom_string(name_value, atom)?;
+                        name_value
+                    } else {
+                        key_register.expect("computed property keys should have a key register")
+                    };
+                    self.emit_set_function_name(value_register, name_value)?;
+                }
                 if property.method {
                     self.bind_function_home_object(value_register, object, property.span)?;
                 }

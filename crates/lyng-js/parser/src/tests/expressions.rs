@@ -110,6 +110,14 @@ fn parse_annex_b_legacy_regexp_escapes() {
 }
 
 #[test]
+fn regexp_quantifiable_assertions_exclude_lookbehind() {
+    assert!(!script("/(?=.)?/;").diagnostics.has_errors());
+    assert!(!script("/(?!.){2,3}/;").diagnostics.has_errors());
+    assert!(script("/(?<=.)?/;").diagnostics.has_errors());
+    assert!(script("/(?<!.){2,3}/;").diagnostics.has_errors());
+}
+
+#[test]
 fn regexp_named_group_reference_requires_matching_group() {
     assert!(script("/(?<a>.)\\k<b>/;").diagnostics.has_errors());
     assert!(script("/(?<a>.)\\k/;").diagnostics.has_errors());
@@ -637,6 +645,11 @@ fn parse_array_trailing_comma_after_spread_is_not_elision() {
             panic!("expected array expression");
         }
     }
+}
+
+#[test]
+fn array_rest_assignment_pattern_rejects_trailing_comma() {
+    assert!(script("[...items,] = source;").diagnostics.has_errors());
 }
 
 #[test]

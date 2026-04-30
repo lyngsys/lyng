@@ -58,6 +58,8 @@ pub enum Expr {
         span: Span,
         /// Elements; `None` entries represent elisions.
         elements: NodeList<Option<ExprId>>,
+        /// Whether the final spread element was followed by a trailing comma.
+        trailing_comma_after_spread: bool,
     },
 
     /// `{ a: 1, b: 2 }`

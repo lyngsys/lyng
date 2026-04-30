@@ -707,6 +707,32 @@ fn script_core_supports_annex_b_string_substr() {
 }
 
 #[test]
+fn script_core_object_literal_infers_anonymous_property_function_names() {
+    let result = compile_and_run_string(
+        r#"
+        let anon = Symbol();
+        let named = Symbol("test262");
+        let object = {
+            id: () => {},
+            [anon]: () => {},
+            [named]: function() {},
+            method() {},
+            [String(named) + "Method"]() {}
+        };
+        [
+            object.id.name,
+            object[anon].name,
+            object[named].name,
+            object.method.name,
+            object["Symbol(test262)Method"].name
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "id||[test262]|method|Symbol(test262)Method");
+}
+
+#[test]
 fn script_core_supports_for_of_destructuring_assignment_heads() {
     let result = compile_and_run_string(
         r#"

@@ -136,6 +136,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let start = self.current_span();
         self.advance(); // eat `[`
         let mut elements: Vec<Option<ExprId>> = Vec::new();
+        let mut trailing_comma_after_spread = false;
 
         while !self.at(TokenKind::RBracket) && !self.at(TokenKind::Eof) {
             if self.at(TokenKind::Comma) {
@@ -157,6 +158,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 elements.push(Some(spread));
                 if self.eat(TokenKind::Comma) {
                     if self.at(TokenKind::RBracket) {
+                        trailing_comma_after_spread = true;
                         break;
                     }
                     continue;
@@ -178,6 +180,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         self.ast_mut().alloc_expr(Expr::ArrayExpression {
             span,
             elements: list,
+            trailing_comma_after_spread,
         })
     }
 
@@ -1074,7 +1077,11 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 }
                 self.validate_pattern_expression(left, false, allow_assignment_targets);
             }
-            Expr::ArrayExpression { elements, .. } => {
+            Expr::ArrayExpression {
+                elements,
+                trailing_comma_after_spread,
+                ..
+            } => {
                 let elems = self.ast().get_opt_expr_list(elements).to_vec();
                 let mut seen_rest = false;
                 for (idx, opt) in elems.iter().enumerate() {
@@ -1089,7 +1096,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                     };
                     match self.ast().get_expr(*elem).clone() {
                         Expr::SpreadElement { span, argument } => {
-                            if seen_rest || idx + 1 != elems.len() {
+                            if seen_rest || idx + 1 != elems.len() || trailing_comma_after_spread {
                                 self.error_at(
                                     span,
                                     "rest element must be the last element".to_string(),
@@ -1209,7 +1216,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                         right,
                     })
             }
-            Expr::ArrayExpression { span, elements } => {
+            Expr::ArrayExpression { span, elements, .. } => {
                 let src_elems = self.ast().get_opt_expr_list(elements).to_vec();
                 let mut elems = Vec::new();
                 let mut rest = None;
