@@ -305,14 +305,24 @@ impl Vm {
                             let key = PropertyKey::from_atom(
                                 self.read_atom_constant(frame.code(), u32::from(c))?,
                             );
-                            let define_result = object::ordinary_create_data_property(
-                                agent,
+                            let mut descriptor = PropertyDescriptor::new();
+                            descriptor.set_value(value);
+                            descriptor.set_writable(true);
+                            descriptor.set_enumerable(true);
+                            descriptor.set_configurable(true);
+                            let define_result = object::define_property_in_context(
+                                &mut VmProxyBridge {
+                                    vm: self,
+                                    agent,
+                                    host,
+                                    registry,
+                                    frame,
+                                },
                                 object,
                                 key,
-                                value,
+                                descriptor,
                                 AllocationLifetime::Default,
-                            )
-                            .map_err(VmError::Abrupt);
+                            );
                             let Some(created) = self.handle_vm_result(agent, define_result)? else {
                                 continue;
                             };
@@ -579,14 +589,24 @@ impl Vm {
                             let Some(key) = self.handle_vm_result(agent, key_result)? else {
                                 continue;
                             };
-                            let define_result = object::ordinary_create_data_property(
-                                agent,
+                            let mut descriptor = PropertyDescriptor::new();
+                            descriptor.set_value(value);
+                            descriptor.set_writable(true);
+                            descriptor.set_enumerable(true);
+                            descriptor.set_configurable(true);
+                            let define_result = object::define_property_in_context(
+                                &mut VmProxyBridge {
+                                    vm: self,
+                                    agent,
+                                    host,
+                                    registry,
+                                    frame,
+                                },
                                 object,
                                 key,
-                                value,
+                                descriptor,
                                 AllocationLifetime::Default,
-                            )
-                            .map_err(VmError::Abrupt);
+                            );
                             let Some(created) = self.handle_vm_result(agent, define_result)? else {
                                 continue;
                             };

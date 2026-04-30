@@ -136,6 +136,42 @@ fn phase6_direct_eval_in_static_field_initializer_uses_class_this() {
 }
 
 #[test]
+fn phase6_public_instance_fields_define_through_proxy_traps() {
+    let result = compile_and_run_string(
+        r#"
+        let log = "";
+        function ProxyBase() {
+            return new Proxy(this, {
+                defineProperty(target, key, descriptor) {
+                    log += key
+                        + ":"
+                        + descriptor.value
+                        + ":"
+                        + String(descriptor.enumerable)
+                        + ":"
+                        + String(descriptor.configurable)
+                        + ":"
+                        + String(descriptor.writable)
+                        + ";";
+                    return Reflect.defineProperty(target, key, descriptor);
+                }
+            });
+        }
+
+        class C extends ProxyBase {
+            f = 3;
+            g = "Test262";
+        }
+
+        new C();
+        log;
+        "#,
+    );
+
+    assert_eq!(result, "f:3:true:true:true;g:Test262:true:true:true;");
+}
+
+#[test]
 fn phase6_anonymous_class_expressions_infer_names_before_static_initializers() {
     let result = compile_and_run_string(
         r#"
