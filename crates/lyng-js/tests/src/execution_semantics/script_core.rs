@@ -171,6 +171,30 @@ fn script_core_loop_statement_completion_updates_empty_abrupt_exits() {
 }
 
 #[test]
+fn script_core_for_loop_completion_uses_undefined_seed() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            String(eval('1; for (; false; ) { }')),
+            String(eval('2; for (let i = 0; i < 1; i = i + 1) { }')),
+            String(eval('3; for (let i = 0; i < 1; i = i + 1) { 4; }')),
+            String(eval('var a; 5; for (a in { x: 0 }) { }')),
+            String(eval('var b; 6; for (b in { x: 0 }) { 7; break; }')),
+            String(eval('var c; 8; for (c of [0]) { }')),
+            String(eval('var d; 9; for (d of [0]) { 10; break; }')),
+            String(eval('var e; 11; outer: do { for (e of [0]) { continue outer; } } while (false)')),
+            String(eval('var f; 12; outer: do { for (f of [0]) { 13; continue outer; } } while (false)'))
+        ].join(':');
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "undefined:undefined:4:undefined:7:undefined:10:undefined:13"
+    );
+}
+
+#[test]
 fn script_core_switch_statement_matches_completion_and_lexical_open_rules() {
     let completion_result = compile_and_run_string(
         r#"

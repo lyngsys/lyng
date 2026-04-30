@@ -137,6 +137,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         body: StmtId,
         span: Span,
     ) -> LoweringResult<()> {
+        self.reset_statement_result()?;
         if let Some(init) = init {
             self.lower_for_init(init)?;
         }
@@ -210,6 +211,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         body: StmtId,
         span: Span,
     ) -> LoweringResult<()> {
+        self.reset_statement_result()?;
         let head_tdz_plan = self.for_in_of_head_tdz_plan(left)?;
         let iteration_disposal_kind = self.for_in_of_declaration_disposal_scope_kind(left);
         self.lower_annex_b_for_in_var_initializer(left)?;
@@ -347,6 +349,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         r#await: bool,
         span: Span,
     ) -> LoweringResult<()> {
+        self.reset_statement_result()?;
         let head_tdz_plan = self.for_in_of_head_tdz_plan(left)?;
         let iteration_disposal_kind = self.for_in_of_declaration_disposal_scope_kind(left);
         let iterable_register = if let Some(plan) = &head_tdz_plan {
