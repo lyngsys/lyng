@@ -205,6 +205,7 @@ struct SuspendedExecutionSideState {
     direct_eval_environment_states: Vec<DirectEvalEnvironmentState>,
     async_frame_state: Option<AsyncFrameState>,
     async_generator_frame_state: Option<AsyncGeneratorFrameState>,
+    script_or_module_referrer: Option<AtomId>,
 }
 
 #[derive(Default)]

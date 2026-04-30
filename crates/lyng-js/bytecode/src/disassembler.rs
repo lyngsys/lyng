@@ -140,9 +140,10 @@ fn format_abc_instruction(
 ) -> String {
     match bytecode_opcode {
         crate::Opcode::Move => format!("{opcode}r{}, r{}", operands.a(), operands.b()),
-        crate::Opcode::Negate | crate::Opcode::Increment | crate::Opcode::Decrement => {
-            format!("{opcode}r{}, r{}", operands.a(), operands.b())
-        }
+        crate::Opcode::Negate
+        | crate::Opcode::BitNot
+        | crate::Opcode::Increment
+        | crate::Opcode::Decrement => format!("{opcode}r{}, r{}", operands.a(), operands.b()),
         crate::Opcode::Add
         | crate::Opcode::Sub
         | crate::Opcode::Mul

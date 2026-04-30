@@ -3,7 +3,7 @@ use crate::vm::property_access::ToPrimitiveHint;
 use lyng_js_bytecode::{WideAbcOperands, WideAbxOperands};
 use lyng_js_gc::{AllocationLifetime, BigIntSign, PrimitiveStringView, StringEncoding};
 use lyng_js_ops::{errors, number_to_string, object, read};
-use lyng_js_types::PropertyKey;
+use lyng_js_types::{AbruptCompletion, PropertyKey};
 
 impl Vm {
     #[inline]
@@ -65,7 +65,7 @@ impl Vm {
             registry,
             frame,
             self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
+            ToPrimitiveHint::Default,
         )?;
         let right = self.to_primitive(
             agent,
@@ -73,7 +73,7 @@ impl Vm {
             registry,
             frame,
             self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
+            ToPrimitiveHint::Default,
         )?;
         if left.is_string() || right.is_string() {
             let left_units = self.value_to_string_code_units(agent, left)?;
@@ -92,8 +92,8 @@ impl Vm {
             return bigint_add_values(agent, left, right);
         }
 
-        let left = to_f64_number(agent, left)?;
-        let right = to_f64_number(agent, right)?;
+        let left = to_f64_number_or_type_error(agent, left)?;
+        let right = to_f64_number_or_type_error(agent, right)?;
         Ok(encode_number(left + right))
     }
 
@@ -106,45 +106,60 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
+        let left = self.to_numeric_value(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_value(agent, host, registry, frame, right_register)?;
         if left.is_bigint() || right.is_bigint() {
             if !left.is_bigint() || !right.is_bigint() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             }
             return bigint_subtract_values(agent, left, right);
         }
-        let left = to_f64_number(agent, left)?;
-        let right = to_f64_number(agent, right)?;
+        let left = to_f64_number_or_type_error(agent, left)?;
+        let right = to_f64_number_or_type_error(agent, right)?;
         Ok(encode_number(left - right))
     }
 
     pub(super) fn negate_value(
-        &self,
+        &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
         register: u16,
     ) -> VmResult<Value> {
-        let value = self.read_register(frame, register)?;
+        let value = self.to_primitive(
+            agent,
+            host,
+            registry,
+            frame,
+            self.read_register(frame, register)?,
+            ToPrimitiveHint::Number,
+        )?;
         if value.is_bigint() {
             return bigint_negate_value(agent, value);
         }
-        let number = to_f64_number(agent, value)?;
+        let number = to_f64_number_or_type_error(agent, value)?;
         Ok(encode_number(-number))
+    }
+
+    pub(super) fn bitwise_not_value(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        register: u16,
+    ) -> VmResult<Value> {
+        let value = self.to_numeric_value(agent, host, registry, frame, register)?;
+        if value.is_bigint() {
+            return bigint_bitwise_not_value(agent, value);
+        }
+        let number = number_to_int32(
+            value
+                .as_f64()
+                .expect("numeric non-BigInt Value should expose an f64 payload"),
+        );
+        Ok(Value::from_smi(!number))
     }
 
     pub(super) fn update_numeric_value(
@@ -184,30 +199,16 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
+        let left = self.to_numeric_value(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_value(agent, host, registry, frame, right_register)?;
         if left.is_bigint() || right.is_bigint() {
             if !left.is_bigint() || !right.is_bigint() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             }
             return bigint_multiply_values(agent, left, right);
         }
-        let left = to_f64_number(agent, left)?;
-        let right = to_f64_number(agent, right)?;
+        let left = to_f64_number_or_type_error(agent, left)?;
+        let right = to_f64_number_or_type_error(agent, right)?;
         Ok(encode_number(left * right))
     }
 
@@ -220,30 +221,16 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
+        let left = self.to_numeric_value(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_value(agent, host, registry, frame, right_register)?;
         if left.is_bigint() || right.is_bigint() {
             if !left.is_bigint() || !right.is_bigint() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             }
             return bigint_divide_values(agent, left, right);
         }
-        let left = to_f64_number(agent, left)?;
-        let right = to_f64_number(agent, right)?;
+        let left = to_f64_number_or_type_error(agent, left)?;
+        let right = to_f64_number_or_type_error(agent, right)?;
         Ok(encode_number(left / right))
     }
 
@@ -256,30 +243,16 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
+        let left = self.to_numeric_value(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_value(agent, host, registry, frame, right_register)?;
         if left.is_bigint() || right.is_bigint() {
             if !left.is_bigint() || !right.is_bigint() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             }
             return bigint_remainder_values(agent, left, right);
         }
-        let left = to_f64_number(agent, left)?;
-        let right = to_f64_number(agent, right)?;
+        let left = to_f64_number_or_type_error(agent, left)?;
+        let right = to_f64_number_or_type_error(agent, right)?;
         Ok(encode_number(left % right))
     }
 
@@ -292,31 +265,40 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
+        let left = self.to_numeric_value(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_value(agent, host, registry, frame, right_register)?;
         if left.is_bigint() || right.is_bigint() {
             if !left.is_bigint() || !right.is_bigint() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             }
             return bigint_exponentiate_values(agent, left, right);
         }
-        let left = to_f64_number(agent, left)?;
-        let right = to_f64_number(agent, right)?;
+        let left = to_f64_number_or_type_error(agent, left)?;
+        let right = to_f64_number_or_type_error(agent, right)?;
+        if left.abs() == 1.0 && right.is_infinite() {
+            return Ok(Value::from_f64(f64::NAN));
+        }
         Ok(encode_number(left.powf(right)))
+    }
+
+    fn to_numeric_value(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        register: u16,
+    ) -> VmResult<Value> {
+        let primitive = self.to_primitive(
+            agent,
+            host,
+            registry,
+            frame,
+            self.read_register(frame, register)?,
+            ToPrimitiveHint::Number,
+        )?;
+        read::to_numeric(agent.heap().view(), primitive)
+            .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
     }
 
     pub(crate) fn value_to_string_text(&self, agent: &mut Agent, value: Value) -> VmResult<String> {
@@ -940,6 +922,36 @@ pub(super) fn to_f64_number(agent: &Agent, value: Value) -> VmResult<f64> {
         .expect("ToNumber must always produce a numeric Value"))
 }
 
+fn numeric_conversion_error(agent: &mut Agent, abrupt: AbruptCompletion) -> VmError {
+    match abrupt {
+        AbruptCompletion::Throw(value) if value.is_undefined() => {
+            VmError::Abrupt(errors::throw_type_error(agent))
+        }
+        abrupt => VmError::Abrupt(abrupt),
+    }
+}
+
+#[inline]
+fn to_f64_number_or_type_error(agent: &mut Agent, value: Value) -> VmResult<f64> {
+    if value.is_symbol() || value.is_bigint() {
+        return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+    }
+    to_f64_number(agent, value)
+}
+
+fn number_to_int32(number: f64) -> i32 {
+    if !number.is_finite() || number == 0.0 {
+        return 0;
+    }
+    let truncated = number.trunc();
+    let modulo = truncated.rem_euclid(4_294_967_296.0);
+    if modulo >= 2_147_483_648.0 {
+        (modulo - 4_294_967_296.0) as i32
+    } else {
+        modulo as i32
+    }
+}
+
 #[inline]
 pub(super) fn encode_number(number: f64) -> Value {
     if number == 0.0 && number.to_bits() != 0.0f64.to_bits() {
@@ -1026,6 +1038,16 @@ fn bigint_negate_value(agent: &mut Agent, value: Value) -> VmResult<Value> {
         BigIntSign::NonNegative => BigIntSign::Negative,
         BigIntSign::Negative => BigIntSign::NonNegative,
     };
+    Ok(alloc_bigint_value(agent, sign, &limbs))
+}
+
+fn bigint_bitwise_not_value(agent: &mut Agent, value: Value) -> VmResult<Value> {
+    let (sign, limbs) = bigint_value_parts(agent, value)?;
+    let sign = match sign {
+        BigIntSign::NonNegative => BigIntSign::Negative,
+        BigIntSign::Negative => BigIntSign::NonNegative,
+    };
+    let (sign, limbs) = bigint_add_signed_parts(sign, &limbs, BigIntSign::Negative, &[1]);
     Ok(alloc_bigint_value(agent, sign, &limbs))
 }
 
@@ -1142,6 +1164,50 @@ pub(super) fn bigint_bitwise_xor_values(
     bigint_bitwise_values(agent, left, right, |left, right| left ^ right)
 }
 
+pub(super) fn bigint_shift_left_values(
+    agent: &mut Agent,
+    left: Value,
+    right: Value,
+) -> VmResult<Value> {
+    let (right_sign, right_limbs) = bigint_value_parts(agent, right)?;
+    let Some(shift) = bigint_shift_count(&right_limbs) else {
+        return if right_sign == BigIntSign::Negative {
+            bigint_shift_right_by_large_count(agent, left)
+        } else {
+            Err(VmError::Abrupt(errors::throw_range_error(agent)))
+        };
+    };
+    if right_sign == BigIntSign::Negative {
+        return bigint_shift_right_by_count(agent, left, shift);
+    }
+
+    let (left_sign, left_limbs) = bigint_value_parts(agent, left)?;
+    let limbs = bigint_shift_left_bits(&left_limbs, shift);
+    Ok(alloc_bigint_value(agent, left_sign, &limbs))
+}
+
+pub(super) fn bigint_shift_right_values(
+    agent: &mut Agent,
+    left: Value,
+    right: Value,
+) -> VmResult<Value> {
+    let (right_sign, right_limbs) = bigint_value_parts(agent, right)?;
+    let Some(shift) = bigint_shift_count(&right_limbs) else {
+        return if right_sign == BigIntSign::Negative {
+            Err(VmError::Abrupt(errors::throw_range_error(agent)))
+        } else {
+            bigint_shift_right_by_large_count(agent, left)
+        };
+    };
+    if right_sign == BigIntSign::Negative {
+        let (left_sign, left_limbs) = bigint_value_parts(agent, left)?;
+        let limbs = bigint_shift_left_bits(&left_limbs, shift);
+        return Ok(alloc_bigint_value(agent, left_sign, &limbs));
+    }
+
+    bigint_shift_right_by_count(agent, left, shift)
+}
+
 pub(super) fn compare_numeric_values(
     agent: &mut Agent,
     left: Value,
@@ -1239,6 +1305,83 @@ fn twos_complement_to_bigint(agent: &mut Agent, bits: &[u64]) -> Value {
     };
     normalize_bigint_limbs(&mut limbs);
     alloc_bigint_value(agent, normalize_bigint_sign(sign, &limbs), &limbs)
+}
+
+fn bigint_shift_count(limbs: &[u64]) -> Option<usize> {
+    let len = normalized_bigint_limb_len(limbs);
+    if len == 0 {
+        return Some(0);
+    }
+    if len > usize::BITS as usize / 64 {
+        return None;
+    }
+    let mut shift = 0_usize;
+    for (index, limb) in limbs.iter().take(len).copied().enumerate() {
+        let bit_offset = index.checked_mul(64)?;
+        if bit_offset >= usize::BITS as usize {
+            return (limb == 0).then_some(shift);
+        }
+        let limb_value = usize::try_from(limb).ok()?;
+        shift |= limb_value.checked_shl(bit_offset as u32)?;
+    }
+    Some(shift)
+}
+
+fn bigint_shift_right_by_count(agent: &mut Agent, value: Value, shift: usize) -> VmResult<Value> {
+    let (sign, limbs) = bigint_value_parts(agent, value)?;
+    if shift == 0 {
+        return Ok(alloc_bigint_value(agent, sign, &limbs));
+    }
+
+    let (mut result, truncated_non_zero) = bigint_shift_right_abs_bits(&limbs, shift);
+    let sign = if sign == BigIntSign::Negative && (!result.is_empty() || truncated_non_zero) {
+        if truncated_non_zero {
+            result = bigint_add_limbs(&result, &[1]);
+        }
+        BigIntSign::Negative
+    } else {
+        BigIntSign::NonNegative
+    };
+    Ok(alloc_bigint_value(agent, sign, &result))
+}
+
+fn bigint_shift_right_by_large_count(agent: &mut Agent, value: Value) -> VmResult<Value> {
+    let (sign, limbs) = bigint_value_parts(agent, value)?;
+    if normalized_bigint_limb_len(&limbs) == 0 {
+        return Ok(alloc_bigint_value(agent, BigIntSign::NonNegative, &[]));
+    }
+    if sign == BigIntSign::Negative {
+        return Ok(alloc_bigint_value(agent, BigIntSign::Negative, &[1]));
+    }
+    Ok(alloc_bigint_value(agent, BigIntSign::NonNegative, &[]))
+}
+
+fn bigint_shift_right_abs_bits(limbs: &[u64], shift: usize) -> (Vec<u64>, bool) {
+    let len = normalized_bigint_limb_len(limbs);
+    if len == 0 {
+        return (Vec::new(), false);
+    }
+
+    let limb_shift = shift / 64;
+    let bit_shift = shift % 64;
+    let truncated_by_limb = limbs
+        .iter()
+        .take(limb_shift.min(len))
+        .any(|limb| *limb != 0);
+    if limb_shift >= len {
+        return (Vec::new(), truncated_by_limb);
+    }
+    let truncated_by_bits = bit_shift != 0 && (limbs[limb_shift] & ((1_u64 << bit_shift) - 1)) != 0;
+    let mut result = Vec::with_capacity(len - limb_shift);
+    for index in limb_shift..len {
+        let mut limb = limbs[index] >> bit_shift;
+        if bit_shift != 0 && index + 1 < len {
+            limb |= limbs[index + 1] << (64 - bit_shift);
+        }
+        result.push(limb);
+    }
+    normalize_bigint_limbs(&mut result);
+    (result, truncated_by_limb || truncated_by_bits)
 }
 
 fn add_one_to_limbs(limbs: &mut [u64]) {

@@ -1244,6 +1244,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
 
     /// Scan a single escape character after the backslash has been consumed.
     fn scan_string_escape(&mut self, buf: &mut CookedStringBuffer, flags: &mut TokenFlags) {
+        let escape_start = self.pos;
         let ch = self.current();
         self.advance();
         match ch {
@@ -1319,6 +1320,26 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
             }
             b'\n' => {
                 // Line continuation
+            }
+            0xE2 if escape_start + 2 < self.source.len()
+                && self.source[escape_start + 1] == 0x80
+                && (self.source[escape_start + 2] == 0xA8
+                    || self.source[escape_start + 2] == 0xA9) =>
+            {
+                // Line continuation: \<LS> or \<PS>
+                self.pos = escape_start + 3;
+            }
+            0x80..=0xFF => {
+                let rest = &self.source[escape_start..];
+                if let Some(ch) = std::str::from_utf8(rest)
+                    .ok()
+                    .and_then(|s| s.chars().next())
+                {
+                    buf.push_char(ch);
+                    self.pos = escape_start + ch.len_utf8();
+                } else {
+                    buf.push_char(ch as char);
+                }
             }
             _ => {
                 // Identity escape

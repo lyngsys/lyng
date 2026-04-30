@@ -320,11 +320,8 @@ impl Vm {
             crate::error::ModuleLoadError::Host(error) => {
                 self.dynamic_import_host_error_value(agent, error)
             }
-            crate::error::ModuleLoadError::Parse => {
-                Value::from_string_ref(alloc_string(agent, "dynamic import parse failure", None))
-            }
-            crate::error::ModuleLoadError::Sema => {
-                Value::from_string_ref(alloc_string(agent, "dynamic import semantic failure", None))
+            crate::error::ModuleLoadError::Parse | crate::error::ModuleLoadError::Sema => {
+                errors::syntax_error_value(agent)
             }
             crate::error::ModuleLoadError::Lowering => {
                 Value::from_string_ref(alloc_string(agent, "dynamic import lowering failure", None))
@@ -336,6 +333,9 @@ impl Vm {
         match error {
             VmError::Abrupt(completion) => completion.thrown_value().unwrap_or(Value::undefined()),
             VmError::Host(error) => self.dynamic_import_host_error_value(agent, error),
+            VmError::AmbiguousModuleExport | VmError::MissingModuleResolution => {
+                errors::syntax_error_value(agent)
+            }
             other => Value::from_string_ref(alloc_string(agent, &format!("{other:?}"), None)),
         }
     }

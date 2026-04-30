@@ -178,6 +178,7 @@ fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::BitOr
         | Opcode::BitXor
         | Opcode::BitAnd
+        | Opcode::BitNot
         | Opcode::ShiftLeft
         | Opcode::ShiftRight
         | Opcode::UnsignedShiftRight

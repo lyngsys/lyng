@@ -3756,6 +3756,57 @@ fn script_core_unary_plus_uses_to_number_instead_of_addition() {
 }
 
 #[test]
+fn script_core_unary_minus_uses_to_primitive_number_hint() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += (-{ valueOf: function() { return -1; } } === 1 ? 1 : 0);
+        total += (-new Boolean(true) === -1 ? 2 : 0);
+        total += (-1n === -1n ? 4 : 0);
+        try {
+            -{ valueOf: function() { return {}; }, toString: function() { return {}; } };
+        } catch (error) {
+            total += (error.constructor === TypeError ? 8 : 0);
+        }
+        try {
+            -Symbol();
+        } catch (error) {
+            total += (error.constructor === TypeError ? 16 : 0);
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn script_core_postfix_update_returns_old_numeric_value() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+
+        let booleanValue = false;
+        total += (booleanValue++ === 0 && booleanValue === 1 ? 1 : 0);
+
+        let objectValue = { valueOf: function() { return 1; } };
+        total += (objectValue++ === 1 && objectValue === 2 ? 2 : 0);
+
+        let stringValue = "x";
+        let oldStringValue = stringValue++;
+        total += (isNaN(oldStringValue) && isNaN(stringValue) ? 4 : 0);
+
+        let bigintValue = 1n;
+        total += (bigintValue++ === 1n && bigintValue === 2n ? 8 : 0);
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
 fn script_core_supports_number_formatting_builtins() {
     let result = compile_and_run(
         r#"
@@ -4101,6 +4152,132 @@ fn script_core_bigint_bitwise_operators_use_to_numeric() {
     );
 
     assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
+fn script_core_bitwise_not_supports_number_and_bigint() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += (~0 === -1 ? 1 : 0);
+        total += (~1n === -2n ? 2 : 0);
+        total += (~Object(1n) === -2n ? 4 : 0);
+        total += (~{ valueOf: function() { return 1n; } } === -2n ? 8 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_addition_uses_default_to_primitive_hint() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        let calls = "";
+        let left = {
+            [Symbol.toPrimitive]: function(hint) {
+                calls += "L" + hint;
+                return 2;
+            }
+        };
+        let right = {
+            [Symbol.toPrimitive]: function(hint) {
+                calls += "R" + hint;
+                return 3;
+            }
+        };
+        total += (left + right === 5 ? 1 : 0);
+        total += (calls === "LdefaultRdefault" ? 2 : 0);
+        total += ({ [Symbol.toPrimitive]: function(hint) { return hint; } } + "" === "default" ? 4 : 0);
+        try {
+            0 + { [Symbol.toPrimitive]: function() { return Symbol.toPrimitive; } };
+        } catch (error) {
+            total += (error.constructor === TypeError ? 8 : 0);
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn script_core_bigint_shift_operators_use_to_numeric() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += ((8n << 2n) === 32n ? 1 : 0);
+        total += ((32n >> 2n) === 8n ? 2 : 0);
+        total += ((-5n >> 1n) === -3n ? 4 : 0);
+        total += ((8n << -1n) === 4n ? 8 : 0);
+        total += ((8n >> -1n) === 16n ? 16 : 0);
+
+        let calls = "";
+        let left = {
+            [Symbol.toPrimitive]: function(hint) {
+                calls += "L" + hint;
+                return 4n;
+            }
+        };
+        let right = {
+            [Symbol.toPrimitive]: function(hint) {
+                calls += "R" + hint;
+                return 1n;
+            }
+        };
+        total += ((left << right) === 8n ? 32 : 0);
+        total += (calls === "LnumberRnumber" ? 64 : 0);
+
+        try {
+            1n << 1;
+        } catch (error) {
+            total += (error.constructor === TypeError ? 128 : 0);
+        }
+        try {
+            1n >>> 0n;
+        } catch (error) {
+            total += (error.constructor === TypeError ? 256 : 0);
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(511));
+}
+
+#[test]
+fn script_core_exponentiation_uses_to_numeric_order_and_infinity_edges() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += (isNaN(1 ** Infinity) ? 1 : 0);
+        total += (isNaN((-1) ** -Infinity) ? 2 : 0);
+
+        let trace = "";
+        try {
+            ({
+                valueOf: function() {
+                    trace += "L";
+                    return Symbol("x");
+                }
+            }) ** ({
+                valueOf: function() {
+                    trace += "R";
+                    return 1;
+                }
+            });
+        } catch (error) {
+            total += (error.constructor === TypeError ? 4 : 0);
+        }
+        total += (trace === "L" ? 8 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
 }
 
 #[test]

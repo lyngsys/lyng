@@ -11,37 +11,30 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 - Proposal stage: `Stage 3+`
 - Jobs: `12`
 - Exclusion manifest: `reports/js/lyng-js/test262-exclusions.txt`
-- Category breakdown groups tests by the first path component under `testdata/test262/test/`.
-- Skipped tests are reported separately and still count against the selected-test pass rate.
+- Category breakdown groups source files by the first path component under `testdata/test262/test/`.
+- Default script files may execute strict and non-strict variants; file totals aggregate those variants into one Test262 file result.
+- Skipped files are reported separately and still count against the selected-file pass rate.
 
 ## Summary
 
 | Metric | Count |
 | --- | ---: |
-| Candidate tests | `53125` |
-| Excluded from selection | `96` |
-| Selected tests | `101854` |
-| Runnable | `95124` |
-| Passed | `89599` |
-| Failed | `5525` |
-| Panicked | `0` |
-| Skipped | `6730` |
-| Pass rate (selected) | `87.97%` |
-| Time | `162.1s` |
+| Candidate files | `53125` |
+| Excluded files from selection | `96` |
+| Selected files | `53029` |
+| Runnable files | `49664` |
+| Passed files | `47330` |
+| Failed files | `2334` |
+| Panicked files | `0` |
+| Skipped files | `3365` |
+| Pass rate (selected files) | `89.25%` |
+| Selected variant executions | `101854` |
+| Runnable variant executions | `95124` |
+| Time | `231.5s` |
 
 ## Delta From Previous Report
 
-| Metric | Previous | Current | Delta |
-| --- | ---: | ---: | ---: |
-| Candidate tests | `53125` | `53125` | `+0` |
-| Excluded from selection | `96` | `96` | `+0` |
-| Selected tests | `101854` | `101854` | `+0` |
-| Runnable | `95124` | `95124` | `+0` |
-| Passed | `89599` | `89599` | `+0` |
-| Failed | `5525` | `5525` | `+0` |
-| Panicked | `0` | `0` | `+0` |
-| Skipped | `6730` | `6730` | `+0` |
-| Pass rate (selected) | `87.97%` | `87.97%` | `-0.00pp` |
+No previous report summary was available at this report path.
 
 ## Selection Exclusions
 
@@ -53,21 +46,41 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 
 ## Category Breakdown
 
-| Category | Selected | Runnable | Pass | Fail | Skip | Panic | Rate |
+| Category | Selected files | Runnable files | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `annexB` | `1377` | `1307` | `1307` | `0` | `70` | `0` | `94.92%` |
-| `built-ins` | `46475` | `46475` | `43774` | `2701` | `0` | `0` | `94.19%` |
+| `annexB` | `1086` | `1051` | `1049` | `2` | `35` | `0` | `96.59%` |
+| `built-ins` | `23388` | `23388` | `22032` | `1356` | `0` | `0` | `94.20%` |
+| `harness` | `116` | `116` | `116` | `0` | `0` | `0` | `100.00%` |
+| `intl402` | `3323` | `0` | `0` | `0` | `3323` | `0` | `0.00%` |
+| `language` | `23632` | `23632` | `22997` | `635` | `0` | `0` | `97.31%` |
+| `staging` | `1484` | `1477` | `1136` | `341` | `7` | `0` | `76.55%` |
+
+## Variant Execution Breakdown
+
+| Metric | Count |
+| --- | ---: |
+| Selected variant executions | `101854` |
+| Runnable variant executions | `95124` |
+| Passed variants | `90740` |
+| Failed variants | `4384` |
+| Panicked variants | `0` |
+| Skipped variants | `6730` |
+
+| Category | Selected variants | Runnable variants | Pass | Fail | Skip | Panic | Rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `annexB` | `1377` | `1307` | `1303` | `4` | `70` | `0` | `94.63%` |
+| `built-ins` | `46475` | `46475` | `43772` | `2703` | `0` | `0` | `94.18%` |
 | `harness` | `232` | `232` | `232` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `6646` | `0` | `0` | `0` | `6646` | `0` | `0.00%` |
-| `language` | `44339` | `44339` | `42145` | `2194` | `0` | `0` | `95.05%` |
-| `staging` | `2785` | `2771` | `2141` | `630` | `14` | `0` | `76.88%` |
+| `language` | `44339` | `44339` | `43287` | `1052` | `0` | `0` | `97.63%` |
+| `staging` | `2785` | `2771` | `2146` | `625` | `14` | `0` | `77.06%` |
 
 ## Skip Breakdown
 
 | Class | Reason | Count |
 | --- | --- | ---: |
-| Manifest/out of scope | manifest exclusion (suite): ECMA-402 Intl is out of scope for the active ECMA-262 conformance sweep. | `6646` |
-| Manifest/out of scope | manifest exclusion (path): IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. | `84` |
+| Manifest/out of scope | manifest exclusion (suite): ECMA-402 Intl is out of scope for the active ECMA-262 conformance sweep. | `3323` |
+| Manifest/out of scope | manifest exclusion (path): IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. | `42` |
 
 ## Checked-in Manifest Rules
 
@@ -122,143 +135,55 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Cluster | Outcome | Count | Examples |
 | --- | --- | ---: | --- |
 | `language/expressions/dynamic-import/syntax/valid` | `runtime error: harness parse error` | `160` | `language/expressions/dynamic-import/syntax/valid/nested-arrow-assignment-expression-import-defer-empty-str-is-valid-assign-expr.js [non-strict]: runtime error: harness parse error`<br>`language/expressions/dynamic-import/syntax/valid/nested-arrow-assignment-expression-import-defer-empty-str-is-valid-assign-expr.js [strict]: runtime error: harness parse error`<br>`language/expressions/dynamic-import/syntax/valid/nested-arrow-assignment-expression-import-defer-script-code-valid.js [non-strict]: runtime error: harness parse error` |
-| `language/expressions/dynamic-import/catch` | `runtime error: harness parse error` | `128` | `language/expressions/dynamic-import/catch/nested-arrow-import-catch-import-defer-specifier-tostring-abrupt-rejects.js [non-strict]: runtime error: harness parse error`<br>`language/expressions/dynamic-import/catch/nested-arrow-import-catch-import-defer-specifier-tostring-abrupt-rejects.js [strict]: runtime error: harness parse error`<br>`language/expressions/dynamic-import/catch/nested-arrow-import-catch-import-source-source-text-module.js [non-strict]: runtime error: harness parse error` |
-| `language/expressions/dynamic-import/catch` | `Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«undefined», «"SyntaxError"») to be true` | `80` | `language/expressions/dynamic-import/catch/nested-arrow-import-catch-eval-script-code-target.js: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«undefined», «"SyntaxError"») to be true`<br>`language/expressions/dynamic-import/catch/nested-arrow-import-catch-instn-iee-err-circular.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«undefined», «"SyntaxError"») to be true`<br>`language/expressions/dynamic-import/catch/nested-arrow-import-catch-instn-iee-err-circular.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«undefined», «"SyntaxError"») to be true` |
-| `language/expressions/async-generator` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `76` | `language/expressions/async-generator/named-yield-star-getiter-async-not-callable-boolean-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/async-generator/named-yield-star-getiter-async-not-callable-boolean-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/async-generator/named-yield-star-getiter-async-not-callable-number-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `built-ins/Iterator/prototype/flatMap` | `runtime error: TypeError` | `72` | `built-ins/Iterator/prototype/flatMap/callable.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/flatMap/callable.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/flatMap/exhaustion-does-not-call-return.js [non-strict]: runtime error: TypeError` |
-| `built-ins/Iterator/zipKeyed` | `runtime error: TypeError` | `68` | `built-ins/Iterator/zipKeyed/basic-longest.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/zipKeyed/basic-longest.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/zipKeyed/basic-shortest.js [strict]: runtime error: TypeError` |
-| `language/import/import-defer/evaluation-triggers` | `module parse error` | `66` | `language/import/import-defer/evaluation-triggers/ignore-exported-then-defineOwnProperty.js: module parse error`<br>`language/import/import-defer/evaluation-triggers/ignore-exported-then-delete.js: module parse error`<br>`language/import/import-defer/evaluation-triggers/ignore-exported-then-get-in-prototype.js: module parse error` |
-| `built-ins/Iterator/prototype/filter` | `runtime error: TypeError` | `58` | `built-ins/Iterator/prototype/filter/callable.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/filter/callable.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/filter/exhaustion-does-not-call-return.js [non-strict]: runtime error: TypeError` |
-| `built-ins/Iterator/prototype/map` | `runtime error: TypeError` | `56` | `built-ins/Iterator/prototype/map/callable.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/map/callable.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/map/exhaustion-does-not-call-return.js [non-strict]: runtime error: TypeError` |
-| `built-ins/Atomics/wait` | `runtime error: TypeError` | `54` | `built-ins/Atomics/wait/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/false-for-timeout-agent.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/nan-for-timeout.js [non-strict]: runtime error: TypeError` |
+| `language/expressions/dynamic-import/catch` | `runtime error: harness parse error` | `128` | `language/expressions/dynamic-import/catch/nested-arrow-import-catch-import-defer-specifier-tostring-abrupt-rejects.js [non-strict]: runtime error: harness parse error`<br>`language/expressions/dynamic-import/catch/nested-arrow-import-catch-import-defer-specifier-tostring-abrupt-rejects.js [strict]: runtime error: harness parse error`<br>`language/expressions/dynamic-import/catch/nested-arrow-import-catch-import-source-source-text-module.js [strict]: runtime error: harness parse error` |
+| `built-ins/Iterator/prototype/flatMap` | `runtime error: TypeError` | `72` | `built-ins/Iterator/prototype/flatMap/exhaustion-does-not-call-return.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/flatMap/exhaustion-does-not-call-return.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/flatMap/flattens-iterable.js [strict]: runtime error: TypeError` |
+| `built-ins/Iterator/zipKeyed` | `runtime error: TypeError` | `68` | `built-ins/Iterator/zipKeyed/basic-longest.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/zipKeyed/basic-shortest.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/zipKeyed/basic-shortest.js [strict]: runtime error: TypeError` |
+| `language/import/import-defer/evaluation-triggers` | `module parse error` | `66` | `language/import/import-defer/evaluation-triggers/ignore-exported-then-defineOwnProperty.js: module parse error`<br>`language/import/import-defer/evaluation-triggers/ignore-exported-then-delete.js: module parse error`<br>`language/import/import-defer/evaluation-triggers/ignore-exported-then-getOwnProperty.js: module parse error` |
+| `built-ins/Iterator/prototype/filter` | `runtime error: TypeError` | `58` | `built-ins/Iterator/prototype/filter/callable.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/filter/exhaustion-does-not-call-return.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/filter/get-next-method-only-once.js [non-strict]: runtime error: TypeError` |
+| `built-ins/Iterator/prototype/map` | `runtime error: TypeError` | `56` | `built-ins/Iterator/prototype/map/callable.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/map/callable.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/map/exhaustion-does-not-call-return.js [strict]: runtime error: TypeError` |
+| `built-ins/Atomics/wait` | `runtime error: TypeError` | `54` | `built-ins/Atomics/wait/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/nan-for-timeout.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/nan-for-timeout.js [strict]: runtime error: TypeError` |
 | `built-ins/Atomics/waitAsync` | `runtime error: TypeError` | `54` | `built-ins/Atomics/waitAsync/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/waitAsync/false-for-timeout-agent.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/waitAsync/good-views.js [strict]: runtime error: TypeError` |
-| `built-ins/Iterator/prototype/drop` | `runtime error: TypeError` | `54` | `built-ins/Iterator/prototype/drop/argument-effect-order.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/drop/argument-effect-order.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/drop/callable.js [non-strict]: runtime error: TypeError` |
-| `built-ins/Atomics/waitAsync/bigint` | `runtime error: TypeError` | `52` | `built-ins/Atomics/waitAsync/bigint/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/waitAsync/bigint/false-for-timeout-agent.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/waitAsync/bigint/good-views.js [non-strict]: runtime error: TypeError` |
-| `built-ins/Iterator/prototype/take` | `runtime error: TypeError` | `52` | `built-ins/Iterator/prototype/take/argument-effect-order.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/take/callable.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/take/exhaustion-calls-return.js [non-strict]: runtime error: TypeError` |
-| `built-ins/Iterator/zip` | `runtime error: TypeError` | `52` | `built-ins/Iterator/zip/basic-longest.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/zip/basic-shortest.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/zip/basic-shortest.js [strict]: runtime error: TypeError` |
-| `built-ins/Iterator/concat` | `runtime error: TypeError` | `50` | `built-ins/Iterator/concat/fresh-iterator-result.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/concat/get-iterator-method-only-once.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/concat/get-iterator-method-only-once.js [strict]: runtime error: TypeError` |
-| `built-ins/Temporal/ZonedDateTime/prototype/with` | `runtime error: Test262Error` | `40` | `built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-invalid-string.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-invalid-string.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/invalid-disambiguation.js [non-strict]: runtime error: Test262Error` |
-| `language/expressions/class/async-gen-method` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `38` | `language/expressions/class/async-gen-method/yield-star-getiter-async-not-callable-boolean-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/class/async-gen-method/yield-star-getiter-async-not-callable-number-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/class/async-gen-method/yield-star-getiter-async-not-callable-number-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `language/expressions/class/async-gen-method-static` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `38` | `language/expressions/class/async-gen-method-static/yield-star-getiter-async-not-callable-boolean-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/class/async-gen-method-static/yield-star-getiter-async-not-callable-boolean-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/class/async-gen-method-static/yield-star-getiter-async-not-callable-number-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `language/expressions/class/elements/async-gen-private-method` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `38` | `language/expressions/class/elements/async-gen-private-method/yield-star-getiter-async-not-callable-number-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/class/elements/async-gen-private-method/yield-star-getiter-async-not-callable-object-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/class/elements/async-gen-private-method/yield-star-getiter-async-not-callable-object-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `language/expressions/class/elements/async-gen-private-method-static` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `38` | `language/expressions/class/elements/async-gen-private-method-static/yield-star-getiter-async-not-callable-boolean-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/class/elements/async-gen-private-method-static/yield-star-getiter-async-not-callable-number-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/class/elements/async-gen-private-method-static/yield-star-getiter-async-not-callable-object-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `language/expressions/object/method-definition` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `38` | `language/expressions/object/method-definition/async-gen-yield-star-getiter-async-not-callable-boolean-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/object/method-definition/async-gen-yield-star-getiter-async-not-callable-number-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/expressions/object/method-definition/async-gen-yield-star-getiter-async-not-callable-number-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `language/statements/async-generator` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `38` | `language/statements/async-generator/yield-star-getiter-async-not-callable-boolean-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/statements/async-generator/yield-star-getiter-async-not-callable-number-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/statements/async-generator/yield-star-getiter-async-not-callable-number-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `language/statements/class/async-gen-method` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `38` | `language/statements/class/async-gen-method/yield-star-getiter-async-not-callable-boolean-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/statements/class/async-gen-method/yield-star-getiter-async-not-callable-boolean-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/statements/class/async-gen-method/yield-star-getiter-async-not-callable-object-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `language/statements/class/async-gen-method-static` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `38` | `language/statements/class/async-gen-method-static/yield-star-getiter-async-not-callable-boolean-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/statements/class/async-gen-method-static/yield-star-getiter-async-not-callable-number-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/statements/class/async-gen-method-static/yield-star-getiter-async-not-callable-number-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `language/statements/class/elements/async-gen-private-method` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `38` | `language/statements/class/elements/async-gen-private-method/yield-star-getiter-async-not-callable-boolean-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/statements/class/elements/async-gen-private-method/yield-star-getiter-async-not-callable-boolean-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/statements/class/elements/async-gen-private-method/yield-star-getiter-async-not-callable-object-throw.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `language/statements/class/elements/async-gen-private-method-static` | `Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` | `38` | `language/statements/class/elements/async-gen-private-method-static/yield-star-getiter-async-not-callable-boolean-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/statements/class/elements/async-gen-private-method-static/yield-star-getiter-async-not-callable-number-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true`<br>`language/statements/class/elements/async-gen-private-method-static/yield-star-getiter-async-not-callable-object-throw.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: TypeError Expected SameValue(«function Test262Error(message) {
-  this.message = message \|\| "";
-}», «function TypeError() { [native code] }») to be true` |
-| `built-ins/ArrayBuffer/prototype/resize` | `runtime error: Test262Error` | `36` | `built-ins/ArrayBuffer/prototype/resize/coerced-new-length-detach.js [non-strict]: runtime error: Test262Error`<br>`built-ins/ArrayBuffer/prototype/resize/descriptor.js [non-strict]: runtime error: Test262Error`<br>`built-ins/ArrayBuffer/prototype/resize/descriptor.js [strict]: runtime error: Test262Error` |
+| `built-ins/Iterator/prototype/drop` | `runtime error: TypeError` | `54` | `built-ins/Iterator/prototype/drop/argument-effect-order.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/drop/callable.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/drop/exhaustion-does-not-call-return.js [non-strict]: runtime error: TypeError` |
+| `built-ins/Atomics/waitAsync/bigint` | `runtime error: TypeError` | `52` | `built-ins/Atomics/waitAsync/bigint/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/waitAsync/bigint/false-for-timeout-agent.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/waitAsync/bigint/nan-for-timeout-agent.js [non-strict]: runtime error: TypeError` |
+| `built-ins/Iterator/prototype/take` | `runtime error: TypeError` | `52` | `built-ins/Iterator/prototype/take/argument-effect-order.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/take/argument-effect-order.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/prototype/take/callable.js [non-strict]: runtime error: TypeError` |
+| `built-ins/Iterator/zip` | `runtime error: TypeError` | `52` | `built-ins/Iterator/zip/basic-longest.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/zip/basic-shortest.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/zip/iterables-containing-string-objects.js [non-strict]: runtime error: TypeError` |
+| `built-ins/Iterator/concat` | `runtime error: TypeError` | `50` | `built-ins/Iterator/concat/fresh-iterator-result.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/concat/fresh-iterator-result.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/concat/get-iterator-method-only-once.js [strict]: runtime error: TypeError` |
+| `built-ins/Temporal/ZonedDateTime/prototype/with` | `runtime error: Test262Error` | `40` | `built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-invalid-string.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-invalid-string.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-wrong-type.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/ArrayBuffer/prototype/resize` | `runtime error: Test262Error` | `36` | `built-ins/ArrayBuffer/prototype/resize/coerced-new-length-detach.js [non-strict]: runtime error: Test262Error`<br>`built-ins/ArrayBuffer/prototype/resize/coerced-new-length-detach.js [strict]: runtime error: Test262Error`<br>`built-ins/ArrayBuffer/prototype/resize/extensible.js [non-strict]: runtime error: Test262Error` |
 | `built-ins/Temporal/ZonedDateTime/from` | `runtime error: Test262Error` | `36` | `built-ins/Temporal/ZonedDateTime/from/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/from/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/from/argument-string-limits.js [strict]: runtime error: Test262Error` |
-| `staging/sm/Iterator/prototype` | `runtime error: TypeError` | `36` | `staging/sm/Iterator/prototype/generator-methods-throw-on-iterator-helpers.js [non-strict]: runtime error: TypeError`<br>`staging/sm/Iterator/prototype/generator-methods-throw-on-iterator-helpers.js [strict]: runtime error: TypeError`<br>`staging/sm/Iterator/prototype/iterator-helper-methods-throw-on-generators.js [non-strict]: runtime error: TypeError` |
-| `staging/sm/Iterator/prototype/map` | `runtime error: TypeError` | `34` | `staging/sm/Iterator/prototype/map/call-next-on-iterator-while-iterating.js [non-strict]: runtime error: TypeError`<br>`staging/sm/Iterator/prototype/map/call-next-on-iterator-while-iterating.js [strict]: runtime error: TypeError`<br>`staging/sm/Iterator/prototype/map/clobber-symbol.js [non-strict]: runtime error: TypeError` |
-| `built-ins/Atomics/notify` | `runtime error: TypeError` | `32` | `built-ins/Atomics/notify/count-defaults-to-infinity-missing.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/notify/count-defaults-to-infinity-missing.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/notify/count-defaults-to-infinity-undefined.js [non-strict]: runtime error: TypeError` |
-| `built-ins/Atomics/wait/bigint` | `runtime error: TypeError` | `32` | `built-ins/Atomics/wait/bigint/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/bigint/false-for-timeout-agent.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/bigint/nan-for-timeout.js [non-strict]: runtime error: TypeError` |
-| `built-ins/Temporal/PlainDateTime/prototype/since` | `runtime error: RangeError` | `32` | `built-ins/Temporal/PlainDateTime/prototype/since/leap-second.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/since/leap-second.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/since/round-cross-unit-boundary.js [strict]: runtime error: RangeError` |
-| `built-ins/Temporal/PlainDateTime/prototype/until` | `runtime error: RangeError` | `32` | `built-ins/Temporal/PlainDateTime/prototype/until/leap-second.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/until/leap-second.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/until/round-cross-unit-boundary.js [non-strict]: runtime error: RangeError` |
-| `language/expressions/async-generator` | `Test262:AsyncTestFailure:Test262Error: Test262Error: reject reason Expected SameValue(«Test262Error: it should not get Symbol.iterator», «[object Object]») to be true` | `32` | `language/expressions/async-generator/named-yield-star-getiter-async-get-abrupt.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: reject reason Expected SameValue(«Test262Error: it should not get Symbol.iterator», «[object Object]») to be true`<br>`language/expressions/async-generator/named-yield-star-getiter-async-get-abrupt.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: reject reason Expected SameValue(«Test262Error: it should not get Symbol.iterator», «[object Object]») to be true`<br>`language/expressions/async-generator/named-yield-star-getiter-async-returns-abrupt.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: reject reason Expected SameValue(«Test262Error: it should not get Symbol.iterator», «[object Object]») to be true` |
-| `language/statements/class/elements` | `runtime error: Test262Error` | `31` | `language/statements/class/elements/class-field-is-observable-by-proxy.js [non-strict]: runtime error: Test262Error`<br>`language/statements/class/elements/class-field-is-observable-by-proxy.js [strict]: runtime error: Test262Error`<br>`language/statements/class/elements/direct-eval-err-contains-newtarget.js [non-strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/ZonedDateTime/prototype/since` | `runtime error: RangeError` | `30` | `built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-default.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-default.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/round-cross-unit-boundary.js [strict]: runtime error: RangeError` |
-| `built-ins/Temporal/ZonedDateTime/prototype/until` | `runtime error: RangeError` | `30` | `built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-default.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-default.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/round-cross-unit-boundary.js [strict]: runtime error: RangeError` |
-| `language/expressions/dynamic-import/assignment-expression` | `Test262:AsyncTestFailure:Test262Error: load_module_source failed: module file `/Users/sondre/dev/lyng/./module-code-other_FIXTURE.js` was not found` | `30` | `language/expressions/dynamic-import/assignment-expression/additive-expr.js [non-strict]: Test262:AsyncTestFailure:Test262Error: load_module_source failed: module file `/Users/sondre/dev/lyng/./module-code-other_FIXTURE.js` was not found`<br>`language/expressions/dynamic-import/assignment-expression/additive-expr.js [strict]: Test262:AsyncTestFailure:Test262Error: load_module_source failed: module file `/Users/sondre/dev/lyng/./module-code-other_FIXTURE.js` was not found`<br>`language/expressions/dynamic-import/assignment-expression/array-literal.js [strict]: Test262:AsyncTestFailure:Test262Error: load_module_source failed: module file `/Users/sondre/dev/lyng/./module-code-other_FIXTURE.js` was not found` |
+| `staging/sm/Iterator/prototype` | `runtime error: TypeError` | `36` | `staging/sm/Iterator/prototype/generator-methods-throw-on-iterator-helpers.js [non-strict]: runtime error: TypeError`<br>`staging/sm/Iterator/prototype/generator-methods-throw-on-iterator-helpers.js [strict]: runtime error: TypeError`<br>`staging/sm/Iterator/prototype/iterator-helper-methods-throw-on-generators.js [strict]: runtime error: TypeError` |
+| `staging/sm/Iterator/prototype/map` | `runtime error: TypeError` | `34` | `staging/sm/Iterator/prototype/map/call-next-on-iterator-while-iterating.js [non-strict]: runtime error: TypeError`<br>`staging/sm/Iterator/prototype/map/clobber-symbol.js [non-strict]: runtime error: TypeError`<br>`staging/sm/Iterator/prototype/map/interleaved-map-calls.js [non-strict]: runtime error: TypeError` |
+| `built-ins/Atomics/notify` | `runtime error: TypeError` | `32` | `built-ins/Atomics/notify/count-defaults-to-infinity-missing.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/notify/count-defaults-to-infinity-undefined.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/notify/count-defaults-to-infinity-undefined.js [strict]: runtime error: TypeError` |
+| `built-ins/Atomics/wait/bigint` | `runtime error: TypeError` | `32` | `built-ins/Atomics/wait/bigint/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/bigint/nan-for-timeout.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/bigint/negative-timeout-agent.js [non-strict]: runtime error: TypeError` |
+| `built-ins/Temporal/PlainDateTime/prototype/since` | `runtime error: RangeError` | `32` | `built-ins/Temporal/PlainDateTime/prototype/since/leap-second.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/since/leap-second.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/since/round-negative-duration.js [strict]: runtime error: RangeError` |
+| `built-ins/Temporal/PlainDateTime/prototype/until` | `runtime error: RangeError` | `32` | `built-ins/Temporal/PlainDateTime/prototype/until/leap-second.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/until/leap-second.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/until/round-cross-unit-boundary.js [strict]: runtime error: RangeError` |
+| `language/statements/class/elements` | `runtime error: Test262Error` | `31` | `language/statements/class/elements/class-field-is-observable-by-proxy.js [non-strict]: runtime error: Test262Error`<br>`language/statements/class/elements/class-field-is-observable-by-proxy.js [strict]: runtime error: Test262Error`<br>`language/statements/class/elements/direct-eval-err-contains-newtarget.js [strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/ZonedDateTime/prototype/since` | `runtime error: RangeError` | `30` | `built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-default.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-default.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/round-cross-unit-boundary.js [non-strict]: runtime error: RangeError` |
+| `built-ins/Temporal/ZonedDateTime/prototype/until` | `runtime error: RangeError` | `30` | `built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-default.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-default.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/round-cross-unit-boundary.js [non-strict]: runtime error: RangeError` |
 | `staging/sm/Function` | `runtime error: Test262Error` | `30` | `staging/sm/Function/10.2.1.1.6.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Function/arguments-parameter-shadowing.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Function/constructor-binding.js [non-strict]: runtime error: Test262Error` |
 | `staging/sm/Math` | `runtime error: Error` | `30` | `staging/sm/Math/acosh-approx.js [non-strict]: runtime error: Error`<br>`staging/sm/Math/acosh-approx.js [strict]: runtime error: Error`<br>`staging/sm/Math/acosh-exact.js [non-strict]: runtime error: Error` |
-| `built-ins/ArrayBuffer/prototype/transfer` | `runtime error: TypeError` | `28` | `built-ins/ArrayBuffer/prototype/transfer/from-fixed-to-larger-no-resizable.js [non-strict]: runtime error: TypeError`<br>`built-ins/ArrayBuffer/prototype/transfer/from-fixed-to-larger-no-resizable.js [strict]: runtime error: TypeError`<br>`built-ins/ArrayBuffer/prototype/transfer/from-fixed-to-larger.js [non-strict]: runtime error: TypeError` |
-| `built-ins/ArrayBuffer/prototype/transferToFixedLength` | `runtime error: TypeError` | `28` | `built-ins/ArrayBuffer/prototype/transferToFixedLength/from-fixed-to-larger-no-resizable.js [non-strict]: runtime error: TypeError`<br>`built-ins/ArrayBuffer/prototype/transferToFixedLength/from-fixed-to-larger.js [strict]: runtime error: TypeError`<br>`built-ins/ArrayBuffer/prototype/transferToFixedLength/from-fixed-to-same-no-resizable.js [non-strict]: runtime error: TypeError` |
+| `built-ins/ArrayBuffer/prototype/transfer` | `runtime error: TypeError` | `28` | `built-ins/ArrayBuffer/prototype/transfer/from-fixed-to-larger-no-resizable.js [non-strict]: runtime error: TypeError`<br>`built-ins/ArrayBuffer/prototype/transfer/from-fixed-to-larger-no-resizable.js [strict]: runtime error: TypeError`<br>`built-ins/ArrayBuffer/prototype/transfer/from-fixed-to-larger.js [strict]: runtime error: TypeError` |
+| `built-ins/ArrayBuffer/prototype/transferToFixedLength` | `runtime error: TypeError` | `28` | `built-ins/ArrayBuffer/prototype/transferToFixedLength/from-fixed-to-larger.js [non-strict]: runtime error: TypeError`<br>`built-ins/ArrayBuffer/prototype/transferToFixedLength/from-fixed-to-larger.js [strict]: runtime error: TypeError`<br>`built-ins/ArrayBuffer/prototype/transferToFixedLength/from-fixed-to-same-no-resizable.js [strict]: runtime error: TypeError` |
 | `built-ins/TypedArrayConstructors/internals/Set` | `runtime error: Test262Error` | `28` | `built-ins/TypedArrayConstructors/internals/Set/bigint-tonumber.js [non-strict]: runtime error: Test262Error`<br>`built-ins/TypedArrayConstructors/internals/Set/bigint-tonumber.js [strict]: runtime error: Test262Error`<br>`built-ins/TypedArrayConstructors/internals/Set/detached-buffer.js [non-strict]: runtime error: Test262Error` |
-| `language/expressions/async-generator` | `Test262:AsyncTestFailure:Test262Error: Test262Error: it should not get Symbol.iterator` | `28` | `language/expressions/async-generator/named-yield-star-next-then-non-callable-boolean-fulfillpromise.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: it should not get Symbol.iterator`<br>`language/expressions/async-generator/named-yield-star-next-then-non-callable-null-fulfillpromise.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: it should not get Symbol.iterator`<br>`language/expressions/async-generator/named-yield-star-next-then-non-callable-number-fulfillpromise.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: it should not get Symbol.iterator` |
 | `language/expressions/class/elements` | `runtime error: Test262Error` | `26` | `language/expressions/class/elements/direct-eval-err-contains-newtarget.js [non-strict]: runtime error: Test262Error`<br>`language/expressions/class/elements/direct-eval-err-contains-newtarget.js [strict]: runtime error: Test262Error`<br>`language/expressions/class/elements/nested-direct-eval-err-contains-arguments.js [strict]: runtime error: Test262Error` |
 | `staging/sm/Iterator/from` | `runtime error: TypeError` | `26` | `staging/sm/Iterator/from/call-from-with-different-this.js [non-strict]: runtime error: TypeError`<br>`staging/sm/Iterator/from/call-from-with-different-this.js [strict]: runtime error: TypeError`<br>`staging/sm/Iterator/from/modify-next.js [non-strict]: runtime error: TypeError` |
 | `built-ins/SharedArrayBuffer/prototype/grow` | `runtime error: Test262Error` | `24` | `built-ins/SharedArrayBuffer/prototype/grow/descriptor.js [non-strict]: runtime error: Test262Error`<br>`built-ins/SharedArrayBuffer/prototype/grow/descriptor.js [strict]: runtime error: Test262Error`<br>`built-ins/SharedArrayBuffer/prototype/grow/grow-larger-size.js [strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/ZonedDateTime/prototype/since` | `runtime error: Test262Error` | `24` | `built-ins/Temporal/ZonedDateTime/prototype/since/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/argument-string-limits.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/ZonedDateTime/prototype/since` | `runtime error: Test262Error` | `24` | `built-ins/Temporal/ZonedDateTime/prototype/since/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/argument-string-limits.js [strict]: runtime error: Test262Error` |
+| `staging/sm/RegExp` | `runtime error: Test262Error` | `24` | `staging/sm/RegExp/constructor-ordering-2.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/RegExp/constructor-ordering-2.js [strict]: runtime error: Test262Error`<br>`staging/sm/RegExp/constructor-regexp.js [non-strict]: runtime error: Test262Error` |
+| `staging/sm/TypedArray` | `runtime error: Test262Error` | `23` | `staging/sm/TypedArray/constructor-buffer-sequence.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/TypedArray/constructor-buffer-sequence.js [strict]: runtime error: Test262Error`<br>`staging/sm/TypedArray/constructor-undefined-args.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Iterator/from` | `runtime error: TypeError` | `22` | `built-ins/Iterator/from/get-next-method-only-once.js [non-strict]: runtime error: TypeError`<br>`built-ins/Iterator/from/get-next-method-only-once.js [strict]: runtime error: TypeError`<br>`built-ins/Iterator/from/iterable-primitives.js [strict]: runtime error: TypeError` |
+| `built-ins/Temporal/Duration/prototype/total` | `runtime error: RangeError` | `22` | `built-ins/Temporal/Duration/prototype/total/balances-days-up-to-both-years-and-months.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/Duration/prototype/total/balances-days-up-to-both-years-and-months.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/Duration/prototype/total/incorrect-properties-ignored.js [non-strict]: runtime error: RangeError` |
+| `built-ins/Temporal/ZonedDateTime/prototype/until` | `runtime error: Test262Error` | `22` | `built-ins/Temporal/ZonedDateTime/prototype/until/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/argument-string-limits.js [strict]: runtime error: Test262Error` |
+| `built-ins/Map/groupBy` | `runtime error: TypeError` | `20` | `built-ins/Map/groupBy/callback-arg.js [non-strict]: runtime error: TypeError`<br>`built-ins/Map/groupBy/callback-arg.js [strict]: runtime error: TypeError`<br>`built-ins/Map/groupBy/emptyList.js [non-strict]: runtime error: TypeError` |
+| `built-ins/TypedArrayConstructors/internals/Set/BigInt` | `runtime error: Test262Error` | `19` | `built-ins/TypedArrayConstructors/internals/Set/BigInt/detached-buffer.js [non-strict]: runtime error: Test262Error`<br>`built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-canonical-invalid-index-reflect-set.js [non-strict]: runtime error: Test262Error`<br>`built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-minus-zero.js [non-strict]: runtime error: Test262Error` |
+| `language/statements/class/decorator/syntax/valid` | `runtime error: harness parse error` | `19` | `language/statements/class/decorator/syntax/valid/class-element-decorator-call-expr-identifier-reference.js [non-strict]: runtime error: harness parse error`<br>`language/statements/class/decorator/syntax/valid/class-element-decorator-call-expr-identifier-reference.js [strict]: runtime error: harness parse error`<br>`language/statements/class/decorator/syntax/valid/class-element-decorator-member-expr-decorator-member-expr.js [non-strict]: runtime error: harness parse error` |
+| `staging/sm/generators` | `runtime error: Test262Error` | `19` | `staging/sm/generators/create-function-parse-before-getprototype.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/generators/create-function-parse-before-getprototype.js [strict]: runtime error: Test262Error`<br>`staging/sm/generators/delegating-yield-1.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/ArrayBuffer` | `runtime error: Test262Error` | `18` | `built-ins/ArrayBuffer/options-maxbytelength-allocation-limit.js [non-strict]: runtime error: Test262Error`<br>`built-ins/ArrayBuffer/options-maxbytelength-compared-before-object-creation.js [non-strict]: runtime error: Test262Error`<br>`built-ins/ArrayBuffer/options-maxbytelength-diminuitive.js [strict]: runtime error: Test262Error` |
+| `built-ins/JSON/stringify` | `runtime error: Test262Error` | `18` | `built-ins/JSON/stringify/replacer-array-abrupt.js [non-strict]: runtime error: Test262Error`<br>`built-ins/JSON/stringify/replacer-array-abrupt.js [strict]: runtime error: Test262Error`<br>`built-ins/JSON/stringify/replacer-array-proxy-revoked.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/SharedArrayBuffer` | `runtime error: Test262Error` | `18` | `built-ins/SharedArrayBuffer/options-maxbytelength-allocation-limit.js [non-strict]: runtime error: Test262Error`<br>`built-ins/SharedArrayBuffer/options-maxbytelength-allocation-limit.js [strict]: runtime error: Test262Error`<br>`built-ins/SharedArrayBuffer/options-maxbytelength-compared-before-object-creation.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/Duration/prototype/total` | `runtime error: Test262Error` | `18` | `built-ins/Temporal/Duration/prototype/total/precision-exact-mathematical-values-1.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/Duration/prototype/total/precision-exact-mathematical-values-1.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/Duration/prototype/total/precision-exact-mathematical-values-2.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/PlainDate/prototype/since` | `runtime error: Test262Error` | `18` | `built-ins/Temporal/PlainDate/prototype/since/basic-arithmetic.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDate/prototype/since/basic-arithmetic.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDate/prototype/since/largestunit-higher-units.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/PlainDateTime/prototype/until` | `runtime error: Test262Error` | `18` | `built-ins/Temporal/PlainDateTime/prototype/until/argument-string-limits.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/until/argument-string-limits.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/until/balance.js [strict]: runtime error: Test262Error` |
 
 ## Notes
 

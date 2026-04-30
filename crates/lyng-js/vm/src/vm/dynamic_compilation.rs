@@ -30,6 +30,9 @@ fn split_eval_regexp_literal_source(source: &str) -> Option<(&str, &str)> {
     if chars.next()?.1 != '/' {
         return None;
     }
+    if matches!(chars.clone().next().map(|(_, ch)| ch), Some('*' | '/')) {
+        return None;
+    }
 
     let mut escaped = false;
     let mut in_class = false;
@@ -62,6 +65,9 @@ fn is_regexp_literal_flag_char(ch: char) -> bool {
 
 fn split_eval_regexp_literal_units(units: &[u16]) -> Option<(&[u16], String)> {
     if units.first().copied()? != u16::from(b'/') {
+        return None;
+    }
+    if matches!(units.get(1).copied(), Some(0x002a | 0x002f)) {
         return None;
     }
     let mut escaped = false;

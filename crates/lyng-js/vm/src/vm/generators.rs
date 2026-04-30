@@ -619,7 +619,11 @@ impl Vm {
 
             match resume_kind {
                 GeneratorResumeKind::Next => {
-                    let argument = record.delegate_started().then_some(resume_value);
+                    let argument = Some(if record.delegate_started() {
+                        resume_value
+                    } else {
+                        Value::undefined()
+                    });
                     record.set_delegate_started(true);
                     let iter_result = iterator::iterator_next(&mut bridge, &record, argument)?;
                     let done = iterator::iterator_complete(&mut bridge, iter_result)?;
@@ -782,6 +786,11 @@ impl Vm {
             self.register_stack[start + index] = value;
         }
 
+        let side_state = self.suspended_side_states.remove(&suspended);
+        let script_or_module_referrer = side_state
+            .as_ref()
+            .and_then(|state| state.script_or_module_referrer);
+
         let context_kind = decode_execution_context_kind(record.context_kind_raw())
             .unwrap_or(ExecutionContextKind::Function);
         let context = ExecutionContext::new(
@@ -796,6 +805,7 @@ impl Vm {
             record.this_state_kind(),
             record.this_value(),
         ))
+        .with_script_or_module_referrer(script_or_module_referrer)
         .with_new_target(record.new_target());
         let mut frame = FrameRecord::new(
             record.code(),
@@ -820,7 +830,7 @@ impl Vm {
         self.frames.push(frame);
         self.note_frame_depth();
 
-        if let Some(side_state) = self.suspended_side_states.remove(&suspended) {
+        if let Some(side_state) = side_state {
             self.iterator_states
                 .restore_window(frame.registers(), side_state.iterator_states);
             self.for_in_states
@@ -925,6 +935,7 @@ impl Vm {
             async_generator_frame_state: self
                 .async_generator_frame_states
                 .remove(&frame.registers().base()),
+            script_or_module_referrer: context.script_or_module_referrer(),
         };
         if !side_state.iterator_states.is_empty()
             || !side_state.for_in_states.is_empty()
@@ -934,6 +945,7 @@ impl Vm {
             || !side_state.direct_eval_environment_states.is_empty()
             || side_state.async_frame_state.is_some()
             || side_state.async_generator_frame_state.is_some()
+            || side_state.script_or_module_referrer.is_some()
         {
             self.suspended_side_states.insert(suspended, side_state);
         }

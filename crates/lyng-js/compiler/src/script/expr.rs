@@ -249,11 +249,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let iterable = self.lower_expr_to_temp(argument)?;
         let iterator_register = self.alloc_temp()?;
         let done_register = self.alloc_temp()?;
+        let async_iteration = self.current_function.is_some_and(|function| {
+            self.state.function_kind(function) == FunctionKind::AsyncGenerator
+        });
         self.builder.emit_abc(
             Opcode::CreateIterator,
             self.encode_register(iterator_register)?,
             self.encode_register(iterable)?,
-            0,
+            u8::from(async_iteration),
         )?;
         self.builder.emit_abc(
             Opcode::DelegateYield,

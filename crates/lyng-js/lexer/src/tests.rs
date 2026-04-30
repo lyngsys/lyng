@@ -462,6 +462,28 @@ fn string_unicode_braced_escape() {
 }
 
 #[test]
+fn string_identity_escape_consumes_full_unicode_character() {
+    let mut atoms = AtomTable::new();
+    let source_id = SourceId::new(0);
+    let mut lexer = Lexer::new("\"\\А\"", source_id, &mut atoms);
+    let tok = lexer.next_token();
+    assert_eq!(tok.kind, TokenKind::StringLiteral);
+    let id = literal_id(&tok);
+    assert_eq!(lexer.literals.get_string(id).as_str(), Some("А"));
+}
+
+#[test]
+fn string_line_continuation_accepts_unicode_line_terminators() {
+    let mut atoms = AtomTable::new();
+    let source_id = SourceId::new(0);
+    let mut lexer = Lexer::new("\"\\\u{2028}\\\u{2029}\"", source_id, &mut atoms);
+    let tok = lexer.next_token();
+    assert_eq!(tok.kind, TokenKind::StringLiteral);
+    let id = literal_id(&tok);
+    assert_eq!(lexer.literals.get_string(id).as_str(), Some(""));
+}
+
+#[test]
 fn empty_string() {
     let mut atoms = AtomTable::new();
     let source_id = SourceId::new(0);

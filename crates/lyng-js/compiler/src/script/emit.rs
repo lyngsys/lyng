@@ -186,6 +186,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
+    pub(super) fn emit_profiled_bit_not(&mut self, dest: u16, argument: u16) -> LoweringResult<()> {
+        let instruction_offset = self.builder.emit_abc(
+            Opcode::BitNot,
+            self.encode_register(dest)?,
+            self.encode_register(argument)?,
+            0,
+        )?;
+        self.builder.add_feedback_site(
+            instruction_offset,
+            FeedbackSiteKind::Arithmetic,
+            FeedbackSiteMetadata::None,
+        )?;
+        Ok(())
+    }
+
     pub(super) fn emit_profiled_update(
         &mut self,
         opcode: Opcode,
@@ -694,6 +709,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             | Opcode::BitOr
             | Opcode::BitXor
             | Opcode::BitAnd
+            | Opcode::BitNot
             | Opcode::ShiftLeft
             | Opcode::ShiftRight
             | Opcode::UnsignedShiftRight => FeedbackSiteKind::Arithmetic,

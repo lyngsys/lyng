@@ -1,6 +1,7 @@
 use super::values::{
     bigint_bitwise_and_values, bigint_bitwise_or_values, bigint_bitwise_xor_values,
-    compare_numeric_values, decode_env_operand, to_f64_number,
+    bigint_shift_left_values, bigint_shift_right_values, compare_numeric_values,
+    decode_env_operand,
 };
 use super::*;
 use crate::vm::property_access::ToPrimitiveHint;
@@ -122,8 +123,18 @@ impl Vm {
                             self.advance_instruction()?;
                         }
                         Opcode::Negate => {
-                            let negate_result = self.negate_value(agent, frame, b);
+                            let negate_result = self.negate_value(agent, host, registry, frame, b);
                             let Some(value) = self.handle_vm_result(agent, negate_result)? else {
+                                continue;
+                            };
+                            self.record_feedback_site(frame.code(), frame.instruction_offset());
+                            self.write_register(frame, a, value)?;
+                            self.advance_instruction()?;
+                        }
+                        Opcode::BitNot => {
+                            let bit_not_result =
+                                self.bitwise_not_value(agent, host, registry, frame, b);
+                            let Some(value) = self.handle_vm_result(agent, bit_not_result)? else {
                                 continue;
                             };
                             self.record_feedback_site(frame.code(), frame.instruction_offset());
@@ -139,9 +150,12 @@ impl Vm {
                                 b,
                                 opcode == Opcode::Increment,
                             );
-                            let Some(value) = self.handle_vm_result(agent, update_result)? else {
+                            let Some((numeric, value)) =
+                                self.handle_vm_result(agent, update_result)?
+                            else {
                                 continue;
                             };
+                            self.write_register(frame, b, numeric)?;
                             self.record_feedback_site(frame.code(), frame.instruction_offset());
                             self.write_register(frame, a, value)?;
                             self.advance_instruction()?;
@@ -1526,9 +1540,10 @@ impl Vm {
         frame: FrameRecord,
         register: u16,
         increment: bool,
-    ) -> VmResult<Value> {
+    ) -> VmResult<(Value, Value)> {
         let numeric = self.to_numeric_register(agent, host, registry, frame, register)?;
-        self.update_numeric_value(agent, numeric, increment)
+        let updated = self.update_numeric_value(agent, numeric, increment)?;
+        Ok((numeric, updated))
     }
 
     pub(super) fn relational_compare(
@@ -1665,24 +1680,16 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let left = number_to_int32(to_f64_number(agent, left)?);
-        let right = number_to_uint32(to_f64_number(agent, right)?) & 0x1f;
+        let left = self.to_numeric_register(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_register(agent, host, registry, frame, right_register)?;
+        if left.is_bigint() || right.is_bigint() {
+            if !left.is_bigint() || !right.is_bigint() {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
+            return bigint_shift_left_values(agent, left, right);
+        }
+        let left = number_to_int32(numeric_value_to_f64(left));
+        let right = number_to_uint32(numeric_value_to_f64(right)) & 0x1f;
         Ok(Value::from_smi(left.wrapping_shl(right)))
     }
 
@@ -1695,24 +1702,16 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let left = number_to_int32(to_f64_number(agent, left)?);
-        let right = number_to_uint32(to_f64_number(agent, right)?) & 0x1f;
+        let left = self.to_numeric_register(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_register(agent, host, registry, frame, right_register)?;
+        if left.is_bigint() || right.is_bigint() {
+            if !left.is_bigint() || !right.is_bigint() {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
+            return bigint_shift_right_values(agent, left, right);
+        }
+        let left = number_to_int32(numeric_value_to_f64(left));
+        let right = number_to_uint32(numeric_value_to_f64(right)) & 0x1f;
         Ok(Value::from_smi(left >> right))
     }
 
@@ -1725,24 +1724,13 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let right = self.to_primitive(
-            agent,
-            host,
-            registry,
-            frame,
-            self.read_register(frame, right_register)?,
-            ToPrimitiveHint::Number,
-        )?;
-        let left = number_to_uint32(to_f64_number(agent, left)?);
-        let right = number_to_uint32(to_f64_number(agent, right)?) & 0x1f;
+        let left = self.to_numeric_register(agent, host, registry, frame, left_register)?;
+        let right = self.to_numeric_register(agent, host, registry, frame, right_register)?;
+        if left.is_bigint() || right.is_bigint() {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        let left = number_to_uint32(numeric_value_to_f64(left));
+        let right = number_to_uint32(numeric_value_to_f64(right)) & 0x1f;
         let result = left >> right;
         if let Ok(result) = i32::try_from(result) {
             Ok(Value::from_smi(result))

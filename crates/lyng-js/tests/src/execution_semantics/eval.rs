@@ -16,6 +16,19 @@ fn direct_eval_creates_local_var_binding_visible_after_eval() {
 }
 
 #[test]
+fn eval_treats_comment_like_slash_sources_as_script_comments() {
+    let result = compile_and_run_string(
+        r#"
+        eval("/*\u000C multi line \u000C comment \u000C*/");
+        (0, eval)("// line comment");
+        "ok";
+        "#,
+    );
+
+    assert_eq!(result, "ok");
+}
+
+#[test]
 fn direct_eval_can_create_arguments_binding_in_non_arrow_function() {
     let result = compile_and_run_string(
         r#"

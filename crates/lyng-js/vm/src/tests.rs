@@ -2239,6 +2239,180 @@ fn dynamic_import_accepts_unary_assignment_expressions() {
 }
 
 #[test]
+fn dynamic_import_preserves_script_referrer_after_async_resume() {
+    let unit = compile_test_unit(
+        220,
+        r#"
+            (async function() {
+                await 0;
+                return import('./dep.mjs');
+            })();
+        "#,
+    );
+    let host = TestHost::new();
+    let script_referrer = ModuleKey::new("/tmp/main.js");
+    let module_key = ModuleKey::new("/tmp/dep.mjs");
+    host.define_module_source(
+        "./dep.mjs",
+        LoadedModuleSource::new(module_key.clone(), "/tmp/dep.mjs", "export default 13;"),
+    );
+    host.define_import_meta(
+        module_key.clone(),
+        ImportMetaProperties::new(vec![ImportMetaProperty {
+            key: "url".into(),
+            value: ImportMetaValue::String("file:///tmp/dep.mjs".into()),
+        }]),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    vm.evaluate_script_with_registry_and_host_referrer(
+        agent,
+        realm,
+        &unit,
+        Some(&script_referrer),
+        &host,
+        &mut registry,
+    )
+    .expect("async dynamic import should evaluate");
+
+    assert!(host
+        .snapshot()
+        .calls
+        .contains(&HostCall::LoadModule(ModuleSourceRequest {
+            specifier: "./dep.mjs".into(),
+            referrer: Some(script_referrer),
+            attributes: Vec::new(),
+        })));
+}
+
+#[test]
+fn dynamic_import_rejects_module_parse_errors_with_syntax_error() {
+    let unit = compile_test_unit(221, "import('./bad.mjs');");
+    let host = TestHost::new();
+    let script_referrer = ModuleKey::new("/tmp/main.js");
+    let module_key = ModuleKey::new("/tmp/bad.mjs");
+    host.define_module_source(
+        "./bad.mjs",
+        LoadedModuleSource::new(module_key, "/tmp/bad.mjs", "export {"),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host_referrer(
+            agent,
+            realm,
+            &unit,
+            Some(&script_referrer),
+            &host,
+            &mut registry,
+        )
+        .expect("dynamic import parse rejection should evaluate");
+
+    let promise = result
+        .as_object_ref()
+        .expect("dynamic import should return a promise object");
+    let record = agent
+        .promise_record(promise)
+        .expect("dynamic import promise should stay tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+    let reason = record
+        .result()
+        .as_object_ref()
+        .expect("dynamic import parse failure should reject with an error object");
+    let name_atom = agent.atoms_mut().intern_collectible("name");
+    let name = ordinary_get(agent, reason, PropertyKey::from_atom(name_atom))
+        .expect("error name should be readable")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("error name should be a string");
+    assert_eq!(name, "SyntaxError");
+}
+
+#[test]
+fn dynamic_import_rejects_ambiguous_module_exports_with_syntax_error() {
+    let unit = compile_test_unit(222, "import('./entry.mjs');");
+    let host = TestHost::new();
+    let script_referrer = ModuleKey::new("/tmp/main.js");
+    host.define_module_source(
+        "./entry.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/entry.mjs"),
+            "/tmp/entry.mjs",
+            "export { x } from './ambiguous.mjs';",
+        ),
+    );
+    host.define_module_source(
+        "./ambiguous.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/ambiguous.mjs"),
+            "/tmp/ambiguous.mjs",
+            "export * from './left.mjs'; export * from './right.mjs';",
+        ),
+    );
+    host.define_module_source(
+        "./left.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/left.mjs"),
+            "/tmp/left.mjs",
+            "export var x = 1;",
+        ),
+    );
+    host.define_module_source(
+        "./right.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/right.mjs"),
+            "/tmp/right.mjs",
+            "export var x = 2;",
+        ),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host_referrer(
+            agent,
+            realm,
+            &unit,
+            Some(&script_referrer),
+            &host,
+            &mut registry,
+        )
+        .expect("dynamic import ambiguous export rejection should evaluate");
+
+    let promise = result
+        .as_object_ref()
+        .expect("dynamic import should return a promise object");
+    let record = agent
+        .promise_record(promise)
+        .expect("dynamic import promise should stay tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+    let reason = record
+        .result()
+        .as_object_ref()
+        .expect("ambiguous export should reject with an error object");
+    let name_atom = agent.atoms_mut().intern_collectible("name");
+    let name = ordinary_get(agent, reason, PropertyKey::from_atom(name_atom))
+        .expect("error name should be readable")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("error name should be a string");
+    assert_eq!(name, "SyntaxError");
+}
+
+#[test]
 fn nested_eval_script_preserves_host_access_for_dynamic_import() {
     let unit = compile_test_unit(219, "embeddingEvalScript(\"import('./dep.mjs');\");");
     let host = TestHost::new();
@@ -6178,6 +6352,50 @@ fn async_generator_awaits_within_the_body_before_settling_next_requests() {
 
     assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(3));
+}
+
+#[test]
+fn async_generator_yield_star_uses_async_iterator_hint() {
+    let unit = compile_test_unit(
+        333,
+        r#"
+            async function main() {
+                var touchedSyncIterator = 0;
+                var iterable = {
+                    get [Symbol.iterator]() {
+                        touchedSyncIterator = 1;
+                        throw new Error("sync iterator should not be read");
+                    },
+                    [Symbol.asyncIterator]: false
+                };
+                var iter = (async function* () {
+                    yield* iterable;
+                })();
+                try {
+                    await iter.next();
+                    return -1;
+                } catch (error) {
+                    return (error.constructor === TypeError ? 1 : 0) + touchedSyncIterator * 10;
+                }
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("async generator yield-star test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("async generator yield-star promise should remain tracked");
+
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.result(), Value::from_smi(1));
 }
 
 #[test]

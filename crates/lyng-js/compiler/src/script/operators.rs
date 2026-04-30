@@ -36,15 +36,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
             lyng_js_ast::UnaryOp::BitNot => {
                 let argument_register = self.lower_expr_to_temp(argument)?;
-                let mask = self.alloc_temp()?;
-                self.emit_load_smi(mask, -1)?;
-                let int32_value = self.alloc_temp()?;
-                self.emit_profiled_binary(Opcode::BitAnd, int32_value, argument_register, mask)?;
-                let one = self.alloc_temp()?;
-                self.emit_load_smi(one, 1)?;
-                let incremented = self.alloc_temp()?;
-                self.emit_profiled_binary(Opcode::Add, incremented, int32_value, one)?;
-                self.emit_profiled_negate(dest, incremented)
+                self.emit_profiled_bit_not(dest, argument_register)
             }
             lyng_js_ast::UnaryOp::Void => {
                 let temp = self.alloc_temp()?;
