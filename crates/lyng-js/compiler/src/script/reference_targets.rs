@@ -65,14 +65,19 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 object, property, ..
             } => {
                 if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
-                    self.prepare_super_computed_reference(object, property)
+                    self.prepare_super_computed_reference(object, property, usage)
                         .map(Some)
                 } else {
                     let object = self.lower_expr_to_temp(object)?;
                     let raw_key = self.lower_expr_to_temp(property)?;
-                    self.emit_check_object_coercible(object)?;
-                    let key = self.alloc_temp()?;
-                    self.emit_to_property_key(key, raw_key)?;
+                    let key = if usage == ReferenceUsage::WriteOnly {
+                        raw_key
+                    } else {
+                        self.emit_check_object_coercible(object)?;
+                        let key = self.alloc_temp()?;
+                        self.emit_to_property_key(key, raw_key)?;
+                        key
+                    };
                     Ok(Some(PreparedReferenceTarget::KeyedProperty { object, key }))
                 }
             }
@@ -213,11 +218,17 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         &mut self,
         object: ExprId,
         property: ExprId,
+        usage: ReferenceUsage,
     ) -> LoweringResult<PreparedReferenceTarget> {
         let receiver = self.lower_super_receiver()?;
         let raw_key = self.lower_expr_to_temp(property)?;
-        let key = self.alloc_temp()?;
-        self.emit_to_property_key(key, raw_key)?;
+        let key = if usage == ReferenceUsage::WriteOnly {
+            raw_key
+        } else {
+            let key = self.alloc_temp()?;
+            self.emit_to_property_key(key, raw_key)?;
+            key
+        };
         Ok(PreparedReferenceTarget::SuperProperty {
             receiver,
             key,

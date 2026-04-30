@@ -1,9 +1,18 @@
 use super::*;
 use lyng_js_bytecode::DirectEvalSiteFlags;
 
+#[derive(Clone, Copy)]
 pub(super) enum ObjectRestExcludedKey {
     Atom(AtomId),
     Register(u16),
+}
+
+enum ObjectDestructuringAssignmentTarget {
+    Prepared {
+        target: PreparedReferenceTarget,
+        default_initializer: Option<ExprId>,
+    },
+    Pattern(ExprId),
 }
 
 #[derive(Clone, Copy)]
@@ -781,66 +790,41 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         continue;
                     }
                     let value = self.alloc_temp()?;
-                    let prepared_private_target = if property.shorthand {
-                        None
-                    } else {
-                        self.prepare_private_assignment_target(property.value)?
-                    };
-                    if !property.computed {
+                    let source_key = if !property.computed {
                         if let Some(atom) = self.named_property_atom(property.key)? {
-                            self.emit_get_property_by_atom(value, source_register, atom)?;
-                            excluded_keys.push(ObjectRestExcludedKey::Atom(atom));
+                            ObjectRestExcludedKey::Atom(atom)
                         } else {
-                            let key = self.lower_expr_to_temp(property.key)?;
-                            self.emit_get_keyed_property(value, source_register, key)?;
-                            excluded_keys.push(ObjectRestExcludedKey::Register(key));
+                            self.lower_object_destructuring_property_key(property.key)?
                         }
                     } else {
-                        let key = self.lower_expr_to_temp(property.key)?;
-                        self.emit_get_keyed_property(value, source_register, key)?;
-                        excluded_keys.push(ObjectRestExcludedKey::Register(key));
+                        self.lower_object_destructuring_property_key(property.key)?
+                    };
+                    let target = self.prepare_object_destructuring_assignment_target(
+                        property.shorthand,
+                        property.key,
+                        property.value,
+                    )?;
+                    match source_key {
+                        ObjectRestExcludedKey::Atom(atom) => {
+                            self.emit_get_property_by_atom(value, source_register, atom)?;
+                        }
+                        ObjectRestExcludedKey::Register(key) => {
+                            self.emit_get_keyed_property(value, source_register, key)?;
+                        }
                     }
-                    if let Some(target) = prepared_private_target {
-                        self.assign_prepared_private_target(target, value)?;
-                        continue;
-                    }
-                    if property.shorthand && property.value != property.key {
-                        let undefined = self.alloc_temp()?;
-                        self.emit_load_undefined(undefined)?;
-                        let is_undefined = self.alloc_temp()?;
-                        self.emit_profiled_binary(
-                            Opcode::StrictEqual,
-                            is_undefined,
+                    excluded_keys.push(source_key);
+                    match target {
+                        ObjectDestructuringAssignmentTarget::Prepared {
+                            target,
+                            default_initializer,
+                        } => self.assign_array_element_value_to_prepared_target(
+                            target,
                             value,
-                            undefined,
-                        )?;
-                        let use_source = self.builder.emit_cond_jump_placeholder(
-                            Opcode::JumpIfFalse,
-                            self.encode_register(is_undefined)?,
-                        )?;
-                        let default_value = self.alloc_temp()?;
-                        self.lower_initializer_with_inferred_name(
-                            property.value,
-                            self.assignment_target_name(property.key),
-                            default_value,
-                        )?;
-                        self.lower_destructuring_assignment_from_register(
-                            property.key,
-                            default_value,
-                        )?;
-                        let end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
-                        let use_source_offset = self.builder.current_offset()?;
-                        self.builder.patch_jump_to(use_source, use_source_offset)?;
-                        self.lower_destructuring_assignment_from_register(property.key, value)?;
-                        let end_offset = self.builder.current_offset()?;
-                        self.builder.patch_jump_to(end, end_offset)?;
-                    } else {
-                        let target_expr = if property.shorthand {
-                            property.key
-                        } else {
-                            property.value
-                        };
-                        self.lower_destructuring_assignment_from_register(target_expr, value)?;
+                            default_initializer,
+                        )?,
+                        ObjectDestructuringAssignmentTarget::Pattern(target_expr) => {
+                            self.lower_destructuring_assignment_from_register(target_expr, value)?;
+                        }
                     }
                 }
                 if let Some(rest_target) = rest_target {
@@ -853,6 +837,65 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 Ok(())
             }
             _ => Err(LoweringError::UnsupportedExpression { expr: expr_id }),
+        }
+    }
+
+    fn lower_object_destructuring_property_key(
+        &mut self,
+        key_expr: ExprId,
+    ) -> LoweringResult<ObjectRestExcludedKey> {
+        let raw_key = self.lower_expr_to_temp(key_expr)?;
+        let key = self.alloc_temp()?;
+        self.emit_to_property_key(key, raw_key)?;
+        Ok(ObjectRestExcludedKey::Register(key))
+    }
+
+    fn prepare_object_destructuring_assignment_target(
+        &mut self,
+        shorthand: bool,
+        property_key: ExprId,
+        property_value: ExprId,
+    ) -> LoweringResult<ObjectDestructuringAssignmentTarget> {
+        if shorthand && property_value != property_key {
+            let target = self
+                .prepare_reference_target(property_key, ReferenceUsage::WriteOnly)?
+                .ok_or(LoweringError::UnsupportedExpression { expr: property_key })?;
+            return Ok(ObjectDestructuringAssignmentTarget::Prepared {
+                target,
+                default_initializer: Some(property_value),
+            });
+        }
+
+        let target_expr = if shorthand {
+            property_key
+        } else {
+            property_value
+        };
+        match self.ast().get_expr(target_expr).clone() {
+            Expr::AssignmentExpression {
+                operator: AssignOp::Assign,
+                left,
+                right,
+                ..
+            } if !self.assignment_rest_target_is_pattern(left) => {
+                let target = self
+                    .prepare_reference_target(left, ReferenceUsage::WriteOnly)?
+                    .ok_or(LoweringError::UnsupportedExpression { expr: left })?;
+                Ok(ObjectDestructuringAssignmentTarget::Prepared {
+                    target,
+                    default_initializer: Some(right),
+                })
+            }
+            _ if !self.assignment_rest_target_is_pattern(target_expr) => {
+                let target = self
+                    .prepare_reference_target(target_expr, ReferenceUsage::WriteOnly)?
+                    .ok_or(LoweringError::UnsupportedExpression { expr: target_expr })?;
+                Ok(ObjectDestructuringAssignmentTarget::Prepared {
+                    target,
+                    default_initializer: None,
+                })
+            }
+            _ => Ok(ObjectDestructuringAssignmentTarget::Pattern(target_expr)),
         }
     }
 

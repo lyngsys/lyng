@@ -1109,7 +1109,7 @@ fn script_core_handles_object_property_key_to_primitive_edge_cases() {
 }
 
 #[test]
-fn script_core_computed_assignment_reuses_prepared_property_key() {
+fn script_core_computed_assignment_defers_reference_validation_until_put_value() {
     let result = compile_and_run(
         r#"
         let total = 0;
@@ -1126,7 +1126,20 @@ fn script_core_computed_assignment_reuses_prepared_property_key() {
             return 3;
         }
         assigned[assignmentKey] = rhs();
-        total += (order === "keyrhs" && assigned.value === 3 ? 1 : 0);
+        total += (order === "rhskey" && assigned.value === 3 ? 1 : 0);
+
+        try {
+            let base = null;
+            let key = {
+                toString: function() {
+                    order += "bad-key";
+                    return "value";
+                }
+            };
+            base[key] = rhs();
+        } catch (error) {
+            total += (error instanceof TypeError && order === "rhskeyrhs" ? 4 : 0);
+        }
 
         let compoundKeyCount = 0;
         let compound = { value: 5 };
@@ -1142,7 +1155,72 @@ fn script_core_computed_assignment_reuses_prepared_property_key() {
         "#,
     );
 
-    assert_eq!(result, Value::from_smi(3));
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn script_core_destructuring_assignment_prepares_property_target_before_source_get() {
+    let result = compile_and_run_string(
+        r#"
+        let log = [];
+
+        function source() {
+            log.push("source");
+            return {
+                get p() {
+                    log.push("get");
+                }
+            };
+        }
+        function target() {
+            log.push("target");
+            return {
+                set q(v) {
+                    log.push("set");
+                }
+            };
+        }
+        function sourceKey() {
+            log.push("source-key");
+            return {
+                toString: function() {
+                    log.push("source-key-tostring");
+                    return "p";
+                }
+            };
+        }
+        function targetKey() {
+            log.push("target-key");
+            return {
+                toString: function() {
+                    log.push("target-key-tostring");
+                    return "q";
+                }
+            };
+        }
+
+        ({[sourceKey()]: target()[targetKey()]} = source());
+        log.join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "source|source-key|source-key-tostring|target|target-key|get|target-key-tostring|set"
+    );
+}
+
+#[test]
+fn script_core_parenthesized_assignment_target_does_not_infer_function_name() {
+    let result = compile_and_run_string(
+        r#"
+        var fn;
+        (fn) = function() {};
+        fn.name;
+        "#,
+    );
+
+    assert_eq!(result, "");
 }
 
 #[test]

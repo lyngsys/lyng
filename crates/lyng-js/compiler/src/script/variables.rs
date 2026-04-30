@@ -109,6 +109,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         right: ExprId,
         dest: u16,
     ) -> LoweringResult<()> {
+        let original_left = left;
         let left = self.assignment_target(left);
         if self.lower_annex_b_call_assignment_target_reference_error(left)? {
             return Ok(());
@@ -131,10 +132,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let Some(target) = self.prepare_reference_target(left, usage)? else {
                     return Err(LoweringError::UnsupportedExpression { expr: left });
                 };
+                let inferred_name = self.assignment_expression_inferred_name(original_left, target);
                 match operator {
                     AssignOp::Assign => {
                         let value = self.alloc_temp()?;
-                        if let Some(name) = self.reference_target_inferred_name(target) {
+                        if let Some(name) = inferred_name {
                             self.lower_initializer_with_inferred_name(right, Some(name), value)?;
                         } else {
                             self.lower_expr_into(right, value)?;
@@ -149,7 +151,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         let jump_end =
                             self.emit_logical_assignment_short_circuit(operator, current)?;
                         let value = self.alloc_temp()?;
-                        if let Some(name) = self.reference_target_inferred_name(target) {
+                        if let Some(name) = inferred_name {
                             self.lower_initializer_with_inferred_name(right, Some(name), value)?;
                         } else {
                             self.lower_expr_into(right, value)?;
@@ -176,6 +178,18 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     }
                 }
             }
+        }
+    }
+
+    fn assignment_expression_inferred_name(
+        &self,
+        original_left: ExprId,
+        target: PreparedReferenceTarget,
+    ) -> Option<AtomId> {
+        if matches!(self.ast().get_expr(original_left), Expr::Identifier { .. }) {
+            self.reference_target_inferred_name(target)
+        } else {
+            None
         }
     }
 }
