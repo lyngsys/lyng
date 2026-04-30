@@ -660,6 +660,30 @@ fn direct_eval_in_class_field_initializer_rejects_arguments_before_side_effects(
 }
 
 #[test]
+fn direct_eval_nested_in_class_field_initializer_rejects_arguments_before_side_effects() {
+    let result = compile_and_run_string(
+        r#"
+            let executed = false;
+            class C {
+                x = () => {
+                    let run = () => eval("executed = true; arguments;");
+                    run();
+                };
+            }
+
+            try {
+                new C().x();
+                "ok";
+            } catch (error) {
+                error.constructor.name + ":" + String(executed);
+            }
+        "#,
+    );
+
+    assert_eq!(result, "SyntaxError:false");
+}
+
+#[test]
 fn direct_eval_in_global_code_updates_configurable_function_binding_attributes() {
     let result = compile_and_run_string(
         r#"

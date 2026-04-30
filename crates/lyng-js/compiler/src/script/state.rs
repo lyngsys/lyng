@@ -122,6 +122,7 @@ pub(crate) struct CompilationState<'a> {
     pub(super) compiled_children: HashMap<FunctionId, BytecodeFunctionId>,
     pub(super) class_function_metadata: HashMap<FunctionId, ClassFunctionMetadata>,
     pub(super) class_constructor_plans: HashMap<FunctionId, ClassConstructorPlan>,
+    pub(super) class_field_initializer_functions: HashSet<FunctionId>,
     pub(super) next_function_raw: u32,
 }
 
@@ -199,6 +200,7 @@ impl<'a> CompilationState<'a> {
             compiled_children: HashMap::new(),
             class_function_metadata,
             class_constructor_plans,
+            class_field_initializer_functions: HashSet::new(),
             next_function_raw: 1,
         })
     }

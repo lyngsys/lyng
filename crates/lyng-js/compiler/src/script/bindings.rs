@@ -239,6 +239,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if let Some(index) = self.child_indices.get(&function) {
             return Ok(*index);
         }
+        if self.in_class_field_initializer {
+            self.state
+                .class_field_initializer_functions
+                .insert(function);
+        }
         let child_id = self.state.ensure_child_compiled(function)?;
         let child_index = self.builder.add_child_function(child_id)?;
         self.child_indices.insert(function, child_index);

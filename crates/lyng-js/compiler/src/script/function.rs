@@ -217,6 +217,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .unwrap_or(function_record.scope_root);
         let body_scope = function_record.scope_root;
         let scope_count = state.sema.scope_table.len();
+        let in_class_field_initializer =
+            state.class_field_initializer_functions.contains(&function);
 
         Ok(Self {
             state,
@@ -248,7 +250,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             active_class_span: None,
             active_class_contexts: Vec::new(),
             active_direct_eval_scopes: Vec::new(),
-            in_class_field_initializer: false,
+            in_class_field_initializer,
             active_disposal_scopes: Vec::new(),
         })
     }
