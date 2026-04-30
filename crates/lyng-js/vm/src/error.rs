@@ -65,6 +65,7 @@ pub enum VmError {
     GeneratorYield {
         value: Value,
         suspended: SuspendedExecutionRef,
+        raw_iterator_result: bool,
     },
     GeneratorStart {
         suspended: SuspendedExecutionRef,

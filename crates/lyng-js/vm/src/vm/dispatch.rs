@@ -1390,6 +1390,7 @@ impl Vm {
                             frame,
                             value,
                             frame.instruction_offset().saturating_add(1),
+                            false,
                         )?;
                     }
                     Opcode::Await => {

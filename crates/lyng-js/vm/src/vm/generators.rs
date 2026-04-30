@@ -15,7 +15,10 @@ const THIS_STATE_VALUE_RAW: u8 = 2;
 
 enum GeneratorExecutionOutcome {
     Complete(Value),
-    Yield(Value),
+    Yield {
+        value: Value,
+        raw_iterator_result: bool,
+    },
     Throw(Value),
     AsyncSuspend,
 }
@@ -24,6 +27,7 @@ enum DelegateYieldOutcome {
     Suspend {
         value: Value,
         record: iterator::IteratorRecord,
+        raw_iterator_result: bool,
     },
     Complete {
         value: Value,
@@ -138,8 +142,15 @@ impl Vm {
                     GeneratorExecutionOutcome::Complete(value) => {
                         self.generator_result_object(agent, caller_frame.realm(), value, true)
                     }
-                    GeneratorExecutionOutcome::Yield(value) => {
-                        self.generator_result_object(agent, caller_frame.realm(), value, false)
+                    GeneratorExecutionOutcome::Yield {
+                        value,
+                        raw_iterator_result,
+                    } => {
+                        if raw_iterator_result {
+                            Ok(value)
+                        } else {
+                            self.generator_result_object(agent, caller_frame.realm(), value, false)
+                        }
                     }
                     GeneratorExecutionOutcome::Throw(thrown) => Err(VmError::Abrupt(
                         lyng_js_types::AbruptCompletion::throw(thrown),
@@ -408,8 +419,15 @@ impl Vm {
                     agent, host, registry, generator, request, result,
                 )
             }
-            GeneratorExecutionOutcome::Yield(value) => {
-                let result = self.generator_result_object(agent, request.realm, value, false);
+            GeneratorExecutionOutcome::Yield {
+                value,
+                raw_iterator_result,
+            } => {
+                let result = if raw_iterator_result {
+                    Ok(value)
+                } else {
+                    self.generator_result_object(agent, request.realm, value, false)
+                };
                 self.settle_async_generator_request_completion(
                     agent, host, registry, generator, request, result,
                 )
@@ -522,14 +540,21 @@ impl Vm {
                 self.complete_generator_object(agent, generator)?;
                 Ok(GeneratorExecutionOutcome::Complete(value))
             }
-            Err(VmError::GeneratorYield { value, suspended }) => {
+            Err(VmError::GeneratorYield {
+                value,
+                suspended,
+                raw_iterator_result,
+            }) => {
                 self.set_generator_state(
                     agent,
                     generator,
                     GeneratorState::SuspendedYield,
                     Some(suspended),
                 )?;
-                Ok(GeneratorExecutionOutcome::Yield(value))
+                Ok(GeneratorExecutionOutcome::Yield {
+                    value,
+                    raw_iterator_result,
+                })
             }
             Err(VmError::AsyncSuspend) => Ok(GeneratorExecutionOutcome::AsyncSuspend),
             Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::Throw(thrown))) => {
@@ -549,6 +574,7 @@ impl Vm {
         frame: FrameRecord,
         yielded_value: Value,
         resume_instruction_offset: u32,
+        raw_iterator_result: bool,
     ) -> VmResult<()> {
         let suspended =
             self.snapshot_suspended_execution(agent, frame, resume_instruction_offset)?;
@@ -565,6 +591,7 @@ impl Vm {
         Err(VmError::GeneratorYield {
             value: yielded_value,
             suspended,
+            raw_iterator_result,
         })
     }
 
@@ -651,12 +678,16 @@ impl Vm {
                     }
                     let iter_result = iterator::iterator_next(&mut bridge, &record, argument)?;
                     let done = iterator::iterator_complete(&mut bridge, iter_result)?;
-                    let value = iterator::iterator_value(&mut bridge, iter_result)?;
                     if done {
+                        let value = iterator::iterator_value(&mut bridge, iter_result)?;
                         record.set_done(true);
                         DelegateYieldOutcome::Complete { value }
                     } else {
-                        DelegateYieldOutcome::Suspend { value, record }
+                        DelegateYieldOutcome::Suspend {
+                            value: Value::from_object_ref(iter_result),
+                            record,
+                            raw_iterator_result: true,
+                        }
                     }
                 }
                 GeneratorResumeKind::Throw => {
@@ -679,7 +710,7 @@ impl Vm {
                                 frame,
                                 return_method,
                                 receiver,
-                                &[Value::undefined()],
+                                &[],
                             )?;
                             let _ = close_result.as_object_ref().ok_or_else(|| {
                                 VmError::Abrupt(errors::throw_type_error(bridge.agent))
@@ -715,12 +746,16 @@ impl Vm {
                         .as_object_ref()
                         .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(bridge.agent)))?;
                     let done = iterator::iterator_complete(&mut bridge, iter_result)?;
-                    let value = iterator::iterator_value(&mut bridge, iter_result)?;
                     if done {
+                        let value = iterator::iterator_value(&mut bridge, iter_result)?;
                         record.set_done(true);
                         DelegateYieldOutcome::Complete { value }
                     } else {
-                        DelegateYieldOutcome::Suspend { value, record }
+                        DelegateYieldOutcome::Suspend {
+                            value: Value::from_object_ref(iter_result),
+                            record,
+                            raw_iterator_result: true,
+                        }
                     }
                 }
                 GeneratorResumeKind::Return => {
@@ -755,29 +790,20 @@ impl Vm {
                             receiver,
                             &[resume_value],
                         )?;
-                        record.set_delegate_started(true);
-                        if record.is_async() {
-                            return self.start_async_delegate_iterator_result_await(
-                                agent,
-                                host,
-                                registry,
-                                frame,
-                                iterator_register,
-                                record,
-                                result,
-                                true,
-                            );
-                        }
                         let iter_result = result.as_object_ref().ok_or_else(|| {
                             VmError::Abrupt(errors::throw_type_error(bridge.agent))
                         })?;
                         let done = iterator::iterator_complete(&mut bridge, iter_result)?;
-                        let value = iterator::iterator_value(&mut bridge, iter_result)?;
                         if done {
+                            let value = iterator::iterator_value(&mut bridge, iter_result)?;
                             record.set_done(true);
                             DelegateYieldOutcome::Complete { value }
                         } else {
-                            DelegateYieldOutcome::Suspend { value, record }
+                            DelegateYieldOutcome::Suspend {
+                                value: Value::from_object_ref(iter_result),
+                                record,
+                                raw_iterator_result: true,
+                            }
                         }
                     }
                 }
@@ -866,12 +892,16 @@ impl Vm {
                     .as_object_ref()
                     .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(bridge.agent)))?;
                 let done = iterator::iterator_complete(&mut bridge, iter_result)?;
-                let value = iterator::iterator_value(&mut bridge, iter_result)?;
                 if done {
+                    let value = iterator::iterator_value(&mut bridge, iter_result)?;
                     record.set_done(true);
                     DelegateYieldOutcome::Complete { value }
                 } else {
-                    DelegateYieldOutcome::Suspend { value, record }
+                    DelegateYieldOutcome::Suspend {
+                        value: Value::from_object_ref(iter_result),
+                        record,
+                        raw_iterator_result: true,
+                    }
                 }
             }
         };
@@ -898,7 +928,11 @@ impl Vm {
         outcome: DelegateYieldOutcome,
     ) -> VmResult<()> {
         match outcome {
-            DelegateYieldOutcome::Suspend { value, record } => {
+            DelegateYieldOutcome::Suspend {
+                value,
+                record,
+                raw_iterator_result,
+            } => {
                 self.iterator_states
                     .insert(register_base, iterator_register, record);
                 self.write_register(frame, result_register, value)?;
@@ -908,6 +942,7 @@ impl Vm {
                     frame,
                     value,
                     frame.instruction_offset(),
+                    raw_iterator_result,
                 )
             }
             DelegateYieldOutcome::Complete { value } => {
@@ -1121,7 +1156,11 @@ impl Vm {
                     record.set_done(true);
                     DelegateYieldOutcome::Complete { value }
                 } else {
-                    DelegateYieldOutcome::Suspend { value, record }
+                    DelegateYieldOutcome::Suspend {
+                        value,
+                        record,
+                        raw_iterator_result: false,
+                    }
                 };
                 self.finish_delegate_yield_outcome(
                     agent,
@@ -1176,6 +1215,7 @@ impl Vm {
                         DelegateYieldOutcome::Suspend {
                             value: resume_value,
                             record,
+                            raw_iterator_result: false,
                         },
                     )
                 }

@@ -8067,6 +8067,144 @@ fn yield_star_delegates_generator_values_and_final_completion() {
 }
 
 #[test]
+fn yield_star_forwards_inner_iterator_result_objects() {
+    let unit = compile_test_unit(
+        208,
+        r#"
+            var results = [{ value: 1 }, { value: 8 }, { value: 34, done: true }];
+            var index = 0;
+            var iterator = {
+                next() {
+                    var result = results[index];
+                    index += 1;
+                    return result;
+                }
+            };
+            var iterable = {};
+            iterable[Symbol.iterator] = function() {
+                return iterator;
+            };
+            function* g() {
+                yield* iterable;
+            }
+            var iter = g();
+            var first = iter.next();
+            var second = iter.next();
+            var final = iter.next();
+            first.value === 1
+                && first.done === undefined
+                && second.value === 8
+                && second.done === undefined
+                && final.value === undefined
+                && final.done === true;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn yield_star_reads_inner_value_only_when_delegate_is_done() {
+    let unit = compile_test_unit(
+        209,
+        r#"
+            var callCount = 0;
+            var spyResult = Object.defineProperty({ done: false }, "value", {
+                get() {
+                    callCount += 1;
+                    return 42;
+                }
+            });
+            var iterable = {};
+            iterable[Symbol.iterator] = function() {
+                return {
+                    next() {
+                        return spyResult;
+                    }
+                };
+            };
+            var delegationComplete = false;
+            function* g() {
+                yield* iterable;
+                delegationComplete = true;
+            }
+            var iter = g();
+            iter.next();
+            var firstCount = callCount;
+            var firstComplete = delegationComplete;
+            spyResult.done = true;
+            iter.next();
+            firstCount === 0
+                && firstComplete === false
+                && callCount === 1
+                && delegationComplete === true;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn yield_star_missing_throw_invokes_return_without_arguments() {
+    let unit = compile_test_unit(
+        210,
+        r#"
+            var thisValue;
+            var argsLength = -1;
+            var poisonedReturn = {
+                next() {
+                    return { done: false };
+                },
+                return() {
+                    thisValue = this;
+                    argsLength = arguments.length;
+                    return "non-object";
+                }
+            };
+            var iterable = {};
+            iterable[Symbol.iterator] = function() {
+                return poisonedReturn;
+            };
+            function* g() {
+                try {
+                    yield* iterable;
+                } catch (error) {
+                    return error.constructor === TypeError;
+                }
+                return false;
+            }
+            var iter = g();
+            iter.next();
+            var result = iter.throw();
+            result.value === true
+                && result.done === true
+                && thisValue === poisonedReturn
+                && argsLength === 0;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn generator_methods_on_classes_lower_through_the_shared_class_path() {
     let unit = compile_test_unit(
         208,
