@@ -1,12 +1,27 @@
 use super::*;
 
 impl<'a, 'b> FunctionCompiler<'a, 'b> {
-    fn assignment_target(&self, expr_id: ExprId) -> ExprId {
+    pub(super) fn assignment_target(&self, expr_id: ExprId) -> ExprId {
         let mut current = expr_id;
         while let Expr::ParenthesizedExpression { expression, .. } = self.ast().get_expr(current) {
             current = *expression;
         }
         current
+    }
+
+    pub(super) fn lower_annex_b_call_assignment_target_reference_error(
+        &mut self,
+        expr_id: ExprId,
+    ) -> LoweringResult<bool> {
+        let target = self.assignment_target(expr_id);
+        if !matches!(self.ast().get_expr(target), Expr::CallExpression { .. }) {
+            return Ok(false);
+        }
+
+        let value = self.alloc_temp()?;
+        self.lower_expr_into(target, value)?;
+        self.emit_throw_reference_error(self.ast().get_expr(target).span())?;
+        Ok(true)
     }
 
     pub(super) fn named_function_expression_self_binding(
@@ -41,12 +56,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         name: AtomId,
         dest: u16,
     ) -> LoweringResult<()> {
-        if let Some((depth, slot)) = self.arguments_access(name)? {
-            return self.emit_load_env_slot(dest, depth, slot);
-        }
         let use_site = self.use_site(expr_id)?;
         let resolution_kind = use_site.resolution_kind;
         let resolved_binding = use_site.resolved_binding;
+        if resolved_binding.is_none() {
+            if let Some((depth, slot)) = self.arguments_access(name)? {
+                return self.emit_load_env_slot(dest, depth, slot);
+            }
+        }
         match resolution_kind {
             ResolutionKind::Local | ResolutionKind::Captured => {
                 let binding_id = resolved_binding.ok_or(LoweringError::MissingResolvedBinding {
@@ -93,6 +110,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         dest: u16,
     ) -> LoweringResult<()> {
         let left = self.assignment_target(left);
+        if self.lower_annex_b_call_assignment_target_reference_error(left)? {
+            return Ok(());
+        }
+
         match self.ast().get_expr(left).clone() {
             Expr::ArrayExpression { .. } | Expr::ObjectExpression { .. }
                 if operator == AssignOp::Assign =>

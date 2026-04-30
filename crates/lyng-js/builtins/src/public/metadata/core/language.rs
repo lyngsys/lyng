@@ -262,4 +262,12 @@ pub(in crate::public::metadata) const PUBLIC_LANGUAGE_SUPPORT_BUILTIN_METADATA:
         decode_uri_component_builtin,
         BuiltinEntryMetadata::new("decodeURIComponent", 1, false, false),
     ),
+    PublicBuiltinMetadataRow::new(
+        escape_builtin,
+        BuiltinEntryMetadata::new("escape", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        unescape_builtin,
+        BuiltinEntryMetadata::new("unescape", 1, false, false),
+    ),
 ];

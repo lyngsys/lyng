@@ -19,13 +19,14 @@ use lyng_js_types::{
     date_get_timezone_offset_builtin, date_get_utc_date_builtin, date_get_utc_day_builtin,
     date_get_utc_full_year_builtin, date_get_utc_hours_builtin, date_get_utc_milliseconds_builtin,
     date_get_utc_minutes_builtin, date_get_utc_month_builtin, date_get_utc_seconds_builtin,
-    date_now_builtin, date_parse_builtin, date_set_date_builtin, date_set_full_year_builtin,
-    date_set_hours_builtin, date_set_milliseconds_builtin, date_set_minutes_builtin,
-    date_set_month_builtin, date_set_seconds_builtin, date_set_time_builtin,
-    date_set_utc_date_builtin, date_set_utc_full_year_builtin, date_set_utc_hours_builtin,
-    date_set_utc_milliseconds_builtin, date_set_utc_minutes_builtin, date_set_utc_month_builtin,
-    date_set_utc_seconds_builtin, date_to_date_string_builtin, date_to_iso_string_builtin,
-    date_to_json_builtin, date_to_locale_date_string_builtin, date_to_locale_string_builtin,
+    date_get_year_builtin, date_now_builtin, date_parse_builtin, date_set_date_builtin,
+    date_set_full_year_builtin, date_set_hours_builtin, date_set_milliseconds_builtin,
+    date_set_minutes_builtin, date_set_month_builtin, date_set_seconds_builtin,
+    date_set_time_builtin, date_set_utc_date_builtin, date_set_utc_full_year_builtin,
+    date_set_utc_hours_builtin, date_set_utc_milliseconds_builtin, date_set_utc_minutes_builtin,
+    date_set_utc_month_builtin, date_set_utc_seconds_builtin, date_set_year_builtin,
+    date_to_date_string_builtin, date_to_iso_string_builtin, date_to_json_builtin,
+    date_to_locale_date_string_builtin, date_to_locale_string_builtin,
     date_to_locale_time_string_builtin, date_to_primitive_builtin, date_to_string_builtin,
     date_to_temporal_instant_builtin, date_to_time_string_builtin, date_to_utc_string_builtin,
     date_utc_builtin, date_value_of_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
@@ -63,6 +64,7 @@ pub(in crate::public) fn install_date_family(
         date_value_of: conversions.value_of,
         date_get_time: getters.time,
         date_get_full_year: getters.full_year,
+        date_get_year: getters.year,
         date_get_utc_full_year: getters.utc_full_year,
         date_get_month: getters.month,
         date_get_utc_month: getters.utc_month,
@@ -93,6 +95,7 @@ pub(in crate::public) fn install_date_family(
         date_set_month: setters.month,
         date_set_utc_month: setters.utc_month,
         date_set_full_year: setters.full_year,
+        date_set_year: setters.year,
         date_set_utc_full_year: setters.utc_full_year,
         date_to_utc_string: conversions.to_utc_string,
         date_to_iso_string: conversions.to_iso_string,
@@ -167,6 +170,7 @@ fn date_getter_builtin_object(
     [
         (date_get_time_builtin(), builtins.date_get_time),
         (date_get_full_year_builtin(), builtins.date_get_full_year),
+        (date_get_year_builtin(), builtins.date_get_year),
         (
             date_get_utc_full_year_builtin(),
             builtins.date_get_utc_full_year,
@@ -237,6 +241,7 @@ fn date_setter_builtin_object(
         (date_set_month_builtin(), builtins.date_set_month),
         (date_set_utc_month_builtin(), builtins.date_set_utc_month),
         (date_set_full_year_builtin(), builtins.date_set_full_year),
+        (date_set_year_builtin(), builtins.date_set_year),
         (
             date_set_utc_full_year_builtin(),
             builtins.date_set_utc_full_year,
@@ -330,6 +335,7 @@ fn install_date_format_methods(agent: &mut Agent, cx: FamilyInstallContext) -> D
 struct DateGetterMethods {
     time: ObjectRef,
     full_year: ObjectRef,
+    year: ObjectRef,
     utc_full_year: ObjectRef,
     month: ObjectRef,
     utc_month: ObjectRef,
@@ -352,6 +358,7 @@ fn install_date_getter_methods(agent: &mut Agent, cx: FamilyInstallContext) -> D
     DateGetterMethods {
         time: install_public_builtin_function(agent, cx, date_get_time_builtin(), None),
         full_year: install_public_builtin_function(agent, cx, date_get_full_year_builtin(), None),
+        year: install_public_builtin_function(agent, cx, date_get_year_builtin(), None),
         utc_full_year: install_public_builtin_function(
             agent,
             cx,
@@ -417,6 +424,7 @@ struct DateSetterMethods {
     month: ObjectRef,
     utc_month: ObjectRef,
     full_year: ObjectRef,
+    year: ObjectRef,
     utc_full_year: ObjectRef,
 }
 
@@ -456,6 +464,7 @@ fn install_date_setter_methods(agent: &mut Agent, cx: FamilyInstallContext) -> D
         month: install_public_builtin_function(agent, cx, date_set_month_builtin(), None),
         utc_month: install_public_builtin_function(agent, cx, date_set_utc_month_builtin(), None),
         full_year: install_public_builtin_function(agent, cx, date_set_full_year_builtin(), None),
+        year: install_public_builtin_function(agent, cx, date_set_year_builtin(), None),
         utc_full_year: install_public_builtin_function(
             agent,
             cx,
@@ -611,6 +620,7 @@ struct DateDescriptorAtoms {
     to_locale_time_string: AtomId,
     get_time: AtomId,
     get_full_year: AtomId,
+    get_year: AtomId,
     get_utc_full_year: AtomId,
     get_month: AtomId,
     get_utc_month: AtomId,
@@ -641,8 +651,10 @@ struct DateDescriptorAtoms {
     set_month: AtomId,
     set_utc_month: AtomId,
     set_full_year: AtomId,
+    set_year: AtomId,
     set_utc_full_year: AtomId,
     to_utc_string: AtomId,
+    to_gmt_string: AtomId,
     to_iso_string: AtomId,
     to_json: AtomId,
     to_temporal_instant: AtomId,
@@ -661,6 +673,7 @@ impl DateDescriptorAtoms {
             to_locale_time_string: agent.atoms_mut().intern("toLocaleTimeString"),
             get_time: agent.atoms_mut().intern("getTime"),
             get_full_year: agent.atoms_mut().intern("getFullYear"),
+            get_year: agent.atoms_mut().intern("getYear"),
             get_utc_full_year: agent.atoms_mut().intern("getUTCFullYear"),
             get_month: agent.atoms_mut().intern("getMonth"),
             get_utc_month: agent.atoms_mut().intern("getUTCMonth"),
@@ -691,8 +704,10 @@ impl DateDescriptorAtoms {
             set_month: agent.atoms_mut().intern("setMonth"),
             set_utc_month: agent.atoms_mut().intern("setUTCMonth"),
             set_full_year: agent.atoms_mut().intern("setFullYear"),
+            set_year: agent.atoms_mut().intern("setYear"),
             set_utc_full_year: agent.atoms_mut().intern("setUTCFullYear"),
             to_utc_string: agent.atoms_mut().intern("toUTCString"),
+            to_gmt_string: agent.atoms_mut().intern("toGMTString"),
             to_iso_string: agent.atoms_mut().intern("toISOString"),
             to_json: agent.atoms_mut().intern("toJSON"),
             to_temporal_instant: agent.atoms_mut().intern("toTemporalInstant"),
@@ -729,10 +744,11 @@ fn date_value_method_specs() -> [(AtomId, BuiltinFunctionId); 1] {
     [(WellKnownAtom::valueOf.id(), date_value_of_builtin())]
 }
 
-fn date_getter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 18] {
+fn date_getter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 19] {
     [
         (atoms.get_time, date_get_time_builtin()),
         (atoms.get_full_year, date_get_full_year_builtin()),
+        (atoms.get_year, date_get_year_builtin()),
         (atoms.get_utc_full_year, date_get_utc_full_year_builtin()),
         (atoms.get_month, date_get_month_builtin()),
         (atoms.get_utc_month, date_get_utc_month_builtin()),
@@ -758,7 +774,7 @@ fn date_getter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunc
     ]
 }
 
-fn date_setter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 15] {
+fn date_setter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 16] {
     [
         (atoms.set_time, date_set_time_builtin()),
         (atoms.set_milliseconds, date_set_milliseconds_builtin()),
@@ -777,13 +793,15 @@ fn date_setter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunc
         (atoms.set_month, date_set_month_builtin()),
         (atoms.set_utc_month, date_set_utc_month_builtin()),
         (atoms.set_full_year, date_set_full_year_builtin()),
+        (atoms.set_year, date_set_year_builtin()),
         (atoms.set_utc_full_year, date_set_utc_full_year_builtin()),
     ]
 }
 
-fn date_conversion_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 4] {
+fn date_conversion_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 5] {
     [
         (atoms.to_utc_string, date_to_utc_string_builtin()),
+        (atoms.to_gmt_string, date_to_utc_string_builtin()),
         (atoms.to_iso_string, date_to_iso_string_builtin()),
         (atoms.to_json, date_to_json_builtin()),
         (

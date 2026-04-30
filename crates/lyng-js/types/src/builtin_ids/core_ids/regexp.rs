@@ -65,6 +65,134 @@ pub fn regexp_to_string_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn regexp_compile_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_COMPILE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_input_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_INPUT_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_input_setter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_INPUT_SETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_last_match_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_LAST_MATCH_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_last_paren_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_LAST_PAREN_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_left_context_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_LEFT_CONTEXT_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_right_context_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_RIGHT_CONTEXT_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_paren1_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_PAREN1_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_paren2_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_PAREN2_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_paren3_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_PAREN3_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_paren4_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_PAREN4_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_paren5_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_PAREN5_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_paren6_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_PAREN6_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_paren7_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_PAREN7_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_paren8_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_PAREN8_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn regexp_legacy_paren9_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(REGEXP_LEGACY_PAREN9_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn regexp_exec_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(REGEXP_EXEC_RAW) {
         Some(id) => id,

@@ -552,18 +552,24 @@ fn phase6_regexp_replace_uses_custom_exec_result_properties() {
 fn phase6_regexp_split_limit_zero_bails_before_matching() {
     let result = compile_and_run_string(
         r#"
+        let constructed = false;
         let fake = {
             constructor: function() {}
         };
         fake.constructor[Symbol.species] = function() {
-            throw new Error("species should not run");
+            constructed = true;
+            return {
+                exec: function() {
+                    throw new Error("exec should not run");
+                }
+            };
         };
         let split = RegExp.prototype[Symbol.split].call(fake, "abc", 0);
-        [Array.isArray(split), split.length].join("|");
+        [constructed, Array.isArray(split), split.length].join("|");
         "#,
     );
 
-    assert_eq!(result, "true|0");
+    assert_eq!(result, "true|true|0");
 }
 
 #[test]
@@ -604,6 +610,25 @@ fn phase6_regexp_split_uses_species_sticky_exec_and_captures() {
     );
 
     assert_eq!(result, "true|iy|3|3|a|B|c");
+}
+
+#[test]
+fn script_core_regexp_split_constructs_splitter_before_coercing_limit() {
+    let result = compile_and_run_string(
+        r#"
+        let regExp = /a/;
+        let limit = {
+            valueOf: function() {
+                regExp.compile("b");
+                return -1;
+            }
+        };
+        let split = regExp[Symbol.split]("abba", limit);
+        [split.length, split[0], split[1], split[2]].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "3||bb|");
 }
 
 #[test]
@@ -1749,6 +1774,51 @@ fn script_core_supports_date_conformance_edges() {
 }
 
 #[test]
+fn script_core_supports_annex_b_date_legacy_methods() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+
+        let getYearDesc = Object.getOwnPropertyDescriptor(Date.prototype, "getYear");
+        total += (getYearDesc && getYearDesc.writable && !getYearDesc.enumerable && getYearDesc.configurable ? 1 : 0);
+        let setYearDesc = Object.getOwnPropertyDescriptor(Date.prototype, "setYear");
+        total += (setYearDesc && setYearDesc.writable && !setYearDesc.enumerable && setYearDesc.configurable ? 2 : 0);
+        total += (Date.prototype.getYear.length === 0 ? 4 : 0);
+        total += (Date.prototype.setYear.length === 1 ? 8 : 0);
+
+        total += (new Date(1899, 0).getYear() === -1 ? 16 : 0);
+        total += (new Date(1900, 0).getYear() === 0 ? 32 : 0);
+        total += (new Date(2000, 0).getYear() === 100 ? 64 : 0);
+        total += (Number.isNaN(new Date({}).getYear()) ? 128 : 0);
+
+        let date = new Date(1970, 1, 2, 3, 4, 5);
+        let expected = new Date(1971, 1, 2, 3, 4, 5).valueOf();
+        total += (date.setYear(71) === expected && date.valueOf() === expected ? 256 : 0);
+
+        let relative = new Date(1970, 0);
+        relative.setYear(50.999999);
+        total += (relative.getFullYear() === 1950 ? 512 : 0);
+
+        let absolute = new Date(1970, 0);
+        absolute.setYear(100);
+        total += (absolute.getFullYear() === 100 ? 1024 : 0);
+
+        total += (Date.prototype.toGMTString === Date.prototype.toUTCString ? 2048 : 0);
+
+        try {
+            Date.prototype.getYear.call({});
+        } catch (error) {
+            total += (error instanceof TypeError ? 4096 : 0);
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(8191));
+}
+
+#[test]
 fn script_core_parse_and_uri_globals_match_phase6_baseline_behavior() {
     let result = compile_and_run(
         r#"
@@ -2859,6 +2929,43 @@ fn script_core_array_callback_copy_helpers_define_own_result_properties() {
     );
 
     assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_array_spread_preserves_mapped_arrow_results() {
+    let result = compile_and_run_string(
+        r#"
+        let negated = [1, 2].map(value => -value);
+        let adjusted = [1, 2].map(value => value + 0.5);
+        let spreadNegated = [...negated];
+        let spreadAdjusted = [...adjusted];
+        let combined = [
+            ...[0, 1, 2],
+            ...[0, 1, 2].map(value => -value),
+        ];
+        [
+            String(negated[0]),
+            String(negated[1]),
+            String(adjusted[0]),
+            String(adjusted[1]),
+            String(spreadNegated[0]),
+            String(spreadNegated[1]),
+            String(spreadAdjusted[0]),
+            String(spreadAdjusted[1]),
+            String(spreadNegated.length),
+            String(spreadAdjusted.length),
+            String(combined[0]),
+            String(combined[1]),
+            String(combined[2]),
+            String(combined[3]),
+            String(combined[4]),
+            String(combined[5]),
+            String(combined.length),
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "-1|-2|1.5|2.5|-1|-2|1.5|2.5|2|2|0|1|2|0|-1|-2|6");
 }
 
 #[test]
@@ -4465,6 +4572,132 @@ fn script_core_validates_regexp_constructor_flags() {
 }
 
 #[test]
+fn script_core_supports_annex_b_regexp_compile() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        let desc = Object.getOwnPropertyDescriptor(RegExp.prototype, "compile");
+        total += (desc && desc.writable && !desc.enumerable && desc.configurable ? 1 : 0);
+        total += (RegExp.prototype.compile.length === 2 ? 2 : 0);
+
+        let subject = /original/ig;
+        subject.lastIndex = 23;
+        total += (subject.compile("new") === subject ? 4 : 0);
+        total += (subject.source === "new" && subject.flags === "" ? 8 : 0);
+        total += (!subject.test("NEW") && subject.test("new") ? 16 : 0);
+        total += (subject.lastIndex === 0 ? 32 : 0);
+
+        let sourceGetterCount = 0;
+        let flagsGetterCount = 0;
+        let other = /abc/gim;
+        Object.defineProperty(other, "source", { get() { sourceGetterCount += 1; return "bad"; } });
+        Object.defineProperty(other, "flags", { get() { flagsGetterCount += 1; return ""; } });
+        subject.compile(other);
+        total += (subject.toString() === "/abc/gim" && sourceGetterCount === 0 && flagsGetterCount === 0 ? 64 : 0);
+
+        try {
+            subject.compile(other, "");
+        } catch (error) {
+            total += (error instanceof TypeError ? 128 : 0);
+        }
+
+        Object.defineProperty(subject, "lastIndex", { value: 45, writable: false });
+        try {
+            subject.compile(/updated/i);
+        } catch (error) {
+            total += (error instanceof TypeError ? 256 : 0);
+        }
+        total += (subject.toString() === "/updated/i" && subject.lastIndex === 45 ? 512 : 0);
+
+        let subclassed = new (class extends RegExp {})("");
+        try {
+            subclassed.compile();
+        } catch (error) {
+            total += (error instanceof TypeError ? 1024 : 0);
+        }
+        try {
+            RegExp.prototype.compile.call(subclassed);
+        } catch (error) {
+            total += (error instanceof TypeError ? 2048 : 0);
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(4095));
+}
+
+#[test]
+fn script_core_supports_annex_b_regexp_legacy_static_accessors() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        let inputDesc = Object.getOwnPropertyDescriptor(RegExp, "input");
+        let aliasDesc = Object.getOwnPropertyDescriptor(RegExp, "$_");
+        let captureDesc = Object.getOwnPropertyDescriptor(RegExp, "$1");
+        total += (typeof inputDesc.get === "function" && typeof inputDesc.set === "function" ? 1 : 0);
+        total += (typeof aliasDesc.get === "function" && typeof aliasDesc.set === "function" ? 2 : 0);
+        total += (typeof captureDesc.get === "function" && captureDesc.set === undefined ? 4 : 0);
+        total += (!inputDesc.enumerable && inputDesc.configurable ? 8 : 0);
+
+        RegExp.input = "seed";
+        total += (RegExp.input === "seed" && RegExp.$_ === "seed" ? 16 : 0);
+
+        /(a)(b)?/.exec("zzac");
+        total += (RegExp.input === "zzac" ? 32 : 0);
+        total += (RegExp.lastMatch === "a" && RegExp["$&"] === "a" ? 64 : 0);
+        total += (RegExp.leftContext === "zz" && RegExp["$`"] === "zz" ? 128 : 0);
+        total += (RegExp.rightContext === "c" && RegExp["$'"] === "c" ? 256 : 0);
+        total += (RegExp.lastParen === "a" && RegExp["$+"] === "a" ? 512 : 0);
+        total += (RegExp.$1 === "a" && RegExp.$2 === "" && RegExp.$9 === "" ? 1024 : 0);
+
+        try {
+            inputDesc.get.call({});
+        } catch (error) {
+            total += (error instanceof TypeError ? 2048 : 0);
+        }
+
+        class MyRegExp extends RegExp {}
+        try {
+            MyRegExp.input;
+        } catch (error) {
+            total += (error instanceof TypeError ? 4096 : 0);
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(8191));
+}
+
+#[test]
+fn script_core_supports_annex_b_regexp_legacy_identity_escapes() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        let cyrillic = String.fromCharCode(0x0410);
+        let invalidControl = new RegExp("\\c" + cyrillic);
+        total += (invalidControl.test("\\c" + cyrillic) ? 1 : 0);
+        total += (!invalidControl.test(String.fromCharCode(cyrillic.charCodeAt(0) % 32)) ? 2 : 0);
+
+        let invalidClass = new RegExp("[\\c_]");
+        total += (invalidClass.test(String.fromCharCode("_".charCodeAt(0) % 32)) ? 4 : 0);
+        total += (!invalidClass.test("\\") && !invalidClass.test("c") && !invalidClass.test("_") ? 8 : 0);
+
+        let nul = String.fromCharCode(0);
+        let escapedNul = new RegExp("\\" + nul);
+        total += (escapedNul.source === "\\" + nul && escapedNul.test(nul) ? 16 : 0);
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
 fn script_core_supports_regexp_prototype_escape_and_receiver_edges() {
     let result = compile_and_run(
         r#"
@@ -4490,6 +4723,456 @@ fn script_core_supports_regexp_prototype_escape_and_receiver_edges() {
     );
 
     assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
+fn script_core_supports_annex_b_escape_and_unescape_globals() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            typeof escape,
+            escape.length,
+            Object.getOwnPropertyDescriptor(globalThis, "escape").enumerable,
+            Object.getOwnPropertyDescriptor(globalThis, "escape").configurable,
+            escape("AZaz09*@-_+./ !\u0100\u{10401}"),
+            unescape("%41%u0100%uD801%uDC01%zz"),
+            unescape(123n)
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "function|1|false|true|AZaz09*@-_+./%20%21%u0100%uD801%uDC01|A\u{0100}\u{10401}%zz|123"
+    );
+}
+
+#[test]
+fn script_core_supports_annex_b_string_html_methods_and_trim_aliases() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            "Lyng".bold(),
+            "Lyng".fontcolor("\"<&"),
+            "Lyng".link("a\"b"),
+            String.prototype.trimLeft === String.prototype.trimStart,
+            String.prototype.trimRight === String.prototype.trimEnd,
+            String.prototype.trimLeft.name,
+            "\tLyng\n".trimLeft(),
+            "\tLyng\n".trimRight()
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "<b>Lyng</b>|<font color=\"&quot;<&\">Lyng</font>|<a href=\"a&quot;b\">Lyng</a>|true|true|trimStart|Lyng\n|\tLyng"
+    );
+}
+
+#[test]
+fn script_core_string_substr_matches_annex_b_numeric_edges() {
+    let result = compile_and_run_string(
+        r#"
+        function toIntegerOrInfinity(value) {
+            return Number.isNaN(value) ? 0 : Math.trunc(value);
+        }
+        function expectedSubstr(string, start, length) {
+            let size = string.length;
+            let intStart = toIntegerOrInfinity(start);
+            if (intStart === -Infinity) {
+                intStart = 0;
+            } else if (intStart < 0) {
+                intStart = Math.max(size + intStart, 0);
+            } else {
+                intStart = Math.min(intStart, size);
+            }
+            let intLength = length === undefined ? size : toIntegerOrInfinity(length);
+            intLength = Math.min(Math.max(intLength, 0), size);
+            let intEnd = Math.min(intStart + intLength, size);
+            let result = string.substring(intStart, intEnd);
+            if (!Object.is(result.length, intEnd - intStart)) {
+                return "bad length:" + [string, String(start), String(length), String(result.length), String(intEnd - intStart)].join("|");
+            }
+            for (let index = 0; index < result.length; index = index + 1) {
+                if (result[index] !== string[intStart + index]) {
+                    return "bad char:" + [string, String(start), String(length), String(index)].join("|");
+                }
+            }
+            return result;
+        }
+        let strings = ["", "a", "ab", "abc"];
+        let positiveIntegers = [0, 1, 2, 3, 4, 5, 10, 100];
+        let integers = [
+            ...positiveIntegers,
+            ...positiveIntegers.map(value => -value),
+        ];
+        let numbers = [
+            ...integers,
+            ...integers.map(value => value + 0.5),
+            -Infinity, Infinity, NaN,
+        ];
+        let lengths = numbers.concat([undefined]);
+        let mismatch = "ok";
+        outer:
+        for (let string of strings) {
+            for (let start of numbers) {
+                for (let length of lengths) {
+                    if (typeof start !== "number") {
+                        mismatch = "bad start:" + String(start);
+                        break outer;
+                    }
+                    if (length !== undefined && typeof length !== "number") {
+                        mismatch = "bad length arg:" + String(length);
+                        break outer;
+                    }
+                    let actual = string.substr(start, length);
+                    let expected = expectedSubstr(string, start, length);
+                    if (expected.startsWith("bad ")) {
+                        mismatch = expected;
+                        break outer;
+                    }
+                    if (actual !== expected) {
+                        mismatch = [string, String(start), String(length), actual, expected].join("|");
+                        break outer;
+                    }
+                }
+            }
+        }
+        mismatch;
+        "#,
+    );
+
+    assert_eq!(result, "ok");
+}
+
+#[test]
+fn script_core_supports_annex_b_function_code_block_function_bindings() {
+    let result = compile_and_run_string(
+        r#"
+        var before, after, blockValue, blockAfterAssignment;
+
+        (function() {
+            before = f;
+
+            {
+                function f() { return 'decl'; }
+                blockValue = f();
+                f = 123;
+                blockAfterAssignment = f;
+            }
+
+            after = f();
+        }());
+
+        String(before) + ':' + blockValue + ':' + blockAfterAssignment + ':' + after;
+        "#,
+    );
+
+    assert_eq!(result, "undefined:decl:123:decl");
+}
+
+#[test]
+fn script_core_supports_annex_b_global_code_block_function_bindings() {
+    let result = compile_and_run_string(
+        r#"
+        var before = f === undefined ? 'undefined' : 'other';
+
+        {
+            function f() { return 'global'; }
+        }
+
+        before + ':' + f();
+        "#,
+    );
+
+    assert_eq!(result, "undefined:global");
+}
+
+#[test]
+fn script_core_annex_b_call_expression_assignment_targets_throw_after_callee() {
+    let result = compile_and_run_string(
+        r#"
+        var out = [];
+        var fCalled = false;
+        var fValueOfCalled = false;
+        var gCalled = false;
+
+        function reset() {
+            fCalled = false;
+            fValueOfCalled = false;
+            gCalled = false;
+        }
+
+        function record(threw) {
+            out.push(threw, fCalled, fValueOfCalled, gCalled);
+        }
+
+        function f() {
+            fCalled = true;
+            return {
+                valueOf() {
+                    fValueOfCalled = true;
+                    return 1;
+                }
+            };
+        }
+
+        function g() {
+            gCalled = true;
+            return 1;
+        }
+
+        reset();
+        try { f() = g(); } catch (error) { record(error.constructor === ReferenceError); }
+
+        reset();
+        try { f() += g(); } catch (error) { record(error.constructor === ReferenceError); }
+
+        reset();
+        try { f()++; } catch (error) { record(error.constructor === ReferenceError); }
+
+        reset();
+        try { ++f(); } catch (error) { record(error.constructor === ReferenceError); }
+
+        reset();
+        try { for (f() in [1]) {} } catch (error) { record(error.constructor === ReferenceError); }
+
+        reset();
+        try { for (f() of [1]) {} } catch (error) { record(error.constructor === ReferenceError); }
+
+        out.join(":");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        [
+            "true", "true", "false", "false", "true", "true", "false", "false", "true", "true",
+            "false", "false", "true", "true", "false", "false", "true", "true", "false", "false",
+            "true", "true", "false", "false",
+        ]
+        .join(":")
+    );
+}
+
+#[test]
+fn script_core_annex_b_for_in_var_initializer_runs_before_rhs() {
+    let result = compile_and_run_string(
+        r#"
+        var effects = 0;
+        var iterations = 0;
+        var stored;
+
+        for (var a = (++effects, -1) in stored = a, { first: 0, second: 1 }) {
+            ++iterations;
+        }
+
+        String(effects) + ":" + String(stored) + ":" + String(iterations) + ":" + String(a);
+        "#,
+    );
+
+    assert_eq!(result, "1:-1:2:second");
+}
+
+#[test]
+fn script_core_annex_b_labeled_function_declaration_is_hoisted() {
+    let result = compile_and_run_string(
+        r#"
+        label: function f() { return 'ok'; }
+        f();
+        "#,
+    );
+
+    assert_eq!(result, "ok");
+}
+
+#[test]
+fn script_core_annex_b_catch_var_redeclaration_updates_simple_catch_parameter() {
+    let result = compile_and_run_string(
+        r#"
+        var out = [];
+
+        foo = "outer";
+        try {
+            throw "caught";
+        } catch (foo) {
+            out.push(foo);
+            var foo = "var statement";
+            out.push(foo);
+        }
+        out.push(foo);
+
+        try {
+            throw "caught";
+        } catch (err) {
+            out.push(err);
+            for (var err in { propertyName: null }) {
+                out.push(err);
+            }
+            out.push(err);
+        }
+
+        try {
+            throw "caught";
+        } catch (value) {
+            out.push(value);
+            for (var value of [2]) {
+                out.push(value);
+            }
+            out.push(value);
+        }
+
+        out.join(":");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "caught:var statement:outer:caught:propertyName:propertyName:caught:2:2"
+    );
+}
+
+#[test]
+fn script_core_annex_b_regexp_legacy_pattern_extensions() {
+    let result = compile_and_run_string(
+        r#"
+        var out = [];
+
+        out.push(/]/.exec(" ]{}")[0]);
+        out.push(/{/.exec(" ]{}")[0]);
+        out.push(/}/.exec(" ]{}")[0]);
+        out.push(/x{o}x/.exec("x{o}x")[0]);
+        out.push(/[\c0]/.exec("\x0f\x10\x11")[0].charCodeAt(0));
+        out.push(/[\c00]+/.exec("\x0f0\x10\x11")[0].length);
+        out.push(/.(?=Z)+/.exec("a bZ")[0]);
+        out.push(/[a-e](?!Z)+/.exec("aZ e")[0]);
+
+        out.join(":");
+        "#,
+    );
+
+    assert_eq!(result, "]:{:}:x{o}x:16:2:b:e");
+}
+
+#[test]
+fn script_core_typeof_before_for_lexical_shadow_returns_undefined() {
+    let result = compile_and_run_string(
+        r#"
+        var beforeType;
+
+        beforeType = typeof f;
+        for (let f; ; ) {
+            {
+                function f() {}
+            }
+            break;
+        }
+
+        beforeType;
+        "#,
+    );
+
+    assert_eq!(result, "undefined");
+}
+
+#[test]
+fn script_core_block_function_named_arguments_shadows_arguments_object() {
+    let result = compile_and_run_string(
+        r#"
+        (function() {
+            {
+                var before = arguments();
+                function arguments() { return 'block'; }
+                return before + ':' + arguments();
+            }
+        }());
+        "#,
+    );
+
+    assert_eq!(result, "block:block");
+}
+
+#[test]
+fn script_core_skips_annex_b_block_function_var_binding_for_destructured_catch_conflicts() {
+    let result = compile_and_run_string(
+        r#"
+        var destructured, simple;
+
+        (function() {
+            try {
+                throw { f: 1 };
+            } catch ({ f }) {
+                {
+                    function f() { return 'blocked'; }
+                }
+            }
+            destructured = typeof f;
+        }());
+
+        (function() {
+            try {
+                throw null;
+            } catch (g) {
+                {
+                    function g() { return 'allowed'; }
+                }
+            }
+            simple = g();
+        }());
+
+        destructured + ':' + simple;
+        "#,
+    );
+
+    assert_eq!(result, "undefined:allowed");
+}
+
+#[test]
+fn script_core_skips_annex_b_block_function_var_binding_for_for_lexical_conflicts() {
+    let result = compile_and_run_string(
+        r#"
+        var before, beforeType, loopResult, after, afterType;
+
+        try {
+            f;
+        } catch (error) {
+            before = error.constructor === ReferenceError ? 'ref' : 'other';
+        }
+        try {
+            beforeType = typeof f;
+        } catch (error) {
+            beforeType = error.constructor === ReferenceError ? 'type-ref' : 'type-other';
+        }
+
+        try {
+            for (let f; ; ) {
+                {
+                    function f() {}
+                }
+                break;
+            }
+            loopResult = 'loop-ok';
+        } catch (error) {
+            loopResult = error.constructor === ReferenceError ? 'loop-ref' : 'loop-other';
+        }
+
+        try {
+            f;
+        } catch (error) {
+            after = error.constructor === ReferenceError ? 'ref' : 'other';
+        }
+        try {
+            afterType = typeof f;
+        } catch (error) {
+            afterType = error.constructor === ReferenceError ? 'type-ref' : 'type-other';
+        }
+
+        [before, beforeType, loopResult, after, afterType].join(':');
+        "#,
+    );
+
+    assert_eq!(result, "ref:undefined:loop-ok:ref:undefined");
 }
 
 #[test]

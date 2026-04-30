@@ -1,7 +1,7 @@
 use super::Agent;
 use crate::{
     realm_index, AllocationLifetime, EnvironmentLayout, EnvironmentLayoutKind, Intrinsics,
-    RealmBootstrapState, RealmMetadata, RealmRecord, RuntimeRealmRecord,
+    RealmBootstrapState, RealmMetadata, RealmRecord, RegExpLegacyStaticState, RuntimeRealmRecord,
 };
 use lyng_js_objects::ObjectAllocation;
 use lyng_js_types::RealmRef;
@@ -59,6 +59,7 @@ impl Agent {
                 intrinsics: Intrinsics::new(),
                 bootstrap_state: RealmBootstrapState::new(),
                 is_default: self.default_realm.is_none(),
+                regexp_legacy_static_state: RegExpLegacyStaticState::default(),
             },
         );
         if !self.realms.contains(&realm) {
@@ -139,6 +140,17 @@ impl Agent {
             .with_spec_ready(true)
             .with_embedding_ready(true);
         true
+    }
+
+    pub fn regexp_legacy_static_state(&self, realm: RealmRef) -> Option<&RegExpLegacyStaticState> {
+        Some(&self.realm_metadata(realm)?.regexp_legacy_static_state)
+    }
+
+    pub fn regexp_legacy_static_state_mut(
+        &mut self,
+        realm: RealmRef,
+    ) -> Option<&mut RegExpLegacyStaticState> {
+        Some(&mut self.realm_metadata_mut(realm)?.regexp_legacy_static_state)
     }
 
     fn store_realm_metadata(&mut self, realm: RealmRef, metadata: RealmMetadata) {

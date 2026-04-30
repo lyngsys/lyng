@@ -60,10 +60,12 @@ fn annex_b_if_clause_function_is_allowed_in_sloppy_script() {
     let stmts = body(&p);
     assert_eq!(stmts.len(), 1);
     if let Stmt::If { consequent, .. } = p.ast.get_stmt(stmts[0]) {
-        assert!(matches!(
-            p.ast.get_stmt(*consequent),
-            Stmt::Declaration { .. }
-        ));
+        let Stmt::Block { body, .. } = p.ast.get_stmt(*consequent) else {
+            panic!("expected synthetic block statement");
+        };
+        let body = p.ast.get_stmt_list(*body);
+        assert_eq!(body.len(), 1);
+        assert!(matches!(p.ast.get_stmt(body[0]), Stmt::Declaration { .. }));
     } else {
         panic!("expected if statement");
     }
@@ -171,6 +173,20 @@ fn parse_for_in() {
     let p = script_ok("for (var x in obj) { x; }");
     let stmts = body(&p);
     assert!(matches!(p.ast.get_stmt(stmts[0]), Stmt::ForIn { .. }));
+}
+
+#[test]
+fn annex_b_parse_sloppy_for_in_var_initializer() {
+    let p = script_ok("for (var x = 1 in obj) { x; }");
+    let stmts = body(&p);
+    assert!(matches!(p.ast.get_stmt(stmts[0]), Stmt::ForIn { .. }));
+}
+
+#[test]
+fn strict_for_in_var_initializer_is_error() {
+    assert!(script("\"use strict\"; for (var x = 1 in obj) {}")
+        .diagnostics
+        .has_errors());
 }
 
 #[test]
@@ -466,6 +482,20 @@ fn parse_labeled_statement() {
     let p = script_ok("loop: while (true) { break loop; }");
     let stmts = body(&p);
     assert!(matches!(p.ast.get_stmt(stmts[0]), Stmt::Labeled { .. }));
+}
+
+#[test]
+fn annex_b_parse_sloppy_labeled_function_declaration() {
+    let p = script_ok("label: function f() {}");
+    let stmts = body(&p);
+    assert!(matches!(p.ast.get_stmt(stmts[0]), Stmt::Labeled { .. }));
+}
+
+#[test]
+fn strict_labeled_function_declaration_is_error() {
+    assert!(script("\"use strict\"; label: function f() {}")
+        .diagnostics
+        .has_errors());
 }
 
 #[test]

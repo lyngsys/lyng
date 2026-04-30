@@ -30,6 +30,7 @@ pub struct BootstrapAtoms {
     bigint: AtomId,
     encode_uri: AtomId,
     encode_uri_component: AtomId,
+    escape: AtomId,
     flags: AtomId,
     has_indices: AtomId,
     has_own_property: AtomId,
@@ -81,6 +82,7 @@ pub struct BootstrapAtoms {
     symbol: AtomId,
     type_error: AtomId,
     uri_error: AtomId,
+    unescape: AtomId,
     key_for: AtomId,
     undefined: AtomId,
     has_instance: AtomId,
@@ -143,6 +145,7 @@ impl BootstrapAtoms {
             bigint: atoms.intern("BigInt"),
             encode_uri: atoms.intern("encodeURI"),
             encode_uri_component: atoms.intern("encodeURIComponent"),
+            escape: atoms.intern("escape"),
             flags: atoms.intern("flags"),
             has_indices: atoms.intern("hasIndices"),
             has_own_property: atoms.intern("hasOwnProperty"),
@@ -194,6 +197,7 @@ impl BootstrapAtoms {
             symbol: atoms.intern("Symbol"),
             type_error: atoms.intern("TypeError"),
             uri_error: atoms.intern("URIError"),
+            unescape: atoms.intern("unescape"),
             key_for: atoms.intern("keyFor"),
             undefined: WellKnownAtom::undefined.id(),
             has_instance: atoms.intern("hasInstance"),
@@ -353,6 +357,11 @@ impl BootstrapAtoms {
     #[inline]
     pub const fn encode_uri_component(self) -> AtomId {
         self.encode_uri_component
+    }
+
+    #[inline]
+    pub const fn escape(self) -> AtomId {
+        self.escape
     }
 
     #[inline]
@@ -611,6 +620,11 @@ impl BootstrapAtoms {
     }
 
     #[inline]
+    pub const fn unescape(self) -> AtomId {
+        self.unescape
+    }
+
+    #[inline]
     pub const fn key_for(self) -> AtomId {
         self.key_for
     }
@@ -744,6 +758,7 @@ impl TraceAtomEdges for BootstrapAtoms {
         self.bigint.trace_atom_edges(sweep);
         self.encode_uri.trace_atom_edges(sweep);
         self.encode_uri_component.trace_atom_edges(sweep);
+        self.escape.trace_atom_edges(sweep);
         self.flags.trace_atom_edges(sweep);
         self.has_indices.trace_atom_edges(sweep);
         self.has_own_property.trace_atom_edges(sweep);
@@ -791,6 +806,7 @@ impl TraceAtomEdges for BootstrapAtoms {
         self.symbol.trace_atom_edges(sweep);
         self.type_error.trace_atom_edges(sweep);
         self.uri_error.trace_atom_edges(sweep);
+        self.unescape.trace_atom_edges(sweep);
         self.key_for.trace_atom_edges(sweep);
         self.undefined.trace_atom_edges(sweep);
         self.has_instance.trace_atom_edges(sweep);

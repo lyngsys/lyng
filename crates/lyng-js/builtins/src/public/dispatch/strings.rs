@@ -3,10 +3,10 @@ mod normalization;
 
 use super::{
     allocate_array_like_result, callable_object_from_value, define_data_property_with_attrs,
-    range_error, regexp, string_from_code_units, string_ref_code_units, string_this_ref,
-    to_integer_or_infinity_for_builtin, to_length_for_builtin, to_number_for_builtin,
-    to_string_string_ref, to_uint32_for_builtin, type_error, usize_index_value,
-    PublicBuiltinDispatchContext,
+    range_error, regexp, string_from_code_units, string_ref_code_units, string_ref_text,
+    string_this_ref, string_value, to_integer_or_infinity_for_builtin, to_length_for_builtin,
+    to_number_for_builtin, to_string_string_ref, to_uint32_for_builtin, type_error,
+    usize_index_value, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use basic::{
@@ -137,7 +137,126 @@ fn dispatch_string_transform_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::string_trim_start_builtin() {
         return string_trim_builtin(context, invocation, true, false).map(Some);
     }
+    if let Some(spec) = string_html_method_spec(entry) {
+        return string_html_builtin(context, invocation, spec).map(Some);
+    }
     Ok(None)
+}
+
+#[derive(Clone, Copy)]
+struct StringHtmlMethodSpec {
+    tag: &'static str,
+    attribute: Option<&'static str>,
+}
+
+fn string_html_method_spec(entry: BuiltinFunctionId) -> Option<StringHtmlMethodSpec> {
+    let spec = if entry == super::string_anchor_builtin() {
+        StringHtmlMethodSpec {
+            tag: "a",
+            attribute: Some("name"),
+        }
+    } else if entry == super::string_big_builtin() {
+        StringHtmlMethodSpec {
+            tag: "big",
+            attribute: None,
+        }
+    } else if entry == super::string_blink_builtin() {
+        StringHtmlMethodSpec {
+            tag: "blink",
+            attribute: None,
+        }
+    } else if entry == super::string_bold_builtin() {
+        StringHtmlMethodSpec {
+            tag: "b",
+            attribute: None,
+        }
+    } else if entry == super::string_fixed_builtin() {
+        StringHtmlMethodSpec {
+            tag: "tt",
+            attribute: None,
+        }
+    } else if entry == super::string_fontcolor_builtin() {
+        StringHtmlMethodSpec {
+            tag: "font",
+            attribute: Some("color"),
+        }
+    } else if entry == super::string_fontsize_builtin() {
+        StringHtmlMethodSpec {
+            tag: "font",
+            attribute: Some("size"),
+        }
+    } else if entry == super::string_italics_builtin() {
+        StringHtmlMethodSpec {
+            tag: "i",
+            attribute: None,
+        }
+    } else if entry == super::string_link_builtin() {
+        StringHtmlMethodSpec {
+            tag: "a",
+            attribute: Some("href"),
+        }
+    } else if entry == super::string_small_builtin() {
+        StringHtmlMethodSpec {
+            tag: "small",
+            attribute: None,
+        }
+    } else if entry == super::string_strike_builtin() {
+        StringHtmlMethodSpec {
+            tag: "strike",
+            attribute: None,
+        }
+    } else if entry == super::string_sub_builtin() {
+        StringHtmlMethodSpec {
+            tag: "sub",
+            attribute: None,
+        }
+    } else if entry == super::string_sup_builtin() {
+        StringHtmlMethodSpec {
+            tag: "sup",
+            attribute: None,
+        }
+    } else {
+        return None;
+    };
+    Some(spec)
+}
+
+fn escape_html_attribute_value(input: &str) -> String {
+    input.replace('"', "&quot;")
+}
+
+fn string_html_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    spec: StringHtmlMethodSpec,
+) -> Result<Value, Cx::Error> {
+    let text_ref = string_this_ref(cx, invocation.this_value())?;
+    let text = string_ref_text(cx, text_ref)?;
+    let mut html = String::new();
+    html.push('<');
+    html.push_str(spec.tag);
+    if let Some(attribute) = spec.attribute {
+        let value_ref = to_string_string_ref(
+            cx,
+            invocation
+                .arguments()
+                .first()
+                .copied()
+                .unwrap_or(Value::undefined()),
+        )?;
+        let value = string_ref_text(cx, value_ref)?;
+        html.push(' ');
+        html.push_str(attribute);
+        html.push_str("=\"");
+        html.push_str(&escape_html_attribute_value(&value));
+        html.push('"');
+    }
+    html.push('>');
+    html.push_str(&text);
+    html.push_str("</");
+    html.push_str(spec.tag);
+    html.push('>');
+    Ok(string_value(cx, &html))
 }
 
 fn find_subsequence(haystack: &[u16], needle: &[u16], start: usize) -> Option<usize> {

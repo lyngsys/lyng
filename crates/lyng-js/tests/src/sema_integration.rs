@@ -130,9 +130,8 @@ fn block_function_binding_stays_in_block_scope() {
         .binding_table
         .as_slice()
         .iter()
-        .find(|b| b.name == foo)
+        .find(|b| b.name == foo && b.kind == DeclarationKind::Function)
         .expect("missing function binding");
-    assert_eq!(binding.kind, DeclarationKind::Function);
     assert_eq!(s.scope_table.get(binding.scope).kind, ScopeKind::Block);
 }
 

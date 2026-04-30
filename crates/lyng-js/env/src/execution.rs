@@ -1,6 +1,7 @@
 use lyng_js_common::AtomId;
 use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
 use lyng_js_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, ShapeId, Value};
+use std::ops::Range;
 
 /// Execution identity categories reserved by the Phase 3 runtime substrate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -358,4 +359,92 @@ pub(crate) struct RealmMetadata {
     pub(crate) intrinsics: Intrinsics,
     pub(crate) bootstrap_state: RealmBootstrapState,
     pub(crate) is_default: bool,
+    pub(crate) regexp_legacy_static_state: RegExpLegacyStaticState,
+}
+
+/// Annex B state exposed by the legacy static accessors on a realm's `%RegExp%`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RegExpLegacyStaticState {
+    input: Vec<u16>,
+    last_match: Vec<u16>,
+    last_paren: Vec<u16>,
+    left_context: Vec<u16>,
+    right_context: Vec<u16>,
+    parens: [Vec<u16>; 9],
+}
+
+impl Default for RegExpLegacyStaticState {
+    fn default() -> Self {
+        Self {
+            input: Vec::new(),
+            last_match: Vec::new(),
+            last_paren: Vec::new(),
+            left_context: Vec::new(),
+            right_context: Vec::new(),
+            parens: std::array::from_fn(|_| Vec::new()),
+        }
+    }
+}
+
+impl RegExpLegacyStaticState {
+    #[inline]
+    pub fn input(&self) -> &[u16] {
+        &self.input
+    }
+
+    #[inline]
+    pub fn last_match(&self) -> &[u16] {
+        &self.last_match
+    }
+
+    #[inline]
+    pub fn last_paren(&self) -> &[u16] {
+        &self.last_paren
+    }
+
+    #[inline]
+    pub fn left_context(&self) -> &[u16] {
+        &self.left_context
+    }
+
+    #[inline]
+    pub fn right_context(&self) -> &[u16] {
+        &self.right_context
+    }
+
+    #[inline]
+    pub fn paren(&self, one_based_index: usize) -> Option<&[u16]> {
+        one_based_index
+            .checked_sub(1)
+            .and_then(|index| self.parens.get(index))
+            .map(Vec::as_slice)
+    }
+
+    #[inline]
+    pub fn set_input(&mut self, input: Vec<u16>) {
+        self.input = input;
+    }
+
+    pub fn record_match(
+        &mut self,
+        input: &[u16],
+        matched: Range<usize>,
+        captures: &[Option<Range<usize>>],
+    ) {
+        self.input.clear();
+        self.input.extend_from_slice(input);
+        self.last_match = input[matched.clone()].to_vec();
+        self.left_context = input[..matched.start].to_vec();
+        self.right_context = input[matched.end..].to_vec();
+        self.last_paren.clear();
+
+        for (index, slot) in self.parens.iter_mut().enumerate() {
+            slot.clear();
+            let Some(Some(range)) = captures.get(index) else {
+                continue;
+            };
+            slot.extend_from_slice(&input[range.clone()]);
+            self.last_paren = slot.clone();
+        }
+    }
 }

@@ -113,6 +113,14 @@ pub fn date_get_full_year_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn date_get_year_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(DATE_GET_YEAR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn date_get_utc_full_year_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(DATE_GET_UTC_FULL_YEAR_RAW) {
         Some(id) => id,
@@ -339,6 +347,14 @@ pub fn date_set_utc_month_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn date_set_full_year_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(DATE_SET_FULL_YEAR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn date_set_year_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(DATE_SET_YEAR_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }

@@ -57,7 +57,7 @@ pub use environment_records::{
 };
 pub use execution::{
     ExecutableId, ExecutionContext, ExecutionContextKind, Intrinsics, RealmBootstrapState,
-    RealmRecord, ThisState,
+    RealmRecord, RegExpLegacyStaticState, ThisState,
 };
 pub use ids::{AgentId, JobId};
 pub use ids::{

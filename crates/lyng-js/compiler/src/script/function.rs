@@ -116,6 +116,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             builtin_constants: HashMap::new(),
             child_indices: HashMap::new(),
             hoisted_function_decls: HashSet::new(),
+            block_instantiated_function_decls: HashSet::new(),
             hoisted_default_export_functions: HashSet::new(),
             parameter_sources: Vec::new(),
             result_register: Some(0),
@@ -231,6 +232,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             builtin_constants: HashMap::new(),
             child_indices: HashMap::new(),
             hoisted_function_decls: HashSet::new(),
+            block_instantiated_function_decls: HashSet::new(),
             hoisted_default_export_functions: HashSet::new(),
             parameter_sources: Vec::new(),
             result_register: None,
@@ -726,56 +728,69 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         };
 
         for stmt in statements {
-            let Stmt::Declaration { decl, .. } = self.ast().get_stmt(stmt).clone() else {
-                continue;
-            };
-            match self.ast().get_decl(decl).clone() {
-                Decl::Function { function, .. } => {
+            self.emit_hoisted_function_declaration_from_statement(stmt)?;
+        }
+
+        Ok(())
+    }
+
+    fn emit_hoisted_function_declaration_from_statement(
+        &mut self,
+        stmt: StmtId,
+    ) -> LoweringResult<()> {
+        let Stmt::Declaration { decl, .. } = self.ast().get_stmt(stmt).clone() else {
+            if let Stmt::Labeled { body, .. } = self.ast().get_stmt(stmt).clone() {
+                self.emit_hoisted_function_declaration_from_statement(body)?;
+            }
+            return Ok(());
+        };
+
+        match self.ast().get_decl(decl).clone() {
+            Decl::Function { function, .. } => {
+                self.lower_function_declaration(decl, function)?;
+                self.hoisted_function_decls.insert(decl);
+            }
+            Decl::Export {
+                kind: lyng_js_ast::ExportKind::Declaration { decl },
+                ..
+            } => {
+                let Decl::Function { function, .. } = self.ast().get_decl(decl).clone() else {
+                    return Ok(());
+                };
+                let function_record = self.ast().get_function(function);
+                if matches!(
+                    function_record.kind,
+                    FunctionKind::Normal
+                        | FunctionKind::Generator
+                        | FunctionKind::Async
+                        | FunctionKind::AsyncGenerator
+                ) {
                     self.lower_function_declaration(decl, function)?;
                     self.hoisted_function_decls.insert(decl);
                 }
-                Decl::Export {
-                    kind: lyng_js_ast::ExportKind::Declaration { decl },
-                    ..
-                } => {
-                    let Decl::Function { function, .. } = self.ast().get_decl(decl).clone() else {
-                        continue;
-                    };
-                    let function_record = self.ast().get_function(function);
-                    if matches!(
-                        function_record.kind,
-                        FunctionKind::Normal
-                            | FunctionKind::Generator
-                            | FunctionKind::Async
-                            | FunctionKind::AsyncGenerator
-                    ) {
-                        self.lower_function_declaration(decl, function)?;
-                        self.hoisted_function_decls.insert(decl);
-                    }
-                }
-                Decl::Export {
-                    kind:
-                        lyng_js_ast::ExportKind::Default {
-                            declaration: lyng_js_ast::ExportDefaultDecl::Function(function),
-                        },
-                    ..
-                } => {
-                    let function_record = self.ast().get_function(function);
-                    if matches!(
-                        function_record.kind,
-                        FunctionKind::Normal
-                            | FunctionKind::Generator
-                            | FunctionKind::Async
-                            | FunctionKind::AsyncGenerator
-                    ) {
-                        self.lower_default_export_declaration(
-                            lyng_js_ast::ExportDefaultDecl::Function(function),
-                        )?;
-                        self.hoisted_default_export_functions.insert(function);
-                    }
-                }
-                _ => {}
             }
+            Decl::Export {
+                kind:
+                    lyng_js_ast::ExportKind::Default {
+                        declaration: lyng_js_ast::ExportDefaultDecl::Function(function),
+                    },
+                ..
+            } => {
+                let function_record = self.ast().get_function(function);
+                if matches!(
+                    function_record.kind,
+                    FunctionKind::Normal
+                        | FunctionKind::Generator
+                        | FunctionKind::Async
+                        | FunctionKind::AsyncGenerator
+                ) {
+                    self.lower_default_export_declaration(
+                        lyng_js_ast::ExportDefaultDecl::Function(function),
+                    )?;
+                    self.hoisted_default_export_functions.insert(function);
+                }
+            }
+            _ => {}
         }
 
         Ok(())

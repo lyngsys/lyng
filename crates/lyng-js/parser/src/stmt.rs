@@ -284,7 +284,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             && self.allows_annex_b_sloppy_function_declarations()
             && self.peek().kind != TokenKind::Star
         {
-            return self.parse_function_declaration_stmt();
+            let declaration = self.parse_function_declaration_stmt();
+            let span = self.ast().get_stmt(declaration).span();
+            let body = self.ast_mut().alloc_stmt_list(&[declaration]);
+            return self.ast_mut().alloc_stmt(Stmt::Block { span, body });
         }
 
         self.parse_statement()

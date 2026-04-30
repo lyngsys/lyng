@@ -71,3 +71,19 @@ pub fn decode_uri_component_builtin() -> BuiltinFunctionId {
         None => unreachable!("builtin id should stay non-zero"),
     }
 }
+
+#[inline]
+pub fn escape_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ESCAPE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn unescape_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(UNESCAPE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}

@@ -1346,6 +1346,7 @@ pub(super) struct FunctionCompiler<'a, 'b> {
     pub(super) builtin_constants: HashMap<BuiltinFunctionId, u32>,
     pub(super) child_indices: HashMap<FunctionId, u16>,
     pub(super) hoisted_function_decls: HashSet<DeclId>,
+    pub(super) block_instantiated_function_decls: HashSet<DeclId>,
     pub(super) hoisted_default_export_functions: HashSet<FunctionId>,
     pub(super) parameter_sources: Vec<ParameterSource>,
     pub(super) result_register: Option<u16>,

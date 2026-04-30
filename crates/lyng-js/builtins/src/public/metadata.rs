@@ -44,13 +44,14 @@ use lyng_js_types::{
     date_get_timezone_offset_builtin, date_get_utc_date_builtin, date_get_utc_day_builtin,
     date_get_utc_full_year_builtin, date_get_utc_hours_builtin, date_get_utc_milliseconds_builtin,
     date_get_utc_minutes_builtin, date_get_utc_month_builtin, date_get_utc_seconds_builtin,
-    date_now_builtin, date_parse_builtin, date_set_date_builtin, date_set_full_year_builtin,
-    date_set_hours_builtin, date_set_milliseconds_builtin, date_set_minutes_builtin,
-    date_set_month_builtin, date_set_seconds_builtin, date_set_time_builtin,
-    date_set_utc_date_builtin, date_set_utc_full_year_builtin, date_set_utc_hours_builtin,
-    date_set_utc_milliseconds_builtin, date_set_utc_minutes_builtin, date_set_utc_month_builtin,
-    date_set_utc_seconds_builtin, date_to_date_string_builtin, date_to_iso_string_builtin,
-    date_to_json_builtin, date_to_locale_date_string_builtin, date_to_locale_string_builtin,
+    date_get_year_builtin, date_now_builtin, date_parse_builtin, date_set_date_builtin,
+    date_set_full_year_builtin, date_set_hours_builtin, date_set_milliseconds_builtin,
+    date_set_minutes_builtin, date_set_month_builtin, date_set_seconds_builtin,
+    date_set_time_builtin, date_set_utc_date_builtin, date_set_utc_full_year_builtin,
+    date_set_utc_hours_builtin, date_set_utc_milliseconds_builtin, date_set_utc_minutes_builtin,
+    date_set_utc_month_builtin, date_set_utc_seconds_builtin, date_set_year_builtin,
+    date_to_date_string_builtin, date_to_iso_string_builtin, date_to_json_builtin,
+    date_to_locale_date_string_builtin, date_to_locale_string_builtin,
     date_to_locale_time_string_builtin, date_to_primitive_builtin, date_to_string_builtin,
     date_to_temporal_instant_builtin, date_to_time_string_builtin, date_to_utc_string_builtin,
     date_utc_builtin, date_value_of_builtin, decode_uri_builtin, decode_uri_component_builtin,
@@ -58,8 +59,8 @@ use lyng_js_types::{
     disposable_stack_dispose_builtin, disposable_stack_disposed_getter_builtin,
     disposable_stack_move_builtin, disposable_stack_use_builtin, dispose_scope_async_builtin,
     dispose_scope_builtin, encode_uri_builtin, encode_uri_component_builtin, error_builtin,
-    error_is_error_builtin, error_to_string_builtin, eval_builtin, eval_error_builtin,
-    finalization_registry_builtin, finalization_registry_register_builtin,
+    error_is_error_builtin, error_to_string_builtin, escape_builtin, eval_builtin,
+    eval_error_builtin, finalization_registry_builtin, finalization_registry_register_builtin,
     finalization_registry_unregister_builtin, float32_array_builtin, float64_array_builtin,
     function_apply_builtin, function_bind_builtin, function_builtin, function_call_builtin,
     function_prototype_builtin, function_symbol_has_instance_builtin, function_to_string_builtin,
@@ -113,9 +114,17 @@ use lyng_js_types::{
     reflect_get_own_property_descriptor_builtin, reflect_get_prototype_of_builtin,
     reflect_has_builtin, reflect_is_extensible_builtin, reflect_own_keys_builtin,
     reflect_prevent_extensions_builtin, reflect_set_builtin, reflect_set_prototype_of_builtin,
-    regexp_builtin, regexp_dot_all_getter_builtin, regexp_escape_builtin, regexp_exec_builtin,
-    regexp_flags_getter_builtin, regexp_global_getter_builtin, regexp_has_indices_getter_builtin,
-    regexp_ignore_case_getter_builtin, regexp_multiline_getter_builtin,
+    regexp_builtin, regexp_compile_builtin, regexp_dot_all_getter_builtin, regexp_escape_builtin,
+    regexp_exec_builtin, regexp_flags_getter_builtin, regexp_global_getter_builtin,
+    regexp_has_indices_getter_builtin, regexp_ignore_case_getter_builtin,
+    regexp_legacy_input_getter_builtin, regexp_legacy_input_setter_builtin,
+    regexp_legacy_last_match_getter_builtin, regexp_legacy_last_paren_getter_builtin,
+    regexp_legacy_left_context_getter_builtin, regexp_legacy_paren1_getter_builtin,
+    regexp_legacy_paren2_getter_builtin, regexp_legacy_paren3_getter_builtin,
+    regexp_legacy_paren4_getter_builtin, regexp_legacy_paren5_getter_builtin,
+    regexp_legacy_paren6_getter_builtin, regexp_legacy_paren7_getter_builtin,
+    regexp_legacy_paren8_getter_builtin, regexp_legacy_paren9_getter_builtin,
+    regexp_legacy_right_context_getter_builtin, regexp_multiline_getter_builtin,
     regexp_source_getter_builtin, regexp_species_getter_builtin, regexp_sticky_getter_builtin,
     regexp_string_iterator_next_builtin, regexp_symbol_match_all_builtin,
     regexp_symbol_match_builtin, regexp_symbol_replace_builtin, regexp_symbol_search_builtin,
@@ -127,16 +136,20 @@ use lyng_js_types::{
     set_iterator_next_builtin, set_keys_builtin, set_size_getter_builtin,
     set_symmetric_difference_builtin, set_union_builtin, set_values_builtin,
     shared_array_buffer_builtin, shared_array_buffer_byte_length_getter_builtin,
-    shared_array_buffer_slice_builtin, string_at_builtin, string_builtin, string_char_at_builtin,
-    string_char_code_at_builtin, string_code_point_at_builtin, string_concat_builtin,
-    string_ends_with_builtin, string_from_char_code_builtin, string_from_code_point_builtin,
-    string_includes_builtin, string_index_of_builtin, string_is_well_formed_builtin,
-    string_iterator_builtin, string_iterator_next_builtin, string_last_index_of_builtin,
+    shared_array_buffer_slice_builtin, string_anchor_builtin, string_at_builtin,
+    string_big_builtin, string_blink_builtin, string_bold_builtin, string_builtin,
+    string_char_at_builtin, string_char_code_at_builtin, string_code_point_at_builtin,
+    string_concat_builtin, string_ends_with_builtin, string_fixed_builtin,
+    string_fontcolor_builtin, string_fontsize_builtin, string_from_char_code_builtin,
+    string_from_code_point_builtin, string_includes_builtin, string_index_of_builtin,
+    string_is_well_formed_builtin, string_italics_builtin, string_iterator_builtin,
+    string_iterator_next_builtin, string_last_index_of_builtin, string_link_builtin,
     string_locale_compare_builtin, string_match_all_builtin, string_match_builtin,
     string_normalize_builtin, string_pad_end_builtin, string_pad_start_builtin, string_raw_builtin,
     string_repeat_builtin, string_replace_all_builtin, string_replace_builtin,
-    string_search_builtin, string_slice_builtin, string_split_builtin, string_starts_with_builtin,
-    string_substr_builtin, string_substring_builtin, string_to_locale_lower_case_builtin,
+    string_search_builtin, string_slice_builtin, string_small_builtin, string_split_builtin,
+    string_starts_with_builtin, string_strike_builtin, string_sub_builtin, string_substr_builtin,
+    string_substring_builtin, string_sup_builtin, string_to_locale_lower_case_builtin,
     string_to_locale_upper_case_builtin, string_to_lower_case_builtin, string_to_string_builtin,
     string_to_upper_case_builtin, string_to_well_formed_builtin, string_trim_builtin,
     string_trim_end_builtin, string_trim_start_builtin, string_value_of_builtin,
@@ -160,10 +173,11 @@ use lyng_js_types::{
     uint8_array_set_from_base64_builtin, uint8_array_set_from_hex_builtin,
     uint8_array_slice_builtin, uint8_array_subarray_builtin, uint8_array_to_base64_builtin,
     uint8_array_to_hex_builtin, uint8_array_values_builtin, uint8_clamped_array_builtin,
-    uri_error_builtin, weak_map_builtin, weak_map_delete_builtin, weak_map_get_builtin,
-    weak_map_get_or_insert_builtin, weak_map_get_or_insert_computed_builtin, weak_map_has_builtin,
-    weak_map_set_builtin, weak_ref_builtin, weak_ref_deref_builtin, weak_set_add_builtin,
-    weak_set_builtin, weak_set_delete_builtin, weak_set_has_builtin, BuiltinFunctionId,
+    unescape_builtin, uri_error_builtin, weak_map_builtin, weak_map_delete_builtin,
+    weak_map_get_builtin, weak_map_get_or_insert_builtin, weak_map_get_or_insert_computed_builtin,
+    weak_map_has_builtin, weak_map_set_builtin, weak_ref_builtin, weak_ref_deref_builtin,
+    weak_set_add_builtin, weak_set_builtin, weak_set_delete_builtin, weak_set_has_builtin,
+    BuiltinFunctionId,
 };
 
 mod binary_data;
@@ -1675,6 +1689,58 @@ mod tests {
                 string_trim_start_builtin(),
                 BuiltinEntryMetadata::new("trimStart", 0, false, false),
             ),
+            (
+                string_anchor_builtin(),
+                BuiltinEntryMetadata::new("anchor", 1, false, false),
+            ),
+            (
+                string_big_builtin(),
+                BuiltinEntryMetadata::new("big", 0, false, false),
+            ),
+            (
+                string_blink_builtin(),
+                BuiltinEntryMetadata::new("blink", 0, false, false),
+            ),
+            (
+                string_bold_builtin(),
+                BuiltinEntryMetadata::new("bold", 0, false, false),
+            ),
+            (
+                string_fixed_builtin(),
+                BuiltinEntryMetadata::new("fixed", 0, false, false),
+            ),
+            (
+                string_fontcolor_builtin(),
+                BuiltinEntryMetadata::new("fontcolor", 1, false, false),
+            ),
+            (
+                string_fontsize_builtin(),
+                BuiltinEntryMetadata::new("fontsize", 1, false, false),
+            ),
+            (
+                string_italics_builtin(),
+                BuiltinEntryMetadata::new("italics", 0, false, false),
+            ),
+            (
+                string_link_builtin(),
+                BuiltinEntryMetadata::new("link", 1, false, false),
+            ),
+            (
+                string_small_builtin(),
+                BuiltinEntryMetadata::new("small", 0, false, false),
+            ),
+            (
+                string_strike_builtin(),
+                BuiltinEntryMetadata::new("strike", 0, false, false),
+            ),
+            (
+                string_sub_builtin(),
+                BuiltinEntryMetadata::new("sub", 0, false, false),
+            ),
+            (
+                string_sup_builtin(),
+                BuiltinEntryMetadata::new("sup", 0, false, false),
+            ),
         ];
 
         assert_eq!(PUBLIC_TEXT_BUILTIN_METADATA.len(), expected.len());
@@ -1698,6 +1764,70 @@ mod tests {
             (
                 regexp_to_string_builtin(),
                 BuiltinEntryMetadata::new("toString", 0, false, false),
+            ),
+            (
+                regexp_compile_builtin(),
+                BuiltinEntryMetadata::new("compile", 2, false, false),
+            ),
+            (
+                regexp_legacy_input_getter_builtin(),
+                BuiltinEntryMetadata::new("get input", 0, false, false),
+            ),
+            (
+                regexp_legacy_input_setter_builtin(),
+                BuiltinEntryMetadata::new("set input", 1, false, false),
+            ),
+            (
+                regexp_legacy_last_match_getter_builtin(),
+                BuiltinEntryMetadata::new("get lastMatch", 0, false, false),
+            ),
+            (
+                regexp_legacy_last_paren_getter_builtin(),
+                BuiltinEntryMetadata::new("get lastParen", 0, false, false),
+            ),
+            (
+                regexp_legacy_left_context_getter_builtin(),
+                BuiltinEntryMetadata::new("get leftContext", 0, false, false),
+            ),
+            (
+                regexp_legacy_right_context_getter_builtin(),
+                BuiltinEntryMetadata::new("get rightContext", 0, false, false),
+            ),
+            (
+                regexp_legacy_paren1_getter_builtin(),
+                BuiltinEntryMetadata::new("get $1", 0, false, false),
+            ),
+            (
+                regexp_legacy_paren2_getter_builtin(),
+                BuiltinEntryMetadata::new("get $2", 0, false, false),
+            ),
+            (
+                regexp_legacy_paren3_getter_builtin(),
+                BuiltinEntryMetadata::new("get $3", 0, false, false),
+            ),
+            (
+                regexp_legacy_paren4_getter_builtin(),
+                BuiltinEntryMetadata::new("get $4", 0, false, false),
+            ),
+            (
+                regexp_legacy_paren5_getter_builtin(),
+                BuiltinEntryMetadata::new("get $5", 0, false, false),
+            ),
+            (
+                regexp_legacy_paren6_getter_builtin(),
+                BuiltinEntryMetadata::new("get $6", 0, false, false),
+            ),
+            (
+                regexp_legacy_paren7_getter_builtin(),
+                BuiltinEntryMetadata::new("get $7", 0, false, false),
+            ),
+            (
+                regexp_legacy_paren8_getter_builtin(),
+                BuiltinEntryMetadata::new("get $8", 0, false, false),
+            ),
+            (
+                regexp_legacy_paren9_getter_builtin(),
+                BuiltinEntryMetadata::new("get $9", 0, false, false),
             ),
             (
                 regexp_exec_builtin(),
@@ -1840,6 +1970,10 @@ mod tests {
                 BuiltinEntryMetadata::new("getFullYear", 0, false, false),
             ),
             (
+                date_get_year_builtin(),
+                BuiltinEntryMetadata::new("getYear", 0, false, false),
+            ),
+            (
                 date_get_utc_full_year_builtin(),
                 BuiltinEntryMetadata::new("getUTCFullYear", 0, false, false),
             ),
@@ -1958,6 +2092,10 @@ mod tests {
             (
                 date_set_full_year_builtin(),
                 BuiltinEntryMetadata::new("setFullYear", 3, false, false),
+            ),
+            (
+                date_set_year_builtin(),
+                BuiltinEntryMetadata::new("setYear", 1, false, false),
             ),
             (
                 date_set_utc_full_year_builtin(),
@@ -2530,6 +2668,14 @@ mod tests {
             (
                 decode_uri_component_builtin(),
                 BuiltinEntryMetadata::new("decodeURIComponent", 1, false, false),
+            ),
+            (
+                escape_builtin(),
+                BuiltinEntryMetadata::new("escape", 1, false, false),
+            ),
+            (
+                unescape_builtin(),
+                BuiltinEntryMetadata::new("unescape", 1, false, false),
             ),
         ];
 

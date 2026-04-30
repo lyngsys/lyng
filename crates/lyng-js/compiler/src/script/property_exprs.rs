@@ -11,6 +11,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         dest: u16,
     ) -> LoweringResult<()> {
         let target = self.delete_target(argument);
+        if self.lower_annex_b_call_assignment_target_reference_error(target)? {
+            return Ok(());
+        }
+
         let Some(target) = self.prepare_reference_target(target, ReferenceUsage::ReadWrite)? else {
             return Err(LoweringError::UnsupportedExpression { expr: expr_id });
         };
@@ -429,7 +433,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         current
     }
 
-    fn emit_throw_reference_error(&mut self, span: Span) -> LoweringResult<()> {
+    pub(super) fn emit_throw_reference_error(&mut self, span: Span) -> LoweringResult<()> {
         let error = self.alloc_temp()?;
         self.emit_internal_builtin_call_into(reference_error_builtin(), &[], span, error)?;
         self.builder.emit_ax(Opcode::Throw, i32::from(error))?;

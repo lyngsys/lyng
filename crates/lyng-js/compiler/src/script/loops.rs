@@ -212,6 +212,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         let head_tdz_plan = self.for_in_of_head_tdz_plan(left)?;
         let iteration_disposal_kind = self.for_in_of_declaration_disposal_scope_kind(left);
+        self.lower_annex_b_for_in_var_initializer(left)?;
         let object_register = if let Some(plan) = &head_tdz_plan {
             let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
             self.builder.add_loop_iteration_environment_site(
@@ -292,6 +293,32 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.pop_control_target(target);
         debug_assert!(end_offset >= close_offset);
         Ok(())
+    }
+
+    fn lower_annex_b_for_in_var_initializer(&mut self, left: ForInOfLeft) -> LoweringResult<()> {
+        let ForInOfLeft::Declaration(decl_id) = left else {
+            return Ok(());
+        };
+        let Decl::Variable {
+            kind, declarators, ..
+        } = self.ast().get_decl(decl_id).clone()
+        else {
+            return Ok(());
+        };
+        if kind != VariableKind::Var {
+            return Ok(());
+        }
+
+        let declarators = self.ast().get_var_declarator_list(declarators).to_vec();
+        let [declarator] = declarators.as_slice() else {
+            return Ok(());
+        };
+        let Some(init) = declarator.init else {
+            return Ok(());
+        };
+
+        let value = self.lower_expr_to_temp(init)?;
+        self.lower_binding_pattern_initialization(declarator.id, DeclarationKind::Var, value)
     }
 
     pub(super) fn lower_for_of_statement(
@@ -546,6 +573,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let [declarator] = declarators.as_slice() else {
             return Err(LoweringError::UnsupportedDeclaration { decl: decl_id });
         };
+        if kind == VariableKind::Var {
+            if let Pattern::Identifier { name, .. } = self.ast().get_pattern(declarator.id) {
+                if let Some(catch_binding) = self.active_simple_catch_binding_for_name(*name) {
+                    return self.assign_binding_value(catch_binding, *name, value_register);
+                }
+            }
+        }
         self.lower_binding_pattern_initialization(
             declarator.id,
             match kind {

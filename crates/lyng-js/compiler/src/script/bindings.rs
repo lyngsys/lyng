@@ -68,6 +68,42 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(first)
     }
 
+    pub(super) fn find_named_binding_in_scope(
+        &self,
+        name: AtomId,
+        expected_kind: DeclarationKind,
+        scope: ScopeId,
+    ) -> Option<SemanticBindingId> {
+        self.state
+            .sema
+            .binding_table
+            .as_slice()
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(index, binding)| {
+                (binding.name == name && binding.kind == expected_kind && binding.scope == scope)
+                    .then_some(SemanticBindingId::new(index as u32))
+            })
+    }
+
+    pub(super) fn nearest_var_scope(&self) -> ScopeId {
+        let mut scope = self.current_scope;
+        loop {
+            let record = self.state.sema.scope_table.get(scope);
+            if matches!(
+                record.kind,
+                ScopeKind::Global | ScopeKind::Module | ScopeKind::Function
+            ) {
+                return scope;
+            }
+            let Some(parent) = record.parent else {
+                return scope;
+            };
+            scope = parent;
+        }
+    }
+
     pub(super) fn declared_binding_for_pattern(
         &self,
         pattern: lyng_js_ast::PatternId,

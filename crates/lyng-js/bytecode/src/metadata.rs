@@ -232,6 +232,7 @@ impl LoopIterationEnvironmentSite {
 pub struct DirectEvalLexicalScope {
     source_base: u32,
     bindings: Vec<BytecodeEnvironmentBinding>,
+    annex_b_catch_name: Option<AtomId>,
 }
 
 impl DirectEvalLexicalScope {
@@ -240,7 +241,14 @@ impl DirectEvalLexicalScope {
         Self {
             source_base,
             bindings,
+            annex_b_catch_name: None,
         }
+    }
+
+    #[inline]
+    pub const fn with_annex_b_catch_name(mut self, name: AtomId) -> Self {
+        self.annex_b_catch_name = Some(name);
+        self
     }
 
     #[inline]
@@ -251,6 +259,11 @@ impl DirectEvalLexicalScope {
     #[inline]
     pub fn bindings(&self) -> &[BytecodeEnvironmentBinding] {
         &self.bindings
+    }
+
+    #[inline]
+    pub const fn annex_b_catch_name(&self) -> Option<AtomId> {
+        self.annex_b_catch_name
     }
 }
 
@@ -290,6 +303,7 @@ pub struct DirectEvalLexicalSite {
     instruction_offset: u32,
     scopes: Vec<DirectEvalLexicalScope>,
     flags: DirectEvalSiteFlags,
+    annex_b_catch_names: Vec<AtomId>,
 }
 
 impl DirectEvalLexicalSite {
@@ -298,11 +312,13 @@ impl DirectEvalLexicalSite {
         instruction_offset: u32,
         scopes: Vec<DirectEvalLexicalScope>,
         flags: DirectEvalSiteFlags,
+        annex_b_catch_names: Vec<AtomId>,
     ) -> Self {
         Self {
             instruction_offset,
             scopes,
             flags,
+            annex_b_catch_names,
         }
     }
 
@@ -319,6 +335,11 @@ impl DirectEvalLexicalSite {
     #[inline]
     pub const fn flags(&self) -> DirectEvalSiteFlags {
         self.flags
+    }
+
+    #[inline]
+    pub fn annex_b_catch_names(&self) -> &[AtomId] {
+        &self.annex_b_catch_names
     }
 }
 

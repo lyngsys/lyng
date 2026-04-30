@@ -15,6 +15,70 @@ pub(in crate::public::metadata) const PUBLIC_REGEXP_BUILTIN_METADATA:
         BuiltinEntryMetadata::new("toString", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        regexp_compile_builtin,
+        BuiltinEntryMetadata::new("compile", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_input_getter_builtin,
+        BuiltinEntryMetadata::new("get input", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_input_setter_builtin,
+        BuiltinEntryMetadata::new("set input", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_last_match_getter_builtin,
+        BuiltinEntryMetadata::new("get lastMatch", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_last_paren_getter_builtin,
+        BuiltinEntryMetadata::new("get lastParen", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_left_context_getter_builtin,
+        BuiltinEntryMetadata::new("get leftContext", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_right_context_getter_builtin,
+        BuiltinEntryMetadata::new("get rightContext", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_paren1_getter_builtin,
+        BuiltinEntryMetadata::new("get $1", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_paren2_getter_builtin,
+        BuiltinEntryMetadata::new("get $2", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_paren3_getter_builtin,
+        BuiltinEntryMetadata::new("get $3", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_paren4_getter_builtin,
+        BuiltinEntryMetadata::new("get $4", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_paren5_getter_builtin,
+        BuiltinEntryMetadata::new("get $5", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_paren6_getter_builtin,
+        BuiltinEntryMetadata::new("get $6", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_paren7_getter_builtin,
+        BuiltinEntryMetadata::new("get $7", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_paren8_getter_builtin,
+        BuiltinEntryMetadata::new("get $8", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        regexp_legacy_paren9_getter_builtin,
+        BuiltinEntryMetadata::new("get $9", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         regexp_exec_builtin,
         BuiltinEntryMetadata::new("exec", 1, false, false),
     ),

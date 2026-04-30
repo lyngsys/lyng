@@ -21,11 +21,11 @@ use lyng_js_types::{
     internal_object_literal_set_prototype_builtin, internal_object_to_string_builtin,
     internal_private_field_get_builtin, internal_private_field_init_builtin,
     internal_private_field_set_builtin, internal_private_has_builtin,
-    internal_set_function_home_object_builtin, internal_string_index_of_builtin,
-    internal_string_replace_builtin, internal_super_property_get_builtin,
-    internal_super_property_set_builtin, internal_template_to_string_builtin,
-    internal_throw_type_error_builtin, BuiltinFunctionId, EnvironmentRef, ObjectRef,
-    PropertyDescriptor, PropertyKey, RealmRef, ShapeId, Value,
+    internal_regexp_literal_builtin, internal_set_function_home_object_builtin,
+    internal_string_index_of_builtin, internal_string_replace_builtin,
+    internal_super_property_get_builtin, internal_super_property_set_builtin,
+    internal_template_to_string_builtin, internal_throw_type_error_builtin, BuiltinFunctionId,
+    EnvironmentRef, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, ShapeId, Value,
 };
 use std::collections::HashMap;
 
@@ -80,6 +80,7 @@ pub struct InternalRealmBuiltins {
     import_meta: ObjectRef,
     dynamic_import: ObjectRef,
     direct_eval: ObjectRef,
+    regexp_literal: ObjectRef,
 }
 
 impl InternalRealmBuiltins {
@@ -224,6 +225,9 @@ impl InternalRealmBuiltins {
         }
         if entry == internal_direct_eval_builtin() {
             return Some(self.direct_eval);
+        }
+        if entry == internal_regexp_literal_builtin() {
+            return Some(self.regexp_literal);
         }
         None
     }
@@ -433,6 +437,7 @@ impl InternalBuiltinCache {
                 import_meta: alloc_builtin(internal_import_meta_builtin(), &mut mutator),
                 dynamic_import: alloc_builtin(internal_dynamic_import_builtin(), &mut mutator),
                 direct_eval: alloc_builtin(internal_direct_eval_builtin(), &mut mutator),
+                regexp_literal: alloc_builtin(internal_regexp_literal_builtin(), &mut mutator),
             }
         });
 
@@ -762,6 +767,14 @@ pub fn internal_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntr
         return Some(BuiltinEntryMetadata::new(
             "internal_directEval",
             1,
+            false,
+            false,
+        ));
+    }
+    if entry == internal_regexp_literal_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "internal_regExpLiteral",
+            2,
             false,
             false,
         ));

@@ -45,9 +45,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         )?;
         let lexical_scopes = self.active_direct_eval_lexical_scopes();
         let flags = self.active_direct_eval_site_flags();
-        if !lexical_scopes.is_empty() || !flags.is_empty() {
-            self.builder
-                .add_direct_eval_lexical_site(instruction_offset, lexical_scopes, flags);
+        let annex_b_catch_names = self.active_direct_eval_annex_b_catch_names();
+        if !lexical_scopes.is_empty() || !flags.is_empty() || !annex_b_catch_names.is_empty() {
+            self.builder.add_direct_eval_lexical_site(
+                instruction_offset,
+                lexical_scopes,
+                flags,
+                annex_b_catch_names,
+            );
         }
         Ok(true)
     }
@@ -94,9 +99,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         )?;
         let lexical_scopes = self.active_direct_eval_lexical_scopes();
         let flags = self.active_direct_eval_site_flags();
-        if !lexical_scopes.is_empty() || !flags.is_empty() {
-            self.builder
-                .add_direct_eval_lexical_site(instruction_offset, lexical_scopes, flags);
+        let annex_b_catch_names = self.active_direct_eval_annex_b_catch_names();
+        if !lexical_scopes.is_empty() || !flags.is_empty() || !annex_b_catch_names.is_empty() {
+            self.builder.add_direct_eval_lexical_site(
+                instruction_offset,
+                lexical_scopes,
+                flags,
+                annex_b_catch_names,
+            );
         }
         self.builder
             .emit_ax(Opcode::Return, i32::from(direct_eval_result))?;

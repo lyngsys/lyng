@@ -229,4 +229,56 @@ pub(in crate::public::metadata) const PUBLIC_TEXT_BUILTIN_METADATA: &[PublicBuil
         string_trim_start_builtin,
         BuiltinEntryMetadata::new("trimStart", 0, false, false),
     ),
+    PublicBuiltinMetadataRow::new(
+        string_anchor_builtin,
+        BuiltinEntryMetadata::new("anchor", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_big_builtin,
+        BuiltinEntryMetadata::new("big", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_blink_builtin,
+        BuiltinEntryMetadata::new("blink", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_bold_builtin,
+        BuiltinEntryMetadata::new("bold", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_fixed_builtin,
+        BuiltinEntryMetadata::new("fixed", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_fontcolor_builtin,
+        BuiltinEntryMetadata::new("fontcolor", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_fontsize_builtin,
+        BuiltinEntryMetadata::new("fontsize", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_italics_builtin,
+        BuiltinEntryMetadata::new("italics", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_link_builtin,
+        BuiltinEntryMetadata::new("link", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_small_builtin,
+        BuiltinEntryMetadata::new("small", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_strike_builtin,
+        BuiltinEntryMetadata::new("strike", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_sub_builtin,
+        BuiltinEntryMetadata::new("sub", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        string_sup_builtin,
+        BuiltinEntryMetadata::new("sup", 0, false, false),
+    ),
 ];

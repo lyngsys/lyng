@@ -120,23 +120,40 @@ impl Vm {
         agent: &mut Agent,
         caller: FrameRecord,
         lexical_env: EnvironmentRef,
-    ) -> VmResult<(EnvironmentRef, DirectEvalSiteFlags)> {
+    ) -> VmResult<(
+        EnvironmentRef,
+        DirectEvalSiteFlags,
+        Vec<(EnvironmentRef, AtomId)>,
+        Vec<AtomId>,
+    )> {
         let Some(installed) = self
             .installed
             .get(code_index(caller.code()))
             .and_then(Option::as_ref)
         else {
-            return Ok((lexical_env, DirectEvalSiteFlags::empty()));
+            return Ok((
+                lexical_env,
+                DirectEvalSiteFlags::empty(),
+                Vec::new(),
+                Vec::new(),
+            ));
         };
         let Some(site) = installed
             .direct_eval_lexical_site(caller.instruction_offset())
             .cloned()
         else {
-            return Ok((lexical_env, DirectEvalSiteFlags::empty()));
+            return Ok((
+                lexical_env,
+                DirectEvalSiteFlags::empty(),
+                Vec::new(),
+                Vec::new(),
+            ));
         };
 
         let source_start = lexical_env;
         let mut current_outer = lexical_env;
+        let mut annex_b_catch_environments = Vec::new();
+        let annex_b_catch_names = site.annex_b_catch_names().to_vec();
         for scope in site.scopes() {
             let source_environment = self
                 .direct_eval_scope_source_environment(agent, source_start, scope)
@@ -162,10 +179,18 @@ impl Vm {
                     return Err(VmError::MissingEnvironment(environment));
                 }
             }
+            if let Some(name) = scope.annex_b_catch_name() {
+                annex_b_catch_environments.push((environment, name));
+            }
             current_outer = environment;
         }
 
-        Ok((current_outer, site.flags()))
+        Ok((
+            current_outer,
+            site.flags(),
+            annex_b_catch_environments,
+            annex_b_catch_names,
+        ))
     }
 
     pub(super) fn active_direct_eval_environment(
@@ -191,12 +216,25 @@ impl Vm {
             });
     }
 
-    pub(super) fn dynamic_name_start_environment(&self, frame: FrameRecord) -> EnvironmentRef {
+    pub(super) fn lexical_name_start_environment(&self, frame: FrameRecord) -> EnvironmentRef {
+        self.active_loop_iteration_environment(frame.lexical_env())
+            .unwrap_or(frame.lexical_env())
+    }
+
+    pub(super) fn dynamic_name_start_environment(
+        &self,
+        agent: &Agent,
+        frame: FrameRecord,
+    ) -> EnvironmentRef {
+        let lexical_env = self.lexical_name_start_environment(frame);
+        if matches!(
+            agent.environment(lexical_env),
+            Some(lyng_js_env::EnvironmentRecord::Object(_))
+        ) {
+            return lexical_env;
+        }
         self.active_direct_eval_environment(self.frames.len())
-            .unwrap_or_else(|| {
-                self.active_loop_iteration_environment(frame.lexical_env())
-                    .unwrap_or(frame.lexical_env())
-            })
+            .unwrap_or(lexical_env)
     }
 
     pub(super) fn close_direct_eval_frames(&mut self, frame_depth: usize) {

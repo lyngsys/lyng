@@ -54,6 +54,10 @@ pub(in crate::public::metadata) const PUBLIC_DATE_BUILTIN_METADATA: &[PublicBuil
         BuiltinEntryMetadata::new("getFullYear", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        date_get_year_builtin,
+        BuiltinEntryMetadata::new("getYear", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         date_get_utc_full_year_builtin,
         BuiltinEntryMetadata::new("getUTCFullYear", 0, false, false),
     ),
@@ -172,6 +176,10 @@ pub(in crate::public::metadata) const PUBLIC_DATE_BUILTIN_METADATA: &[PublicBuil
     PublicBuiltinMetadataRow::new(
         date_set_full_year_builtin,
         BuiltinEntryMetadata::new("setFullYear", 3, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        date_set_year_builtin,
+        BuiltinEntryMetadata::new("setYear", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
         date_set_utc_full_year_builtin,

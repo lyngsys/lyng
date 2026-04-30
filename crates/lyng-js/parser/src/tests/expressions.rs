@@ -104,6 +104,9 @@ fn parse_annex_b_legacy_regexp_escapes() {
     assert!(!script("/\\x/;").diagnostics.has_errors());
     assert!(!script("/\\u/;").diagnostics.has_errors());
     assert!(!script("/\\k<a>/;").diagnostics.has_errors());
+    assert!(!script("/\\c_/;").diagnostics.has_errors());
+    assert!(!script("/[\\c_]/;").diagnostics.has_errors());
+    assert!(!script("/\\c\u{0410}/;").diagnostics.has_errors());
 }
 
 #[test]
@@ -615,6 +618,21 @@ fn parse_array_with_elision() {
             assert!(elems[0].is_some());
             assert!(elems[1].is_none());
             assert!(elems[2].is_some());
+        } else {
+            panic!("expected array expression");
+        }
+    }
+}
+
+#[test]
+fn parse_array_trailing_comma_after_spread_is_not_elision() {
+    let p = script_ok("[...items,];");
+    let stmts = body(&p);
+    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0]) {
+        if let Expr::ArrayExpression { elements, .. } = p.ast.get_expr(*expression) {
+            let elems = p.ast.get_opt_expr_list(*elements);
+            assert_eq!(elems.len(), 1);
+            assert!(elems[0].is_some());
         } else {
             panic!("expected array expression");
         }

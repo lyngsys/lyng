@@ -94,6 +94,9 @@ fn dispatch_date_getter_builtin<Cx: PublicBuiltinDispatchContext>(
         return date_get_component_builtin(context, invocation, DateComponent::FullYear, false)
             .map(Some);
     }
+    if entry == super::date_get_year_builtin() {
+        return date_get_year_builtin(context, invocation).map(Some);
+    }
     if entry == super::date_get_utc_full_year_builtin() {
         return date_get_component_builtin(context, invocation, DateComponent::FullYear, true)
             .map(Some);
@@ -246,6 +249,9 @@ fn dispatch_date_setter_part_three<Cx: PublicBuiltinDispatchContext>(
     if entry == super::date_set_full_year_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::FullYear, false)
             .map(Some);
+    }
+    if entry == super::date_set_year_builtin() {
+        return date_set_year_builtin(context, invocation).map(Some);
     }
     if entry == super::date_set_utc_full_year_builtin() {
         return date_set_component_builtin(context, invocation, DateSetKind::FullYear, true)
@@ -946,6 +952,21 @@ fn date_get_component_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_smi(value))
 }
 
+fn date_get_year_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let value = {
+        let agent = cx.agent();
+        object::require_date_value(agent, invocation.this_value())
+    };
+    let value = map_completion(cx, value)?;
+    let Some(parts) = date_parts_for_value(cx, value, false)? else {
+        return Ok(Value::from_f64(f64::NAN));
+    };
+    Ok(Value::from_smi(parts.year - 1900))
+}
+
 fn date_get_timezone_offset_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -1075,6 +1096,57 @@ fn date_set_component_builtin<Cx: PublicBuiltinDispatchContext>(
     } else {
         date_make_local_value(cx, year, month, date, hour, minute, second, millisecond)?
     };
+    date_store_value(cx, object, value)?;
+    Ok(value)
+}
+
+fn date_set_year_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (object, old_value) = date_this_object_and_value(cx, invocation.this_value())?;
+    let year = to_number_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    if year.is_nan() {
+        let value = Value::from_f64(f64::NAN);
+        date_store_value(cx, object, value)?;
+        return Ok(value);
+    }
+
+    let parts = if old_value.as_f64().is_some_and(f64::is_nan) {
+        date_utc_parts_from_millis(0.0)
+    } else {
+        let old_millis = old_value.as_f64().unwrap_or(f64::NAN);
+        date_local_parts_from_millis(cx, old_millis)?
+    };
+    let Some(parts) = parts else {
+        let value = Value::from_f64(f64::NAN);
+        date_store_value(cx, object, value)?;
+        return Ok(value);
+    };
+
+    let integer_year = year.trunc();
+    let year = if (0.0..=99.0).contains(&integer_year) {
+        1900.0 + integer_year
+    } else {
+        year
+    };
+    let value = date_make_local_value(
+        cx,
+        year,
+        f64::from(parts.month - 1),
+        f64::from(parts.day),
+        f64::from(parts.hour),
+        f64::from(parts.minute),
+        f64::from(parts.second),
+        f64::from(parts.millisecond),
+    )?;
     date_store_value(cx, object, value)?;
     Ok(value)
 }

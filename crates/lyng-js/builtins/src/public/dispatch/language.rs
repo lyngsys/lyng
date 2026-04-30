@@ -63,6 +63,12 @@ fn dispatch_global_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::decode_uri_component_builtin() {
         return decode_uri_builtin(context, invocation, true).map(Some);
     }
+    if entry == super::escape_builtin() {
+        return escape_builtin(context, invocation).map(Some);
+    }
+    if entry == super::unescape_builtin() {
+        return unescape_builtin(context, invocation).map(Some);
+    }
     Ok(None)
 }
 
@@ -261,6 +267,86 @@ fn push_percent_byte(output: &mut String, byte: u8) {
     output.push('%');
     output.push(char::from(HEX[usize::from(byte >> 4)]));
     output.push(char::from(HEX[usize::from(byte & 0x0F)]));
+}
+
+fn push_legacy_escape_unit(output: &mut String, unit: u16) {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    output.push('%');
+    if unit <= 0x00FF {
+        output.push(char::from(HEX[usize::from(unit >> 4)]));
+        output.push(char::from(HEX[usize::from(unit & 0x000F)]));
+    } else {
+        output.push('u');
+        output.push(char::from(HEX[usize::from((unit >> 12) & 0x000F)]));
+        output.push(char::from(HEX[usize::from((unit >> 8) & 0x000F)]));
+        output.push(char::from(HEX[usize::from((unit >> 4) & 0x000F)]));
+        output.push(char::from(HEX[usize::from(unit & 0x000F)]));
+    }
+}
+
+fn is_legacy_escape_unescaped(unit: u16) -> bool {
+    matches!(
+        unit,
+        0x0041..=0x005A
+            | 0x0061..=0x007A
+            | 0x0030..=0x0039
+            | 0x0040
+            | 0x002A
+            | 0x005F
+            | 0x002B
+            | 0x002D
+            | 0x002E
+            | 0x002F
+    )
+}
+
+fn legacy_escape_units(units: &[u16]) -> String {
+    let mut output = String::new();
+    for unit in units.iter().copied() {
+        if is_legacy_escape_unescaped(unit) {
+            output.push(char::from(
+                u8::try_from(unit).expect("unescaped escape() unit should be ASCII"),
+            ));
+        } else {
+            push_legacy_escape_unit(&mut output, unit);
+        }
+    }
+    output
+}
+
+fn legacy_unescape_hex_unit(units: &[u16], start: usize, len: usize) -> Option<u16> {
+    let mut value = 0_u16;
+    for offset in 0..len {
+        let digit = u16::from(uri_hex_value_unit(*units.get(start + offset)?)?);
+        value = (value << 4) | digit;
+    }
+    Some(value)
+}
+
+fn legacy_unescape_units(units: &[u16]) -> Vec<u16> {
+    let mut output = Vec::with_capacity(units.len());
+    let mut index = 0_usize;
+    while index < units.len() {
+        if units[index] == u16::from(b'%') {
+            if index + 5 < units.len() && units[index + 1] == u16::from(b'u') {
+                if let Some(unit) = legacy_unescape_hex_unit(units, index + 2, 4) {
+                    output.push(unit);
+                    index += 6;
+                    continue;
+                }
+            }
+            if index + 2 < units.len() {
+                if let Some(unit) = legacy_unescape_hex_unit(units, index + 1, 2) {
+                    output.push(unit);
+                    index += 3;
+                    continue;
+                }
+            }
+        }
+        output.push(units[index]);
+        index += 1;
+    }
+    output
 }
 
 fn percent_encode_code_point(output: &mut String, code_point: u32) -> Result<(), ()> {
@@ -555,4 +641,38 @@ fn decode_uri_builtin<Cx: PublicBuiltinDispatchContext>(
     let input_units = string_ref_code_units(cx, input_ref)?;
     let decoded = decode_uri_units(&input_units, component).map_err(|()| uri_error(cx))?;
     Ok(string_from_code_units(cx, &decoded))
+}
+
+fn escape_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let input_ref = to_string_string_ref(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let input_units = string_ref_code_units(cx, input_ref)?;
+    let escaped = legacy_escape_units(&input_units);
+    Ok(string_value(cx, &escaped))
+}
+
+fn unescape_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let input_ref = to_string_string_ref(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let input_units = string_ref_code_units(cx, input_ref)?;
+    let unescaped = legacy_unescape_units(&input_units);
+    Ok(string_from_code_units(cx, &unescaped))
 }

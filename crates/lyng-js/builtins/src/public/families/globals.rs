@@ -3,8 +3,8 @@ use crate::public::PublicRealmBuiltins;
 use lyng_js_env::Agent;
 use lyng_js_types::{
     decode_uri_builtin, decode_uri_component_builtin, encode_uri_builtin,
-    encode_uri_component_builtin, eval_builtin, is_finite_builtin, is_nan_builtin,
-    parse_float_builtin, parse_int_builtin, BuiltinFunctionId, ObjectRef,
+    encode_uri_component_builtin, escape_builtin, eval_builtin, is_finite_builtin, is_nan_builtin,
+    parse_float_builtin, parse_int_builtin, unescape_builtin, BuiltinFunctionId, ObjectRef,
 };
 
 pub(in crate::public) fn install_global_function_family(
@@ -31,6 +31,8 @@ pub(in crate::public) fn install_global_function_family(
             decode_uri_component_builtin(),
             None,
         ),
+        escape: install_public_builtin_function(agent, cx, escape_builtin(), None),
+        unescape: install_public_builtin_function(agent, cx, unescape_builtin(), None),
     }
 }
 
@@ -54,6 +56,8 @@ pub(in crate::public) fn global_function_builtin_object(
             decode_uri_component_builtin(),
             builtins.decode_uri_component,
         ),
+        (escape_builtin(), builtins.escape),
+        (unescape_builtin(), builtins.unescape),
     ]
     .into_iter()
     .find_map(|(id, object)| (entry == id).then_some(object))

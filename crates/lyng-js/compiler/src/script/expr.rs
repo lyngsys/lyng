@@ -395,9 +395,6 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         dest: u16,
     ) -> LoweringResult<()> {
         let literal = self.ast().literals().get_regexp(value).clone();
-        let callee = self.alloc_temp()?;
-        self.emit_load_builtin(callee, regexp_builtin())?;
-
         let pattern = self.alloc_temp()?;
         let pattern_atom = self.state.atoms.intern(&literal.pattern);
         self.emit_load_atom_string(pattern, pattern_atom)?;
@@ -406,26 +403,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let flags_atom = self.state.atoms.intern(&literal.flags);
         self.emit_load_atom_string(flags, flags_atom)?;
 
-        let arguments = [pattern, flags];
-        let argument_range = self.materialize_argument_block(&arguments)?;
-        let (call_result, call_callee, move_back) =
-            self.bridge_construct_registers(dest, callee)?;
-        let instruction_offset = self.builder.emit_construct(
-            self.encode_register(call_result)?,
-            self.encode_register(call_callee)?,
-            argument_range,
-        )?;
         let span = self.ast().get_expr(expr_id).span();
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
-        self.builder.add_feedback_site(
-            instruction_offset,
-            FeedbackSiteKind::Construct,
-            self.call_feedback_metadata(argument_range.argument_count(), 0),
-        )?;
-        if let Some(dest) = move_back {
-            self.emit_move(dest, call_result)?;
-        }
-        Ok(())
+        self.emit_internal_builtin_call_into(
+            lyng_js_types::internal_regexp_literal_builtin(),
+            &[pattern, flags],
+            span,
+            dest,
+        )
     }
 
     pub(super) fn lower_bigint_literal(

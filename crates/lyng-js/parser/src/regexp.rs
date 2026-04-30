@@ -42,7 +42,13 @@ struct RegExpFlags {
 pub fn validate_regexp_literal(pattern: &str, flags: &str) -> Result<(), &'static str> {
     let flags = validate_flags(flags)?;
     let total_captures = count_capturing_groups(pattern);
-    validate_pattern(pattern, flags, total_captures)
+    validate_pattern(pattern, flags, total_captures, true)
+}
+
+pub fn validate_regexp_constructor_pattern(pattern: &str, flags: &str) -> Result<(), &'static str> {
+    let flags = validate_flags(flags)?;
+    let total_captures = count_capturing_groups(pattern);
+    validate_pattern(pattern, flags, total_captures, false)
 }
 
 fn validate_flags(flags: &str) -> Result<RegExpFlags, &'static str> {
@@ -125,6 +131,7 @@ fn validate_pattern(
     pattern: &str,
     flags: RegExpFlags,
     total_captures: usize,
+    allow_annex_b_invalid_braced_quantifier: bool,
 ) -> Result<(), &'static str> {
     let chars: Vec<char> = pattern.chars().collect();
     validate_duplicate_named_groups(&chars)?;
@@ -183,7 +190,9 @@ fn validate_pattern(
                 i += 1;
             }
             '*' | '+' | '?' => {
-                if last_atom != AtomKind::Atom {
+                if last_atom != AtomKind::Atom
+                    && !(last_atom == AtomKind::Assertion && !flags.unicode)
+                {
                     return Err("invalid regular expression pattern");
                 }
                 i += 1;
@@ -195,7 +204,17 @@ fn validate_pattern(
             '{' => {
                 let quantifier = parse_braced_quantifier(&chars, i);
                 if let Some((next, valid)) = quantifier {
-                    if !valid || last_atom != AtomKind::Atom {
+                    if !valid {
+                        if flags.unicode || !allow_annex_b_invalid_braced_quantifier {
+                            return Err("invalid regular expression pattern");
+                        }
+                        last_atom = AtomKind::Atom;
+                        i += 1;
+                        continue;
+                    }
+                    if last_atom != AtomKind::Atom
+                        && !(last_atom == AtomKind::Assertion && !flags.unicode)
+                    {
                         return Err("invalid regular expression pattern");
                     }
                     i = next;
@@ -526,9 +545,18 @@ fn parse_escape(
         'q' if in_class && flags.unicode_sets => parse_class_string_disjunction(chars, start),
         'c' => {
             let Some(control) = chars.get(start + 2) else {
+                if !flags.unicode {
+                    return Ok((start + 2, ClassAtomKind::Single));
+                }
                 return Err("invalid regular expression pattern");
             };
             if !control.is_ascii_alphabetic() {
+                if !flags.unicode && in_class && (control.is_ascii_digit() || *control == '_') {
+                    return Ok((start + 3, ClassAtomKind::Single));
+                }
+                if !flags.unicode {
+                    return Ok((start + 2, ClassAtomKind::Single));
+                }
                 return Err("invalid regular expression pattern");
             }
             Ok((start + 3, ClassAtomKind::Single))

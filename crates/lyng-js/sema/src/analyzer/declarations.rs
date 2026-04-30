@@ -91,7 +91,7 @@ impl<'a> Analyzer<'a> {
         }
     }
 
-    fn predeclare_stmt_lexical_bindings(&mut self, stmt_id: lyng_js_ast::StmtId) {
+    pub(super) fn predeclare_stmt_lexical_bindings(&mut self, stmt_id: lyng_js_ast::StmtId) {
         let Stmt::Declaration { decl, .. } = self.ast.get_stmt(stmt_id) else {
             return;
         };
@@ -498,6 +498,400 @@ impl<'a> Analyzer<'a> {
         }
     }
 
+    pub(super) fn hoist_annex_b_block_function_var_bindings(
+        &mut self,
+        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+    ) {
+        let scope_kind = self.scopes.get(self.ctx.current_scope).kind;
+        if self.ctx.strict || !matches!(scope_kind, ScopeKind::Block | ScopeKind::Switch) {
+            return;
+        }
+
+        for &stmt_id in self.ast.get_stmt_list(list) {
+            let Stmt::Declaration { decl, .. } = self.ast.get_stmt(stmt_id) else {
+                continue;
+            };
+            let Decl::Function { function, span, .. } = self.ast.get_decl(*decl) else {
+                continue;
+            };
+            let func = self.ast.get_function(*function);
+            if func.kind != FunctionKind::Normal {
+                continue;
+            }
+            let Some(name) = func.name else {
+                continue;
+            };
+            self.hoist_annex_b_block_function_var_binding(name, *span);
+        }
+    }
+
+    pub(super) fn hoist_annex_b_contained_block_function_var_bindings(
+        &mut self,
+        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+    ) {
+        let scope_kind = self.scopes.get(self.ctx.current_scope).kind;
+        if self.ctx.strict || !matches!(scope_kind, ScopeKind::Global | ScopeKind::Function) {
+            return;
+        }
+
+        let blocked = self.annex_b_non_function_lexical_names_in_list(list);
+        self.hoist_annex_b_contained_functions_from_stmt_list(list, false, &blocked);
+    }
+
+    fn hoist_annex_b_contained_functions_from_stmt_list(
+        &mut self,
+        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        direct_candidate_context: bool,
+        inherited_blocked_names: &HashSet<AtomId>,
+    ) {
+        let mut candidate_blocked_names = inherited_blocked_names.clone();
+        candidate_blocked_names.extend(self.annex_b_non_function_lexical_names_in_list(list));
+
+        if direct_candidate_context {
+            for &stmt_id in self.ast.get_stmt_list(list) {
+                if let Some((name, span)) = self.annex_b_direct_function_declaration(stmt_id) {
+                    if !candidate_blocked_names.contains(&name) {
+                        self.hoist_annex_b_block_function_var_binding(name, span);
+                    }
+                }
+            }
+        }
+
+        let mut child_blocked_names = candidate_blocked_names;
+        if direct_candidate_context {
+            child_blocked_names.extend(self.annex_b_direct_function_names_in_list(list));
+        }
+
+        for &stmt_id in self.ast.get_stmt_list(list) {
+            self.hoist_annex_b_contained_functions_from_stmt(stmt_id, &child_blocked_names);
+        }
+    }
+
+    fn hoist_annex_b_contained_functions_from_stmt(
+        &mut self,
+        stmt_id: lyng_js_ast::StmtId,
+        inherited_blocked_names: &HashSet<AtomId>,
+    ) {
+        match self.ast.get_stmt(stmt_id) {
+            Stmt::Block { body, .. } => {
+                self.hoist_annex_b_contained_functions_from_stmt_list(
+                    *body,
+                    true,
+                    inherited_blocked_names,
+                );
+            }
+            Stmt::If {
+                consequent,
+                alternate,
+                ..
+            } => {
+                self.hoist_annex_b_if_clause_function(*consequent, inherited_blocked_names);
+                if let Some(alternate) = alternate {
+                    self.hoist_annex_b_if_clause_function(*alternate, inherited_blocked_names);
+                }
+                self.hoist_annex_b_contained_functions_from_stmt(
+                    *consequent,
+                    inherited_blocked_names,
+                );
+                if let Some(alternate) = alternate {
+                    self.hoist_annex_b_contained_functions_from_stmt(
+                        *alternate,
+                        inherited_blocked_names,
+                    );
+                }
+            }
+            Stmt::DoWhile { body, .. }
+            | Stmt::While { body, .. }
+            | Stmt::With { body, .. }
+            | Stmt::Labeled { body, .. } => {
+                self.hoist_annex_b_contained_functions_from_stmt(*body, inherited_blocked_names);
+            }
+            Stmt::For { init, body, .. } => {
+                let mut blocked = inherited_blocked_names.clone();
+                if let Some(ForInit::Declaration(decl)) = init {
+                    self.annex_b_collect_for_head_lexical_names(*decl, &mut blocked);
+                }
+                self.hoist_annex_b_contained_functions_from_stmt(*body, &blocked);
+            }
+            Stmt::ForIn { left, body, .. } | Stmt::ForOf { left, body, .. } => {
+                let mut blocked = inherited_blocked_names.clone();
+                if let ForInOfLeft::Declaration(decl) = left {
+                    self.annex_b_collect_for_head_lexical_names(*decl, &mut blocked);
+                }
+                self.hoist_annex_b_contained_functions_from_stmt(*body, &blocked);
+            }
+            Stmt::Switch { cases, .. } => {
+                let mut switch_blocked_names = inherited_blocked_names.clone();
+                for case in self.ast.get_switch_case_list(*cases) {
+                    switch_blocked_names
+                        .extend(self.annex_b_non_function_lexical_names_in_list(case.consequent));
+                }
+                for case in self.ast.get_switch_case_list(*cases) {
+                    self.hoist_annex_b_contained_functions_from_stmt_list(
+                        case.consequent,
+                        true,
+                        &switch_blocked_names,
+                    );
+                }
+            }
+            Stmt::Try {
+                block,
+                handler,
+                finalizer,
+                ..
+            } => {
+                self.hoist_annex_b_contained_functions_from_stmt(*block, inherited_blocked_names);
+                if let Some(catch) = handler {
+                    let mut catch_blocked_names = inherited_blocked_names.clone();
+                    self.annex_b_collect_catch_blocking_names(catch, &mut catch_blocked_names);
+                    self.hoist_annex_b_contained_functions_from_stmt(
+                        catch.body,
+                        &catch_blocked_names,
+                    );
+                }
+                if let Some(finalizer) = finalizer {
+                    self.hoist_annex_b_contained_functions_from_stmt(
+                        *finalizer,
+                        inherited_blocked_names,
+                    );
+                }
+            }
+            Stmt::Declaration { .. }
+            | Stmt::Expression { .. }
+            | Stmt::Return { .. }
+            | Stmt::Throw { .. }
+            | Stmt::Break { .. }
+            | Stmt::Continue { .. }
+            | Stmt::Empty { .. }
+            | Stmt::Debugger { .. }
+            | Stmt::InvalidStatement { .. } => {}
+        }
+    }
+
+    fn hoist_annex_b_if_clause_function(
+        &mut self,
+        stmt_id: lyng_js_ast::StmtId,
+        inherited_blocked_names: &HashSet<AtomId>,
+    ) {
+        if let Some((name, span)) = self.annex_b_direct_function_declaration(stmt_id) {
+            if !inherited_blocked_names.contains(&name) {
+                self.hoist_annex_b_block_function_var_binding(name, span);
+            }
+        }
+    }
+
+    fn annex_b_direct_function_declaration(
+        &self,
+        stmt_id: lyng_js_ast::StmtId,
+    ) -> Option<(AtomId, lyng_js_common::Span)> {
+        let Stmt::Declaration { decl, .. } = self.ast.get_stmt(stmt_id) else {
+            return None;
+        };
+        let Decl::Function { function, span, .. } = self.ast.get_decl(*decl) else {
+            return None;
+        };
+        let func = self.ast.get_function(*function);
+        (func.kind == FunctionKind::Normal).then_some((func.name?, *span))
+    }
+
+    fn annex_b_direct_function_names_in_list(
+        &self,
+        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+    ) -> HashSet<AtomId> {
+        self.ast
+            .get_stmt_list(list)
+            .iter()
+            .filter_map(|&stmt| self.annex_b_direct_function_declaration(stmt))
+            .map(|(name, _)| name)
+            .collect()
+    }
+
+    fn annex_b_non_function_lexical_names_in_list(
+        &self,
+        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+    ) -> HashSet<AtomId> {
+        let mut names = HashSet::new();
+        for &stmt_id in self.ast.get_stmt_list(list) {
+            let Stmt::Declaration { decl, .. } = self.ast.get_stmt(stmt_id) else {
+                continue;
+            };
+            self.annex_b_collect_non_function_lexical_names(*decl, &mut names);
+        }
+        names
+    }
+
+    fn annex_b_collect_non_function_lexical_names(
+        &self,
+        decl_id: lyng_js_ast::DeclId,
+        names: &mut HashSet<AtomId>,
+    ) {
+        match self.ast.get_decl(decl_id) {
+            Decl::Variable {
+                kind:
+                    VariableKind::Let
+                    | VariableKind::Const
+                    | VariableKind::Using
+                    | VariableKind::AwaitUsing,
+                declarators,
+                ..
+            } => {
+                for declarator in self.ast.get_var_declarator_list(*declarators) {
+                    let mut bound = Vec::new();
+                    self.collect_pattern_names(declarator.id, &mut bound);
+                    names.extend(bound.into_iter().map(|(name, _)| name));
+                }
+            }
+            Decl::Class {
+                name: Some(name), ..
+            } => {
+                names.insert(*name);
+            }
+            Decl::Function { function, .. } => {
+                let func = self.ast.get_function(*function);
+                if func.kind != FunctionKind::Normal {
+                    if let Some(name) = func.name {
+                        names.insert(name);
+                    }
+                }
+            }
+            Decl::Export { kind, .. } => {
+                if let lyng_js_ast::ExportKind::Declaration { decl } = kind {
+                    self.annex_b_collect_non_function_lexical_names(*decl, names);
+                }
+            }
+            Decl::Import { specifiers, .. } => {
+                for spec in self.ast.get_import_spec_list(*specifiers) {
+                    match spec {
+                        lyng_js_ast::ImportSpecifier::Default { local, .. }
+                        | lyng_js_ast::ImportSpecifier::Namespace { local, .. }
+                        | lyng_js_ast::ImportSpecifier::Named { local, .. } => {
+                            names.insert(*local);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn annex_b_collect_for_head_lexical_names(
+        &self,
+        decl_id: lyng_js_ast::DeclId,
+        names: &mut HashSet<AtomId>,
+    ) {
+        let Decl::Variable {
+            kind:
+                VariableKind::Let | VariableKind::Const | VariableKind::Using | VariableKind::AwaitUsing,
+            declarators,
+            ..
+        } = self.ast.get_decl(decl_id)
+        else {
+            return;
+        };
+        for declarator in self.ast.get_var_declarator_list(*declarators) {
+            let mut bound = Vec::new();
+            self.collect_pattern_names(declarator.id, &mut bound);
+            names.extend(bound.into_iter().map(|(name, _)| name));
+        }
+    }
+
+    fn annex_b_collect_catch_blocking_names(
+        &self,
+        catch: &CatchClause,
+        names: &mut HashSet<AtomId>,
+    ) {
+        let Some(param) = catch.param else {
+            return;
+        };
+        if matches!(
+            self.ast.get_pattern(param),
+            lyng_js_ast::Pattern::Identifier { .. }
+        ) {
+            return;
+        }
+        let mut bound = Vec::new();
+        self.collect_pattern_names(param, &mut bound);
+        names.extend(bound.into_iter().map(|(name, _)| name));
+    }
+
+    fn hoist_annex_b_block_function_var_binding(
+        &mut self,
+        name: AtomId,
+        span: lyng_js_common::Span,
+    ) {
+        if name == lyng_js_common::WellKnownAtom::arguments.id()
+            || self.annex_b_parameter_names_contain(name)
+        {
+            return;
+        }
+
+        let var_scope = self.find_var_scope();
+        if let Some(&existing_bid) = self.scope_binding_names.get(&(var_scope, name)) {
+            let existing = self.bindings.get(existing_bid);
+            if matches!(
+                existing.kind,
+                DeclarationKind::Function | DeclarationKind::Var
+            ) {
+                return;
+            }
+            return;
+        }
+
+        if self.annex_b_var_replacement_would_conflict(name, var_scope) {
+            return;
+        }
+
+        self.declare_binding(name, DeclarationKind::Var, var_scope, span);
+    }
+
+    fn annex_b_parameter_names_contain(&self, name: AtomId) -> bool {
+        let Some(function) = self.ctx.current_function else {
+            return false;
+        };
+        let record = self.functions.get(function);
+        [Some(record.scope_root), record.param_scope]
+            .into_iter()
+            .flatten()
+            .any(|scope| {
+                self.scopes.get(scope).bindings.iter().any(|&binding| {
+                    let binding = self.bindings.get(binding);
+                    binding.kind == DeclarationKind::Parameter && binding.name == name
+                })
+            })
+    }
+
+    fn annex_b_var_replacement_would_conflict(
+        &self,
+        name: AtomId,
+        var_scope: crate::ids::ScopeId,
+    ) -> bool {
+        if self
+            .ctx
+            .annex_b_blocked_catch_names
+            .iter()
+            .any(|names| names.contains(&name))
+        {
+            return true;
+        }
+
+        let mut scope_id = self.ctx.current_scope;
+        loop {
+            if let Some(&binding) = self.scope_binding_names.get(&(scope_id, name)) {
+                let binding = self.bindings.get(binding);
+                if self.binding_is_lexical_in_scope(binding.kind, scope_id) {
+                    return true;
+                }
+            }
+            if scope_id == var_scope {
+                return false;
+            }
+            let Some(parent) = self.scopes.get(scope_id).parent else {
+                return false;
+            };
+            scope_id = parent;
+        }
+    }
+
     pub(super) fn hoist_declarations(&mut self, stmt_id: lyng_js_ast::StmtId) {
         let stmt = self.ast.get_stmt(stmt_id);
         match stmt {
@@ -568,6 +962,9 @@ impl<'a> Analyzer<'a> {
                     }
                     _ => {}
                 }
+            }
+            Stmt::Labeled { body, .. } => {
+                self.hoist_declarations(*body);
             }
             _ => {}
         }

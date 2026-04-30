@@ -616,6 +616,104 @@ fn direct_eval_root_lexical_declarations_create_tdz_before_initialization() {
 }
 
 #[test]
+fn direct_eval_annex_b_block_function_updates_global_var_binding() {
+    let result = compile_and_run_string(
+        r#"
+            var initial = "missing";
+            var current = "missing";
+
+            eval("{ function f() { initial = f; f = 123; current = f; return 'decl'; } }");
+            let first = f();
+            let initialCall = initial();
+            let globalCall = f();
+
+            first + ":" + initialCall + ":" + String(current) + ":" + globalCall;
+        "#,
+    );
+
+    assert_eq!(result, "decl:decl:123:decl");
+}
+
+#[test]
+fn direct_eval_typeof_skips_future_annex_b_for_head_lexical_shadow() {
+    let result = compile_and_run_string(
+        r#"
+            function run() {
+                return eval([
+                    "let status = 'missing';",
+                    "try { f; status = 'bound'; } catch (error) {",
+                    "  status = error.constructor === ReferenceError ? 'reference' : 'other';",
+                    "}",
+                    "let before = typeof f;",
+                    "for (let f; ; ) {",
+                    "  { function f() {} }",
+                    "  break;",
+                    "}",
+                    "let after = typeof f;",
+                    "status + ':' + before + ':' + after;",
+                ].join("\n"));
+            }
+            run();
+        "#,
+    );
+
+    assert_eq!(result, "reference:undefined:undefined");
+}
+
+#[test]
+fn indirect_eval_annex_b_block_function_updates_global_var_binding() {
+    let result = compile_and_run_string(
+        r#"
+            var initial = "missing";
+            var current = "missing";
+
+            (0, eval)("{ function f() { initial = f; f = 123; current = f; return 'decl'; } }");
+            let first = f();
+            let initialCall = initial();
+            let globalCall = f();
+
+            first + ":" + initialCall + ":" + String(current) + ":" + globalCall;
+        "#,
+    );
+
+    assert_eq!(result, "decl:decl:123:decl");
+}
+
+#[test]
+fn direct_eval_allows_var_redeclaration_of_simple_catch_parameter() {
+    let result = compile_and_run_string(
+        r#"
+            let status = "missing";
+            try {
+                throw "caught";
+            } catch (err) {
+                status = "";
+                try { eval("function err() {}"); status += "ok:"; }
+                catch (error) { status += error.constructor.name + ":"; }
+                try { eval("function* err() {}"); status += "ok:"; }
+                catch (error) { status += error.constructor.name + ":"; }
+                try { eval("async function err() {}"); status += "ok:"; }
+                catch (error) { status += error.constructor.name + ":"; }
+                try { eval("async function* err() {}"); status += "ok:"; }
+                catch (error) { status += error.constructor.name + ":"; }
+                try { eval("var err;"); status += "ok:"; }
+                catch (error) { status += error.constructor.name + ":"; }
+                try { eval("for (var err; false; ) {}"); status += "ok:"; }
+                catch (error) { status += error.constructor.name + ":"; }
+                try { eval("for (var err in []) {}"); status += "ok:"; }
+                catch (error) { status += error.constructor.name + ":"; }
+                try { eval("for (var err of []) {}"); status += "ok:"; }
+                catch (error) { status += error.constructor.name + ":"; }
+                status += typeof err + ":" + err;
+            }
+            status;
+        "#,
+    );
+
+    assert_eq!(result, "ok:ok:ok:ok:ok:ok:ok:ok:string:caught");
+}
+
+#[test]
 fn direct_eval_in_nested_block_rejects_var_collision_with_enclosing_lexical() {
     let result = compile_and_run_string(
         r#"

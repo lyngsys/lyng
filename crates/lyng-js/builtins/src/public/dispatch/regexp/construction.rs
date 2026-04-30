@@ -2,14 +2,14 @@ use super::super::{syntax_error, type_error, PublicBuiltinDispatchContext};
 use super::{allocate_regexp_object, is_regexp_value};
 use crate::BuiltinInvocation;
 use lyng_js_common::WellKnownAtom;
-use lyng_js_parser::validate_regexp_literal;
+use lyng_js_parser::validate_regexp_constructor_pattern;
 use lyng_js_types::{PropertyKey, Value};
 
 pub(super) fn regexp_species_getter_builtin(invocation: BuiltinInvocation<'_>) -> Value {
     invocation.this_value()
 }
 
-fn normalize_regexp_constructor_pattern_text(pattern: &str) -> String {
+pub(super) fn normalize_regexp_constructor_pattern_text(pattern: &str) -> String {
     let mut normalized = String::with_capacity(pattern.len());
     let mut trailing_backslashes = 0usize;
     for ch in pattern.chars() {
@@ -100,7 +100,7 @@ pub(super) fn regexp_builtin<Cx: PublicBuiltinDispatchContext>(
     } else {
         cx.value_to_string_text(flags_value)?
     };
-    if validate_regexp_literal(&pattern_text, &flags_text).is_err() {
+    if validate_regexp_constructor_pattern(&pattern_text, &flags_text).is_err() {
         return Err(syntax_error(cx));
     }
 

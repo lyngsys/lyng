@@ -437,7 +437,6 @@ fn compile_script_lowers_parenthesized_typeof_identifiers_through_resolve_name()
         &mut atoms,
         lyng_js_common::SourceId::new(6),
         r#"
-            "use strict";
             function testcase() {
                 eval("function fun(x) { return x; }");
                 return typeof (fun);
@@ -463,10 +462,37 @@ fn compile_script_lowers_parenthesized_typeof_identifiers_through_resolve_name()
             ..
         }
     )));
-    assert!(!testcase.instructions().iter().any(|instruction| matches!(
+}
+
+#[test]
+fn compile_script_lowers_typeof_before_for_lexical_shadow_through_resolve_global() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(37),
+        r#"
+            var beforeType;
+            beforeType = typeof f;
+            for (let f; ; ) {
+                {
+                    function f() {}
+                }
+                break;
+            }
+            beforeType;
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+
+    assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
         lyng_js_bytecode::Instruction::Abx {
-            opcode: Opcode::LoadName,
+            opcode: Opcode::ResolveGlobal,
             ..
         }
     )));
@@ -1638,6 +1664,72 @@ fn compile_script_records_direct_eval_lexical_site_for_active_block_scope() {
     assert_eq!(scope.bindings().len(), 1);
     assert_eq!(scope.bindings()[0].name(), Some(atoms.intern("x")));
     assert!(scope.bindings()[0].flags().is_lexical());
+}
+
+#[test]
+fn compile_script_marks_direct_eval_catch_parameter_scope_for_annex_b() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(22),
+        r#"
+            try {
+                throw null;
+            } catch (err) {
+                eval("var err;");
+            }
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit
+        .function(unit.entry())
+        .expect("entry script should lower");
+    let site = entry
+        .direct_eval_lexical_sites()
+        .first()
+        .expect("direct eval should record lexical-site metadata");
+    let err = atoms.intern("err");
+
+    assert!(site
+        .scopes()
+        .iter()
+        .any(|scope| scope.annex_b_catch_name() == Some(err)));
+}
+
+#[test]
+fn compile_script_marks_nested_direct_eval_catch_parameter_scope_for_annex_b() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(23),
+        r#"
+            try {
+                throw null;
+            } catch (err) {
+                try {
+                    eval("var err;");
+                } catch (error) {}
+            }
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit
+        .function(unit.entry())
+        .expect("entry script should lower");
+    let err = atoms.intern("err");
+
+    assert!(entry.direct_eval_lexical_sites().iter().any(|site| site
+        .scopes()
+        .iter()
+        .any(|scope| scope.annex_b_catch_name() == Some(err))));
 }
 
 #[test]

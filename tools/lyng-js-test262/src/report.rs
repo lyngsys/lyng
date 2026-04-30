@@ -629,6 +629,15 @@ fn write_notes_section(out: &mut String, report: &SuiteReport<'_>) {
         out,
         "- Stage 4 implementation gaps remain visible as skips or failures; proposal-stage policy only excludes tests below the configured proposal maturity."
     );
+    if report
+        .skip_reasons
+        .contains_key("unsupported host feature: IsHTMLDDA")
+    {
+        let _ = writeln!(
+            out,
+            "- `IsHTMLDDA` skips are explicit host-boundary exclusions for browser `document.all` compatibility objects. The standalone Lyng JS Test262 harness does not provide that host object, so these skips are not hidden Annex B language or builtin gaps."
+        );
+    }
 }
 
 #[cfg(test)]
@@ -903,6 +912,60 @@ mod tests {
         assert!(output
             .contains("| Harness capability | unsupported harness include: sm/foo.js | `4` |"));
         assert!(output.contains("| Runtime safety | runtime abort: oversize ArrayBuffer allocation guard missing | `1` |"));
+    }
+
+    #[test]
+    fn report_documents_is_htmldda_host_policy_skip() {
+        let mut selected_counts = HashMap::new();
+        selected_counts.insert("annexB".to_string(), 1);
+
+        let mut category_stats = HashMap::new();
+        category_stats.insert(
+            "annexB".to_string(),
+            CategoryStats {
+                pass: 0,
+                fail: 0,
+                skip: 1,
+                panic: 0,
+            },
+        );
+
+        let skip_reasons = HashMap::from([("unsupported host feature: IsHTMLDDA".to_string(), 1)]);
+        let exclusion_reasons = HashMap::new();
+        let failures = Vec::new();
+        let manifest = ExclusionManifest {
+            path: "reports/js/lyng-js/test262-exclusions.txt".to_string(),
+            rules: Vec::new(),
+        };
+        let (report_path, report_path_string) = unique_report_path("is-htmldda-policy");
+
+        write_report(&SuiteReport {
+            report_path: &report_path_string,
+            manifest: &manifest,
+            filter: Some("annexB"),
+            no_skip: false,
+            proposal_stage: ProposalStage::Stage3,
+            jobs: 1,
+            timeout: Duration::from_secs(1),
+            candidate_total: 1,
+            selected_total: 1,
+            selected_counts: &selected_counts,
+            category_stats: &category_stats,
+            skip_reasons: &skip_reasons,
+            exclusion_reasons: &exclusion_reasons,
+            failures: &failures,
+            elapsed: Duration::from_secs(1),
+        });
+
+        let output = fs::read_to_string(&report_path).expect("report should be readable");
+        let _ = fs::remove_file(&report_path);
+
+        assert!(
+            output.contains("| Host/runtime policy | unsupported host feature: IsHTMLDDA | `1` |")
+        );
+        assert!(output.contains(
+            "`IsHTMLDDA` skips are explicit host-boundary exclusions for browser `document.all` compatibility objects"
+        ));
     }
 
     #[test]

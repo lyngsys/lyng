@@ -232,6 +232,7 @@ fn format_abx_instruction(
         | crate::Opcode::StoreGlobal
         | crate::Opcode::AssignGlobal
         | crate::Opcode::DeleteGlobal
+        | crate::Opcode::ResolveGlobal
         | crate::Opcode::CaptureName => {
             format!(
                 "{opcode}r{}, {}",

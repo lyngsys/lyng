@@ -11,17 +11,18 @@ use lyng_js_types::{
     data_view_get_uint8_builtin, date_get_time_builtin, date_now_builtin,
     date_set_full_year_builtin, date_to_primitive_builtin, date_to_string_builtin,
     disposable_stack_dispose_builtin, disposable_stack_disposed_getter_builtin,
-    disposable_stack_use_builtin, error_to_string_builtin, iterator_prototype_iterator_builtin,
-    json_parse_builtin, json_raw_json_builtin, map_iterator_next_builtin, map_size_getter_builtin,
-    math_abs_builtin, number_is_finite_builtin, number_to_string_builtin, promise_resolve_builtin,
-    promise_species_getter_builtin, promise_then_builtin, proxy_revocable_builtin,
-    reflect_get_builtin, regexp_escape_builtin, regexp_exec_builtin, regexp_global_getter_builtin,
-    regexp_species_getter_builtin, regexp_symbol_match_builtin, set_iterator_next_builtin,
-    set_values_builtin, string_from_char_code_builtin, string_iterator_builtin,
-    string_iterator_next_builtin, string_trim_builtin, symbol_description_getter_builtin,
-    symbol_for_builtin, symbol_to_primitive_builtin, typed_array_from_builtin,
+    disposable_stack_use_builtin, error_to_string_builtin, escape_builtin,
+    iterator_prototype_iterator_builtin, json_parse_builtin, json_raw_json_builtin,
+    map_iterator_next_builtin, map_size_getter_builtin, math_abs_builtin, number_is_finite_builtin,
+    number_to_string_builtin, promise_resolve_builtin, promise_species_getter_builtin,
+    promise_then_builtin, proxy_revocable_builtin, reflect_get_builtin, regexp_escape_builtin,
+    regexp_exec_builtin, regexp_global_getter_builtin, regexp_species_getter_builtin,
+    regexp_symbol_match_builtin, set_iterator_next_builtin, set_values_builtin,
+    string_from_char_code_builtin, string_iterator_builtin, string_iterator_next_builtin,
+    string_trim_builtin, symbol_description_getter_builtin, symbol_for_builtin,
+    symbol_to_primitive_builtin, typed_array_from_builtin,
     typed_array_to_string_tag_getter_builtin, uint8_array_buffer_getter_builtin,
-    uint8_array_values_builtin, weak_ref_deref_builtin, PropertyKey, Value,
+    uint8_array_values_builtin, unescape_builtin, weak_ref_deref_builtin, PropertyKey, Value,
 };
 
 fn assert_reachable_object_atom_keys_are_permanent(
@@ -461,6 +462,24 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         )
         .unwrap()
         .expect("encodeURIComponent should be installed");
+    let escape = agent
+        .objects()
+        .get_own_property(
+            agent.heap().view(),
+            global,
+            PropertyKey::from_atom(atoms.escape()),
+        )
+        .unwrap()
+        .expect("escape should be installed");
+    let unescape = agent
+        .objects()
+        .get_own_property(
+            agent.heap().view(),
+            global,
+            PropertyKey::from_atom(atoms.unescape()),
+        )
+        .unwrap()
+        .expect("unescape should be installed");
     let reflect_atom = agent.atoms_mut().intern_collectible("Reflect");
     let math = agent
         .objects()
@@ -724,6 +743,20 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
     assert_eq!(encode_uri_component.writable(), Some(true));
     assert_eq!(encode_uri_component.enumerable(), Some(false));
     assert_eq!(encode_uri_component.configurable(), Some(true));
+    assert_eq!(
+        escape.value(),
+        cache.builtin_constant(agent, artifacts.realm(), escape_builtin())
+    );
+    assert_eq!(escape.writable(), Some(true));
+    assert_eq!(escape.enumerable(), Some(false));
+    assert_eq!(escape.configurable(), Some(true));
+    assert_eq!(
+        unescape.value(),
+        cache.builtin_constant(agent, artifacts.realm(), unescape_builtin())
+    );
+    assert_eq!(unescape.writable(), Some(true));
+    assert_eq!(unescape.enumerable(), Some(false));
+    assert_eq!(unescape.configurable(), Some(true));
     let reflect = reflect.expect("Reflect should be installed");
     assert!(reflect.value().and_then(Value::as_object_ref).is_some());
     assert_eq!(reflect.writable(), Some(true));

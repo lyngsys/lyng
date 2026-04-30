@@ -1016,6 +1016,15 @@ impl Vm {
                             self.write_register(frame, a, value)?;
                             self.advance_instruction()?;
                         }
+                        Opcode::ResolveGlobal => {
+                            let atom = self.read_atom_constant(frame.code(), bx)?;
+                            let resolve_result = self.resolve_global(agent, frame, atom);
+                            let Some(value) = self.handle_vm_result(agent, resolve_result)? else {
+                                continue;
+                            };
+                            self.write_register(frame, a, value)?;
+                            self.advance_instruction()?;
+                        }
                         Opcode::AssignName => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
                             let value = self.read_register(frame, a)?;

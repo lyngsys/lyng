@@ -182,20 +182,6 @@ fn regexp_symbol_split_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let limit = if let Some(value) = invocation.arguments().get(1).copied() {
-        if value.is_undefined() {
-            u32::MAX
-        } else {
-            to_uint32_for_builtin(cx, value)?
-        }
-    } else {
-        u32::MAX
-    };
-    if limit == 0 {
-        let empty = create_array_from_values(cx, &[])?;
-        return Ok(Value::from_object_ref(empty));
-    }
-
     let source_units = string_ref_code_units(cx, input_ref)?;
     let flags_key = {
         let agent = cx.agent();
@@ -217,6 +203,19 @@ fn regexp_symbol_split_builtin<Cx: PublicBuiltinDispatchContext>(
         let agent = cx.agent();
         PropertyKey::from_atom(agent.bootstrap_atoms().last_index())
     };
+    let limit = if let Some(value) = invocation.arguments().get(1).copied() {
+        if value.is_undefined() {
+            u32::MAX
+        } else {
+            to_uint32_for_builtin(cx, value)?
+        }
+    } else {
+        u32::MAX
+    };
+    if limit == 0 {
+        let empty = create_array_from_values(cx, &[])?;
+        return Ok(Value::from_object_ref(empty));
+    }
 
     if source_units.is_empty() {
         let matched = regexp_exec(cx, splitter, input_ref, &source_units)?;

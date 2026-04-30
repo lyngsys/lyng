@@ -34,7 +34,7 @@ use lyng_js_types::{
     internal_private_field_set_builtin, internal_private_has_builtin,
     internal_set_function_home_object_builtin, internal_super_property_get_builtin,
     internal_super_property_set_builtin, internal_template_to_string_builtin,
-    object_set_prototype_of_builtin, reference_error_builtin, regexp_builtin, BuiltinFunctionId,
+    object_set_prototype_of_builtin, reference_error_builtin, BuiltinFunctionId,
 };
 
 use crate::error::{LoweringError, LoweringResult};

@@ -8,13 +8,17 @@ use crate::scope::ScopeKind;
 impl<'a> Analyzer<'a> {
     pub(super) fn walk_stmt_list(&mut self, list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>) {
         let scope_kind = self.scopes.get(self.ctx.current_scope).kind;
+        let stmts = self.ast.get_stmt_list(list).to_vec();
+        for &stmt_id in &stmts {
+            self.predeclare_stmt_lexical_bindings(stmt_id);
+        }
         self.check_statement_list_redeclarations(list, scope_kind);
-        let stmts = self.ast.get_stmt_list(list);
-        for &stmt_id in stmts {
+        self.hoist_annex_b_contained_block_function_var_bindings(list);
+        self.hoist_annex_b_block_function_var_bindings(list);
+        for &stmt_id in &stmts {
             self.hoist_declarations(stmt_id);
         }
-        let stmts = self.ast.get_stmt_list(list);
-        for &stmt_id in stmts {
+        for &stmt_id in &stmts {
             self.walk_stmt(stmt_id);
         }
     }
@@ -229,11 +233,24 @@ impl<'a> Analyzer<'a> {
                 if let Some(catch) = handler {
                     self.check_catch_clause_early_errors(catch);
                     self.push_scope(ScopeKind::Catch);
+                    let mut annex_b_blocked_names = std::collections::HashSet::new();
                     if let Some(param) = catch.param {
+                        if !matches!(
+                            self.ast.get_pattern(param),
+                            lyng_js_ast::Pattern::Identifier { .. }
+                        ) {
+                            let mut bound = Vec::new();
+                            self.collect_pattern_names(param, &mut bound);
+                            annex_b_blocked_names.extend(bound.into_iter().map(|(name, _)| name));
+                        }
                         self.declare_pattern_bindings(param, DeclarationKind::CatchParam);
                         self.walk_binding_pattern_expressions(param);
                     }
+                    self.ctx
+                        .annex_b_blocked_catch_names
+                        .push(annex_b_blocked_names);
                     self.walk_stmt(catch.body);
+                    self.ctx.annex_b_blocked_catch_names.pop();
                     self.pop_scope();
                 }
                 if let Some(fin) = finalizer {

@@ -56,6 +56,8 @@ struct WalkContext {
     in_static_block: bool,
     /// Exported names for duplicate-export detection in modules.
     exported_names: HashSet<AtomId>,
+    /// Destructured catch parameters whose names block Annex B var replacement.
+    annex_b_blocked_catch_names: Vec<HashSet<AtomId>>,
 }
 
 /// The analyzer state accumulates all side tables during the walk.
@@ -151,6 +153,7 @@ impl<'a> Analyzer<'a> {
                 class_scopes: Vec::new(),
                 in_static_block: false,
                 exported_names: HashSet::new(),
+                annex_b_blocked_catch_names: Vec::new(),
             },
         }
     }
@@ -195,6 +198,7 @@ impl<'a> Analyzer<'a> {
                 class_scopes: Vec::new(),
                 in_static_block: false,
                 exported_names: HashSet::new(),
+                annex_b_blocked_catch_names: Vec::new(),
             },
         }
     }

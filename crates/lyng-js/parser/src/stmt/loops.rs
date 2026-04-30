@@ -264,6 +264,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     fn validate_for_in_of_declaration(&mut self, decl: lyng_js_ast::DeclId) {
+        let is_for_in = self.at(TokenKind::In);
         let (kind, declarators, span) = match self.ast().get_decl(decl) {
             Decl::Variable {
                 kind,
@@ -289,8 +290,16 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             );
         }
 
+        let annex_b_allows_initializer = !self.is_strict()
+            && is_for_in
+            && kind == VariableKind::Var
+            && declarators.len() == 1
+            && matches!(
+                self.ast().get_pattern(declarators[0].id),
+                lyng_js_ast::Pattern::Identifier { .. }
+            );
         for declarator in declarators {
-            if declarator.init.is_some() {
+            if declarator.init.is_some() && !annex_b_allows_initializer {
                 self.error_at(
                     declarator.span,
                     "for-in/of declarations cannot have initializers".to_string(),

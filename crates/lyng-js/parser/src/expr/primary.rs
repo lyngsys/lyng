@@ -157,7 +157,6 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 elements.push(Some(spread));
                 if self.eat(TokenKind::Comma) {
                     if self.at(TokenKind::RBracket) {
-                        elements.push(None);
                         break;
                     }
                     continue;

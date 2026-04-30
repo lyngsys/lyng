@@ -129,10 +129,6 @@ const EXPLICIT_SELECTION_EXCLUSIONS: &[(&str, &str)] = &[
 
 const EXPLICIT_TEST_SKIPS: &[(&str, &str)] = &[
     (
-        "annexB/built-ins/RegExp/prototype/compile/duplicate-named-capturing-groups-syntax.js",
-        "RegExp.prototype.compile is not implemented",
-    ),
-    (
         "staging/built-ins/RegExp/named-groups/duplicate-named-groups-replace.js",
         "duplicate named backreferences need participating-capture semantics",
     ),

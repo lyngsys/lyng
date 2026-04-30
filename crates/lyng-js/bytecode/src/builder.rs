@@ -643,12 +643,14 @@ impl BytecodeBuilder {
         instruction_offset: u32,
         scopes: Vec<DirectEvalLexicalScope>,
         flags: DirectEvalSiteFlags,
+        annex_b_catch_names: Vec<lyng_js_common::AtomId>,
     ) {
         self.direct_eval_lexical_sites
             .push(DirectEvalLexicalSite::new(
                 instruction_offset,
                 scopes,
                 flags,
+                annex_b_catch_names,
             ));
     }
 

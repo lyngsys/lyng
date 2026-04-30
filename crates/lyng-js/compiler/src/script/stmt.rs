@@ -93,14 +93,82 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .filter_map(|scope| {
                 let base = self.state.scope_environment_base(*scope)?;
                 let bindings = self.state.scope_environment_bindings_for(*scope);
-                (!bindings.is_empty()).then_some(DirectEvalLexicalScope::new(base, bindings))
+                if bindings.is_empty() {
+                    return None;
+                }
+                let mut lexical_scope = DirectEvalLexicalScope::new(base, bindings);
+                if let Some(name) = self.annex_b_simple_catch_name_for_scope(*scope) {
+                    lexical_scope = lexical_scope.with_annex_b_catch_name(name);
+                }
+                Some(lexical_scope)
             })
             .collect()
+    }
+
+    fn annex_b_simple_catch_name_for_scope(&self, scope: ScopeId) -> Option<AtomId> {
+        let names = self
+            .state
+            .sema
+            .scope_table
+            .get(scope)
+            .bindings
+            .iter()
+            .copied()
+            .filter_map(|binding_id| {
+                let binding = self.state.sema.binding_table.get(binding_id);
+                (binding.kind == DeclarationKind::CatchParam).then_some(binding.name)
+            })
+            .collect::<Vec<_>>();
+        (names.len() == 1).then(|| names[0])
     }
 
     pub(super) fn active_direct_eval_site_flags(&self) -> DirectEvalSiteFlags {
         DirectEvalSiteFlags::empty()
             .with_forbid_arguments_in_class_initializer(self.in_class_field_initializer)
+    }
+
+    pub(super) fn active_direct_eval_annex_b_catch_names(&self) -> Vec<AtomId> {
+        let mut names = Vec::new();
+        let mut current = Some(self.current_scope);
+        while let Some(scope) = current {
+            if let Some(name) = self.annex_b_simple_catch_name_for_scope(scope) {
+                if !names.contains(&name) {
+                    names.push(name);
+                }
+            }
+            current = self.state.sema.scope_table.get(scope).parent;
+        }
+        names
+    }
+
+    pub(super) fn active_simple_catch_binding_for_name(
+        &self,
+        name: AtomId,
+    ) -> Option<SemanticBindingId> {
+        let mut current = Some(self.current_scope);
+        while let Some(scope) = current {
+            let record = self.state.sema.scope_table.get(scope);
+            if record.kind == ScopeKind::Catch {
+                let mut matches = record.bindings.iter().copied().filter(|&binding_id| {
+                    let binding = self.state.sema.binding_table.get(binding_id);
+                    binding.kind == DeclarationKind::CatchParam && binding.name == name
+                });
+                if let Some(first) = matches.next() {
+                    if matches.next().is_none() {
+                        return Some(first);
+                    }
+                    return None;
+                }
+            }
+            if matches!(
+                record.kind,
+                ScopeKind::Function | ScopeKind::Global | ScopeKind::Module
+            ) {
+                return None;
+            }
+            current = record.parent;
+        }
+        None
     }
 
     fn merge_disposal_scope_kind(
@@ -355,6 +423,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         match stmt {
             Stmt::Block { body, span } => {
                 self.with_child_scope(ScopeKind::Block, true, stmt_id, |this| {
+                    this.emit_block_function_declaration_instantiations(body)?;
                     this.lower_statement_list_with_disposal(body, span)
                 })
             }
@@ -590,6 +659,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         expr_id: ExprId,
         value_register: u16,
     ) -> LoweringResult<()> {
+        if self.lower_annex_b_call_assignment_target_reference_error(expr_id)? {
+            return Ok(());
+        }
+
         match self.ast().get_expr(expr_id).clone() {
             Expr::ParenthesizedExpression { expression, .. } => {
                 self.lower_assignment_target_from_register(expression, value_register)
@@ -1216,6 +1289,32 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
     }
 
+    pub(super) fn load_binding_value(
+        &mut self,
+        binding_id: SemanticBindingId,
+        name: AtomId,
+        dest: u16,
+    ) -> LoweringResult<()> {
+        let binding = self.binding(binding_id)?;
+        if binding.storage_class == StorageClass::DynamicLookup {
+            return self.emit_load_name(dest, name);
+        }
+        if let Some((depth, slot)) = self.binding_env_access(binding_id)? {
+            return self.emit_load_env_slot(dest, depth, slot);
+        }
+        match binding.storage_class {
+            StorageClass::FrameLocal => {
+                let register = self.ensure_local_register(binding_id)?;
+                self.emit_move(dest, register)
+            }
+            StorageClass::GlobalName => self.emit_load_global(dest, binding.name),
+            StorageClass::EnvironmentSlot => unreachable!("env-backed bindings handled above"),
+            StorageClass::DynamicLookup => {
+                unreachable!("dynamic lookup bindings must lower through LoadName")
+            }
+        }
+    }
+
     pub(super) fn assign_binding_value(
         &mut self,
         binding_id: SemanticBindingId,
@@ -1256,6 +1355,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Decl::Function { function, .. } => {
                 if self.hoisted_function_decls.contains(&decl_id) {
                     Ok(())
+                } else if self.block_instantiated_function_decls.contains(&decl_id) {
+                    self.lower_block_instantiated_function_declaration(function)
                 } else {
                     self.lower_function_declaration(decl_id, function)
                 }
@@ -1348,6 +1449,46 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.emit_store_env_slot(value_register, 0, slot)
     }
 
+    pub(super) fn emit_block_function_declaration_instantiations(
+        &mut self,
+        list: lyng_js_ast::NodeList<StmtId>,
+    ) -> LoweringResult<()> {
+        let stmts = self.ast().get_stmt_list(list).to_vec();
+        for stmt in stmts {
+            let Stmt::Declaration { decl, .. } = self.ast().get_stmt(stmt).clone() else {
+                continue;
+            };
+            let Decl::Function { function, .. } = self.ast().get_decl(decl).clone() else {
+                continue;
+            };
+            self.instantiate_block_function_declaration(decl, function)?;
+        }
+        Ok(())
+    }
+
+    fn instantiate_block_function_declaration(
+        &mut self,
+        decl_id: DeclId,
+        function: FunctionId,
+    ) -> LoweringResult<()> {
+        let ast_function = self.ast().get_function(function).clone();
+        let name = ast_function
+            .name
+            .ok_or(LoweringError::UnsupportedFunction { function })?;
+        let binding_id = self.function_declaration_binding(name)?;
+        let child_index = self.ensure_child_index(function)?;
+        let value_register = self.alloc_temp()?;
+
+        self.builder.emit_abx(
+            Opcode::CreateClosure,
+            self.encode_register(value_register)?,
+            child_index,
+        )?;
+        self.store_binding_value(binding_id, name, value_register)?;
+        self.block_instantiated_function_decls.insert(decl_id);
+        Ok(())
+    }
+
     pub(super) fn lower_function_declaration(
         &mut self,
         _decl_id: DeclId,
@@ -1357,55 +1498,161 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let name = ast_function
             .name
             .ok_or(LoweringError::UnsupportedFunction { function })?;
-        let binding_id = self
-            .find_named_binding(name, DeclarationKind::Function)
-            .or_else(|_| self.find_named_binding(name, DeclarationKind::Var))?;
-        let storage_class = self.binding(binding_id)?.storage_class;
+        let binding_id = self.function_declaration_binding(name)?;
         let child_index = self.ensure_child_index(function)?;
+        let value_register = self.alloc_temp()?;
 
-        match storage_class {
-            StorageClass::FrameLocal => {
-                let register = self.ensure_local_register(binding_id)?;
-                self.builder.emit_abx(
-                    Opcode::CreateClosure,
-                    self.encode_register(register)?,
-                    child_index,
-                )?;
-                Ok(())
-            }
-            StorageClass::GlobalName => {
-                let temp = self.alloc_temp()?;
-                self.builder.emit_abx(
-                    Opcode::CreateClosure,
-                    self.encode_register(temp)?,
-                    child_index,
-                )?;
-                self.emit_store_global(temp, name)
-            }
-            StorageClass::EnvironmentSlot => {
-                let temp = self.alloc_temp()?;
-                self.builder.emit_abx(
-                    Opcode::CreateClosure,
-                    self.encode_register(temp)?,
-                    child_index,
-                )?;
-                let (depth, slot) = self.binding_env_access(binding_id)?.ok_or(
-                    LoweringError::MissingEnvironmentSlot {
-                        binding: binding_id,
-                    },
-                )?;
-                self.emit_store_env_slot(temp, depth, slot)
-            }
-            StorageClass::DynamicLookup => {
-                let temp = self.alloc_temp()?;
-                self.builder.emit_abx(
-                    Opcode::CreateClosure,
-                    self.encode_register(temp)?,
-                    child_index,
-                )?;
-                self.emit_assign_name(temp, name)
+        self.builder.emit_abx(
+            Opcode::CreateClosure,
+            self.encode_register(value_register)?,
+            child_index,
+        )?;
+        self.store_binding_value(binding_id, name, value_register)?;
+
+        if self.function_declaration_uses_annex_b_var_update(&ast_function) {
+            if let Some(var_binding) = self.annex_b_var_binding_for_block_function(name, binding_id)
+            {
+                self.assign_binding_value(var_binding, name, value_register)?;
             }
         }
+
+        Ok(())
+    }
+
+    fn lower_block_instantiated_function_declaration(
+        &mut self,
+        function: FunctionId,
+    ) -> LoweringResult<()> {
+        let ast_function = self.ast().get_function(function).clone();
+        let name = ast_function
+            .name
+            .ok_or(LoweringError::UnsupportedFunction { function })?;
+        if !self.function_declaration_uses_annex_b_var_update(&ast_function) {
+            return Ok(());
+        }
+        let binding_id = self.function_declaration_binding(name)?;
+        if let Some(var_binding) = self.annex_b_var_binding_for_block_function(name, binding_id) {
+            let value_register = self.alloc_temp()?;
+            self.load_binding_value(binding_id, name, value_register)?;
+            self.assign_binding_value(var_binding, name, value_register)?;
+        }
+        Ok(())
+    }
+
+    fn function_declaration_binding(&self, name: AtomId) -> LoweringResult<SemanticBindingId> {
+        let scope_kind = self.state.sema.scope_table.get(self.current_scope).kind;
+        if matches!(scope_kind, ScopeKind::Block | ScopeKind::Switch) {
+            if let Some(binding) = self.find_named_binding_in_scope(
+                name,
+                DeclarationKind::Function,
+                self.current_scope,
+            ) {
+                return Ok(binding);
+            }
+        }
+
+        self.find_named_binding_in_scope(name, DeclarationKind::Function, self.nearest_var_scope())
+            .or_else(|| {
+                self.find_named_binding_in_scope(
+                    name,
+                    DeclarationKind::Var,
+                    self.nearest_var_scope(),
+                )
+            })
+            .ok_or(LoweringError::MissingDeclarationBinding { name })
+    }
+
+    fn function_declaration_uses_annex_b_var_update(
+        &self,
+        ast_function: &lyng_js_ast::Function,
+    ) -> bool {
+        if ast_function.kind != FunctionKind::Normal {
+            return false;
+        }
+        let scope_kind = self.state.sema.scope_table.get(self.current_scope).kind;
+        if !matches!(scope_kind, ScopeKind::Block | ScopeKind::Switch) {
+            return false;
+        }
+        if let Some(function) = self.current_function {
+            !self.state.sema.function_table.get(function).strict
+        } else {
+            !self.state.program.strict
+        }
+    }
+
+    fn annex_b_var_binding_for_block_function(
+        &self,
+        name: AtomId,
+        lexical_binding: SemanticBindingId,
+    ) -> Option<SemanticBindingId> {
+        if self.annex_b_var_update_would_conflict(name, lexical_binding) {
+            return None;
+        }
+        let var_scope = self.nearest_var_scope();
+        let binding = self
+            .find_named_binding_in_scope(name, DeclarationKind::Function, var_scope)
+            .or_else(|| self.find_named_binding_in_scope(name, DeclarationKind::Var, var_scope))?;
+        (binding != lexical_binding).then_some(binding)
+    }
+
+    fn annex_b_var_update_would_conflict(
+        &self,
+        name: AtomId,
+        lexical_binding: SemanticBindingId,
+    ) -> bool {
+        let var_scope = self.nearest_var_scope();
+        let mut scope_id = self.current_scope;
+        loop {
+            if let Some(binding) = self.find_any_named_binding_in_scope(name, scope_id) {
+                if binding != lexical_binding && self.annex_b_binding_is_lexical(binding, scope_id)
+                {
+                    return true;
+                }
+            }
+            if scope_id == var_scope {
+                return false;
+            }
+            let Some(parent) = self.state.sema.scope_table.get(scope_id).parent else {
+                return false;
+            };
+            scope_id = parent;
+        }
+    }
+
+    fn find_any_named_binding_in_scope(
+        &self,
+        name: AtomId,
+        scope: ScopeId,
+    ) -> Option<SemanticBindingId> {
+        self.state
+            .sema
+            .binding_table
+            .as_slice()
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(index, binding)| {
+                (binding.name == name && binding.scope == scope)
+                    .then_some(SemanticBindingId::new(index as u32))
+            })
+    }
+
+    fn annex_b_binding_is_lexical(&self, binding: SemanticBindingId, scope: ScopeId) -> bool {
+        let Some(binding) = self
+            .state
+            .sema
+            .binding_table
+            .as_slice()
+            .get(binding.raw() as usize)
+        else {
+            return false;
+        };
+        binding.kind.is_lexical()
+            || (binding.kind == DeclarationKind::Function
+                && !matches!(
+                    self.state.sema.scope_table.get(scope).kind,
+                    ScopeKind::Global | ScopeKind::Function
+                ))
     }
 
     pub(super) fn lower_variable_declarator(
@@ -1421,7 +1668,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             VariableKind::AwaitUsing => DeclarationKind::AwaitUsing,
         };
         let pattern = self.ast().get_pattern(declarator.id).clone();
-        let Pattern::Identifier { name: _, .. } = pattern else {
+        let Pattern::Identifier { name, .. } = pattern else {
             if matches!(kind, VariableKind::Using | VariableKind::AwaitUsing) {
                 return Err(LoweringError::UnsupportedPattern {
                     pattern: declarator.id,
@@ -1442,6 +1689,17 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 value_register,
             );
         };
+        if kind == VariableKind::Var {
+            if let Some(catch_binding) = self.active_simple_catch_binding_for_name(name) {
+                if let Some(init) = declarator.init {
+                    let value_register = self.alloc_temp()?;
+                    self.lower_initializer_with_inferred_name(init, Some(name), value_register)?;
+                    self.assign_binding_value(catch_binding, name, value_register)?;
+                }
+                return Ok(());
+            }
+        }
+
         let binding_id = self.declared_binding_for_pattern(declarator.id, declaration_kind)?;
         let (storage_class, binding_name) = {
             let binding = self.binding(binding_id)?;

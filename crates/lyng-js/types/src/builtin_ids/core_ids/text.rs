@@ -185,6 +185,110 @@ pub fn string_to_well_formed_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn string_anchor_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_ANCHOR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_big_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_BIG_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_blink_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_BLINK_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_bold_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_BOLD_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_fixed_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_FIXED_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_fontcolor_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_FONTCOLOR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_fontsize_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_FONTSIZE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_italics_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_ITALICS_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_link_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_LINK_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_small_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_SMALL_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_strike_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_STRIKE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_sub_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_SUB_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn string_sup_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(STRING_SUP_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn string_trim_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(STRING_TRIM_RAW) {
         Some(id) => id,

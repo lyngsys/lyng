@@ -61,15 +61,23 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
                 if let Expr::Identifier { name, .. } = self.ast().get_expr(current).clone() {
                     let use_site = self.use_site(current)?;
-                    if matches!(
-                        use_site.resolution_kind,
-                        ResolutionKind::Dynamic
-                            | ResolutionKind::Global
-                            | ResolutionKind::Unresolved
-                    ) {
+                    if matches!(use_site.resolution_kind, ResolutionKind::Dynamic) {
                         let index = self.constant_atom(name)?;
                         self.builder.emit_abx(
                             Opcode::ResolveName,
+                            self.encode_register(dest)?,
+                            index,
+                        )?;
+                        self.builder.emit_ax(Opcode::TypeOf, i32::from(dest))?;
+                        return Ok(());
+                    }
+                    if matches!(
+                        use_site.resolution_kind,
+                        ResolutionKind::Global | ResolutionKind::Unresolved
+                    ) {
+                        let index = self.constant_atom(name)?;
+                        self.builder.emit_abx(
+                            Opcode::ResolveGlobal,
                             self.encode_register(dest)?,
                             index,
                         )?;

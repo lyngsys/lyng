@@ -918,6 +918,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 builtin_constants: HashMap::new(),
                 child_indices: HashMap::new(),
                 hoisted_function_decls: HashSet::new(),
+                block_instantiated_function_decls: HashSet::new(),
                 hoisted_default_export_functions: HashSet::new(),
                 parameter_sources: Vec::new(),
                 result_register: None,

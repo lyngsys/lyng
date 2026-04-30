@@ -277,6 +277,11 @@ fn normalize_backend_pattern(pattern: &str, flags: RegExpObjectFlags) -> String 
     const UNKNOWN_SCRIPT_SET: &str =
         r"[\P{Assigned}\p{General_Category=Surrogate}\p{General_Category=Private_Use}]";
 
+    let pattern = if flags.unicode_aware() {
+        pattern.to_owned()
+    } else {
+        normalize_legacy_identity_escapes(pattern)
+    };
     let normalized = [
         (r"\p{Script=Unknown}", UNKNOWN_SCRIPT_SET),
         (r"\p{Script=Zzzz}", UNKNOWN_SCRIPT_SET),
@@ -296,15 +301,284 @@ fn normalize_backend_pattern(pattern: &str, flags: RegExpObjectFlags) -> String 
         (r"\P{scx=Zzzz}", r"\p{Assigned}"),
     ]
     .into_iter()
-    .fold(pattern.to_owned(), |current, (from, to)| {
-        current.replace(from, to)
-    });
+    .fold(pattern, |current, (from, to)| current.replace(from, to));
 
     if flags.unicode_aware() {
         normalized
     } else {
         expand_astral_source_for_ucs2(&normalized)
     }
+}
+
+fn normalize_legacy_identity_escapes(pattern: &str) -> String {
+    let chars = pattern.chars().collect::<Vec<_>>();
+    let mut normalized = String::with_capacity(pattern.len());
+    let mut in_class = false;
+    let mut index = 0;
+    while index < chars.len() {
+        let ch = chars[index];
+        if !in_class {
+            if let Some(next) =
+                normalize_legacy_quantifiable_assertion(&chars, index, &mut normalized)
+            {
+                index = next;
+                continue;
+            }
+        }
+        if ch == '[' && !in_class {
+            in_class = true;
+            normalized.push(ch);
+            index += 1;
+            continue;
+        }
+        if ch == ']' && in_class {
+            in_class = false;
+            normalized.push(ch);
+            index += 1;
+            continue;
+        }
+        if !in_class {
+            if let Some(next) = copy_valid_legacy_braced_quantifier(&chars, index, &mut normalized)
+            {
+                index = next;
+                continue;
+            }
+            if matches!(ch, ']' | '{' | '}') {
+                normalized.push('\\');
+                normalized.push(ch);
+                index += 1;
+                continue;
+            }
+        }
+        if ch != '\\' {
+            normalized.push(ch);
+            index += 1;
+            continue;
+        }
+
+        let Some(&escaped) = chars.get(index + 1) else {
+            normalized.push(ch);
+            index += 1;
+            continue;
+        };
+
+        match escaped {
+            'c' => {
+                if let Some(&control) = chars.get(index + 2) {
+                    if in_class && (control.is_ascii_digit() || control == '_') {
+                        write!(normalized, r"\u{:04X}", u32::from(control) % 32)
+                            .expect("writing to String cannot fail");
+                        index += 3;
+                        continue;
+                    }
+                    if control.is_ascii_alphabetic() {
+                        normalized.push('\\');
+                        normalized.push('c');
+                        normalized.push(control);
+                        index += 3;
+                        continue;
+                    }
+                }
+                normalized.push_str(r"\\c");
+                index += 2;
+            }
+            'x' => {
+                if has_hex_digits(&chars, index + 2, 2) {
+                    normalized.extend(chars[index..index + 4].iter());
+                    index += 4;
+                } else {
+                    push_backend_literal(&mut normalized, escaped, in_class);
+                    index += 2;
+                }
+            }
+            'u' => {
+                if has_hex_digits(&chars, index + 2, 4) {
+                    normalized.extend(chars[index..index + 6].iter());
+                    index += 6;
+                } else {
+                    push_backend_literal(&mut normalized, escaped, in_class);
+                    index += 2;
+                }
+            }
+            'k' if chars.get(index + 2) == Some(&'<') => {
+                normalized.push('\\');
+                normalized.push(escaped);
+                index += 2;
+            }
+            escaped
+                if is_legacy_backend_escape(escaped)
+                    || escaped.is_ascii_digit()
+                    || is_escaped_syntax_character(escaped, in_class) =>
+            {
+                normalized.push('\\');
+                normalized.push(escaped);
+                index += 2;
+            }
+            _ => {
+                push_backend_literal(&mut normalized, escaped, in_class);
+                index += 2;
+            }
+        }
+    }
+    normalized
+}
+
+fn normalize_legacy_quantifiable_assertion(
+    chars: &[char],
+    start: usize,
+    normalized: &mut String,
+) -> Option<usize> {
+    if chars.get(start) != Some(&'(')
+        || chars.get(start + 1) != Some(&'?')
+        || !matches!(chars.get(start + 2), Some('=') | Some('!'))
+    {
+        return None;
+    }
+
+    let group_end = assertion_group_end(chars, start)?;
+    let (quantifier_end, requires_assertion) = legacy_assertion_quantifier(chars, group_end)?;
+    if requires_assertion {
+        normalized.extend(chars[start..group_end].iter());
+    }
+    Some(quantifier_end)
+}
+
+fn assertion_group_end(chars: &[char], start: usize) -> Option<usize> {
+    let mut index = start + 3;
+    let mut depth = 1usize;
+    let mut in_class = false;
+    while index < chars.len() {
+        match chars[index] {
+            '\\' => index += 2,
+            '[' if !in_class => {
+                in_class = true;
+                index += 1;
+            }
+            ']' if in_class => {
+                in_class = false;
+                index += 1;
+            }
+            '(' if !in_class => {
+                depth += 1;
+                index += 1;
+            }
+            ')' if !in_class => {
+                depth = depth.saturating_sub(1);
+                index += 1;
+                if depth == 0 {
+                    return Some(index);
+                }
+            }
+            _ => index += 1,
+        }
+    }
+    None
+}
+
+fn legacy_assertion_quantifier(chars: &[char], start: usize) -> Option<(usize, bool)> {
+    let (mut end, requires_assertion) = match chars.get(start)? {
+        '*' | '?' => (start + 1, false),
+        '+' => (start + 1, true),
+        '{' => (valid_legacy_braced_quantifier_end(chars, start)?, true),
+        _ => return None,
+    };
+    if chars.get(end) == Some(&'?') {
+        end += 1;
+    }
+    Some((end, requires_assertion))
+}
+
+fn copy_valid_legacy_braced_quantifier(
+    chars: &[char],
+    start: usize,
+    normalized: &mut String,
+) -> Option<usize> {
+    let end = valid_legacy_braced_quantifier_end(chars, start)?;
+    normalized.extend(chars[start..end].iter());
+    Some(end)
+}
+
+fn valid_legacy_braced_quantifier_end(chars: &[char], start: usize) -> Option<usize> {
+    if chars.get(start) != Some(&'{') {
+        return None;
+    }
+    let mut end = start + 1;
+    while end < chars.len() && chars[end] != '}' {
+        end += 1;
+    }
+    if end >= chars.len() {
+        return None;
+    }
+
+    let inner = &chars[start + 1..end];
+    if inner.is_empty() {
+        return None;
+    }
+    let valid = if let Some(comma) = inner.iter().position(|&ch| ch == ',') {
+        let lhs = &inner[..comma];
+        let rhs = &inner[comma + 1..];
+        if lhs.is_empty() || !lhs.iter().all(|ch| ch.is_ascii_digit()) {
+            false
+        } else if rhs.is_empty() {
+            true
+        } else if !rhs.iter().all(|ch| ch.is_ascii_digit()) {
+            false
+        } else {
+            let lhs = digits_to_u32(lhs);
+            let rhs = digits_to_u32(rhs);
+            lhs <= rhs
+        }
+    } else {
+        inner.iter().all(|ch| ch.is_ascii_digit())
+    };
+
+    valid.then_some(end + 1)
+}
+
+fn digits_to_u32(chars: &[char]) -> u32 {
+    chars.iter().fold(0u32, |acc, ch| {
+        acc.saturating_mul(10)
+            .saturating_add(ch.to_digit(10).unwrap_or(0))
+    })
+}
+
+fn is_legacy_backend_escape(ch: char) -> bool {
+    matches!(
+        ch,
+        'b' | 'B' | 'd' | 'D' | 's' | 'S' | 'w' | 'W' | 'f' | 'n' | 'r' | 't' | 'v'
+    )
+}
+
+fn is_escaped_syntax_character(ch: char, in_class: bool) -> bool {
+    if in_class {
+        matches!(ch, '\\' | ']' | '-' | '^')
+    } else {
+        matches!(
+            ch,
+            '^' | '$' | '\\' | '.' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '|'
+        )
+    }
+}
+
+fn push_backend_literal(normalized: &mut String, ch: char, in_class: bool) {
+    match ch {
+        '\0'..='\u{001F}' | '\u{007F}' => {
+            write!(normalized, r"\u{:04X}", u32::from(ch)).expect("writing to String cannot fail");
+        }
+        '\\' => normalized.push_str(r"\\"),
+        ']' if in_class => normalized.push_str(r"\]"),
+        '-' if in_class => normalized.push_str(r"\-"),
+        '^' if in_class => normalized.push_str(r"\^"),
+        _ => normalized.push(ch),
+    }
+}
+
+fn has_hex_digits(chars: &[char], start: usize, count: usize) -> bool {
+    (0..count).all(|offset| {
+        chars
+            .get(start + offset)
+            .is_some_and(char::is_ascii_hexdigit)
+    })
 }
 
 fn expand_astral_source_for_ucs2(pattern: &str) -> String {

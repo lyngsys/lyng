@@ -47,7 +47,7 @@ impl InstalledFunction {
                     .scopes()
                     .iter()
                     .map(|scope| {
-                        lyng_js_bytecode::DirectEvalLexicalScope::new(
+                        let canonical_scope = lyng_js_bytecode::DirectEvalLexicalScope::new(
                             scope.source_base(),
                             scope
                                 .bindings()
@@ -69,13 +69,37 @@ impl InstalledFunction {
                                     )
                                 })
                                 .collect::<Vec<_>>(),
-                        )
+                        );
+                        if let Some(name) = scope.annex_b_catch_name() {
+                            canonical_scope.with_annex_b_catch_name(
+                                canonical_atoms
+                                    .get(usize::try_from(name.raw()).unwrap_or(usize::MAX))
+                                    .copied()
+                                    .flatten()
+                                    .unwrap_or(name),
+                            )
+                        } else {
+                            canonical_scope
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let canonical_annex_b_catch_names = site
+                    .annex_b_catch_names()
+                    .iter()
+                    .copied()
+                    .map(|name| {
+                        canonical_atoms
+                            .get(usize::try_from(name.raw()).unwrap_or(usize::MAX))
+                            .copied()
+                            .flatten()
+                            .unwrap_or(name)
                     })
                     .collect::<Vec<_>>();
                 *slot = Some(lyng_js_bytecode::DirectEvalLexicalSite::new(
                     site.instruction_offset(),
                     canonical_scopes,
                     site.flags(),
+                    canonical_annex_b_catch_names,
                 ));
             }
         }

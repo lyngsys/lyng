@@ -41,7 +41,7 @@ use lyng_js_lexer::{TokenKind, TokenPayload};
 
 use parser::Parser;
 
-pub use regexp::validate_regexp_literal;
+pub use regexp::{validate_regexp_constructor_pattern, validate_regexp_literal};
 
 /// Parses a script and returns the complete parse result.
 pub fn parse_script(atoms: &mut AtomTable, source_id: SourceId, source: &str) -> ParsedScript {

@@ -15,11 +15,14 @@ use accessors::{
     regexp_flag_getter_builtin, regexp_flags_getter_builtin, regexp_has_indices_getter_builtin,
     regexp_source_getter_builtin,
 };
-use construction::{regexp_builtin, regexp_species_getter_builtin};
+use construction::{
+    normalize_regexp_constructor_pattern_text, regexp_builtin, regexp_species_getter_builtin,
+};
 use escape::regexp_escape_builtin;
 use lyng_js_common::WellKnownAtom;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData};
+use lyng_js_parser::{validate_regexp_constructor_pattern, validate_regexp_literal};
 use lyng_js_types::{
     BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, StringRef, Value, WellKnownSymbolId,
 };
@@ -53,6 +56,12 @@ fn dispatch_regexp_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::regexp_escape_builtin() {
         return regexp_escape_builtin(context, invocation).map(Some);
     }
+    if let Some(property) = legacy_static_property_for_getter(entry) {
+        return regexp_legacy_static_getter_builtin(context, invocation, property).map(Some);
+    }
+    if entry == super::regexp_legacy_input_setter_builtin() {
+        return regexp_legacy_input_setter_builtin(context, invocation).map(Some);
+    }
     if entry == super::regexp_species_getter_builtin() {
         return Ok(Some(regexp_species_getter_builtin(invocation)));
     }
@@ -66,6 +75,9 @@ fn dispatch_regexp_prototype_builtin<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Option<Value>, Cx::Error> {
     if entry == super::regexp_to_string_builtin() {
         return regexp_to_string_builtin(context, invocation).map(Some);
+    }
+    if entry == super::regexp_compile_builtin() {
+        return regexp_compile_builtin(context, invocation).map(Some);
     }
     if entry == super::regexp_exec_builtin() {
         return regexp_exec_builtin(context, invocation).map(Some);
@@ -174,6 +186,26 @@ fn regexp_matcher_this_object<Cx: PublicBuiltinDispatchContext>(
     Ok(object_ref)
 }
 
+fn regexp_compile_this_object<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<ObjectRef, Cx::Error> {
+    let object_ref = regexp_matcher_this_object(cx, value)?;
+    let expected_prototype =
+        current_intrinsic_regexp_prototype(cx).ok_or_else(|| type_error(cx))?;
+    let actual_prototype = {
+        let agent = cx.agent();
+        agent
+            .objects()
+            .get_prototype_of(agent.heap().view(), object_ref)
+    }
+    .map_err(|_| type_error(cx))?;
+    if actual_prototype != Some(expected_prototype) {
+        return Err(type_error(cx));
+    }
+    Ok(object_ref)
+}
+
 fn regexp_last_index_key<Cx: PublicBuiltinDispatchContext>(cx: &mut Cx) -> PropertyKey {
     let last_index = {
         let agent = cx.agent();
@@ -195,6 +227,139 @@ fn boolean_property_value<Cx: PublicBuiltinDispatchContext>(
 struct RegExpExecState {
     flags: lyng_js_objects::RegExpObjectFlags,
     matched: lyng_js_objects::RegExpMatchRecord,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum RegExpLegacyStaticProperty {
+    Input,
+    LastMatch,
+    LastParen,
+    LeftContext,
+    RightContext,
+    Paren(usize),
+}
+
+fn legacy_static_property_for_getter(
+    entry: BuiltinFunctionId,
+) -> Option<RegExpLegacyStaticProperty> {
+    if entry == super::regexp_legacy_input_getter_builtin() {
+        return Some(RegExpLegacyStaticProperty::Input);
+    }
+    if entry == super::regexp_legacy_last_match_getter_builtin() {
+        return Some(RegExpLegacyStaticProperty::LastMatch);
+    }
+    if entry == super::regexp_legacy_last_paren_getter_builtin() {
+        return Some(RegExpLegacyStaticProperty::LastParen);
+    }
+    if entry == super::regexp_legacy_left_context_getter_builtin() {
+        return Some(RegExpLegacyStaticProperty::LeftContext);
+    }
+    if entry == super::regexp_legacy_right_context_getter_builtin() {
+        return Some(RegExpLegacyStaticProperty::RightContext);
+    }
+    [
+        super::regexp_legacy_paren1_getter_builtin(),
+        super::regexp_legacy_paren2_getter_builtin(),
+        super::regexp_legacy_paren3_getter_builtin(),
+        super::regexp_legacy_paren4_getter_builtin(),
+        super::regexp_legacy_paren5_getter_builtin(),
+        super::regexp_legacy_paren6_getter_builtin(),
+        super::regexp_legacy_paren7_getter_builtin(),
+        super::regexp_legacy_paren8_getter_builtin(),
+        super::regexp_legacy_paren9_getter_builtin(),
+    ]
+    .iter()
+    .position(|candidate| *candidate == entry)
+    .map(|zero_based| RegExpLegacyStaticProperty::Paren(zero_based + 1))
+}
+
+fn require_legacy_static_regexp_constructor<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    this_value: Value,
+) -> Result<RealmRef, Cx::Error> {
+    let realm = cx.builtin_realm();
+    let constructor = {
+        let agent = cx.agent();
+        agent
+            .realm(realm)
+            .and_then(|record| record.intrinsics().regexp())
+    }
+    .ok_or_else(|| type_error(cx))?;
+    if this_value.as_object_ref() != Some(constructor) {
+        return Err(type_error(cx));
+    }
+    Ok(realm)
+}
+
+fn regexp_legacy_static_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    property: RegExpLegacyStaticProperty,
+) -> Result<Value, Cx::Error> {
+    let realm = require_legacy_static_regexp_constructor(cx, invocation.this_value())?;
+    let units = {
+        let agent = cx.agent();
+        agent.regexp_legacy_static_state(realm).map(|state| {
+            match property {
+                RegExpLegacyStaticProperty::Input => state.input(),
+                RegExpLegacyStaticProperty::LastMatch => state.last_match(),
+                RegExpLegacyStaticProperty::LastParen => state.last_paren(),
+                RegExpLegacyStaticProperty::LeftContext => state.left_context(),
+                RegExpLegacyStaticProperty::RightContext => state.right_context(),
+                RegExpLegacyStaticProperty::Paren(index) => state.paren(index).unwrap_or(&[]),
+            }
+            .to_vec()
+        })
+    }
+    .ok_or_else(|| type_error(cx))?;
+    Ok(string_from_code_units(cx, &units))
+}
+
+fn regexp_legacy_input_setter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let realm = require_legacy_static_regexp_constructor(cx, invocation.this_value())?;
+    let value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let input = cx.value_to_string_text(value)?;
+    let input_units = input.encode_utf16().collect();
+    let updated = {
+        let agent = cx.agent();
+        agent
+            .regexp_legacy_static_state_mut(realm)
+            .map(|state| state.set_input(input_units))
+            .is_some()
+    };
+    if !updated {
+        return Err(type_error(cx));
+    }
+    Ok(Value::undefined())
+}
+
+fn record_regexp_legacy_static_match<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    units: &[u16],
+    state: &RegExpExecState,
+) -> Result<(), Cx::Error> {
+    let realm = cx.builtin_realm();
+    let updated = {
+        let agent = cx.agent();
+        agent
+            .regexp_legacy_static_state_mut(realm)
+            .map(|legacy_state| {
+                legacy_state.record_match(units, state.matched.range(), state.matched.captures());
+            })
+            .is_some()
+    };
+    if updated {
+        Ok(())
+    } else {
+        Err(type_error(cx))
+    }
 }
 
 const REGEXP_STRING_ITERATOR_REGEXP_SLOT: u32 = 0;
@@ -245,6 +410,38 @@ pub(super) fn allocate_regexp_object<Cx: PublicBuiltinDispatchContext>(
     Ok(object)
 }
 
+pub(super) fn regexp_literal_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let pattern_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let flags_value = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let pattern_text = cx.value_to_string_text(pattern_value)?;
+    let flags_text = cx.value_to_string_text(flags_value)?;
+    if validate_regexp_literal(&pattern_text, &flags_text).is_err() {
+        return Err(syntax_error(cx));
+    }
+
+    let realm = cx.builtin_realm();
+    let prototype = {
+        let agent = cx.agent();
+        agent
+            .realm(realm)
+            .and_then(|record| record.intrinsics().regexp_prototype())
+    }
+    .ok_or_else(|| type_error(cx))?;
+    allocate_regexp_object(cx, realm, prototype, &pattern_text, &flags_text)
+        .map(Value::from_object_ref)
+}
+
 fn regexp_object_flags<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: lyng_js_types::ObjectRef,
@@ -263,6 +460,20 @@ fn regexp_object_flags<Cx: PublicBuiltinDispatchContext>(
         return Ok(lyng_js_objects::RegExpObjectFlags::default());
     }
     Err(type_error(cx))
+}
+
+fn regexp_object_source_and_flags<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    object_ref: lyng_js_types::ObjectRef,
+) -> Result<(String, String), Cx::Error> {
+    let values = {
+        let agent = cx.agent();
+        agent
+            .objects()
+            .regexp_payload(object_ref)
+            .map(|payload| (payload.source().to_owned(), payload.flag_text().to_owned()))
+    };
+    values.ok_or_else(|| type_error(cx))
 }
 
 pub(super) fn regexp_object_source_text<Cx: PublicBuiltinDispatchContext>(
@@ -578,7 +789,9 @@ fn regexp_exec_state<Cx: PublicBuiltinDispatchContext>(
                 usize_index_value(next_index),
             )?;
         }
-        return Ok(Some(RegExpExecState { flags, matched }));
+        let state = RegExpExecState { flags, matched };
+        record_regexp_legacy_static_match(cx, units, &state)?;
+        return Ok(Some(state));
     }
 
     if uses_stateful_last_index {
@@ -1138,6 +1351,72 @@ fn regexp_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
     let flags_value = cx.get_property_value(receiver, flags_key)?;
     let flags = cx.value_to_string_text(flags_value)?;
     Ok(string_value(cx, &format!("/{source}/{flags}")))
+}
+
+fn regexp_compile_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object_ref = regexp_compile_this_object(cx, invocation.this_value())?;
+    let pattern_value = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let flags_value = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+
+    let (pattern_text, flags_text) = if let Some(pattern_object) = pattern_value.as_object_ref() {
+        if is_regexp_object(cx, pattern_object) {
+            if !flags_value.is_undefined() {
+                return Err(type_error(cx));
+            }
+            regexp_object_source_and_flags(cx, pattern_object)?
+        } else {
+            let pattern_text = if pattern_value.is_undefined() {
+                String::new()
+            } else {
+                normalize_regexp_constructor_pattern_text(&cx.value_to_string_text(pattern_value)?)
+            };
+            let flags_text = if flags_value.is_undefined() {
+                String::new()
+            } else {
+                cx.value_to_string_text(flags_value)?
+            };
+            (pattern_text, flags_text)
+        }
+    } else {
+        let pattern_text = if pattern_value.is_undefined() {
+            String::new()
+        } else {
+            normalize_regexp_constructor_pattern_text(&cx.value_to_string_text(pattern_value)?)
+        };
+        let flags_text = if flags_value.is_undefined() {
+            String::new()
+        } else {
+            cx.value_to_string_text(flags_value)?
+        };
+        (pattern_text, flags_text)
+    };
+
+    if validate_regexp_constructor_pattern(&pattern_text, &flags_text).is_err() {
+        return Err(syntax_error(cx));
+    }
+    let payload = lyng_js_objects::RegExpPayload::compile(&pattern_text, &flags_text)
+        .map_err(|_| syntax_error(cx))?;
+    let stored = cx
+        .agent()
+        .objects_mut()
+        .store_regexp_payload(object_ref, payload);
+    if !stored {
+        return Err(type_error(cx));
+    }
+    let last_index_key = regexp_last_index_key(cx);
+    set_data_property_value(cx, object_ref, last_index_key, Value::from_smi(0))?;
+    Ok(Value::from_object_ref(object_ref))
 }
 
 fn regexp_exec_builtin<Cx: PublicBuiltinDispatchContext>(
