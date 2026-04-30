@@ -12,7 +12,7 @@ use super::property_access::VmProxyBridge;
 use super::values::{alloc_string, to_f64_number};
 use super::{
     Agent, AllocationLifetime, FrameRecord, NativeFunctionRegistry, ObjectRef, TemplateCacheKey,
-    ThisState, Value, Vm, VmError, VmResult, WellKnownAtom,
+    ThisState, Value, Vm, VmError, VmResult, WellKnownAtom, WellKnownSymbolId,
 };
 use crate::extensions::{EmbeddingFunctionContext, EmbeddingInvocation};
 use crate::frame::GeneratorResumeKind;

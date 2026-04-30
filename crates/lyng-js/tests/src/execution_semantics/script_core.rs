@@ -49,6 +49,42 @@ fn script_core_executes_if_blocks_and_local_assignment() {
 }
 
 #[test]
+fn script_core_instanceof_uses_symbol_has_instance_protocol() {
+    let result = compile_and_run_string(
+        r#"
+        let log = [];
+
+        try {
+            true instanceof true;
+            log.push("missing");
+        } catch (error) {
+            log.push(error instanceof TypeError ? "type" : error.name);
+        }
+
+        let rhs = {};
+        rhs[Symbol.hasInstance] = function(value) {
+            log.push(this === rhs ? "this" : "bad-this");
+            log.push(value === 0 ? "arg" : "bad-arg");
+            return "truthy";
+        };
+        log.push(0 instanceof rhs ? "truthy" : "falsy");
+
+        rhs[Symbol.hasInstance] = null;
+        try {
+            0 instanceof rhs;
+            log.push("missing-null");
+        } catch (error) {
+            log.push(error instanceof TypeError ? "null" : error.name);
+        }
+
+        log.join("|");
+        "#,
+    );
+
+    assert_eq!(result, "type|this|arg|truthy|null");
+}
+
+#[test]
 fn script_core_executes_for_loops_with_local_register_updates() {
     let result = compile_and_run(
         r#"

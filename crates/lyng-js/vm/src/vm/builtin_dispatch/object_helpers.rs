@@ -195,11 +195,49 @@ impl Vm {
         arguments: &[Value],
     ) -> VmResult<Value> {
         let value = arguments.first().copied().unwrap_or(Value::undefined());
-        let constructor = arguments.get(1).copied().unwrap_or(Value::undefined());
+        let constructor_value = arguments.get(1).copied().unwrap_or(Value::undefined());
+        let constructor_object = constructor_value
+            .as_object_ref()
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let has_instance_key = agent
+            .well_known_symbol(WellKnownSymbolId::HasInstance)
+            .map(PropertyKey::from_symbol)
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let has_instance = {
+            let mut bridge = VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame: caller,
+            };
+            object::get_with_receiver_in_context(
+                &mut bridge,
+                constructor_object,
+                has_instance_key,
+                constructor_value,
+            )?
+        };
+        if !has_instance.is_undefined() && !has_instance.is_null() {
+            let has_instance = Self::require_callable_object(agent, caller, has_instance)?;
+            let result = self.call_to_completion(
+                agent,
+                host,
+                registry,
+                caller,
+                has_instance,
+                constructor_value,
+                &[value],
+            )?;
+            let is_instance =
+                read::to_boolean(agent.heap().view(), result).map_err(VmError::Abrupt)?;
+            return Ok(Value::from_bool(is_instance));
+        }
+
+        let constructor = Self::require_callable_object(agent, caller, constructor_value)?;
         let Some(object) = value.as_object_ref() else {
             return Ok(Value::from_bool(false));
         };
-        let constructor = Self::require_callable_object(agent, caller, constructor)?;
         let mut bridge = VmProxyBridge {
             vm: self,
             agent,
