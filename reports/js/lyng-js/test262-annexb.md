@@ -57,13 +57,55 @@ No tests were excluded from selection.
 
 | Class | Reason | Count |
 | --- | --- | ---: |
-| Host/runtime policy | unsupported host feature: IsHTMLDDA | `70` |
+| Manifest/out of scope | manifest exclusion (path): IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. | `70` |
 
 ## Checked-in Manifest Rules
 
 | Kind | Pattern | Reason |
 | --- | --- | --- |
 | `suite` | `intl402/*` | ECMA-402 Intl is out of scope for the active ECMA-262 conformance sweep. |
+| `path` | `annexB/language/expressions/typeof/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/coalesce/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/logical-or/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/yield/star-iterable-return-emulates-undefined-throws-when-called.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/yield/star-iterable-throw-emulates-undefined-throws-when-called.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/logical-assignment/emulates-undefined-or.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/logical-assignment/emulates-undefined-and.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/logical-assignment/emulates-undefined-coalesce.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/strict-equals/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/logical-not/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/equals/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/strict-does-not-equals/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/assignment/dstr/object-pattern-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/assignment/dstr/array-pattern-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/built-ins/String/prototype/replaceAll/custom-replacer-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/built-ins/String/prototype/matchAll/custom-matcher-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/does-not-equals/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/conditional/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/expressions/logical-and/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/built-ins/String/prototype/replace/custom-replacer-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/statements/class/subclass/superclass-prototype-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/statements/class/subclass/superclass-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/statements/switch/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/statements/const/dstr/object-pattern-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/statements/const/dstr/array-pattern-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/statements/function/default-parameters-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/statements/for-of/iterator-close-return-emulates-undefined-throws-when-called.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/statements/if/emulated-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/language/statements/for-await-of/iterator-close-return-emulates-undefined-throws-when-called.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/built-ins/String/prototype/search/custom-searcher-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `staging/sm/generators/yield-star-throw-htmldda.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/built-ins/String/prototype/match/custom-matcher-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/built-ins/String/prototype/split/custom-splitter-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/built-ins/Object/is/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/built-ins/Array/from/iterator-method-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `staging/sm/Reflect/defineProperty.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `annexB/built-ins/TypedArrayConstructors/from/iterator-method-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `staging/sm/expressions/nullish-coalescing.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `staging/sm/Iterator/prototype/some/coerce-result-to-boolean.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `staging/sm/Iterator/prototype/filter/coerce-result-to-boolean.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `staging/sm/Iterator/prototype/find/coerce-result-to-boolean.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
+| `path` | `staging/sm/Iterator/prototype/every/coerce-result-to-boolean.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
 
 ## Failure Clusters
 
@@ -72,5 +114,5 @@ No failures recorded.
 ## Notes
 
 - The checked-in exclusion manifest remains intentionally narrow. Missing engine work stays visible here as skips or failures instead of being hidden in the manifest.
+- Default-suite skips must come from checked-in manifest rules for out-of-scope suites or explicit host-only cases.
 - Stage 4 implementation gaps remain visible as skips or failures; proposal-stage policy only excludes tests below the configured proposal maturity.
-- `IsHTMLDDA` skips are explicit host-boundary exclusions for browser `document.all` compatibility objects. The standalone Lyng JS Test262 harness does not provide that host object, so these skips are not hidden Annex B language or builtin gaps.

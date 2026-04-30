@@ -64,8 +64,22 @@ pub(crate) const SUPPORTED_INCLUDES: &[&str] = &[
     "proxyTrapsHelper.js",
     "assertRelativeDateMs.js",
     "dateConstants.js",
+    "atomicsHelper.js",
+    "iteratorZipUtils.js",
+    "resizableArrayBufferUtils.js",
     "testAtomics.js",
     "tcoHelper.js",
+    "sm/assertThrowsValue.js",
+    "sm/non262-Date-shell.js",
+    "sm/non262-JSON-shell.js",
+    "sm/non262-Math-shell.js",
+    "sm/non262-Reflect-shell.js",
+    "sm/non262-Set-shell.js",
+    "sm/non262-Temporal-PlainMonthDay-shell.js",
+    "sm/non262-TypedArray-shell.js",
+    "sm/non262-expressions-shell.js",
+    "sm/non262-generators-shell.js",
+    "sm/non262-strict-shell.js",
 ];
 
 #[derive(Clone)]
@@ -334,5 +348,39 @@ mod tests {
         assert!(source.contains("var integer = number - (number % 1);"));
         assert!(source.contains("return \"%\" + hex.charAt((n - low) / 16) + hex.charAt(low);"));
         assert!(!source.contains("Math.floor"));
+    }
+
+    #[test]
+    fn supports_current_spidermonkey_non262_helpers() {
+        let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        for include in [
+            "sm/non262-TypedArray-shell.js",
+            "sm/non262-strict-shell.js",
+            "sm/assertThrowsValue.js",
+            "sm/non262-Math-shell.js",
+            "sm/non262-Date-shell.js",
+            "sm/non262-JSON-shell.js",
+            "sm/non262-Set-shell.js",
+            "sm/non262-expressions-shell.js",
+            "sm/non262-generators-shell.js",
+            "sm/non262-Reflect-shell.js",
+        ] {
+            assert!(
+                catalog.supports_include(include),
+                "missing SpiderMonkey helper include {include}"
+            );
+        }
+    }
+
+    #[test]
+    fn supports_iterator_zip_helper() {
+        let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        assert!(catalog.supports_include("iteratorZipUtils.js"));
+    }
+
+    #[test]
+    fn supports_resizable_arraybuffer_helper() {
+        let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        assert!(catalog.supports_include("resizableArrayBufferUtils.js"));
     }
 }

@@ -33,16 +33,8 @@ impl ProposalStage {
     }
 }
 
-const UNSUPPORTED_FEATURES: &[&str] = &[
-    "decorators",
-    "import-assertions",
-    "regexp-v-flag",
-    "regexp-modifiers",
-    "resizable-arraybuffer",
-    "arraybuffer-transfer",
-    "immutable-arraybuffer",
-    "ShadowRealm",
-];
+const UNSUPPORTED_FEATURES: &[&str] =
+    &["import-assertions", "immutable-arraybuffer", "ShadowRealm"];
 
 const PROPOSAL_FEATURE_STAGES: &[(&str, ProposalStage)] = &[
     ("Temporal", ProposalStage::Stage4),
@@ -69,274 +61,11 @@ fn proposal_feature_stage(feature: &str) -> Option<ProposalStage> {
         .find_map(|(candidate, stage)| (*candidate == feature).then_some(*stage))
 }
 
-const FEATURE_REASON_ALIASES: &[(&str, &str)] = &[
-    (
-        "iterator-sequencing",
-        "unsupported feature: iterator-helpers",
-    ),
-    ("joint-iteration", "unsupported feature: iterator-helpers"),
-];
+const FEATURE_REASON_ALIASES: &[(&str, &str)] = &[];
 
-const UNSUPPORTED_HOST_FEATURES: &[(&str, &str)] =
-    &[("IsHTMLDDA", "unsupported host feature: IsHTMLDDA")];
+const EXPLICIT_SELECTION_EXCLUSIONS: &[(&str, &str)] = &[];
 
-const EXPLICIT_SELECTION_EXCLUSIONS: &[(&str, &str)] = &[
-    (
-        "built-ins/RegExp/named-groups/duplicate-names-exec.js",
-        "duplicate named backreferences need participating-capture semantics",
-    ),
-    (
-        "built-ins/RegExp/named-groups/duplicate-names-match.js",
-        "duplicate named backreferences need participating-capture semantics",
-    ),
-    (
-        "built-ins/RegExp/named-groups/duplicate-names-test.js",
-        "duplicate named backreferences need participating-capture semantics",
-    ),
-    (
-        "built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-backreferences.js",
-        "regexp modifier scoped ignoreCase for backreferences needs backend support",
-    ),
-    (
-        "built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-lower-b.js",
-        "regexp modifier scoped ignoreCase for word boundaries needs backend support",
-    ),
-    (
-        "built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-lower-p.js",
-        "regexp modifier scoped ignoreCase for property escapes needs backend support",
-    ),
-    (
-        "built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-upper-b.js",
-        "regexp modifier scoped ignoreCase for word boundaries needs backend support",
-    ),
-    (
-        "built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-upper-p.js",
-        "regexp modifier scoped ignoreCase for property escapes needs backend support",
-    ),
-    (
-        "built-ins/RegExp/regexp-modifiers/remove-ignoreCase-affects-backreferences.js",
-        "regexp modifier scoped ignoreCase for backreferences needs backend support",
-    ),
-    (
-        "built-ins/RegExp/regexp-modifiers/remove-ignoreCase-affects-slash-lower-b.js",
-        "regexp modifier scoped ignoreCase for word boundaries needs backend support",
-    ),
-    (
-        "built-ins/RegExp/regexp-modifiers/remove-ignoreCase-affects-slash-upper-b.js",
-        "regexp modifier scoped ignoreCase for word boundaries needs backend support",
-    ),
-];
-
-const EXPLICIT_TEST_SKIPS: &[(&str, &str)] = &[
-    (
-        "staging/built-ins/RegExp/named-groups/duplicate-named-groups-replace.js",
-        "duplicate named backreferences need participating-capture semantics",
-    ),
-    (
-        "staging/built-ins/RegExp/named-groups/duplicate-named-groups.js",
-        "duplicate named backreferences need participating-capture semantics",
-    ),
-    (
-        "built-ins/Iterator/concat/proto.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/concat/is-function.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/concat/non-constructible.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/concat/throws-typeerror-when-iterable-not-an-object.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zip/is-function.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zip/iterables-primitive.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zip/non-constructible.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zip/iterator-non-iterable.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zip/options-padding.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zip/options.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zip/proto.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zipKeyed/is-function.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zipKeyed/iterables-iteration-deleted.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zipKeyed/iterables-primitive.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zipKeyed/non-constructible.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zipKeyed/options-padding.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zipKeyed/options.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zipKeyed/proto.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Iterator/zipKeyed/results-object-has-no-undefined-iterables-properties.js",
-        "unsupported feature: iterator-helpers",
-    ),
-    (
-        "built-ins/Object/getPrototypeOf/15.2.3.2-1.js",
-        "needs builtin bootstrap: Number",
-    ),
-    (
-        "built-ins/Object/getPrototypeOf/15.2.3.2-1-4.js",
-        "needs builtin bootstrap: String",
-    ),
-    (
-        "built-ins/Object/getPrototypeOf/15.2.3.2-2-5.js",
-        "needs builtin bootstrap: Array",
-    ),
-    (
-        "built-ins/Object/getPrototypeOf/15.2.3.2-2-6.js",
-        "needs builtin bootstrap: String",
-    ),
-    (
-        "built-ins/Object/getPrototypeOf/15.2.3.2-2-7.js",
-        "needs builtin bootstrap: Number",
-    ),
-    (
-        "built-ins/Object/getPrototypeOf/15.2.3.2-2-8.js",
-        "needs builtin bootstrap: Math",
-    ),
-    (
-        "built-ins/Object/getPrototypeOf/15.2.3.2-2-18.js",
-        "needs builtin bootstrap: JSON",
-    ),
-    (
-        "built-ins/Object/getPrototypeOf/15.2.3.2-2-22.js",
-        "needs builtin bootstrap: String",
-    ),
-    (
-        "built-ins/Object/getPrototypeOf/15.2.3.2-2-24.js",
-        "needs builtin bootstrap: Number",
-    ),
-    (
-        "built-ins/Object/prototype/toString/Object.prototype.toString.call-number.js",
-        "needs builtin bootstrap: Number",
-    ),
-    (
-        "built-ins/Object/prototype/toString/Object.prototype.toString.call-string.js",
-        "needs builtin bootstrap: String",
-    ),
-    (
-        "built-ins/Object/prototype/toString/symbol-tag-non-str-builtin.js",
-        "needs builtin bootstrap: Math/JSON",
-    ),
-    (
-        "built-ins/Object/prototype/toString/symbol-tag-non-str.js",
-        "needs builtin bootstrap: String",
-    ),
-    (
-        "built-ins/Object/prototype/toString/symbol-tag-override-primitives.js",
-        "needs builtin bootstrap: Number/String",
-    ),
-    (
-        "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-4.js",
-        "needs builtin bootstrap: eval",
-    ),
-    (
-        "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-16.js",
-        "needs builtin bootstrap: Object.getOwnPropertyNames",
-    ),
-    (
-        "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-19.js",
-        "needs builtin bootstrap: Object.defineProperties",
-    ),
-    (
-        "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-26.js",
-        "needs builtin bootstrap: Object.keys",
-    ),
-    (
-        "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-33.js",
-        "needs builtin bootstrap: Object.prototype.toLocaleString",
-    ),
-    (
-        "built-ins/Object/create/15.2.3.5-4-6.js",
-        "needs builtin bootstrap: Array",
-    ),
-    (
-        "built-ins/Object/create/15.2.3.5-4-10.js",
-        "needs builtin bootstrap: Math",
-    ),
-    (
-        "built-ins/Object/create/15.2.3.5-4-13.js",
-        "needs builtin bootstrap: JSON",
-    ),
-    (
-        "built-ins/Object/create/15.2.3.5-4-14.js",
-        "needs builtin bootstrap: Object.getOwnPropertyNames",
-    ),
-    (
-        "built-ins/Object/create/15.2.3.5-4-37.js",
-        "needs builtin bootstrap: Object.getOwnPropertyNames",
-    ),
-    (
-        "built-ins/Object/create/properties-arg-to-object.js",
-        "needs builtin bootstrap: Object.getOwnPropertyNames/Object.getOwnPropertySymbols",
-    ),
-    (
-        "built-ins/Function/prototype/call/S15.3.4.4_A6_T1.js",
-        "needs builtin bootstrap: Array",
-    ),
-    (
-        "built-ins/Function/prototype/call/15.3.4.4-1-s.js",
-        "needs builtin bootstrap: String",
-    ),
-    (
-        "built-ins/Function/prototype/call/15.3.4.4-2-s.js",
-        "needs builtin bootstrap: Number",
-    ),
-    (
-        "built-ins/Function/prototype/bind/15.3.4.5-2-6.js",
-        "needs builtin bootstrap: Number",
-    ),
-    (
-        "built-ins/ArrayBuffer/allocation-limit.js",
-        "runtime abort: oversize ArrayBuffer allocation guard missing",
-    ),
-    (
-        "built-ins/ArrayBuffer/length-is-too-large-throws.js",
-        "runtime abort: oversize ArrayBuffer allocation guard missing",
-    ),
-];
+const EXPLICIT_TEST_SKIPS: &[(&str, &str)] = &[];
 
 const SUPPORTED_FEATURE_TESTS: &[(&str, &[&str])] = &[(
     "regexp-v-flag",
@@ -575,20 +304,11 @@ fn should_skip_metadata(
     metadata: &TestMetadata,
     helpers: &HelperCatalog,
 ) -> Option<String> {
-    if metadata.flags.iter().any(|flag| flag == "CanBlockIsFalse") {
-        return Some("host runs with [[CanBlock]] true".to_string());
-    }
     let is_temporal_test = metadata
         .features
         .iter()
         .any(|feature| feature == "Temporal");
     for feature in &metadata.features {
-        if let Some((_, reason)) = UNSUPPORTED_HOST_FEATURES
-            .iter()
-            .find(|(unsupported, _)| feature == unsupported)
-        {
-            return Some((*reason).to_string());
-        }
         if let Some((_, reason)) = FEATURE_REASON_ALIASES
             .iter()
             .find(|(alias, _)| feature == alias)
@@ -610,9 +330,6 @@ fn should_skip_metadata(
     }
     for include in &metadata.includes {
         if !helpers.supports_include(include) {
-            if include == "atomicsHelper.js" {
-                return Some("requires $262.agent multi-agent harness".to_string());
-            }
             return Some(format!("unsupported harness include: {include}"));
         }
     }
@@ -753,8 +470,9 @@ mod tests {
     use crate::metadata::parse_metadata;
 
     use super::{
-        category_for_test, disabled_manifest, manifest_matches_pattern, parse_manifest_line,
-        skip_decision, ExclusionKind, ExclusionRule, ProposalStage, SkipDecision,
+        category_for_test, disabled_manifest, load_manifest, manifest_matches_pattern,
+        parse_manifest_line, skip_decision, ExclusionKind, ExclusionRule, ProposalStage,
+        SkipDecision,
     };
 
     fn workspace_root() -> PathBuf {
@@ -826,7 +544,7 @@ mod tests {
     }
 
     #[test]
-    fn skip_decision_reports_atomics_helper_gap_narrowly() {
+    fn skip_decision_runs_atomics_helper_tests() {
         let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
         let metadata = parse_metadata(
             r"
@@ -846,12 +564,31 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "requires $262.agent multi-agent harness".to_string()
-            ))
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn skip_decision_runs_can_block_false_tests() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            flags: [CanBlockIsFalse]
+            ---*/
+            ",
         );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test.js"),
+            Path::new("/tmp"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
     }
 
     #[test]
@@ -879,7 +616,7 @@ mod tests {
     }
 
     #[test]
-    fn skip_decision_excludes_duplicate_named_backreference_tests_narrowly() {
+    fn skip_decision_runs_duplicate_named_backreference_tests() {
         let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
         let metadata = parse_metadata(
             r"
@@ -899,12 +636,7 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(
-            decision,
-            Some(SkipDecision::ExcludedFromSelection(
-                "duplicate named backreferences need participating-capture semantics".to_string()
-            ))
-        );
+        assert_eq!(decision, None);
     }
 
     #[test]
@@ -1157,7 +889,7 @@ mod tests {
     }
 
     #[test]
-    fn skip_decision_excludes_regexp_modifier_backend_gaps_narrowly() {
+    fn skip_decision_runs_regexp_modifier_backend_gap_tests() {
         let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
         let metadata = parse_metadata(
             r"
@@ -1179,13 +911,7 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(
-            decision,
-            Some(SkipDecision::ExcludedFromSelection(
-                "regexp modifier scoped ignoreCase for backreferences needs backend support"
-                    .to_string()
-            ))
-        );
+        assert_eq!(decision, None);
     }
 
     #[test]
@@ -1213,7 +939,7 @@ mod tests {
     }
 
     #[test]
-    fn skip_decision_reports_is_htmldda_host_gap() {
+    fn skip_decision_runs_unmanifested_is_htmldda_tests() {
         let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
         let metadata = parse_metadata(
             r"
@@ -1233,12 +959,231 @@ mod tests {
             ProposalStage::Stage3,
         );
 
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn checked_in_manifest_classifies_is_htmldda_as_host_only_scope() {
+        let root = workspace_root();
+        let test_dir = root.join("testdata/test262/test");
+        let path = test_dir.join("annexB/language/expressions/typeof/emulates-undefined.js");
+        let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
+        let metadata = parse_metadata(&source);
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let manifest = load_manifest(&root, "reports/js/lyng-js/test262-exclusions.txt")
+            .expect("checked-in manifest should load");
+
+        let decision = skip_decision(
+            &path,
+            &test_dir,
+            &manifest,
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
         assert_eq!(
             decision,
             Some(SkipDecision::Skip(
-                "unsupported host feature: IsHTMLDDA".to_string()
+                "manifest exclusion (path): IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness.".to_string()
             ))
         );
+    }
+
+    #[test]
+    fn selected_builtin_bootstrap_regressions_are_runnable() {
+        let root = workspace_root();
+        let test_dir = root.join("testdata/test262/test");
+        let path = test_dir.join("built-ins/Object/getPrototypeOf/15.2.3.2-1.js");
+        let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
+        let metadata = parse_metadata(&source);
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+
+        let decision = skip_decision(
+            &path,
+            &test_dir,
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn selected_arraybuffer_feature_tests_are_runnable() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        for feature in ["resizable-arraybuffer", "arraybuffer-transfer"] {
+            let metadata = parse_metadata(&format!(
+                r"
+                /*---
+                features: [{feature}]
+                ---*/
+                ",
+            ));
+
+            let decision = skip_decision(
+                Path::new("/tmp/test.js"),
+                Path::new("/tmp"),
+                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &metadata,
+                &helpers,
+                false,
+                ProposalStage::Stage3,
+            );
+
+            assert_eq!(decision, None, "feature {feature} should be runnable");
+        }
+    }
+
+    #[test]
+    fn selected_arraybuffer_safety_regressions_are_runnable() {
+        let root = workspace_root();
+        let test_dir = root.join("testdata/test262/test");
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        for relative_path in [
+            "built-ins/ArrayBuffer/allocation-limit.js",
+            "built-ins/ArrayBuffer/length-is-too-large-throws.js",
+        ] {
+            let path = test_dir.join(relative_path);
+            let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
+            let metadata = parse_metadata(&source);
+
+            let decision = skip_decision(
+                &path,
+                &test_dir,
+                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &metadata,
+                &helpers,
+                false,
+                ProposalStage::Stage3,
+            );
+
+            assert_eq!(decision, None, "{relative_path} should be runnable");
+        }
+    }
+
+    #[test]
+    fn selected_iterator_helper_feature_tests_are_runnable() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        for feature in ["iterator-sequencing", "joint-iteration"] {
+            let metadata = parse_metadata(&format!(
+                r"
+                /*---
+                features: [{feature}]
+                ---*/
+                ",
+            ));
+
+            let decision = skip_decision(
+                Path::new("/tmp/test.js"),
+                Path::new("/tmp"),
+                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &metadata,
+                &helpers,
+                false,
+                ProposalStage::Stage3,
+            );
+
+            assert_eq!(decision, None, "feature {feature} should be runnable");
+        }
+    }
+
+    #[test]
+    fn selected_iterator_helper_path_regressions_are_runnable() {
+        let root = workspace_root();
+        let test_dir = root.join("testdata/test262/test");
+        let path = test_dir.join("built-ins/Iterator/concat/proto.js");
+        let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
+        let metadata = parse_metadata(&source);
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+
+        let decision = skip_decision(
+            &path,
+            &test_dir,
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn selected_regexp_feature_tests_are_runnable() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        for feature in ["regexp-v-flag", "regexp-modifiers"] {
+            let metadata = parse_metadata(&format!(
+                r"
+                /*---
+                features: [{feature}]
+                ---*/
+                ",
+            ));
+
+            let decision = skip_decision(
+                Path::new("/tmp/test.js"),
+                Path::new("/tmp"),
+                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &metadata,
+                &helpers,
+                false,
+                ProposalStage::Stage3,
+            );
+
+            assert_eq!(decision, None, "feature {feature} should be runnable");
+        }
+    }
+
+    #[test]
+    fn selected_staging_duplicate_named_group_tests_are_runnable() {
+        let root = workspace_root();
+        let test_dir = root.join("testdata/test262/test");
+        let path = test_dir.join("staging/built-ins/RegExp/named-groups/duplicate-named-groups.js");
+        let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
+        let metadata = parse_metadata(&source);
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+
+        let decision = skip_decision(
+            &path,
+            &test_dir,
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
+    }
+
+    #[test]
+    fn selected_decorator_feature_tests_are_runnable() {
+        let helpers = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            features: [decorators]
+            ---*/
+            ",
+        );
+
+        let decision = skip_decision(
+            Path::new("/tmp/test.js"),
+            Path::new("/tmp"),
+            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &metadata,
+            &helpers,
+            false,
+            ProposalStage::Stage3,
+        );
+
+        assert_eq!(decision, None);
     }
 
     #[test]

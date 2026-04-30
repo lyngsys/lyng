@@ -59,7 +59,7 @@ The active `6H` closure work currently centers on these buckets:
   - script strictness and lexical cleanup
   - optional-chaining execution closure
 - compatibility and remaining semantic tails
-  - Annex B is green in the filtered report, with only explicit `IsHTMLDDA` host-policy skips
+  - Annex B is green in the filtered report, with only manifest `IsHTMLDDA` host-only exclusions
   - remaining RegExp-literal lowering gaps
   - remaining Temporal conformance tail
   - class/private/computed-name conformance tail
@@ -161,8 +161,9 @@ The filtered Annex B run currently has `1307` passed, `0` failed, `0` panicked,
 and `70` skipped. The remaining skipped tests are all `IsHTMLDDA` cases, which
 require a browser `document.all` compatibility object supplied by the host. The
 standalone Lyng JS Test262 harness does not provide that host object, so these
-are explicit host-boundary exclusions rather than hidden Annex B language or
-builtin implementation gaps.
+are checked-in manifest path exclusions rather than hidden Annex B language or
+builtin implementation gaps. Default-suite skips must come from the manifest,
+which remains limited to out-of-scope suites or explicit host-only cases.
 
 ## Completion Bar
 

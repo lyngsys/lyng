@@ -624,20 +624,15 @@ fn write_notes_section(out: &mut String, report: &SuiteReport<'_>) {
             out,
             "- The checked-in exclusion manifest remains intentionally narrow. Missing engine work stays visible here as skips or failures instead of being hidden in the manifest."
         );
+        let _ = writeln!(
+            out,
+            "- Default-suite skips must come from checked-in manifest rules for out-of-scope suites or explicit host-only cases."
+        );
     }
     let _ = writeln!(
         out,
         "- Stage 4 implementation gaps remain visible as skips or failures; proposal-stage policy only excludes tests below the configured proposal maturity."
     );
-    if report
-        .skip_reasons
-        .contains_key("unsupported host feature: IsHTMLDDA")
-    {
-        let _ = writeln!(
-            out,
-            "- `IsHTMLDDA` skips are explicit host-boundary exclusions for browser `document.all` compatibility objects. The standalone Lyng JS Test262 harness does not provide that host object, so these skips are not hidden Annex B language or builtin gaps."
-        );
-    }
 }
 
 #[cfg(test)]
@@ -914,8 +909,68 @@ mod tests {
         assert!(output.contains("| Runtime safety | runtime abort: oversize ArrayBuffer allocation guard missing | `1` |"));
     }
 
+    fn workspace_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("workspace root should exist")
+    }
+
+    fn skip_breakdown_rows(source: &str) -> Vec<String> {
+        let mut rows = Vec::new();
+        let mut in_skip_breakdown = false;
+        for line in source.lines() {
+            if line.trim() == "## Skip Breakdown" {
+                in_skip_breakdown = true;
+                continue;
+            }
+            if in_skip_breakdown && line.starts_with("## ") {
+                break;
+            }
+            if !in_skip_breakdown
+                || !line.starts_with('|')
+                || line.starts_with("| Class ")
+                || line.starts_with("| ---")
+            {
+                continue;
+            }
+            rows.push(line.to_string());
+        }
+        rows
+    }
+
+    fn assert_checked_in_report_has_only_manifest_skips(relative_path: &str) {
+        let report_path = workspace_root().join(relative_path);
+        let report = fs::read_to_string(&report_path).unwrap_or_else(|error| {
+            panic!("{} should be readable: {error}", report_path.display())
+        });
+        let rows = skip_breakdown_rows(&report);
+        assert!(
+            !rows.is_empty(),
+            "{} should record checked-in manifest skips",
+            report_path.display()
+        );
+        for row in rows {
+            assert!(
+                row.starts_with("| Manifest/out of scope |"),
+                "{} contains a non-manifest skip row: {row}",
+                report_path.display()
+            );
+        }
+    }
+
     #[test]
-    fn report_documents_is_htmldda_host_policy_skip() {
+    fn checked_in_whole_report_has_only_manifest_skips() {
+        assert_checked_in_report_has_only_manifest_skips("reports/js/lyng-js/test262.md");
+    }
+
+    #[test]
+    fn checked_in_annexb_report_has_only_manifest_skips() {
+        assert_checked_in_report_has_only_manifest_skips("reports/js/lyng-js/test262-annexb.md");
+    }
+
+    #[test]
+    fn report_documents_manifest_host_only_skip() {
         let mut selected_counts = HashMap::new();
         selected_counts.insert("annexB".to_string(), 1);
 
@@ -930,12 +985,19 @@ mod tests {
             },
         );
 
-        let skip_reasons = HashMap::from([("unsupported host feature: IsHTMLDDA".to_string(), 1)]);
+        let skip_reasons = HashMap::from([(
+            "manifest exclusion (path): IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness.".to_string(),
+            1,
+        )]);
         let exclusion_reasons = HashMap::new();
         let failures = Vec::new();
         let manifest = ExclusionManifest {
             path: "reports/js/lyng-js/test262-exclusions.txt".to_string(),
-            rules: Vec::new(),
+            rules: vec![crate::selection::ExclusionRule {
+                kind: crate::selection::ExclusionKind::Path,
+                pattern: "annexB/language/expressions/typeof/emulates-undefined.js".to_string(),
+                reason: "IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness.".to_string(),
+            }],
         };
         let (report_path, report_path_string) = unique_report_path("is-htmldda-policy");
 
@@ -960,11 +1022,9 @@ mod tests {
         let output = fs::read_to_string(&report_path).expect("report should be readable");
         let _ = fs::remove_file(&report_path);
 
-        assert!(
-            output.contains("| Host/runtime policy | unsupported host feature: IsHTMLDDA | `1` |")
-        );
+        assert!(output.contains("| Manifest/out of scope | manifest exclusion (path): IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. | `1` |"));
         assert!(output.contains(
-            "`IsHTMLDDA` skips are explicit host-boundary exclusions for browser `document.all` compatibility objects"
+            "Default-suite skips must come from checked-in manifest rules for out-of-scope suites or explicit host-only cases"
         ));
     }
 
