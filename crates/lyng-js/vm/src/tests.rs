@@ -6513,6 +6513,75 @@ fn async_generator_yield_star_uses_async_iterator_hint() {
 }
 
 #[test]
+fn async_generator_private_yield_star_awaits_async_iterator_next_results() {
+    let unit = compile_test_unit(
+        334,
+        r#"
+            async function main() {
+                var log = "";
+                var iterable = {
+                    [Symbol.asyncIterator]() {
+                        var count = 0;
+                        return {
+                            next(value) {
+                                log += "next:" + String(value) + ";";
+                                count += 1;
+                                if (count === 1) {
+                                    return Promise.resolve({
+                                        value: Promise.resolve(5),
+                                        done: false
+                                    });
+                                }
+                                return Promise.resolve({
+                                    value: "done",
+                                    done: true
+                                });
+                            }
+                        };
+                    }
+                };
+                class C {
+                    async *#gen() {
+                        var completion = yield* iterable;
+                        return "ret:" + completion;
+                    }
+                    gen() {
+                        return this.#gen();
+                    }
+                }
+                var iter = new C().gen();
+                var first = await iter.next("ignored");
+                var second = await iter.next("sent");
+                return String(first.value) + ":" + first.done
+                    + "|" + second.value + ":" + second.done
+                    + "|" + log;
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("async generator delegated yield-star test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("async generator delegated yield-star promise should remain tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    let text = record
+        .result()
+        .as_string_ref()
+        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .expect("async generator delegated yield-star result should be a string");
+
+    assert_eq!(text, "5:false|ret:done:true|next:undefined;next:sent;");
+}
+
+#[test]
 fn async_generator_functions_use_the_async_generator_prototype_chain() {
     let unit = compile_test_unit(
         233,

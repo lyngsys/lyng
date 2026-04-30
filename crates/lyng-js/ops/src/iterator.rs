@@ -21,11 +21,19 @@ pub enum AsyncFromSyncState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DelegateYieldAwaitState {
+    None,
+    IteratorResult { return_completion: bool },
+    Value { done: bool, return_completion: bool },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct IteratorRecord {
     iterator: ObjectRef,
     next_method: Value,
     kind: IteratorKind,
     async_from_sync_state: AsyncFromSyncState,
+    delegate_yield_await_state: DelegateYieldAwaitState,
     preserve_completion_on_close: bool,
     done: bool,
     delegate_started: bool,
@@ -39,6 +47,7 @@ impl IteratorRecord {
             next_method: Value::from_object_ref(next_method),
             kind: IteratorKind::Sync,
             async_from_sync_state: AsyncFromSyncState::None,
+            delegate_yield_await_state: DelegateYieldAwaitState::None,
             preserve_completion_on_close: false,
             done: false,
             delegate_started: false,
@@ -56,6 +65,7 @@ impl IteratorRecord {
             next_method,
             kind,
             async_from_sync_state: AsyncFromSyncState::None,
+            delegate_yield_await_state: DelegateYieldAwaitState::None,
             preserve_completion_on_close: false,
             done: false,
             delegate_started: false,
@@ -113,6 +123,16 @@ impl IteratorRecord {
     #[inline]
     pub fn set_async_from_sync_state(&mut self, state: AsyncFromSyncState) {
         self.async_from_sync_state = state;
+    }
+
+    #[inline]
+    pub const fn delegate_yield_await_state(self) -> DelegateYieldAwaitState {
+        self.delegate_yield_await_state
+    }
+
+    #[inline]
+    pub fn set_delegate_yield_await_state(&mut self, state: DelegateYieldAwaitState) {
+        self.delegate_yield_await_state = state;
     }
 
     #[inline]
