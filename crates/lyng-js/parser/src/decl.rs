@@ -348,6 +348,16 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             self.advance(); // eat `static`
         }
 
+        // Auto-accessor field definitions: `accessor x;`.
+        if self.at_contextual(WellKnownAtom::accessor) {
+            let peek = self.peek();
+            if !peek.preceded_by_line_terminator() && is_accessor_field_name_start(peek.kind) {
+                self.advance(); // eat `accessor`
+                let (key, computed, private) = self.parse_class_element_name();
+                return self.finish_class_property(start, key, computed, private, is_static);
+            }
+        }
+
         // Get/Set accessors
         if self.at_contextual(WellKnownAtom::get) || self.at_contextual(WellKnownAtom::set) {
             let method_start = self.current_span();
@@ -460,6 +470,17 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
 
         // Field: `name = value;` or `name;`
+        self.finish_class_property(start, key, computed, private, is_static)
+    }
+
+    fn finish_class_property(
+        &mut self,
+        start: lyng_js_common::Span,
+        key: lyng_js_ast::ExprId,
+        computed: bool,
+        private: bool,
+        is_static: bool,
+    ) -> lyng_js_ast::ClassElementId {
         let value = if self.eat(TokenKind::Eq) {
             Some(self.parse_assignment_expression())
         } else {
@@ -533,5 +554,17 @@ fn is_property_name_start(kind: TokenKind) -> bool {
             | TokenKind::BigIntLiteral
             | TokenKind::LBracket
             | TokenKind::Star
+    ) || kind.is_keyword()
+}
+
+fn is_accessor_field_name_start(kind: TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::Identifier
+            | TokenKind::PrivateIdentifier
+            | TokenKind::StringLiteral
+            | TokenKind::NumericLiteral
+            | TokenKind::BigIntLiteral
+            | TokenKind::LBracket
     ) || kind.is_keyword()
 }

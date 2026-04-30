@@ -156,6 +156,36 @@ fn parse_class_field() {
 }
 
 #[test]
+fn parse_class_accessor_field_definition() {
+    let p = script_ok("class Foo { accessor $; accessor _ = 1; }");
+    let stmts = body(&p);
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
+        if let Decl::Class { body, .. } = p.ast.get_decl(*decl) {
+            let elements = p.ast.get_class_element_list(*body);
+            assert_eq!(elements.len(), 2);
+            for element in elements {
+                assert!(matches!(
+                    p.ast.get_class_element(*element),
+                    ClassElement::Property { .. }
+                ));
+            }
+        }
+    }
+}
+
+#[test]
+fn parse_class_accessor_line_terminator_as_field_name() {
+    let p = script_ok("class Foo { accessor\n$; static accessor\n$; }");
+    let stmts = body(&p);
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
+        if let Decl::Class { body, .. } = p.ast.get_decl(*decl) {
+            let elements = p.ast.get_class_element_list(*body);
+            assert_eq!(elements.len(), 4);
+        }
+    }
+}
+
+#[test]
 fn parse_class_getter_setter() {
     let p = script_ok("class Foo { get x() { return 1; } set x(v) {} }");
     let stmts = body(&p);
