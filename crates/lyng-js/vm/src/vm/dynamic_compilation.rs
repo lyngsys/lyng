@@ -892,6 +892,13 @@ impl Vm {
         annex_b_catch_names: &[AtomId],
     ) -> VmResult<()> {
         if lexical_env == var_env {
+            for &name in function_names.iter().chain(var_names) {
+                if self
+                    .direct_eval_variable_environment_has_own_lexical_binding(agent, var_env, name)
+                {
+                    return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
+                }
+            }
             return Ok(());
         }
 
@@ -975,6 +982,34 @@ impl Vm {
                 Self::layout_has_binding(agent, record.layout(), name)
             }
             lyng_js_env::EnvironmentRecord::Global(record) => record.has_var_name(name),
+            lyng_js_env::EnvironmentRecord::Private(_)
+            | lyng_js_env::EnvironmentRecord::Object(_) => false,
+        }
+    }
+
+    fn direct_eval_variable_environment_has_own_lexical_binding(
+        &self,
+        agent: &Agent,
+        variable_env: lyng_js_types::EnvironmentRef,
+        name: AtomId,
+    ) -> bool {
+        let Some(record) = agent.environment(variable_env) else {
+            return false;
+        };
+        match record {
+            lyng_js_env::EnvironmentRecord::Declarative(record) => {
+                Self::layout_binding_is_lexical(agent, record.layout(), name) == Some(true)
+            }
+            lyng_js_env::EnvironmentRecord::Function(record) => {
+                Self::layout_binding_is_lexical(agent, record.declarative().layout(), name)
+                    == Some(true)
+            }
+            lyng_js_env::EnvironmentRecord::Module(record) => {
+                Self::layout_binding_is_lexical(agent, record.layout(), name) == Some(true)
+            }
+            lyng_js_env::EnvironmentRecord::Global(record) => self
+                .lookup_global_lexical_binding(agent, &record, name)
+                .is_some(),
             lyng_js_env::EnvironmentRecord::Private(_)
             | lyng_js_env::EnvironmentRecord::Object(_) => false,
         }

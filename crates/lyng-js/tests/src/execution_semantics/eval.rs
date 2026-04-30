@@ -908,6 +908,26 @@ fn direct_eval_in_nested_block_rejects_var_collision_with_enclosing_lexical() {
 }
 
 #[test]
+fn direct_eval_in_sloppy_function_rejects_var_collision_with_body_lexical() {
+    let result = compile_and_run_string(
+        r#"
+            function f() {
+                let x;
+                try {
+                    eval("var x;");
+                    return "ok";
+                } catch (error) {
+                    return error.constructor === SyntaxError ? "syntax" : "other";
+                }
+            }
+            f();
+        "#,
+    );
+
+    assert_eq!(result, "syntax");
+}
+
+#[test]
 fn indirect_eval_creates_distinct_lexical_environment_for_root_let_bindings() {
     let result = compile_and_run_string(
         r#"
