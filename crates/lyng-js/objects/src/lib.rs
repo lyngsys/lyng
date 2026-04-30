@@ -43,7 +43,7 @@ pub use self::core::{
 };
 use self::descriptors::{
     complete_descriptor_update, dense_element_growth_capacity, descriptor_from_payload,
-    descriptor_kind, flattened_property_lookup, ordinary_property_attrs,
+    descriptor_kind, descriptor_same_value, flattened_property_lookup, ordinary_property_attrs,
     payload_from_complete_descriptor, resolve_get_from_descriptor, trim_dense_logical_len,
     update_integrity_flags, validate_descriptor_change, write_named_payload, DescriptorKind,
 };

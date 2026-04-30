@@ -109,7 +109,7 @@ impl ObjectRuntime {
         let (old_len, old_writable) = self.engine_array_length_state(heap.view(), id)?;
         let current = self.ordinary_own_index_property(heap.view(), id, index)?;
         if let Some(current) = current {
-            if !validate_descriptor_change(current, descriptor)? {
+            if !validate_descriptor_change(heap.view(), current, descriptor)? {
                 return Ok(false);
             }
         } else {

@@ -843,6 +843,9 @@ impl Vm {
         key: PropertyKey,
         mut value: Value,
     ) -> VmResult<bool> {
+        if agent.objects().is_module_namespace_object(object) {
+            return Ok(false);
+        }
         if agent.objects().typed_array(object).is_some() {
             if key.as_index().is_some() {
                 return self

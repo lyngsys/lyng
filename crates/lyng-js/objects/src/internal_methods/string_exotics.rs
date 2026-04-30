@@ -33,11 +33,11 @@ impl ObjectRuntime {
     ) -> InternalMethodResult<bool> {
         if let Some(index) = key.as_index() {
             if let Some(current) = self.string_exotic_index_property(heap.view(), id, index)? {
-                return validate_descriptor_change(current, descriptor);
+                return validate_descriptor_change(heap.view(), current, descriptor);
             }
             let current = self.ordinary_own_index_property(heap.view(), id, index)?;
             if let Some(current) = current {
-                if !validate_descriptor_change(current, descriptor)? {
+                if !validate_descriptor_change(heap.view(), current, descriptor)? {
                     return Ok(false);
                 }
             } else if !self.ordinary_is_extensible(id)? {
@@ -50,12 +50,12 @@ impl ObjectRuntime {
 
         if key.as_atom() == Some(WellKnownAtom::length.id()) {
             let current = self.string_exotic_length_property(heap.view(), id)?;
-            return validate_descriptor_change(current, descriptor);
+            return validate_descriptor_change(heap.view(), current, descriptor);
         }
 
         let current = self.ordinary_own_named_property(heap.view(), id, key)?;
         if let Some(current) = current {
-            if !validate_descriptor_change(current, descriptor)? {
+            if !validate_descriptor_change(heap.view(), current, descriptor)? {
                 return Ok(false);
             }
         } else if !self.ordinary_is_extensible(id)? {

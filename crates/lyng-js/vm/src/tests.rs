@@ -934,9 +934,79 @@ fn module_namespace_object_exposes_symbol_to_string_tag() {
 }
 
 #[test]
+fn module_namespace_reflect_define_accepts_matching_to_string_tag_descriptor() {
+    let source = "import * as ns from './main.mjs'; let status = 0; const tag = { value: 'Module', writable: false, enumerable: false, configurable: false }; if (Reflect.defineProperty(ns, Symbol.toStringTag, tag) === true) status += 1; try { if (Object.defineProperty(ns, Symbol.toStringTag, tag) === ns) status += 2; } catch (error) { status += 8; } export { status }; export default null;";
+    let unit = compile_test_module(227, source);
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let key = ModuleKey::new("/tmp/main.mjs");
+    let mut vm = Vm::new();
+
+    vm.install_module(agent, realm.id(), &key, "/tmp/main.mjs", &unit)
+        .unwrap();
+    assert!(agent.set_module_requested_key(&key, 0, Some(key.clone())));
+
+    let _ = vm.evaluate_linked_module(agent, realm, &key).unwrap();
+
+    let record = agent
+        .module_record(&key)
+        .expect("module should stay cached after evaluation");
+    let module_env = record
+        .environment()
+        .expect("module evaluation should allocate one environment");
+    let status_slot = unit
+        .local_exports()
+        .iter()
+        .find(|entry| unit.atom_text(entry.export_name()) == Some("status"))
+        .expect("module should export status")
+        .local_slot();
+
+    assert_eq!(
+        agent.environment_slot(module_env, status_slot),
+        Some(Value::from_smi(3))
+    );
+}
+
+#[test]
+fn module_namespace_reflect_set_rejects_same_export_and_symbol_values() {
+    let source = "import * as ns from './main.mjs'; export default 42; const receiver = {}; export const status = (Reflect.set(ns, 'default', 42) === false ? 1 : 0) + (Reflect.set(ns, Symbol.toStringTag, ns[Symbol.toStringTag]) === false ? 2 : 0) + (Reflect.set(ns, 'missing', 1, receiver) === false && !('missing' in receiver) ? 4 : 0);";
+    let unit = compile_test_module(228, source);
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let key = ModuleKey::new("/tmp/main.mjs");
+    let mut vm = Vm::new();
+
+    vm.install_module(agent, realm.id(), &key, "/tmp/main.mjs", &unit)
+        .unwrap();
+    assert!(agent.set_module_requested_key(&key, 0, Some(key.clone())));
+
+    let _ = vm.evaluate_linked_module(agent, realm, &key).unwrap();
+
+    let record = agent
+        .module_record(&key)
+        .expect("module should stay cached after evaluation");
+    let module_env = record
+        .environment()
+        .expect("module evaluation should allocate one environment");
+    let status_slot = unit
+        .local_exports()
+        .iter()
+        .find(|entry| unit.atom_text(entry.export_name()) == Some("status"))
+        .expect("module should export status")
+        .local_slot();
+
+    assert_eq!(
+        agent.environment_slot(module_env, status_slot),
+        Some(Value::from_smi(7))
+    );
+}
+
+#[test]
 fn module_namespace_get_own_property_throws_for_uninitialized_binding() {
     let unit = compile_test_module(
-        227,
+        229,
         "import * as ns from './main.mjs'; let status = 0; try { Object.getOwnPropertyDescriptor(ns, 'local'); status = 1; } catch (error) { status = error.constructor === ReferenceError ? 2 : 3; } export { status }; export let local = 1;",
     );
     let mut runtime = Runtime::new(NoopHostHooks);

@@ -82,7 +82,7 @@ impl ObjectRuntime {
         let _ = self.require_object_kind(id)?;
         let current = self.get_own_property(heap.view(), id, key)?;
         if let Some(current) = current {
-            if !validate_descriptor_change(current, descriptor)? {
+            if !validate_descriptor_change(heap.view(), current, descriptor)? {
                 return Ok(false);
             }
         } else if !self.ordinary_is_extensible(id)? {

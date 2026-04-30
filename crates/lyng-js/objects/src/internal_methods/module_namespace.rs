@@ -54,7 +54,11 @@ impl ObjectRuntime {
             return Ok(false);
         }
         if let Some(value) = descriptor.value() {
-            if value != self.module_namespace_export_value(heap.view(), export)? {
+            if !descriptor_same_value(
+                heap.view(),
+                value,
+                self.module_namespace_export_value(heap.view(), export)?,
+            )? {
                 return Ok(false);
             }
         }

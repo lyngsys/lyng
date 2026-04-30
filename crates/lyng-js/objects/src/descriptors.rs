@@ -3,7 +3,7 @@ use super::{
     ShapeProperty, ShapePropertyKind, Value, MIN_DENSE_ELEMENT_CAPACITY,
     SMALL_SHAPE_INLINE_PROPERTY_LIMIT,
 };
-use lyng_js_gc::{ObjectSlotsRef, PrimitiveMutator, ValueStoreTarget};
+use lyng_js_gc::{ObjectSlotsRef, PrimitiveHeapView, PrimitiveMutator, ValueStoreTarget};
 use lyng_js_types::{PropertyDescriptor, PropertyKey};
 use std::collections::HashMap;
 
@@ -187,6 +187,7 @@ pub(crate) fn complete_descriptor_update(
 }
 
 pub(crate) fn validate_descriptor_change(
+    heap: PrimitiveHeapView<'_>,
     current: PropertyDescriptor,
     update: PropertyDescriptor,
 ) -> InternalMethodResult<bool> {
@@ -218,7 +219,11 @@ pub(crate) fn validate_descriptor_change(
                     return Ok(false);
                 }
                 if let Some(value) = update.value() {
-                    if value != current.value().unwrap_or(Value::undefined()) {
+                    if !descriptor_same_value(
+                        heap,
+                        value,
+                        current.value().unwrap_or(Value::undefined()),
+                    )? {
                         return Ok(false);
                     }
                 }
@@ -239,6 +244,52 @@ pub(crate) fn validate_descriptor_change(
             Ok(true)
         }
     }
+}
+
+pub(crate) fn descriptor_same_value(
+    heap: PrimitiveHeapView<'_>,
+    left: Value,
+    right: Value,
+) -> InternalMethodResult<bool> {
+    match (left.as_f64(), right.as_f64()) {
+        (Some(left), Some(right)) => {
+            if left.is_nan() && right.is_nan() {
+                return Ok(true);
+            }
+            if left == right {
+                return Ok(left != 0.0 || left.is_sign_negative() == right.is_sign_negative());
+            }
+            return Ok(false);
+        }
+        (Some(_), None) | (None, Some(_)) => return Ok(false),
+        (None, None) => {}
+    }
+
+    match (left.as_string_ref(), right.as_string_ref()) {
+        (Some(left), Some(right)) => {
+            return heap
+                .strings_equal(left, right)
+                .ok_or(InternalMethodError::CorruptObjectState);
+        }
+        (Some(_), None) | (None, Some(_)) => return Ok(false),
+        (None, None) => {}
+    }
+
+    match (left.as_bigint_ref(), right.as_bigint_ref()) {
+        (Some(left), Some(right)) => {
+            let left = heap
+                .bigint_view(left)
+                .ok_or(InternalMethodError::CorruptObjectState)?;
+            let right = heap
+                .bigint_view(right)
+                .ok_or(InternalMethodError::CorruptObjectState)?;
+            return Ok(left.sign() == right.sign() && left.limb_bytes_le() == right.limb_bytes_le());
+        }
+        (Some(_), None) | (None, Some(_)) => return Ok(false),
+        (None, None) => {}
+    }
+
+    Ok(left == right)
 }
 
 pub(crate) fn resolve_get_from_descriptor(

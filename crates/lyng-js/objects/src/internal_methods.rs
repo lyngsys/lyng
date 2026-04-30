@@ -290,11 +290,7 @@ impl ObjectRuntime {
                 }
             }
             ObjectKind::Ordinary | ObjectKind::Function => {
-                if self
-                    .module_namespace_slot(id)
-                    .and_then(|namespace| key.as_atom().and_then(|atom| namespace.export(atom)))
-                    .is_some()
-                {
+                if self.is_module_namespace_object(id) {
                     return Ok(false);
                 }
                 self.ordinary_set(heap, id, key, value, receiver, lifetime)
