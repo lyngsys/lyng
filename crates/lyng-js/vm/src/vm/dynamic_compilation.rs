@@ -539,6 +539,34 @@ impl Vm {
             })
     }
 
+    fn direct_eval_declares_root_var_or_function_with_name(
+        sema: &ScriptSema,
+        name: AtomId,
+    ) -> bool {
+        let root_scope = ScopeId::new(0);
+        sema.scope_table
+            .get(root_scope)
+            .bindings
+            .iter()
+            .copied()
+            .any(|binding_id| {
+                let binding = sema.binding_table.get(binding_id);
+                binding.scope == root_scope
+                    && binding.name == name
+                    && matches!(
+                        binding.kind,
+                        DeclarationKind::Var | DeclarationKind::Function
+                    )
+            })
+    }
+
+    fn direct_eval_declares_parameter_name(sema: &ScriptSema, parameter_names: &[AtomId]) -> bool {
+        parameter_names
+            .iter()
+            .copied()
+            .any(|name| Self::direct_eval_declares_root_var_or_function_with_name(sema, name))
+    }
+
     fn push_unique_atom(names: &mut Vec<AtomId>, name: AtomId) {
         if !names.contains(&name) {
             names.push(name);
@@ -1127,6 +1155,7 @@ impl Vm {
             direct_eval_site_flags,
             annex_b_catch_environments,
             annex_b_catch_names,
+            direct_eval_parameter_names,
         ) = self.caller_direct_eval_lexical_environment(agent, caller, caller_name_env_start)?;
         let source_id = self.allocate_dynamic_source_id();
         let direct_eval_private_layouts =
@@ -1167,6 +1196,15 @@ impl Vm {
         let caller_variable_env = caller.variable_env();
         let root_var_names = Self::direct_eval_root_var_names(analysis.sema());
         let root_function_names = Self::direct_eval_root_function_names(analysis.sema());
+        if !analysis.parsed().strict
+            && Self::caller_in_parameter_initializer(caller)
+            && Self::direct_eval_declares_parameter_name(
+                analysis.sema(),
+                &direct_eval_parameter_names,
+            )
+        {
+            return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
+        }
         if !analysis.parsed().strict
             && Self::caller_in_parameter_initializer(caller)
             && Self::direct_eval_declares_root_var_or_function_named_arguments(analysis.sema())

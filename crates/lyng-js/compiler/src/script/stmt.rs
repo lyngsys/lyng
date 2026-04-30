@@ -114,6 +114,29 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .collect()
     }
 
+    pub(super) fn active_direct_eval_parameter_names(&self) -> Vec<AtomId> {
+        if self.state.sema.scope_table.get(self.current_scope).kind != ScopeKind::Parameter {
+            return Vec::new();
+        }
+
+        let mut names = Vec::new();
+        for binding_id in self
+            .state
+            .sema
+            .scope_table
+            .get(self.current_scope)
+            .bindings
+            .iter()
+            .copied()
+        {
+            let binding = self.state.sema.binding_table.get(binding_id);
+            if binding.kind == DeclarationKind::Parameter && !names.contains(&binding.name) {
+                names.push(binding.name);
+            }
+        }
+        names
+    }
+
     fn annex_b_simple_catch_name_for_scope(&self, scope: ScopeId) -> Option<AtomId> {
         let names = self
             .state

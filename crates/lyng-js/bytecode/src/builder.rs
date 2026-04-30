@@ -646,6 +646,7 @@ impl BytecodeBuilder {
         scopes: Vec<DirectEvalLexicalScope>,
         flags: DirectEvalSiteFlags,
         annex_b_catch_names: Vec<lyng_js_common::AtomId>,
+        parameter_names: Vec<lyng_js_common::AtomId>,
     ) {
         self.direct_eval_lexical_sites
             .push(DirectEvalLexicalSite::new(
@@ -653,6 +654,7 @@ impl BytecodeBuilder {
                 scopes,
                 flags,
                 annex_b_catch_names,
+                parameter_names,
             ));
     }
 

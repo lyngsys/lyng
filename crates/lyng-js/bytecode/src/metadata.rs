@@ -316,6 +316,7 @@ pub struct DirectEvalLexicalSite {
     scopes: Vec<DirectEvalLexicalScope>,
     flags: DirectEvalSiteFlags,
     annex_b_catch_names: Vec<AtomId>,
+    parameter_names: Vec<AtomId>,
 }
 
 impl DirectEvalLexicalSite {
@@ -325,12 +326,14 @@ impl DirectEvalLexicalSite {
         scopes: Vec<DirectEvalLexicalScope>,
         flags: DirectEvalSiteFlags,
         annex_b_catch_names: Vec<AtomId>,
+        parameter_names: Vec<AtomId>,
     ) -> Self {
         Self {
             instruction_offset,
             scopes,
             flags,
             annex_b_catch_names,
+            parameter_names,
         }
     }
 
@@ -352,6 +355,11 @@ impl DirectEvalLexicalSite {
     #[inline]
     pub fn annex_b_catch_names(&self) -> &[AtomId] {
         &self.annex_b_catch_names
+    }
+
+    #[inline]
+    pub fn parameter_names(&self) -> &[AtomId] {
+        &self.parameter_names
     }
 }
 

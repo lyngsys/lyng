@@ -95,11 +95,24 @@ impl InstalledFunction {
                             .unwrap_or(name)
                     })
                     .collect::<Vec<_>>();
+                let canonical_parameter_names = site
+                    .parameter_names()
+                    .iter()
+                    .copied()
+                    .map(|name| {
+                        canonical_atoms
+                            .get(usize::try_from(name.raw()).unwrap_or(usize::MAX))
+                            .copied()
+                            .flatten()
+                            .unwrap_or(name)
+                    })
+                    .collect::<Vec<_>>();
                 *slot = Some(lyng_js_bytecode::DirectEvalLexicalSite::new(
                     site.instruction_offset(),
                     canonical_scopes,
                     site.flags(),
                     canonical_annex_b_catch_names,
+                    canonical_parameter_names,
                 ));
             }
         }

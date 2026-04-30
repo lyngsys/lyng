@@ -125,6 +125,7 @@ impl Vm {
         DirectEvalSiteFlags,
         Vec<(EnvironmentRef, AtomId)>,
         Vec<AtomId>,
+        Vec<AtomId>,
     )> {
         let Some(installed) = self
             .installed
@@ -134,6 +135,7 @@ impl Vm {
             return Ok((
                 lexical_env,
                 DirectEvalSiteFlags::empty(),
+                Vec::new(),
                 Vec::new(),
                 Vec::new(),
             ));
@@ -147,6 +149,7 @@ impl Vm {
                 DirectEvalSiteFlags::empty(),
                 Vec::new(),
                 Vec::new(),
+                Vec::new(),
             ));
         };
 
@@ -154,6 +157,7 @@ impl Vm {
         let mut current_outer = lexical_env;
         let mut annex_b_catch_environments = Vec::new();
         let annex_b_catch_names = site.annex_b_catch_names().to_vec();
+        let parameter_names = site.parameter_names().to_vec();
         for scope in site.scopes() {
             let source_environment = self
                 .direct_eval_scope_source_environment(agent, source_start, scope)
@@ -190,6 +194,7 @@ impl Vm {
             site.flags(),
             annex_b_catch_environments,
             annex_b_catch_names,
+            parameter_names,
         ))
     }
 

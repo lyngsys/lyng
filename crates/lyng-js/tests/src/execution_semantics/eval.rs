@@ -175,6 +175,40 @@ fn direct_eval_during_parameter_initialization_rejects_var_arguments_in_non_arro
 }
 
 #[test]
+fn direct_eval_during_parameter_initialization_rejects_var_parameter_redeclaration() {
+    let result = compile_and_run_string(
+        r#"
+            let calls = 0;
+            function f(a = eval("var a = 42")) {
+                calls += 1;
+            }
+            let functionStatus = "missing";
+            try {
+                f();
+                functionStatus = "ok";
+            } catch (error) {
+                functionStatus = error.constructor === SyntaxError ? "syntax" : "other";
+            }
+
+            const g = (a = eval("var a = 42")) => {
+                calls += 10;
+            };
+            let arrowStatus = "missing";
+            try {
+                g();
+                arrowStatus = "ok";
+            } catch (error) {
+                arrowStatus = error.constructor === SyntaxError ? "syntax" : "other";
+            }
+
+            functionStatus + ":" + arrowStatus + ":" + calls;
+        "#,
+    );
+
+    assert_eq!(result, "syntax:syntax:0");
+}
+
+#[test]
 fn direct_eval_during_parameter_initialization_rejects_var_arguments_when_arrow_parameter_exists() {
     let result = compile_and_run_string(
         r#"
