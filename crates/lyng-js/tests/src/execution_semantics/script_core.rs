@@ -195,6 +195,58 @@ fn script_core_for_loop_completion_uses_undefined_seed() {
 }
 
 #[test]
+fn script_core_for_of_iterator_close_reports_non_throw_close_errors() {
+    let result = compile_and_run_string(
+        r#"
+        let log = [];
+        function run(iterable, classify) {
+            try {
+                for (let value of iterable) {
+                    log.push("body");
+                    break;
+                }
+                log.push("missing");
+            } catch (error) {
+                log.push(classify(error));
+            }
+        }
+
+        run({
+            [Symbol.iterator]() {
+                return {
+                    next() { return { done: false, value: 0 }; },
+                    return() { return 0; }
+                };
+            }
+        }, error => error instanceof TypeError ? "return-object" : error.name);
+
+        let marker = {};
+        run({
+            [Symbol.iterator]() {
+                return {
+                    next() { return { done: false, value: 0 }; },
+                    get return() { throw marker; }
+                };
+            }
+        }, error => error === marker ? "getter" : error.name);
+
+        run({
+            [Symbol.iterator]() {
+                return {
+                    next() { return { done: false, value: 0 }; },
+                    return: 1
+                };
+            }
+        }, error => error instanceof TypeError ? "callable" : error.name);
+
+        log.join("|");
+        "#,
+    );
+
+    assert_eq!(result, "body|return-object|body|getter|body|callable");
+}
+
+#[test]
 fn script_core_switch_statement_matches_completion_and_lexical_open_rules() {
     let completion_result = compile_and_run_string(
         r#"

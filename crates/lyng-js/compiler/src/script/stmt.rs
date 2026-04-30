@@ -1080,7 +1080,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
-    fn emit_close_iterator_for_completion(&mut self, iterator_register: u16) -> LoweringResult<()> {
+    pub(super) fn emit_close_iterator_for_completion(
+        &mut self,
+        iterator_register: u16,
+    ) -> LoweringResult<()> {
         let registers = self.ensure_completion_registers()?;
         let throw_kind = self.alloc_temp()?;
         self.emit_load_smi(throw_kind, CompletionKind::Throw.encoded())?;

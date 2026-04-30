@@ -6159,7 +6159,7 @@ fn for_await_of_wraps_sync_iterators_and_awaits_each_value() {
 }
 
 #[test]
-fn for_await_of_break_preserves_completion_when_async_close_rejects() {
+fn for_await_of_break_rejects_when_async_close_rejects() {
     let unit = compile_test_unit(
         227,
         r#"
@@ -6204,8 +6204,18 @@ fn for_await_of_break_preserves_completion_when_async_close_rejects() {
         .expect("for await promise should remain tracked")
         .result();
 
-    assert_eq!(state, lyng_js_env::PromiseState::Fulfilled);
-    assert_eq!(promise_result, Value::from_smi(1));
+    assert_eq!(state, lyng_js_env::PromiseState::Rejected);
+    let reason = promise_result
+        .as_object_ref()
+        .expect("async iterator close rejection should reject with an error object");
+    let name_atom = agent.atoms_mut().intern_collectible("name");
+    let name = ordinary_get(agent, reason, PropertyKey::from_atom(name_atom))
+        .expect("error name should be readable")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("error name should be a string");
+    assert_eq!(name, "Error");
 }
 
 #[test]

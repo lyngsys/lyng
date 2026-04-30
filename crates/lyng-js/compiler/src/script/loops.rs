@@ -446,7 +446,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.builder.emit_abx(
             Opcode::CloseIterator,
             self.encode_register(iterator_register)?,
-            1,
+            0,
         )?;
         let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
 
@@ -455,11 +455,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if loop_iteration_plan.is_some() {
             self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
         }
-        self.builder.emit_abx(
-            Opcode::CloseIterator,
-            self.encode_register(iterator_register)?,
-            1,
-        )?;
+        self.emit_close_iterator_for_completion(iterator_register)?;
         if let Some(outer) = self.outer_active_finally(finally_index) {
             self.emit_jump_to_finally(outer)?;
         } else {
