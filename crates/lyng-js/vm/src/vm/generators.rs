@@ -724,24 +724,22 @@ impl Vm {
                     }
                 }
                 GeneratorResumeKind::Return => {
+                    if record.is_async() {
+                        return self.start_async_delegate_return_resume_await(
+                            agent,
+                            host,
+                            registry,
+                            frame,
+                            iterator_register,
+                            record,
+                            resume_value,
+                        );
+                    }
                     let return_method = bridge.get_property_value(
                         receiver,
                         PropertyKey::from_atom(WellKnownAtom::r#return.id()),
                     )?;
                     if return_method.is_undefined() || return_method.is_null() {
-                        if record.is_async() {
-                            return self.start_async_delegate_value_await(
-                                agent,
-                                host,
-                                registry,
-                                frame,
-                                iterator_register,
-                                record,
-                                resume_value,
-                                true,
-                                true,
-                            );
-                        }
                         DelegateYieldOutcome::Complete {
                             value: resume_value,
                         }
@@ -797,6 +795,98 @@ impl Vm {
         )
     }
 
+    fn finish_delegate_return_resume(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        iterator_register: u16,
+        result_register: u16,
+        done_register: u16,
+        mut record: iterator::IteratorRecord,
+        resume_value: Value,
+    ) -> VmResult<()> {
+        let receiver = Value::from_object_ref(record.iterator());
+        let outcome = {
+            let mut bridge = VmIteratorBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame,
+            };
+            let return_method = bridge.get_property_value(
+                receiver,
+                PropertyKey::from_atom(WellKnownAtom::r#return.id()),
+            )?;
+            if return_method.is_undefined() || return_method.is_null() {
+                if record.is_async() {
+                    return self.start_async_delegate_value_await(
+                        agent,
+                        host,
+                        registry,
+                        frame,
+                        iterator_register,
+                        record,
+                        resume_value,
+                        true,
+                        true,
+                    );
+                }
+                DelegateYieldOutcome::Complete {
+                    value: resume_value,
+                }
+            } else {
+                let return_method =
+                    Self::require_callable_object(bridge.agent, frame, return_method)?;
+                let result = bridge.vm.call_to_completion(
+                    bridge.agent,
+                    bridge.host,
+                    bridge.registry,
+                    frame,
+                    return_method,
+                    receiver,
+                    &[resume_value],
+                )?;
+                record.set_delegate_started(true);
+                if record.is_async() {
+                    return self.start_async_delegate_iterator_result_await(
+                        agent,
+                        host,
+                        registry,
+                        frame,
+                        iterator_register,
+                        record,
+                        result,
+                        true,
+                    );
+                }
+                let iter_result = result
+                    .as_object_ref()
+                    .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(bridge.agent)))?;
+                let done = iterator::iterator_complete(&mut bridge, iter_result)?;
+                let value = iterator::iterator_value(&mut bridge, iter_result)?;
+                if done {
+                    record.set_done(true);
+                    DelegateYieldOutcome::Complete { value }
+                } else {
+                    DelegateYieldOutcome::Suspend { value, record }
+                }
+            }
+        };
+
+        self.finish_delegate_yield_outcome(
+            agent,
+            frame,
+            result_register,
+            done_register,
+            frame.registers().base(),
+            iterator_register,
+            outcome,
+        )
+    }
+
     fn finish_delegate_yield_outcome(
         &mut self,
         agent: &mut Agent,
@@ -827,6 +917,23 @@ impl Vm {
                 Ok(())
             }
         }
+    }
+
+    fn start_async_delegate_return_resume_await(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        iterator_register: u16,
+        mut record: iterator::IteratorRecord,
+        value: Value,
+    ) -> VmResult<()> {
+        let promise = self.promise_resolve_in_realm(agent, host, registry, frame.realm(), value)?;
+        record.set_delegate_yield_await_state(iterator::DelegateYieldAwaitState::ReturnResumeValue);
+        self.iterator_states
+            .insert(frame.registers().base(), iterator_register, record);
+        self.suspend_for_await_promise(agent, frame, promise)
     }
 
     fn start_async_delegate_next(
@@ -1026,6 +1133,18 @@ impl Vm {
                     outcome,
                 )
             }
+            iterator::DelegateYieldAwaitState::ReturnResumeValue => self
+                .finish_delegate_return_resume(
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                    iterator_register,
+                    result_register,
+                    done_register,
+                    record,
+                    resume_value,
+                ),
             iterator::DelegateYieldAwaitState::Value {
                 done,
                 return_completion,

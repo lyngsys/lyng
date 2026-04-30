@@ -6628,6 +6628,184 @@ fn async_generator_yield_star_missing_return_method_awaits_return_value() {
 }
 
 #[test]
+fn async_generator_explicit_return_undefined_awaits_before_settling() {
+    let unit = compile_test_unit(
+        336,
+        r#"
+            async function main() {
+                var actual = [];
+                Promise.resolve(0)
+                    .then(() => actual.push("tick 1"))
+                    .then(() => actual.push("tick 2"));
+
+                async function* implicitReturn() {}
+                async function* bareReturn() {
+                    return;
+                }
+                async function* explicitReturn() {
+                    return undefined;
+                }
+
+                implicitReturn().next().then(() => actual.push("implicit"));
+                bareReturn().next().then(() => actual.push("bare"));
+                explicitReturn().next().then(() => actual.push("explicit"));
+
+                await Promise.resolve();
+                await Promise.resolve();
+                await Promise.resolve();
+                return actual.join("|");
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("async generator explicit-return timing test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("async generator explicit-return timing promise should remain tracked");
+    let text = record
+        .result()
+        .as_string_ref()
+        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .expect("async generator explicit-return timing should return a string");
+
+    assert_eq!(text, "tick 1|implicit|bare|tick 2|explicit");
+}
+
+#[test]
+fn async_generator_yield_return_resumption_awaits_return_value() {
+    let unit = compile_test_unit(
+        337,
+        r#"
+            async function main() {
+                var actual = [];
+                async function* f() {
+                    actual.push("start");
+                    yield 123;
+                    actual.push("stop");
+                }
+
+                Promise.resolve(0)
+                    .then(() => actual.push("tick 1"))
+                    .then(() => actual.push("tick 2"));
+
+                var iter = f();
+                iter.next();
+                iter.return({
+                    get then() {
+                        actual.push("get then");
+                    }
+                });
+
+                await Promise.resolve();
+                await Promise.resolve();
+                await Promise.resolve();
+                return actual.join("|");
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("async generator yield-return timing test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("async generator yield-return timing promise should remain tracked");
+    let text = record
+        .result()
+        .as_string_ref()
+        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .expect("async generator yield-return timing should return a string");
+
+    assert_eq!(text, "start|tick 1|get then|tick 2");
+}
+
+#[test]
+fn async_generator_yield_star_return_resumption_awaits_before_delegate_return_lookup() {
+    let unit = compile_test_unit(
+        338,
+        r#"
+            async function main() {
+                var actual = [];
+                var asyncIter = {
+                    [Symbol.asyncIterator]() {
+                        return this;
+                    },
+                    next() {
+                        return {
+                            done: false
+                        };
+                    },
+                    get return() {
+                        actual.push("get return");
+                    }
+                };
+                async function* f() {
+                    actual.push("start");
+                    yield* asyncIter;
+                    actual.push("stop");
+                }
+
+                Promise.resolve(0)
+                    .then(() => actual.push("tick 1"))
+                    .then(() => actual.push("tick 2"))
+                    .then(() => actual.push("tick 3"));
+
+                var iter = f();
+                iter.next();
+                iter.return({
+                    get then() {
+                        actual.push("get then");
+                    }
+                });
+
+                await Promise.resolve();
+                await Promise.resolve();
+                await Promise.resolve();
+                await Promise.resolve();
+                return actual.join("|");
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("async generator yield-star return timing test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("async generator yield-star return timing promise should remain tracked");
+    let text = record
+        .result()
+        .as_string_ref()
+        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .expect("async generator yield-star return timing should return a string");
+
+    assert_eq!(
+        text,
+        "start|tick 1|get then|tick 2|get return|get then|tick 3"
+    );
+}
+
+#[test]
 fn async_generator_functions_use_the_async_generator_prototype_chain() {
     let unit = compile_test_unit(
         233,

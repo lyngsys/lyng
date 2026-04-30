@@ -5,9 +5,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         &mut self,
         argument: Option<ExprId>,
     ) -> LoweringResult<()> {
+        let is_async_generator = self.current_function.is_some_and(|function| {
+            self.state.function_kind(function) == FunctionKind::AsyncGenerator
+        });
         if let Some(finally_index) = self.nearest_active_finally() {
             let value = if let Some(argument) = argument {
-                self.lower_expr_to_temp(argument)?
+                let value = self.lower_expr_to_temp(argument)?;
+                if is_async_generator {
+                    self.builder.emit_ax(Opcode::Await, i32::from(value))?;
+                }
+                value
             } else {
                 let value = self.alloc_temp()?;
                 self.emit_load_undefined(value)?;
@@ -22,6 +29,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.builder.emit_ax(Opcode::ReturnUndefined, 0)?;
             return Ok(());
         };
+
+        if is_async_generator {
+            let value = self.lower_expr_to_temp(argument)?;
+            self.builder.emit_ax(Opcode::Await, i32::from(value))?;
+            self.builder.emit_ax(Opcode::Return, i32::from(value))?;
+            return Ok(());
+        }
 
         self.lower_tail_return_expression(argument)
     }
