@@ -199,15 +199,22 @@ pub struct LoopIterationEnvironmentSite {
     instruction_offset: u32,
     iteration_slots: Vec<u16>,
     shared_slots: Vec<u16>,
+    detached_slots: Vec<u16>,
 }
 
 impl LoopIterationEnvironmentSite {
     #[inline]
-    pub fn new(instruction_offset: u32, iteration_slots: Vec<u16>, shared_slots: Vec<u16>) -> Self {
+    pub fn new(
+        instruction_offset: u32,
+        iteration_slots: Vec<u16>,
+        shared_slots: Vec<u16>,
+        detached_slots: Vec<u16>,
+    ) -> Self {
         Self {
             instruction_offset,
             iteration_slots,
             shared_slots,
+            detached_slots,
         }
     }
 
@@ -224,6 +231,11 @@ impl LoopIterationEnvironmentSite {
     #[inline]
     pub fn shared_slots(&self) -> &[u16] {
         &self.shared_slots
+    }
+
+    #[inline]
+    pub fn detached_slots(&self) -> &[u16] {
+        &self.detached_slots
     }
 }
 

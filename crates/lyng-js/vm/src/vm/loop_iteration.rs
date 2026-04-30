@@ -10,7 +10,7 @@ impl Vm {
         mirrored_slot: Option<u32>,
     ) -> VmResult<()> {
         let source_environment = frame.lexical_env();
-        let (iteration_slots, shared_slots) = match site {
+        let (iteration_slots, shared_slots, detached_slots) = match site {
             Some(site) => (
                 site.iteration_slots()
                     .iter()
@@ -20,8 +20,12 @@ impl Vm {
                     .iter()
                     .map(|slot| u32::from(*slot))
                     .collect::<Vec<_>>(),
+                site.detached_slots()
+                    .iter()
+                    .map(|slot| u32::from(*slot))
+                    .collect::<Vec<_>>(),
             ),
-            None => (mirrored_slot.into_iter().collect(), Vec::new()),
+            None => (mirrored_slot.into_iter().collect(), Vec::new(), Vec::new()),
         };
         let iteration_environment =
             self.create_loop_iteration_environment(agent, source_environment, &iteration_slots)?;
@@ -31,6 +35,7 @@ impl Vm {
             iteration_environment,
             iteration_slots,
             shared_slots,
+            detached_slots,
             active: true,
         });
         Ok(())
@@ -192,6 +197,9 @@ impl Vm {
             if !slots.contains(&slot) {
                 continue;
             }
+            if active_only && environment_record.detached_slots.contains(&slot) {
+                continue;
+            }
             if environment_record.source_environment != environment
                 && environment_record.iteration_environment != environment
             {
@@ -219,7 +227,9 @@ impl Vm {
                 continue;
             }
             if active_only {
-                if !environment_record.active || !environment_record.iteration_slots.contains(&slot)
+                if !environment_record.active
+                    || !environment_record.iteration_slots.contains(&slot)
+                    || environment_record.detached_slots.contains(&slot)
                 {
                     continue;
                 }

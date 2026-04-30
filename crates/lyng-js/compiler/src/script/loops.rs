@@ -4,6 +4,7 @@ use super::*;
 struct LoopIterationEnvironmentPlan {
     iteration_slots: Vec<u16>,
     shared_slots: Vec<u16>,
+    copy_slots: Vec<u16>,
 }
 
 impl<'a, 'b> FunctionCompiler<'a, 'b> {
@@ -141,6 +142,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if let Some(init) = init {
             self.lower_for_init(init)?;
         }
+        let loop_iteration_plan = self.normal_for_loop_iteration_plan(init, test, update, body)?;
+        if let Some(plan) = &loop_iteration_plan {
+            self.emit_push_loop_iteration_environment(plan)?;
+        }
         let target = self.push_control_target(label, ControlTargetKind::Loop);
         let loop_start = self.builder.current_offset()?;
         let exit_jump = if let Some(test) = test {
@@ -152,20 +157,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         } else {
             None
         };
-        let loop_iteration_plan = self.loop_body_iteration_plan(body)?;
-        if let Some(plan) = &loop_iteration_plan {
-            let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
-            self.builder.add_loop_iteration_environment_site(
-                push,
-                plan.iteration_slots.clone(),
-                plan.shared_slots.clone(),
-            );
-        }
         self.lower_statement(body)?;
         let continue_target = self.builder.current_offset()?;
         self.patch_continue_placeholders(target, continue_target)?;
-        if loop_iteration_plan.is_some() {
-            self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
+        if let Some(plan) = &loop_iteration_plan {
+            self.emit_recreate_loop_iteration_environment(plan)?;
         }
         if let Some(update) = update {
             let update_register = self.alloc_temp()?;
@@ -178,9 +174,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if loop_iteration_plan.is_some() {
             self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
         }
-        let end = self.builder.current_offset()?;
         if let Some(exit_jump) = exit_jump {
-            self.builder.patch_jump_to(exit_jump, end)?;
+            self.builder.patch_jump_to(exit_jump, break_cleanup)?;
         }
         self.patch_break_placeholders(target, break_cleanup)?;
         self.pop_control_target(target);
@@ -221,6 +216,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 push,
                 plan.iteration_slots.clone(),
                 plan.shared_slots.clone(),
+                plan.copy_slots.clone(),
             );
             let object_register = self.lower_expr_to_temp(right)?;
             self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
@@ -258,6 +254,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 push,
                 plan.iteration_slots.clone(),
                 plan.shared_slots.clone(),
+                Vec::new(),
             );
         }
         if let Some(kind) = iteration_disposal_kind {
@@ -358,6 +355,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 push,
                 plan.iteration_slots.clone(),
                 plan.shared_slots.clone(),
+                Vec::new(),
             );
             let iterable_register = self.lower_expr_to_temp(right)?;
             self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
@@ -393,6 +391,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 push,
                 plan.iteration_slots.clone(),
                 plan.shared_slots.clone(),
+                Vec::new(),
             );
         }
         let finally_index = self.push_finally_context();
@@ -655,6 +654,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 LoopIterationEnvironmentPlan {
                     iteration_slots,
                     shared_slots,
+                    copy_slots: Vec::new(),
                 },
             ),
         )
@@ -669,15 +669,36 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             (!iteration_slots.is_empty()).then_some(LoopIterationEnvironmentPlan {
                 iteration_slots,
                 shared_slots: Vec::new(),
+                copy_slots: Vec::new(),
             }),
         )
     }
 
-    fn loop_body_iteration_plan(
+    fn normal_for_loop_iteration_plan(
         &self,
+        init: Option<ForInit>,
+        test: Option<ExprId>,
+        update: Option<ExprId>,
         body: StmtId,
     ) -> LoweringResult<Option<LoopIterationEnvironmentPlan>> {
+        let copy_slots = self.for_init_let_binding_slots(init)?;
         let mut nested_functions = Vec::new();
+        if let Some(init) = init {
+            match init {
+                ForInit::Declaration(decl) => {
+                    self.collect_functions_in_declaration(decl, &mut nested_functions);
+                }
+                ForInit::Expression(expr) => {
+                    self.collect_functions_in_expression(expr, &mut nested_functions);
+                }
+            }
+        }
+        if let Some(test) = test {
+            self.collect_functions_in_expression(test, &mut nested_functions);
+        }
+        if let Some(update) = update {
+            self.collect_functions_in_expression(update, &mut nested_functions);
+        }
         self.collect_functions_in_statement(body, &mut nested_functions);
 
         let mut iteration_slots = Vec::new();
@@ -702,8 +723,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 }
                 let slot = u16::try_from(slot)
                     .map_err(|_| LoweringError::ConstantIndexOverflow { index: slot })?;
-                if capture_scope != self.current_scope
-                    && self.scope_is_same_or_descendant(capture_scope, self.current_scope)
+                if copy_slots.contains(&slot)
+                    || (capture_scope != self.current_scope
+                        && self.scope_is_same_or_descendant(capture_scope, self.current_scope))
                 {
                     iteration_slots.push(slot);
                 } else {
@@ -717,12 +739,68 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         shared_slots.sort_unstable();
         shared_slots.dedup();
 
+        let mut copy_slots = copy_slots
+            .into_iter()
+            .filter(|slot| iteration_slots.contains(slot))
+            .collect::<Vec<_>>();
+        copy_slots.sort_unstable();
+        copy_slots.dedup();
+
         Ok(
             (!iteration_slots.is_empty()).then_some(LoopIterationEnvironmentPlan {
                 iteration_slots,
                 shared_slots,
+                copy_slots,
             }),
         )
+    }
+
+    fn emit_recreate_loop_iteration_environment(
+        &mut self,
+        plan: &LoopIterationEnvironmentPlan,
+    ) -> LoweringResult<()> {
+        let copied_values = self.load_loop_iteration_copy_slots(plan)?;
+        self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
+        self.emit_push_loop_iteration_environment_with_copies(plan, copied_values)
+    }
+
+    fn emit_push_loop_iteration_environment(
+        &mut self,
+        plan: &LoopIterationEnvironmentPlan,
+    ) -> LoweringResult<()> {
+        let copied_values = self.load_loop_iteration_copy_slots(plan)?;
+        self.emit_push_loop_iteration_environment_with_copies(plan, copied_values)
+    }
+
+    fn load_loop_iteration_copy_slots(
+        &mut self,
+        plan: &LoopIterationEnvironmentPlan,
+    ) -> LoweringResult<Vec<(u16, u16)>> {
+        let mut copied_values = Vec::with_capacity(plan.copy_slots.len());
+        for &slot in &plan.copy_slots {
+            let value = self.alloc_temp()?;
+            self.emit_load_env_slot(value, 0, u32::from(slot))?;
+            copied_values.push((slot, value));
+        }
+        Ok(copied_values)
+    }
+
+    fn emit_push_loop_iteration_environment_with_copies(
+        &mut self,
+        plan: &LoopIterationEnvironmentPlan,
+        copied_values: Vec<(u16, u16)>,
+    ) -> LoweringResult<()> {
+        let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
+        self.builder.add_loop_iteration_environment_site(
+            push,
+            plan.iteration_slots.clone(),
+            plan.shared_slots.clone(),
+            plan.copy_slots.clone(),
+        );
+        for (slot, value) in copied_values {
+            self.emit_store_env_slot(value, 0, u32::from(slot))?;
+        }
+        Ok(())
     }
 
     fn for_in_of_capture_roots(&self, loop_scope: ScopeId) -> Vec<ScopeId> {
@@ -771,6 +849,43 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             binding_pattern,
             expected_kind,
         )?))
+    }
+
+    fn for_init_let_binding_slots(&self, init: Option<ForInit>) -> LoweringResult<Vec<u16>> {
+        let Some(ForInit::Declaration(decl_id)) = init else {
+            return Ok(Vec::new());
+        };
+        let Decl::Variable {
+            kind, declarators, ..
+        } = self.ast().get_decl(decl_id).clone()
+        else {
+            return Ok(Vec::new());
+        };
+        if kind != VariableKind::Let {
+            return Ok(Vec::new());
+        }
+
+        let mut slots = Vec::new();
+        for declarator in self.ast().get_var_declarator_list(declarators) {
+            let mut identifier_patterns = Vec::new();
+            self.collect_identifier_patterns(declarator.id, &mut identifier_patterns);
+            for pattern in identifier_patterns {
+                let binding = self.declared_binding_for_pattern(pattern, DeclarationKind::Let)?;
+                let Some((depth, slot)) = self.binding_env_access(binding)? else {
+                    continue;
+                };
+                if depth != 0 {
+                    continue;
+                }
+                let slot = u16::try_from(slot)
+                    .map_err(|_| LoweringError::ConstantIndexOverflow { index: slot })?;
+                slots.push(slot);
+            }
+        }
+
+        slots.sort_unstable();
+        slots.dedup();
+        Ok(slots)
     }
 
     fn for_in_of_binding_slots(&self, left: ForInOfLeft) -> LoweringResult<Vec<u16>> {

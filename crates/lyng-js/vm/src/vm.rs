@@ -143,8 +143,9 @@ struct TemplateCacheKey {
 /// Runtime state for one compiler-planned loop-iteration lexical environment.
 ///
 /// `iteration_slots` mirror per-iteration bindings while the loop body is
-/// active. `shared_slots` continue to alias the source environment after the
-/// per-iteration environment is retained by a closure.
+/// active unless they are detached normal-for copies. `shared_slots` continue
+/// to alias the source environment after the per-iteration environment is
+/// retained by a closure.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LoopIterationEnvironment {
     frame_depth: usize,
@@ -152,6 +153,7 @@ struct LoopIterationEnvironment {
     iteration_environment: EnvironmentRef,
     iteration_slots: Vec<u32>,
     shared_slots: Vec<u32>,
+    detached_slots: Vec<u32>,
     active: bool,
 }
 

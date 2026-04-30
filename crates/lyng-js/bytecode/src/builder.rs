@@ -628,12 +628,14 @@ impl BytecodeBuilder {
         instruction_offset: u32,
         iteration_slots: Vec<u16>,
         shared_slots: Vec<u16>,
+        detached_slots: Vec<u16>,
     ) {
         self.loop_iteration_environment_sites
             .push(LoopIterationEnvironmentSite::new(
                 instruction_offset,
                 iteration_slots,
                 shared_slots,
+                detached_slots,
             ));
     }
 

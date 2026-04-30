@@ -95,6 +95,58 @@ fn phase4_for_of_closures_observe_in_iteration_reassignments() {
 }
 
 #[test]
+fn phase4_normal_for_let_closures_capture_fresh_iteration_bindings() {
+    let result = compile_and_run(
+        r#"
+        let closures = [];
+        for (let value = 0; value < 3; ++value) {
+            closures.push(function() { return value; });
+        }
+        closures[0]() * 100 + closures[1]() * 10 + closures[2]();
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(12));
+}
+
+#[test]
+fn phase4_normal_for_let_condition_and_update_closures_use_iteration_bindings() {
+    let result = compile_and_run(
+        r#"
+        let conditionClosures = [];
+        for (let value = 0; conditionClosures.push(function() { return value; }), value < 3; ++value) {
+        }
+
+        let updateClosures = [];
+        for (let value = 0; value < 3; updateClosures.push(function() { return value; }), ++value) {
+        }
+
+        conditionClosures[0]() * 1000
+            + conditionClosures[1]() * 100
+            + updateClosures[0]() * 10
+            + updateClosures[1]();
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(112));
+}
+
+#[test]
+fn phase4_normal_for_let_initializer_closure_keeps_initial_binding() {
+    let result = compile_and_run(
+        r#"
+        let closures = [];
+        for (let value = 0, closure = function() { return value; }; value < 3; ++value) {
+            closures.push(closure);
+        }
+        closures[0]() * 100 + closures[1]() * 10 + closures[2]();
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(0));
+}
+
+#[test]
 fn phase4_for_of_closures_ignore_unrelated_var_declarations() {
     let result = compile_and_run(
         r#"
