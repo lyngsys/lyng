@@ -622,6 +622,29 @@ impl Vm {
         }
     }
 
+    pub(super) fn load_captured_name_this_with_context(
+        &mut self,
+        frame: FrameRecord,
+        reference_register: u16,
+    ) -> VmResult<Value> {
+        let reference = self
+            .captured_name_references
+            .get(frame.registers().base(), reference_register)
+            .ok_or(VmError::RegisterOutOfBounds {
+                code: frame.code(),
+                register: reference_register,
+            })?;
+        match reference.target() {
+            CapturedNameTarget::ObjectProperty { record } if record.with_environment() => {
+                Ok(Value::from_object_ref(record.binding_object()))
+            }
+            CapturedNameTarget::EnvironmentSlot { .. }
+            | CapturedNameTarget::ObjectProperty { .. }
+            | CapturedNameTarget::GlobalProperty { .. }
+            | CapturedNameTarget::Unresolvable { .. } => Ok(Value::undefined()),
+        }
+    }
+
     pub(super) fn assign_captured_name_with_context(
         &mut self,
         agent: &mut Agent,

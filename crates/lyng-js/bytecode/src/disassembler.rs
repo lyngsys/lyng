@@ -241,7 +241,9 @@ fn format_abx_instruction(
                 format_atom_operand(function, operands.bx())
             )
         }
-        crate::Opcode::LoadCapturedName | crate::Opcode::AssignCapturedName => {
+        crate::Opcode::LoadCapturedName
+        | crate::Opcode::LoadCapturedNameThis
+        | crate::Opcode::AssignCapturedName => {
             format!("{opcode}r{}, r{}", operands.a(), operands.bx())
         }
         crate::Opcode::LoadEnvSlot | crate::Opcode::StoreEnvSlot | crate::Opcode::AssignEnvSlot => {

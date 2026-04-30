@@ -361,6 +361,19 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
+    pub(super) fn emit_load_captured_name_this(
+        &mut self,
+        dest: u16,
+        reference: u16,
+    ) -> LoweringResult<()> {
+        self.builder.emit_abx(
+            Opcode::LoadCapturedNameThis,
+            self.encode_register(dest)?,
+            u32::from(self.encode_register(reference)?),
+        )?;
+        Ok(())
+    }
+
     pub(super) fn emit_assign_captured_name(
         &mut self,
         value: u16,

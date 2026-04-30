@@ -337,7 +337,7 @@ fn compile_script_lowers_logical_member_assignments_through_assign_property_ops(
 }
 
 #[test]
-fn compile_script_lowers_with_call_targets_through_load_name() {
+fn compile_script_lowers_with_call_targets_through_captured_name_reference() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
@@ -357,13 +357,22 @@ fn compile_script_lowers_with_call_targets_through_load_name() {
         .function(unit.entry())
         .expect("script entry should exist");
 
-    assert!(entry.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abx {
-            opcode: Opcode::LoadName,
-            ..
-        }
-    )));
+    for opcode in [
+        Opcode::CaptureName,
+        Opcode::LoadCapturedName,
+        Opcode::LoadCapturedNameThis,
+    ] {
+        assert!(
+            entry.instructions().iter().any(|instruction| matches!(
+                instruction,
+                lyng_js_bytecode::Instruction::Abx {
+                    opcode: actual,
+                    ..
+                } if *actual == opcode
+            )),
+            "expected {opcode:?} in with-call lowering"
+        );
+    }
     assert!(!entry.instructions().iter().any(|instruction| matches!(
         instruction,
         lyng_js_bytecode::Instruction::Abx {
@@ -1042,7 +1051,7 @@ fn compile_script_marks_conditional_tail_calls_in_each_branch() {
 }
 
 #[test]
-fn compile_script_keeps_shadowed_eval_tail_calls_on_the_tail_path() {
+fn compile_script_keeps_shadowed_eval_fallback_on_the_tail_path() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
@@ -1072,7 +1081,7 @@ fn compile_script_keeps_shadowed_eval_tail_calls_on_the_tail_path() {
             ..
         }
     )));
-    assert!(!recur.instructions().iter().any(|instruction| matches!(
+    assert!(recur.instructions().iter().any(|instruction| matches!(
         instruction,
         lyng_js_bytecode::Instruction::Abc {
             opcode: Opcode::Call,

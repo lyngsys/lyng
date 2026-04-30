@@ -1088,6 +1088,20 @@ impl Vm {
                             self.write_register(frame, a, value)?;
                             self.advance_instruction()?;
                         }
+                        Opcode::LoadCapturedNameThis => {
+                            let reference_register =
+                                u16::try_from(bx).map_err(|_| VmError::RegisterOutOfBounds {
+                                    code: frame.code(),
+                                    register: u16::MAX,
+                                })?;
+                            let load_result = self
+                                .load_captured_name_this_with_context(frame, reference_register);
+                            let Some(value) = self.handle_vm_result(agent, load_result)? else {
+                                continue;
+                            };
+                            self.write_register(frame, a, value)?;
+                            self.advance_instruction()?;
+                        }
                         Opcode::AssignCapturedName => {
                             let reference_register =
                                 u16::try_from(bx).map_err(|_| VmError::RegisterOutOfBounds {

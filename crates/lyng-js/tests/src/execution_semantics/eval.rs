@@ -29,6 +29,106 @@ fn eval_treats_comment_like_slash_sources_as_script_comments() {
 }
 
 #[test]
+fn direct_eval_expands_spread_arguments_in_caller_scope() {
+    let result = compile_and_run_string(
+        r#"
+        var x = "global";
+
+        function run() {
+            var x = "local";
+            var elements = ["x = 'spread';", "x = 'ignored';"];
+            var nextCount = 0;
+            var iter = {};
+            iter[Symbol.iterator] = function() {
+                return {
+                    next: function() {
+                        var index = nextCount++;
+                        if (index < elements.length) {
+                            return { done: false, value: elements[index] };
+                        }
+                        return { done: true, value: undefined };
+                    }
+                };
+            };
+
+            eval(...iter);
+            var first = x + ":" + nextCount;
+
+            elements = [];
+            nextCount = 0;
+            eval(...iter, "x = 'trailing';");
+            return first + ":" + x + ":" + nextCount;
+        }
+
+        run() + ":" + x;
+        "#,
+    );
+
+    assert_eq!(result, "spread:3:trailing:1:global");
+}
+
+#[test]
+fn strict_direct_eval_expands_spread_arguments_in_caller_scope() {
+    let result = compile_and_run_string(
+        r#"
+        var x = "global";
+
+        function run() {
+            "use strict";
+            var x = "local";
+            var elements = ["x = 'spread';", "x = 'ignored';"];
+            var nextCount = 0;
+            var iter = {};
+            iter[Symbol.iterator] = function() {
+                return {
+                    next: function() {
+                        var index = nextCount++;
+                        if (index < elements.length) {
+                            return { done: false, value: elements[index] };
+                        }
+                        return { done: true, value: undefined };
+                    }
+                };
+            };
+
+            eval(...iter);
+            return x + ":" + nextCount;
+        }
+
+        run() + ":" + x;
+        "#,
+    );
+
+    assert_eq!(result, "spread:3:global");
+}
+
+#[test]
+fn with_statement_identifier_calls_use_with_base_as_this() {
+    let result = compile_and_run_string(
+        r#"
+        var viaMember, viaCall;
+        var obj = {
+            method: function() {
+                viaCall = this;
+            },
+            get attribute() {
+                viaMember = this;
+            }
+        };
+
+        with (obj) {
+            method();
+            attribute;
+        }
+
+        String(viaCall === obj) + ":" + String(viaMember === obj);
+        "#,
+    );
+
+    assert_eq!(result, "true:true");
+}
+
+#[test]
 fn direct_eval_can_create_arguments_binding_in_non_arrow_function() {
     let result = compile_and_run_string(
         r#"

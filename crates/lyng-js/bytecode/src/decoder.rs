@@ -156,6 +156,7 @@ fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::DeleteName
         | Opcode::CaptureName
         | Opcode::LoadCapturedName
+        | Opcode::LoadCapturedNameThis
         | Opcode::AssignCapturedName
         | Opcode::LoadThis
         | Opcode::LoadCallee

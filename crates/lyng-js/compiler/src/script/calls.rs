@@ -14,7 +14,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             return Ok(false);
         }
 
-        Ok(self.use_site(current)?.resolved_binding.is_none())
+        Ok(true)
     }
 
     fn lower_direct_eval_call_expression(
@@ -29,14 +29,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
 
         let argument_values = self.lower_call_arguments(arguments)?;
-        if argument_values.spread_mask != 0 {
-            return Ok(false);
-        }
-
-        let callee_register = self.lower_expr_to_temp(callee)?;
+        let callee_register = self.lower_direct_eval_callee(callee)?;
         let mut direct_eval_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
         direct_eval_arguments.push(callee_register);
-        direct_eval_arguments.extend(argument_values.registers);
+        direct_eval_arguments.extend(argument_values.registers.iter().copied());
         let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
             internal_direct_eval_builtin(),
             &direct_eval_arguments,
@@ -54,6 +50,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 annex_b_catch_names,
             );
         }
+        self.add_direct_eval_spread_feedback_site(instruction_offset, &argument_values)?;
         Ok(true)
     }
 
@@ -68,11 +65,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
 
         let argument_values = self.lower_call_arguments(arguments)?;
-        if argument_values.spread_mask != 0 {
-            return Ok(false);
-        }
-
-        let callee_register = self.lower_expr_to_temp(callee)?;
+        let callee_register = self.lower_direct_eval_callee(callee)?;
         let builtin_eval = self.alloc_temp()?;
         self.emit_load_builtin(builtin_eval, eval_builtin())?;
         let is_builtin_eval = self.alloc_temp()?;
@@ -108,6 +101,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 annex_b_catch_names,
             );
         }
+        self.add_direct_eval_spread_feedback_site(instruction_offset, &argument_values)?;
         self.builder
             .emit_ax(Opcode::Return, i32::from(direct_eval_result))?;
 
@@ -149,6 +143,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             this_value: self.alloc_temp()?,
         });
         Ok(())
+    }
+
+    fn lower_direct_eval_callee(&mut self, callee: ExprId) -> LoweringResult<u16> {
+        let mut current = callee;
+        while let Expr::ParenthesizedExpression { expression, .. } = self.ast().get_expr(current) {
+            current = *expression;
+        }
+        let Expr::Identifier { name, .. } = self.ast().get_expr(current) else {
+            return self.lower_expr_to_temp(callee);
+        };
+        let name = *name;
+        debug_assert_eq!(name, WellKnownAtom::eval.id());
+        let callee_register = self.alloc_temp()?;
+        self.emit_load_name(callee_register, name)?;
+        Ok(callee_register)
     }
 
     pub(super) fn bridge_call_registers(
@@ -385,6 +394,17 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 )?;
                 Ok((callee_register, this_register))
             }
+            Expr::Identifier { name, .. }
+                if self.use_site(callee)?.resolution_kind == ResolutionKind::Dynamic =>
+            {
+                let reference = self.alloc_temp()?;
+                self.emit_capture_name(reference, name)?;
+                let callee_register = self.alloc_temp()?;
+                self.emit_load_captured_name(callee_register, reference)?;
+                let this_register = self.alloc_temp()?;
+                self.emit_load_captured_name_this(this_register, reference)?;
+                Ok((callee_register, this_register))
+            }
             Expr::StaticMemberExpression {
                 object, property, ..
             } => {
@@ -530,6 +550,28 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 spread_mask,
             }
         }
+    }
+
+    fn add_direct_eval_spread_feedback_site(
+        &mut self,
+        instruction_offset: u32,
+        argument_values: &LoweredCallArguments,
+    ) -> LoweringResult<()> {
+        if argument_values.spread_mask == 0 {
+            return Ok(());
+        }
+        if argument_values.spread_mask & (1_u64 << 63) != 0 {
+            return Err(LoweringError::RegisterOverflow { register: u16::MAX });
+        }
+        let shifted_spread_mask = argument_values.spread_mask << 1;
+        let expected_arity = u16::try_from(argument_values.registers.len() + 1)
+            .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+        self.builder.add_feedback_site(
+            instruction_offset,
+            FeedbackSiteKind::Call,
+            self.call_feedback_metadata(expected_arity, shifted_spread_mask),
+        )?;
+        Ok(())
     }
 
     fn lower_super_construct_call(
