@@ -30,6 +30,8 @@ struct PreparedSuite {
     prepared: Vec<PreparedTest>,
     category_stats: HashMap<String, CategoryStats>,
     selected_counts: HashMap<String, usize>,
+    variant_category_stats: HashMap<String, CategoryStats>,
+    selected_variant_counts: HashMap<String, usize>,
     skip_reasons: HashMap<String, u32>,
     exclusion_reasons: HashMap<String, u32>,
     failures: Vec<String>,
@@ -39,21 +41,35 @@ impl PreparedSuite {
     fn selected_total(&self) -> usize {
         self.selected_counts.values().sum()
     }
+
+    fn selected_variant_total(&self) -> usize {
+        self.selected_variant_counts.values().sum()
+    }
 }
 
 struct ExecutionResults {
     elapsed: Duration,
     failures: Vec<(String, String)>,
+    outcomes: Vec<PreparedOutcome>,
+}
+
+#[derive(Clone, Debug)]
+struct PreparedOutcome {
+    index: usize,
+    outcome: RunOutcome,
 }
 
 struct SummaryView<'a> {
     options: &'a RunnerConfig,
     candidate_total: usize,
     selected_total: usize,
+    selected_variant_total: usize,
     jobs: usize,
     elapsed: Duration,
     selected_counts: &'a HashMap<String, usize>,
     category_stats: &'a HashMap<String, CategoryStats>,
+    selected_variant_counts: &'a HashMap<String, usize>,
+    variant_category_stats: &'a HashMap<String, CategoryStats>,
     failures: &'a [String],
 }
 
@@ -61,6 +77,69 @@ fn push_failure(failures_lock: &Mutex<Vec<(String, String)>>, category: &str, fa
     match failures_lock.lock() {
         Ok(mut failures) => failures.push((category.to_string(), failure)),
         Err(poisoned) => poisoned.into_inner().push((category.to_string(), failure)),
+    }
+}
+
+fn push_outcome(outcomes_lock: &Mutex<Vec<PreparedOutcome>>, index: usize, outcome: RunOutcome) {
+    match outcomes_lock.lock() {
+        Ok(mut outcomes) => outcomes.push(PreparedOutcome { index, outcome }),
+        Err(poisoned) => poisoned
+            .into_inner()
+            .push(PreparedOutcome { index, outcome }),
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AggregatedOutcome {
+    Pass,
+    Fail,
+    Panic,
+}
+
+impl AggregatedOutcome {
+    fn from_run(outcome: &RunOutcome) -> Self {
+        match outcome {
+            RunOutcome::Pass => Self::Pass,
+            RunOutcome::Fail(message) if message.starts_with("PANIC") => Self::Panic,
+            RunOutcome::Fail(_) => Self::Fail,
+        }
+    }
+
+    fn merge(self, next: Self) -> Self {
+        match (self, next) {
+            (Self::Panic, _) | (_, Self::Panic) => Self::Panic,
+            (Self::Fail, _) | (_, Self::Fail) => Self::Fail,
+            (Self::Pass, Self::Pass) => Self::Pass,
+        }
+    }
+
+    fn record(self, stats: &mut CategoryStats) {
+        match self {
+            Self::Pass => stats.pass += 1,
+            Self::Fail => stats.fail += 1,
+            Self::Panic => stats.panic += 1,
+        }
+    }
+}
+
+fn record_execution_outcomes(suite: &mut PreparedSuite, outcomes: &[PreparedOutcome]) {
+    let mut file_outcomes: HashMap<(PathBuf, String), AggregatedOutcome> = HashMap::new();
+
+    for outcome in outcomes {
+        let test = &suite.prepared[outcome.index];
+        let category = test.category.clone();
+        let file_key = (test.path.clone(), category.clone());
+        let aggregated = AggregatedOutcome::from_run(&outcome.outcome);
+
+        aggregated.record(suite.variant_category_stats.entry(category).or_default());
+        file_outcomes
+            .entry(file_key)
+            .and_modify(|current| *current = current.merge(aggregated))
+            .or_insert(aggregated);
+    }
+
+    for ((_, category), outcome) in file_outcomes {
+        outcome.record(suite.category_stats.entry(category).or_default());
     }
 }
 
@@ -78,53 +157,40 @@ pub fn main_entry() {
     ensure_test_dir_or_exit(&test_dir);
     let mut suite = prepare_suite(&options, &test_dir, &manifest, &helpers);
     let selected_total = suite.selected_total();
-    let jobs = options.jobs.min(suite.candidate_total.max(1));
-    eprintln!("Found {} candidate tests", suite.candidate_total);
+    let selected_variant_total = suite.selected_variant_total();
+    let skipped_total = suite
+        .category_stats
+        .values()
+        .map(|stats| stats.skip)
+        .sum::<u32>();
+    let runnable_file_total = selected_total.saturating_sub(skipped_total as usize);
+    let jobs = options.jobs.min(suite.prepared.len().max(1));
+    eprintln!("Found {} candidate files", suite.candidate_total);
     eprintln!(
-        "Prepared {} runnable tests after {} explicit skips",
+        "Prepared {} runnable variant executions for {} runnable files after {} explicit file skips",
         suite.prepared.len(),
-        selected_total.saturating_sub(suite.prepared.len())
+        runnable_file_total,
+        skipped_total
     );
 
     let timeout = Duration::from_millis(options.timeout_ms);
     let execution = execute_suite(&suite.prepared, &test_dir, timeout, jobs);
-    let mut failures_by_category: HashMap<String, (u32, u32)> = HashMap::new();
-    for (category, failure) in execution.failures {
-        let entry = failures_by_category.entry(category.clone()).or_default();
-        if failure.contains("PANIC") {
-            entry.1 += 1;
-        } else {
-            entry.0 += 1;
-        }
+    for (_, failure) in execution.failures {
         suite.failures.push(failure);
     }
-
-    let mut pass_by_category: HashMap<String, u32> = HashMap::new();
-    for test in &suite.prepared {
-        *pass_by_category.entry(test.category.clone()).or_default() += 1;
-    }
-    for (category, (fail, panic)) in &failures_by_category {
-        if let Some(pass) = pass_by_category.get_mut(category) {
-            *pass = pass.saturating_sub(*fail + *panic);
-        }
-    }
-    for (category, pass) in pass_by_category {
-        suite.category_stats.entry(category).or_default().pass += pass;
-    }
-    for (category, (fail, panic)) in failures_by_category {
-        let stats = suite.category_stats.entry(category).or_default();
-        stats.fail += fail;
-        stats.panic += panic;
-    }
+    record_execution_outcomes(&mut suite, &execution.outcomes);
 
     print_summary(&SummaryView {
         options: &options,
         candidate_total: suite.candidate_total,
         selected_total,
+        selected_variant_total,
         jobs,
         elapsed: execution.elapsed,
         selected_counts: &suite.selected_counts,
         category_stats: &suite.category_stats,
+        selected_variant_counts: &suite.selected_variant_counts,
+        variant_category_stats: &suite.variant_category_stats,
         failures: &suite.failures,
     });
 
@@ -138,8 +204,11 @@ pub fn main_entry() {
         timeout,
         candidate_total: suite.candidate_total,
         selected_total,
+        selected_variant_total,
         selected_counts: &suite.selected_counts,
         category_stats: &suite.category_stats,
+        selected_variant_counts: &suite.selected_variant_counts,
+        variant_category_stats: &suite.variant_category_stats,
         skip_reasons: &suite.skip_reasons,
         exclusion_reasons: &suite.exclusion_reasons,
         failures: &suite.failures,
@@ -215,6 +284,8 @@ fn prepare_suite(
     let mut prepared = Vec::with_capacity(candidate_total);
     let mut category_stats: HashMap<String, CategoryStats> = HashMap::new();
     let mut selected_counts: HashMap<String, usize> = HashMap::new();
+    let mut variant_category_stats: HashMap<String, CategoryStats> = HashMap::new();
+    let mut selected_variant_counts: HashMap<String, usize> = HashMap::new();
     let mut skip_reasons: HashMap<String, u32> = HashMap::new();
     let mut exclusion_reasons: HashMap<String, u32> = HashMap::new();
     let mut failures = Vec::new();
@@ -249,17 +320,19 @@ fn prepare_suite(
                 continue;
             }
             Some(SkipDecision::Skip(reason)) => {
-                *selected_counts.entry(category.clone()).or_default() += variant_count;
-                category_stats.entry(category).or_default().skip +=
+                *selected_counts.entry(category.clone()).or_default() += 1;
+                *selected_variant_counts.entry(category.clone()).or_default() += variant_count;
+                category_stats.entry(category.clone()).or_default().skip += 1;
+                variant_category_stats.entry(category).or_default().skip +=
                     u32::try_from(variant_count).unwrap_or(u32::MAX);
-                *skip_reasons.entry(reason).or_default() +=
-                    u32::try_from(variant_count).unwrap_or(u32::MAX);
+                *skip_reasons.entry(reason).or_default() += 1;
                 continue;
             }
             None => {}
         }
 
-        *selected_counts.entry(category.clone()).or_default() += variant_count;
+        *selected_counts.entry(category.clone()).or_default() += 1;
+        *selected_variant_counts.entry(category.clone()).or_default() += variant_count;
         for variant in variants {
             prepared.push(PreparedTest {
                 path: path.clone(),
@@ -268,7 +341,8 @@ fn prepare_suite(
                 variant,
             });
         }
-        category_stats.entry(category).or_default();
+        category_stats.entry(category.clone()).or_default();
+        variant_category_stats.entry(category).or_default();
     }
 
     PreparedSuite {
@@ -276,6 +350,8 @@ fn prepare_suite(
         prepared,
         category_stats,
         selected_counts,
+        variant_category_stats,
+        selected_variant_counts,
         skip_reasons,
         exclusion_reasons,
         failures,
@@ -295,6 +371,7 @@ fn execute_suite(
     let fail_count = AtomicU32::new(0);
     let panic_count = AtomicU32::new(0);
     let failures_lock: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+    let outcomes_lock: Mutex<Vec<PreparedOutcome>> = Mutex::new(Vec::new());
 
     std::thread::scope(|scope| {
         for _ in 0..jobs {
@@ -313,6 +390,7 @@ fn execute_suite(
                             Ok(handle) => Some(handle),
                             Err(error) => {
                                 fail_count.fetch_add(1, Ordering::Relaxed);
+                                let outcome = RunOutcome::Fail(error.clone());
                                 push_failure(
                                     &failures_lock,
                                     &test.category,
@@ -321,19 +399,16 @@ fn execute_suite(
                                         relative_prepared_test_name(test, test_dir)
                                     ),
                                 );
+                                push_outcome(&outcomes_lock, index, outcome);
                                 let done = done_count.fetch_add(1, Ordering::Relaxed) + 1;
-                                if done.is_multiple_of(100)
-                                    || usize::try_from(done).ok() == Some(prepared.len())
-                                {
-                                    print_progress(
-                                        done,
-                                        prepared.len(),
-                                        &pass_count,
-                                        &fail_count,
-                                        &panic_count,
-                                        start.elapsed(),
-                                    );
-                                }
+                                maybe_print_progress(
+                                    done,
+                                    prepared.len(),
+                                    &pass_count,
+                                    &fail_count,
+                                    &panic_count,
+                                    start.elapsed(),
+                                );
                                 continue;
                             }
                         };
@@ -344,26 +419,16 @@ fn execute_suite(
                         .as_mut()
                         .expect("worker should exist after spawn")
                         .run_test(test, test_timeout);
-                    match &execution.outcome {
-                        RunOutcome::Pass => {
-                            pass_count.fetch_add(1, Ordering::Relaxed);
-                        }
-                        RunOutcome::Fail(message) => {
-                            if message.starts_with("PANIC") {
-                                panic_count.fetch_add(1, Ordering::Relaxed);
-                            } else {
-                                fail_count.fetch_add(1, Ordering::Relaxed);
-                            }
-                            push_failure(
-                                &failures_lock,
-                                &test.category,
-                                format!(
-                                    "{}: {message}",
-                                    relative_prepared_test_name(test, test_dir)
-                                ),
-                            );
-                        }
-                    }
+                    record_variant_execution(
+                        &execution.outcome,
+                        test,
+                        test_dir,
+                        &failures_lock,
+                        &pass_count,
+                        &fail_count,
+                        &panic_count,
+                    );
+                    push_outcome(&outcomes_lock, index, execution.outcome.clone());
 
                     let should_recycle = worker.as_ref().is_some_and(WorkerHandle::should_recycle);
                     if !execution.reusable || should_recycle {
@@ -373,18 +438,14 @@ fn execute_suite(
                     }
 
                     let done = done_count.fetch_add(1, Ordering::Relaxed) + 1;
-                    if done.is_multiple_of(100)
-                        || usize::try_from(done).ok() == Some(prepared.len())
-                    {
-                        print_progress(
-                            done,
-                            prepared.len(),
-                            &pass_count,
-                            &fail_count,
-                            &panic_count,
-                            start.elapsed(),
-                        );
-                    }
+                    maybe_print_progress(
+                        done,
+                        prepared.len(),
+                        &pass_count,
+                        &fail_count,
+                        &panic_count,
+                        start.elapsed(),
+                    );
                 }
 
                 if let Some(mut stale_worker) = worker {
@@ -399,9 +460,42 @@ fn execute_suite(
         Ok(failures) => failures,
         Err(poisoned) => poisoned.into_inner(),
     };
+    let outcomes = match outcomes_lock.into_inner() {
+        Ok(outcomes) => outcomes,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     ExecutionResults {
         elapsed: start.elapsed(),
         failures,
+        outcomes,
+    }
+}
+
+fn record_variant_execution(
+    outcome: &RunOutcome,
+    test: &PreparedTest,
+    test_dir: &Path,
+    failures_lock: &Mutex<Vec<(String, String)>>,
+    pass_count: &AtomicU32,
+    fail_count: &AtomicU32,
+    panic_count: &AtomicU32,
+) {
+    match outcome {
+        RunOutcome::Pass => {
+            pass_count.fetch_add(1, Ordering::Relaxed);
+        }
+        RunOutcome::Fail(message) => {
+            if message.starts_with("PANIC") {
+                panic_count.fetch_add(1, Ordering::Relaxed);
+            } else {
+                fail_count.fetch_add(1, Ordering::Relaxed);
+            }
+            push_failure(
+                failures_lock,
+                &test.category,
+                format!("{}: {message}", relative_prepared_test_name(test, test_dir)),
+            );
+        }
     }
 }
 
@@ -459,6 +553,19 @@ fn is_exhaustive_uri_legacy_test(path: &Path) -> bool {
     .any(|suffix| path.ends_with(suffix))
 }
 
+fn maybe_print_progress(
+    done: u32,
+    total: usize,
+    pass_count: &AtomicU32,
+    fail_count: &AtomicU32,
+    panic_count: &AtomicU32,
+    elapsed: Duration,
+) {
+    if done.is_multiple_of(100) || usize::try_from(done).ok() == Some(total) {
+        print_progress(done, total, pass_count, fail_count, panic_count, elapsed);
+    }
+}
+
 fn print_progress(
     done: u32,
     total: usize,
@@ -508,34 +615,63 @@ fn print_summary(summary: &SummaryView<'_>) {
         .values()
         .map(report::CategoryStats::attempted)
         .sum::<u32>();
+    let runnable_variants = summary
+        .variant_category_stats
+        .values()
+        .map(report::CategoryStats::attempted)
+        .sum::<u32>();
 
     println!("\n========== Lyng JS Whole-Suite Test262 ==========");
-    println!("Candidate:      {}", summary.candidate_total);
-    println!("Selected:       {}", summary.selected_total);
-    println!("Runnable:       {runnable}");
-    println!("Passed:         {total_pass}");
-    println!("Failed:         {total_fail}");
-    println!("Panicked:       {total_panic}");
-    println!("Skipped:        {total_skip}");
+    println!("Candidate files:      {}", summary.candidate_total);
+    println!("Selected files:       {}", summary.selected_total);
+    println!("Runnable files:       {runnable}");
+    println!("Passed files:         {total_pass}");
+    println!("Failed files:         {total_fail}");
+    println!("Panicked files:       {total_panic}");
+    println!("Skipped files:        {total_skip}");
+    println!("Selected variants:    {}", summary.selected_variant_total);
+    println!("Runnable variants:    {runnable_variants}");
     println!(
-        "Time:           {:.1}s ({} threads)",
+        "Time:                 {:.1}s ({} threads)",
         summary.elapsed.as_secs_f64(),
         summary.jobs
     );
     println!(
-        "Filter:         {}",
+        "Filter:               {}",
         summary.options.filter.as_deref().unwrap_or("whole corpus")
     );
     println!();
 
-    println!("--- Category Breakdown ---");
+    println!("--- File Category Breakdown ---");
     let mut categories: Vec<_> = summary.category_stats.iter().collect();
     categories.sort_by(|left, right| left.0.cmp(right.0));
     for (category, stats) in categories {
         println!(
-            "  {:<28} selected={:<5} runnable={:<5} pass={:<5} fail={:<5} skip={:<5} panic={:<5} ({}%)",
+            "  {:<28} selected_files={:<5} runnable_files={:<5} pass={:<5} fail={:<5} skip={:<5} panic={:<5} ({}%)",
             category,
             summary.selected_counts.get(category).copied().unwrap_or(0),
+            stats.attempted(),
+            stats.pass,
+            stats.reported_failures(),
+            stats.skip,
+            stats.panic,
+            report::format_pass_rate(stats.pass_rate()),
+        );
+    }
+
+    println!();
+    println!("--- Variant Execution Breakdown ---");
+    let mut variant_categories: Vec<_> = summary.variant_category_stats.iter().collect();
+    variant_categories.sort_by(|left, right| left.0.cmp(right.0));
+    for (category, stats) in variant_categories {
+        println!(
+            "  {:<28} selected_variants={:<5} runnable_variants={:<5} pass={:<5} fail={:<5} skip={:<5} panic={:<5} ({}%)",
+            category,
+            summary
+                .selected_variant_counts
+                .get(category)
+                .copied()
+                .unwrap_or(0),
             stats.attempted(),
             stats.pass,
             stats.reported_failures(),
@@ -631,7 +767,7 @@ mod prepare_suite_tests {
         );
 
         assert_eq!(suite.prepared.len(), 2);
-        assert_eq!(suite.selected_total(), 2);
+        assert_eq!(suite.selected_total(), 1);
 
         let _ = fs::remove_dir_all(root);
     }
@@ -718,5 +854,63 @@ mod tests {
             timeout_for_test(&test, Duration::from_secs(1)),
             Duration::from_secs(30)
         );
+    }
+
+    #[test]
+    fn file_stats_fail_when_any_strictness_variant_fails() {
+        let metadata = parse_metadata("");
+        let path = PathBuf::from("test/language/default-script.js");
+        let mut suite = PreparedSuite {
+            candidate_total: 1,
+            prepared: vec![
+                PreparedTest {
+                    path: path.clone(),
+                    category: "language".to_string(),
+                    metadata: metadata.clone(),
+                    variant: crate::metadata::TestVariant::NonStrict,
+                },
+                PreparedTest {
+                    path,
+                    category: "language".to_string(),
+                    metadata,
+                    variant: crate::metadata::TestVariant::Strict,
+                },
+            ],
+            category_stats: HashMap::new(),
+            selected_counts: HashMap::from([("language".to_string(), 1)]),
+            variant_category_stats: HashMap::new(),
+            selected_variant_counts: HashMap::from([("language".to_string(), 2)]),
+            skip_reasons: HashMap::new(),
+            exclusion_reasons: HashMap::new(),
+            failures: Vec::new(),
+        };
+
+        record_execution_outcomes(
+            &mut suite,
+            &[
+                PreparedOutcome {
+                    index: 0,
+                    outcome: RunOutcome::Pass,
+                },
+                PreparedOutcome {
+                    index: 1,
+                    outcome: RunOutcome::Fail("runtime error: Test262Error".to_string()),
+                },
+            ],
+        );
+
+        let file_stats = suite
+            .category_stats
+            .get("language")
+            .expect("file stats should be recorded");
+        assert_eq!(file_stats.pass, 0);
+        assert_eq!(file_stats.fail, 1);
+
+        let variant_stats = suite
+            .variant_category_stats
+            .get("language")
+            .expect("variant stats should be recorded");
+        assert_eq!(variant_stats.pass, 1);
+        assert_eq!(variant_stats.fail, 1);
     }
 }

@@ -49,11 +49,41 @@ fn run_passing_test(path: &Path, source: &str) -> String {
     );
 
     let report = fs::read_to_string(&report_path).expect("report should be written");
+    assert_passed(&report, 1, 2);
+    report
+}
+
+fn assert_passed(report: &str, files: u32, variants: u32) {
     assert!(
-        report.contains("| Passed | `2` |"),
+        report.contains(&format!("| Passed files | `{files}` |")),
         "unexpected report:\n{report}"
     );
-    report
+    assert!(
+        report.contains(&format!("| Passed variants | `{variants}` |")),
+        "unexpected report:\n{report}"
+    );
+}
+
+fn assert_failed(report: &str, files: u32, variants: u32) {
+    assert!(
+        report.contains(&format!("| Failed files | `{files}` |")),
+        "unexpected report:\n{report}"
+    );
+    assert!(
+        report.contains(&format!("| Failed variants | `{variants}` |")),
+        "unexpected report:\n{report}"
+    );
+}
+
+fn assert_skipped(report: &str, files: u32, variants: u32) {
+    assert!(
+        report.contains(&format!("| Skipped files | `{files}` |")),
+        "unexpected report:\n{report}"
+    );
+    assert!(
+        report.contains(&format!("| Skipped variants | `{variants}` |")),
+        "unexpected report:\n{report}"
+    );
 }
 
 fn run_filtered_test(filter: &str) -> String {
@@ -172,10 +202,7 @@ fn runner_exposes_eval_script_and_create_realm_through_external_embedding() {
         "#,
     );
 
-    assert!(
-        report.contains("Skipped | `0` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_skipped(&report, 0, 0);
     let _ = fs::remove_dir_all(root);
 }
 
@@ -250,14 +277,8 @@ fn runner_fails_wrong_runtime_negative_type() {
         "#,
     );
 
-    assert!(
-        report.contains("| Passed | `0` |"),
-        "unexpected report:\n{report}"
-    );
-    assert!(
-        report.contains("| Failed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 0, 0);
+    assert_failed(&report, 1, 2);
     let _ = fs::remove_dir_all(root);
 }
 
@@ -290,14 +311,8 @@ fn runner_fails_wrong_resolution_negative_type() {
         "#,
     );
 
-    assert!(
-        report.contains("| Passed | `0` |"),
-        "unexpected report:\n{report}"
-    );
-    assert!(
-        report.contains("| Failed | `1` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 0, 0);
+    assert_failed(&report, 1, 1);
     let _ = fs::remove_dir_all(root);
 }
 
@@ -310,33 +325,27 @@ fn runner_reports_skips_separately_from_failures() {
         &entry_path,
         r"
         /*---
-        includes: [atomicsHelper.js]
+        includes: [unsupportedHelper.js]
         ---*/
         ",
     );
 
     assert!(
-        stdout.contains("Failed:         0"),
+        stdout.contains("Failed files:         0"),
         "unexpected stdout:\n{stdout}"
     );
     assert!(
-        stdout.contains("Skipped:        2"),
+        stdout.contains("Skipped files:        1"),
         "unexpected stdout:\n{stdout}"
     );
     assert!(
         !stdout.contains("skip included"),
         "unexpected stdout:\n{stdout}"
     );
+    assert_failed(&report, 0, 0);
+    assert_skipped(&report, 1, 2);
     assert!(
-        report.contains("| Failed | `0` |"),
-        "unexpected report:\n{report}"
-    );
-    assert!(
-        report.contains("| Skipped | `2` |"),
-        "unexpected report:\n{report}"
-    );
-    assert!(
-        report.contains("requires $262.agent multi-agent harness"),
+        report.contains("unsupported harness include: unsupportedHelper.js"),
         "unexpected report:\n{report}"
     );
 
@@ -346,73 +355,49 @@ fn runner_reports_skips_separately_from_failures() {
 #[test]
 fn runner_passes_async_helper_self_test_without_async_flag_done() {
     let report = run_filtered_test("harness/asyncHelpers-asyncTest-without-async-flag.js");
-    assert!(
-        report.contains("| Passed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 2);
 }
 
 #[test]
 fn runner_passes_assert_tostring_harness_self_test() {
     let report = run_filtered_test("harness/assert-tostring.js");
-    assert!(
-        report.contains("| Passed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 2);
 }
 
 #[test]
 fn runner_passes_compare_array_arguments_harness_self_test() {
     let report = run_filtered_test("harness/compare-array-arguments.js");
-    assert!(
-        report.contains("| Passed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 2);
 }
 
 #[test]
 fn runner_passes_decimal_to_hex_string_harness_self_test() {
     let report = run_filtered_test("harness/decimalToHexString.js");
-    assert!(
-        report.contains("| Passed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 2);
 }
 
 #[test]
 fn runner_passes_assert_relative_date_ms_harness_self_test() {
     let report = run_filtered_test("harness/assertRelativeDateMs.js");
-    assert!(
-        report.contains("| Passed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 2);
 }
 
 #[test]
 fn runner_passes_compare_array_sparse_harness_self_test() {
     let report = run_filtered_test("harness/compare-array-sparse.js");
-    assert!(
-        report.contains("| Passed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 2);
 }
 
 #[test]
 fn runner_passes_deep_equal_mapset_harness_self_test() {
     let report = run_filtered_test("harness/deepEqual-mapset.js");
-    assert!(
-        report.contains("| Passed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 2);
 }
 
 #[test]
 fn runner_passes_deep_equal_primitives_bigint_harness_self_test() {
     let report = run_filtered_test("harness/deepEqual-primitives-bigint.js");
-    assert!(
-        report.contains("| Passed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 2);
 }
 
 #[test]
@@ -462,39 +447,27 @@ fn runner_temporal_helper_formats_well_known_symbol_property_names() {
 #[test]
 fn runner_passes_well_known_intrinsics_harness_self_test() {
     let report = run_filtered_test("harness/wellKnownIntrinsicObjects.js");
-    assert!(
-        report.contains("| Passed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 2);
 }
 
 #[test]
 fn runner_passes_tco_helper_harness_self_test() {
     let report = run_filtered_test("harness/tcoHelper.js");
-    assert!(
-        report.contains("| Passed | `2` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 2);
 }
 
 #[test]
 fn runner_passes_tco_non_eval_global_regression() {
     let report =
         run_filtered_test_with_timeout("language/expressions/call/tco-non-eval-global.js", 5000);
-    assert!(
-        report.contains("| Passed | `1` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 1);
 }
 
 #[test]
 fn runner_passes_tco_non_eval_function_regression() {
     let report =
         run_filtered_test_with_timeout("language/expressions/call/tco-non-eval-function.js", 5000);
-    assert!(
-        report.contains("| Passed | `1` |"),
-        "unexpected report:\n{report}"
-    );
+    assert_passed(&report, 1, 1);
 }
 
 #[test]
@@ -504,9 +477,6 @@ fn runner_passes_tco_coalesce_regressions() {
         "language/expressions/coalesce/tco-pos-undefined.js",
     ] {
         let report = run_filtered_test_with_timeout(test, 5000);
-        assert!(
-            report.contains("| Passed | `1` |"),
-            "unexpected report for {test}:\n{report}"
-        );
+        assert_passed(&report, 1, 1);
     }
 }
