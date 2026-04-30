@@ -133,6 +133,7 @@ pub enum InternalMethodError {
     InvalidPrivateElement,
     InvalidPrivateBrand,
     DuplicatePrivateElement,
+    ObjectNotExtensible,
     RangeError,
     AccessorCallPending,
     MissingFunctionPayload,

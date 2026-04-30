@@ -172,6 +172,62 @@ fn phase6_public_instance_fields_define_through_proxy_traps() {
 }
 
 #[test]
+fn phase6_private_elements_reject_non_extensible_receivers() {
+    let result = compile_and_run_string(
+        r#"
+        let log = "";
+        function record(label, callback) {
+            try {
+                callback();
+                log += label + ":miss;";
+            } catch (error) {
+                log += label + ":" + String(error instanceof TypeError) + ";";
+            }
+        }
+
+        class SealingBase {
+            constructor() {
+                Object.preventExtensions(this);
+            }
+        }
+        class PrivateFieldOnBase extends SealingBase {
+            #value = 1;
+        }
+        class PrivateMethodOnBase extends SealingBase {
+            #method() {
+                return 1;
+            }
+        }
+
+        class ReturnOverrideBase {
+            constructor(object) {
+                return object;
+            }
+        }
+        class PrivateFieldOnReturnOverride extends ReturnOverrideBase {
+            #value = 1;
+            constructor(object) {
+                super(object);
+            }
+        }
+
+        record("field", () => new PrivateFieldOnBase());
+        record("method", () => new PrivateMethodOnBase());
+        record("return", () => new PrivateFieldOnReturnOverride(Object.preventExtensions({})));
+        record("static", () => {
+            class PrivateStaticField {
+                static #value = (Object.preventExtensions(PrivateStaticField), 1);
+            }
+        });
+
+        log;
+        "#,
+    );
+
+    assert_eq!(result, "field:true;method:true;return:true;static:true;");
+}
+
+#[test]
 fn phase6_anonymous_class_expressions_infer_names_before_static_initializers() {
     let result = compile_and_run_string(
         r#"

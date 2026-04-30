@@ -185,6 +185,7 @@ pub(crate) fn internal_method_error(
         | InternalMethodError::InvalidPrivateElement
         | InternalMethodError::InvalidPrivateBrand
         | InternalMethodError::DuplicatePrivateElement
+        | InternalMethodError::ObjectNotExtensible
         | InternalMethodError::AccessorCallPending
         | InternalMethodError::MissingFunctionPayload
         | InternalMethodError::MissingNativeHandler

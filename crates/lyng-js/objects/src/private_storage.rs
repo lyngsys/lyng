@@ -251,6 +251,9 @@ impl ObjectRuntime {
     ) -> Result<(), InternalMethodError> {
         let (descriptor, brand, field_slot_count, shared_slot_count) =
             self.private_element_brand_descriptor_layout(class_key, descriptor_index)?;
+        if !self.is_extensible(receiver)? {
+            return Err(InternalMethodError::ObjectNotExtensible);
+        }
         let slot_base = self.ensure_private_brand_storage(
             heap,
             receiver,
