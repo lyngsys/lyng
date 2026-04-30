@@ -137,6 +137,7 @@ fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::LoadResumeKind
         | Opcode::LoadResumeValue => InstructionForm::Ax,
         Opcode::LoadUndefined
+        | Opcode::LoadUninitializedLexical
         | Opcode::LoadNull
         | Opcode::LoadTrue
         | Opcode::LoadFalse
@@ -166,6 +167,7 @@ fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::CreateObject
         | Opcode::CreateArray
         | Opcode::CheckObjectCoercible
+        | Opcode::ThrowIfUninitialized
         | Opcode::CreateClosure
         | Opcode::CloseForIn
         | Opcode::CloseIterator => InstructionForm::Abx,

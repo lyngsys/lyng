@@ -70,9 +70,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     expr: expr_id,
                     name,
                 })?;
-                let (storage_class, binding_name) = {
+                let (storage_class, binding_name, has_tdz) = {
                     let binding = self.binding(binding_id)?;
-                    (binding.storage_class, binding.name)
+                    (binding.storage_class, binding.name, binding.has_tdz)
                 };
                 if storage_class == StorageClass::DynamicLookup {
                     return self.emit_load_name(dest, binding_name);
@@ -83,7 +83,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     match storage_class {
                         StorageClass::FrameLocal => {
                             let register = self.ensure_local_register(binding_id)?;
-                            self.emit_move(dest, register)
+                            self.emit_move(dest, register)?;
+                            if has_tdz {
+                                self.emit_throw_if_uninitialized(dest)?;
+                            }
+                            Ok(())
                         }
                         StorageClass::EnvironmentSlot => {
                             unreachable!("env-backed bindings handled above")

@@ -223,10 +223,12 @@ fn format_abx_instruction(
         crate::Opcode::CreateClosure => {
             format!("{opcode}r{}, child[{}]", operands.a(), operands.bx())
         }
-        crate::Opcode::LoadThis
+        crate::Opcode::LoadUninitializedLexical
+        | crate::Opcode::LoadThis
         | crate::Opcode::LoadCallee
         | crate::Opcode::LoadNewTarget
-        | crate::Opcode::CheckObjectCoercible => {
+        | crate::Opcode::CheckObjectCoercible
+        | crate::Opcode::ThrowIfUninitialized => {
             format!("{opcode}r{}", operands.a())
         }
         crate::Opcode::LoadGlobal

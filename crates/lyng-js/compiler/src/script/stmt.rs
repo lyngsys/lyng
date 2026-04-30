@@ -288,6 +288,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         list: lyng_js_ast::NodeList<StmtId>,
         span: Span,
     ) -> LoweringResult<()> {
+        self.emit_frame_local_tdz_initializers_for_current_scope()?;
         let stmts = self.ast().get_stmt_list(list).to_vec();
         if let Some(kind) = self.statement_list_disposal_scope_kind(list) {
             return self.with_disposal_scope(kind, span, move |this| {
@@ -299,6 +300,27 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
         for stmt in stmts {
             self.lower_statement(stmt)?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn emit_frame_local_tdz_initializers_for_current_scope(
+        &mut self,
+    ) -> LoweringResult<()> {
+        let bindings = self
+            .state
+            .sema
+            .scope_table
+            .get(self.current_scope)
+            .bindings
+            .clone();
+        for binding_id in bindings {
+            let binding = self.binding(binding_id)?;
+            if binding.storage_class != StorageClass::FrameLocal || !binding.has_tdz {
+                continue;
+            }
+            let register = self.ensure_local_register(binding_id)?;
+            self.emit_load_uninitialized_lexical(register)?;
         }
         Ok(())
     }
@@ -615,6 +637,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         cases: lyng_js_ast::NodeList<SwitchCase>,
     ) -> LoweringResult<()> {
         let discriminant_register = self.lower_expr_to_temp(discriminant)?;
+        self.emit_frame_local_tdz_initializers_for_current_scope()?;
         let switch_target = self.push_control_target(label, ControlTargetKind::Switch);
         let cases = self.ast().get_switch_case_list(cases).to_vec();
         let mut case_body_offsets = vec![None; cases.len()];
@@ -1342,6 +1365,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         dest: u16,
     ) -> LoweringResult<()> {
         let binding = self.binding(binding_id)?;
+        let has_tdz = binding.has_tdz;
         if binding.storage_class == StorageClass::DynamicLookup {
             return self.emit_load_name(dest, name);
         }
@@ -1351,7 +1375,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         match binding.storage_class {
             StorageClass::FrameLocal => {
                 let register = self.ensure_local_register(binding_id)?;
-                self.emit_move(dest, register)
+                self.emit_move(dest, register)?;
+                if has_tdz {
+                    self.emit_throw_if_uninitialized(dest)?;
+                }
+                Ok(())
             }
             StorageClass::GlobalName => self.emit_load_global(dest, binding.name),
             StorageClass::EnvironmentSlot => unreachable!("env-backed bindings handled above"),
@@ -1368,6 +1396,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         value_register: u16,
     ) -> LoweringResult<()> {
         let binding = self.binding(binding_id)?;
+        let has_tdz = binding.has_tdz;
         if binding.storage_class == StorageClass::DynamicLookup {
             return self.emit_assign_name(value_register, name);
         }
@@ -1377,6 +1406,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         match binding.storage_class {
             StorageClass::FrameLocal => {
                 let register = self.ensure_local_register(binding_id)?;
+                if has_tdz {
+                    self.emit_throw_if_uninitialized(register)?;
+                }
                 self.emit_move(register, value_register)
             }
             StorageClass::GlobalName => self.emit_assign_global(value_register, binding.name),

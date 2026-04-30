@@ -131,6 +131,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
+    pub(super) fn emit_load_uninitialized_lexical(&mut self, dest: u16) -> LoweringResult<()> {
+        self.builder.emit_abx(
+            Opcode::LoadUninitializedLexical,
+            self.encode_register(dest)?,
+            0,
+        )?;
+        Ok(())
+    }
+
+    pub(super) fn emit_throw_if_uninitialized(&mut self, value: u16) -> LoweringResult<()> {
+        self.builder.emit_abx(
+            Opcode::ThrowIfUninitialized,
+            self.encode_register(value)?,
+            0,
+        )?;
+        Ok(())
+    }
+
     pub(super) fn emit_load_null(&mut self, dest: u16) -> LoweringResult<()> {
         self.builder
             .emit_abx(Opcode::LoadNull, self.encode_register(dest)?, 0)?;

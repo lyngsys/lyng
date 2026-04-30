@@ -927,6 +927,10 @@ impl Vm {
                             self.write_register(frame, a, Value::undefined())?;
                             self.advance_instruction()?;
                         }
+                        Opcode::LoadUninitializedLexical => {
+                            self.write_register(frame, a, Value::uninitialized_lexical())?;
+                            self.advance_instruction()?;
+                        }
                         Opcode::LoadNull => {
                             self.write_register(frame, a, Value::null())?;
                             self.advance_instruction()?;
@@ -1233,6 +1237,17 @@ impl Vm {
                             let Some(()) = self.handle_vm_result(agent, coercible)? else {
                                 continue;
                             };
+                            self.advance_instruction()?;
+                        }
+                        Opcode::ThrowIfUninitialized => {
+                            let value = self.read_register(frame, a)?;
+                            if value == Value::uninitialized_lexical() {
+                                let result =
+                                    Err(VmError::Abrupt(errors::throw_reference_error(agent)));
+                                let Some(()) = self.handle_vm_result(agent, result)? else {
+                                    continue;
+                                };
+                            }
                             self.advance_instruction()?;
                         }
                         Opcode::CreateClosure => {

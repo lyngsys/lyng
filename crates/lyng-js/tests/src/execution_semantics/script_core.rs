@@ -49,6 +49,46 @@ fn script_core_executes_if_blocks_and_local_assignment() {
 }
 
 #[test]
+fn script_core_frame_local_lexicals_throw_in_tdz() {
+    let result = compile_and_run_string(
+        r#"
+        let log = [];
+
+        try {
+            { value; let value; }
+        } catch (error) {
+            log.push(error.constructor === ReferenceError ? "block-prior" : "block-other");
+        }
+
+        try {
+            { let value = value + 1; }
+        } catch (error) {
+            log.push(error.constructor === ReferenceError ? "block-init" : "block-init-other");
+        }
+
+        try {
+            (function() { value; const value = 1; }());
+        } catch (error) {
+            log.push(error.constructor === ReferenceError ? "function-prior" : "function-other");
+        }
+
+        try {
+            (function() { const value = value + 1; }());
+        } catch (error) {
+            log.push(error.constructor === ReferenceError ? "function-init" : "function-init-other");
+        }
+
+        log.join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "block-prior|block-init|function-prior|function-init"
+    );
+}
+
+#[test]
 fn script_core_instanceof_uses_symbol_has_instance_protocol() {
     let result = compile_and_run_string(
         r#"
