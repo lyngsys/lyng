@@ -14,6 +14,7 @@
 
 mod error;
 mod execution;
+mod extensions;
 mod host;
 
 use lyng_js_builtins::BootstrapMode;
@@ -28,6 +29,9 @@ Usage: lyng-js <entry.js|entry.mjs>
 
 Runs one Lyng JS entry file through the shared default-realm bootstrap.
 The CLI does not install harness globals, browser globals, or Node-style globals.
+
+Options:
+  --shell  Install non-spec shell globals (currently: print).
 ";
 
 /// High-level CLI command.
@@ -42,14 +46,16 @@ pub enum CliCommand {
 pub struct CliInvocation {
     script_path: PathBuf,
     bootstrap_mode: BootstrapMode,
+    shell_mode: bool,
 }
 
 impl CliInvocation {
     #[inline]
-    pub fn new(script_path: PathBuf, bootstrap_mode: BootstrapMode) -> Self {
+    pub fn new(script_path: PathBuf, bootstrap_mode: BootstrapMode, shell_mode: bool) -> Self {
         Self {
             script_path,
             bootstrap_mode,
+            shell_mode,
         }
     }
 
@@ -70,6 +76,11 @@ impl CliInvocation {
     pub const fn bootstrap_mode(&self) -> BootstrapMode {
         self.bootstrap_mode
     }
+
+    #[inline]
+    pub const fn shell_mode(&self) -> bool {
+        self.shell_mode
+    }
 }
 
 #[inline]
@@ -84,19 +95,30 @@ pub const fn help_text() -> &'static str {
 pub fn parse_args(args: impl IntoIterator<Item = OsString>) -> CliResult<CliCommand> {
     let mut args = args.into_iter();
     let _program_name = args.next();
-    let Some(first) = args.next() else {
+    let mut shell_mode = false;
+    let mut script_path = None;
+
+    for arg in args.by_ref() {
+        if arg == "-h" || arg == "--help" {
+            return Ok(CliCommand::Help);
+        }
+        if arg == "--shell" {
+            shell_mode = true;
+            continue;
+        }
+        if arg.to_string_lossy().starts_with('-') {
+            return Err(CliError::usage(format!(
+                "unknown option `{}`\n\n{}",
+                arg.to_string_lossy(),
+                help_text()
+            )));
+        }
+        script_path = Some(arg);
+        break;
+    }
+    let Some(script_path) = script_path else {
         return Ok(CliCommand::Help);
     };
-    if first == OsString::from("-h") || first == OsString::from("--help") {
-        return Ok(CliCommand::Help);
-    }
-    if first.to_string_lossy().starts_with('-') {
-        return Err(CliError::usage(format!(
-            "unknown option `{}`\n\n{}",
-            first.to_string_lossy(),
-            help_text()
-        )));
-    }
 
     if let Some(extra) = args.next() {
         return Err(CliError::usage(format!(
@@ -107,8 +129,9 @@ pub fn parse_args(args: impl IntoIterator<Item = OsString>) -> CliResult<CliComm
     }
 
     Ok(CliCommand::Run(CliInvocation::new(
-        PathBuf::from(first),
+        PathBuf::from(script_path),
         BootstrapMode::SpecOnly,
+        shell_mode,
     )))
 }
 
@@ -175,6 +198,35 @@ mod tests {
     }
 
     #[test]
+    fn parse_args_accepts_shell_flag() {
+        let command = parse_args([
+            OsString::from("lyng-js"),
+            OsString::from("--shell"),
+            OsString::from("x.js"),
+        ])
+        .expect("shell-mode parse should succeed");
+
+        let CliCommand::Run(invocation) = command else {
+            panic!("shell flag should produce a run invocation");
+        };
+        assert_eq!(invocation.script_path(), Path::new("x.js"));
+        assert!(invocation.shell_mode());
+    }
+
+    #[test]
+    fn parse_args_rejects_shell_after_script() {
+        let error = parse_args([
+            OsString::from("lyng-js"),
+            OsString::from("x.js"),
+            OsString::from("--shell"),
+        ])
+        .expect_err("shell flag after the script path should fail");
+
+        assert_eq!(error.kind(), CliErrorKind::Usage);
+        assert!(error.message().contains("unexpected trailing argument"));
+    }
+
+    #[test]
     fn run_help_returns_success() {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
@@ -207,11 +259,32 @@ mod tests {
             CliCommand::Run(CliInvocation::new(
                 script.path().to_path_buf(),
                 BootstrapMode::SpecOnly,
+                false,
             )),
             &mut stdout,
             &mut stderr,
         )
         .expect("script execution should succeed");
+
+        assert_eq!(exit_code, 0);
+        assert!(stdout.is_empty());
+        assert!(stderr.is_empty());
+    }
+
+    #[test]
+    fn run_script_in_shell_mode_installs_print() {
+        let script = TempScript::new("cli-shell-print.js", r#"print("hello");"#);
+        let command = parse_args([
+            OsString::from("lyng-js"),
+            OsString::from("--shell"),
+            script.path().as_os_str().to_owned(),
+        ])
+        .expect("shell-mode parse should succeed");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+
+        let exit_code =
+            run_with_io(command, &mut stdout, &mut stderr).expect("shell print should execute");
 
         assert_eq!(exit_code, 0);
         assert!(stdout.is_empty());
@@ -228,6 +301,7 @@ mod tests {
             CliCommand::Run(CliInvocation::new(
                 script.path().to_path_buf(),
                 BootstrapMode::SpecOnly,
+                false,
             )),
             &mut stdout,
             &mut stderr,
@@ -251,6 +325,7 @@ mod tests {
             CliCommand::Run(CliInvocation::new(
                 script.path().to_path_buf(),
                 BootstrapMode::SpecOnly,
+                false,
             )),
             &mut stdout,
             &mut stderr,
@@ -275,7 +350,11 @@ mod tests {
         let mut stderr = Vec::new();
 
         let exit_code = run_with_io(
-            CliCommand::Run(CliInvocation::new(entry.clone(), BootstrapMode::SpecOnly)),
+            CliCommand::Run(CliInvocation::new(
+                entry.clone(),
+                BootstrapMode::SpecOnly,
+                false,
+            )),
             &mut stdout,
             &mut stderr,
         )

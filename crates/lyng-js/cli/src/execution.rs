@@ -1,4 +1,5 @@
 use crate::error::CliError;
+use crate::extensions::CliRealmExtension;
 use crate::host::{CliHost, CliHostSnapshot};
 use crate::CliInvocation;
 use lyng_js_common::{Diagnostic, SourceId, WellKnownAtom};
@@ -12,9 +13,10 @@ use lyng_js_ops::{number_to_string, object};
 use lyng_js_parser::parse_script;
 use lyng_js_sema::analyze_script;
 use lyng_js_types::{ObjectRef, PropertyKey, Value};
-use lyng_js_vm::{ModuleLoadError, Vm, VmError};
+use lyng_js_vm::{ModuleLoadError, SharedRealmExtensionProvider, Vm, VmError};
 use std::fmt::Write as _;
 use std::io::Write;
+use std::sync::Arc;
 
 const ENTRY_SOURCE_ID: SourceId = SourceId::new(1);
 
@@ -86,13 +88,20 @@ fn execute_script(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
             .to_string()
             .into_boxed_str(),
     );
-    let exit_code = match vm.evaluate_script_with_host_referrer(
-        agent,
-        realm,
-        &unit,
-        Some(&script_referrer),
-        &host,
-    ) {
+    let provider = shell_extension_provider(invocation);
+    let execution_result = if let Some(provider) = provider.as_ref() {
+        vm.evaluate_script_with_host_referrer_and_extensions(
+            agent,
+            realm,
+            &unit,
+            Some(&script_referrer),
+            &host,
+            Some(provider),
+        )
+    } else {
+        vm.evaluate_script_with_host_referrer(agent, realm, &unit, Some(&script_referrer), &host)
+    };
+    let exit_code = match execution_result {
         Ok(_) => 0,
         Err(VmError::Abrupt(completion)) => {
             let thrown_value = completion.thrown_value().unwrap_or(Value::undefined());
@@ -129,16 +138,24 @@ fn execute_module(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
         .bootstrap_realm(agent, realm.id(), invocation.bootstrap_mode())
         .map_err(|error| CliError::vm(format!("realm bootstrap failed: {error:?}")))?;
 
-    let loaded = match vm.load_module_graph_from_host(
-        agent,
-        realm,
-        &host,
-        &ModuleSourceRequest {
-            specifier: invocation.script_path().display().to_string(),
-            referrer: None,
-            attributes: Vec::new(),
-        },
-    ) {
+    let module_request = ModuleSourceRequest {
+        specifier: invocation.script_path().display().to_string(),
+        referrer: None,
+        attributes: Vec::new(),
+    };
+    let provider = shell_extension_provider(invocation);
+    let load_result = if let Some(provider) = provider.as_ref() {
+        vm.load_module_graph_from_host_and_extensions(
+            agent,
+            realm,
+            &host,
+            &module_request,
+            Some(provider),
+        )
+    } else {
+        vm.load_module_graph_from_host(agent, realm, &host, &module_request)
+    };
+    let loaded = match load_result {
         Ok(loaded) => loaded,
         Err(ModuleLoadError::Host(error)) => return Err(CliError::host(error)),
         Err(ModuleLoadError::Lowering) => return Err(CliError::lowering("module lowering failed")),
@@ -154,7 +171,18 @@ fn execute_module(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
         }
     };
 
-    let exit_code = match vm.evaluate_linked_module_with_host(agent, realm, loaded.key(), &host) {
+    let execution_result = if let Some(provider) = provider.as_ref() {
+        vm.evaluate_linked_module_with_host_and_extensions(
+            agent,
+            realm,
+            loaded.key(),
+            &host,
+            Some(provider),
+        )
+    } else {
+        vm.evaluate_linked_module_with_host(agent, realm, loaded.key(), &host)
+    };
+    let exit_code = match execution_result {
         Ok(_) => 0,
         Err(VmError::Abrupt(completion)) => {
             let thrown_value = completion.thrown_value().unwrap_or(Value::undefined());
@@ -178,6 +206,14 @@ fn execute_module(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
         display_name: loaded.display_name().to_owned(),
         snapshot: host.snapshot(),
     })
+}
+
+fn shell_extension_provider(invocation: &CliInvocation) -> Option<SharedRealmExtensionProvider> {
+    if invocation.shell_mode() {
+        Some(Arc::new(CliRealmExtension))
+    } else {
+        None
+    }
 }
 
 fn report_diagnostics(
