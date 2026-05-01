@@ -874,6 +874,29 @@ fn private_identifier() {
     assert_eq!(atoms.resolve(atom), "foo");
 }
 
+#[test]
+fn private_identifier_keyword_name_keeps_atom_payload() {
+    let mut atoms = AtomTable::new();
+    let source_id = SourceId::new(0);
+    let mut lexer = Lexer::new("#yield #await", source_id, &mut atoms);
+    let first = lexer.next_token();
+    let second = lexer.next_token();
+    drop(lexer);
+
+    assert_eq!(first.kind, TokenKind::PrivateIdentifier);
+    assert_eq!(second.kind, TokenKind::PrivateIdentifier);
+    let first_atom = match first.payload {
+        TokenPayload::Atom(a) => a,
+        _ => panic!(),
+    };
+    let second_atom = match second.payload {
+        TokenPayload::Atom(a) => a,
+        _ => panic!(),
+    };
+    assert_eq!(atoms.resolve(first_atom), "yield");
+    assert_eq!(atoms.resolve(second_atom), "await");
+}
+
 // =========================================================================
 // EOF
 // =========================================================================

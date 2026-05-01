@@ -173,6 +173,18 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
             TokenKind::Class => self.parse_class_expression(),
 
+            TokenKind::At => {
+                let start = self.current_span();
+                self.parse_decorator_list_syntax_only();
+                if self.at(TokenKind::Class) {
+                    self.parse_class_expression()
+                } else {
+                    self.error("expected class expression after decorator list".to_string());
+                    self.ast_mut()
+                        .alloc_expr(Expr::InvalidExpression { span: start })
+                }
+            }
+
             TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                 let template = self.parse_template_literal(false);
                 let span = self.current_span(); // approximate

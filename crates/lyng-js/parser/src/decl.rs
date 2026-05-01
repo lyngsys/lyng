@@ -306,6 +306,76 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         self.ast_mut().alloc_stmt(Stmt::Declaration { span, decl })
     }
 
+    pub(crate) fn parse_decorator_list_syntax_only(&mut self) {
+        while self.eat(TokenKind::At) {
+            self.parse_decorator_syntax_only();
+        }
+    }
+
+    fn parse_decorator_syntax_only(&mut self) {
+        if self.eat(TokenKind::LParen) {
+            if self.at(TokenKind::RParen) {
+                self.error("expected decorator expression".to_string());
+            } else {
+                self.parse_expression();
+            }
+            self.expect(TokenKind::RParen);
+            return;
+        }
+
+        self.parse_decorator_member_expression_syntax_only();
+        if self.at(TokenKind::LParen) {
+            self.parse_decorator_arguments_syntax_only();
+        }
+    }
+
+    fn parse_decorator_member_expression_syntax_only(&mut self) {
+        self.parse_decorator_identifier_reference_syntax_only();
+        while self.eat(TokenKind::Dot) {
+            if self.at(TokenKind::PrivateIdentifier) {
+                self.advance();
+            } else {
+                self.parse_identifier_name();
+            }
+        }
+    }
+
+    fn parse_decorator_identifier_reference_syntax_only(&mut self) {
+        if !self.at_identifier_reference() {
+            self.error("expected decorator member expression".to_string());
+            if !self.at(TokenKind::Eof) {
+                self.advance();
+            }
+            return;
+        }
+
+        let span = self.current_span();
+        let atom = self
+            .current_atom()
+            .unwrap_or_else(|| match self.current_kind() {
+                TokenKind::Yield => WellKnownAtom::yield_.id(),
+                TokenKind::Await => WellKnownAtom::r#await.id(),
+                _ => WellKnownAtom::Empty.id(),
+            });
+        if self.current().contains_escape() {
+            self.check_escaped_keyword_identifier();
+        }
+        self.validate_identifier_reference_atom(atom, span);
+        self.advance();
+    }
+
+    fn parse_decorator_arguments_syntax_only(&mut self) {
+        self.expect(TokenKind::LParen);
+        while !self.at(TokenKind::RParen) && !self.at(TokenKind::Eof) {
+            self.eat(TokenKind::Ellipsis);
+            self.parse_assignment_expression();
+            if !self.eat(TokenKind::Comma) {
+                break;
+            }
+        }
+        self.expect(TokenKind::RParen);
+    }
+
     /// Parses a class body: `{ elements }`.
     pub fn parse_class_body(&mut self) -> NodeList<lyng_js_ast::ClassElementId> {
         self.expect(TokenKind::LBrace);
@@ -324,7 +394,15 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     fn parse_class_element(&mut self) -> lyng_js_ast::ClassElementId {
-        let start = self.current_span();
+        let decorator_start = self.current_span();
+        if self.at(TokenKind::At) {
+            self.parse_decorator_list_syntax_only();
+        }
+        let start = if self.at(TokenKind::Eof) {
+            decorator_start
+        } else {
+            self.current_span()
+        };
         let is_static = self.at_contextual(WellKnownAtom::r#static)
             && self.class_element_uses_static_modifier();
 

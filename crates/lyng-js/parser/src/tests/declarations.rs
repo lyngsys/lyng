@@ -114,6 +114,53 @@ fn parse_class_declaration() {
 }
 
 #[test]
+fn parse_decorator_syntax_on_classes_and_elements() {
+    let p = script_ok(
+        r#"
+        function dec() {}
+        let ns = { value: dec };
+        @dec
+        @ns.value
+        class Foo {
+            @dec()
+            method() {}
+            @(dec)
+            static field;
+        }
+        let Bar = @dec() @(ns.value) class {
+            @ns.value
+            field;
+        };
+        "#,
+    );
+    let stmts = body(&p);
+    assert_eq!(stmts.len(), 4);
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[2]) {
+        if let Decl::Class { body, .. } = p.ast.get_decl(*decl) {
+            assert_eq!(p.ast.get_class_element_list(*body).len(), 2);
+        } else {
+            panic!("expected class declaration");
+        }
+    } else {
+        panic!("expected declaration statement");
+    }
+}
+
+#[test]
+fn parse_decorator_private_member_expression_in_class_static_block() {
+    script_ok(
+        r#"
+        class Foo {
+            static #dec() {}
+            static {
+                let Bar = @Foo.#dec class {};
+            }
+        }
+        "#,
+    );
+}
+
+#[test]
 fn parse_class_extends() {
     let p = script_ok("class Foo extends Bar {}");
     let stmts = body(&p);

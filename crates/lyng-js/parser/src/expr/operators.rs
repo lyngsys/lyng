@@ -104,6 +104,7 @@ pub(super) fn token_can_start_expression(kind: TokenKind) -> bool {
             | TokenKind::LBrace
             | TokenKind::Function
             | TokenKind::Class
+            | TokenKind::At
             | TokenKind::NoSubstitutionTemplate
             | TokenKind::TemplateHead
             | TokenKind::LParen

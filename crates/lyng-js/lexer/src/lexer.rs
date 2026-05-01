@@ -2148,13 +2148,18 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                 // Scan the identifier part
                 let ident_start = self.pos;
                 let inner = self.scan_identifier(ident_start, flags);
-                // The inner token will be Identifier with an AtomId payload.
-                // We need to re-wrap it as PrivateIdentifier.
+                let payload = match inner.payload {
+                    TokenPayload::Atom(_) => inner.payload,
+                    _ => {
+                        let text = self.text(ident_start, self.pos).to_owned();
+                        TokenPayload::Atom(self.atoms.intern(&text))
+                    }
+                };
                 return Token::with_payload(
                     TokenKind::PrivateIdentifier,
                     self.span(start, self.pos),
                     inner.flags,
-                    inner.payload,
+                    payload,
                 );
             }
         }

@@ -13,6 +13,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     /// Parses a `StatementListItem`: either a declaration or a statement.
     pub fn parse_statement_list_item(&mut self) -> StmtId {
         match self.current_kind() {
+            TokenKind::At => self.parse_decorated_class_declaration_stmt(),
             TokenKind::Function => self.parse_function_declaration_stmt(),
             TokenKind::Class => self.parse_class_declaration_stmt(),
             TokenKind::Const => self.parse_lexical_declaration_stmt(),
@@ -41,6 +42,18 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             }
             _ => self.parse_statement(),
         }
+    }
+
+    fn parse_decorated_class_declaration_stmt(&mut self) -> StmtId {
+        let start = self.current_span();
+        self.parse_decorator_list_syntax_only();
+        if self.at(TokenKind::Class) {
+            return self.parse_class_declaration_stmt();
+        }
+        self.error("expected class declaration after decorator list".to_string());
+        self.recover_to_statement_boundary();
+        self.ast_mut()
+            .alloc_stmt(Stmt::InvalidStatement { span: start })
     }
 
     /// Returns true if the token after `let` indicates a let declaration.
@@ -137,6 +150,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             TokenKind::Throw => self.parse_throw_statement(),
             TokenKind::Debugger => self.parse_debugger_statement(),
             TokenKind::With => self.parse_with_statement(),
+            TokenKind::At => {
+                self.error(
+                    "class declarations are not allowed in this statement position".to_string(),
+                );
+                self.parse_decorated_class_declaration_stmt()
+            }
             _ => self.parse_expression_statement(),
         }
     }
