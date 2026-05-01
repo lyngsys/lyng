@@ -83,6 +83,14 @@ impl Vm {
             RuntimeJobPayload::PromiseReaction { reaction, .. } => agent
                 .promise_reaction(reaction)
                 .and_then(|record| record.script_or_module_referrer()),
+            RuntimeJobPayload::DynamicImportEvaluate {
+                script_or_module_referrer,
+                ..
+            }
+            | RuntimeJobPayload::DynamicImportSettle {
+                script_or_module_referrer,
+                ..
+            } => script_or_module_referrer,
             _ => None,
         };
         agent.push_execution_context(
@@ -115,10 +123,13 @@ impl Vm {
                 thenable,
                 then,
             ),
+            RuntimeJobPayload::DynamicImportEvaluate { request, .. } => self
+                .execute_dynamic_import_evaluate_job(agent, host, registry, realm_record, request),
             RuntimeJobPayload::DynamicImportSettle {
                 capability,
                 value,
                 rejected,
+                ..
             } => self.execute_dynamic_import_settle_job(
                 agent,
                 host,
@@ -452,7 +463,7 @@ impl Vm {
         );
     }
 
-    pub(super) fn settle_promise_capability(
+    pub(in crate::vm) fn settle_promise_capability(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,

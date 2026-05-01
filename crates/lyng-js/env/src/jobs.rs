@@ -1,4 +1,5 @@
 use super::{ExecutableId, JobId, PromiseCapabilityId, PromiseReactionId, RuntimeDomainAccounting};
+use lyng_js_common::AtomId;
 use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
 use lyng_js_host::{HostJobId, HostJobKind};
 use lyng_js_types::{ObjectRef, RealmRef, Value};
@@ -39,10 +40,15 @@ pub enum RuntimeJobPayload {
         thenable: ObjectRef,
         then: ObjectRef,
     },
+    DynamicImportEvaluate {
+        request: u32,
+        script_or_module_referrer: Option<AtomId>,
+    },
     DynamicImportSettle {
         capability: PromiseCapabilityId,
         value: Value,
         rejected: bool,
+        script_or_module_referrer: Option<AtomId>,
     },
     FinalizationCleanup {
         registry: ObjectRef,
@@ -188,6 +194,7 @@ impl TraceHeapEdges for RuntimeJobPayload {
                 thenable.trace_heap_edges(tracer);
                 then.trace_heap_edges(tracer);
             }
+            Self::DynamicImportEvaluate { .. } => {}
             Self::DynamicImportSettle { value, .. } => value.trace_heap_edges(tracer),
             Self::FinalizationCleanup { registry } => registry.trace_heap_edges(tracer),
         }

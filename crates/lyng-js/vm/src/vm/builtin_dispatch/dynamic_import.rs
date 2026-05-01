@@ -1,4 +1,6 @@
 use super::*;
+use crate::vm::DynamicImportRequest;
+use lyng_js_env::RealmRecord;
 
 impl Vm {
     pub(super) fn import_meta_builtin(
@@ -99,9 +101,8 @@ impl Vm {
         let specifier = arguments.first().copied().unwrap_or(Value::undefined());
         let options = arguments.get(1).copied().unwrap_or(Value::undefined());
         let phase = DynamicImportPhase::from_value(arguments.get(2).copied());
-        let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
 
-        let outcome = (|| -> Result<Value, Value> {
+        let outcome = (|| -> Result<ModuleSourceRequest, Value> {
             let specifier = self
                 .to_primitive(
                     agent,
@@ -126,25 +127,12 @@ impl Vm {
                 referrer: self.active_script_or_module_referrer(agent),
                 attributes,
             };
-            let loaded = self
-                .load_module_graph_from_host(agent, realm_record, host, &request)
-                .map_err(|error| self.dynamic_import_module_error_value(agent, error))?;
-            let key = loaded.key().clone();
-            let module_env = self
-                .link_module_graph(agent, realm_record, &key)
-                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
-            let _ = self
-                .evaluate_module_graph(agent, realm_record, &key, module_env, host, registry)
-                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
-            let namespace = self
-                .module_namespace_object(agent, realm_record, &key)
-                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
-            Ok(Value::from_object_ref(namespace))
+            Ok(request)
         })();
 
         match outcome {
-            Ok(value) => {
-                self.enqueue_dynamic_import_settle_job(agent, realm, capability, value, false)
+            Ok(request) => {
+                self.enqueue_dynamic_import_evaluate_job(agent, realm, capability, request)
             }
             Err(reason) => {
                 self.enqueue_dynamic_import_settle_job(agent, realm, capability, reason, true)
@@ -297,6 +285,9 @@ impl Vm {
         value: Value,
         rejected: bool,
     ) {
+        let script_or_module_referrer = agent
+            .current_execution_context()
+            .and_then(|context| context.script_or_module_referrer());
         let _ = agent.enqueue_job_with_payload(
             lyng_js_host::HostJobKind::Promise,
             lyng_js_env::ExecutableId::Builtin,
@@ -304,10 +295,108 @@ impl Vm {
                 capability,
                 value,
                 rejected,
+                script_or_module_referrer,
             },
             Some(realm),
             Some("DynamicImportSettle".into()),
         );
+    }
+
+    fn enqueue_dynamic_import_evaluate_job(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRef,
+        capability: lyng_js_env::PromiseCapabilityId,
+        request: ModuleSourceRequest,
+    ) {
+        let script_or_module_referrer = request
+            .referrer
+            .as_ref()
+            .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
+        let request_id = self.alloc_dynamic_import_request(DynamicImportRequest {
+            capability,
+            request,
+        });
+        let _ = agent.enqueue_job_with_payload(
+            lyng_js_host::HostJobKind::Promise,
+            lyng_js_env::ExecutableId::Builtin,
+            lyng_js_env::RuntimeJobPayload::DynamicImportEvaluate {
+                request: request_id,
+                script_or_module_referrer,
+            },
+            Some(realm),
+            Some("DynamicImportEvaluate".into()),
+        );
+    }
+
+    fn alloc_dynamic_import_request(&mut self, request: DynamicImportRequest) -> u32 {
+        let index = self.dynamic_import_requests.len();
+        let id = u32::try_from(index).expect("dynamic import request id should fit into u32");
+        self.dynamic_import_requests.push(Some(request));
+        id
+    }
+
+    pub(in crate::vm) fn execute_dynamic_import_evaluate_job(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        realm_record: RealmRecord,
+        request_id: u32,
+    ) -> VmResult<()> {
+        let Some(request) = self
+            .dynamic_import_requests
+            .get_mut(usize::try_from(request_id).expect("request id should fit usize"))
+            .and_then(Option::take)
+        else {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        };
+        let outcome =
+            self.evaluate_dynamic_import_request(agent, realm_record, host, registry, &request);
+        match outcome {
+            Ok(value) => self.settle_promise_capability(
+                agent,
+                host,
+                registry,
+                realm_record,
+                request.capability,
+                false,
+                value,
+            ),
+            Err(reason) => self.settle_promise_capability(
+                agent,
+                host,
+                registry,
+                realm_record,
+                request.capability,
+                true,
+                reason,
+            ),
+        }
+    }
+
+    fn evaluate_dynamic_import_request(
+        &mut self,
+        agent: &mut Agent,
+        realm_record: RealmRecord,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        request: &DynamicImportRequest,
+    ) -> Result<Value, Value> {
+        let loaded = self
+            .load_module_graph_from_host(agent, realm_record, host, &request.request)
+            .map_err(|error| self.dynamic_import_module_error_value(agent, error))?;
+        let key = loaded.key().clone();
+        let module_env = self
+            .link_module_graph(agent, realm_record, &key)
+            .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+        let _ = self
+            .evaluate_module_graph(agent, realm_record, &key, module_env, host, registry)
+            .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+        let namespace = self
+            .module_namespace_object(agent, realm_record, &key)
+            .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+        Ok(Value::from_object_ref(namespace))
     }
 
     fn dynamic_import_module_error_value(

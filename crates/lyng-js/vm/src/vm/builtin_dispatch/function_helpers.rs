@@ -154,6 +154,8 @@ impl Vm {
     pub(super) fn create_dynamic_function(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         realm: RealmRef,
         parameters_source: &str,
         body_source: &str,
@@ -174,8 +176,21 @@ impl Vm {
         } else {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         };
+        let script_referrer = self
+            .active_script_or_module_referrer(agent)
+            .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         let function = self
-            .evaluate_installed(agent, installed, lexical_env, variable_env)?
+            .evaluate_entry_with_registry(
+                agent,
+                installed,
+                lexical_env,
+                variable_env,
+                script_referrer,
+                host,
+                registry,
+                None,
+                None,
+            )?
             .as_object_ref()
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let _ = agent.with_heap_and_objects(|heap, objects| {

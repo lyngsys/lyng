@@ -349,6 +349,8 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         let prototype = self.builtin_constructor_prototype(realm, default_prototype, new_target)?;
         self.vm.create_dynamic_function(
             self.agent,
+            self.host,
+            self.registry,
             realm,
             parameters_source,
             body_source,

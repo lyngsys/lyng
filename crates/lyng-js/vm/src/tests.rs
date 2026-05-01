@@ -1762,6 +1762,57 @@ fn linked_module_graph_initializes_named_exported_functions_before_evaluation() 
 }
 
 #[test]
+fn linked_module_graph_initializes_exported_functions_before_dependency_evaluation() {
+    let dependency = compile_test_module(
+        349,
+        "import { f } from './main.mjs'; export const call = f();",
+    );
+    let main = compile_test_module(
+        350,
+        "import { call } from './dep.mjs'; export const seen = call; export function f() { return 23; }",
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let dependency_key = ModuleKey::new("/tmp/dep.mjs");
+    let main_key = ModuleKey::new("/tmp/main.mjs");
+    let mut vm = Vm::new();
+
+    vm.install_module(
+        agent,
+        realm.id(),
+        &dependency_key,
+        "/tmp/dep.mjs",
+        &dependency,
+    )
+    .unwrap();
+    vm.install_module(agent, realm.id(), &main_key, "/tmp/main.mjs", &main)
+        .unwrap();
+    assert!(agent.set_module_requested_key(&dependency_key, 0, Some(main_key.clone())));
+    assert!(agent.set_module_requested_key(&main_key, 0, Some(dependency_key.clone())));
+
+    let _ = vm.evaluate_linked_module(agent, realm, &main_key).unwrap();
+
+    let record = agent
+        .module_record(&main_key)
+        .expect("module should stay cached after evaluation");
+    let module_env = record
+        .environment()
+        .expect("module evaluation should allocate one environment");
+    let seen_slot = main
+        .local_exports()
+        .iter()
+        .find(|entry| main.atom_text(entry.export_name()) == Some("seen"))
+        .expect("module should export seen")
+        .local_slot();
+
+    assert_eq!(
+        agent.environment_slot(module_env, seen_slot),
+        Some(Value::from_smi(23))
+    );
+}
+
+#[test]
 fn linked_module_graph_initializes_indirectly_exported_functions_before_evaluation() {
     let dependency = compile_test_module(331, "export { A as B } from './main.mjs';");
     let main = compile_test_module(
@@ -2569,6 +2620,163 @@ fn dynamic_import_preserves_script_referrer_in_promise_reactions() {
             referrer: Some(script_referrer),
             attributes: Vec::new(),
         })));
+}
+
+#[test]
+fn dynamic_import_preserves_referrer_through_import_promise_reactions() {
+    let unit = compile_test_unit(
+        259,
+        r#"
+            Promise.all([
+                import('./dep.mjs'),
+                import('./dep.mjs')
+            ]).then(async function() {
+                await import('./dep.mjs');
+                await import('./dep.mjs');
+            });
+        "#,
+    );
+    let host = TestHost::new();
+    let script_referrer = ModuleKey::new("/tmp/main.js");
+    let module_key = ModuleKey::new("/tmp/dep.mjs");
+    host.define_module_source(
+        "./dep.mjs",
+        LoadedModuleSource::new(
+            module_key.clone(),
+            "/tmp/dep.mjs",
+            r#"
+                var global = Function('return this;')();
+                if (global.dynamicImportMarker) {
+                    throw new Error('Module was evaluated more than once.');
+                }
+                global.dynamicImportMarker = 19;
+                export default null;
+            "#,
+        ),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host_referrer(
+            agent,
+            realm,
+            &unit,
+            Some(&script_referrer),
+            &host,
+            &mut registry,
+        )
+        .expect("chained dynamic imports should evaluate");
+    let promise = result
+        .as_object_ref()
+        .expect("script result should be the chained promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("script result promise should stay tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+
+    let expected = HostCall::LoadModule(ModuleSourceRequest {
+        specifier: "./dep.mjs".into(),
+        referrer: Some(script_referrer),
+        attributes: Vec::new(),
+    });
+    let load_count = host
+        .snapshot()
+        .calls
+        .into_iter()
+        .filter(|call| call == &expected)
+        .count();
+    assert_eq!(load_count, 4);
+}
+
+#[test]
+fn dynamic_import_does_not_preempt_static_module_dfs_evaluation() {
+    let main_source = "import './state.mjs'; import './a.mjs'; import './b.mjs';";
+    let state_source = r#"
+        export let score = 0;
+        export function step(value) {
+            score = score * 10 + value;
+        }
+    "#;
+    let state_unit = compile_test_module(258, state_source);
+    let state_key = ModuleKey::new("/tmp/state.mjs");
+    let host = TestHost::new();
+    host.define_module_source(
+        "main.mjs",
+        LoadedModuleSource::new(ModuleKey::new("/tmp/main.mjs"), "main.mjs", main_source),
+    );
+    host.define_module_source(
+        "./state.mjs",
+        LoadedModuleSource::new(state_key.clone(), "state.mjs", state_source),
+    );
+    host.define_module_source(
+        "./a.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/a.mjs"),
+            "a.mjs",
+            r#"
+                import { step } from './state.mjs';
+                import('./b.mjs');
+                step(1);
+            "#,
+        ),
+    );
+    host.define_module_source(
+        "./b.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/b.mjs"),
+            "b.mjs",
+            "import { step } from './state.mjs'; step(2);",
+        ),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+    let loaded = vm
+        .load_module_graph_from_host(
+            agent,
+            realm,
+            &host,
+            &ModuleSourceRequest {
+                specifier: "main.mjs".into(),
+                referrer: None,
+                attributes: Vec::new(),
+            },
+        )
+        .unwrap();
+
+    let _ = vm
+        .evaluate_linked_module_with_registry_and_host(
+            agent,
+            realm,
+            loaded.key(),
+            &host,
+            &mut registry,
+        )
+        .unwrap();
+
+    let record = agent
+        .module_record(&state_key)
+        .expect("state module should stay cached");
+    let module_env = record
+        .environment()
+        .expect("state module evaluation should allocate one environment");
+    let score_slot = state_unit
+        .local_exports()
+        .iter()
+        .find(|entry| state_unit.atom_text(entry.export_name()) == Some("score"))
+        .expect("state module should export score")
+        .local_slot();
+
+    assert_eq!(
+        agent.environment_slot(module_env, score_slot),
+        Some(Value::from_smi(12))
+    );
 }
 
 #[test]

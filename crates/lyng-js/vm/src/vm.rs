@@ -69,7 +69,7 @@ mod with_env;
 use call::RejectingNativeRegistry;
 use feedback::FeedbackVector;
 use install::InstalledFunction;
-use values::{bytecode_index, code_index, string_text_array_index};
+use values::{bytecode_index, code_index, decode_env_operand, string_text_array_index};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FeedbackVectorFootprint {
@@ -197,6 +197,12 @@ struct EntryExecutionOverride {
     private_env: Option<EnvironmentRef>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DynamicImportRequest {
+    capability: lyng_js_env::PromiseCapabilityId,
+    request: ModuleSourceRequest,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct SuspendedExecutionSideState {
     iterator_states: Vec<(u16, lyng_js_ops::iterator::IteratorRecord)>,
@@ -234,6 +240,7 @@ pub struct Vm {
     async_generator_objects: HashSet<ObjectRef>,
     async_generator_frame_states: HashMap<u32, AsyncGeneratorFrameState>,
     async_generator_queues: HashMap<ObjectRef, VecDeque<AsyncGeneratorRequest>>,
+    dynamic_import_requests: Vec<Option<DynamicImportRequest>>,
     next_dynamic_source_raw: u32,
     loop_iteration_envs: Vec<LoopIterationEnvironment>,
     with_environment_states: Vec<WithEnvironmentState>,
@@ -274,6 +281,7 @@ impl Vm {
             async_generator_objects: HashSet::new(),
             async_generator_frame_states: HashMap::new(),
             async_generator_queues: HashMap::new(),
+            dynamic_import_requests: Vec::new(),
             next_dynamic_source_raw: 1,
             loop_iteration_envs: Vec::new(),
             with_environment_states: Vec::new(),
@@ -361,6 +369,14 @@ impl Vm {
     #[inline]
     pub fn installed_function(&self, code: CodeRef) -> Option<&BytecodeFunction> {
         Some(&self.installed.get(code_index(code))?.as_ref()?.function)
+    }
+
+    #[inline]
+    fn installed_function_record(&self, code: CodeRef) -> Option<&InstalledFunction> {
+        self.installed
+            .get(code_index(code))?
+            .as_ref()
+            .map(Arc::as_ref)
     }
 
     #[inline]
@@ -1112,6 +1128,34 @@ impl Vm {
         global_script_plan: Option<&GlobalScriptInstantiationPlan>,
         entry_override: Option<EntryExecutionOverride>,
     ) -> VmResult<Value> {
+        self.evaluate_entry_with_registry_from_offset(
+            agent,
+            installed,
+            lexical_env,
+            variable_env,
+            script_or_module_referrer,
+            host,
+            registry,
+            global_script_plan,
+            entry_override,
+            0,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn evaluate_entry_with_registry_from_offset(
+        &mut self,
+        agent: &mut Agent,
+        installed: InstalledCode,
+        lexical_env: EnvironmentRef,
+        variable_env: EnvironmentRef,
+        script_or_module_referrer: Option<AtomId>,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        global_script_plan: Option<&GlobalScriptInstantiationPlan>,
+        entry_override: Option<EntryExecutionOverride>,
+        entry_offset: u32,
+    ) -> VmResult<Value> {
         let code = installed.code();
         let code_record = agent
             .heap()
@@ -1170,7 +1214,7 @@ impl Vm {
         };
         let frame = FrameRecord::new(
             code,
-            0,
+            entry_offset,
             RegisterWindow::new(register_base, register_len),
             None,
             realm,
@@ -1387,8 +1431,129 @@ impl Vm {
             &requested_modules,
             &import_entries,
         )?;
+        self.initialize_module_hoisted_functions(agent, realm, code, module_env)?;
         let _ = agent.set_module_record_status(key, ModuleStatus::Linked);
         Ok(module_env)
+    }
+
+    fn initialize_module_hoisted_functions(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRecord,
+        code: CodeRef,
+        module_env: EnvironmentRef,
+    ) -> VmResult<()> {
+        let installed = self
+            .installed_function_record(code)
+            .cloned()
+            .ok_or(VmError::MissingInstalledCode(code))?;
+        for (slot, child_index) in Self::module_hoisted_function_initializers(&installed) {
+            let frame = FrameRecord::new(
+                code,
+                0,
+                RegisterWindow::new(0, 0),
+                None,
+                realm.id(),
+                module_env,
+                module_env,
+                lyng_js_env::ExecutionContextKind::Module,
+            );
+            let closure = self.create_closure(agent, frame, child_index)?;
+            self.initialize_environment_slot(
+                agent,
+                module_env,
+                slot,
+                Value::from_object_ref(closure),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn module_hoisted_function_initializers(installed: &InstalledFunction) -> Vec<(u32, u32)> {
+        let instructions = installed.function.instructions();
+        let mut offset = Self::module_hoisted_function_prologue_start(instructions);
+        let mut initializers = Vec::new();
+        while let Some((slot, child_index)) =
+            Self::module_hoisted_function_initializer_at(installed, instructions, offset)
+        {
+            initializers.push((slot, child_index));
+            offset += 2;
+        }
+        initializers
+    }
+
+    fn module_hoisted_function_prologue_end(installed: &InstalledFunction) -> u32 {
+        let instructions = installed.function.instructions();
+        let start = Self::module_hoisted_function_prologue_start(instructions);
+        let mut offset = start;
+        while Self::module_hoisted_function_initializer_at(installed, instructions, offset)
+            .is_some()
+        {
+            offset += 2;
+        }
+        if offset == start {
+            0
+        } else {
+            u32::try_from(offset).expect("instruction offset should fit into u32")
+        }
+    }
+
+    fn module_hoisted_function_prologue_start(instructions: &[Instruction]) -> usize {
+        instructions
+            .iter()
+            .take_while(|instruction| {
+                matches!(
+                    instruction,
+                    Instruction::Abx {
+                        opcode: Opcode::LoadUndefined,
+                        ..
+                    }
+                )
+            })
+            .count()
+    }
+
+    fn module_hoisted_function_initializer_at(
+        installed: &InstalledFunction,
+        instructions: &[Instruction],
+        offset: usize,
+    ) -> Option<(u32, u32)> {
+        let create_offset = u32::try_from(offset).expect("instruction offset should fit into u32");
+        let store_offset =
+            u32::try_from(offset + 1).expect("instruction offset should fit into u32");
+        let Instruction::Abx {
+            opcode: Opcode::CreateClosure,
+            a: create_register,
+            bx: child_index,
+        } = instructions.get(offset).copied()?
+        else {
+            return None;
+        };
+        let Instruction::Abx {
+            opcode: Opcode::StoreEnvSlot,
+            a: store_register,
+            bx: env_operand,
+        } = instructions.get(offset + 1).copied()?
+        else {
+            return None;
+        };
+        let create_operands = installed.wide_payload(create_offset).map_or_else(
+            || lyng_js_bytecode::WideAbxOperands::narrow(create_register, child_index),
+            |payload| {
+                lyng_js_bytecode::WideAbxOperands::decode(create_register, child_index, payload)
+            },
+        );
+        let store_operands = installed.wide_payload(store_offset).map_or_else(
+            || lyng_js_bytecode::WideAbxOperands::narrow(store_register, env_operand),
+            |payload| {
+                lyng_js_bytecode::WideAbxOperands::decode(store_register, env_operand, payload)
+            },
+        );
+        if create_operands.a() != store_operands.a() {
+            return None;
+        }
+        let (depth, slot) = decode_env_operand(store_operands.bx());
+        (depth == 0).then_some((slot, create_operands.bx()))
     }
 
     fn evaluate_module_graph(
@@ -1433,6 +1598,10 @@ impl Vm {
                 .ok_or(VmError::MissingInstalledCode(code))?
                 .id(),
         );
+        let entry_offset = self
+            .installed_function_record(code)
+            .map(Self::module_hoisted_function_prologue_end)
+            .ok_or(VmError::MissingInstalledCode(code))?;
         let _ = agent.set_module_record_status(key, ModuleStatus::Evaluating);
         for request in &requested_modules {
             let resolved_key = request
@@ -1450,8 +1619,17 @@ impl Vm {
             )?;
         }
 
-        let result = self.evaluate_entry_with_registry(
-            agent, installed, module_env, module_env, None, host, registry, None, None,
+        let result = self.evaluate_entry_with_registry_from_offset(
+            agent,
+            installed,
+            module_env,
+            module_env,
+            None,
+            host,
+            registry,
+            None,
+            None,
+            entry_offset,
         );
         match result {
             Ok(value) => {
