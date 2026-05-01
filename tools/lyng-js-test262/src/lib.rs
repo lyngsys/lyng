@@ -528,8 +528,16 @@ fn is_generated_regexp_test(test: &PreparedTest) -> bool {
 }
 
 fn is_exhaustive_regexp_legacy_test(path: &Path) -> bool {
-    path.file_name().and_then(|name| name.to_str())
-        == Some("character-class-escape-non-whitespace.js")
+    matches!(
+        path.file_name().and_then(|name| name.to_str()),
+        Some(
+            "character-class-escape-non-whitespace.js"
+                | "S7.8.5_A1.1_T2.js"
+                | "S7.8.5_A1.4_T2.js"
+                | "S7.8.5_A2.1_T2.js"
+                | "S7.8.5_A2.4_T2.js"
+        )
+    )
 }
 
 fn relative_prepared_test_name(test: &PreparedTest, test_dir: &Path) -> String {
@@ -848,6 +856,21 @@ mod tests {
             category: "built-ins".to_string(),
             metadata: parse_metadata("/*---\nesid: sec-characterclassescape\n---*/"),
             variant: crate::metadata::TestVariant::Default,
+        };
+
+        assert_eq!(
+            timeout_for_test(&test, Duration::from_secs(1)),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn exhaustive_regexp_literal_legacy_tests_receive_extended_timeout() {
+        let test = PreparedTest {
+            path: PathBuf::from("test/language/literals/regexp/S7.8.5_A1.1_T2.js"),
+            category: "language".to_string(),
+            metadata: parse_metadata("/*---\nes5id: 7.8.5_A1.1_T2\n---*/"),
+            variant: crate::metadata::TestVariant::NonStrict,
         };
 
         assert_eq!(
