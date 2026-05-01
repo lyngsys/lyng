@@ -10,7 +10,7 @@ use super::super::{
     string_value, to_integer_or_infinity_for_builtin, type_error, PublicBuiltinDispatchContext,
 };
 use super::{
-    typed_array_read_element_value, typed_array_read_storage_bits,
+    typed_array_is_out_of_bounds, typed_array_read_element_value, typed_array_read_storage_bits,
     typed_array_storage_bits_to_value, typed_array_this_record, typed_array_validated_record,
 };
 use crate::BuiltinInvocation;
@@ -113,6 +113,9 @@ fn typed_array_length_getter_builtin<Cx: PublicBuiltinDispatchContext>(
         .ok_or_else(|| type_error(cx))?
     {
         return Ok(Value::from_smi(0));
+    }
+    if typed_array_is_out_of_bounds(cx.agent(), record) {
+        return Err(type_error(cx));
     }
     Ok(length_value_u64(
         u64::try_from(record.length()).unwrap_or(u64::MAX),

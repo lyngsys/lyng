@@ -20,17 +20,39 @@ pub enum PrimitiveWrapperKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ArrayBufferObjectData {
     backing_store: BackingStoreRef,
+    max_byte_length: Option<usize>,
 }
 
 impl ArrayBufferObjectData {
     #[inline]
     pub const fn new(backing_store: BackingStoreRef) -> Self {
-        Self { backing_store }
+        Self {
+            backing_store,
+            max_byte_length: None,
+        }
+    }
+
+    #[inline]
+    pub const fn new_resizable(backing_store: BackingStoreRef, max_byte_length: usize) -> Self {
+        Self {
+            backing_store,
+            max_byte_length: Some(max_byte_length),
+        }
     }
 
     #[inline]
     pub const fn backing_store(self) -> BackingStoreRef {
         self.backing_store
+    }
+
+    #[inline]
+    pub const fn max_byte_length(self) -> Option<usize> {
+        self.max_byte_length
+    }
+
+    #[inline]
+    pub const fn is_resizable(self) -> bool {
+        self.max_byte_length.is_some()
     }
 }
 
@@ -277,6 +299,7 @@ pub struct TypedArrayObjectData {
     byte_offset: usize,
     length: usize,
     kind: TypedArrayElementKind,
+    length_tracking: bool,
 }
 
 impl TypedArrayObjectData {
@@ -294,6 +317,25 @@ impl TypedArrayObjectData {
             byte_offset,
             length,
             kind,
+            length_tracking: false,
+        }
+    }
+
+    #[inline]
+    pub const fn new_length_tracking(
+        viewed_array_buffer: ObjectRef,
+        backing_store: BackingStoreRef,
+        byte_offset: usize,
+        length: usize,
+        kind: TypedArrayElementKind,
+    ) -> Self {
+        Self {
+            viewed_array_buffer,
+            backing_store,
+            byte_offset,
+            length,
+            kind,
+            length_tracking: true,
         }
     }
 
@@ -315,6 +357,17 @@ impl TypedArrayObjectData {
     #[inline]
     pub const fn length(self) -> usize {
         self.length
+    }
+
+    #[inline]
+    pub const fn is_length_tracking(self) -> bool {
+        self.length_tracking
+    }
+
+    #[inline]
+    pub const fn with_length(mut self, length: usize) -> Self {
+        self.length = length;
+        self
     }
 
     #[inline]

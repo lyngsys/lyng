@@ -53,6 +53,13 @@ impl BackingStoreRecord {
         }
     }
 
+    fn resize(&mut self, byte_length: usize) -> bool {
+        match self {
+            Self::Local(record) => record.resize(byte_length),
+            Self::Shared(_) => false,
+        }
+    }
+
     fn atomic_load_bits(&self, index: usize, byte_width: usize) -> Option<u64> {
         match self {
             Self::Local(record) => record.atomic_load_bits(index, byte_width),
@@ -119,6 +126,14 @@ impl LocalBackingStoreRecord {
             return false;
         };
         *slot = value;
+        true
+    }
+
+    fn resize(&mut self, byte_length: usize) -> bool {
+        if self.detached {
+            return false;
+        }
+        self.bytes.resize(byte_length, 0);
         true
     }
 
@@ -282,6 +297,13 @@ impl BackingStoreRuntime {
             return false;
         };
         record.set_byte(index, value)
+    }
+
+    pub(crate) fn resize(&mut self, id: BackingStoreRef, byte_length: usize) -> bool {
+        let Some(record) = self.record_mut(id) else {
+            return false;
+        };
+        record.resize(byte_length)
     }
 
     pub(crate) fn atomic_load_bits(

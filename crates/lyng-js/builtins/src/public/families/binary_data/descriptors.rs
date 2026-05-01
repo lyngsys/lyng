@@ -177,6 +177,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
         buffers::BufferDescriptorAtoms {
             is_view: is_view_atom,
             byte_length: byte_length_atom,
+            resize: agent.atoms_mut().intern("resize"),
             slice: slice_atom,
         },
         buffers::BufferDescriptorTags {

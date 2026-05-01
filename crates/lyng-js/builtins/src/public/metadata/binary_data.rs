@@ -174,6 +174,10 @@ pub(super) const PUBLIC_BINARY_DATA_BUILTIN_METADATA: &[PublicBuiltinMetadataRow
         BuiltinEntryMetadata::new("get byteLength", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        array_buffer_resize_builtin,
+        BuiltinEntryMetadata::new("resize", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         array_buffer_slice_builtin,
         BuiltinEntryMetadata::new("slice", 2, false, false),
     ),

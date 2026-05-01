@@ -437,6 +437,7 @@ pub(super) struct BinaryDataFamilyBuiltins {
     pub(super) array_buffer_prototype: ObjectRef,
     pub(super) shared_array_buffer_prototype: ObjectRef,
     pub(super) array_buffer_byte_length_getter: ObjectRef,
+    pub(super) array_buffer_resize: ObjectRef,
     pub(super) array_buffer_slice: ObjectRef,
     pub(super) shared_array_buffer_byte_length_getter: ObjectRef,
     pub(super) shared_array_buffer_slice: ObjectRef,

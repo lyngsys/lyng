@@ -9357,6 +9357,41 @@ fn for_of_destructuring_assignment_defaults_only_for_undefined_values() {
 }
 
 #[test]
+fn typed_array_for_of_tracks_resizable_array_buffer_growth() {
+    let unit = compile_test_unit(
+        2311,
+        r#"
+            var rab = new ArrayBuffer(4, { maxByteLength: 8 });
+            var values = new Uint8Array(rab);
+            values[0] = 1;
+            values[1] = 2;
+
+            var seen = [];
+            for (var value of values) {
+                seen.push(value);
+                if (seen.length === 2) {
+                    rab.resize(6);
+                }
+            }
+            seen.join(",");
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let actual = result
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("for-of result should be a string");
+
+    assert_eq!(actual, "1,2,0,0,0,0");
+}
+
+#[test]
 fn yield_star_delegates_generator_values_and_final_completion() {
     let unit = compile_test_unit(
         207,

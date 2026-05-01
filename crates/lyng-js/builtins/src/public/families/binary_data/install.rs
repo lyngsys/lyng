@@ -5,11 +5,11 @@ use super::super::{
 use lyng_js_env::Agent;
 use lyng_js_types::{
     array_buffer_builtin, array_buffer_byte_length_getter_builtin, array_buffer_is_view_builtin,
-    array_buffer_slice_builtin, atomics_add_builtin, atomics_and_builtin,
-    atomics_compare_exchange_builtin, atomics_exchange_builtin, atomics_is_lock_free_builtin,
-    atomics_load_builtin, atomics_notify_builtin, atomics_or_builtin, atomics_pause_builtin,
-    atomics_store_builtin, atomics_sub_builtin, atomics_wait_async_builtin, atomics_wait_builtin,
-    atomics_xor_builtin, big_int64_array_builtin, big_uint64_array_builtin,
+    array_buffer_resize_builtin, array_buffer_slice_builtin, atomics_add_builtin,
+    atomics_and_builtin, atomics_compare_exchange_builtin, atomics_exchange_builtin,
+    atomics_is_lock_free_builtin, atomics_load_builtin, atomics_notify_builtin, atomics_or_builtin,
+    atomics_pause_builtin, atomics_store_builtin, atomics_sub_builtin, atomics_wait_async_builtin,
+    atomics_wait_builtin, atomics_xor_builtin, big_int64_array_builtin, big_uint64_array_builtin,
     data_view_buffer_getter_builtin, data_view_builtin, data_view_byte_length_getter_builtin,
     data_view_byte_offset_getter_builtin, data_view_get_big_int64_builtin,
     data_view_get_big_uint64_builtin, data_view_get_float16_builtin, data_view_get_float32_builtin,
@@ -77,6 +77,7 @@ pub(in crate::public) fn install_binary_data_family(
         array_buffer_prototype: prototypes.array_buffer_prototype,
         shared_array_buffer_prototype: prototypes.shared_array_buffer_prototype,
         array_buffer_byte_length_getter: buffer_methods.array_buffer_byte_length_getter,
+        array_buffer_resize: buffer_methods.array_buffer_resize,
         array_buffer_slice: buffer_methods.array_buffer_slice,
         shared_array_buffer_byte_length_getter: buffer_methods
             .shared_array_buffer_byte_length_getter,
@@ -307,6 +308,7 @@ fn install_binary_data_constructors(
 #[derive(Clone, Copy, Debug)]
 struct BufferMethodBuiltins {
     array_buffer_byte_length_getter: ObjectRef,
+    array_buffer_resize: ObjectRef,
     array_buffer_slice: ObjectRef,
     shared_array_buffer_byte_length_getter: ObjectRef,
     shared_array_buffer_slice: ObjectRef,
@@ -319,6 +321,7 @@ fn install_buffer_methods(agent: &mut Agent, cx: FamilyInstallContext) -> Buffer
             cx,
             array_buffer_byte_length_getter_builtin(),
         ),
+        array_buffer_resize: install(agent, cx, array_buffer_resize_builtin()),
         array_buffer_slice: install(agent, cx, array_buffer_slice_builtin()),
         shared_array_buffer_byte_length_getter: install(
             agent,

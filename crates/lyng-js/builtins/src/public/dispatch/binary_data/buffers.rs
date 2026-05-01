@@ -29,6 +29,9 @@ pub(super) fn dispatch_buffer_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::super::array_buffer_slice_builtin() {
         return array_buffer_slice_builtin(context, invocation).map(Some);
     }
+    if entry == super::super::array_buffer_resize_builtin() {
+        return array_buffer_resize_builtin(context, invocation).map(Some);
+    }
     if entry == super::super::shared_array_buffer_builtin() {
         return shared_array_buffer_builtin(context, invocation).map(Some);
     }
@@ -45,7 +48,7 @@ fn allocate_array_buffer_family_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
     prototype: lyng_js_types::ObjectRef,
-    backing_store: lyng_js_types::BackingStoreRef,
+    data: ArrayBufferObjectData,
     kind: OrdinaryObjectData,
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
@@ -64,8 +67,7 @@ fn allocate_array_buffer_family_object<Cx: PublicBuiltinDispatchContext>(
                 .with_cold_data(ObjectColdData::Ordinary(kind)),
             AllocationLifetime::Default,
         );
-        let installed =
-            objects.install_array_buffer_object(object, ArrayBufferObjectData::new(backing_store));
+        let installed = objects.install_array_buffer_object(object, data);
         debug_assert!(
             installed,
             "fresh buffer object should install its backing store"
@@ -80,13 +82,21 @@ pub(super) fn allocate_array_buffer_object<Cx: PublicBuiltinDispatchContext>(
     prototype: lyng_js_types::ObjectRef,
     backing_store: lyng_js_types::BackingStoreRef,
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
-    allocate_array_buffer_family_object(
+    allocate_array_buffer_object_with_data(
         cx,
         realm,
         prototype,
-        backing_store,
-        OrdinaryObjectData::ArrayBuffer,
+        ArrayBufferObjectData::new(backing_store),
     )
+}
+
+fn allocate_array_buffer_object_with_data<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    realm: RealmRef,
+    prototype: lyng_js_types::ObjectRef,
+    data: ArrayBufferObjectData,
+) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+    allocate_array_buffer_family_object(cx, realm, prototype, data, OrdinaryObjectData::ArrayBuffer)
 }
 
 fn allocate_shared_array_buffer_object<Cx: PublicBuiltinDispatchContext>(
@@ -99,7 +109,7 @@ fn allocate_shared_array_buffer_object<Cx: PublicBuiltinDispatchContext>(
         cx,
         realm,
         prototype,
-        backing_store,
+        ArrayBufferObjectData::new(backing_store),
         OrdinaryObjectData::SharedArrayBuffer,
     )
 }
@@ -194,6 +204,29 @@ fn shared_array_buffer_species_constructor<Cx: PublicBuiltinDispatchContext>(
     array_buffer_family_species_constructor(cx, array_buffer, true)
 }
 
+fn array_buffer_max_byte_length_option<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Option<Value>,
+) -> Result<Option<usize>, Cx::Error> {
+    let Some(options) = value else {
+        return Ok(None);
+    };
+    if options.is_undefined() {
+        return Ok(None);
+    }
+    let options_object = cx.to_object_for_builtin_value(cx.builtin_realm(), options)?;
+    let key = {
+        let agent = cx.agent();
+        PropertyKey::from_atom(agent.atoms_mut().intern_collectible("maxByteLength"))
+    };
+    let max = cx.get_property_value(Value::from_object_ref(options_object), key)?;
+    if max.is_undefined() {
+        return Ok(None);
+    }
+    let max = to_index_for_builtin(cx, max)?;
+    Ok(Some(usize::try_from(max).map_err(|_| range_error(cx))?))
+}
+
 fn array_buffer_family_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -209,6 +242,14 @@ fn array_buffer_family_builtin<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let byte_length = usize::try_from(byte_length).map_err(|_| range_error(cx))?;
+    let max_byte_length = if shared {
+        None
+    } else {
+        array_buffer_max_byte_length_option(cx, invocation.arguments().get(1).copied())?
+    };
+    if max_byte_length.is_some_and(|max| byte_length > max) {
+        return Err(range_error(cx));
+    }
     let realm = cx.builtin_realm();
     let default_prototype = {
         let agent = cx.agent();
@@ -234,6 +275,13 @@ fn array_buffer_family_builtin<Cx: PublicBuiltinDispatchContext>(
     .ok_or_else(|| range_error(cx))?;
     let object = if shared {
         allocate_shared_array_buffer_object(cx, realm, prototype, backing_store)?
+    } else if let Some(max_byte_length) = max_byte_length {
+        allocate_array_buffer_object_with_data(
+            cx,
+            realm,
+            prototype,
+            ArrayBufferObjectData::new_resizable(backing_store, max_byte_length),
+        )?
     } else {
         allocate_array_buffer_object(cx, realm, prototype, backing_store)?
     };
@@ -297,6 +345,75 @@ fn shared_buffer_byte_length_value<Cx: PublicBuiltinDispatchContext>(
     Ok(length_value_u64(
         u64::try_from(byte_length).unwrap_or(u64::MAX),
     ))
+}
+
+fn refresh_length_tracking_views<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    buffer_object: ObjectRef,
+    byte_length: usize,
+) {
+    let views = {
+        let agent = cx.agent();
+        agent
+            .objects()
+            .typed_array_views_of_buffer(agent.heap().view(), buffer_object)
+    };
+    for (view, record) in views {
+        if !record.is_length_tracking() {
+            continue;
+        }
+        let element_size = record.kind().bytes_per_element();
+        let length = byte_length
+            .checked_sub(record.byte_offset())
+            .map_or(0, |remaining| remaining / element_size);
+        let _ = cx
+            .agent()
+            .objects_mut()
+            .install_typed_array_object(view, record.with_length(length));
+    }
+}
+
+fn array_buffer_resize_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let object = invocation
+        .this_value()
+        .as_object_ref()
+        .ok_or_else(|| type_error(cx))?;
+    let buffer = cx
+        .agent()
+        .objects()
+        .array_buffer(object)
+        .ok_or_else(|| type_error(cx))?;
+    let max_byte_length = buffer.max_byte_length().ok_or_else(|| type_error(cx))?;
+    let new_byte_length = to_index_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let new_byte_length = usize::try_from(new_byte_length).map_err(|_| range_error(cx))?;
+    if new_byte_length > max_byte_length {
+        return Err(range_error(cx));
+    }
+    if cx
+        .agent()
+        .backing_store_is_detached(buffer.backing_store())
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Err(type_error(cx));
+    }
+    if !cx
+        .agent()
+        .backing_store_resize(buffer.backing_store(), new_byte_length)
+    {
+        return Err(type_error(cx));
+    }
+    refresh_length_tracking_views(cx, object, new_byte_length);
+    Ok(Value::undefined())
 }
 
 fn array_buffer_family_slice_builtin<Cx: PublicBuiltinDispatchContext>(

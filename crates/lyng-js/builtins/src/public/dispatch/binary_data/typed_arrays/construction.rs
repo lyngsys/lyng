@@ -179,7 +179,7 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
             .and_then(|record| record.intrinsics().array_buffer_prototype())
     }
     .ok_or_else(|| type_error(cx))?;
-    let (buffer_object, store, byte_offset, length) = if let Some(buffer_object) =
+    let (buffer_object, store, byte_offset, length, length_tracking) = if let Some(buffer_object) =
         argument.as_object_ref()
     {
         if let Some(buffer) = cx.agent().objects().array_buffer(buffer_object) {
@@ -207,7 +207,8 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
             if byte_offset > store_len || byte_offset % element_size != 0 {
                 return Err(range_error(cx));
             }
-            let length = if let Some(value) = invocation.arguments().get(2).copied() {
+            let explicit_length = invocation.arguments().get(2).copied();
+            let length = if let Some(value) = explicit_length {
                 let requested = to_index_for_builtin(cx, value)?;
                 usize::try_from(requested).map_err(|_| range_error(cx))?
             } else {
@@ -223,7 +224,13 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
             if byte_offset.saturating_add(byte_length) > store_len {
                 return Err(range_error(cx));
             }
-            (buffer_object, store, byte_offset, length)
+            (
+                buffer_object,
+                store,
+                byte_offset,
+                length,
+                buffer.is_resizable() && explicit_length.is_none(),
+            )
         } else {
             let elements = if let Some(iterator_symbol) =
                 cx.agent().well_known_symbol(WellKnownSymbolId::Iterator)
@@ -263,7 +270,7 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
             }
             let buffer_object =
                 allocate_array_buffer_object(cx, realm, array_buffer_prototype, store)?;
-            (buffer_object, store, 0, length)
+            (buffer_object, store, 0, length, false)
         }
     } else {
         let length = to_index_for_builtin(cx, argument)?;
@@ -276,17 +283,17 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
             .allocate_backing_store(byte_length)
             .ok_or_else(|| range_error(cx))?;
         let buffer_object = allocate_array_buffer_object(cx, realm, array_buffer_prototype, store)?;
-        (buffer_object, store, 0, length)
+        (buffer_object, store, 0, length, false)
     };
     let default_prototype = typed_array_default_prototype(cx, realm, kind)?;
     let prototype =
         cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)?;
-    let object = allocate_typed_array_object(
-        cx,
-        realm,
-        prototype,
-        TypedArrayObjectData::new(buffer_object, store, byte_offset, length, kind),
-    )?;
+    let record = if length_tracking {
+        TypedArrayObjectData::new_length_tracking(buffer_object, store, byte_offset, length, kind)
+    } else {
+        TypedArrayObjectData::new(buffer_object, store, byte_offset, length, kind)
+    };
+    let object = allocate_typed_array_object(cx, realm, prototype, record)?;
     Ok(Value::from_object_ref(object))
 }
 

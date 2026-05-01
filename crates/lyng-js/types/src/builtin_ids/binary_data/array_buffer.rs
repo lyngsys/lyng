@@ -31,3 +31,11 @@ pub fn array_buffer_slice_builtin() -> BuiltinFunctionId {
         None => unreachable!("builtin id should stay non-zero"),
     }
 }
+
+#[inline]
+pub fn array_buffer_resize_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ARRAY_BUFFER_RESIZE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}

@@ -62,6 +62,11 @@ impl ClusterBackingStoreHandle {
     }
 
     #[inline]
+    fn resize(&self, store: BackingStoreRef, byte_length: usize) -> bool {
+        self.0.borrow_mut().resize(store, byte_length)
+    }
+
+    #[inline]
     fn atomic_load_bits(
         &self,
         store: BackingStoreRef,
@@ -238,6 +243,11 @@ impl Agent {
         value: u8,
     ) -> bool {
         self.backing_stores.set_byte(store, index, value)
+    }
+
+    #[inline]
+    pub fn backing_store_resize(&mut self, store: BackingStoreRef, byte_length: usize) -> bool {
+        self.backing_stores.resize(store, byte_length)
     }
 
     #[inline]

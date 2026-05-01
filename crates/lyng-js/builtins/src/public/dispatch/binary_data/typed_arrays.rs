@@ -185,6 +185,16 @@ pub(super) fn typed_array_read_element_value(
     })
 }
 
+pub(super) fn typed_array_is_out_of_bounds(agent: &Agent, record: TypedArrayObjectData) -> bool {
+    let Some(byte_length) = agent.backing_store_byte_length(record.backing_store()) else {
+        return true;
+    };
+    if record.is_length_tracking() {
+        return record.byte_offset() > byte_length;
+    }
+    record.byte_offset().saturating_add(record.byte_length()) > byte_length
+}
+
 pub(super) fn allocate_typed_array_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
@@ -250,6 +260,9 @@ pub(super) fn typed_array_validated_record<Cx: PublicBuiltinDispatchContext>(
         .backing_store_is_detached(record.backing_store())
         .ok_or_else(|| type_error(cx))?
     {
+        return Err(type_error(cx));
+    }
+    if typed_array_is_out_of_bounds(cx.agent(), record) {
         return Err(type_error(cx));
     }
     Ok(record)

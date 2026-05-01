@@ -226,6 +226,7 @@ impl InstalledBuiltinFamilies {
             array_buffer_prototype: binary_data_family.array_buffer_prototype,
             shared_array_buffer_prototype: binary_data_family.shared_array_buffer_prototype,
             array_buffer_byte_length_getter: binary_data_family.array_buffer_byte_length_getter,
+            array_buffer_resize: binary_data_family.array_buffer_resize,
             array_buffer_slice: binary_data_family.array_buffer_slice,
             shared_array_buffer_byte_length_getter: binary_data_family
                 .shared_array_buffer_byte_length_getter,

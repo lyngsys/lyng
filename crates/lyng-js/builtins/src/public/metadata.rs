@@ -4,9 +4,9 @@ use lyng_js_types::{
     add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin,
     aggregate_error_builtin, array_at_builtin, array_buffer_builtin,
     array_buffer_byte_length_getter_builtin, array_buffer_is_view_builtin,
-    array_buffer_slice_builtin, array_builtin, array_concat_builtin, array_copy_within_builtin,
-    array_entries_builtin, array_every_builtin, array_fill_builtin, array_filter_builtin,
-    array_find_builtin, array_find_index_builtin, array_find_last_builtin,
+    array_buffer_resize_builtin, array_buffer_slice_builtin, array_builtin, array_concat_builtin,
+    array_copy_within_builtin, array_entries_builtin, array_every_builtin, array_fill_builtin,
+    array_filter_builtin, array_find_builtin, array_find_index_builtin, array_find_last_builtin,
     array_find_last_index_builtin, array_flat_builtin, array_flat_map_builtin,
     array_for_each_builtin, array_from_async_builtin, array_from_builtin, array_includes_builtin,
     array_index_of_builtin, array_is_array_builtin, array_iterator_next_builtin,
@@ -1110,6 +1110,10 @@ mod tests {
             (
                 array_buffer_byte_length_getter_builtin(),
                 BuiltinEntryMetadata::new("get byteLength", 0, false, false),
+            ),
+            (
+                array_buffer_resize_builtin(),
+                BuiltinEntryMetadata::new("resize", 1, false, false),
             ),
             (
                 array_buffer_slice_builtin(),
