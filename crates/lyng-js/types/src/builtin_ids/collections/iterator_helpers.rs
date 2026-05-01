@@ -65,6 +65,70 @@ pub fn iterator_to_array_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn iterator_map_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_MAP_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn iterator_filter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_FILTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn iterator_take_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_TAKE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn iterator_drop_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_DROP_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn iterator_dispose_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_DISPOSE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn iterator_flat_map_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_FLAT_MAP_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn iterator_helper_next_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_HELPER_NEXT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn iterator_helper_return_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_HELPER_RETURN_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn iterator_to_string_tag_getter_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(ITERATOR_TO_STRING_TAG_GETTER_RAW) {
         Some(id) => id,

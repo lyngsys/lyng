@@ -14,9 +14,12 @@ use lyng_js_common::AtomId;
 use lyng_js_env::Agent;
 use lyng_js_types::{
     iterator_builtin, iterator_constructor_getter_builtin, iterator_constructor_setter_builtin,
-    iterator_every_builtin, iterator_find_builtin, iterator_for_each_builtin,
-    iterator_from_builtin, iterator_prototype_iterator_builtin, iterator_reduce_builtin,
-    iterator_some_builtin, iterator_to_array_builtin, iterator_to_string_tag_getter_builtin,
+    iterator_dispose_builtin, iterator_drop_builtin, iterator_every_builtin,
+    iterator_filter_builtin, iterator_find_builtin, iterator_flat_map_builtin,
+    iterator_for_each_builtin, iterator_from_builtin, iterator_helper_next_builtin,
+    iterator_helper_return_builtin, iterator_map_builtin, iterator_prototype_iterator_builtin,
+    iterator_reduce_builtin, iterator_some_builtin, iterator_take_builtin,
+    iterator_to_array_builtin, iterator_to_string_tag_getter_builtin,
     iterator_to_string_tag_setter_builtin, map_iterator_next_builtin, set_iterator_next_builtin,
     BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
 };
@@ -81,6 +84,39 @@ pub(in crate::public) fn install_iterator_family(
             iterator_to_array_builtin(),
             None,
         ),
+        iterator_map: install_public_builtin_function(agent, cx, iterator_map_builtin(), None),
+        iterator_filter: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_filter_builtin(),
+            None,
+        ),
+        iterator_take: install_public_builtin_function(agent, cx, iterator_take_builtin(), None),
+        iterator_drop: install_public_builtin_function(agent, cx, iterator_drop_builtin(), None),
+        iterator_dispose: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_dispose_builtin(),
+            None,
+        ),
+        iterator_flat_map: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_flat_map_builtin(),
+            None,
+        ),
+        iterator_helper_next: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_helper_next_builtin(),
+            None,
+        ),
+        iterator_helper_return: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_helper_return_builtin(),
+            None,
+        ),
         iterator_to_string_tag_getter: install_public_builtin_function(
             agent,
             cx,
@@ -127,6 +163,20 @@ pub(in crate::public) fn iterator_builtin_object(
         (iterator_every_builtin(), builtins.iterator_every),
         (iterator_find_builtin(), builtins.iterator_find),
         (iterator_to_array_builtin(), builtins.iterator_to_array),
+        (iterator_map_builtin(), builtins.iterator_map),
+        (iterator_filter_builtin(), builtins.iterator_filter),
+        (iterator_take_builtin(), builtins.iterator_take),
+        (iterator_drop_builtin(), builtins.iterator_drop),
+        (iterator_dispose_builtin(), builtins.iterator_dispose),
+        (iterator_flat_map_builtin(), builtins.iterator_flat_map),
+        (
+            iterator_helper_next_builtin(),
+            builtins.iterator_helper_next,
+        ),
+        (
+            iterator_helper_return_builtin(),
+            builtins.iterator_helper_return,
+        ),
         (
             iterator_to_string_tag_getter_builtin(),
             builtins.iterator_to_string_tag_getter,
@@ -176,6 +226,16 @@ pub(in crate::public) fn install_iterator_family_descriptors(
         builtin_function_atom_property(atoms.every, iterator_every_builtin()),
         builtin_function_atom_property(atoms.find, iterator_find_builtin()),
         builtin_function_atom_property(atoms.to_array, iterator_to_array_builtin()),
+        builtin_function_atom_property(atoms.map, iterator_map_builtin()),
+        builtin_function_atom_property(atoms.filter, iterator_filter_builtin()),
+        builtin_function_atom_property(atoms.take, iterator_take_builtin()),
+        builtin_function_atom_property(atoms.drop, iterator_drop_builtin()),
+        builtin_function_atom_property(atoms.flat_map, iterator_flat_map_builtin()),
+        builtin_function_symbol_property(
+            WellKnownSymbolId::Dispose,
+            iterator_dispose_builtin(),
+            writable_builtin_attributes(),
+        ),
         accessor_atom_property(
             atoms.constructor,
             Some(iterator_constructor_getter_builtin()),
@@ -188,6 +248,10 @@ pub(in crate::public) fn install_iterator_family_descriptors(
             Some(iterator_to_string_tag_setter_builtin()),
             writable_builtin_attributes(),
         ),
+    ];
+    let iterator_helper_prototype_descriptors = [
+        builtin_function_atom_property(atoms.next, iterator_helper_next_builtin()),
+        builtin_function_atom_property(atoms.return_, iterator_helper_return_builtin()),
     ];
     let async_iterator_prototype_descriptors = [
         data_symbol_property(
@@ -227,6 +291,10 @@ pub(in crate::public) fn install_iterator_family_descriptors(
             &iterator_prototype_descriptors,
         ),
         BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::IteratorHelperPrototype),
+            &iterator_helper_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
             BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::AsyncIteratorPrototype),
             &async_iterator_prototype_descriptors,
         ),
@@ -253,6 +321,12 @@ struct IteratorDescriptorAtoms {
     every: AtomId,
     find: AtomId,
     to_array: AtomId,
+    map: AtomId,
+    filter: AtomId,
+    take: AtomId,
+    drop: AtomId,
+    flat_map: AtomId,
+    return_: AtomId,
 }
 
 impl IteratorDescriptorAtoms {
@@ -268,6 +342,12 @@ impl IteratorDescriptorAtoms {
             every: atoms.intern("every"),
             find: atoms.intern("find"),
             to_array: atoms.intern("toArray"),
+            map: atoms.intern("map"),
+            filter: atoms.intern("filter"),
+            take: atoms.intern("take"),
+            drop: atoms.intern("drop"),
+            flat_map: atoms.intern("flatMap"),
+            return_: atoms.intern("return"),
         }
     }
 }

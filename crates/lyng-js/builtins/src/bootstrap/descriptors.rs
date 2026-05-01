@@ -109,6 +109,7 @@ fn resolve_intrinsic(
         BuiltinIntrinsic::AsyncFromSyncIteratorPrototype => {
             intrinsics.async_from_sync_iterator_prototype()
         }
+        BuiltinIntrinsic::IteratorHelperPrototype => intrinsics.iterator_helper_prototype(),
         BuiltinIntrinsic::ArrayIteratorPrototype => intrinsics.array_iterator_prototype(),
         BuiltinIntrinsic::String => intrinsics.string(),
         BuiltinIntrinsic::StringPrototype => intrinsics.string_prototype(),

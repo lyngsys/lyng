@@ -66,6 +66,7 @@ pub struct Intrinsics {
     iterator_prototype: Option<ObjectRef>,
     async_iterator_prototype: Option<ObjectRef>,
     async_from_sync_iterator_prototype: Option<ObjectRef>,
+    iterator_helper_prototype: Option<ObjectRef>,
     array_iterator_prototype: Option<ObjectRef>,
     string: Option<ObjectRef>,
     string_prototype: Option<ObjectRef>,
@@ -181,6 +182,7 @@ impl Intrinsics {
             iterator_prototype: None,
             async_iterator_prototype: None,
             async_from_sync_iterator_prototype: None,
+            iterator_helper_prototype: None,
             array_iterator_prototype: None,
             string: None,
             string_prototype: None,
@@ -543,6 +545,11 @@ impl Intrinsics {
     #[inline]
     pub const fn async_from_sync_iterator_prototype(self) -> Option<ObjectRef> {
         self.async_from_sync_iterator_prototype
+    }
+
+    #[inline]
+    pub const fn iterator_helper_prototype(self) -> Option<ObjectRef> {
+        self.iterator_helper_prototype
     }
 
     #[inline]
@@ -1156,6 +1163,12 @@ impl Intrinsics {
         value: Option<ObjectRef>,
     ) -> Self {
         self.async_from_sync_iterator_prototype = value;
+        self
+    }
+
+    #[inline]
+    pub const fn with_iterator_helper_prototype(mut self, value: Option<ObjectRef>) -> Self {
+        self.iterator_helper_prototype = value;
         self
     }
 

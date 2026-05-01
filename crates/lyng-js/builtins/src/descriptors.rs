@@ -75,6 +75,7 @@ pub enum BuiltinIntrinsic {
     IteratorPrototype,
     AsyncIteratorPrototype,
     AsyncFromSyncIteratorPrototype,
+    IteratorHelperPrototype,
     ArrayIteratorPrototype,
     String,
     StringPrototype,

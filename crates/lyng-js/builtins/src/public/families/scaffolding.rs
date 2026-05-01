@@ -59,6 +59,7 @@ struct RootObjects {
 struct IteratorScaffolding {
     iterator_prototype: ObjectRef,
     async_from_sync_iterator_prototype: ObjectRef,
+    iterator_helper_prototype: ObjectRef,
     array_iterator_prototype: ObjectRef,
     map_iterator_prototype: ObjectRef,
     set_iterator_prototype: ObjectRef,
@@ -381,6 +382,12 @@ fn allocate_iterator_prototypes(
             request.intrinsics.async_from_sync_iterator_prototype(),
             async_iterator_prototype,
         ),
+        iterator_helper_prototype: ordinary_intrinsic(
+            agent,
+            request,
+            request.intrinsics.iterator_helper_prototype(),
+            iterator_prototype,
+        ),
         array_iterator_prototype: ordinary_intrinsic(
             agent,
             request,
@@ -649,6 +656,7 @@ fn public_intrinsic_handles(
         uint8_array_prototype: binary_data.uint8_array_prototype,
         iterator_prototype: iterators.iterator_prototype,
         async_from_sync_iterator_prototype: iterators.async_from_sync_iterator_prototype,
+        iterator_helper_prototype: iterators.iterator_helper_prototype,
         array_iterator_prototype: iterators.array_iterator_prototype,
         string_iterator_prototype: iterators.string_iterator_prototype,
         regexp_string_iterator_prototype: iterators.regexp_string_iterator_prototype,

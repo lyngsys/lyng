@@ -50,6 +50,38 @@ pub(in crate::public::metadata) const PUBLIC_TEXT_BUILTIN_METADATA: &[PublicBuil
         BuiltinEntryMetadata::new("toArray", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        iterator_map_builtin,
+        BuiltinEntryMetadata::new("map", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_filter_builtin,
+        BuiltinEntryMetadata::new("filter", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_take_builtin,
+        BuiltinEntryMetadata::new("take", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_drop_builtin,
+        BuiltinEntryMetadata::new("drop", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_dispose_builtin,
+        BuiltinEntryMetadata::new("[Symbol.dispose]", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_flat_map_builtin,
+        BuiltinEntryMetadata::new("flatMap", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_helper_next_builtin,
+        BuiltinEntryMetadata::new("next", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_helper_return_builtin,
+        BuiltinEntryMetadata::new("return", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         iterator_to_string_tag_getter_builtin,
         BuiltinEntryMetadata::new("get [Symbol.toStringTag]", 0, false, false),
     ),

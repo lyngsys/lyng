@@ -31,6 +31,7 @@ pub(in crate::public) struct PublicRealmPrototypeHandles {
     pub(in crate::public) uint8_array_prototype: ObjectRef,
     pub(in crate::public) iterator_prototype: ObjectRef,
     pub(in crate::public) async_from_sync_iterator_prototype: ObjectRef,
+    pub(in crate::public) iterator_helper_prototype: ObjectRef,
     pub(in crate::public) array_iterator_prototype: ObjectRef,
     pub(in crate::public) string_iterator_prototype: ObjectRef,
     pub(in crate::public) regexp_string_iterator_prototype: ObjectRef,
@@ -77,6 +78,7 @@ fn with_core_intrinsics(
         .with_async_from_sync_iterator_prototype(Some(
             prototypes.async_from_sync_iterator_prototype,
         ))
+        .with_iterator_helper_prototype(Some(prototypes.iterator_helper_prototype))
         .with_array_iterator_prototype(Some(prototypes.array_iterator_prototype))
 }
 
