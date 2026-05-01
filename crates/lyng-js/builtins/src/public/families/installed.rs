@@ -333,6 +333,8 @@ impl InstalledBuiltinFamilies {
             iterator: iterator_family.iterator,
             iterator_from: iterator_family.iterator_from,
             iterator_concat: iterator_family.iterator_concat,
+            iterator_zip: iterator_family.iterator_zip,
+            iterator_zip_keyed: iterator_family.iterator_zip_keyed,
             iterator_reduce: iterator_family.iterator_reduce,
             iterator_for_each: iterator_family.iterator_for_each,
             iterator_some: iterator_family.iterator_some,

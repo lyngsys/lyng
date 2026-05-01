@@ -20,8 +20,9 @@ use lyng_js_types::{
     iterator_helper_next_builtin, iterator_helper_return_builtin, iterator_map_builtin,
     iterator_prototype_iterator_builtin, iterator_reduce_builtin, iterator_some_builtin,
     iterator_take_builtin, iterator_to_array_builtin, iterator_to_string_tag_getter_builtin,
-    iterator_to_string_tag_setter_builtin, map_iterator_next_builtin, set_iterator_next_builtin,
-    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
+    iterator_to_string_tag_setter_builtin, iterator_zip_builtin, iterator_zip_keyed_builtin,
+    map_iterator_next_builtin, set_iterator_next_builtin, BuiltinFunctionId, ObjectRef, RealmRef,
+    Value, WellKnownSymbolId,
 };
 
 pub(in crate::public) fn install_iterator_family(
@@ -67,6 +68,13 @@ pub(in crate::public) fn install_iterator_family(
             agent,
             cx,
             iterator_concat_builtin(),
+            None,
+        ),
+        iterator_zip: install_public_builtin_function(agent, cx, iterator_zip_builtin(), None),
+        iterator_zip_keyed: install_public_builtin_function(
+            agent,
+            cx,
+            iterator_zip_keyed_builtin(),
             None,
         ),
         iterator_reduce: install_public_builtin_function(
@@ -164,6 +172,8 @@ pub(in crate::public) fn iterator_builtin_object(
         (iterator_builtin(), builtins.iterator),
         (iterator_from_builtin(), builtins.iterator_from),
         (iterator_concat_builtin(), builtins.iterator_concat),
+        (iterator_zip_builtin(), builtins.iterator_zip),
+        (iterator_zip_keyed_builtin(), builtins.iterator_zip_keyed),
         (iterator_reduce_builtin(), builtins.iterator_reduce),
         (iterator_for_each_builtin(), builtins.iterator_for_each),
         (iterator_some_builtin(), builtins.iterator_some),
@@ -225,6 +235,16 @@ pub(in crate::public) fn install_iterator_family_descriptors(
         data_atom_property(
             atoms.concat,
             Value::from_object_ref(builtins.iterator_concat),
+            writable_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.zip,
+            Value::from_object_ref(builtins.iterator_zip),
+            writable_builtin_attributes(),
+        ),
+        data_atom_property(
+            atoms.zip_keyed,
+            Value::from_object_ref(builtins.iterator_zip_keyed),
             writable_builtin_attributes(),
         ),
     ];
@@ -330,6 +350,8 @@ struct IteratorDescriptorAtoms {
     constructor: AtomId,
     from: AtomId,
     concat: AtomId,
+    zip: AtomId,
+    zip_keyed: AtomId,
     reduce: AtomId,
     for_each: AtomId,
     some: AtomId,
@@ -352,6 +374,8 @@ impl IteratorDescriptorAtoms {
             constructor: lyng_js_common::WellKnownAtom::constructor.id(),
             from: atoms.intern("from"),
             concat: atoms.intern("concat"),
+            zip: atoms.intern("zip"),
+            zip_keyed: atoms.intern("zipKeyed"),
             reduce: atoms.intern("reduce"),
             for_each: atoms.intern("forEach"),
             some: atoms.intern("some"),

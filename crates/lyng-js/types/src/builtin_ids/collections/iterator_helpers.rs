@@ -25,6 +25,22 @@ pub fn iterator_concat_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn iterator_zip_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_ZIP_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn iterator_zip_keyed_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_ZIP_KEYED_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn iterator_reduce_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(ITERATOR_REDUCE_RAW) {
         Some(id) => id,

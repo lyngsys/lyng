@@ -315,6 +315,8 @@ pub(super) struct IteratorFamilyBuiltins {
     pub(super) iterator: ObjectRef,
     pub(super) iterator_from: ObjectRef,
     pub(super) iterator_concat: ObjectRef,
+    pub(super) iterator_zip: ObjectRef,
+    pub(super) iterator_zip_keyed: ObjectRef,
     pub(super) iterator_reduce: ObjectRef,
     pub(super) iterator_for_each: ObjectRef,
     pub(super) iterator_some: ObjectRef,

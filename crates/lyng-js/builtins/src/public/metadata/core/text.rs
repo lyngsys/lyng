@@ -30,6 +30,14 @@ pub(in crate::public::metadata) const PUBLIC_TEXT_BUILTIN_METADATA: &[PublicBuil
         BuiltinEntryMetadata::new("concat", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        iterator_zip_builtin,
+        BuiltinEntryMetadata::new("zip", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        iterator_zip_keyed_builtin,
+        BuiltinEntryMetadata::new("zipKeyed", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         iterator_reduce_builtin,
         BuiltinEntryMetadata::new("reduce", 1, false, false),
     ),
