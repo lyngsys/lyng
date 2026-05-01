@@ -4047,6 +4047,28 @@ fn script_core_number_min_value_is_minimum_subnormal() {
 }
 
 #[test]
+fn script_core_subnormal_numbers_do_not_collide_with_value_tags() {
+    let result = compile_and_run(
+        r#"
+        let value = 1;
+        for (let power = 0; power < 1039; power += 1) {
+            value = value * 0.5;
+        }
+
+        let total = 0;
+        total += (typeof value === "number" ? 1 : 0);
+        total += (+value === value ? 2 : 0);
+
+        let next = value * 0.5;
+        total += (next * 2 === value ? 4 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
 fn script_core_unary_plus_uses_to_number_instead_of_addition() {
     let result = compile_and_run(
         r#"

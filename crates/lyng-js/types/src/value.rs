@@ -92,7 +92,11 @@ impl Value {
 
     #[inline]
     const fn tag_kind(self) -> Option<TagKind> {
-        Self::tag_kind_bits(self.0)
+        if Self::is_tagged_bits(self.0) {
+            Self::tag_kind_bits(self.0)
+        } else {
+            None
+        }
     }
 
     #[inline]
@@ -427,6 +431,36 @@ mod tests {
             assert!(encoded.is_double(), "{value:?} should stay a direct double");
             assert_eq!(encoded.bits(), value.to_bits());
             assert_eq!(encoded.as_f64(), Some(value));
+        }
+    }
+
+    #[test]
+    fn finite_doubles_with_tag_kind_bits_are_not_tagged() {
+        for raw_kind in 1_u64..=10 {
+            let bits = raw_kind << TAG_KIND_SHIFT;
+            let value = f64::from_bits(bits);
+            assert!(value.is_finite());
+
+            let encoded = Value::from_f64(value);
+            assert!(encoded.is_double(), "0x{bits:016x} should stay a double");
+            assert!(encoded.is_number(), "0x{bits:016x} should stay numeric");
+            assert_eq!(encoded.as_f64().map(f64::to_bits), Some(bits));
+            assert!(!encoded.is_undefined(), "0x{bits:016x} looked undefined");
+            assert!(!encoded.is_null(), "0x{bits:016x} looked null");
+            assert!(!encoded.is_bool(), "0x{bits:016x} looked boolean");
+            assert!(!encoded.is_smi(), "0x{bits:016x} looked like a smi");
+            assert!(!encoded.is_object(), "0x{bits:016x} looked like an object");
+            assert!(!encoded.is_string(), "0x{bits:016x} looked like a string");
+            assert!(!encoded.is_symbol(), "0x{bits:016x} looked like a symbol");
+            assert!(!encoded.is_bigint(), "0x{bits:016x} looked like a bigint");
+            assert!(
+                !encoded.is_sentinel(),
+                "0x{bits:016x} looked like a sentinel"
+            );
+            assert!(
+                !encoded.is_suspended_execution_ref(),
+                "0x{bits:016x} looked like a suspended execution ref"
+            );
         }
     }
 
