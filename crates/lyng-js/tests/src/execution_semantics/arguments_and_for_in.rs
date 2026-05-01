@@ -1,4 +1,4 @@
-use super::support::compile_and_run;
+use super::support::{compile_and_run, compile_and_run_string};
 use lyng_js_types::Value;
 
 #[test]
@@ -31,6 +31,70 @@ fn phase4_arguments_use_unmapped_objects_in_strict_functions() {
     );
 
     assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn phase4_duplicate_sloppy_parameters_resolve_to_last_binding() {
+    let result = compile_and_run(
+        r#"
+        function duplicate(x, x) {
+            return x;
+        }
+
+        function missing(x, a, b, x) {
+            return x === undefined ? 10 : 0;
+        }
+
+        duplicate(1, 2) + missing(1, 2);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(12));
+}
+
+#[test]
+fn phase4_function_declaration_replaces_parameter_binding() {
+    let result = compile_and_run_string(
+        r#"
+        function hoisted(x) {
+            return typeof x;
+            function x() { return 7; }
+        }
+        hoisted();
+        "#,
+    );
+
+    assert_eq!(result, "function");
+}
+
+#[test]
+fn phase4_var_declaration_reuses_parameter_binding() {
+    let result = compile_and_run(
+        r#"
+        function keepParameter(x) {
+            var x;
+            return x;
+        }
+        keepParameter(1);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn phase4_var_arguments_preserves_arguments_object_binding() {
+    let result = compile_and_run_string(
+        r#"
+        function inspect() {
+            return typeof arguments;
+            var arguments = "local";
+        }
+        inspect(1, 2, 3);
+        "#,
+    );
+
+    assert_eq!(result, "object");
 }
 
 #[test]

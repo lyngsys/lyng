@@ -136,6 +136,9 @@ fn resolved_arguments_binding_shadows_owner(
     owner: FunctionSemaId,
 ) -> bool {
     let binding = sema.binding_table.get(binding);
+    if binding.kind == DeclarationKind::Var {
+        return false;
+    }
     let binding_owner = sema.scope_table.get(binding.scope).owning_function;
     binding_owner.and_then(|binding_owner| {
         nearest_non_arrow_owner_for(program, sema, parent_functions, binding_owner)

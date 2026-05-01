@@ -7,6 +7,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> bool {
         actual_kind == expected_kind
             || (expected_kind == DeclarationKind::Var && actual_kind == DeclarationKind::Function)
+            || (expected_kind == DeclarationKind::Var && actual_kind == DeclarationKind::Parameter)
     }
 
     pub(super) fn use_site(&self, expr: ExprId) -> LoweringResult<&UseSiteRecord> {
@@ -54,7 +55,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .enumerate()
             .filter_map(|(index, binding)| {
                 (binding.name == name
-                    && binding.kind == expected_kind
+                    && Self::declaration_kind_matches(binding.kind, expected_kind)
                     && self.binding_belongs_to_current_function(binding.scope))
                 .then_some(SemanticBindingId::new(index as u32))
             });
@@ -82,7 +83,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .enumerate()
             .rev()
             .find_map(|(index, binding)| {
-                (binding.name == name && binding.kind == expected_kind && binding.scope == scope)
+                (binding.name == name
+                    && Self::declaration_kind_matches(binding.kind, expected_kind)
+                    && binding.scope == scope)
                     .then_some(SemanticBindingId::new(index as u32))
             })
     }
@@ -213,6 +216,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             return Ok(false);
         };
         let binding = self.binding(binding_id)?;
+        if binding.kind == DeclarationKind::Var {
+            return Ok(false);
+        }
         let Some(binding_owner) = self.scope_owner(binding.scope) else {
             return Ok(false);
         };

@@ -68,7 +68,7 @@ impl<'a> Analyzer<'a> {
             let existing = self.bindings.get(existing_bid);
             if matches!(
                 existing.kind,
-                DeclarationKind::Var | DeclarationKind::Function
+                DeclarationKind::Var | DeclarationKind::Function | DeclarationKind::Parameter
             ) {
                 return existing_bid;
             }
@@ -178,7 +178,7 @@ impl<'a> Analyzer<'a> {
                 return (None, ResolutionKind::Dynamic);
             }
 
-            for &bid in &scope.bindings {
+            for &bid in scope.bindings.iter().rev() {
                 if self.bindings.get(bid).name == name {
                     let kind = if crossed_function {
                         ResolutionKind::Captured
