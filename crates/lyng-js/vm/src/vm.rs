@@ -202,6 +202,24 @@ struct EntryExecutionOverride {
 struct DynamicImportRequest {
     capability: lyng_js_env::PromiseCapabilityId,
     request: ModuleSourceRequest,
+    phase: DynamicImportPhase,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::vm) enum DynamicImportPhase {
+    Evaluation,
+    Source,
+    Defer,
+}
+
+impl DynamicImportPhase {
+    pub(in crate::vm) fn from_value(value: Option<Value>) -> Self {
+        match value.and_then(Value::as_smi) {
+            Some(1) => Self::Source,
+            Some(2) => Self::Defer,
+            _ => Self::Evaluation,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -250,6 +268,7 @@ pub struct Vm {
     dynamic_import_requests: Vec<Option<DynamicImportRequest>>,
     dynamic_import_evaluate_depth: u32,
     dynamic_import_waiting_modules: HashMap<ModuleKey, Vec<PendingDynamicImport>>,
+    deferred_dynamic_import_namespaces: HashMap<ObjectRef, ModuleKey>,
     async_body_suspended_modules: HashSet<ModuleKey>,
     async_dependency_blocked_modules: HashSet<ModuleKey>,
     async_dependency_blocked_queue: VecDeque<ModuleKey>,
@@ -297,6 +316,7 @@ impl Vm {
             dynamic_import_requests: Vec::new(),
             dynamic_import_evaluate_depth: 0,
             dynamic_import_waiting_modules: HashMap::new(),
+            deferred_dynamic_import_namespaces: HashMap::new(),
             async_body_suspended_modules: HashSet::new(),
             async_dependency_blocked_modules: HashSet::new(),
             async_dependency_blocked_queue: VecDeque::new(),

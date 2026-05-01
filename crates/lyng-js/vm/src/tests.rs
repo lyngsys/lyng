@@ -3188,6 +3188,68 @@ fn dynamic_import_source_phase_rejects_source_text_modules_with_syntax_error() {
 }
 
 #[test]
+fn dynamic_import_defer_sync_module_evaluates_on_namespace_access() {
+    let unit = compile_test_unit(
+        266,
+        r#"
+            globalThis.evaluations = [];
+            import.defer('./sync.mjs').then(ns => {
+                globalThis.beforeDeferredAccess = globalThis.evaluations.join(',');
+                ns.x;
+                globalThis.afterDeferredAccess = globalThis.evaluations.join(',');
+            });
+        "#,
+    );
+    let host = TestHost::new();
+    let script_referrer = ModuleKey::new("/tmp/main.js");
+    host.define_module_source(
+        "./dep.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/dep.mjs"),
+            "/tmp/dep.mjs",
+            "globalThis.evaluations.push('dep');",
+        ),
+    );
+    host.define_module_source(
+        "./sync.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/sync.mjs"),
+            "/tmp/sync.mjs",
+            "import './dep.mjs'; globalThis.evaluations.push('sync');",
+        ),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let _ = vm
+        .evaluate_script_with_registry_and_host_referrer(
+            agent,
+            realm,
+            &unit,
+            Some(&script_referrer),
+            &host,
+            &mut registry,
+        )
+        .expect("import.defer sync regression should evaluate");
+
+    let before = global_value(agent, realm, "beforeDeferredAccess")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("beforeDeferredAccess should be a string");
+    let after = global_value(agent, realm, "afterDeferredAccess")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("afterDeferredAccess should be a string");
+    assert_eq!(before, "");
+    assert_eq!(after, "dep,sync");
+}
+
+#[test]
 fn static_source_phase_import_rejects_source_text_modules_with_syntax_error() {
     let host = TestHost::new();
     host.define_module_source(

@@ -653,6 +653,9 @@ impl Vm {
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<Value> {
+        self.evaluate_deferred_dynamic_import_namespace(
+            agent, host, registry, caller, object, key,
+        )?;
         object::get_with_receiver_in_context(
             &mut VmProxyBridge {
                 vm: self,
@@ -677,6 +680,9 @@ impl Vm {
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<Value> {
+        self.evaluate_deferred_dynamic_import_namespace(
+            agent, host, registry, caller, object, key,
+        )?;
         if let Some(index) = key.as_index() {
             if let Some(result) = self.mapped_arguments_get(agent, object, index) {
                 return result;
@@ -711,6 +717,70 @@ impl Vm {
             return Ok(Value::undefined());
         };
         self.get_property_from_object(agent, host, registry, caller, prototype, receiver, key)
+    }
+
+    fn evaluate_deferred_dynamic_import_namespace(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        object: ObjectRef,
+        key: PropertyKey,
+    ) -> VmResult<()> {
+        if key
+            .as_atom()
+            .is_some_and(|atom| agent.atoms().resolve(atom) == "then")
+        {
+            return Ok(());
+        }
+        let Some(key) = self
+            .deferred_dynamic_import_namespaces
+            .get(&object)
+            .cloned()
+        else {
+            return Ok(());
+        };
+        let status = agent
+            .module_record(&key)
+            .ok_or(VmError::MissingModuleRecord)?
+            .status();
+        match status {
+            ModuleStatus::Evaluated => {
+                self.deferred_dynamic_import_namespaces.remove(&object);
+                Ok(())
+            }
+            ModuleStatus::Errored => {
+                self.deferred_dynamic_import_namespaces.remove(&object);
+                let thrown = agent
+                    .module_record(&key)
+                    .and_then(ModuleRecord::evaluation_error)
+                    .unwrap_or(Value::undefined());
+                Err(VmError::Abrupt(AbruptCompletion::throw(thrown)))
+            }
+            ModuleStatus::Evaluating => Ok(()),
+            ModuleStatus::New
+            | ModuleStatus::Unlinked
+            | ModuleStatus::Linking
+            | ModuleStatus::Linked => {
+                let realm = agent
+                    .realm(caller.realm())
+                    .ok_or(VmError::MissingRootShape(caller.realm()))?;
+                let module_env = self.link_module_graph(agent, realm, &key)?;
+                let result = self.evaluate_module_graph(
+                    agent, realm, &key, module_env, host, registry, None, true,
+                );
+                if agent.module_record(&key).is_some_and(|record| {
+                    matches!(
+                        record.status(),
+                        ModuleStatus::Evaluated | ModuleStatus::Errored
+                    )
+                }) {
+                    self.deferred_dynamic_import_namespaces.remove(&object);
+                }
+                result.map(|_| ())
+            }
+        }
     }
 
     pub(super) fn get_own_property_from_object(
