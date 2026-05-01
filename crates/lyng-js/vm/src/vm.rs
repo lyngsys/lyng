@@ -1648,8 +1648,8 @@ impl Vm {
             }
         }
         if !suspended_dependencies.is_empty() {
+            self.queue_async_dependency_blocked_module(key);
             if !checkpoint_on_async_suspend {
-                self.queue_async_dependency_blocked_module(key);
                 return Err(VmError::AsyncSuspend);
             }
             self.checkpoint_promise_jobs(agent, host, registry)?;
@@ -1666,6 +1666,27 @@ impl Vm {
                 registry,
                 defer_waiter_flush_for,
             )?;
+            match agent
+                .module_record(key)
+                .ok_or(VmError::MissingModuleRecord)?
+                .status()
+            {
+                ModuleStatus::Evaluated => return Ok(Value::undefined()),
+                ModuleStatus::Errored => {
+                    let thrown = agent
+                        .module_record(key)
+                        .and_then(ModuleRecord::evaluation_error)
+                        .unwrap_or(Value::undefined());
+                    return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::throw(
+                        thrown,
+                    )));
+                }
+                ModuleStatus::Evaluating
+                | ModuleStatus::Linked
+                | ModuleStatus::Linking
+                | ModuleStatus::Unlinked
+                | ModuleStatus::New => {}
+            }
         }
 
         let _ = self.async_dependency_blocked_modules.remove(key);
