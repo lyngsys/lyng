@@ -6990,6 +6990,52 @@ fn await_using_waits_for_async_disposal_before_resolving() {
 }
 
 #[test]
+fn skipped_await_using_declaration_does_not_suspend_async_function() {
+    let unit = compile_test_unit(
+        2309,
+        r#"
+            var sameTurn = true;
+
+            async function run() {
+                var started = sameTurn;
+                var before = false;
+                var after = false;
+                outer: {
+                    before = sameTurn;
+                    break outer;
+                    await using resource = null;
+                }
+                after = sameTurn;
+                return started && before && after;
+            }
+
+            var result = run();
+            sameTurn = false;
+            result;
+        "#,
+    );
+    let host = TestHost::new();
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .unwrap();
+
+    let promise = result
+        .as_object_ref()
+        .expect("skipped await using result should be a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("skipped await using promise should remain tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.result(), Value::from_bool(true));
+}
+
+#[test]
 fn evaluate_module_supports_top_level_await_using() {
     let unit = compile_test_module(
         2314,

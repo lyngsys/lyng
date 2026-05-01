@@ -335,14 +335,18 @@ fn call_disposal_resource<Cx: PublicBuiltinDispatchContext>(
     resource: lyng_js_env::DisposableResourceRecord,
 ) -> Result<Value, Cx::Error> {
     match resource.kind() {
+        lyng_js_env::DisposableResourceKind::NoMethod => Ok(Value::undefined()),
         lyng_js_env::DisposableResourceKind::UseMethod => {
-            cx.call_to_completion(resource.callable(), resource.value(), &[])
+            let callable = resource.callable().ok_or_else(|| type_error(cx))?;
+            cx.call_to_completion(callable, resource.value(), &[])
         }
         lyng_js_env::DisposableResourceKind::CallbackWithValue => {
-            cx.call_to_completion(resource.callable(), Value::undefined(), &[resource.value()])
+            let callable = resource.callable().ok_or_else(|| type_error(cx))?;
+            cx.call_to_completion(callable, Value::undefined(), &[resource.value()])
         }
         lyng_js_env::DisposableResourceKind::CallbackWithoutValue => {
-            cx.call_to_completion(resource.callable(), Value::undefined(), &[])
+            let callable = resource.callable().ok_or_else(|| type_error(cx))?;
+            cx.call_to_completion(callable, Value::undefined(), &[])
         }
     }
 }
@@ -520,6 +524,15 @@ fn add_disposal_scope_resource_builtin<Cx: PublicBuiltinDispatchContext>(
     if async_hint && record.kind() != lyng_js_env::DisposalCapabilityKind::Async {
         return Err(type_error(cx));
     }
+    if async_hint && (value.is_undefined() || value.is_null()) {
+        let _ = cx.agent().push_disposal_resource(
+            capability,
+            lyng_js_env::DisposableResourceRecord::no_method(
+                lyng_js_env::DisposalMethodKind::Async,
+            ),
+        );
+        return Ok(value);
+    }
     let Some((callable, method_kind)) = dispose_method_for_hint(cx, value, async_hint)? else {
         return Ok(value);
     };
@@ -582,15 +595,15 @@ fn dispose_scope_async_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let promise_constructor = promise_default_constructor(cx)?;
-    let promise_capability = new_promise_capability(cx, promise_constructor)?;
-    let promise = promise_capability_promise(cx, promise_capability)?;
     let scope = invocation
         .arguments()
         .first()
         .copied()
         .unwrap_or(Value::undefined());
     let Ok((_, capability, record)) = require_disposal_scope_receiver(cx, scope) else {
+        let promise_constructor = promise_default_constructor(cx)?;
+        let promise_capability = new_promise_capability(cx, promise_constructor)?;
+        let promise = promise_capability_promise(cx, promise_capability)?;
         let reject = promise_capability_reject(cx, promise_capability)?;
         let reason = errors::throw_type_error(cx.agent())
             .thrown_value()
@@ -599,10 +612,18 @@ fn dispose_scope_async_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Value::from_object_ref(promise));
     };
     if record.is_disposed() {
-        let resolve = promise_capability_resolve(cx, promise_capability)?;
-        let _ = cx.call_to_completion(resolve, Value::undefined(), &[Value::undefined()])?;
-        return Ok(Value::from_object_ref(promise));
+        return Ok(Value::undefined());
     }
+    if record.resources().is_empty() {
+        let _ = cx.agent().set_disposal_capability_state(
+            capability,
+            lyng_js_env::DisposalCapabilityState::Disposed,
+        );
+        return Ok(Value::undefined());
+    }
+    let promise_constructor = promise_default_constructor(cx)?;
+    let promise_capability = new_promise_capability(cx, promise_constructor)?;
+    let promise = promise_capability_promise(cx, promise_capability)?;
     let _ = cx
         .agent()
         .set_disposal_capability_state(capability, lyng_js_env::DisposalCapabilityState::Disposed);

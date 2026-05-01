@@ -401,7 +401,22 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     span,
                     promise,
                 )?;
+                let undefined = self.alloc_temp()?;
+                self.emit_load_undefined(undefined)?;
+                let is_empty = self.alloc_temp()?;
+                self.builder.emit_abc(
+                    Opcode::StrictEqual,
+                    self.encode_register(is_empty)?,
+                    self.encode_register(promise)?,
+                    self.encode_register(undefined)?,
+                )?;
+                let skip_await = self.builder.emit_cond_jump_placeholder(
+                    Opcode::JumpIfTrue,
+                    self.encode_register(is_empty)?,
+                )?;
                 self.builder.emit_ax(Opcode::Await, i32::from(promise))?;
+                let end = self.builder.current_offset()?;
+                self.builder.patch_jump_to(skip_await, end)?;
                 Ok(())
             }
         }

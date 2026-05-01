@@ -25,6 +25,7 @@ pub enum DisposalMethodKind {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DisposableResourceKind {
+    NoMethod,
     UseMethod,
     CallbackWithValue,
     CallbackWithoutValue,
@@ -34,11 +35,21 @@ pub enum DisposableResourceKind {
 pub struct DisposableResourceRecord {
     kind: DisposableResourceKind,
     method_kind: DisposalMethodKind,
-    callable: ObjectRef,
+    callable: Option<ObjectRef>,
     value: Value,
 }
 
 impl DisposableResourceRecord {
+    #[inline]
+    pub const fn no_method(method_kind: DisposalMethodKind) -> Self {
+        Self {
+            kind: DisposableResourceKind::NoMethod,
+            method_kind,
+            callable: None,
+            value: Value::undefined(),
+        }
+    }
+
     #[inline]
     pub const fn use_method(
         value: Value,
@@ -48,7 +59,7 @@ impl DisposableResourceRecord {
         Self {
             kind: DisposableResourceKind::UseMethod,
             method_kind,
-            callable,
+            callable: Some(callable),
             value,
         }
     }
@@ -62,7 +73,7 @@ impl DisposableResourceRecord {
         Self {
             kind: DisposableResourceKind::CallbackWithValue,
             method_kind,
-            callable,
+            callable: Some(callable),
             value,
         }
     }
@@ -75,7 +86,7 @@ impl DisposableResourceRecord {
         Self {
             kind: DisposableResourceKind::CallbackWithoutValue,
             method_kind,
-            callable,
+            callable: Some(callable),
             value: Value::undefined(),
         }
     }
@@ -91,7 +102,7 @@ impl DisposableResourceRecord {
     }
 
     #[inline]
-    pub const fn callable(self) -> ObjectRef {
+    pub const fn callable(self) -> Option<ObjectRef> {
         self.callable
     }
 
