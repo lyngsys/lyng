@@ -1701,3 +1701,26 @@ fn phase6_default_derived_constructors_forward_arguments_to_super() {
 
     assert_eq!(result, Value::from_bool(true));
 }
+
+#[test]
+fn phase6_default_derived_constructors_do_not_iterate_rest_arguments_for_super() {
+    let result = compile_and_run(
+        r#"
+        Array.prototype[Symbol.iterator] = function() {
+            throw "iterator";
+        };
+
+        class Base {
+            constructor(value) {
+                this.value = value;
+            }
+        }
+
+        class Derived extends Base {}
+
+        new Derived(5).value;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(5));
+}

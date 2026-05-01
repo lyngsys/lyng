@@ -10,11 +10,12 @@ use lyng_js_objects::{
 use lyng_js_types::{
     internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
     internal_bind_function_private_env_builtin, internal_capture_arrow_context_builtin,
-    internal_construct_super_builtin, internal_construct_super_spread_builtin,
-    internal_define_class_getter_property_builtin, internal_define_class_setter_property_builtin,
-    internal_define_getter_property_builtin, internal_define_method_property_builtin,
-    internal_define_private_field_builtin, internal_define_setter_property_builtin,
-    internal_direct_eval_builtin, internal_dynamic_import_builtin, internal_function_call_builtin,
+    internal_construct_super_array_like_builtin, internal_construct_super_builtin,
+    internal_construct_super_spread_builtin, internal_define_class_getter_property_builtin,
+    internal_define_class_setter_property_builtin, internal_define_getter_property_builtin,
+    internal_define_method_property_builtin, internal_define_private_field_builtin,
+    internal_define_setter_property_builtin, internal_direct_eval_builtin,
+    internal_dynamic_import_builtin, internal_function_call_builtin,
     internal_get_instance_field_key_builtin, internal_get_template_object_builtin,
     internal_import_meta_builtin, internal_install_instance_field_key_builtin,
     internal_instance_of_builtin, internal_object_has_own_property_builtin,
@@ -72,6 +73,7 @@ pub struct InternalRealmBuiltins {
     super_base: ObjectRef,
     construct_super: ObjectRef,
     construct_super_spread: ObjectRef,
+    construct_super_array_like: ObjectRef,
     set_function_home_object: ObjectRef,
     object_literal_set_prototype: ObjectRef,
     bind_function_private_env: ObjectRef,
@@ -198,6 +200,9 @@ impl InternalRealmBuiltins {
         }
         if entry == internal_construct_super_spread_builtin() {
             return Some(self.construct_super_spread);
+        }
+        if entry == internal_construct_super_array_like_builtin() {
+            return Some(self.construct_super_array_like);
         }
         if entry == internal_object_has_own_property_builtin() {
             return Some(self.object_has_own_property);
@@ -417,6 +422,10 @@ impl InternalBuiltinCache {
                 construct_super: alloc_builtin(internal_construct_super_builtin(), &mut mutator),
                 construct_super_spread: alloc_builtin(
                     internal_construct_super_spread_builtin(),
+                    &mut mutator,
+                ),
+                construct_super_array_like: alloc_builtin(
+                    internal_construct_super_array_like_builtin(),
                     &mut mutator,
                 ),
                 set_function_home_object: alloc_builtin(
@@ -710,6 +719,14 @@ pub fn internal_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntr
             false,
         ));
     }
+    if entry == internal_construct_super_array_like_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "internal_constructSuperArrayLike",
+            1,
+            false,
+            false,
+        ));
+    }
     if entry == internal_object_has_own_property_builtin() {
         return Some(BuiltinEntryMetadata::new("hasOwnProperty", 1, false, false));
     }
@@ -916,6 +933,11 @@ pub trait InternalBuiltinDispatchContext {
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error>;
 
+    fn construct_super_array_like_builtin(
+        &mut self,
+        invocation: BuiltinInvocation<'_>,
+    ) -> Result<Value, Self::Error>;
+
     fn set_function_home_object_builtin(
         &mut self,
         invocation: BuiltinInvocation<'_>,
@@ -1038,6 +1060,11 @@ pub fn dispatch_internal_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == internal_construct_super_spread_builtin() {
         return context.construct_super_spread_builtin(invocation).map(Some);
+    }
+    if entry == internal_construct_super_array_like_builtin() {
+        return context
+            .construct_super_array_like_builtin(invocation)
+            .map(Some);
     }
     if entry == internal_set_function_home_object_builtin() {
         return context

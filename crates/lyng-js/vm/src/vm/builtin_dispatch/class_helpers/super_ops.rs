@@ -222,4 +222,24 @@ impl Vm {
         )?;
         self.construct_super_with_arguments(agent, host, registry, caller, &spread_arguments)
     }
+
+    pub(in crate::vm::builtin_dispatch) fn construct_super_array_like_builtin(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        arguments: &[Value],
+    ) -> VmResult<Value> {
+        let array_like = arguments.first().copied().unwrap_or(Value::undefined());
+        let super_arguments = self.collect_array_like_arguments(
+            agent,
+            host,
+            registry,
+            caller,
+            caller.realm(),
+            array_like,
+        )?;
+        self.construct_super_with_arguments(agent, host, registry, caller, &super_arguments)
+    }
 }

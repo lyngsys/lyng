@@ -161,6 +161,7 @@ mod tests {
         let dynamic_import = internal_dynamic_import_builtin();
         let regexp_literal = internal_regexp_literal_builtin();
         let require_constructor = internal_require_constructor_builtin();
+        let construct_super_array_like = internal_construct_super_array_like_builtin();
         let public = boolean_builtin();
         let phase6 = promise_builtin();
 
@@ -168,13 +169,14 @@ mod tests {
         assert!(is_internal_builtin(dynamic_import));
         assert!(is_internal_builtin(regexp_literal));
         assert!(is_internal_builtin(require_constructor));
+        assert!(is_internal_builtin(construct_super_array_like));
         assert!(!is_internal_builtin(public));
         assert!(!is_internal_builtin(phase6));
         assert!(is_core_builtin(public));
         assert!(!is_core_builtin(phase6));
         assert!(is_completion_builtin(phase6));
         assert_eq!(INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
-        assert_eq!(INTERNAL_BUILTIN_NAMESPACE_END, 1_039);
+        assert_eq!(INTERNAL_BUILTIN_NAMESPACE_END, 1_040);
         assert_eq!(CORE_BUILTIN_NAMESPACE_START, 2_001);
         assert_eq!(CORE_BUILTIN_NAMESPACE_END, 2_321);
         assert_eq!(COMPLETION_BUILTIN_NAMESPACE_START, 3_101);

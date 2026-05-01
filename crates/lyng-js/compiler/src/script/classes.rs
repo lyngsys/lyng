@@ -1,7 +1,7 @@
 use super::state::ClassInstanceElementPlan;
 use super::*;
 use lyng_js_types::{
-    internal_construct_super_spread_builtin, internal_require_constructor_builtin,
+    internal_construct_super_array_like_builtin, internal_require_constructor_builtin,
 };
 
 #[derive(Clone, Copy)]
@@ -990,7 +990,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let rest_arguments = synthetic.alloc_temp()?;
                 synthetic.emit_load_env_slot(rest_arguments, 0, 0)?;
                 synthetic.emit_internal_builtin_call_into(
-                    internal_construct_super_spread_builtin(),
+                    internal_construct_super_array_like_builtin(),
                     &[rest_arguments],
                     class_span,
                     this_register,

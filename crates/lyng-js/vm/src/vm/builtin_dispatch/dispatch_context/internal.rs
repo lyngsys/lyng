@@ -308,6 +308,19 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         )
     }
 
+    fn construct_super_array_like_builtin(
+        &mut self,
+        invocation: BuiltinInvocation<'_>,
+    ) -> Result<Value, Self::Error> {
+        self.vm.construct_super_array_like_builtin(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            invocation.arguments(),
+        )
+    }
+
     fn set_function_home_object_builtin(
         &mut self,
         invocation: BuiltinInvocation<'_>,
