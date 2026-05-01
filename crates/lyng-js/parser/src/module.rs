@@ -5,7 +5,7 @@ use lyng_js_ast::{
     ImportSpecifier, Stmt, StmtId,
 };
 use lyng_js_common::WellKnownAtom;
-use lyng_js_lexer::{TokenKind, TokenPayload};
+use lyng_js_lexer::{Token, TokenKind, TokenPayload};
 
 use crate::parser::Parser;
 
@@ -54,8 +54,19 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         let mut specifiers = Vec::new();
 
-        // Default import: `import x from "mod"`
-        if self.at(TokenKind::Identifier) {
+        // Source-phase import: `import source x from "mod"`.
+        // The lookahead keeps `import source from "mod"` as a default import
+        // whose local binding is named `source`.
+        if self.is_source_phase_import_declaration() {
+            self.advance(); // eat contextual `source`
+            let local_span = self.current_span();
+            let local = self.parse_binding_identifier();
+            specifiers.push(ImportSpecifier::Source {
+                span: local_span,
+                local,
+            });
+        } else if self.at(TokenKind::Identifier) {
+            // Default import: `import x from "mod"`
             let local_span = self.current_span();
             let local = self.parse_binding_identifier();
             specifiers.push(ImportSpecifier::Default {
@@ -99,6 +110,34 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             attributes,
         });
         self.ast_mut().alloc_stmt(Stmt::Declaration { span, decl })
+    }
+
+    fn is_source_phase_import_declaration(&mut self) -> bool {
+        if !self.at_contextual_source() {
+            return false;
+        }
+        let local = self.peek();
+        if !self.token_is_binding_identifier_in_current_context(local) {
+            return false;
+        }
+        token_is_contextual_atom(self.peek_second(), WellKnownAtom::from)
+    }
+
+    fn at_contextual_source(&self) -> bool {
+        self.current_kind() == TokenKind::Identifier
+            && !self.current().contains_escape()
+            && self
+                .current_atom()
+                .is_some_and(|atom| self.lexer.resolve_atom(atom) == "source")
+    }
+
+    fn token_is_binding_identifier_in_current_context(&self, token: Token) -> bool {
+        match token.kind {
+            TokenKind::Identifier => true,
+            TokenKind::Yield => !self.allow_yield && !self.is_strict(),
+            TokenKind::Await => !self.allow_await,
+            _ => false,
+        }
     }
 
     fn parse_import_specifiers_after_default(&mut self, specifiers: &mut Vec<ImportSpecifier>) {
@@ -214,8 +253,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             Stmt::Declaration { decl, .. } => *decl,
             _ => {
                 let span = start.cover(self.current_span());
-                let decl = self.ast_mut().alloc_decl(Decl::InvalidDeclaration { span });
-                decl
+                self.ast_mut().alloc_decl(Decl::InvalidDeclaration { span })
             }
         };
 
@@ -563,6 +601,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             self.ast_mut().literals_mut().alloc_string("")
         }
     }
+}
+
+fn token_is_contextual_atom(token: Token, atom: WellKnownAtom) -> bool {
+    token.kind == TokenKind::Identifier
+        && !token.contains_escape()
+        && matches!(token.payload, TokenPayload::Atom(id) if id == atom.id())
 }
 
 fn string_literal_has_unpaired_surrogate_escape(raw: &str) -> bool {

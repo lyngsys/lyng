@@ -73,6 +73,9 @@ pub enum ImportSpecifier {
     /// `import * as x from "mod"` — namespace import.
     Namespace { span: Span, local: AtomId },
 
+    /// `import source x from "mod"` — source-phase import.
+    Source { span: Span, local: AtomId },
+
     /// `import { foo as bar } from "mod"` — named import.
     Named {
         span: Span,

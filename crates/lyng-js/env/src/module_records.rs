@@ -45,6 +45,7 @@ impl ModuleRequestRecord {
 pub enum ModuleImportKind {
     Named(AtomId),
     NamespaceObject,
+    Source,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

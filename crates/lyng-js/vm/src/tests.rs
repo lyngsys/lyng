@@ -3188,6 +3188,63 @@ fn dynamic_import_source_phase_rejects_source_text_modules_with_syntax_error() {
 }
 
 #[test]
+fn static_source_phase_import_rejects_source_text_modules_with_syntax_error() {
+    let host = TestHost::new();
+    host.define_module_source(
+        "entry.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/entry.mjs"),
+            "entry.mjs",
+            "import source x from './dep.mjs';",
+        ),
+    );
+    host.define_module_source(
+        "./dep.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/dep.mjs"),
+            "dep.mjs",
+            "export const x = 7;",
+        ),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let loaded = vm
+        .load_module_graph_from_host(
+            agent,
+            realm,
+            &host,
+            &ModuleSourceRequest {
+                specifier: "entry.mjs".into(),
+                referrer: None,
+                attributes: Vec::new(),
+            },
+        )
+        .expect("source-phase import module graph should parse and load");
+    let error = vm
+        .evaluate_linked_module_with_host(agent, realm, loaded.key(), &host)
+        .expect_err("source text modules should not have source-phase representations");
+    let VmError::Abrupt(reason) = error else {
+        panic!("expected abrupt SyntaxError, got {error:?}");
+    };
+    let reason = reason
+        .thrown_value()
+        .expect("source-phase import should throw")
+        .as_object_ref()
+        .expect("source-phase import failure should be an error object");
+    let name_atom = agent.atoms_mut().intern_collectible("name");
+    let name = ordinary_get(agent, reason, PropertyKey::from_atom(name_atom))
+        .expect("error name should be readable")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("error name should be a string");
+    assert_eq!(name, "SyntaxError");
+}
+
+#[test]
 fn dynamic_import_attributes_reject_non_object_and_non_string_values() {
     let cases = [
         "import('./dep.mjs', false);",

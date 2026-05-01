@@ -92,6 +92,31 @@ fn parse_import_attributes_accept_identifier_name_keys() {
 }
 
 #[test]
+fn parse_source_phase_import_allows_source_and_from_binding_names() {
+    let p = module_ok(
+        "import source from 'mod'; import source source from 'mod'; import source from from 'mod';",
+    );
+    let stmts = mbody(&p);
+    assert_eq!(stmts.len(), 3);
+    for (index, expected_source_phase) in [false, true, true].into_iter().enumerate() {
+        match p.ast.get_stmt(stmts[index]) {
+            Stmt::Declaration { decl, .. } => {
+                let Decl::Import { specifiers, .. } = p.ast.get_decl(*decl) else {
+                    panic!("expected import declaration");
+                };
+                let specs = p.ast.get_import_spec_list(*specifiers);
+                assert_eq!(specs.len(), 1);
+                assert_eq!(
+                    matches!(specs[0], ImportSpecifier::Source { .. }),
+                    expected_source_phase
+                );
+            }
+            _ => panic!("expected declaration statement"),
+        }
+    }
+}
+
+#[test]
 fn parse_export_named() {
     let p = module_ok("const x = 1; export { x };");
     let stmts = mbody(&p);

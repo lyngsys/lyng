@@ -14,6 +14,7 @@ use std::collections::{HashMap, HashSet};
 pub enum ModuleImportKind {
     Named(AtomId),
     NamespaceObject,
+    Source,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -504,6 +505,14 @@ fn derive_decl_metadata(
                             *local,
                             local_binding_slot(*local, compilation, bindings_by_name)?,
                             ModuleImportKind::NamespaceObject,
+                        ))
+                    }
+                    ImportSpecifier::Source { local, .. } => {
+                        metadata.import_entries.push(ModuleImportEntry::new(
+                            request_index,
+                            *local,
+                            local_binding_slot(*local, compilation, bindings_by_name)?,
+                            ModuleImportKind::Source,
                         ))
                     }
                     ImportSpecifier::Named {

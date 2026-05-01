@@ -29,11 +29,12 @@ use lyng_js_host::{
 use lyng_js_objects::{
     ModuleNamespaceExport, ModuleNamespaceExportTarget, NativeFunctionRegistry, ObjectAllocation,
 };
+use lyng_js_ops::errors;
 use lyng_js_parser::parse_module;
 use lyng_js_sema::analyze_module;
 use lyng_js_types::{
-    BuiltinFunctionId, CodeRef, EnvironmentRef, ObjectRef, PropertyDescriptor, PropertyKey,
-    RealmRef, Value, WellKnownSymbolId,
+    AbruptCompletion, BuiltinFunctionId, CodeRef, EnvironmentRef, ObjectRef, PropertyDescriptor,
+    PropertyKey, RealmRef, Value, WellKnownSymbolId,
 };
 
 use crate::activation::ActivationSideTables;
@@ -1916,6 +1917,11 @@ impl Vm {
                         Value::from_object_ref(namespace),
                     )?;
                 }
+                ModuleImportKind::Source => {
+                    return Err(VmError::Abrupt(AbruptCompletion::throw(
+                        errors::syntax_error_value(agent),
+                    )));
+                }
             }
         }
         Ok(())
@@ -2107,6 +2113,11 @@ impl Vm {
                             self.module_namespace_object(agent, realm, &resolved_key)?,
                         )),
                     )),
+                    ModuleImportKind::Source => {
+                        return Err(VmError::Abrupt(AbruptCompletion::throw(
+                            errors::syntax_error_value(agent),
+                        )));
+                    }
                 }
             } else {
                 Some(ModuleResolvedExport::new(
@@ -2137,6 +2148,11 @@ impl Vm {
                         self.module_namespace_object(agent, realm, &resolved_key)?,
                     )),
                 )),
+                ModuleImportKind::Source => {
+                    return Err(VmError::Abrupt(AbruptCompletion::throw(
+                        errors::syntax_error_value(agent),
+                    )));
+                }
             }
         } else if export_name == WellKnownAtom::default.id() {
             None
@@ -2353,6 +2369,7 @@ fn compiled_module_record(
                         CompiledModuleImportKind::NamespaceObject => {
                             ModuleImportKind::NamespaceObject
                         }
+                        CompiledModuleImportKind::Source => ModuleImportKind::Source,
                     },
                 )
             })
@@ -2380,6 +2397,7 @@ fn compiled_module_record(
                         CompiledModuleImportKind::NamespaceObject => {
                             ModuleImportKind::NamespaceObject
                         }
+                        CompiledModuleImportKind::Source => ModuleImportKind::Source,
                     },
                 )
             })

@@ -338,7 +338,8 @@ impl<'a> Analyzer<'a> {
                 for spec in self.ast.get_import_spec_list(*specifiers) {
                     match spec {
                         lyng_js_ast::ImportSpecifier::Default { local, span, .. }
-                        | lyng_js_ast::ImportSpecifier::Namespace { local, span, .. } => {
+                        | lyng_js_ast::ImportSpecifier::Namespace { local, span, .. }
+                        | lyng_js_ast::ImportSpecifier::Source { local, span, .. } => {
                             out.push(LexicalDeclaredName {
                                 name: *local,
                                 span: *span,
@@ -811,6 +812,7 @@ impl<'a> Analyzer<'a> {
                     match spec {
                         lyng_js_ast::ImportSpecifier::Default { local, .. }
                         | lyng_js_ast::ImportSpecifier::Namespace { local, .. }
+                        | lyng_js_ast::ImportSpecifier::Source { local, .. }
                         | lyng_js_ast::ImportSpecifier::Named { local, .. } => {
                             names.insert(*local);
                         }
@@ -986,6 +988,7 @@ impl<'a> Analyzer<'a> {
                             match spec {
                                 lyng_js_ast::ImportSpecifier::Default { local, span, .. }
                                 | lyng_js_ast::ImportSpecifier::Namespace { local, span, .. }
+                                | lyng_js_ast::ImportSpecifier::Source { local, span, .. }
                                 | lyng_js_ast::ImportSpecifier::Named { local, span, .. } => {
                                     self.declare_binding(
                                         *local,
