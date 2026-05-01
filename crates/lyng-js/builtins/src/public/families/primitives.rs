@@ -345,7 +345,7 @@ fn install_number_constructor_descriptors(
         ),
         data_atom_property(
             atoms.min_value,
-            Value::from_f64(f64::MIN_POSITIVE),
+            Value::from_f64(f64::from_bits(1)),
             hidden_builtin_attributes(),
         ),
         data_atom_property(

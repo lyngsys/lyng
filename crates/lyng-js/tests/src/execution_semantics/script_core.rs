@@ -4029,6 +4029,24 @@ fn script_core_supports_phase6_number_math_and_bigint_basics() {
 }
 
 #[test]
+fn script_core_number_min_value_is_minimum_subnormal() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        total += (Number.MIN_VALUE / 2 === 0 ? 1 : 0);
+        total += (1 / (Number.MIN_VALUE / -2) === -Infinity ? 2 : 0);
+        total += (Number.MIN_VALUE / 1.9 === Number.MIN_VALUE ? 4 : 0);
+        total += (Number.MIN_VALUE * 0.5 === 0 ? 8 : 0);
+        total += (1 / (-0.5 * Number.MIN_VALUE) === -Infinity ? 16 : 0);
+        total += (Number.MIN_VALUE * 0.51 === Number.MIN_VALUE ? 32 : 0);
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
 fn script_core_unary_plus_uses_to_number_instead_of_addition() {
     let result = compile_and_run(
         r#"
