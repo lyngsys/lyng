@@ -10,14 +10,19 @@ impl Vm {
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments.first().copied().unwrap_or(Value::undefined());
-        let home_object = arguments
-            .get(2)
-            .and_then(|value| value.as_object_ref())
-            .map(Ok)
-            .unwrap_or_else(|| {
-                Self::resolve_super_home_object(agent, caller.lexical_env(), caller)
-            })?;
-        let base = object::super_base(agent, home_object).map_err(VmError::Abrupt)?;
+        let base = if arguments.get(3).and_then(|value| value.as_bool()) == Some(true) {
+            let base_value = arguments.get(2).copied().unwrap_or(Value::undefined());
+            self.to_object_for_value(agent, caller.realm(), base_value)?
+        } else {
+            let home_object = arguments
+                .get(2)
+                .and_then(|value| value.as_object_ref())
+                .map(Ok)
+                .unwrap_or_else(|| {
+                    Self::resolve_super_home_object(agent, caller.lexical_env(), caller)
+                })?;
+            object::super_base(agent, home_object).map_err(VmError::Abrupt)?
+        };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
         let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
         self.get_property_from_object(agent, host, registry, caller, base, receiver, key)
@@ -33,14 +38,19 @@ impl Vm {
     ) -> VmResult<Value> {
         let receiver = arguments.first().copied().unwrap_or(Value::undefined());
         let value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let home_object = arguments
-            .get(3)
-            .and_then(|value| value.as_object_ref())
-            .map(Ok)
-            .unwrap_or_else(|| {
-                Self::resolve_super_home_object(agent, caller.lexical_env(), caller)
-            })?;
-        let base = object::super_base(agent, home_object).map_err(VmError::Abrupt)?;
+        let base = if arguments.get(4).and_then(|value| value.as_bool()) == Some(true) {
+            let base_value = arguments.get(3).copied().unwrap_or(Value::undefined());
+            self.to_object_for_value(agent, caller.realm(), base_value)?
+        } else {
+            let home_object = arguments
+                .get(3)
+                .and_then(|value| value.as_object_ref())
+                .map(Ok)
+                .unwrap_or_else(|| {
+                    Self::resolve_super_home_object(agent, caller.lexical_env(), caller)
+                })?;
+            object::super_base(agent, home_object).map_err(VmError::Abrupt)?
+        };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
         let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
         let updated =
@@ -49,6 +59,25 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         Ok(value)
+    }
+
+    pub(in crate::vm::builtin_dispatch) fn super_base_builtin(
+        &mut self,
+        agent: &mut Agent,
+        caller: FrameRecord,
+        arguments: &[Value],
+    ) -> VmResult<Value> {
+        let home_object = arguments
+            .first()
+            .and_then(|value| value.as_object_ref())
+            .map(Ok)
+            .unwrap_or_else(|| {
+                Self::resolve_super_home_object(agent, caller.lexical_env(), caller)
+            })?;
+        let base = object::ordinary_get_prototype_of(agent, home_object)
+            .map_err(VmError::Abrupt)?
+            .map_or_else(Value::null, Value::from_object_ref);
+        Ok(base)
     }
 
     pub(in crate::vm::builtin_dispatch) fn construct_super_with_arguments(

@@ -1348,6 +1348,82 @@ fn phase6_super_computed_property_resolves_base_before_to_property_key() {
 }
 
 #[test]
+fn phase6_super_computed_compound_assignment_reuses_base_before_to_property_key() {
+    let result = compile_and_run_string(
+        r#"
+        let log = "";
+        let proto = {
+            get p() {
+                log += "get1|";
+                return 1;
+            },
+            set p(value) {
+                log += "set1:" + value;
+            }
+        };
+        let proto2 = {
+            get p() {
+                log += "get2|";
+                return -1;
+            },
+            set p(value) {
+                log += "set2:" + value;
+            }
+        };
+        let obj = {
+            m() {
+                return super[key] += 1;
+            }
+        };
+        Object.setPrototypeOf(obj, proto);
+        let key = {
+            toString() {
+                Object.setPrototypeOf(obj, proto2);
+                return "p";
+            }
+        };
+
+        String(obj.m()) + "|" + log;
+        "#,
+    );
+
+    assert_eq!(result, "2|get1|set1:2");
+}
+
+#[test]
+fn phase6_super_assignment_null_base_evaluates_rhs_before_type_error() {
+    let result = compile_and_run_string(
+        r#"
+        let count = 0;
+        let caughtNamed = false;
+        let caughtComputed = false;
+        class C {
+            static named() {
+                super.x = count += 1;
+            }
+            static computed() {
+                super[0] = count += 1;
+            }
+        }
+        Object.setPrototypeOf(C, null);
+        try {
+            C.named();
+        } catch (error) {
+            caughtNamed = error instanceof TypeError;
+        }
+        try {
+            C.computed();
+        } catch (error) {
+            caughtComputed = error instanceof TypeError;
+        }
+        String(caughtNamed) + "|" + String(caughtComputed) + "|" + String(count);
+        "#,
+    );
+
+    assert_eq!(result, "true|true|2");
+}
+
+#[test]
 fn phase6_methods_record_home_object_for_super_dispatch() {
     let mut atoms = AtomTable::new();
     let unit = compile_unit(

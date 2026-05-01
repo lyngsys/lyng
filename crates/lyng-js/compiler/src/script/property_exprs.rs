@@ -288,22 +288,47 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         )
     }
 
-    pub(super) fn emit_super_property_set(
+    pub(super) fn emit_super_base(&mut self, dest: u16, span: Span) -> LoweringResult<()> {
+        let arguments = if let Some(home_object) = self.super_home_object_override {
+            vec![home_object]
+        } else {
+            Vec::new()
+        };
+        self.emit_internal_builtin_call_into(internal_super_base_builtin(), &arguments, span, dest)
+    }
+
+    pub(super) fn emit_super_property_get_from_base(
+        &mut self,
+        receiver: u16,
+        key: u16,
+        base: u16,
+        span: Span,
+        dest: u16,
+    ) -> LoweringResult<()> {
+        let direct_base = self.alloc_temp()?;
+        self.emit_load_bool(direct_base, true)?;
+        self.emit_internal_builtin_call_into(
+            internal_super_property_get_builtin(),
+            &[receiver, key, base, direct_base],
+            span,
+            dest,
+        )
+    }
+
+    pub(super) fn emit_super_property_set_from_base(
         &mut self,
         receiver: u16,
         key: u16,
         value: u16,
+        base: u16,
         span: Span,
         dest: u16,
     ) -> LoweringResult<()> {
-        let arguments = if let Some(home_object) = self.super_home_object_override {
-            vec![receiver, key, value, home_object]
-        } else {
-            vec![receiver, key, value]
-        };
+        let direct_base = self.alloc_temp()?;
+        self.emit_load_bool(direct_base, true)?;
         self.emit_internal_builtin_call_into(
             internal_super_property_set_builtin(),
-            &arguments,
+            &[receiver, key, value, base, direct_base],
             span,
             dest,
         )

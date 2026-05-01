@@ -22,7 +22,7 @@ use lyng_js_types::{
     internal_private_field_get_builtin, internal_private_field_init_builtin,
     internal_private_field_set_builtin, internal_private_has_builtin,
     internal_regexp_literal_builtin, internal_set_function_home_object_builtin,
-    internal_string_index_of_builtin, internal_string_replace_builtin,
+    internal_string_index_of_builtin, internal_string_replace_builtin, internal_super_base_builtin,
     internal_super_property_get_builtin, internal_super_property_set_builtin,
     internal_template_to_string_builtin, internal_throw_type_error_builtin, BuiltinFunctionId,
     EnvironmentRef, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, ShapeId, Value,
@@ -68,6 +68,7 @@ pub struct InternalRealmBuiltins {
     private_has: ObjectRef,
     super_property_get: ObjectRef,
     super_property_set: ObjectRef,
+    super_base: ObjectRef,
     construct_super: ObjectRef,
     construct_super_spread: ObjectRef,
     set_function_home_object: ObjectRef,
@@ -186,6 +187,9 @@ impl InternalRealmBuiltins {
         }
         if entry == internal_super_property_set_builtin() {
             return Some(self.super_property_set);
+        }
+        if entry == internal_super_base_builtin() {
+            return Some(self.super_base);
         }
         if entry == internal_construct_super_builtin() {
             return Some(self.construct_super);
@@ -404,6 +408,7 @@ impl InternalBuiltinCache {
                     internal_super_property_set_builtin(),
                     &mut mutator,
                 ),
+                super_base: alloc_builtin(internal_super_base_builtin(), &mut mutator),
                 construct_super: alloc_builtin(internal_construct_super_builtin(), &mut mutator),
                 construct_super_spread: alloc_builtin(
                     internal_construct_super_spread_builtin(),
@@ -672,6 +677,14 @@ pub fn internal_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntr
             false,
         ));
     }
+    if entry == internal_super_base_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "internal_superBase",
+            0,
+            false,
+            false,
+        ));
+    }
     if entry == internal_construct_super_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "internal_constructSuper",
@@ -871,6 +884,11 @@ pub trait InternalBuiltinDispatchContext {
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error>;
 
+    fn super_base_builtin(
+        &mut self,
+        invocation: BuiltinInvocation<'_>,
+    ) -> Result<Value, Self::Error>;
+
     fn construct_super_builtin(
         &mut self,
         invocation: BuiltinInvocation<'_>,
@@ -989,6 +1007,9 @@ pub fn dispatch_internal_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == internal_super_property_set_builtin() {
         return context.super_property_set_builtin(invocation).map(Some);
+    }
+    if entry == internal_super_base_builtin() {
+        return context.super_base_builtin(invocation).map(Some);
     }
     if entry == internal_construct_super_builtin() {
         return context.construct_super_builtin(invocation).map(Some);

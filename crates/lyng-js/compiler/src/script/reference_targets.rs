@@ -9,9 +9,20 @@ pub(super) enum ReferenceUsage {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum PreparedReferenceTarget {
     Identifier(PreparedIdentifierTarget),
-    NamedProperty { object: u16, property: AtomId },
-    KeyedProperty { object: u16, key: u16 },
-    SuperProperty { receiver: u16, key: u16, span: Span },
+    NamedProperty {
+        object: u16,
+        property: AtomId,
+    },
+    KeyedProperty {
+        object: u16,
+        key: u16,
+    },
+    SuperProperty {
+        receiver: u16,
+        key: u16,
+        base: u16,
+        span: Span,
+    },
     Private(PreparedPrivateReferenceTarget),
 }
 
@@ -119,8 +130,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             PreparedReferenceTarget::SuperProperty {
                 receiver,
                 key,
+                base,
                 span,
-            } => self.emit_super_property_get(receiver, key, span, dest),
+            } => self.emit_super_property_get_from_base(receiver, key, base, span, dest),
             PreparedReferenceTarget::Private(target) => target.load(self, dest),
         }
     }
@@ -141,8 +153,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             PreparedReferenceTarget::SuperProperty {
                 receiver,
                 key,
+                base,
                 span,
-            } => self.emit_super_property_set(receiver, key, value, span, value),
+            } => self.emit_super_property_set_from_base(receiver, key, value, base, span, value),
             PreparedReferenceTarget::Private(target) => target.assign(self, value),
         }
     }
@@ -207,9 +220,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let receiver = self.lower_super_receiver()?;
         let key = self.alloc_temp()?;
         self.emit_load_atom_string(key, property)?;
+        let base = self.alloc_temp()?;
+        self.emit_super_base(base, self.ast().get_expr(object).span())?;
         Ok(PreparedReferenceTarget::SuperProperty {
             receiver,
             key,
+            base,
             span: self.ast().get_expr(object).span(),
         })
     }
@@ -222,16 +238,19 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<PreparedReferenceTarget> {
         let receiver = self.lower_super_receiver()?;
         let raw_key = self.lower_expr_to_temp(property)?;
-        let key = if usage == ReferenceUsage::WriteOnly {
-            raw_key
-        } else {
+        let base = self.alloc_temp()?;
+        self.emit_super_base(base, self.ast().get_expr(object).span())?;
+        let key = if usage == ReferenceUsage::ReadWrite {
             let key = self.alloc_temp()?;
             self.emit_to_property_key(key, raw_key)?;
             key
+        } else {
+            raw_key
         };
         Ok(PreparedReferenceTarget::SuperProperty {
             receiver,
             key,
+            base,
             span: self.ast().get_expr(object).span(),
         })
     }
