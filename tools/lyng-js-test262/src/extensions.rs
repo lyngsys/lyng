@@ -161,16 +161,39 @@ impl Test262Host {
             })
     }
 
+    fn recognized_module_type(attributes: &[lyng_js_host::ModuleImportAttribute]) -> Option<&str> {
+        attributes
+            .iter()
+            .find(|attribute| attribute.key == "type")
+            .and_then(|attribute| match attribute.value.as_str() {
+                "json" | "text" => Some(attribute.value.as_str()),
+                _ => None,
+            })
+    }
+
+    fn module_key_for_import(
+        path: &Path,
+        attributes: &[lyng_js_host::ModuleImportAttribute],
+    ) -> ModuleKey {
+        let path = path.display();
+        if let Some(module_type) = Self::recognized_module_type(attributes) {
+            return ModuleKey::new(format!("{path}#with:type={module_type}").into_boxed_str());
+        }
+        ModuleKey::new(path.to_string().into_boxed_str())
+    }
+
     fn source_text_from_import_attributes(
         raw_source: &str,
         attributes: &[lyng_js_host::ModuleImportAttribute],
     ) -> Option<String> {
-        let module_type = attributes
-            .iter()
-            .find(|attribute| attribute.key == "type")
-            .map(|attribute| attribute.value.as_str())?;
+        let module_type = Self::recognized_module_type(attributes)?;
         match module_type {
-            "json" => Some(format!("export default ({raw_source});")),
+            "json" => {
+                if serde_json::from_str::<serde_json::Value>(raw_source).is_err() {
+                    return Some("export default ;".to_string());
+                }
+                Some(format!("export default ({raw_source});"))
+            }
             "text" => Some(format!(
                 "export default {};",
                 Self::js_string_literal(raw_source)
@@ -206,25 +229,26 @@ impl Test262Host {
 impl HostHooks for Test262Host {
     fn load_module_source(&self, request: &ModuleSourceRequest) -> HostResult<LoadedModuleSource> {
         let path = Self::resolve_module_path(request)?;
-        let source_text = if path == self.entry_path {
+        let raw_source = if path == self.entry_path {
             self.entry_source.clone()
         } else {
-            let raw_source = Self::read_utf8_file("load_module_source", &path)?;
-            if let Some(source_text) =
-                Self::source_text_from_import_attributes(&raw_source, &request.attributes)
-            {
-                source_text
-            } else if raw_source.contains("/*---") {
-                self.helpers
-                    .build_runtime_source(&parse_metadata(&raw_source), &raw_source)
-                    .map_err(|error| HostError::internal("load_module_source", error))?
-            } else {
-                raw_source
-            }
+            Self::read_utf8_file("load_module_source", &path)?
         };
+        let source_text = if let Some(source_text) =
+            Self::source_text_from_import_attributes(&raw_source, &request.attributes)
+        {
+            source_text
+        } else if path != self.entry_path && raw_source.contains("/*---") {
+            self.helpers
+                .build_runtime_source(&parse_metadata(&raw_source), &raw_source)
+                .map_err(|error| HostError::internal("load_module_source", error))?
+        } else {
+            raw_source
+        };
+        let module_key = Self::module_key_for_import(&path, &request.attributes);
 
         Ok(LoadedModuleSource::new(
-            ModuleKey::new(path.display().to_string().into_boxed_str()),
+            module_key,
             path.display().to_string(),
             source_text,
         ))
@@ -544,7 +568,7 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    use lyng_js_host::TemporalInstant;
+    use lyng_js_host::{HostHooks, ModuleImportAttribute, ModuleSourceRequest, TemporalInstant};
 
     use crate::helpers::HelperCatalog;
 
@@ -602,7 +626,7 @@ mod tests {
     fn import_attribute_source_transform_wraps_json_and_text_modules() {
         let json = Test262Host::source_text_from_import_attributes(
             "262",
-            &[lyng_js_host::ModuleImportAttribute {
+            &[ModuleImportAttribute {
                 key: "type".to_string(),
                 value: "json".to_string(),
             }],
@@ -612,12 +636,51 @@ mod tests {
 
         let text = Test262Host::source_text_from_import_attributes(
             "line \"one\"\nline \\two",
-            &[lyng_js_host::ModuleImportAttribute {
+            &[ModuleImportAttribute {
                 key: "type".to_string(),
                 value: "text".to_string(),
             }],
         )
         .expect("text import attribute should transform source");
         assert_eq!(text, "export default \"line \\\"one\\\"\\nline \\\\two\";");
+    }
+
+    #[test]
+    fn json_import_attribute_rejects_invalid_json_during_module_parse() {
+        let source_text = Test262Host::source_text_from_import_attributes(
+            "{\n  notJson: 0\n}\n",
+            &[ModuleImportAttribute {
+                key: "type".to_string(),
+                value: "json".to_string(),
+            }],
+        )
+        .expect("json import attribute should transform source");
+
+        assert_eq!(source_text, "export default ;");
+    }
+
+    #[test]
+    fn load_module_source_applies_import_attributes_to_entry_self_imports() {
+        let helpers = Arc::new(HelperCatalog::load(&workspace_root()).expect("helper catalog"));
+        let entry_path = workspace_root()
+            .join("testdata/test262/test/language/import/import-attributes/text-self.js");
+        let host = Test262Host::new(&entry_path, "entry source", helpers);
+
+        let loaded = host
+            .load_module_source(&ModuleSourceRequest {
+                specifier: entry_path.display().to_string(),
+                referrer: None,
+                attributes: vec![ModuleImportAttribute {
+                    key: "type".to_string(),
+                    value: "text".to_string(),
+                }],
+            })
+            .expect("entry self import should load");
+
+        assert_eq!(loaded.source_text, "export default \"entry source\";");
+        assert_ne!(
+            loaded.key, host.entry_key,
+            "text-module self imports need a distinct module identity"
+        );
     }
 }
