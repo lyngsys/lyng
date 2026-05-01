@@ -393,6 +393,14 @@ var TemporalHelpers = {};
     });
   };
 
+  TemporalHelpers.observeMethod = function (calls, object, propertyName, objectName) {
+    var method = object[propertyName];
+    object[propertyName] = function () {
+      calls.push("call " + formatPropertyName(propertyName, objectName));
+      return method.apply(object, arguments);
+    };
+  };
+
   TemporalHelpers.propertyBagObserver = function (calls, propertyBag, objectName, skipToPrimitive) {
     return new Proxy(propertyBag, {
       ownKeys: function (target) {

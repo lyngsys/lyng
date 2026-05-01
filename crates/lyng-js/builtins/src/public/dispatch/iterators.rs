@@ -136,6 +136,7 @@ enum IteratorHelperKind {
     Take = 2,
     Drop = 3,
     FlatMap = 4,
+    Wrap = 5,
 }
 
 impl IteratorHelperKind {
@@ -147,6 +148,7 @@ impl IteratorHelperKind {
             Some(2) => Some(Self::Take),
             Some(3) => Some(Self::Drop),
             Some(4) => Some(Self::FlatMap),
+            Some(5) => Some(Self::Wrap),
             _ => None,
         }
     }
@@ -495,10 +497,9 @@ pub(super) fn string_iterator_next_builtin<Cx: PublicBuiltinDispatchContext>(
 //
 // Stage 1 here covers: the Iterator constructor (subclass-only), the eager
 // helpers reduce/forEach/some/every/find/toArray, the initial lazy helpers
-// map/filter/take/drop/flatMap, and Iterator.from when the input already
-// inherits from %Iterator.prototype% (i.e. the fast-path branch of the spec's
-// GetIteratorFlattenable). Wrapped-iterator support for arbitrary input
-// and the static helper constructors are tracked by dcat issue lyng-3k8k.
+// map/filter/take/drop/flatMap, and Iterator.from including the
+// WrapForValidIteratorPrototype branch. The static helper constructors are
+// tracked by dcat issue lyng-3k8k.
 
 fn iterator_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
@@ -1199,6 +1200,7 @@ fn iterator_helper_next_builtin<Cx: PublicBuiltinDispatchContext>(
         IteratorHelperKind::Take => iterator_helper_take_next(cx, helper),
         IteratorHelperKind::Drop => iterator_helper_drop_next(cx, helper),
         IteratorHelperKind::FlatMap => iterator_helper_flat_map_next(cx, helper),
+        IteratorHelperKind::Wrap => iterator_helper_wrap_next(cx, helper),
     };
     set_iterator_helper_running(cx, helper, false)?;
     result
@@ -1224,6 +1226,11 @@ fn iterator_helper_return_builtin<Cx: PublicBuiltinDispatchContext>(
         ITERATOR_HELPER_KIND_SLOT,
     )?)
     .ok_or_else(|| type_error(cx))?;
+    if kind == IteratorHelperKind::Wrap {
+        let result = iterator_helper_wrap_return(cx, helper);
+        set_iterator_helper_running(cx, helper, false)?;
+        return result;
+    }
     if kind == IteratorHelperKind::FlatMap {
         if let Some(mut inner_record) = iterator_helper_inner_record(cx, helper)? {
             clear_iterator_helper_inner(cx, helper)?;
@@ -1256,6 +1263,32 @@ fn iterator_helper_return_builtin<Cx: PublicBuiltinDispatchContext>(
     };
     set_iterator_helper_running(cx, helper, false)?;
     result
+}
+
+fn iterator_helper_wrap_next<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    helper: ObjectRef,
+) -> Result<Value, Cx::Error> {
+    let iterator_record = iterator_helper_record(cx, helper)?;
+    let result = {
+        let mut bridge = BuiltinIteratorBridge { cx };
+        iterator::iterator_next(&mut bridge, &iterator_record, None)
+    }?;
+    Ok(Value::from_object_ref(result))
+}
+
+fn iterator_helper_wrap_return<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    helper: ObjectRef,
+) -> Result<Value, Cx::Error> {
+    let iterated = iterator_helper_iterated_object(cx, helper)?;
+    let return_key = property_key_from_text(cx, "return");
+    let return_value = cx.get_property_value(Value::from_object_ref(iterated), return_key)?;
+    if return_value.is_undefined() || return_value.is_null() {
+        return create_iterator_result_value(cx, Value::undefined(), true);
+    }
+    let return_method = cx.require_callable_object(return_value)?;
+    cx.call_to_completion(return_method, Value::from_object_ref(iterated), &[])
 }
 
 fn iterator_helper_map_next<Cx: PublicBuiltinDispatchContext>(
@@ -1696,14 +1729,7 @@ fn iterator_helper_record<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     helper: ObjectRef,
 ) -> Result<iterator::IteratorRecord, Cx::Error> {
-    let iterated = iterator_slot_value_for_builtin(
-        cx,
-        helper,
-        OrdinaryObjectData::IteratorHelper,
-        ITERATOR_HELPER_ITERATED_SLOT,
-    )?
-    .as_object_ref()
-    .ok_or_else(|| type_error(cx))?;
+    let iterated = iterator_helper_iterated_object(cx, helper)?;
     let next_value = iterator_slot_value_for_builtin(
         cx,
         helper,
@@ -1712,6 +1738,20 @@ fn iterator_helper_record<Cx: PublicBuiltinDispatchContext>(
     )?;
     let next_method = cx.require_callable_object(next_value)?;
     Ok(iterator::IteratorRecord::new(iterated, next_method))
+}
+
+fn iterator_helper_iterated_object<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    helper: ObjectRef,
+) -> Result<ObjectRef, Cx::Error> {
+    iterator_slot_value_for_builtin(
+        cx,
+        helper,
+        OrdinaryObjectData::IteratorHelper,
+        ITERATOR_HELPER_ITERATED_SLOT,
+    )?
+    .as_object_ref()
+    .ok_or_else(|| type_error(cx))
 }
 
 fn iterator_helper_done<Cx: PublicBuiltinDispatchContext>(
@@ -1816,12 +1856,6 @@ fn iterator_from_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    // Stage 1 covers the fast path of GetIteratorFlattenable: when O is
-    // already an object whose [[Prototype]] chain includes %Iterator.prototype%,
-    // return it as-is. The wrapping branch (WrapForValidIteratorPrototype) is
-    // deferred to Stage 2 along with the lazy helpers; calling Iterator.from
-    // with a non-Iterator-prototype iterable currently throws TypeError so
-    // the gap is observable rather than silently incorrect.
     let argument = invocation
         .arguments()
         .first()
@@ -1833,11 +1867,55 @@ fn iterator_from_builtin<Cx: PublicBuiltinDispatchContext>(
         .realm(realm)
         .and_then(|record| record.intrinsics().iterator_prototype())
         .ok_or_else(|| type_error(cx))?;
-    let object = argument.as_object_ref().ok_or_else(|| type_error(cx))?;
-    if iterator_prototype_in_chain(cx, object, iterator_prototype)? {
-        return Ok(Value::from_object_ref(object));
+    let (iterator, next_method) = get_iterator_flattenable_for_iterator_from(cx, argument)?;
+    if iterator_prototype_in_chain(cx, iterator, iterator_prototype)? {
+        return Ok(Value::from_object_ref(iterator));
     }
-    Err(type_error(cx))
+    let prototype = cx
+        .agent()
+        .realm(realm)
+        .and_then(|record| record.intrinsics().iterator_helper_prototype())
+        .ok_or_else(|| type_error(cx))?;
+    let slot_values = [
+        Value::from_object_ref(iterator),
+        next_method,
+        Value::from_bool(false),
+        Value::from_bool(false),
+        IteratorHelperKind::Wrap.into_value(),
+        Value::undefined(),
+        Value::from_smi(0),
+    ];
+    let wrapper = allocate_iterator_object(
+        cx,
+        prototype,
+        OrdinaryObjectData::IteratorHelper,
+        &slot_values,
+    )?;
+    Ok(Value::from_object_ref(wrapper))
+}
+
+fn get_iterator_flattenable_for_iterator_from<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<(ObjectRef, Value), Cx::Error> {
+    if value.as_object_ref().is_none() && !value.is_string() {
+        return Err(type_error(cx));
+    }
+    let iterator_symbol = cx
+        .agent()
+        .well_known_symbol(WellKnownSymbolId::Iterator)
+        .ok_or_else(|| type_error(cx))?;
+    let method = cx.get_property_value(value, PropertyKey::from_symbol(iterator_symbol))?;
+    let iterator = if method.is_undefined() || method.is_null() {
+        value.as_object_ref().ok_or_else(|| type_error(cx))?
+    } else {
+        let method = cx.require_callable_object(method)?;
+        let iterator = cx.call_to_completion(method, value, &[])?;
+        iterator.as_object_ref().ok_or_else(|| type_error(cx))?
+    };
+    let next_key = property_key_from_text(cx, "next");
+    let next = cx.get_property_value(Value::from_object_ref(iterator), next_key)?;
+    Ok((iterator, next))
 }
 
 fn iterator_prototype_in_chain<Cx: PublicBuiltinDispatchContext>(
