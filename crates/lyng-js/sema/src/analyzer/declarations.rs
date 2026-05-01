@@ -895,7 +895,7 @@ impl<'a> Analyzer<'a> {
     pub(super) fn hoist_declarations(&mut self, stmt_id: lyng_js_ast::StmtId) {
         let stmt = self.ast.get_stmt(stmt_id);
         match stmt {
-            Stmt::Declaration { decl, span, .. } => {
+            Stmt::Declaration { decl, .. } => {
                 let decl_node = self.ast.get_decl(*decl);
                 match decl_node {
                     Decl::Function { function, span, .. } => {
@@ -950,21 +950,110 @@ impl<'a> Analyzer<'a> {
                             }
                         }
                     }
-                    Decl::Variable {
-                        kind: VariableKind::Var,
-                        declarators,
-                        ..
-                    } => {
-                        let decls = self.ast.get_var_declarator_list(*declarators);
-                        for decl in decls {
-                            self.hoist_var_pattern(decl.id, *span);
-                        }
-                    }
                     _ => {}
                 }
             }
             Stmt::Labeled { body, .. } => {
                 self.hoist_declarations(*body);
+            }
+            _ => {}
+        }
+        self.hoist_var_declarations_from_stmt(stmt_id);
+    }
+
+    fn hoist_var_declarations_from_stmt_list(
+        &mut self,
+        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+    ) {
+        let stmts = self.ast.get_stmt_list(list).to_vec();
+        for stmt_id in stmts {
+            self.hoist_var_declarations_from_stmt(stmt_id);
+        }
+    }
+
+    fn hoist_var_declarations_from_stmt(&mut self, stmt_id: lyng_js_ast::StmtId) {
+        match self.ast.get_stmt(stmt_id).clone() {
+            Stmt::Block { body, .. } => {
+                self.hoist_var_declarations_from_stmt_list(body);
+            }
+            Stmt::If {
+                consequent,
+                alternate,
+                ..
+            } => {
+                self.hoist_var_declarations_from_stmt(consequent);
+                if let Some(alternate) = alternate {
+                    self.hoist_var_declarations_from_stmt(alternate);
+                }
+            }
+            Stmt::DoWhile { body, .. }
+            | Stmt::While { body, .. }
+            | Stmt::With { body, .. }
+            | Stmt::Labeled { body, .. } => {
+                self.hoist_var_declarations_from_stmt(body);
+            }
+            Stmt::For { init, body, .. } => {
+                if let Some(ForInit::Declaration(decl)) = init {
+                    self.hoist_var_declarations_from_decl(decl);
+                }
+                self.hoist_var_declarations_from_stmt(body);
+            }
+            Stmt::ForIn { left, body, .. } | Stmt::ForOf { left, body, .. } => {
+                if let ForInOfLeft::Declaration(decl) = left {
+                    self.hoist_var_declarations_from_decl(decl);
+                }
+                self.hoist_var_declarations_from_stmt(body);
+            }
+            Stmt::Switch { cases, .. } => {
+                for case in self.ast.get_switch_case_list(cases).to_vec() {
+                    self.hoist_var_declarations_from_stmt_list(case.consequent);
+                }
+            }
+            Stmt::Try {
+                block,
+                handler,
+                finalizer,
+                ..
+            } => {
+                self.hoist_var_declarations_from_stmt(block);
+                if let Some(catch) = handler {
+                    self.hoist_var_declarations_from_stmt(catch.body);
+                }
+                if let Some(finalizer) = finalizer {
+                    self.hoist_var_declarations_from_stmt(finalizer);
+                }
+            }
+            Stmt::Declaration { decl, .. } => {
+                self.hoist_var_declarations_from_decl(decl);
+            }
+            Stmt::Expression { .. }
+            | Stmt::Return { .. }
+            | Stmt::Throw { .. }
+            | Stmt::Break { .. }
+            | Stmt::Continue { .. }
+            | Stmt::Empty { .. }
+            | Stmt::Debugger { .. }
+            | Stmt::InvalidStatement { .. } => {}
+        }
+    }
+
+    fn hoist_var_declarations_from_decl(&mut self, decl_id: lyng_js_ast::DeclId) {
+        match self.ast.get_decl(decl_id).clone() {
+            Decl::Variable {
+                kind: VariableKind::Var,
+                declarators,
+                ..
+            } => {
+                let decls = self.ast.get_var_declarator_list(declarators).to_vec();
+                for decl in decls {
+                    self.hoist_var_pattern(decl.id, decl.span);
+                }
+            }
+            Decl::Export {
+                kind: lyng_js_ast::ExportKind::Declaration { decl },
+                ..
+            } => {
+                self.hoist_var_declarations_from_decl(decl);
             }
             _ => {}
         }

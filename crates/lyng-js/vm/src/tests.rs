@@ -1549,6 +1549,78 @@ fn link_module_graph_initializes_module_var_bindings_to_undefined() {
 }
 
 #[test]
+fn evaluate_module_reads_exported_var_before_declaration_as_undefined() {
+    let unit = compile_test_module(
+        253,
+        "let status = 0; try { if (test262 === undefined) status += 1; test262 = null; if (test262 === null) status += 2; } catch (error) { status = error.constructor === ReferenceError ? 8 : 16; } export { status }; export var test262 = 23;",
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let key = ModuleKey::new("/tmp/main.mjs");
+    let mut vm = Vm::new();
+
+    vm.install_module(agent, realm.id(), &key, "/tmp/main.mjs", &unit)
+        .unwrap();
+
+    let _ = vm.evaluate_linked_module(agent, realm, &key).unwrap();
+
+    let record = agent
+        .module_record(&key)
+        .expect("module should stay cached after evaluation");
+    let module_env = record
+        .environment()
+        .expect("module evaluation should allocate one environment");
+    let status_slot = unit
+        .local_exports()
+        .iter()
+        .find(|entry| unit.atom_text(entry.export_name()) == Some("status"))
+        .expect("module should export status")
+        .local_slot();
+
+    assert_eq!(
+        agent.environment_slot(module_env, status_slot),
+        Some(Value::from_smi(3))
+    );
+}
+
+#[test]
+fn evaluate_module_reads_for_var_before_declaration_as_undefined() {
+    let unit = compile_test_module(
+        254,
+        "let status = 0; try { if (test262 === undefined) status += 1; for (var test262 = null; false;) {} if (test262 === null) status += 2; } catch (error) { status = error.constructor === ReferenceError ? 8 : 16; } export { status };",
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let key = ModuleKey::new("/tmp/main.mjs");
+    let mut vm = Vm::new();
+
+    vm.install_module(agent, realm.id(), &key, "/tmp/main.mjs", &unit)
+        .unwrap();
+
+    let _ = vm.evaluate_linked_module(agent, realm, &key).unwrap();
+
+    let record = agent
+        .module_record(&key)
+        .expect("module should stay cached after evaluation");
+    let module_env = record
+        .environment()
+        .expect("module evaluation should allocate one environment");
+    let status_slot = unit
+        .local_exports()
+        .iter()
+        .find(|entry| unit.atom_text(entry.export_name()) == Some("status"))
+        .expect("module should export status")
+        .local_slot();
+
+    assert_eq!(
+        agent.environment_slot(module_env, status_slot),
+        Some(Value::from_smi(3))
+    );
+}
+
+#[test]
 fn linked_module_graph_supports_default_and_named_self_import_instantiation() {
     let unit = compile_test_module(
         223,
