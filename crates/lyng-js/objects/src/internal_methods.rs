@@ -231,7 +231,11 @@ impl ObjectRuntime {
                 }
             }
             ObjectKind::Ordinary | ObjectKind::Function => {
-                self.ordinary_has_property(heap, id, key)
+                if self.is_module_namespace_object(id) {
+                    self.module_namespace_has_property(heap, id, key)
+                } else {
+                    self.ordinary_has_property(heap, id, key)
+                }
             }
         }
     }

@@ -1089,6 +1089,43 @@ fn module_namespace_has_own_property_throws_for_uninitialized_binding() {
 }
 
 #[test]
+fn module_namespace_has_property_does_not_read_uninitialized_binding() {
+    let unit = compile_test_module(
+        252,
+        "import * as ns from './main.mjs'; let status = 0; try { if ('local' in ns) status += 1; if (Reflect.has(ns, 'local')) status += 2; } catch (error) { status = error.constructor === ReferenceError ? 8 : 16; } export { status }; export let local = 1;",
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let key = ModuleKey::new("/tmp/main.mjs");
+    let mut vm = Vm::new();
+
+    vm.install_module(agent, realm.id(), &key, "/tmp/main.mjs", &unit)
+        .unwrap();
+    assert!(agent.set_module_requested_key(&key, 0, Some(key.clone())));
+
+    let _ = vm.evaluate_linked_module(agent, realm, &key).unwrap();
+
+    let record = agent
+        .module_record(&key)
+        .expect("module should stay cached after evaluation");
+    let module_env = record
+        .environment()
+        .expect("module evaluation should allocate one environment");
+    let status_slot = unit
+        .local_exports()
+        .iter()
+        .find(|entry| unit.atom_text(entry.export_name()) == Some("status"))
+        .expect("module should export status")
+        .local_slot();
+
+    assert_eq!(
+        agent.environment_slot(module_env, status_slot),
+        Some(Value::from_smi(3))
+    );
+}
+
+#[test]
 fn module_namespace_reads_initialized_local_renamed_indirect_and_default_exports() {
     let source = "import * as ns from './main.mjs'; export var local1 = 23; var local2 = 45; export { local2 as renamed }; export { local1 as indirect } from './main.mjs'; export default 444; export const status = (ns.local1 === 23 ? 1 : 0) + (ns.renamed === 45 ? 2 : 0) + (ns.indirect === 23 ? 4 : 0) + (ns.default === 444 ? 8 : 0);";
     let host = TestHost::new();

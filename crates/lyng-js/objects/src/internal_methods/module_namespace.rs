@@ -59,6 +59,21 @@ impl ObjectRuntime {
         Ok(true)
     }
 
+    pub(super) fn module_namespace_has_property(
+        &self,
+        heap: PrimitiveHeapView<'_>,
+        id: ObjectRef,
+        key: PropertyKey,
+    ) -> InternalMethodResult<bool> {
+        let Some(namespace) = self.module_namespace_slot(id) else {
+            return Err(InternalMethodError::MissingObject);
+        };
+        if namespace.export_for_key(key).is_some() {
+            return Ok(true);
+        }
+        self.ordinary_has_property(heap, id, key)
+    }
+
     pub(super) fn module_namespace_delete(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,

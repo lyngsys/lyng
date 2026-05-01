@@ -92,6 +92,13 @@ pub fn has_property<Cx: ProxyTrapContext>(
     key: PropertyKey,
 ) -> Result<bool, Cx::Error> {
     if !is_proxy(cx, object) {
+        if is_module_namespace(cx, object) {
+            let result = {
+                let agent = cx.agent();
+                ordinary_object::ordinary_has_property(agent, object, key)
+            };
+            return map_completion(cx, result);
+        }
         if get_own_property(cx, object, key)?.is_some() {
             return Ok(true);
         }
@@ -738,6 +745,10 @@ fn map_completion<Cx: ProxyTrapContext, T>(
 
 fn is_proxy<Cx: ProxyTrapContext>(cx: &mut Cx, object: ObjectRef) -> bool {
     cx.agent().objects().is_proxy_object(object)
+}
+
+fn is_module_namespace<Cx: ProxyTrapContext>(cx: &mut Cx, object: ObjectRef) -> bool {
+    cx.agent().objects().is_module_namespace_object(object)
 }
 
 fn descriptor_kind(descriptor: PropertyDescriptor) -> Result<DescriptorKind, ()> {
