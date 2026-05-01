@@ -1534,12 +1534,18 @@ impl Vm {
     ) -> VmResult<bool> {
         if left.is_object() && !right.is_object() {
             let left =
-                self.to_primitive(agent, host, registry, frame, left, ToPrimitiveHint::Number)?;
+                self.to_primitive(agent, host, registry, frame, left, ToPrimitiveHint::Default)?;
             return self.loosely_equal(agent, host, registry, frame, left, right);
         }
         if right.is_object() && !left.is_object() {
-            let right =
-                self.to_primitive(agent, host, registry, frame, right, ToPrimitiveHint::Number)?;
+            let right = self.to_primitive(
+                agent,
+                host,
+                registry,
+                frame,
+                right,
+                ToPrimitiveHint::Default,
+            )?;
             return self.loosely_equal(agent, host, registry, frame, left, right);
         }
 

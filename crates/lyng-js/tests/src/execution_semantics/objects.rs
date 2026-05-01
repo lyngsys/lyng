@@ -157,6 +157,28 @@ fn phase6_object_literal_accessor_keys_apply_to_property_key() {
 }
 
 #[test]
+fn phase6_equality_to_primitive_uses_default_hint() {
+    let result = compile_and_run(
+        r#"
+        let left = {
+            [Symbol.toPrimitive](hint) {
+                return hint === "default" ? 1 : 2;
+            }
+        };
+        let right = {
+            [Symbol.toPrimitive](hint) {
+                return hint === "default" ? 1 : 2;
+            }
+        };
+
+        (true == left ? 1 : 0) + (right == true ? 2 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
 fn phase6_object_literal_computed_key_coerces_before_value_evaluation() {
     let result = compile_and_run_string(
         r#"
