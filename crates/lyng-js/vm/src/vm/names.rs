@@ -206,7 +206,16 @@ impl Vm {
         strict: bool,
     ) -> VmResult<Option<Value>> {
         let mut current = Some(start);
+        let mut consumed_overlay_source = None;
         while let Some(environment) = current {
+            if consumed_overlay_source != Some(environment) {
+                if let Some(overlay) = self.direct_eval_environment_overlay(environment) {
+                    consumed_overlay_source = Some(environment);
+                    current = Some(overlay);
+                    continue;
+                }
+            }
+
             let record = agent
                 .environment(environment)
                 .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
@@ -311,7 +320,16 @@ impl Vm {
         name: AtomId,
     ) -> VmResult<CapturedNameTarget> {
         let mut current = Some(start);
+        let mut consumed_overlay_source = None;
         while let Some(environment) = current {
+            if consumed_overlay_source != Some(environment) {
+                if let Some(overlay) = self.direct_eval_environment_overlay(environment) {
+                    consumed_overlay_source = Some(environment);
+                    current = Some(overlay);
+                    continue;
+                }
+            }
+
             let Some(record) = agent.environment(environment) else {
                 break;
             };

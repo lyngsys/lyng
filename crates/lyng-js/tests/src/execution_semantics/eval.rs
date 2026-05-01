@@ -245,6 +245,24 @@ fn direct_eval_preserves_eval_created_arguments_for_arrow_created_after_default_
 }
 
 #[test]
+fn direct_eval_parameter_var_binding_is_visible_to_parameter_closures() {
+    let result = compile_and_run_string(
+        r#"
+            var x = "outside";
+            let first;
+            let second;
+            (function(
+                _ = first = function() { return x; },
+                __ = (eval("var x = 'inside';"), second = function() { return x; })
+            ) {})();
+            first() + ":" + second();
+        "#,
+    );
+
+    assert_eq!(result, "inside:inside");
+}
+
+#[test]
 fn direct_eval_in_global_code_rejects_var_collisions_with_global_lexicals() {
     let result = compile_and_run_string(
         r#"

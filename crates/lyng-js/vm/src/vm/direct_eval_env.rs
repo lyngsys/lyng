@@ -209,6 +209,22 @@ impl Vm {
             .map(|state| state.environment)
     }
 
+    pub(super) fn direct_eval_environment_overlay(
+        &self,
+        source: EnvironmentRef,
+    ) -> Option<EnvironmentRef> {
+        self.direct_eval_environment_overlays.get(&source).copied()
+    }
+
+    pub(super) fn register_direct_eval_environment_overlay(
+        &mut self,
+        source: EnvironmentRef,
+        overlay: EnvironmentRef,
+    ) {
+        self.direct_eval_environment_overlays
+            .insert(source, overlay);
+    }
+
     pub(super) fn push_direct_eval_environment(
         &mut self,
         frame_depth: usize,

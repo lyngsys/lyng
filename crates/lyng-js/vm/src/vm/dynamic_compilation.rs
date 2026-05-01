@@ -1310,13 +1310,20 @@ impl Vm {
             )?;
             (caller_lexical_env, caller_variable_env)
         } else {
+            let inherited_direct_eval_env =
+                self.direct_eval_environment_overlay(caller_lexical_env);
+            let direct_eval_outer = inherited_direct_eval_env.unwrap_or(caller_lexical_env);
             let direct_eval_env =
-                self.create_direct_eval_var_environment(agent, caller_lexical_env, &hosted_names)?;
+                self.create_direct_eval_var_environment(agent, direct_eval_outer, &hosted_names)?;
             if let Some(environment) = direct_eval_env {
+                self.register_direct_eval_environment_overlay(caller_lexical_env, environment);
                 persistent_direct_eval_env = Some(environment);
                 (environment, caller_variable_env)
             } else {
-                (caller_lexical_env, caller_variable_env)
+                (
+                    inherited_direct_eval_env.unwrap_or(caller_lexical_env),
+                    caller_variable_env,
+                )
             }
         };
         let script_referrer = self

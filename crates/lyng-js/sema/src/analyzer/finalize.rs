@@ -8,14 +8,33 @@ impl<'a> Analyzer<'a> {
     pub(super) fn finalize(&mut self) {
         self.propagate_eval_with();
 
-        for record in self.use_sites.as_mut_slice() {
-            let scope = self.scopes.get(record.scope);
-            if (scope.has_eval || scope.has_with)
-                && matches!(
-                    record.resolution_kind,
-                    ResolutionKind::Captured | ResolutionKind::Global | ResolutionKind::Unresolved
-                )
-            {
+        let use_crosses_dynamic_scope = self
+            .use_sites
+            .as_slice()
+            .iter()
+            .map(|record| self.use_site_crosses_eval_or_with(record.scope, record.resolved_binding))
+            .collect::<Vec<_>>();
+        for (record, crosses_dynamic_scope) in self
+            .use_sites
+            .as_mut_slice()
+            .iter_mut()
+            .zip(use_crosses_dynamic_scope)
+        {
+            let use_scope = self.scopes.get(record.scope);
+            let should_dynamic = match record.resolution_kind {
+                ResolutionKind::Captured => {
+                    use_scope.has_eval
+                        || use_scope.has_with
+                        || (crosses_dynamic_scope
+                            && record.resolved_binding.is_some_and(|binding| {
+                                self.scopes.get(self.bindings.get(binding).scope).kind
+                                    == ScopeKind::Global
+                            }))
+                }
+                ResolutionKind::Global | ResolutionKind::Unresolved => crosses_dynamic_scope,
+                ResolutionKind::Local | ResolutionKind::Dynamic => false,
+            };
+            if should_dynamic {
                 record.resolution_kind = ResolutionKind::Dynamic;
             }
         }
@@ -166,6 +185,27 @@ impl<'a> Analyzer<'a> {
                     }
                 }
             }
+        }
+    }
+
+    fn use_site_crosses_eval_or_with(
+        &self,
+        mut scope_id: ScopeId,
+        resolved_binding: Option<SemanticBindingId>,
+    ) -> bool {
+        let stop_scope = resolved_binding.map(|binding| self.bindings.get(binding).scope);
+        loop {
+            let scope = self.scopes.get(scope_id);
+            if scope.has_eval || scope.has_with {
+                return true;
+            }
+            if Some(scope_id) == stop_scope {
+                return false;
+            }
+            let Some(parent) = scope.parent else {
+                return false;
+            };
+            scope_id = parent;
         }
     }
 
