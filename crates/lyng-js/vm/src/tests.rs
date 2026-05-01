@@ -2522,6 +2522,56 @@ fn dynamic_import_preserves_script_referrer_after_async_resume() {
 }
 
 #[test]
+fn dynamic_import_preserves_script_referrer_in_promise_reactions() {
+    let unit = compile_test_unit(
+        226,
+        r#"
+            Promise.resolve().then(function() {
+                return import('./dep.mjs');
+            });
+        "#,
+    );
+    let host = TestHost::new();
+    let script_referrer = ModuleKey::new("/tmp/main.js");
+    let module_key = ModuleKey::new("/tmp/dep.mjs");
+    host.define_module_source(
+        "./dep.mjs",
+        LoadedModuleSource::new(module_key.clone(), "/tmp/dep.mjs", "export default 17;"),
+    );
+    host.define_import_meta(
+        module_key.clone(),
+        ImportMetaProperties::new(vec![ImportMetaProperty {
+            key: "url".into(),
+            value: ImportMetaValue::String("file:///tmp/dep.mjs".into()),
+        }]),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    vm.evaluate_script_with_registry_and_host_referrer(
+        agent,
+        realm,
+        &unit,
+        Some(&script_referrer),
+        &host,
+        &mut registry,
+    )
+    .expect("promise reaction dynamic import should evaluate");
+
+    assert!(host
+        .snapshot()
+        .calls
+        .contains(&HostCall::LoadModule(ModuleSourceRequest {
+            specifier: "./dep.mjs".into(),
+            referrer: Some(script_referrer),
+            attributes: Vec::new(),
+        })));
+}
+
+#[test]
 fn dynamic_import_rejects_module_parse_errors_with_syntax_error() {
     let unit = compile_test_unit(221, "import('./bad.mjs');");
     let host = TestHost::new();

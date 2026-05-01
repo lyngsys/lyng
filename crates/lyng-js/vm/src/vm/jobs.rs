@@ -79,7 +79,16 @@ impl Vm {
         let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
         let lexical_env = realm_record.global_env();
         let variable_env = realm_record.global_env();
-        agent.push_job_context(realm, job.executable(), lexical_env, variable_env);
+        let script_or_module_referrer = match job.payload() {
+            RuntimeJobPayload::PromiseReaction { reaction, .. } => agent
+                .promise_reaction(reaction)
+                .and_then(|record| record.script_or_module_referrer()),
+            _ => None,
+        };
+        agent.push_execution_context(
+            lyng_js_env::ExecutionContext::job(realm, job.executable(), lexical_env, variable_env)
+                .with_script_or_module_referrer(script_or_module_referrer),
+        );
         let result = match job.payload() {
             RuntimeJobPayload::Executable => {
                 self.execute_executable_job(agent, host, registry, job, realm_record)
@@ -388,16 +397,17 @@ impl Vm {
         on_rejected: PromiseReactionHandler,
         capability: Option<PromiseCapabilityId>,
     ) -> VmResult<()> {
-        let fulfill_reaction = agent.alloc_promise_reaction(PromiseReactionRecord::new(
-            PromiseReactionKind::Fulfill,
-            on_fulfilled,
-            capability,
-        ));
-        let reject_reaction = agent.alloc_promise_reaction(PromiseReactionRecord::new(
-            PromiseReactionKind::Reject,
-            on_rejected,
-            capability,
-        ));
+        let script_or_module_referrer = agent
+            .current_execution_context()
+            .and_then(|context| context.script_or_module_referrer());
+        let fulfill_reaction = agent.alloc_promise_reaction(
+            PromiseReactionRecord::new(PromiseReactionKind::Fulfill, on_fulfilled, capability)
+                .with_script_or_module_referrer(script_or_module_referrer),
+        );
+        let reject_reaction = agent.alloc_promise_reaction(
+            PromiseReactionRecord::new(PromiseReactionKind::Reject, on_rejected, capability)
+                .with_script_or_module_referrer(script_or_module_referrer),
+        );
         let record = agent
             .promise_record(promise)
             .cloned()

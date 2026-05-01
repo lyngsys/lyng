@@ -31,7 +31,13 @@ pub fn create_promise_reaction(
     handler: PromiseReactionHandler,
     capability: Option<lyng_js_env::PromiseCapabilityId>,
 ) -> lyng_js_env::PromiseReactionId {
-    agent.alloc_promise_reaction(PromiseReactionRecord::new(kind, handler, capability))
+    let script_or_module_referrer = agent
+        .current_execution_context()
+        .and_then(|context| context.script_or_module_referrer());
+    agent.alloc_promise_reaction(
+        PromiseReactionRecord::new(kind, handler, capability)
+            .with_script_or_module_referrer(script_or_module_referrer),
+    )
 }
 
 pub fn fulfill_promise(agent: &mut Agent, promise: ObjectRef, value: Value) -> Completion<()> {

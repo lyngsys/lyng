@@ -5,6 +5,7 @@ use super::{
     },
     RealmRef,
 };
+use lyng_js_common::AtomId;
 use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
 use lyng_js_types::{ObjectRef, SuspendedExecutionRef, Value};
 
@@ -44,6 +45,7 @@ pub struct PromiseReactionRecord {
     kind: PromiseReactionKind,
     handler: PromiseReactionHandler,
     capability: Option<PromiseCapabilityId>,
+    script_or_module_referrer: Option<AtomId>,
 }
 
 impl PromiseReactionRecord {
@@ -57,7 +59,14 @@ impl PromiseReactionRecord {
             kind,
             handler,
             capability,
+            script_or_module_referrer: None,
         }
+    }
+
+    #[inline]
+    pub const fn with_script_or_module_referrer(mut self, referrer: Option<AtomId>) -> Self {
+        self.script_or_module_referrer = referrer;
+        self
     }
 
     #[inline]
@@ -73,6 +82,11 @@ impl PromiseReactionRecord {
     #[inline]
     pub const fn capability(self) -> Option<PromiseCapabilityId> {
         self.capability
+    }
+
+    #[inline]
+    pub const fn script_or_module_referrer(self) -> Option<AtomId> {
+        self.script_or_module_referrer
     }
 }
 
