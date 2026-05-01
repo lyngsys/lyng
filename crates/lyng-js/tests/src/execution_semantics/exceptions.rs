@@ -115,6 +115,19 @@ fn phase4_labeled_break_and_continue_run_finally_cleanup() {
 }
 
 #[test]
+fn phase6_finally_abrupt_completion_uses_finalizer_value() {
+    let result = compile_and_run(
+        r#"
+        let empty = eval("do { try { 39 } finally { break; } } while (false);");
+        let valued = eval("do { try { 39 } finally { 42; break; } } while (false);");
+        empty === undefined && valued === 42;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn phase4_typeof_identifier_reference_probes_without_throwing() {
     let result = compile_and_run_string("typeof missingName;");
 

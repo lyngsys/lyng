@@ -280,6 +280,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let normal_entry = self.builder.current_offset()?;
         self.set_finally_normal_entry(finally_index, normal_entry)?;
         self.mark_finally_body(finally_index, true);
+        self.reset_statement_result()?;
         self.lower_statement(finalizer)?;
         self.emit_leave_handler()?;
         self.emit_finally_dispatch(finally_index)?;
@@ -328,6 +329,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let normal_entry = self.builder.current_offset()?;
         self.set_finally_normal_entry(finally_index, normal_entry)?;
         self.mark_finally_body(finally_index, true);
+        self.reset_statement_result()?;
         self.lower_statement(finalizer)?;
         self.emit_leave_handler()?;
         self.emit_finally_dispatch(finally_index)?;
@@ -365,6 +367,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     value,
                 )?;
             }
+            this.reset_statement_result()?;
             this.lower_statement(handler.body)
         })
     }
