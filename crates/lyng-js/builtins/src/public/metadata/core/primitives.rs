@@ -228,7 +228,7 @@ pub(in crate::public::metadata) const PUBLIC_PRIMITIVE_BUILTIN_METADATA:
     ),
     PublicBuiltinMetadataRow::new(
         symbol_builtin,
-        BuiltinEntryMetadata::new("Symbol", 0, false, true),
+        BuiltinEntryMetadata::new("Symbol", 0, true, true),
     ),
     PublicBuiltinMetadataRow::new(
         symbol_for_builtin,

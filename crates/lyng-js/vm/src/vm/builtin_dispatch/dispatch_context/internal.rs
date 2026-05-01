@@ -372,4 +372,33 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             errors::ErrorKind::Type,
         ))
     }
+
+    fn require_constructor_builtin(
+        &mut self,
+        invocation: BuiltinInvocation<'_>,
+    ) -> Result<Value, Self::Error> {
+        let value = invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined());
+        let Some(object) = value.as_object_ref() else {
+            let realm = Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame);
+            return Err(Vm::abrupt_intrinsic_error(
+                self.agent,
+                realm,
+                errors::ErrorKind::Type,
+            ));
+        };
+        if self.agent.objects().is_constructor(object) {
+            return Ok(Value::undefined());
+        }
+
+        let realm = Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame);
+        Err(Vm::abrupt_intrinsic_error(
+            self.agent,
+            realm,
+            errors::ErrorKind::Type,
+        ))
+    }
 }

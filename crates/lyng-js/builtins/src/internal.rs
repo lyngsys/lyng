@@ -21,8 +21,9 @@ use lyng_js_types::{
     internal_object_literal_set_prototype_builtin, internal_object_to_string_builtin,
     internal_private_field_get_builtin, internal_private_field_init_builtin,
     internal_private_field_set_builtin, internal_private_has_builtin,
-    internal_regexp_literal_builtin, internal_set_function_home_object_builtin,
-    internal_string_index_of_builtin, internal_string_replace_builtin, internal_super_base_builtin,
+    internal_regexp_literal_builtin, internal_require_constructor_builtin,
+    internal_set_function_home_object_builtin, internal_string_index_of_builtin,
+    internal_string_replace_builtin, internal_super_base_builtin,
     internal_super_property_get_builtin, internal_super_property_set_builtin,
     internal_template_to_string_builtin, internal_throw_type_error_builtin, BuiltinFunctionId,
     EnvironmentRef, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, ShapeId, Value,
@@ -78,6 +79,7 @@ pub struct InternalRealmBuiltins {
     install_instance_field_key: ObjectRef,
     get_instance_field_key: ObjectRef,
     throw_type_error: ObjectRef,
+    require_constructor: ObjectRef,
     import_meta: ObjectRef,
     dynamic_import: ObjectRef,
     direct_eval: ObjectRef,
@@ -220,6 +222,9 @@ impl InternalRealmBuiltins {
         }
         if entry == internal_throw_type_error_builtin() {
             return Some(self.throw_type_error);
+        }
+        if entry == internal_require_constructor_builtin() {
+            return Some(self.require_constructor);
         }
         if entry == internal_import_meta_builtin() {
             return Some(self.import_meta);
@@ -439,6 +444,10 @@ impl InternalBuiltinCache {
                     &mut mutator,
                 ),
                 throw_type_error: alloc_builtin(internal_throw_type_error_builtin(), &mut mutator),
+                require_constructor: alloc_builtin(
+                    internal_require_constructor_builtin(),
+                    &mut mutator,
+                ),
                 import_meta: alloc_builtin(internal_import_meta_builtin(), &mut mutator),
                 dynamic_import: alloc_builtin(internal_dynamic_import_builtin(), &mut mutator),
                 direct_eval: alloc_builtin(internal_direct_eval_builtin(), &mut mutator),
@@ -760,6 +769,14 @@ pub fn internal_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntr
             false,
         ));
     }
+    if entry == internal_require_constructor_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "internal_requireConstructor",
+            1,
+            false,
+            false,
+        ));
+    }
     if entry == internal_import_meta_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "internal_importMeta",
@@ -934,6 +951,11 @@ pub trait InternalBuiltinDispatchContext {
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error>;
 
+    fn require_constructor_builtin(
+        &mut self,
+        invocation: BuiltinInvocation<'_>,
+    ) -> Result<Value, Self::Error>;
+
     fn direct_eval_builtin(
         &mut self,
         invocation: BuiltinInvocation<'_>,
@@ -1045,6 +1067,9 @@ pub fn dispatch_internal_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == internal_throw_type_error_builtin() {
         return context.throw_type_error_builtin(invocation).map(Some);
+    }
+    if entry == internal_require_constructor_builtin() {
+        return context.require_constructor_builtin(invocation).map(Some);
     }
     if entry == internal_direct_eval_builtin() {
         return context.direct_eval_builtin(invocation).map(Some);

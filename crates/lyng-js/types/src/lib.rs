@@ -159,18 +159,22 @@ mod tests {
     fn builtin_internal_namespace_classifies_helper_ids() {
         let internal = internal_function_call_builtin();
         let dynamic_import = internal_dynamic_import_builtin();
+        let regexp_literal = internal_regexp_literal_builtin();
+        let require_constructor = internal_require_constructor_builtin();
         let public = boolean_builtin();
         let phase6 = promise_builtin();
 
         assert!(is_internal_builtin(internal));
         assert!(is_internal_builtin(dynamic_import));
+        assert!(is_internal_builtin(regexp_literal));
+        assert!(is_internal_builtin(require_constructor));
         assert!(!is_internal_builtin(public));
         assert!(!is_internal_builtin(phase6));
         assert!(is_core_builtin(public));
         assert!(!is_core_builtin(phase6));
         assert!(is_completion_builtin(phase6));
         assert_eq!(INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
-        assert_eq!(INTERNAL_BUILTIN_NAMESPACE_END, 1_037);
+        assert_eq!(INTERNAL_BUILTIN_NAMESPACE_END, 1_039);
         assert_eq!(CORE_BUILTIN_NAMESPACE_START, 2_001);
         assert_eq!(CORE_BUILTIN_NAMESPACE_END, 2_321);
         assert_eq!(COMPLETION_BUILTIN_NAMESPACE_START, 3_101);

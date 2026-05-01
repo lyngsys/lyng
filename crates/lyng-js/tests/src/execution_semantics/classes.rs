@@ -336,6 +336,75 @@ fn phase6_classes_link_derived_constructor_and_prototype_chains() {
 }
 
 #[test]
+fn phase6_class_heritage_rejects_non_constructors_before_prototype_lookup() {
+    let result = compile_and_run_string(
+        r#"
+        function check(label, value) {
+            try {
+                class Derived extends value {}
+                return label + ":miss";
+            } catch (error) {
+                return label + ":" + (error instanceof TypeError ? "type" : String(error));
+            }
+        }
+
+        let arrow = () => {};
+        Object.defineProperty(arrow, "prototype", {
+            get() {
+                throw "arrow prototype";
+            }
+        });
+
+        let bound = (() => {}).bind();
+        Object.defineProperty(bound, "prototype", {
+            get() {
+                throw "bound prototype";
+            }
+        });
+
+        let proxy = new Proxy(() => {}, {
+            get() {
+                throw "proxy prototype";
+            }
+        });
+
+        function* generator() {}
+
+        check("arrow", arrow) + "|"
+            + check("bound", bound) + "|"
+            + check("proxy", proxy) + "|"
+            + check("generator", generator);
+        "#,
+    );
+
+    assert_eq!(result, "arrow:type|bound:type|proxy:type|generator:type");
+}
+
+#[test]
+fn phase6_symbol_is_valid_class_heritage_but_throws_from_super_call() {
+    let result = compile_and_run_string(
+        r#"
+        let status = "";
+        try {
+            class S extends Symbol {}
+            status += "defined";
+            try {
+                new S();
+                status += ":miss";
+            } catch (error) {
+                status += error instanceof TypeError ? ":new-type" : ":new-other";
+            }
+        } catch (error) {
+            status = error instanceof TypeError ? "define-type" : "define-other";
+        }
+        status;
+        "#,
+    );
+
+    assert_eq!(result, "defined:new-type");
+}
+
+#[test]
 fn phase6_computed_instance_field_keys_are_fixed_at_class_definition_time() {
     let result = compile_and_run(
         r#"

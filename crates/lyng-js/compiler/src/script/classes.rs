@@ -1,6 +1,8 @@
 use super::state::ClassInstanceElementPlan;
 use super::*;
-use lyng_js_types::internal_construct_super_spread_builtin;
+use lyng_js_types::{
+    internal_construct_super_spread_builtin, internal_require_constructor_builtin,
+};
 
 #[derive(Clone, Copy)]
 enum StaticPublicFieldKey {
@@ -1400,6 +1402,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let super_span = super_span.unwrap_or(self.root_span());
 
         if !super_is_literal_null {
+            self.emit_internal_builtin_call(
+                internal_require_constructor_builtin(),
+                &[super_value],
+                super_span,
+            )?;
             self.emit_internal_builtin_call(
                 object_set_prototype_of_builtin(),
                 &[class_object, super_value],

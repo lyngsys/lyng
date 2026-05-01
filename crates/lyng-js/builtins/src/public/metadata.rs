@@ -2359,7 +2359,7 @@ mod tests {
             ),
             (
                 symbol_builtin(),
-                BuiltinEntryMetadata::new("Symbol", 0, false, true),
+                BuiltinEntryMetadata::new("Symbol", 0, true, true),
             ),
             (
                 symbol_for_builtin(),

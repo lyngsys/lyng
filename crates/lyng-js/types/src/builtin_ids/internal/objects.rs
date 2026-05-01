@@ -41,6 +41,14 @@ pub fn internal_throw_type_error_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn internal_require_constructor_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(INTERNAL_REQUIRE_CONSTRUCTOR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn internal_define_method_property_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(INTERNAL_DEFINE_METHOD_PROPERTY_RAW) {
         Some(id) => id,
