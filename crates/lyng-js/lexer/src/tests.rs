@@ -336,6 +336,28 @@ fn legacy_octal_like_decimal_sets_flag() {
 }
 
 #[test]
+fn legacy_octal_integer_value_is_octal() {
+    let tok = lex_single("010");
+    assert!(tok.has_legacy_octal_like_decimal());
+    assert_eq!(num_value(&tok), 8.0);
+
+    let tok = lex_single("077");
+    assert!(tok.has_legacy_octal_like_decimal());
+    assert_eq!(num_value(&tok), 63.0);
+}
+
+#[test]
+fn non_octal_decimal_integer_value_stays_decimal() {
+    let tok = lex_single("08");
+    assert!(tok.has_legacy_octal_like_decimal());
+    assert_eq!(num_value(&tok), 8.0);
+
+    let tok = lex_single("0708");
+    assert!(tok.has_legacy_octal_like_decimal());
+    assert_eq!(num_value(&tok), 708.0);
+}
+
+#[test]
 fn numeric_followed_by_identifier_reports_error() {
     let mut atoms = AtomTable::new();
     let source_id = SourceId::new(0);

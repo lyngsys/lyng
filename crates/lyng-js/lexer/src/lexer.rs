@@ -934,12 +934,15 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
         } else {
             Cow::Borrowed(text)
         };
-        let value: f64 = clean.parse().unwrap_or_else(|_| {
-            self.error(start, self.pos, "invalid numeric literal");
-            f64::NAN
-        });
+        let value: f64 = if !is_float && is_legacy_octal_integer(integer_text) {
+            parse_octal_to_f64(&clean[1..])
+        } else {
+            clean.parse().unwrap_or_else(|_| {
+                self.error(start, self.pos, "invalid numeric literal");
+                f64::NAN
+            })
+        };
 
-        let _ = is_float; // used above but not needed for final value
         self.check_numeric_literal_terminator(start);
         Token::with_payload(
             TokenKind::NumericLiteral,
@@ -2230,6 +2233,14 @@ fn is_legacy_octal_like_decimal(text: &str) -> bool {
         && bytes[0] == b'0'
         && !text.contains('_')
         && bytes[1..].iter().all(u8::is_ascii_digit)
+}
+
+fn is_legacy_octal_integer(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    bytes.len() > 1
+        && bytes[0] == b'0'
+        && !text.contains('_')
+        && bytes[1..].iter().all(|byte| matches!(byte, b'0'..=b'7'))
 }
 
 fn has_invalid_legacy_decimal_separator(text: &str) -> bool {
