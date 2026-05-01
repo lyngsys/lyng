@@ -68,6 +68,10 @@ impl<'a> Analyzer<'a> {
                 body,
                 ..
             } => {
+                if let Some(ForInit::Declaration(decl_id)) = init {
+                    self.check_for_head_body_var_conflicts(*decl_id, *body);
+                }
+
                 let has_lexical_init = matches!(init, Some(ForInit::Declaration(decl_id)) if {
                     let decl = self.ast.get_decl(*decl_id);
                     matches!(
@@ -115,6 +119,10 @@ impl<'a> Analyzer<'a> {
             | Stmt::ForOf {
                 left, right, body, ..
             } => {
+                if let ForInOfLeft::Declaration(decl_id) = left {
+                    self.check_for_head_body_var_conflicts(*decl_id, *body);
+                }
+
                 let has_lexical = self.for_in_of_has_lexical(left);
                 if has_lexical {
                     self.push_scope(ScopeKind::ForLoop);

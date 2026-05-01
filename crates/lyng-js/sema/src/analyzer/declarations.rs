@@ -498,6 +498,53 @@ impl<'a> Analyzer<'a> {
         }
     }
 
+    pub(super) fn check_for_head_body_var_conflicts(
+        &mut self,
+        decl_id: lyng_js_ast::DeclId,
+        body: lyng_js_ast::StmtId,
+    ) {
+        let mut head_names = Vec::new();
+        self.collect_for_head_lexical_bound_names(decl_id, &mut head_names);
+        if head_names.is_empty() {
+            return;
+        }
+
+        let scope_kind = self.scopes.get(self.ctx.current_scope).kind;
+        let mut body_var_names = Vec::new();
+        self.collect_var_declared_names_from_stmt(body, scope_kind, &mut body_var_names);
+        let body_var_name_set: HashSet<AtomId> = body_var_names.into_iter().collect();
+
+        let mut reported = HashSet::new();
+        for (name, span) in head_names {
+            if body_var_name_set.contains(&name) && reported.insert(name) {
+                self.diagnostics.error(
+                    span,
+                    "for loop head declaration conflicts with body var declaration",
+                );
+            }
+        }
+    }
+
+    fn collect_for_head_lexical_bound_names(
+        &self,
+        decl_id: lyng_js_ast::DeclId,
+        out: &mut Vec<(AtomId, lyng_js_common::Span)>,
+    ) {
+        let Decl::Variable {
+            kind:
+                VariableKind::Let | VariableKind::Const | VariableKind::Using | VariableKind::AwaitUsing,
+            declarators,
+            ..
+        } = self.ast.get_decl(decl_id)
+        else {
+            return;
+        };
+
+        for declarator in self.ast.get_var_declarator_list(*declarators) {
+            self.collect_pattern_names(declarator.id, out);
+        }
+    }
+
     pub(super) fn hoist_annex_b_block_function_var_bindings(
         &mut self,
         list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,

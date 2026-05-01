@@ -188,6 +188,35 @@ fn block_lexical_and_var_conflict_errors() {
 }
 
 #[test]
+fn for_lexical_head_conflicts_with_body_var() {
+    for (source, description) in [
+        (
+            "for (let x; false; ) { var x; }",
+            "for let head names should conflict with body var declarations",
+        ),
+        (
+            "for (const x = 0; false; ) { var x; }",
+            "for const head names should conflict with body var declarations",
+        ),
+        (
+            "for (let x in obj) { var x; }",
+            "for-in let head names should conflict with body var declarations",
+        ),
+        (
+            "for (let x of []) { var x; }",
+            "for-of let head names should conflict with body var declarations",
+        ),
+    ] {
+        let (parsed, sema) = script_sema(source);
+        assert!(
+            !parsed.diagnostics.has_errors(),
+            "{description}: unexpected parse error"
+        );
+        assert!(sema.diagnostics.has_errors(), "{description}");
+    }
+}
+
+#[test]
 fn labeled_var_statement_parses() {
     let p = script("label: var x = 1;");
     assert!(
