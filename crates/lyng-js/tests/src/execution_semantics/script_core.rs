@@ -211,6 +211,20 @@ fn script_core_loop_statement_completion_updates_empty_abrupt_exits() {
 }
 
 #[test]
+fn script_core_debugger_statement_preserves_empty_completion() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            String(eval('1; debugger;')),
+            String(eval('2; while (false) debugger;'))
+        ].join(':');
+        "#,
+    );
+
+    assert_eq!(result, "1:undefined");
+}
+
+#[test]
 fn script_core_for_loop_completion_uses_undefined_seed() {
     let result = compile_and_run_string(
         r#"

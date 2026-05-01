@@ -481,7 +481,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     this.lower_statement_list_with_disposal(body, span)
                 })
             }
-            Stmt::Empty { .. } => Ok(()),
+            Stmt::Empty { .. } | Stmt::Debugger { .. } => Ok(()),
             Stmt::Expression { expression, .. } => {
                 if let Some(result_register) = self.result_register {
                     self.lower_expr_into(expression, result_register)
