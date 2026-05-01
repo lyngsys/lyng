@@ -295,6 +295,21 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         key: PropertyKey,
     ) -> Result<bool, Self::Error>;
 
+    fn prepare_own_property_keys_from_object(
+        &mut self,
+        _object: lyng_js_types::ObjectRef,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn prepare_has_property_from_object(
+        &mut self,
+        _object: lyng_js_types::ObjectRef,
+        _key: PropertyKey,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
     fn to_object_for_builtin_value(
         &mut self,
         realm: RealmRef,

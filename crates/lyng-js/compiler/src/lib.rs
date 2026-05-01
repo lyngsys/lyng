@@ -33,7 +33,7 @@ pub use environment::{
 pub use error::{LoweringError, LoweringResult};
 pub use module::{
     compile_module, CompiledModuleUnit, DynamicImportSite, IndirectExportEntry, LocalExportEntry,
-    ModuleImportEntry, ModuleImportKind, RequestedModule, StarExportEntry,
+    ModuleImportEntry, ModuleImportKind, ModuleRequestPhase, RequestedModule, StarExportEntry,
 };
 pub use script::compile_script;
 

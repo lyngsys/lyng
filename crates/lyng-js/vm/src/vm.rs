@@ -12,14 +12,14 @@ use lyng_js_bytecode::{
 use lyng_js_common::{AtomId, Diagnostic, SourceId, WellKnownAtom};
 use lyng_js_compiler::{
     compile_module, dynamic::DynamicFunctionCacheKey, CompiledModuleUnit,
-    ModuleImportKind as CompiledModuleImportKind,
+    ModuleImportKind as CompiledModuleImportKind, ModuleRequestPhase as CompiledModuleRequestPhase,
 };
 use lyng_js_env::{
     Agent, EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
     EnvironmentSlotFlags, ExecutionContext, ModuleBindingAlias, ModuleImportEntry,
     ModuleImportKind, ModuleIndirectExportEntry, ModuleLocalExportEntry, ModuleRecord,
-    ModuleRequestRecord, ModuleResolvedExport, ModuleResolvedExportTarget, ModuleStarExportEntry,
-    ModuleStatus, RealmRecord, ThisBindingStatus, ThisState,
+    ModuleRequestPhase, ModuleRequestRecord, ModuleResolvedExport, ModuleResolvedExportTarget,
+    ModuleStarExportEntry, ModuleStatus, RealmRecord, ThisBindingStatus, ThisState,
 };
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_host::{
@@ -268,7 +268,7 @@ pub struct Vm {
     dynamic_import_requests: Vec<Option<DynamicImportRequest>>,
     dynamic_import_evaluate_depth: u32,
     dynamic_import_waiting_modules: HashMap<ModuleKey, Vec<PendingDynamicImport>>,
-    deferred_dynamic_import_namespaces: HashMap<ObjectRef, ModuleKey>,
+    deferred_module_namespaces: HashMap<ObjectRef, ModuleKey>,
     async_body_suspended_modules: HashSet<ModuleKey>,
     async_dependency_blocked_modules: HashSet<ModuleKey>,
     async_dependency_blocked_queue: VecDeque<ModuleKey>,
@@ -316,7 +316,7 @@ impl Vm {
             dynamic_import_requests: Vec::new(),
             dynamic_import_evaluate_depth: 0,
             dynamic_import_waiting_modules: HashMap::new(),
-            deferred_dynamic_import_namespaces: HashMap::new(),
+            deferred_module_namespaces: HashMap::new(),
             async_body_suspended_modules: HashSet::new(),
             async_dependency_blocked_modules: HashSet::new(),
             async_dependency_blocked_queue: VecDeque::new(),
@@ -1656,20 +1656,27 @@ impl Vm {
                 .resolved_key()
                 .cloned()
                 .ok_or(VmError::MissingModuleResolution)?;
-            let dependency_env = self.link_module_graph(agent, realm, &resolved_key)?;
-            match self.evaluate_module_graph(
-                agent,
-                realm,
-                &resolved_key,
-                dependency_env,
-                host,
-                registry,
-                defer_waiter_flush_for,
-                false,
-            ) {
-                Ok(_) => {}
-                Err(VmError::AsyncSuspend) => suspended_dependencies.push(resolved_key),
-                Err(error) => return Err(error),
+            let evaluation_keys = if request.phase() == ModuleRequestPhase::Defer {
+                self.gather_asynchronous_transitive_dependencies(agent, &resolved_key)?
+            } else {
+                vec![resolved_key]
+            };
+            for evaluation_key in evaluation_keys {
+                let dependency_env = self.link_module_graph(agent, realm, &evaluation_key)?;
+                match self.evaluate_module_graph(
+                    agent,
+                    realm,
+                    &evaluation_key,
+                    dependency_env,
+                    host,
+                    registry,
+                    defer_waiter_flush_for,
+                    false,
+                ) {
+                    Ok(_) => {}
+                    Err(VmError::AsyncSuspend) => suspended_dependencies.push(evaluation_key),
+                    Err(error) => return Err(error),
+                }
             }
         }
         if !suspended_dependencies.is_empty() {
@@ -1926,7 +1933,14 @@ impl Vm {
                     }
                 }
                 ModuleImportKind::NamespaceObject => {
-                    let namespace = self.module_namespace_object(agent, realm, &resolved_key)?;
+                    let namespace = self.module_namespace_object_for_request(
+                        agent,
+                        realm,
+                        &resolved_key,
+                        requested_modules
+                            .get(entry.request_index() as usize)
+                            .map_or(ModuleRequestPhase::Evaluation, ModuleRequestRecord::phase),
+                    )?;
                     if !agent.set_module_binding_alias(module_env, entry.local_slot(), None) {
                         return Err(VmError::MissingModuleEnvironment);
                     }
@@ -2130,7 +2144,17 @@ impl Vm {
                     ModuleImportKind::NamespaceObject => Some(ModuleResolvedExport::new(
                         export_name,
                         ModuleResolvedExportTarget::Value(Value::from_object_ref(
-                            self.module_namespace_object(agent, realm, &resolved_key)?,
+                            self.module_namespace_object_for_request(
+                                agent,
+                                realm,
+                                &resolved_key,
+                                requested_modules
+                                    .get(import_entry.request_index() as usize)
+                                    .map_or(
+                                        ModuleRequestPhase::Evaluation,
+                                        ModuleRequestRecord::phase,
+                                    ),
+                            )?,
                         )),
                     )),
                     ModuleImportKind::Source => {
@@ -2165,7 +2189,14 @@ impl Vm {
                 ModuleImportKind::NamespaceObject => Some(ModuleResolvedExport::new(
                     export_name,
                     ModuleResolvedExportTarget::Value(Value::from_object_ref(
-                        self.module_namespace_object(agent, realm, &resolved_key)?,
+                        self.module_namespace_object_for_request(
+                            agent,
+                            realm,
+                            &resolved_key,
+                            requested_modules
+                                .get(entry.request_index() as usize)
+                                .map_or(ModuleRequestPhase::Evaluation, ModuleRequestRecord::phase),
+                        )?,
                     )),
                 )),
                 ModuleImportKind::Source => {
@@ -2216,8 +2247,48 @@ impl Vm {
         realm: RealmRecord,
         key: &ModuleKey,
     ) -> VmResult<ObjectRef> {
+        self.module_namespace_object_with_phase(agent, realm, key, false)
+    }
+
+    fn module_namespace_object_for_request(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRecord,
+        key: &ModuleKey,
+        phase: ModuleRequestPhase,
+    ) -> VmResult<ObjectRef> {
+        self.module_namespace_object_with_phase(
+            agent,
+            realm,
+            key,
+            phase == ModuleRequestPhase::Defer,
+        )
+    }
+
+    fn module_namespace_object_with_phase(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRecord,
+        key: &ModuleKey,
+        deferred: bool,
+    ) -> VmResult<ObjectRef> {
         let _ = self.link_module_graph(agent, realm, key)?;
-        if let Some(namespace) = agent.module_record(key).and_then(ModuleRecord::namespace) {
+        let existing_namespace = agent.module_record(key).and_then(|record| {
+            if deferred {
+                record.deferred_namespace()
+            } else {
+                record.namespace()
+            }
+        });
+        if let Some(namespace) = existing_namespace {
+            if deferred
+                && agent
+                    .module_record(key)
+                    .is_some_and(|record| !matches!(record.status(), ModuleStatus::Evaluated))
+            {
+                self.deferred_module_namespaces
+                    .insert(namespace, key.clone());
+            }
             return Ok(namespace);
         }
 
@@ -2254,8 +2325,13 @@ impl Vm {
         let to_string_tag = agent
             .well_known_symbol(WellKnownSymbolId::ToStringTag)
             .expect("default realm should bootstrap Symbol.toStringTag");
+        let tag = if deferred {
+            "Deferred Module"
+        } else {
+            "Module"
+        };
         let module_tag = Value::from_string_ref(agent.alloc_runtime_string(
-            "Module",
+            tag,
             None,
             AllocationLifetime::Default,
         ));
@@ -2291,7 +2367,18 @@ impl Vm {
             );
             object
         });
-        let _ = agent.set_module_record_namespace(key, Some(namespace));
+        if deferred {
+            let _ = agent.set_module_record_deferred_namespace(key, Some(namespace));
+            if agent
+                .module_record(key)
+                .is_some_and(|record| !matches!(record.status(), ModuleStatus::Evaluated))
+            {
+                self.deferred_module_namespaces
+                    .insert(namespace, key.clone());
+            }
+        } else {
+            let _ = agent.set_module_record_namespace(key, Some(namespace));
+        }
         Ok(namespace)
     }
 
@@ -2372,7 +2459,15 @@ fn compiled_module_record(
         unit.requested_modules()
             .iter()
             .map(|request| {
-                ModuleRequestRecord::new(request.specifier(), request.attributes().to_vec())
+                ModuleRequestRecord::new(
+                    request.specifier(),
+                    request.attributes().to_vec(),
+                    match request.phase() {
+                        CompiledModuleRequestPhase::Evaluation => ModuleRequestPhase::Evaluation,
+                        CompiledModuleRequestPhase::Source => ModuleRequestPhase::Source,
+                        CompiledModuleRequestPhase::Defer => ModuleRequestPhase::Defer,
+                    },
+                )
             })
             .collect(),
         unit.import_entries()

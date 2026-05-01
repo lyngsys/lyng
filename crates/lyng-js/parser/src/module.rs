@@ -65,6 +65,9 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 span: local_span,
                 local,
             });
+        } else if self.is_deferred_namespace_import_declaration() {
+            self.advance(); // eat contextual `defer`
+            self.parse_namespace_import(&mut specifiers, true);
         } else if self.at(TokenKind::Identifier) {
             // Default import: `import x from "mod"`
             let local_span = self.current_span();
@@ -80,14 +83,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             }
         } else if self.at(TokenKind::Star) {
             // Namespace import: `import * as name from "mod"`
-            self.advance(); // eat `*`
-            self.expect_contextual(WellKnownAtom::as_);
-            let local_span = self.current_span();
-            let local = self.parse_binding_identifier();
-            specifiers.push(ImportSpecifier::Namespace {
-                span: local_span,
-                local,
-            });
+            self.parse_namespace_import(&mut specifiers, false);
         } else if self.at(TokenKind::LBrace) {
             // Named imports: `import { a, b as c } from "mod"`
             self.parse_named_imports(&mut specifiers);
@@ -123,12 +119,24 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         token_is_contextual_atom(self.peek_second(), WellKnownAtom::from)
     }
 
+    fn is_deferred_namespace_import_declaration(&mut self) -> bool {
+        self.at_contextual_defer() && self.peek().kind == TokenKind::Star
+    }
+
     fn at_contextual_source(&self) -> bool {
         self.current_kind() == TokenKind::Identifier
             && !self.current().contains_escape()
             && self
                 .current_atom()
                 .is_some_and(|atom| self.lexer.resolve_atom(atom) == "source")
+    }
+
+    fn at_contextual_defer(&self) -> bool {
+        self.current_kind() == TokenKind::Identifier
+            && !self.current().contains_escape()
+            && self
+                .current_atom()
+                .is_some_and(|atom| self.lexer.resolve_atom(atom) == "defer")
     }
 
     fn token_is_binding_identifier_in_current_context(&self, token: Token) -> bool {
@@ -140,17 +148,22 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
     }
 
+    fn parse_namespace_import(&mut self, specifiers: &mut Vec<ImportSpecifier>, deferred: bool) {
+        self.advance(); // eat `*`
+        self.expect_contextual(WellKnownAtom::as_);
+        let local_span = self.current_span();
+        let local = self.parse_binding_identifier();
+        specifiers.push(ImportSpecifier::Namespace {
+            span: local_span,
+            local,
+            deferred,
+        });
+    }
+
     fn parse_import_specifiers_after_default(&mut self, specifiers: &mut Vec<ImportSpecifier>) {
         if self.at(TokenKind::Star) {
             // `import x, * as ns from "mod"`
-            self.advance(); // eat `*`
-            self.expect_contextual(WellKnownAtom::as_);
-            let local_span = self.current_span();
-            let local = self.parse_binding_identifier();
-            specifiers.push(ImportSpecifier::Namespace {
-                span: local_span,
-                local,
-            });
+            self.parse_namespace_import(specifiers, false);
         } else if self.at(TokenKind::LBrace) {
             // `import x, { a, b } from "mod"`
             self.parse_named_imports(specifiers);

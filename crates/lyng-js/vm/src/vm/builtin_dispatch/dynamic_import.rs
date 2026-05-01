@@ -555,31 +555,23 @@ impl Vm {
                 });
             }
         }
-        let namespace = match self.module_namespace_object(agent, realm_record, &key) {
-            Ok(namespace) => namespace,
-            Err(error) => {
-                return Ok(DynamicImportEvaluationOutcome::Rejected {
-                    key: Some(key),
-                    reason: self.dynamic_import_error_value(agent, error),
-                })
-            }
-        };
-        if agent.module_record(&key).is_some_and(|record| {
-            !matches!(
-                record.status(),
-                ModuleStatus::Evaluated | ModuleStatus::Errored
-            )
-        }) {
-            self.deferred_dynamic_import_namespaces
-                .insert(namespace, key.clone());
-        }
+        let namespace =
+            match self.module_namespace_object_with_phase(agent, realm_record, &key, true) {
+                Ok(namespace) => namespace,
+                Err(error) => {
+                    return Ok(DynamicImportEvaluationOutcome::Rejected {
+                        key: Some(key),
+                        reason: self.dynamic_import_error_value(agent, error),
+                    })
+                }
+            };
         Ok(DynamicImportEvaluationOutcome::Fulfilled {
             key,
             value: Value::from_object_ref(namespace),
         })
     }
 
-    fn gather_asynchronous_transitive_dependencies(
+    pub(in crate::vm) fn gather_asynchronous_transitive_dependencies(
         &self,
         agent: &Agent,
         key: &ModuleKey,
@@ -634,7 +626,11 @@ impl Vm {
         Ok(())
     }
 
-    fn module_has_top_level_await(&self, agent: &Agent, key: &ModuleKey) -> VmResult<bool> {
+    pub(in crate::vm) fn module_has_top_level_await(
+        &self,
+        agent: &Agent,
+        key: &ModuleKey,
+    ) -> VmResult<bool> {
         let code = agent
             .module_record(key)
             .ok_or(VmError::MissingModuleRecord)?

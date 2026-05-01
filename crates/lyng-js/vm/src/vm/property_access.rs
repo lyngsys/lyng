@@ -133,8 +133,14 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         object: ObjectRef,
         key: PropertyKey,
     ) -> Result<Option<PropertyDescriptor>, Self::Error> {
-        self.vm
-            .get_own_property_from_object(self.agent, object, key)
+        self.vm.get_own_property_from_object(
+            self.agent,
+            self.host,
+            self.registry,
+            self.frame,
+            object,
+            key,
+        )
     }
 
     fn set_property_on_object_with_receiver(
@@ -164,6 +170,14 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         descriptor: PropertyDescriptor,
         lifetime: AllocationLifetime,
     ) -> Result<bool, Self::Error> {
+        self.vm.evaluate_deferred_module_namespace(
+            self.agent,
+            self.host,
+            self.registry,
+            self.frame,
+            object,
+            key,
+        )?;
         self.vm
             .define_property_on_object(self.agent, object, key, descriptor, lifetime)
     }
@@ -173,7 +187,43 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         object: ObjectRef,
         key: PropertyKey,
     ) -> Result<bool, Self::Error> {
+        self.vm.evaluate_deferred_module_namespace(
+            self.agent,
+            self.host,
+            self.registry,
+            self.frame,
+            object,
+            key,
+        )?;
         self.vm.delete_property_from_object(self.agent, object, key)
+    }
+
+    fn prepare_own_property_keys_from_object(
+        &mut self,
+        object: ObjectRef,
+    ) -> Result<(), Self::Error> {
+        self.vm.evaluate_deferred_module_namespace_for_own_keys(
+            self.agent,
+            self.host,
+            self.registry,
+            self.frame,
+            object,
+        )
+    }
+
+    fn prepare_has_property_from_object(
+        &mut self,
+        object: ObjectRef,
+        key: PropertyKey,
+    ) -> Result<(), Self::Error> {
+        self.vm.evaluate_deferred_module_namespace(
+            self.agent,
+            self.host,
+            self.registry,
+            self.frame,
+            object,
+            key,
+        )
     }
 
     fn call_to_completion(
@@ -653,9 +703,7 @@ impl Vm {
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<Value> {
-        self.evaluate_deferred_dynamic_import_namespace(
-            agent, host, registry, caller, object, key,
-        )?;
+        self.evaluate_deferred_module_namespace(agent, host, registry, caller, object, key)?;
         object::get_with_receiver_in_context(
             &mut VmProxyBridge {
                 vm: self,
@@ -680,9 +728,7 @@ impl Vm {
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<Value> {
-        self.evaluate_deferred_dynamic_import_namespace(
-            agent, host, registry, caller, object, key,
-        )?;
+        self.evaluate_deferred_module_namespace(agent, host, registry, caller, object, key)?;
         if let Some(index) = key.as_index() {
             if let Some(result) = self.mapped_arguments_get(agent, object, index) {
                 return result;
@@ -719,7 +765,7 @@ impl Vm {
         self.get_property_from_object(agent, host, registry, caller, prototype, receiver, key)
     }
 
-    fn evaluate_deferred_dynamic_import_namespace(
+    pub(in crate::vm) fn evaluate_deferred_module_namespace(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -734,11 +780,32 @@ impl Vm {
         {
             return Ok(());
         }
-        let Some(key) = self
-            .deferred_dynamic_import_namespaces
-            .get(&object)
-            .cloned()
-        else {
+        if key.is_symbol() {
+            return Ok(());
+        }
+        self.evaluate_deferred_module_namespace_object(agent, host, registry, caller, object)
+    }
+
+    pub(in crate::vm) fn evaluate_deferred_module_namespace_for_own_keys(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        object: ObjectRef,
+    ) -> VmResult<()> {
+        self.evaluate_deferred_module_namespace_object(agent, host, registry, caller, object)
+    }
+
+    fn evaluate_deferred_module_namespace_object(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        object: ObjectRef,
+    ) -> VmResult<()> {
+        let Some(key) = self.deferred_module_namespaces.get(&object).cloned() else {
             return Ok(());
         };
         let status = agent
@@ -747,18 +814,17 @@ impl Vm {
             .status();
         match status {
             ModuleStatus::Evaluated => {
-                self.deferred_dynamic_import_namespaces.remove(&object);
+                self.deferred_module_namespaces.remove(&object);
                 Ok(())
             }
             ModuleStatus::Errored => {
-                self.deferred_dynamic_import_namespaces.remove(&object);
                 let thrown = agent
                     .module_record(&key)
                     .and_then(ModuleRecord::evaluation_error)
                     .unwrap_or(Value::undefined());
                 Err(VmError::Abrupt(AbruptCompletion::throw(thrown)))
             }
-            ModuleStatus::Evaluating => Ok(()),
+            ModuleStatus::Evaluating => Err(VmError::Abrupt(errors::throw_type_error(agent))),
             ModuleStatus::New
             | ModuleStatus::Unlinked
             | ModuleStatus::Linking
@@ -767,28 +833,69 @@ impl Vm {
                     .realm(caller.realm())
                     .ok_or(VmError::MissingRootShape(caller.realm()))?;
                 let module_env = self.link_module_graph(agent, realm, &key)?;
+                if !self.ready_for_sync_module_execution(agent, &key, &mut Vec::new())? {
+                    return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+                }
                 let result = self.evaluate_module_graph(
                     agent, realm, &key, module_env, host, registry, None, true,
                 );
-                if agent.module_record(&key).is_some_and(|record| {
-                    matches!(
-                        record.status(),
-                        ModuleStatus::Evaluated | ModuleStatus::Errored
-                    )
-                }) {
-                    self.deferred_dynamic_import_namespaces.remove(&object);
+                if agent
+                    .module_record(&key)
+                    .is_some_and(|record| matches!(record.status(), ModuleStatus::Evaluated))
+                {
+                    self.deferred_module_namespaces.remove(&object);
                 }
                 result.map(|_| ())
             }
         }
     }
 
-    pub(super) fn get_own_property_from_object(
+    fn ready_for_sync_module_execution(
         &self,
+        agent: &Agent,
+        key: &ModuleKey,
+        seen: &mut Vec<ModuleKey>,
+    ) -> VmResult<bool> {
+        if seen.iter().any(|candidate| candidate == key) {
+            return Ok(true);
+        }
+        seen.push(key.clone());
+        let (status, requested_modules) = {
+            let record = agent
+                .module_record(key)
+                .ok_or(VmError::MissingModuleRecord)?;
+            (record.status(), record.requested_modules().to_vec())
+        };
+        match status {
+            ModuleStatus::Evaluated | ModuleStatus::Errored => return Ok(true),
+            ModuleStatus::Evaluating => return Ok(false),
+            ModuleStatus::New | ModuleStatus::Unlinked | ModuleStatus::Linking => return Ok(false),
+            ModuleStatus::Linked => {}
+        }
+        if self.module_has_top_level_await(agent, key)? {
+            return Ok(false);
+        }
+        for request in requested_modules {
+            let Some(resolved_key) = request.resolved_key().cloned() else {
+                return Err(VmError::MissingModuleResolution);
+            };
+            if !self.ready_for_sync_module_execution(agent, &resolved_key, seen)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    pub(super) fn get_own_property_from_object(
+        &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
         object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<Option<PropertyDescriptor>> {
+        self.evaluate_deferred_module_namespace(agent, host, registry, caller, object, key)?;
         let mut descriptor =
             object::ordinary_get_own_property(agent, object, key).map_err(VmError::Abrupt)?;
         let Some(index) = key.as_index() else {
@@ -1045,6 +1152,9 @@ impl Vm {
         let Some(receiver) = receiver.as_object_ref() else {
             return Ok(false);
         };
+        if agent.objects().is_module_namespace_object(receiver) {
+            return Ok(false);
+        }
         if Self::is_engine_array_length_property(agent, receiver, key) {
             value = self.normalize_array_length_set_value(agent, host, registry, caller, value)?;
         }

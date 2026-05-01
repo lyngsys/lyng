@@ -589,6 +589,21 @@ impl<Cx: PublicBuiltinDispatchContext> proxy::ProxyTrapContext for BuiltinProxyB
         self.cx.delete_property_from_object(object, key)
     }
 
+    fn prepare_own_property_keys_from_object(
+        &mut self,
+        object: ObjectRef,
+    ) -> Result<(), Self::Error> {
+        self.cx.prepare_own_property_keys_from_object(object)
+    }
+
+    fn prepare_has_property_from_object(
+        &mut self,
+        object: ObjectRef,
+        key: PropertyKey,
+    ) -> Result<(), Self::Error> {
+        self.cx.prepare_has_property_from_object(object, key)
+    }
+
     fn call_to_completion(
         &mut self,
         callee_object: ObjectRef,

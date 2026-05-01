@@ -17,18 +17,31 @@ pub enum ModuleImportKind {
     Source,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModuleRequestPhase {
+    Evaluation,
+    Source,
+    Defer,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RequestedModule {
     specifier: Box<str>,
     attributes: Vec<ModuleImportAttribute>,
+    phase: ModuleRequestPhase,
 }
 
 impl RequestedModule {
     #[inline]
-    pub fn new(specifier: impl Into<Box<str>>, attributes: Vec<ModuleImportAttribute>) -> Self {
+    pub fn new(
+        specifier: impl Into<Box<str>>,
+        attributes: Vec<ModuleImportAttribute>,
+        phase: ModuleRequestPhase,
+    ) -> Self {
         Self {
             specifier: specifier.into(),
             attributes,
+            phase,
         }
     }
 
@@ -40,6 +53,11 @@ impl RequestedModule {
     #[inline]
     pub fn attributes(&self) -> &[ModuleImportAttribute] {
         &self.attributes
+    }
+
+    #[inline]
+    pub const fn phase(&self) -> ModuleRequestPhase {
+        self.phase
     }
 }
 
@@ -487,9 +505,17 @@ fn derive_decl_metadata(
             attributes,
             ..
         } => {
-            let request_index =
-                push_requested_module(ast, *source, *attributes, compilation, metadata);
-            for specifier in ast.get_import_spec_list(*specifiers) {
+            let specifiers = ast.get_import_spec_list(*specifiers);
+            let request_phase = import_request_phase(specifiers);
+            let request_index = push_requested_module(
+                ast,
+                *source,
+                *attributes,
+                request_phase,
+                compilation,
+                metadata,
+            );
+            for specifier in specifiers {
                 match specifier {
                     ImportSpecifier::Default { local, .. } => {
                         metadata.import_entries.push(ModuleImportEntry::new(
@@ -548,8 +574,14 @@ fn derive_export_metadata(
             attributes,
         } => {
             if let Some(source) = source {
-                let request_index =
-                    push_requested_module(ast, *source, *attributes, compilation, metadata);
+                let request_index = push_requested_module(
+                    ast,
+                    *source,
+                    *attributes,
+                    ModuleRequestPhase::Evaluation,
+                    compilation,
+                    metadata,
+                );
                 for specifier in ast.get_export_spec_list(*specifiers) {
                     metadata.indirect_exports.push(IndirectExportEntry::new(
                         specifier.exported,
@@ -600,8 +632,14 @@ fn derive_export_metadata(
             exported,
             attributes,
         } => {
-            let request_index =
-                push_requested_module(ast, *source, *attributes, compilation, metadata);
+            let request_index = push_requested_module(
+                ast,
+                *source,
+                *attributes,
+                ModuleRequestPhase::Evaluation,
+                compilation,
+                metadata,
+            );
             if let Some(exported) = exported {
                 metadata.indirect_exports.push(IndirectExportEntry::new(
                     *exported,
@@ -719,6 +757,7 @@ fn push_requested_module(
     ast: &lyng_js_ast::Ast,
     source: lyng_js_ast::StringLiteralId,
     attributes: lyng_js_ast::NodeList<ImportAttribute>,
+    phase: ModuleRequestPhase,
     compilation: &CompilationState<'_>,
     metadata: &mut ModuleMetadata,
 ) -> u32 {
@@ -734,8 +773,24 @@ fn push_requested_module(
     let index = u32::try_from(metadata.requested_modules.len()).unwrap_or(u32::MAX);
     metadata
         .requested_modules
-        .push(RequestedModule::new(specifier, attributes));
+        .push(RequestedModule::new(specifier, attributes, phase));
     index
+}
+
+fn import_request_phase(specifiers: &[ImportSpecifier]) -> ModuleRequestPhase {
+    if specifiers
+        .iter()
+        .any(|specifier| matches!(specifier, ImportSpecifier::Source { .. }))
+    {
+        return ModuleRequestPhase::Source;
+    }
+    if specifiers
+        .iter()
+        .any(|specifier| matches!(specifier, ImportSpecifier::Namespace { deferred: true, .. }))
+    {
+        return ModuleRequestPhase::Defer;
+    }
+    ModuleRequestPhase::Evaluation
 }
 
 fn collect_module_expression_sites(

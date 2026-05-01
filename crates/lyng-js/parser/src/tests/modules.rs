@@ -35,6 +35,21 @@ fn parse_import_namespace() {
 }
 
 #[test]
+fn parse_import_defer_namespace() {
+    let p = module_ok("import defer * as ns from 'mod';");
+    let stmts = mbody(&p);
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
+        if let Decl::Import { specifiers, .. } = p.ast.get_decl(*decl) {
+            let specs = p.ast.get_import_spec_list(*specifiers);
+            assert_eq!(specs.len(), 1);
+            assert!(matches!(specs[0], ImportSpecifier::Namespace { .. }));
+        } else {
+            panic!("expected import declaration");
+        }
+    }
+}
+
+#[test]
 fn parse_import_named() {
     let p = module_ok("import { a, b as c } from 'mod';");
     let stmts = mbody(&p);

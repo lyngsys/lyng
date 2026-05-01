@@ -70,8 +70,13 @@ pub enum ImportSpecifier {
     /// `import x from "mod"` — default import, bound to local `x`.
     Default { span: Span, local: AtomId },
 
-    /// `import * as x from "mod"` — namespace import.
-    Namespace { span: Span, local: AtomId },
+    /// `import * as x from "mod"` or `import defer * as x from "mod"` —
+    /// namespace import.
+    Namespace {
+        span: Span,
+        local: AtomId,
+        deferred: bool,
+    },
 
     /// `import source x from "mod"` — source-phase import.
     Source { span: Span, local: AtomId },

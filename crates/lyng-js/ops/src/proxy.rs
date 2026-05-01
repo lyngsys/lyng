@@ -57,6 +57,21 @@ pub trait ProxyTrapContext {
         key: PropertyKey,
     ) -> Result<bool, Self::Error>;
 
+    fn prepare_own_property_keys_from_object(
+        &mut self,
+        _object: ObjectRef,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn prepare_has_property_from_object(
+        &mut self,
+        _object: ObjectRef,
+        _key: PropertyKey,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
     fn call_to_completion(
         &mut self,
         callee_object: ObjectRef,
@@ -93,6 +108,7 @@ pub fn has_property<Cx: ProxyTrapContext>(
 ) -> Result<bool, Cx::Error> {
     if !is_proxy(cx, object) {
         if is_module_namespace(cx, object) {
+            cx.prepare_has_property_from_object(object, key)?;
             let result = {
                 let agent = cx.agent();
                 ordinary_object::ordinary_has_property(agent, object, key)
@@ -424,6 +440,7 @@ pub fn own_property_keys<Cx: ProxyTrapContext>(
     object: ObjectRef,
 ) -> Result<Vec<PropertyKey>, Cx::Error> {
     if !is_proxy(cx, object) {
+        cx.prepare_own_property_keys_from_object(object)?;
         let result = {
             let agent = cx.agent();
             ordinary_object::ordinary_own_property_keys(agent, object)

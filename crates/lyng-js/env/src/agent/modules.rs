@@ -46,6 +46,18 @@ impl Agent {
         true
     }
 
+    pub fn set_module_record_deferred_namespace(
+        &mut self,
+        key: &ModuleKey,
+        namespace: Option<ObjectRef>,
+    ) -> bool {
+        let Some(record) = self.modules.get_mut(key) else {
+            return false;
+        };
+        record.set_deferred_namespace(namespace);
+        true
+    }
+
     pub fn set_module_record_import_meta_object(
         &mut self,
         key: &ModuleKey,

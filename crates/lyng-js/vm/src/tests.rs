@@ -3250,6 +3250,88 @@ fn dynamic_import_defer_sync_module_evaluates_on_namespace_access() {
 }
 
 #[test]
+fn static_import_defer_sync_module_evaluates_on_namespace_access() {
+    let host = TestHost::new();
+    host.define_module_source(
+        "./setup.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/setup.mjs"),
+            "/tmp/setup.mjs",
+            "globalThis.evaluations = [];",
+        ),
+    );
+    host.define_module_source(
+        "./dep.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/dep.mjs"),
+            "/tmp/dep.mjs",
+            "globalThis.evaluations.push('dep'); export const y = 1;",
+        ),
+    );
+    host.define_module_source(
+        "./sync.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/sync.mjs"),
+            "/tmp/sync.mjs",
+            "import './dep.mjs'; globalThis.evaluations.push('sync'); export const x = 2;",
+        ),
+    );
+    host.define_module_source(
+        "main.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/main.mjs"),
+            "/tmp/main.mjs",
+            r#"
+            import './setup.mjs';
+            import defer * as ns from './sync.mjs';
+            globalThis.beforeDeferredAccess = globalThis.evaluations.join(',');
+            ns.x;
+            globalThis.afterDeferredAccess = globalThis.evaluations.join(',');
+        "#,
+        ),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let loaded = vm
+        .load_module_graph_from_host(
+            agent,
+            realm,
+            &host,
+            &ModuleSourceRequest {
+                specifier: "main.mjs".into(),
+                referrer: None,
+                attributes: Vec::new(),
+            },
+        )
+        .expect("static import defer sync regression should load");
+    vm.evaluate_linked_module_with_registry_and_host(
+        agent,
+        realm,
+        loaded.key(),
+        &host,
+        &mut registry,
+    )
+    .expect("static import defer sync regression should evaluate");
+
+    let before = global_value(agent, realm, "beforeDeferredAccess")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("beforeDeferredAccess should be a string");
+    let after = global_value(agent, realm, "afterDeferredAccess")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("afterDeferredAccess should be a string");
+    assert_eq!(before, "");
+    assert_eq!(after, "dep,sync");
+}
+
+#[test]
 fn static_source_phase_import_rejects_source_text_modules_with_syntax_error() {
     let host = TestHost::new();
     host.define_module_source(

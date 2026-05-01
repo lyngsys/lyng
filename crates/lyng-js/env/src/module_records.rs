@@ -7,15 +7,21 @@ use lyng_js_types::{CodeRef, EnvironmentRef, ObjectRef, Value};
 pub struct ModuleRequestRecord {
     specifier: Box<str>,
     attributes: Vec<ModuleImportAttribute>,
+    phase: ModuleRequestPhase,
     resolved_key: Option<ModuleKey>,
 }
 
 impl ModuleRequestRecord {
     #[inline]
-    pub fn new(specifier: impl Into<Box<str>>, attributes: Vec<ModuleImportAttribute>) -> Self {
+    pub fn new(
+        specifier: impl Into<Box<str>>,
+        attributes: Vec<ModuleImportAttribute>,
+        phase: ModuleRequestPhase,
+    ) -> Self {
         Self {
             specifier: specifier.into(),
             attributes,
+            phase,
             resolved_key: None,
         }
     }
@@ -31,6 +37,11 @@ impl ModuleRequestRecord {
     }
 
     #[inline]
+    pub const fn phase(&self) -> ModuleRequestPhase {
+        self.phase
+    }
+
+    #[inline]
     pub fn resolved_key(&self) -> Option<&ModuleKey> {
         self.resolved_key.as_ref()
     }
@@ -39,6 +50,13 @@ impl ModuleRequestRecord {
     pub fn set_resolved_key(&mut self, resolved_key: Option<ModuleKey>) {
         self.resolved_key = resolved_key;
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModuleRequestPhase {
+    Evaluation,
+    Source,
+    Defer,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -264,6 +282,7 @@ pub struct ModuleRecord {
     code: Option<CodeRef>,
     environment: Option<EnvironmentRef>,
     namespace: Option<ObjectRef>,
+    deferred_namespace: Option<ObjectRef>,
     import_meta_object: Option<ObjectRef>,
     import_meta_properties: Option<ImportMetaProperties>,
     resolved_exports: Vec<ModuleResolvedExport>,
@@ -295,6 +314,7 @@ impl ModuleRecord {
             code: None,
             environment: None,
             namespace: None,
+            deferred_namespace: None,
             import_meta_object: None,
             import_meta_properties: None,
             resolved_exports: Vec::new(),
@@ -353,6 +373,11 @@ impl ModuleRecord {
     #[inline]
     pub const fn namespace(&self) -> Option<ObjectRef> {
         self.namespace
+    }
+
+    #[inline]
+    pub const fn deferred_namespace(&self) -> Option<ObjectRef> {
+        self.deferred_namespace
     }
 
     #[inline]
@@ -427,6 +452,11 @@ impl ModuleRecord {
     }
 
     #[inline]
+    pub fn set_deferred_namespace(&mut self, namespace: Option<ObjectRef>) {
+        self.deferred_namespace = namespace;
+    }
+
+    #[inline]
     pub fn set_import_meta_object(&mut self, import_meta_object: Option<ObjectRef>) {
         self.import_meta_object = import_meta_object;
     }
@@ -478,6 +508,7 @@ impl TraceHeapEdges for ModuleRecord {
         self.code.trace_heap_edges(tracer);
         self.environment.trace_heap_edges(tracer);
         self.namespace.trace_heap_edges(tracer);
+        self.deferred_namespace.trace_heap_edges(tracer);
         self.import_meta_object.trace_heap_edges(tracer);
         self.evaluation_error.trace_heap_edges(tracer);
         for export in &self.resolved_exports {

@@ -68,8 +68,8 @@ pub use ids::{
 pub use jobs::{JobQueueKind, RuntimeJob, RuntimeJobPayload};
 pub use module_records::{
     ModuleImportEntry, ModuleImportKind, ModuleIndirectExportEntry, ModuleLocalExportEntry,
-    ModuleRecord, ModuleRequestRecord, ModuleResolvedExport, ModuleResolvedExportTarget,
-    ModuleStarExportEntry, ModuleStatus,
+    ModuleRecord, ModuleRequestPhase, ModuleRequestRecord, ModuleResolvedExport,
+    ModuleResolvedExportTarget, ModuleStarExportEntry, ModuleStatus,
 };
 pub use promise::{
     PromiseCapabilityRecord, PromiseCombinatorElementKind, PromiseCombinatorElementRecord,

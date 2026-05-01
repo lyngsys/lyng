@@ -387,6 +387,7 @@ impl Vm {
             };
             return proxy::delete_property(&mut bridge, object, key);
         }
+        self.evaluate_deferred_module_namespace(agent, host, registry, frame, object, key)?;
         self.delete_property_from_object(agent, object, key)
     }
 

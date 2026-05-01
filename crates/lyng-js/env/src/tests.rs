@@ -625,7 +625,11 @@ fn module_environment_family_and_module_record_cache_track_agent_owned_module_st
     let module = ModuleRecord::new(
         key.clone(),
         "/tmp/main.mjs",
-        vec![ModuleRequestRecord::new("./dep.mjs", Vec::new())],
+        vec![ModuleRequestRecord::new(
+            "./dep.mjs",
+            Vec::new(),
+            ModuleRequestPhase::Evaluation,
+        )],
         vec![ModuleImportEntry::new(
             0,
             AtomId::from_raw(201),

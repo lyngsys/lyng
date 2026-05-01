@@ -70,8 +70,14 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         object: ObjectRef,
         key: PropertyKey,
     ) -> Result<Option<PropertyDescriptor>, Self::Error> {
-        self.vm
-            .get_own_property_from_object(self.agent, object, key)
+        self.vm.get_own_property_from_object(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            object,
+            key,
+        )
     }
 
     fn set_property_on_object_with_receiver(
@@ -100,6 +106,14 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         descriptor: PropertyDescriptor,
         lifetime: AllocationLifetime,
     ) -> Result<bool, Self::Error> {
+        self.vm.evaluate_deferred_module_namespace(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            object,
+            key,
+        )?;
         self.vm
             .define_property_on_object(self.agent, object, key, descriptor, lifetime)
     }
@@ -109,7 +123,43 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         object: ObjectRef,
         key: PropertyKey,
     ) -> Result<bool, Self::Error> {
+        self.vm.evaluate_deferred_module_namespace(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            object,
+            key,
+        )?;
         self.vm.delete_property_from_object(self.agent, object, key)
+    }
+
+    fn prepare_own_property_keys_from_object(
+        &mut self,
+        object: ObjectRef,
+    ) -> Result<(), Self::Error> {
+        self.vm.evaluate_deferred_module_namespace_for_own_keys(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            object,
+        )
+    }
+
+    fn prepare_has_property_from_object(
+        &mut self,
+        object: ObjectRef,
+        key: PropertyKey,
+    ) -> Result<(), Self::Error> {
+        self.vm.evaluate_deferred_module_namespace(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            object,
+            key,
+        )
     }
 
     fn to_object_for_builtin_value(
