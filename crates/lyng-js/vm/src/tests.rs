@@ -2914,6 +2914,184 @@ fn top_level_await_does_not_resume_before_sibling_module_evaluation() {
 }
 
 #[test]
+fn top_level_await_dynamic_imports_settle_leaf_before_parent() {
+    let unit = compile_test_unit(
+        261,
+        r#"
+            globalThis.logs = [];
+            globalThis.p1 = Promise.withResolvers();
+            globalThis.pAStart = Promise.withResolvers();
+            globalThis.pBStart = Promise.withResolvers();
+
+            const imports = Promise.all([
+                globalThis.pBStart.promise.then(function() {
+                    return import('./a.mjs').finally(function() {
+                        globalThis.logs.push('A');
+                    });
+                }).catch(function() {}),
+                import('./b.mjs').finally(function() {
+                    globalThis.logs.push('B');
+                }).catch(function() {})
+            ]);
+            Promise.all([
+                globalThis.pAStart.promise,
+                globalThis.pBStart.promise
+            ]).then(globalThis.p1.resolve);
+
+            imports.then(function() {
+                return globalThis.logs.join(',');
+            });
+        "#,
+    );
+    let host = TestHost::new();
+    host.define_module_source(
+        "./a-sentinel.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/a-sentinel.mjs"),
+            "/tmp/a-sentinel.mjs",
+            "globalThis.pAStart.resolve();",
+        ),
+    );
+    host.define_module_source(
+        "./a.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/a.mjs"),
+            "/tmp/a.mjs",
+            "import './a-sentinel.mjs'; import './b.mjs';",
+        ),
+    );
+    host.define_module_source(
+        "./b-sentinel.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/b-sentinel.mjs"),
+            "/tmp/b-sentinel.mjs",
+            "globalThis.pBStart.resolve();",
+        ),
+    );
+    host.define_module_source(
+        "./b.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/b.mjs"),
+            "/tmp/b.mjs",
+            "import './b-sentinel.mjs'; await globalThis.p1.promise;",
+        ),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .expect("script should evaluate");
+    let promise = result
+        .as_object_ref()
+        .expect("script should return a promise object");
+    let record = agent
+        .promise_record(promise)
+        .expect("script promise should stay tracked");
+
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    let text = record
+        .result()
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("script promise should fulfill with joined logs");
+    assert_eq!(text, "B,A");
+}
+
+#[test]
+fn top_level_await_dynamic_import_rejections_settle_leaf_before_parent() {
+    let unit = compile_test_unit(
+        262,
+        r#"
+            globalThis.logs = [];
+            globalThis.p1 = Promise.withResolvers();
+            globalThis.pAStart = Promise.withResolvers();
+            globalThis.pBStart = Promise.withResolvers();
+
+            const imports = Promise.all([
+                globalThis.pBStart.promise.then(function() {
+                    return import('./a.mjs').finally(function() {
+                        globalThis.logs.push('A');
+                    });
+                }).catch(function() {}),
+                import('./b.mjs').finally(function() {
+                    globalThis.logs.push('B');
+                }).catch(function() {})
+            ]);
+            Promise.all([
+                globalThis.pAStart.promise,
+                globalThis.pBStart.promise
+            ]).then(globalThis.p1.reject);
+
+            imports.then(function() {
+                return globalThis.logs.join(',');
+            });
+        "#,
+    );
+    let host = TestHost::new();
+    host.define_module_source(
+        "./a-sentinel.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/reject-a-sentinel.mjs"),
+            "/tmp/reject-a-sentinel.mjs",
+            "globalThis.pAStart.resolve();",
+        ),
+    );
+    host.define_module_source(
+        "./a.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/reject-a.mjs"),
+            "/tmp/reject-a.mjs",
+            "import './a-sentinel.mjs'; import './b.mjs';",
+        ),
+    );
+    host.define_module_source(
+        "./b-sentinel.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/reject-b-sentinel.mjs"),
+            "/tmp/reject-b-sentinel.mjs",
+            "globalThis.pBStart.resolve();",
+        ),
+    );
+    host.define_module_source(
+        "./b.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/reject-b.mjs"),
+            "/tmp/reject-b.mjs",
+            "import './b-sentinel.mjs'; await globalThis.p1.promise;",
+        ),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .expect("script should evaluate");
+    let promise = result
+        .as_object_ref()
+        .expect("script should return a promise object");
+    let record = agent
+        .promise_record(promise)
+        .expect("script promise should stay tracked");
+
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    let text = record
+        .result()
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("script promise should fulfill with joined logs");
+    assert_eq!(text, "B,A");
+}
+
+#[test]
 fn dynamic_import_rejects_module_parse_errors_with_syntax_error() {
     let unit = compile_test_unit(221, "import('./bad.mjs');");
     let host = TestHost::new();

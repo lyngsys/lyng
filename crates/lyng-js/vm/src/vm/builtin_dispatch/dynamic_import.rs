@@ -363,8 +363,11 @@ impl Vm {
         else {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         };
+        self.dynamic_import_evaluate_depth = self.dynamic_import_evaluate_depth.saturating_add(1);
         let outcome =
-            self.evaluate_dynamic_import_request(agent, realm_record, host, registry, &request)?;
+            self.evaluate_dynamic_import_request(agent, realm_record, host, registry, &request);
+        self.dynamic_import_evaluate_depth = self.dynamic_import_evaluate_depth.saturating_sub(1);
+        let outcome = outcome?;
         match outcome {
             DynamicImportEvaluationOutcome::Fulfilled { key, value } => {
                 self.settle_promise_capability(
@@ -376,7 +379,8 @@ impl Vm {
                     false,
                     value,
                 )?;
-                self.settle_waiting_dynamic_imports_for_module(agent, host, registry, &key)
+                self.settle_waiting_dynamic_imports_for_module(agent, host, registry, &key)?;
+                self.settle_ready_dynamic_imports(agent, host, registry)
             }
             DynamicImportEvaluationOutcome::Rejected { key, reason } => {
                 self.settle_promise_capability(
@@ -391,7 +395,7 @@ impl Vm {
                 if let Some(key) = key {
                     self.settle_waiting_dynamic_imports_for_module(agent, host, registry, &key)?;
                 }
-                Ok(())
+                self.settle_ready_dynamic_imports(agent, host, registry)
             }
             DynamicImportEvaluationOutcome::Pending => Ok(()),
         }
@@ -448,6 +452,19 @@ impl Vm {
             Some(&key),
             true,
         ) {
+            if self.dynamic_import_evaluate_depth > 1
+                && self.async_dependency_completed_modules.remove(&key)
+            {
+                self.dynamic_import_waiting_modules
+                    .entry(key)
+                    .or_default()
+                    .push(PendingDynamicImport {
+                        capability: request.capability,
+                        realm: realm_record.id(),
+                    });
+                return Ok(DynamicImportEvaluationOutcome::Pending);
+            }
+            self.async_dependency_completed_modules.remove(&key);
             return Ok(DynamicImportEvaluationOutcome::Rejected {
                 key: Some(key.clone()),
                 reason: self.dynamic_import_error_value(agent, error),
@@ -462,6 +479,19 @@ impl Vm {
                 })
             }
         };
+        if self.dynamic_import_evaluate_depth > 1
+            && self.async_dependency_completed_modules.remove(&key)
+        {
+            self.dynamic_import_waiting_modules
+                .entry(key)
+                .or_default()
+                .push(PendingDynamicImport {
+                    capability: request.capability,
+                    realm: realm_record.id(),
+                });
+            return Ok(DynamicImportEvaluationOutcome::Pending);
+        }
+        self.async_dependency_completed_modules.remove(&key);
         Ok(DynamicImportEvaluationOutcome::Fulfilled {
             key,
             value: Value::from_object_ref(namespace),
@@ -543,6 +573,31 @@ impl Vm {
                 Ok(())
             }
         }
+    }
+
+    fn settle_ready_dynamic_imports(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+    ) -> VmResult<()> {
+        let ready = self
+            .dynamic_import_waiting_modules
+            .keys()
+            .filter(|key| {
+                agent.module_record(key).is_some_and(|record| {
+                    matches!(
+                        record.status(),
+                        ModuleStatus::Evaluated | ModuleStatus::Errored
+                    )
+                })
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        for key in ready {
+            self.settle_waiting_dynamic_imports_for_module(agent, host, registry, &key)?;
+        }
+        Ok(())
     }
 
     fn dynamic_import_module_error_value(
