@@ -96,15 +96,18 @@ impl Vm {
                         Opcode::In => {
                             let key_value = self.read_register(frame, b)?;
                             let receiver = self.read_register(frame, c)?;
+                            let object_result = receiver
+                                .as_object_ref()
+                                .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)));
+                            let Some(object) = self.handle_vm_result(agent, object_result)? else {
+                                continue;
+                            };
                             let key_result = self.to_property_key_from_value(
                                 agent, host, registry, frame, key_value,
                             );
                             let Some(key) = self.handle_vm_result(agent, key_result)? else {
                                 continue;
                             };
-                            let object = receiver
-                                .as_object_ref()
-                                .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
                             let has_property = {
                                 let mut bridge = VmProxyBridge {
                                     vm: self,

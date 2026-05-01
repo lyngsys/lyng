@@ -2878,6 +2878,29 @@ fn script_core_array_reverse_gets_lower_before_testing_upper() {
 }
 
 #[test]
+fn script_core_in_operator_rejects_primitive_rhs_with_type_error() {
+    let result = compile_and_run(
+        r#"
+        let values = [true, 1, "text", undefined, null];
+        let total = 0;
+
+        for (let value of values) {
+            try {
+                "toString" in value;
+                total = total + 100;
+            } catch (error) {
+                total = total + (error instanceof TypeError ? 1 : 10);
+            }
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(5));
+}
+
+#[test]
 fn script_core_array_slice_uses_species_and_defines_result_elements() {
     let result = compile_and_run(
         r#"
