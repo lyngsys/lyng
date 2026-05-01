@@ -177,6 +177,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<Option<(u8, u32)>> {
         let binding_record = self.binding(binding)?;
         let owner = self.scope_owner(binding_record.scope);
+        if binding_record.kind == DeclarationKind::Var
+            && binding_record.name == WellKnownAtom::arguments.id()
+            && owner.is_some_and(|owner| {
+                !matches!(
+                    self.state.function_kind(owner),
+                    FunctionKind::Arrow | FunctionKind::AsyncArrow
+                ) && self.state.function_needs_arguments(owner)
+            })
+        {
+            if let Some(slot) =
+                owner.and_then(|owner| self.state.activation(owner).arguments_slot())
+            {
+                return Ok(Some((
+                    self.binding_environment_depth(binding)?,
+                    u32::from(slot),
+                )));
+            }
+        }
         let (synthetic_parameter, synthetic_rest) = owner
             .map(|owner| {
                 let activation = self.state.activation(owner);

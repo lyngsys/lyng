@@ -98,6 +98,21 @@ fn phase4_var_arguments_preserves_arguments_object_binding() {
 }
 
 #[test]
+fn phase4_var_arguments_initializer_updates_arguments_binding() {
+    let result = compile_and_run_string(
+        r#"
+        function inspect() {
+            var arguments = "local";
+            return arguments;
+        }
+        inspect(1, 2, 3);
+        "#,
+    );
+
+    assert_eq!(result, "local");
+}
+
+#[test]
 fn phase4_nested_function_arguments_shadow_outer_var_arguments() {
     let result = compile_and_run(
         r#"

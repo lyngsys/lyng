@@ -1799,6 +1799,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 }
                 return Ok(());
             }
+            if self.in_with_scope() {
+                if let Some(init) = declarator.init {
+                    let reference = self.alloc_temp()?;
+                    self.emit_capture_name(reference, name)?;
+                    let value_register = self.alloc_temp()?;
+                    self.lower_initializer_with_inferred_name(init, Some(name), value_register)?;
+                    self.emit_assign_captured_name(value_register, reference)?;
+                }
+                return Ok(());
+            }
         }
 
         let binding_id = self.declared_binding_for_pattern(declarator.id, declaration_kind)?;

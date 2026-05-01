@@ -129,6 +129,23 @@ fn with_statement_identifier_calls_use_with_base_as_this() {
 }
 
 #[test]
+fn with_statement_var_initializer_resolves_target_before_rhs() {
+    let result = compile_and_run_string(
+        r#"
+        var obj = { test262id: 1 };
+
+        with (obj) {
+            var test262id = delete obj.test262id;
+        }
+
+        String(obj.test262id) + ":" + String(test262id);
+        "#,
+    );
+
+    assert_eq!(result, "true:undefined");
+}
+
+#[test]
 fn direct_eval_can_create_arguments_binding_in_non_arrow_function() {
     let result = compile_and_run_string(
         r#"
