@@ -2853,6 +2853,67 @@ fn dynamic_import_waits_for_current_top_level_await_evaluation() {
 }
 
 #[test]
+fn top_level_await_does_not_resume_before_sibling_module_evaluation() {
+    let main = compile_test_module(
+        351,
+        "import './async.mjs'; import { check } from './sync.mjs'; export const observed = check;",
+    );
+    let async_dependency = compile_test_module(
+        352,
+        "globalThis.check = false; await 0; globalThis.check = true;",
+    );
+    let sync_dependency = compile_test_module(353, "export const { check } = globalThis;");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let main_key = ModuleKey::new("/tmp/main.mjs");
+    let async_key = ModuleKey::new("/tmp/async.mjs");
+    let sync_key = ModuleKey::new("/tmp/sync.mjs");
+    let mut vm = Vm::new();
+
+    vm.install_module(agent, realm.id(), &main_key, "/tmp/main.mjs", &main)
+        .unwrap();
+    vm.install_module(
+        agent,
+        realm.id(),
+        &async_key,
+        "/tmp/async.mjs",
+        &async_dependency,
+    )
+    .unwrap();
+    vm.install_module(
+        agent,
+        realm.id(),
+        &sync_key,
+        "/tmp/sync.mjs",
+        &sync_dependency,
+    )
+    .unwrap();
+    assert!(agent.set_module_requested_key(&main_key, 0, Some(async_key)));
+    assert!(agent.set_module_requested_key(&main_key, 1, Some(sync_key)));
+
+    let _ = vm.evaluate_linked_module(agent, realm, &main_key).unwrap();
+
+    let record = agent
+        .module_record(&main_key)
+        .expect("main module should stay cached");
+    let module_env = record
+        .environment()
+        .expect("main module evaluation should allocate one environment");
+    let observed_slot = main
+        .local_exports()
+        .iter()
+        .find(|entry| main.atom_text(entry.export_name()) == Some("observed"))
+        .expect("main module should export observed")
+        .local_slot();
+
+    assert_eq!(
+        agent.environment_slot(module_env, observed_slot),
+        Some(Value::from_bool(false))
+    );
+}
+
+#[test]
 fn dynamic_import_rejects_module_parse_errors_with_syntax_error() {
     let unit = compile_test_unit(221, "import('./bad.mjs');");
     let host = TestHost::new();

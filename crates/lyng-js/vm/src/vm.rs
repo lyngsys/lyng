@@ -248,6 +248,9 @@ pub struct Vm {
     async_generator_queues: HashMap<ObjectRef, VecDeque<AsyncGeneratorRequest>>,
     dynamic_import_requests: Vec<Option<DynamicImportRequest>>,
     dynamic_import_waiting_modules: HashMap<ModuleKey, Vec<PendingDynamicImport>>,
+    async_body_suspended_modules: HashSet<ModuleKey>,
+    async_dependency_blocked_modules: HashSet<ModuleKey>,
+    async_dependency_blocked_queue: VecDeque<ModuleKey>,
     next_dynamic_source_raw: u32,
     loop_iteration_envs: Vec<LoopIterationEnvironment>,
     with_environment_states: Vec<WithEnvironmentState>,
@@ -290,6 +293,9 @@ impl Vm {
             async_generator_queues: HashMap::new(),
             dynamic_import_requests: Vec::new(),
             dynamic_import_waiting_modules: HashMap::new(),
+            async_body_suspended_modules: HashSet::new(),
+            async_dependency_blocked_modules: HashSet::new(),
+            async_dependency_blocked_queue: VecDeque::new(),
             next_dynamic_source_raw: 1,
             loop_iteration_envs: Vec::new(),
             with_environment_states: Vec::new(),
@@ -947,7 +953,7 @@ impl Vm {
         self.install_active_realm_extensions(agent, realm.id())?;
         let module_env = self.link_module_graph(agent, realm, key)?;
         let result =
-            self.evaluate_module_graph(agent, realm, key, module_env, host, registry, None);
+            self.evaluate_module_graph(agent, realm, key, module_env, host, registry, None, true);
         let result = match result {
             Ok(value) => {
                 self.checkpoint_promise_jobs(agent, host, registry)?;
@@ -1574,6 +1580,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         defer_waiter_flush_for: Option<&ModuleKey>,
+        checkpoint_on_async_suspend: bool,
     ) -> VmResult<Value> {
         let (status, code, requested_modules, evaluation_error) = {
             let record = agent
@@ -1587,7 +1594,12 @@ impl Vm {
             )
         };
         match status {
-            ModuleStatus::Evaluated | ModuleStatus::Evaluating => return Ok(Value::undefined()),
+            ModuleStatus::Evaluated => return Ok(Value::undefined()),
+            ModuleStatus::Evaluating if self.async_dependency_blocked_modules.contains(key) => {}
+            ModuleStatus::Evaluating if self.async_body_suspended_modules.contains(key) => {
+                return Err(VmError::AsyncSuspend);
+            }
+            ModuleStatus::Evaluating => return Ok(Value::undefined()),
             ModuleStatus::Errored => {
                 if let Some(thrown) = evaluation_error {
                     return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::throw(
@@ -1613,13 +1625,14 @@ impl Vm {
             .map(Self::module_hoisted_function_prologue_end)
             .ok_or(VmError::MissingInstalledCode(code))?;
         let _ = agent.set_module_record_status(key, ModuleStatus::Evaluating);
+        let mut suspended_dependencies = Vec::new();
         for request in &requested_modules {
             let resolved_key = request
                 .resolved_key()
                 .cloned()
                 .ok_or(VmError::MissingModuleResolution)?;
             let dependency_env = self.link_module_graph(agent, realm, &resolved_key)?;
-            let _ = self.evaluate_module_graph(
+            match self.evaluate_module_graph(
                 agent,
                 realm,
                 &resolved_key,
@@ -1627,9 +1640,35 @@ impl Vm {
                 host,
                 registry,
                 defer_waiter_flush_for,
+                false,
+            ) {
+                Ok(_) => {}
+                Err(VmError::AsyncSuspend) => suspended_dependencies.push(resolved_key),
+                Err(error) => return Err(error),
+            }
+        }
+        if !suspended_dependencies.is_empty() {
+            if !checkpoint_on_async_suspend {
+                self.queue_async_dependency_blocked_module(key);
+                return Err(VmError::AsyncSuspend);
+            }
+            self.checkpoint_promise_jobs(agent, host, registry)?;
+            self.finish_async_body_suspended_modules_after_checkpoint(
+                agent,
+                host,
+                registry,
+                defer_waiter_flush_for,
+            )?;
+            self.drain_async_dependency_blocked_modules(
+                agent,
+                realm,
+                host,
+                registry,
+                defer_waiter_flush_for,
             )?;
         }
 
+        let _ = self.async_dependency_blocked_modules.remove(key);
         let result = self.evaluate_entry_with_registry_from_offset(
             agent,
             installed,
@@ -1644,6 +1683,8 @@ impl Vm {
         );
         match result {
             Ok(value) => {
+                self.async_body_suspended_modules.remove(key);
+                self.async_dependency_blocked_modules.remove(key);
                 let _ = agent.set_module_record_status(key, ModuleStatus::Evaluated);
                 let _ = agent.set_module_record_evaluation_error(key, None);
                 if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
@@ -1651,9 +1692,15 @@ impl Vm {
                 }
                 Ok(value)
             }
+            Err(VmError::AsyncSuspend) if !checkpoint_on_async_suspend => {
+                self.async_body_suspended_modules.insert(key.clone());
+                Err(VmError::AsyncSuspend)
+            }
             Err(VmError::AsyncSuspend) => match self.checkpoint_promise_jobs(agent, host, registry)
             {
                 Ok(()) => {
+                    self.async_body_suspended_modules.remove(key);
+                    self.async_dependency_blocked_modules.remove(key);
                     let _ = agent.set_module_record_status(key, ModuleStatus::Evaluated);
                     let _ = agent.set_module_record_evaluation_error(key, None);
                     if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
@@ -1662,6 +1709,8 @@ impl Vm {
                     Ok(Value::undefined())
                 }
                 Err(VmError::Abrupt(completion)) => {
+                    self.async_body_suspended_modules.remove(key);
+                    self.async_dependency_blocked_modules.remove(key);
                     let _ = agent.set_module_record_status(key, ModuleStatus::Errored);
                     let _ =
                         agent.set_module_record_evaluation_error(key, completion.thrown_value());
@@ -1673,6 +1722,8 @@ impl Vm {
                 Err(error) => Err(error),
             },
             Err(VmError::Abrupt(completion)) => {
+                self.async_body_suspended_modules.remove(key);
+                self.async_dependency_blocked_modules.remove(key);
                 let _ = agent.set_module_record_status(key, ModuleStatus::Errored);
                 let _ = agent.set_module_record_evaluation_error(key, completion.thrown_value());
                 if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
@@ -1682,6 +1733,71 @@ impl Vm {
             }
             Err(error) => Err(error),
         }
+    }
+
+    fn queue_async_dependency_blocked_module(&mut self, key: &ModuleKey) {
+        if self.async_dependency_blocked_modules.insert(key.clone()) {
+            self.async_dependency_blocked_queue.push_back(key.clone());
+        }
+    }
+
+    fn finish_async_body_suspended_modules_after_checkpoint(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        defer_waiter_flush_for: Option<&ModuleKey>,
+    ) -> VmResult<()> {
+        let suspended = self
+            .async_body_suspended_modules
+            .drain()
+            .collect::<Vec<_>>();
+        for key in suspended {
+            if !agent
+                .module_record(&key)
+                .is_some_and(|record| record.status() == ModuleStatus::Evaluating)
+            {
+                continue;
+            }
+            let _ = agent.set_module_record_status(&key, ModuleStatus::Evaluated);
+            let _ = agent.set_module_record_evaluation_error(&key, None);
+            if !defer_waiter_flush_for.is_some_and(|deferred| deferred == &key) {
+                self.settle_waiting_dynamic_imports_for_module(agent, host, registry, &key)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn drain_async_dependency_blocked_modules(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRecord,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        defer_waiter_flush_for: Option<&ModuleKey>,
+    ) -> VmResult<()> {
+        while let Some(key) = self.async_dependency_blocked_queue.pop_front() {
+            if !self.async_dependency_blocked_modules.contains(&key) {
+                continue;
+            }
+            let Some(module_env) = agent
+                .module_record(&key)
+                .and_then(ModuleRecord::environment)
+            else {
+                continue;
+            };
+            let _ = self.evaluate_module_graph(
+                agent,
+                realm,
+                &key,
+                module_env,
+                host,
+                registry,
+                defer_waiter_flush_for,
+                true,
+            )?;
+        }
+        Ok(())
     }
 
     fn bind_module_imports(

@@ -446,6 +446,7 @@ impl Vm {
             host,
             registry,
             Some(&key),
+            true,
         ) {
             return Ok(DynamicImportEvaluationOutcome::Rejected {
                 key: Some(key.clone()),
