@@ -567,6 +567,52 @@ impl Vm {
         Ok(())
     }
 
+    fn async_from_sync_iterator_continuation(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        value: Value,
+        done: bool,
+    ) -> VmResult<ObjectRef> {
+        let capability = self.create_intrinsic_promise_capability(agent, frame.realm())?;
+        let promise = self.promise_capability_promise(agent, capability)?;
+        let value_wrapper =
+            match self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)
+            {
+                Ok(value_wrapper) => value_wrapper,
+                Err(VmError::Abrupt(completion)) => {
+                    let realm = agent
+                        .realm(frame.realm())
+                        .ok_or(VmError::MissingRootShape(frame.realm()))?;
+                    self.settle_promise_capability(
+                        agent,
+                        host,
+                        registry,
+                        realm,
+                        capability,
+                        true,
+                        completion.thrown_value().unwrap_or(Value::undefined()),
+                    )?;
+                    return Ok(promise);
+                }
+                Err(error) => return Err(error),
+            };
+        let realm = agent
+            .realm(frame.realm())
+            .ok_or(VmError::MissingRootShape(frame.realm()))?;
+        self.enqueue_promise_then(
+            agent,
+            realm,
+            value_wrapper,
+            lyng_js_env::PromiseReactionHandler::AsyncFromSyncIteratorValue { done },
+            lyng_js_env::PromiseReactionHandler::Thrower,
+            Some(capability),
+        )?;
+        Ok(promise)
+    }
+
     fn advance_async_iterator_state(
         &mut self,
         agent: &mut Agent,
@@ -613,8 +659,18 @@ impl Vm {
                     let state = record.async_from_sync_state();
                     record.set_async_from_sync_state(iterator::AsyncFromSyncState::None);
                     match state {
-                        iterator::AsyncFromSyncState::Next { done } => {
-                            if done {
+                        iterator::AsyncFromSyncState::Next { .. } => {
+                            let iter_result = resume_value
+                                .as_object_ref()
+                                .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+                            let mut bridge = VmIteratorBridge {
+                                vm: self,
+                                agent,
+                                host,
+                                registry,
+                                frame,
+                            };
+                            if iterator::iterator_complete(&mut bridge, iter_result)? {
                                 record.set_done(true);
                                 self.iterator_states.insert(
                                     frame.registers().base(),
@@ -623,7 +679,7 @@ impl Vm {
                                 );
                                 return Ok(None);
                             }
-                            resume_value
+                            iterator::iterator_value(&mut bridge, iter_result)?
                         }
                         iterator::AsyncFromSyncState::None
                         | iterator::AsyncFromSyncState::Return => {
@@ -646,8 +702,14 @@ impl Vm {
             self.call_to_completion(agent, host, registry, frame, next_method, receiver, &[])?;
         match record.kind() {
             iterator::IteratorKind::Async => {
-                let promise =
-                    self.promise_resolve_in_realm(agent, host, registry, frame.realm(), result)?;
+                let promise = self.promise_resolve_in_realm(
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                    frame.realm(),
+                    result,
+                )?;
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
                 self.suspend_for_await_promise(agent, frame, promise)?;
@@ -670,8 +732,17 @@ impl Vm {
                         iterator::iterator_value(&mut bridge, iter_result)?,
                     )
                 };
-                let promise =
-                    self.promise_resolve_in_realm(agent, host, registry, frame.realm(), value)?;
+                let promise = self.async_from_sync_iterator_continuation(
+                    agent, host, registry, frame, value, done,
+                )?;
+                let promise = self.promise_resolve_in_realm(
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                    frame.realm(),
+                    Value::from_object_ref(promise),
+                )?;
                 record.set_async_from_sync_state(iterator::AsyncFromSyncState::Next { done });
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
@@ -788,6 +859,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
+                    frame,
                     frame.realm(),
                     result,
                 ) {
@@ -829,12 +901,23 @@ impl Vm {
                         Err(error) => return Err(error),
                     }
                 };
+                let promise = match self.async_from_sync_iterator_continuation(
+                    agent, host, registry, frame, value, true,
+                ) {
+                    Ok(promise) => promise,
+                    Err(_) if preserve_completion => {
+                        record.set_done(true);
+                        return Ok(());
+                    }
+                    Err(error) => return Err(error),
+                };
                 let promise = match self.promise_resolve_in_realm(
                     agent,
                     host,
                     registry,
+                    frame,
                     frame.realm(),
-                    value,
+                    Value::from_object_ref(promise),
                 ) {
                     Ok(promise) => promise,
                     Err(_) if preserve_completion => {

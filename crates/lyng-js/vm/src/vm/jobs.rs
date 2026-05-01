@@ -4,7 +4,7 @@ use lyng_js_env::{
     PromiseReactionRecord, RuntimeJob, RuntimeJobPayload,
 };
 use lyng_js_host::{HostError, HostHooks, HostJobPhase, JobObservation};
-use lyng_js_ops::{errors, object};
+use lyng_js_ops::{errors, iterator, object};
 use lyng_js_types::{
     promise_reject_function_builtin, promise_resolve_function_builtin, AbruptCompletion, ObjectRef,
     PropertyKey, Value,
@@ -232,6 +232,14 @@ impl Vm {
                 Ok(PromiseReactionOutcome::Fulfill(value))
             }
             PromiseReactionHandler::ThrowWith(value) => Ok(PromiseReactionOutcome::Reject(value)),
+            PromiseReactionHandler::AsyncFromSyncIteratorValue { done } => {
+                let result =
+                    iterator::create_iterator_result_object(agent, realm.id(), argument, done)
+                        .map_err(VmError::Abrupt)?;
+                Ok(PromiseReactionOutcome::Fulfill(Value::from_object_ref(
+                    result,
+                )))
+            }
             PromiseReactionHandler::AsyncResume { suspended, reject } => {
                 let suspended_state = self
                     .suspended_side_states
@@ -399,7 +407,7 @@ impl Vm {
         Ok(PromiseReactionOutcome::Deferred)
     }
 
-    fn enqueue_promise_then(
+    pub(in crate::vm) fn enqueue_promise_then(
         &mut self,
         agent: &mut Agent,
         realm: RealmRecord,

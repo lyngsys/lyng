@@ -7425,6 +7425,65 @@ fn for_await_of_wraps_sync_iterators_and_awaits_each_value() {
 }
 
 #[test]
+fn for_await_of_sync_iterator_preserves_async_from_sync_tick_order() {
+    let unit = compile_test_unit(
+        2310,
+        r#"
+            var actual = [];
+            Promise.resolve(0)
+                .then(function() { actual.push("tick 1"); })
+                .then(function() { actual.push("tick 2"); })
+                .then(function() { actual.push("tick 3"); })
+                .then(function() { actual.push("tick 4"); });
+
+            Object.defineProperty(Promise.prototype, "constructor", {
+                get() {
+                    actual.push("constructor");
+                    return Promise;
+                },
+                configurable: true
+            });
+
+            async function main() {
+                var p = Promise.resolve(0);
+                actual.push("pre");
+                for await (var value of [p]) {
+                    actual.push("loop");
+                }
+                actual.push("post");
+                return actual.join(",");
+            }
+
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("for await should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("for await promise should remain tracked");
+    let actual = record
+        .result()
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("for await log should be a string");
+
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(
+        actual,
+        "pre,constructor,constructor,tick 1,tick 2,loop,constructor,tick 3,tick 4,post"
+    );
+}
+
+#[test]
 fn for_await_of_break_rejects_when_async_close_rejects() {
     let unit = compile_test_unit(
         227,

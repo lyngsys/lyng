@@ -29,6 +29,9 @@ pub enum PromiseReactionHandler {
     Callable(ObjectRef),
     PassThrough(Value),
     ThrowWith(Value),
+    AsyncFromSyncIteratorValue {
+        done: bool,
+    },
     Finally {
         on_finally: ObjectRef,
         constructor: ObjectRef,
@@ -407,6 +410,7 @@ impl TraceHeapEdges for PromiseReactionHandler {
             Self::Identity | Self::Thrower => {}
             Self::Callable(object) => object.trace_heap_edges(tracer),
             Self::PassThrough(value) | Self::ThrowWith(value) => value.trace_heap_edges(tracer),
+            Self::AsyncFromSyncIteratorValue { .. } => {}
             Self::Finally {
                 on_finally,
                 constructor,

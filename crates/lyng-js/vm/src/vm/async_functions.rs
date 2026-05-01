@@ -5,7 +5,7 @@ use lyng_js_env::{
     PromiseCapabilityId, PromiseReactionHandler, PromiseReactionKind, PromiseReactionRecord,
     PromiseResolvingFunctionKind, PromiseResolvingFunctionRecord, RealmRecord,
 };
-use lyng_js_ops::{errors, object};
+use lyng_js_ops::errors;
 use lyng_js_types::{
     promise_reject_function_builtin, promise_resolve_function_builtin, AbruptCompletion,
     PropertyKey, SuspendedExecutionRef, Value,
@@ -167,7 +167,8 @@ impl Vm {
         }
 
         let value = self.read_register(frame, register)?;
-        let promise = self.promise_resolve_in_realm(agent, host, registry, frame.realm(), value)?;
+        let promise =
+            self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)?;
         self.suspend_for_await_promise(agent, frame, promise)
     }
 
@@ -242,6 +243,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
         realm: RealmRef,
         value: Value,
     ) -> VmResult<ObjectRef> {
@@ -253,12 +255,14 @@ impl Vm {
             .as_object_ref()
             .filter(|object| agent.promise_record(*object).is_some())
         {
-            let constructor = object::ordinary_get(
+            let constructor = self.get_property_from_value(
                 agent,
-                promise,
+                host,
+                registry,
+                frame,
+                Value::from_object_ref(promise),
                 PropertyKey::from_atom(WellKnownAtom::constructor.id()),
-            )
-            .map_err(VmError::Abrupt)?;
+            )?;
             if constructor == Value::from_object_ref(promise_constructor) {
                 return Ok(promise);
             }
