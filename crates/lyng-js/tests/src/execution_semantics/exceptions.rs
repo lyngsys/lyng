@@ -135,6 +135,26 @@ fn phase4_typeof_identifier_reference_probes_without_throwing() {
 }
 
 #[test]
+fn phase6_typeof_global_identifier_invokes_accessors() {
+    let result = compile_and_run_string(
+        r#"
+        let count = 0;
+        Object.defineProperty(this, "phase6TypeofAccessor", {
+            get() {
+                count = count + 1;
+                return 1;
+            },
+            configurable: true
+        });
+
+        typeof phase6TypeofAccessor + ":" + count;
+        "#,
+    );
+
+    assert_eq!(result, "number:1");
+}
+
+#[test]
 fn phase4_sloppy_delete_identifier_reference_uses_phase4_special_cases() {
     let result = compile_and_run(
         r#"

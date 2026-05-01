@@ -721,18 +721,34 @@ impl Vm {
             return Ok(value);
         }
         Ok(self
-            .lookup_global_property(agent, frame.variable_env(), name)?
+            .get_global_property_binding_with_context(
+                agent,
+                host,
+                registry,
+                frame,
+                frame.variable_env(),
+                name,
+            )?
             .unwrap_or_else(Value::undefined))
     }
 
     pub(super) fn resolve_global(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
         name: AtomId,
     ) -> VmResult<Value> {
         Ok(self
-            .lookup_global_property(agent, frame.variable_env(), name)?
+            .get_global_property_binding_with_context(
+                agent,
+                host,
+                registry,
+                frame,
+                frame.variable_env(),
+                name,
+            )?
             .unwrap_or_else(Value::undefined))
     }
 

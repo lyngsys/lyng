@@ -1059,7 +1059,8 @@ impl Vm {
                         }
                         Opcode::ResolveGlobal => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
-                            let resolve_result = self.resolve_global(agent, frame, atom);
+                            let resolve_result =
+                                self.resolve_global(agent, host, registry, frame, atom);
                             let Some(value) = self.handle_vm_result(agent, resolve_result)? else {
                                 continue;
                             };
