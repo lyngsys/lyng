@@ -1429,11 +1429,14 @@ impl Vm {
             )
         };
         match status {
-            ModuleStatus::Linked | ModuleStatus::Evaluating | ModuleStatus::Evaluated => {
+            ModuleStatus::Linked
+            | ModuleStatus::Evaluating
+            | ModuleStatus::Evaluated
+            | ModuleStatus::Errored => {
                 return environment.ok_or(VmError::MissingModuleEnvironment);
             }
             ModuleStatus::Linking => return environment.ok_or(VmError::MissingModuleEnvironment),
-            ModuleStatus::New | ModuleStatus::Unlinked | ModuleStatus::Errored => {}
+            ModuleStatus::New | ModuleStatus::Unlinked => {}
         }
 
         let code = code.ok_or(VmError::MissingModuleCode)?;
@@ -1836,14 +1839,22 @@ impl Vm {
             .drain()
             .collect::<Vec<_>>();
         for key in suspended {
-            if !agent
+            match agent
                 .module_record(&key)
-                .is_some_and(|record| record.status() == ModuleStatus::Evaluating)
+                .ok_or(VmError::MissingModuleRecord)?
+                .status()
             {
-                continue;
+                ModuleStatus::Evaluating => {
+                    let _ = agent.set_module_record_status(&key, ModuleStatus::Evaluated);
+                    let _ = agent.set_module_record_evaluation_error(&key, None);
+                }
+                ModuleStatus::Evaluated => {}
+                ModuleStatus::New
+                | ModuleStatus::Unlinked
+                | ModuleStatus::Linking
+                | ModuleStatus::Linked
+                | ModuleStatus::Errored => continue,
             }
-            let _ = agent.set_module_record_status(&key, ModuleStatus::Evaluated);
-            let _ = agent.set_module_record_evaluation_error(&key, None);
             if !defer_waiter_flush_for.is_some_and(|deferred| deferred == &key) {
                 self.settle_waiting_dynamic_imports_for_module(agent, host, registry, &key)?;
             }
@@ -2273,6 +2284,17 @@ impl Vm {
         deferred: bool,
     ) -> VmResult<ObjectRef> {
         let _ = self.link_module_graph(agent, realm, key)?;
+        let needs_resolved_exports = deferred
+            && agent.module_record(key).is_some_and(|record| {
+                record.resolved_exports().is_empty()
+                    && (!record.local_exports().is_empty()
+                        || !record.indirect_exports().is_empty()
+                        || !record.star_exports().is_empty())
+            });
+        if needs_resolved_exports {
+            let resolved_exports = self.compute_module_resolved_exports(agent, realm, key)?;
+            let _ = agent.set_module_record_resolved_exports(key, resolved_exports);
+        }
         let existing_namespace = agent.module_record(key).and_then(|record| {
             if deferred {
                 record.deferred_namespace()

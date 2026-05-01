@@ -27,6 +27,11 @@ impl Vm {
             GeneratorResumeKind::Next
         };
         self.restore_suspended_execution(agent, suspended, resume_kind, argument)?;
+        let resumed_module_key = self.frame().and_then(|frame| {
+            agent
+                .module_key_for_environment(frame.variable_env())
+                .or_else(|| agent.module_key_for_environment(frame.lexical_env()))
+        });
         let prior_frame_depth = self.frames.len().saturating_sub(1);
         let prior_context_depth = agent.execution_contexts().len().saturating_sub(1);
         let prior_register_len = usize::try_from(
@@ -50,7 +55,16 @@ impl Vm {
         )?;
 
         match result {
-            Ok(_) | Err(VmError::AsyncSuspend) => Ok(()),
+            Ok(_) => {
+                if let Some(key) = resumed_module_key {
+                    if self.async_body_suspended_modules.contains(&key) {
+                        let _ = agent.set_module_record_status(&key, ModuleStatus::Evaluated);
+                        let _ = agent.set_module_record_evaluation_error(&key, None);
+                    }
+                }
+                Ok(())
+            }
+            Err(VmError::AsyncSuspend) => Ok(()),
             Err(error) => Err(error),
         }
     }

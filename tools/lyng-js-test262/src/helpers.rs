@@ -43,6 +43,9 @@ function decimalToPercentHexString(n) {
   return "%" + hex.charAt((n - low) / 16) + hex.charAt(low);
 }
 "#;
+const ASYNC_DONE_GLOBAL_BRIDGE_SOURCE: &str = r#"
+globalThis.$DONE = $DONE;
+"#;
 pub(crate) const SUPPORTED_INCLUDES: &[&str] = &[
     "compareArray.js",
     "deepEqual.js",
@@ -105,7 +108,11 @@ impl HelperCatalog {
 
         let assert_source = read_helper_file(&harness_root, "assert.js")?;
         let sta_source = read_helper_file(&harness_root, "sta.js")?;
-        let async_done_source = read_helper_file(&harness_root, "doneprintHandle.js")?;
+        let async_done_source = format!(
+            "{}\n{}",
+            read_helper_file(&harness_root, "doneprintHandle.js")?,
+            ASYNC_DONE_GLOBAL_BRIDGE_SOURCE
+        );
         let base_source = format!("{assert_source}\n{sta_source}");
 
         Ok(Self {
@@ -258,6 +265,7 @@ mod tests {
             .build_runtime_source(&async_metadata, "asyncTest(async function () {});")
             .expect("async harness source");
         assert!(async_source.contains("function $DONE("));
+        assert!(async_source.contains("globalThis.$DONE = $DONE;"));
         assert!(async_source.contains("assert.throwsAsync = function"));
     }
 

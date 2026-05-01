@@ -3332,6 +3332,223 @@ fn static_import_defer_sync_module_evaluates_on_namespace_access() {
 }
 
 #[test]
+fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
+    let host = TestHost::new();
+    host.define_module_source(
+        "./main.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/main.mjs"),
+            "/tmp/main.mjs",
+            r#"
+                import { done } from './promises.mjs';
+                import './dep.mjs';
+                (async function() {
+                    await done;
+                    globalThis.doneBeforeDeferredAsyncReady =
+                        globalThis.beforeDeferredAsyncReady instanceof TypeError;
+                    globalThis.doneDuringDeferredAsyncReady =
+                        globalThis.duringDeferredAsyncReady instanceof TypeError;
+                    globalThis.doneAfterDeferredAsyncReady =
+                        globalThis.afterDeferredAsyncReady;
+                })();
+            "#,
+        ),
+    );
+    host.define_module_source(
+        "./promises.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/promises.mjs"),
+            "/tmp/promises.mjs",
+            r#"
+                export let resolveDone, rejectDone;
+                export const done = new Promise((resolve, reject) => {
+                    resolveDone = resolve;
+                    rejectDone = reject;
+                });
+                export let resolveFirst, resolveSecond, resolveThird;
+                export const first = new Promise((resolve) => { resolveFirst = resolve; });
+                export const second = new Promise((resolve) => { resolveSecond = resolve; });
+                export const third = new Promise((resolve) => { resolveThird = resolve; });
+            "#,
+        ),
+    );
+    host.define_module_source(
+        "./observer.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/observer.mjs"),
+            "/tmp/observer.mjs",
+            r#"
+                import { first, third, resolveDone, rejectDone, resolveSecond } from './promises.mjs';
+                import defer * as ns from './dep.mjs';
+
+                try {
+                    ns.foo;
+                } catch (error) {
+                    globalThis.beforeDeferredAsyncReady = error;
+                }
+
+                first.then(() => {
+                    try {
+                        ns.foo;
+                    } catch (error) {
+                        globalThis.duringDeferredAsyncReady = error;
+                    }
+                    resolveSecond();
+                }).then(() => {
+                    return third.then(() => {
+                        try {
+                            globalThis.afterDeferredAsyncReady = ns.foo;
+                        } catch (error) {
+                            globalThis.afterDeferredAsyncReadyError = error instanceof TypeError;
+                        }
+                    });
+                }).then(resolveDone, rejectDone);
+            "#,
+        ),
+    );
+    host.define_module_source(
+        "./dep.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/dep.mjs"),
+            "/tmp/dep.mjs",
+            r#"
+                import { resolveFirst, resolveThird, second } from './promises.mjs';
+                import './observer.mjs';
+
+                await Promise.resolve();
+                resolveFirst();
+                await second;
+                resolveThird();
+
+                export let foo = 1;
+            "#,
+        ),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+    let loaded = vm
+        .load_module_graph_from_host(
+            agent,
+            realm,
+            &host,
+            &ModuleSourceRequest {
+                specifier: "./main.mjs".into(),
+                referrer: None,
+                attributes: Vec::new(),
+            },
+        )
+        .expect("static import defer async graph should load");
+
+    vm.evaluate_linked_module_with_registry_and_host(
+        agent,
+        realm,
+        loaded.key(),
+        &host,
+        &mut registry,
+    )
+    .expect("static import defer async graph should evaluate");
+
+    assert!(global_value(agent, realm, "beforeDeferredAsyncReady")
+        .as_object_ref()
+        .is_some());
+    assert!(global_value(agent, realm, "duringDeferredAsyncReady")
+        .as_object_ref()
+        .is_some());
+    assert_eq!(
+        global_value(agent, realm, "afterDeferredAsyncReadyError"),
+        Value::undefined()
+    );
+    assert_eq!(
+        global_value(agent, realm, "afterDeferredAsyncReady"),
+        Value::from_smi(1)
+    );
+    assert_eq!(
+        global_value(agent, realm, "doneBeforeDeferredAsyncReady"),
+        Value::from_bool(true)
+    );
+    assert_eq!(
+        global_value(agent, realm, "doneDuringDeferredAsyncReady"),
+        Value::from_bool(true)
+    );
+    assert_eq!(
+        global_value(agent, realm, "doneAfterDeferredAsyncReady"),
+        Value::from_smi(1)
+    );
+}
+
+#[test]
+fn static_import_defer_preserves_prior_evaluation_error_identity() {
+    let unit = compile_test_unit(
+        267,
+        r#"
+            import('./throws.mjs').catch(function(first) {
+                globalThis.firstDeferredError = first;
+                return import('./deferred.mjs').then(function(module) {
+                    try {
+                        module.ns.foo;
+                    } catch (second) {
+                        globalThis.secondDeferredError = second;
+                        globalThis.deferredErrorIdentity = first === second;
+                    }
+                });
+            });
+        "#,
+    );
+    let host = TestHost::new();
+    let script_referrer = ModuleKey::new("/tmp/main.js");
+    host.define_module_source(
+        "./throws.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/throws.mjs"),
+            "/tmp/throws.mjs",
+            "throw { someError: 'the error from throws.mjs' };",
+        ),
+    );
+    host.define_module_source(
+        "./deferred.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/deferred.mjs"),
+            "/tmp/deferred.mjs",
+            "import defer * as ns from './throws.mjs'; export { ns };",
+        ),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host_referrer(
+            agent,
+            realm,
+            &unit,
+            Some(&script_referrer),
+            &host,
+            &mut registry,
+        )
+        .expect("deferred import error identity regression should evaluate");
+    let promise = result
+        .as_object_ref()
+        .expect("script result should be the dynamic import promise chain");
+    let record = agent
+        .promise_record(promise)
+        .expect("script result promise should stay tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(
+        global_value(agent, realm, "deferredErrorIdentity"),
+        Value::from_bool(true)
+    );
+    assert_eq!(
+        global_value(agent, realm, "firstDeferredError"),
+        global_value(agent, realm, "secondDeferredError")
+    );
+}
+
+#[test]
 fn static_source_phase_import_rejects_source_text_modules_with_syntax_error() {
     let host = TestHost::new();
     host.define_module_source(
