@@ -331,6 +331,41 @@ fn phase5_functions_bind_installs_restricted_caller_and_arguments_accessors() {
 }
 
 #[test]
+fn phase6_generator_functions_inherit_restricted_caller_and_arguments_accessors() {
+    let result = compile_and_run(
+        r#"
+        function* generator() {}
+        let total = 0;
+
+        if (generator.hasOwnProperty("caller") === false) {
+            total += 1;
+        }
+        if (generator.hasOwnProperty("arguments") === false) {
+            total += 2;
+        }
+        try {
+            generator.caller;
+        } catch (error) {
+            if (error.constructor === TypeError) {
+                total += 4;
+            }
+        }
+        try {
+            generator.arguments = {};
+        } catch (error) {
+            if (error.constructor === TypeError) {
+                total += 8;
+            }
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
 fn phase6_legacy_function_caller_respects_immediate_caller_strictness() {
     let result = compile_and_run(
         r#"

@@ -494,6 +494,8 @@ impl Vm {
         };
         if function.kind() != lyng_js_bytecode::BytecodeFunctionKind::Function
             || function.flags().strict()
+            || function.flags().generator()
+            || function.flags().async_function()
         {
             return Ok(None);
         }
