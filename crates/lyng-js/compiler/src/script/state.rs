@@ -940,6 +940,10 @@ fn collect_class_lowering_from_pattern(
     }
 }
 
+fn generator_function_has_prototype(kind: FunctionKind) -> bool {
+    matches!(kind, FunctionKind::Generator | FunctionKind::AsyncGenerator)
+}
+
 fn collect_class_lowering_from_expr(
     ast: &lyng_js_ast::Ast,
     expr_id: ExprId,
@@ -982,11 +986,14 @@ fn collect_class_lowering_from_expr(
                     match ast.get_expr(property.value) {
                         Expr::FunctionExpression { function, .. }
                         | Expr::ArrowFunctionExpression { function, .. } => {
+                            let function_kind = ast.get_function(*function).kind;
                             function_metadata.insert(
                                 *function,
                                 ClassFunctionMetadata {
                                     constructible: false,
-                                    has_prototype_property: false,
+                                    has_prototype_property: generator_function_has_prototype(
+                                        function_kind,
+                                    ),
                                     class_constructor: false,
                                     derived_class_constructor: false,
                                     class_source_span: None,
@@ -1203,26 +1210,21 @@ fn collect_class_lowering_from_class_body(
                         constructor_plans,
                     );
                 }
+                let is_constructor = matches!(kind, lyng_js_ast::MethodKind::Constructor);
+                let function_kind = ast.get_function(*value).kind;
                 function_metadata.insert(
                     *value,
                     ClassFunctionMetadata {
-                        constructible: matches!(kind, lyng_js_ast::MethodKind::Constructor),
-                        has_prototype_property: matches!(
-                            kind,
-                            lyng_js_ast::MethodKind::Constructor
-                        ),
-                        class_constructor: matches!(kind, lyng_js_ast::MethodKind::Constructor),
-                        derived_class_constructor: matches!(
-                            kind,
-                            lyng_js_ast::MethodKind::Constructor
-                        ) && has_heritage,
-                        class_source_span: matches!(kind, lyng_js_ast::MethodKind::Constructor)
-                            .then_some(())
-                            .and(class_source_span),
+                        constructible: is_constructor,
+                        has_prototype_property: is_constructor
+                            || generator_function_has_prototype(function_kind),
+                        class_constructor: is_constructor,
+                        derived_class_constructor: is_constructor && has_heritage,
+                        class_source_span: is_constructor.then_some(()).and(class_source_span),
                         class_body: Some(body),
                     },
                 );
-                if matches!(kind, lyng_js_ast::MethodKind::Constructor) {
+                if is_constructor {
                     constructor = Some(*value);
                 }
                 if !*r#static && *private {

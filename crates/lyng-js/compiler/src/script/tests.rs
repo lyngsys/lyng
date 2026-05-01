@@ -1472,15 +1472,16 @@ fn compile_script_marks_async_generators_and_emits_suspend_resume_points() {
 }
 
 #[test]
-fn compile_script_marks_generator_methods_without_prototype_properties() {
+fn compile_script_marks_generator_methods_with_prototype_properties() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(15),
         r#"
+            let ordinary = { method() {} };
             let object = { *gen() { yield 1; } };
             class C { *gen() { yield 2; } }
-            object;
+            ordinary;
         "#,
     );
     assert!(!parsed.diagnostics.has_errors());
@@ -1488,14 +1489,22 @@ fn compile_script_marks_generator_methods_without_prototype_properties() {
     assert!(!sema.diagnostics.has_errors());
 
     let unit = compile_script(&parsed, &sema, &mut atoms).expect("generator methods should lower");
-    let non_prototype_generators = unit
+    let prototype_generators = unit
         .functions()
         .iter()
         .filter(|function| function.flags().generator())
+        .filter(|function| function.flags().has_prototype_property())
+        .count();
+    let ordinary_methods_without_prototype = unit
+        .functions()
+        .iter()
+        .filter(|function| !function.flags().generator())
+        .filter(|function| !function.flags().constructible())
         .filter(|function| !function.flags().has_prototype_property())
         .count();
 
-    assert!(non_prototype_generators >= 2);
+    assert!(prototype_generators >= 2);
+    assert!(ordinary_methods_without_prototype >= 1);
 }
 
 #[test]

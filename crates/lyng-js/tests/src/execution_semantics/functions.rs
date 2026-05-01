@@ -1009,6 +1009,26 @@ fn phase4_functions_cache_tagged_template_objects_by_site() {
 }
 
 #[test]
+fn phase6_generator_methods_expose_generator_prototype_property() {
+    let result = compile_and_run(
+        r#"
+        var GeneratorPrototype = Object.getPrototypeOf(function* () {}).prototype;
+        var method = { *method() {} }.method;
+        var ordinaryMethod = { method() {} }.method;
+        var descriptor = Object.getOwnPropertyDescriptor(method, "prototype");
+
+        (Object.getPrototypeOf(method.prototype) === GeneratorPrototype ? 1 : 0)
+            + (descriptor.writable === true ? 2 : 0)
+            + (descriptor.enumerable === false ? 4 : 0)
+            + (descriptor.configurable === false ? 8 : 0)
+            + (!Object.prototype.hasOwnProperty.call(ordinaryMethod, "prototype") ? 16 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
 fn phase4_functions_share_tagged_template_cache_across_internal_callbacks() {
     let result = compile_and_run(
         r#"
