@@ -34,6 +34,23 @@ fn phase4_arguments_use_unmapped_objects_in_strict_functions() {
 }
 
 #[test]
+fn phase4_nested_function_arguments_shadow_outer_var_arguments() {
+    let result = compile_and_run(
+        r#"
+        function outer() {
+            var arguments = undefined;
+            return (function() {
+                return arguments.length;
+            }());
+        }
+        outer();
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(0));
+}
+
+#[test]
 fn phase4_rest_parameters_materialize_fresh_arrays() {
     let result = compile_and_run(
         r#"

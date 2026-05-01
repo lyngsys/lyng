@@ -128,6 +128,20 @@ fn has_direct_arrow_child_for(
         })
 }
 
+fn resolved_arguments_binding_shadows_owner(
+    program: ProgramSource<'_>,
+    sema: ProgramSemaView<'_>,
+    parent_functions: &[Option<FunctionSemaId>],
+    binding: SemanticBindingId,
+    owner: FunctionSemaId,
+) -> bool {
+    let binding = sema.binding_table.get(binding);
+    let binding_owner = sema.scope_table.get(binding.scope).owning_function;
+    binding_owner.and_then(|binding_owner| {
+        nearest_non_arrow_owner_for(program, sema, parent_functions, binding_owner)
+    }) == Some(owner)
+}
+
 pub(super) fn collect_arguments_owners(
     program: ProgramSource<'_>,
     sema: ProgramSemaView<'_>,
@@ -136,15 +150,25 @@ pub(super) fn collect_arguments_owners(
     sema.use_sites
         .as_slice()
         .iter()
-        .filter(|record| {
-            record.name == WellKnownAtom::arguments.id()
-                && matches!(
-                    record.resolution_kind,
-                    ResolutionKind::Global | ResolutionKind::Unresolved | ResolutionKind::Dynamic
+        .filter_map(|record| {
+            if record.name != WellKnownAtom::arguments.id() {
+                return None;
+            }
+            let owner = sema.scope_table.get(record.scope).owning_function?;
+            let owner = nearest_non_arrow_owner_for(program, sema, parent_functions, owner)?;
+            if record.resolved_binding.is_some_and(|binding| {
+                resolved_arguments_binding_shadows_owner(
+                    program,
+                    sema,
+                    parent_functions,
+                    binding,
+                    owner,
                 )
+            }) {
+                return None;
+            }
+            Some(owner)
         })
-        .filter_map(|record| sema.scope_table.get(record.scope).owning_function)
-        .filter_map(|owner| nearest_non_arrow_owner_for(program, sema, parent_functions, owner))
         .collect()
 }
 

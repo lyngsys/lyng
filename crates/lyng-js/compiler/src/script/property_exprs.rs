@@ -430,20 +430,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         name: AtomId,
         dest: u16,
     ) -> LoweringResult<()> {
-        if self.arguments_access(name)?.is_some() {
+        let (resolution_kind, resolved_binding, arguments_access) = {
+            let use_site = self.use_site(expr_id)?;
+            (
+                use_site.resolution_kind,
+                use_site.resolved_binding,
+                self.arguments_access_for_use(use_site)?,
+            )
+        };
+        if arguments_access.is_some() {
             return self.emit_load_bool(dest, false);
         }
 
-        let use_site = self.use_site(expr_id)?;
-        match use_site.resolution_kind {
+        match resolution_kind {
             ResolutionKind::Local | ResolutionKind::Captured => {
-                let binding_id =
-                    use_site
-                        .resolved_binding
-                        .ok_or(LoweringError::MissingResolvedBinding {
-                            expr: expr_id,
-                            name,
-                        })?;
+                let binding_id = resolved_binding.ok_or(LoweringError::MissingResolvedBinding {
+                    expr: expr_id,
+                    name,
+                })?;
                 let binding = self.binding(binding_id)?;
                 if binding.storage_class == StorageClass::DynamicLookup {
                     return self.emit_delete_name(dest, binding.name);

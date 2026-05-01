@@ -359,15 +359,6 @@ impl<'a> CompilationState<'a> {
         None
     }
 
-    pub(super) fn arguments_owner_for_current(
-        &self,
-        current: Option<FunctionSemaId>,
-    ) -> Option<FunctionSemaId> {
-        let current = current?;
-        let owner = self.nearest_non_arrow_owner(current)?;
-        self.function_needs_arguments(owner).then_some(owner)
-    }
-
     pub(super) fn environment_depth_to_function(
         &self,
         from: FunctionSemaId,

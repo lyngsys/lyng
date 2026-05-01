@@ -204,16 +204,40 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(Some((depth, slot)))
     }
 
-    pub(super) fn arguments_access(&self, name: AtomId) -> LoweringResult<Option<(u8, u32)>> {
-        if name != WellKnownAtom::arguments.id() {
+    fn resolved_arguments_binding_shadows_owner(
+        &self,
+        use_site: &lyng_js_sema::UseSiteRecord,
+        owner: FunctionSemaId,
+    ) -> LoweringResult<bool> {
+        let Some(binding_id) = use_site.resolved_binding else {
+            return Ok(false);
+        };
+        let binding = self.binding(binding_id)?;
+        let Some(binding_owner) = self.scope_owner(binding.scope) else {
+            return Ok(false);
+        };
+        Ok(self.state.nearest_non_arrow_owner(binding_owner) == Some(owner))
+    }
+
+    pub(super) fn arguments_access_for_use(
+        &self,
+        use_site: &lyng_js_sema::UseSiteRecord,
+    ) -> LoweringResult<Option<(u8, u32)>> {
+        if use_site.name != WellKnownAtom::arguments.id() {
             return Ok(None);
         }
         let Some(current) = self.current_function else {
             return Ok(None);
         };
-        let Some(owner) = self.state.arguments_owner_for_current(Some(current)) else {
+        let Some(owner) = self.state.nearest_non_arrow_owner(current) else {
             return Ok(None);
         };
+        if self.resolved_arguments_binding_shadows_owner(use_site, owner)? {
+            return Ok(None);
+        }
+        if !self.state.function_needs_arguments(owner) {
+            return Ok(None);
+        }
         let activation = self.state.activation(owner);
         let Some(slot) = activation.arguments_slot() else {
             return Ok(None);

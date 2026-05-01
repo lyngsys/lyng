@@ -32,6 +32,7 @@ pub(super) struct PreparedIdentifierTarget {
     name: AtomId,
     resolution_kind: ResolutionKind,
     binding: Option<SemanticBindingId>,
+    arguments_access: Option<(u8, u32)>,
     reference: Option<u16>,
 }
 
@@ -179,18 +180,29 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         expr_id: ExprId,
         name: AtomId,
     ) -> LoweringResult<PreparedReferenceTarget> {
-        let use_site = self.use_site(expr_id)?;
-        let resolution_kind = use_site.resolution_kind;
-        let binding = use_site.resolved_binding;
-        let capture_reference = match resolution_kind {
-            ResolutionKind::Dynamic | ResolutionKind::Global | ResolutionKind::Unresolved => true,
-            ResolutionKind::Local | ResolutionKind::Captured => {
-                let binding_id = binding.ok_or(LoweringError::MissingResolvedBinding {
-                    expr: expr_id,
-                    name,
-                })?;
-                let binding_record = self.binding(binding_id)?;
-                binding_record.storage_class == StorageClass::DynamicLookup
+        let (resolution_kind, binding, arguments_access) = {
+            let use_site = self.use_site(expr_id)?;
+            (
+                use_site.resolution_kind,
+                use_site.resolved_binding,
+                self.arguments_access_for_use(use_site)?,
+            )
+        };
+        let capture_reference = if arguments_access.is_some() {
+            false
+        } else {
+            match resolution_kind {
+                ResolutionKind::Dynamic | ResolutionKind::Global | ResolutionKind::Unresolved => {
+                    true
+                }
+                ResolutionKind::Local | ResolutionKind::Captured => {
+                    let binding_id = binding.ok_or(LoweringError::MissingResolvedBinding {
+                        expr: expr_id,
+                        name,
+                    })?;
+                    let binding_record = self.binding(binding_id)?;
+                    binding_record.storage_class == StorageClass::DynamicLookup
+                }
             }
         };
         let reference = if capture_reference {
@@ -207,6 +219,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 name,
                 resolution_kind,
                 binding,
+                arguments_access,
                 reference,
             },
         ))
@@ -299,6 +312,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
 impl PreparedIdentifierTarget {
     fn load(self, compiler: &mut FunctionCompiler<'_, '_>, dest: u16) -> LoweringResult<()> {
+        if let Some((depth, slot)) = self.arguments_access {
+            return compiler.emit_load_env_slot(dest, depth, slot);
+        }
         if let Some(reference) = self.reference {
             compiler.emit_load_captured_name(dest, reference)
         } else {
@@ -307,6 +323,9 @@ impl PreparedIdentifierTarget {
     }
 
     fn assign(self, compiler: &mut FunctionCompiler<'_, '_>, value: u16) -> LoweringResult<()> {
+        if let Some((depth, slot)) = self.arguments_access {
+            return compiler.emit_assign_env_slot(value, depth, slot);
+        }
         if let Some(reference) = self.reference {
             return compiler.emit_assign_captured_name(value, reference);
         }
@@ -326,6 +345,9 @@ impl PreparedIdentifierTarget {
     }
 
     fn store(self, compiler: &mut FunctionCompiler<'_, '_>, value: u16) -> LoweringResult<()> {
+        if let Some((depth, slot)) = self.arguments_access {
+            return compiler.emit_store_env_slot(value, depth, slot);
+        }
         if let Some(reference) = self.reference {
             return compiler.emit_assign_captured_name(value, reference);
         }

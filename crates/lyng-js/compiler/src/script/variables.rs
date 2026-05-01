@@ -56,13 +56,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         name: AtomId,
         dest: u16,
     ) -> LoweringResult<()> {
-        let use_site = self.use_site(expr_id)?;
-        let resolution_kind = use_site.resolution_kind;
-        let resolved_binding = use_site.resolved_binding;
-        if resolved_binding.is_none() {
-            if let Some((depth, slot)) = self.arguments_access(name)? {
-                return self.emit_load_env_slot(dest, depth, slot);
-            }
+        let (resolution_kind, resolved_binding, arguments_access) = {
+            let use_site = self.use_site(expr_id)?;
+            (
+                use_site.resolution_kind,
+                use_site.resolved_binding,
+                self.arguments_access_for_use(use_site)?,
+            )
+        };
+        if let Some((depth, slot)) = arguments_access {
+            return self.emit_load_env_slot(dest, depth, slot);
         }
         match resolution_kind {
             ResolutionKind::Local | ResolutionKind::Captured => {
