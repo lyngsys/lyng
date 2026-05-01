@@ -14,7 +14,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         let prev_iter = self.in_iteration();
         self.set_in_iteration(true);
-        let body = self.parse_statement();
+        let body = self.parse_statement_rejecting_labelled_function();
         self.set_in_iteration(prev_iter);
 
         let body_span = self.ast().get_stmt(body).span();
@@ -28,7 +28,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         let prev_iter = self.in_iteration();
         self.set_in_iteration(true);
-        let body = self.parse_statement();
+        let body = self.parse_statement_rejecting_labelled_function();
         self.set_in_iteration(prev_iter);
 
         self.expect(TokenKind::While);
@@ -94,7 +94,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
             let prev_iter = self.in_iteration();
             self.set_in_iteration(true);
-            let body = self.parse_statement();
+            let body = self.parse_statement_rejecting_labelled_function();
             self.set_in_iteration(prev_iter);
 
             let body_span = self.ast().get_stmt(body).span();
@@ -127,7 +127,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
             let prev_iter = self.in_iteration();
             self.set_in_iteration(true);
-            let body = self.parse_statement();
+            let body = self.parse_statement_rejecting_labelled_function();
             self.set_in_iteration(prev_iter);
 
             let body_span = self.ast().get_stmt(body).span();
@@ -167,7 +167,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
             let prev_iter = self.in_iteration();
             self.set_in_iteration(true);
-            let body = self.parse_statement();
+            let body = self.parse_statement_rejecting_labelled_function();
             self.set_in_iteration(prev_iter);
 
             let body_span = self.ast().get_stmt(body).span();
@@ -188,7 +188,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
             let prev_iter = self.in_iteration();
             self.set_in_iteration(true);
-            let body = self.parse_statement();
+            let body = self.parse_statement_rejecting_labelled_function();
             self.set_in_iteration(prev_iter);
 
             let body_span = self.ast().get_stmt(body).span();
@@ -325,7 +325,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         let prev_iter = self.in_iteration();
         self.set_in_iteration(true);
-        let body = self.parse_statement();
+        let body = self.parse_statement_rejecting_labelled_function();
         self.set_in_iteration(prev_iter);
 
         let body_span = self.ast().get_stmt(body).span();

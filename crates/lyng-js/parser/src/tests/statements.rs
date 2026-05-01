@@ -492,6 +492,32 @@ fn annex_b_parse_sloppy_labeled_function_declaration() {
 }
 
 #[test]
+fn annex_b_labeled_function_is_error_in_if_clause() {
+    assert!(script("if (false) label1: label2: function f() {}")
+        .diagnostics
+        .has_errors());
+}
+
+#[test]
+fn annex_b_labeled_function_is_error_in_loop_body() {
+    assert!(script("while (false) label1: label2: function f() {}")
+        .diagnostics
+        .has_errors());
+}
+
+#[test]
+fn annex_b_labeled_function_is_error_in_with_body() {
+    assert!(script("with (obj) label: function f() {}")
+        .diagnostics
+        .has_errors());
+}
+
+#[test]
+fn generator_declaration_under_label_is_error() {
+    assert!(script("label: function* g() {}").diagnostics.has_errors());
+}
+
+#[test]
 fn strict_labeled_function_declaration_is_error() {
     assert!(script("\"use strict\"; label: function f() {}")
         .diagnostics

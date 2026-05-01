@@ -212,7 +212,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         self.expect(TokenKind::LParen);
         let object = self.parse_expression();
         self.expect(TokenKind::RParen);
-        let body = self.parse_statement();
+        let body = self.parse_statement_rejecting_labelled_function();
 
         let body_span = self.ast().get_stmt(body).span();
         let span = start.cover(body_span);
@@ -223,7 +223,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let start = self.current_span();
         let label = self.parse_label_identifier();
         self.expect(TokenKind::Colon);
-        let body = if !self.is_strict() && self.at(TokenKind::Function) {
+        let body = if !self.is_strict()
+            && self.at(TokenKind::Function)
+            && self.peek().kind != TokenKind::Star
+        {
             self.parse_function_declaration_stmt()
         } else {
             self.parse_statement()

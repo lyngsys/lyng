@@ -3,7 +3,7 @@
 mod control;
 mod loops;
 
-use lyng_js_ast::{Stmt, StmtId};
+use lyng_js_ast::{Decl, FunctionKind, Stmt, StmtId};
 use lyng_js_common::WellKnownAtom;
 use lyng_js_lexer::{TokenKind, TokenPayload};
 
@@ -138,6 +138,37 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             TokenKind::Debugger => self.parse_debugger_statement(),
             TokenKind::With => self.parse_with_statement(),
             _ => self.parse_expression_statement(),
+        }
+    }
+
+    fn parse_statement_rejecting_labelled_function(&mut self) -> StmtId {
+        let stmt = self.parse_statement();
+        if self.stmt_is_labelled_function(stmt) {
+            let span = self.ast().get_stmt(stmt).span();
+            self.error_at(
+                span,
+                "labelled function declarations are not allowed in this statement position"
+                    .to_string(),
+            );
+        }
+        stmt
+    }
+
+    fn stmt_is_labelled_function(&self, stmt: StmtId) -> bool {
+        let Stmt::Labeled { body, .. } = self.ast().get_stmt(stmt) else {
+            return false;
+        };
+
+        match self.ast().get_stmt(*body) {
+            Stmt::Labeled { .. } => self.stmt_is_labelled_function(*body),
+            Stmt::Declaration { decl, .. } => {
+                matches!(
+                    self.ast().get_decl(*decl),
+                    Decl::Function { function, .. }
+                        if self.ast().get_function(*function).kind == FunctionKind::Normal
+                )
+            }
+            _ => false,
         }
     }
 
@@ -290,7 +321,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             return self.ast_mut().alloc_stmt(Stmt::Block { span, body });
         }
 
-        self.parse_statement()
+        self.parse_statement_rejecting_labelled_function()
     }
 
     // -----------------------------------------------------------------------
