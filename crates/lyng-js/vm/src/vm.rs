@@ -203,6 +203,12 @@ struct DynamicImportRequest {
     request: ModuleSourceRequest,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PendingDynamicImport {
+    capability: lyng_js_env::PromiseCapabilityId,
+    realm: RealmRef,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct SuspendedExecutionSideState {
     iterator_states: Vec<(u16, lyng_js_ops::iterator::IteratorRecord)>,
@@ -241,6 +247,7 @@ pub struct Vm {
     async_generator_frame_states: HashMap<u32, AsyncGeneratorFrameState>,
     async_generator_queues: HashMap<ObjectRef, VecDeque<AsyncGeneratorRequest>>,
     dynamic_import_requests: Vec<Option<DynamicImportRequest>>,
+    dynamic_import_waiting_modules: HashMap<ModuleKey, Vec<PendingDynamicImport>>,
     next_dynamic_source_raw: u32,
     loop_iteration_envs: Vec<LoopIterationEnvironment>,
     with_environment_states: Vec<WithEnvironmentState>,
@@ -282,6 +289,7 @@ impl Vm {
             async_generator_frame_states: HashMap::new(),
             async_generator_queues: HashMap::new(),
             dynamic_import_requests: Vec::new(),
+            dynamic_import_waiting_modules: HashMap::new(),
             next_dynamic_source_raw: 1,
             loop_iteration_envs: Vec::new(),
             with_environment_states: Vec::new(),
@@ -938,7 +946,8 @@ impl Vm {
         let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
         self.install_active_realm_extensions(agent, realm.id())?;
         let module_env = self.link_module_graph(agent, realm, key)?;
-        let result = self.evaluate_module_graph(agent, realm, key, module_env, host, registry);
+        let result =
+            self.evaluate_module_graph(agent, realm, key, module_env, host, registry, None);
         let result = match result {
             Ok(value) => {
                 self.checkpoint_promise_jobs(agent, host, registry)?;
@@ -1564,6 +1573,7 @@ impl Vm {
         module_env: EnvironmentRef,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
+        defer_waiter_flush_for: Option<&ModuleKey>,
     ) -> VmResult<Value> {
         let (status, code, requested_modules, evaluation_error) = {
             let record = agent
@@ -1616,6 +1626,7 @@ impl Vm {
                 dependency_env,
                 host,
                 registry,
+                defer_waiter_flush_for,
             )?;
         }
 
@@ -1635,6 +1646,9 @@ impl Vm {
             Ok(value) => {
                 let _ = agent.set_module_record_status(key, ModuleStatus::Evaluated);
                 let _ = agent.set_module_record_evaluation_error(key, None);
+                if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
+                    self.settle_waiting_dynamic_imports_for_module(agent, host, registry, key)?;
+                }
                 Ok(value)
             }
             Err(VmError::AsyncSuspend) => match self.checkpoint_promise_jobs(agent, host, registry)
@@ -1642,12 +1656,18 @@ impl Vm {
                 Ok(()) => {
                     let _ = agent.set_module_record_status(key, ModuleStatus::Evaluated);
                     let _ = agent.set_module_record_evaluation_error(key, None);
+                    if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
+                        self.settle_waiting_dynamic_imports_for_module(agent, host, registry, key)?;
+                    }
                     Ok(Value::undefined())
                 }
                 Err(VmError::Abrupt(completion)) => {
                     let _ = agent.set_module_record_status(key, ModuleStatus::Errored);
                     let _ =
                         agent.set_module_record_evaluation_error(key, completion.thrown_value());
+                    if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
+                        self.settle_waiting_dynamic_imports_for_module(agent, host, registry, key)?;
+                    }
                     Err(VmError::Abrupt(completion))
                 }
                 Err(error) => Err(error),
@@ -1655,6 +1675,9 @@ impl Vm {
             Err(VmError::Abrupt(completion)) => {
                 let _ = agent.set_module_record_status(key, ModuleStatus::Errored);
                 let _ = agent.set_module_record_evaluation_error(key, completion.thrown_value());
+                if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
+                    self.settle_waiting_dynamic_imports_for_module(agent, host, registry, key)?;
+                }
                 Err(VmError::Abrupt(completion))
             }
             Err(error) => Err(error),

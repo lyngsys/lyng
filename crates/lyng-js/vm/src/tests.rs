@@ -2780,6 +2780,79 @@ fn dynamic_import_does_not_preempt_static_module_dfs_evaluation() {
 }
 
 #[test]
+fn dynamic_import_waits_for_current_top_level_await_evaluation() {
+    let unit = compile_test_unit(
+        260,
+        r#"
+            let continueExecution;
+            globalThis.promise = new Promise(function(resolve) {
+                continueExecution = resolve;
+            });
+            const executionStartPromise = new Promise(function(resolve) {
+                globalThis.executionStarted = resolve;
+            });
+
+            async function run() {
+                const first = import('./tla.mjs');
+                await executionStartPromise;
+                const second = import('./tla.mjs');
+                await import('./empty.mjs');
+                continueExecution();
+
+                let secondResolved = false;
+                const results = await Promise.all([
+                    first.then(function() {
+                        return !secondResolved;
+                    }),
+                    second.then(function() {
+                        secondResolved = true;
+                        return true;
+                    })
+                ]);
+                return results[0] === true && results[1] === true;
+            }
+
+            run();
+        "#,
+    );
+    let host = TestHost::new();
+    host.define_module_source(
+        "./tla.mjs",
+        LoadedModuleSource::new(
+            ModuleKey::new("/tmp/tla.mjs"),
+            "/tmp/tla.mjs",
+            r#"
+                globalThis.executionStarted();
+                export let x = 1;
+                await globalThis.promise;
+            "#,
+        ),
+    );
+    host.define_module_source(
+        "./empty.mjs",
+        LoadedModuleSource::new(ModuleKey::new("/tmp/empty.mjs"), "/tmp/empty.mjs", ""),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .expect("script should evaluate");
+    let promise = result
+        .as_object_ref()
+        .expect("run should return a promise object");
+    let record = agent
+        .promise_record(promise)
+        .expect("run promise should remain tracked");
+
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.result(), Value::from_bool(true));
+}
+
+#[test]
 fn dynamic_import_rejects_module_parse_errors_with_syntax_error() {
     let unit = compile_test_unit(221, "import('./bad.mjs');");
     let host = TestHost::new();

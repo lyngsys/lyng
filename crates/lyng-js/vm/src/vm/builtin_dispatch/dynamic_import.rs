@@ -1,6 +1,18 @@
 use super::*;
-use crate::vm::DynamicImportRequest;
-use lyng_js_env::RealmRecord;
+use crate::vm::{DynamicImportRequest, PendingDynamicImport};
+use lyng_js_env::{ModuleStatus, RealmRecord};
+
+enum DynamicImportEvaluationOutcome {
+    Fulfilled {
+        key: ModuleKey,
+        value: Value,
+    },
+    Rejected {
+        key: Option<ModuleKey>,
+        reason: Value,
+    },
+    Pending,
+}
 
 impl Vm {
     pub(super) fn import_meta_builtin(
@@ -352,26 +364,36 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         };
         let outcome =
-            self.evaluate_dynamic_import_request(agent, realm_record, host, registry, &request);
+            self.evaluate_dynamic_import_request(agent, realm_record, host, registry, &request)?;
         match outcome {
-            Ok(value) => self.settle_promise_capability(
-                agent,
-                host,
-                registry,
-                realm_record,
-                request.capability,
-                false,
-                value,
-            ),
-            Err(reason) => self.settle_promise_capability(
-                agent,
-                host,
-                registry,
-                realm_record,
-                request.capability,
-                true,
-                reason,
-            ),
+            DynamicImportEvaluationOutcome::Fulfilled { key, value } => {
+                self.settle_promise_capability(
+                    agent,
+                    host,
+                    registry,
+                    realm_record,
+                    request.capability,
+                    false,
+                    value,
+                )?;
+                self.settle_waiting_dynamic_imports_for_module(agent, host, registry, &key)
+            }
+            DynamicImportEvaluationOutcome::Rejected { key, reason } => {
+                self.settle_promise_capability(
+                    agent,
+                    host,
+                    registry,
+                    realm_record,
+                    request.capability,
+                    true,
+                    reason,
+                )?;
+                if let Some(key) = key {
+                    self.settle_waiting_dynamic_imports_for_module(agent, host, registry, &key)?;
+                }
+                Ok(())
+            }
+            DynamicImportEvaluationOutcome::Pending => Ok(()),
         }
     }
 
@@ -382,21 +404,144 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         request: &DynamicImportRequest,
-    ) -> Result<Value, Value> {
-        let loaded = self
-            .load_module_graph_from_host(agent, realm_record, host, &request.request)
-            .map_err(|error| self.dynamic_import_module_error_value(agent, error))?;
+    ) -> VmResult<DynamicImportEvaluationOutcome> {
+        let loaded =
+            match self.load_module_graph_from_host(agent, realm_record, host, &request.request) {
+                Ok(loaded) => loaded,
+                Err(error) => {
+                    return Ok(DynamicImportEvaluationOutcome::Rejected {
+                        key: None,
+                        reason: self.dynamic_import_module_error_value(agent, error),
+                    })
+                }
+            };
         let key = loaded.key().clone();
-        let module_env = self
-            .link_module_graph(agent, realm_record, &key)
-            .map_err(|error| self.dynamic_import_error_value(agent, error))?;
-        let _ = self
-            .evaluate_module_graph(agent, realm_record, &key, module_env, host, registry)
-            .map_err(|error| self.dynamic_import_error_value(agent, error))?;
-        let namespace = self
-            .module_namespace_object(agent, realm_record, &key)
-            .map_err(|error| self.dynamic_import_error_value(agent, error))?;
-        Ok(Value::from_object_ref(namespace))
+        let module_env = match self.link_module_graph(agent, realm_record, &key) {
+            Ok(module_env) => module_env,
+            Err(error) => {
+                return Ok(DynamicImportEvaluationOutcome::Rejected {
+                    key: Some(key.clone()),
+                    reason: self.dynamic_import_error_value(agent, error),
+                })
+            }
+        };
+        if agent
+            .module_record(&key)
+            .is_some_and(|record| record.status() == ModuleStatus::Evaluating)
+        {
+            self.dynamic_import_waiting_modules
+                .entry(key)
+                .or_default()
+                .push(PendingDynamicImport {
+                    capability: request.capability,
+                    realm: realm_record.id(),
+                });
+            return Ok(DynamicImportEvaluationOutcome::Pending);
+        }
+        if let Err(error) = self.evaluate_module_graph(
+            agent,
+            realm_record,
+            &key,
+            module_env,
+            host,
+            registry,
+            Some(&key),
+        ) {
+            return Ok(DynamicImportEvaluationOutcome::Rejected {
+                key: Some(key.clone()),
+                reason: self.dynamic_import_error_value(agent, error),
+            });
+        }
+        let namespace = match self.module_namespace_object(agent, realm_record, &key) {
+            Ok(namespace) => namespace,
+            Err(error) => {
+                return Ok(DynamicImportEvaluationOutcome::Rejected {
+                    key: Some(key.clone()),
+                    reason: self.dynamic_import_error_value(agent, error),
+                })
+            }
+        };
+        Ok(DynamicImportEvaluationOutcome::Fulfilled {
+            key,
+            value: Value::from_object_ref(namespace),
+        })
+    }
+
+    pub(in crate::vm) fn settle_waiting_dynamic_imports_for_module(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        key: &ModuleKey,
+    ) -> VmResult<()> {
+        let Some(waiters) = self.dynamic_import_waiting_modules.remove(key) else {
+            return Ok(());
+        };
+        if waiters.is_empty() {
+            return Ok(());
+        }
+
+        let (status, evaluation_error) = {
+            let record = agent
+                .module_record(key)
+                .ok_or(VmError::MissingModuleRecord)?;
+            (record.status(), record.evaluation_error())
+        };
+        match status {
+            ModuleStatus::Evaluating => {
+                self.dynamic_import_waiting_modules
+                    .entry(key.clone())
+                    .or_default()
+                    .extend(waiters);
+                Ok(())
+            }
+            ModuleStatus::Evaluated => {
+                for waiter in waiters {
+                    let realm = agent
+                        .realm(waiter.realm)
+                        .ok_or(VmError::MissingRootShape(waiter.realm))?;
+                    let namespace = self.module_namespace_object(agent, realm, key)?;
+                    self.settle_promise_capability(
+                        agent,
+                        host,
+                        registry,
+                        realm,
+                        waiter.capability,
+                        false,
+                        Value::from_object_ref(namespace),
+                    )?;
+                }
+                Ok(())
+            }
+            ModuleStatus::Errored => {
+                let reason = evaluation_error.unwrap_or(Value::undefined());
+                for waiter in waiters {
+                    let realm = agent
+                        .realm(waiter.realm)
+                        .ok_or(VmError::MissingRootShape(waiter.realm))?;
+                    self.settle_promise_capability(
+                        agent,
+                        host,
+                        registry,
+                        realm,
+                        waiter.capability,
+                        true,
+                        reason,
+                    )?;
+                }
+                Ok(())
+            }
+            ModuleStatus::New
+            | ModuleStatus::Unlinked
+            | ModuleStatus::Linking
+            | ModuleStatus::Linked => {
+                self.dynamic_import_waiting_modules
+                    .entry(key.clone())
+                    .or_default()
+                    .extend(waiters);
+                Ok(())
+            }
+        }
     }
 
     fn dynamic_import_module_error_value(
