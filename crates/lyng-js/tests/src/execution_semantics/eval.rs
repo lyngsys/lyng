@@ -146,6 +146,46 @@ fn with_statement_var_initializer_resolves_target_before_rhs() {
 }
 
 #[test]
+fn with_statement_var_object_binding_resolves_target_before_property_get() {
+    let result = compile_and_run_string(
+        r#"
+        var log = [];
+        var sourceKey = {
+            toString: function() {
+                log.push("sourceKey");
+                return "p";
+            }
+        };
+        var source = {
+            get p() {
+                log.push("get source");
+                return undefined;
+            }
+        };
+        var env = new Proxy({}, {
+            has: function(target, key) {
+                log.push("binding::" + key);
+                return false;
+            }
+        });
+        var defaultValue = 0;
+        var varTarget;
+
+        with (env) {
+            var { [sourceKey]: varTarget = defaultValue } = source;
+        }
+
+        log.join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "binding::source|binding::sourceKey|sourceKey|binding::varTarget|get source|binding::defaultValue"
+    );
+}
+
+#[test]
 fn direct_eval_can_create_arguments_binding_in_non_arrow_function() {
     let result = compile_and_run_string(
         r#"

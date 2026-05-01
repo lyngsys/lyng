@@ -49,7 +49,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.state.scope_environment_base(scope).is_some()
     }
 
-    fn in_with_scope(&self) -> bool {
+    pub(super) fn in_with_scope(&self) -> bool {
         let mut current = Some(self.current_scope);
         while let Some(scope_id) = current {
             let scope = self.state.sema.scope_table.get(scope_id);

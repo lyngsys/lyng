@@ -483,17 +483,60 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     let value = self.alloc_temp()?;
                     if !property.computed {
                         if let Some(atom) = self.named_property_atom(property.key)? {
+                            let prepared_target = self
+                                .prepare_with_var_single_name_binding_target(
+                                    kind,
+                                    property.value,
+                                )?;
                             self.emit_get_property_by_atom(value, source_register, atom)?;
                             excluded_keys.push(ObjectRestExcludedKey::Atom(atom));
+                            if let Some((reference, name)) = prepared_target {
+                                self.lower_prepared_with_var_single_name_binding_initialization(
+                                    property.value,
+                                    value,
+                                    reference,
+                                    name,
+                                )?;
+                                continue;
+                            }
                         } else {
-                            let key = self.lower_expr_to_temp(property.key)?;
+                            let raw_key = self.lower_expr_to_temp(property.key)?;
+                            let key = self.alloc_temp()?;
+                            self.emit_to_property_key(key, raw_key)?;
+                            let prepared_target = self
+                                .prepare_with_var_single_name_binding_target(
+                                    kind,
+                                    property.value,
+                                )?;
                             self.emit_get_keyed_property(value, source_register, key)?;
                             excluded_keys.push(ObjectRestExcludedKey::Register(key));
+                            if let Some((reference, name)) = prepared_target {
+                                self.lower_prepared_with_var_single_name_binding_initialization(
+                                    property.value,
+                                    value,
+                                    reference,
+                                    name,
+                                )?;
+                                continue;
+                            }
                         }
                     } else {
-                        let key = self.lower_expr_to_temp(property.key)?;
+                        let raw_key = self.lower_expr_to_temp(property.key)?;
+                        let key = self.alloc_temp()?;
+                        self.emit_to_property_key(key, raw_key)?;
+                        let prepared_target =
+                            self.prepare_with_var_single_name_binding_target(kind, property.value)?;
                         self.emit_get_keyed_property(value, source_register, key)?;
                         excluded_keys.push(ObjectRestExcludedKey::Register(key));
+                        if let Some((reference, name)) = prepared_target {
+                            self.lower_prepared_with_var_single_name_binding_initialization(
+                                property.value,
+                                value,
+                                reference,
+                                name,
+                            )?;
+                            continue;
+                        }
                     }
                     self.lower_binding_pattern_initialization(property.value, kind, value)?;
                 }
@@ -539,6 +582,78 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 Ok(())
             }
             Pattern::InvalidPattern { .. } => Err(LoweringError::UnsupportedPattern { pattern }),
+        }
+    }
+
+    fn prepare_with_var_single_name_binding_target(
+        &mut self,
+        kind: DeclarationKind,
+        pattern: lyng_js_ast::PatternId,
+    ) -> LoweringResult<Option<(u16, AtomId)>> {
+        if kind != DeclarationKind::Var || !self.in_with_scope() {
+            return Ok(None);
+        }
+        let name = match self.ast().get_pattern(pattern) {
+            Pattern::Identifier { name, .. } => Some(*name),
+            Pattern::Assignment { left, .. } => match self.ast().get_pattern(*left) {
+                Pattern::Identifier { name, .. } => Some(*name),
+                Pattern::Object { .. }
+                | Pattern::Array { .. }
+                | Pattern::Assignment { .. }
+                | Pattern::InvalidPattern { .. } => None,
+            },
+            Pattern::Object { .. } | Pattern::Array { .. } | Pattern::InvalidPattern { .. } => None,
+        };
+        let Some(name) = name else {
+            return Ok(None);
+        };
+        let reference = self.alloc_temp()?;
+        self.emit_capture_name(reference, name)?;
+        Ok(Some((reference, name)))
+    }
+
+    fn lower_prepared_with_var_single_name_binding_initialization(
+        &mut self,
+        pattern: lyng_js_ast::PatternId,
+        source_register: u16,
+        reference: u16,
+        name: AtomId,
+    ) -> LoweringResult<()> {
+        match self.ast().get_pattern(pattern).clone() {
+            Pattern::Identifier { .. } => {
+                self.emit_assign_captured_name(source_register, reference)
+            }
+            Pattern::Assignment { left: _, right, .. } => {
+                let undefined = self.alloc_temp()?;
+                self.emit_load_undefined(undefined)?;
+                let is_undefined = self.alloc_temp()?;
+                self.emit_profiled_binary(
+                    Opcode::StrictEqual,
+                    is_undefined,
+                    source_register,
+                    undefined,
+                )?;
+                let use_source = self.builder.emit_cond_jump_placeholder(
+                    Opcode::JumpIfFalse,
+                    self.encode_register(is_undefined)?,
+                )?;
+                let default_value = self.alloc_temp()?;
+                self.lower_initializer_with_inferred_name(right, Some(name), default_value)?;
+                self.emit_assign_captured_name(default_value, reference)?;
+                let end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+                let use_source_offset = self.builder.current_offset()?;
+                self.builder.patch_jump_to(use_source, use_source_offset)?;
+                self.emit_assign_captured_name(source_register, reference)?;
+                let end_offset = self.builder.current_offset()?;
+                self.builder.patch_jump_to(end, end_offset)?;
+                Ok(())
+            }
+            Pattern::Object { .. } | Pattern::Array { .. } | Pattern::InvalidPattern { .. } => self
+                .lower_binding_pattern_initialization(
+                    pattern,
+                    DeclarationKind::Var,
+                    source_register,
+                ),
         }
     }
 
