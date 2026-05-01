@@ -27,6 +27,9 @@ pub(super) fn dispatch_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::iterator_from_builtin() {
         return iterator_from_builtin(context, invocation).map(Some);
     }
+    if entry == super::iterator_concat_builtin() {
+        return iterator_concat_builtin(context, invocation).map(Some);
+    }
     if entry == super::iterator_reduce_builtin() {
         return iterator_reduce_builtin(context, invocation).map(Some);
     }
@@ -111,6 +114,7 @@ const ITERATOR_HELPER_PARAM_SLOT: u32 = 5;
 const ITERATOR_HELPER_COUNTER_SLOT: u32 = 6;
 const ITERATOR_HELPER_INNER_ITERATED_SLOT: u32 = 7;
 const ITERATOR_HELPER_INNER_NEXT_METHOD_SLOT: u32 = 8;
+const ITERATOR_HELPER_SEQUENCE_BASE_SLOT: u32 = 7;
 
 impl ArrayIterationKind {
     #[inline]
@@ -137,6 +141,7 @@ enum IteratorHelperKind {
     Drop = 3,
     FlatMap = 4,
     Wrap = 5,
+    Concat = 6,
 }
 
 impl IteratorHelperKind {
@@ -149,6 +154,7 @@ impl IteratorHelperKind {
             Some(3) => Some(Self::Drop),
             Some(4) => Some(Self::FlatMap),
             Some(5) => Some(Self::Wrap),
+            Some(6) => Some(Self::Concat),
             _ => None,
         }
     }
@@ -1012,6 +1018,54 @@ fn iterator_to_array_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_object_ref(array))
 }
 
+fn iterator_concat_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let arguments = invocation.arguments();
+    let iterator_symbol = cx
+        .agent()
+        .well_known_symbol(WellKnownSymbolId::Iterator)
+        .ok_or_else(|| type_error(cx))?;
+    let count = i32::try_from(arguments.len()).map_err(|_| type_error(cx))?;
+    let mut slot_values = Vec::with_capacity(ITERATOR_HELPER_SEQUENCE_BASE_SLOT as usize + 2);
+    slot_values.extend_from_slice(&[
+        Value::undefined(),
+        Value::undefined(),
+        Value::from_bool(false),
+        Value::from_bool(false),
+        IteratorHelperKind::Concat.into_value(),
+        Value::from_smi(count),
+        Value::from_smi(0),
+    ]);
+    for item in arguments.iter().copied() {
+        let iterable = item.as_object_ref().ok_or_else(|| type_error(cx))?;
+        let method = cx.get_property_value(
+            Value::from_object_ref(iterable),
+            PropertyKey::from_symbol(iterator_symbol),
+        )?;
+        if method.is_undefined() || method.is_null() {
+            return Err(type_error(cx));
+        }
+        let method = cx.require_callable_object(method)?;
+        slot_values.push(Value::from_object_ref(iterable));
+        slot_values.push(Value::from_object_ref(method));
+    }
+    let realm = cx.builtin_realm();
+    let prototype = cx
+        .agent()
+        .realm(realm)
+        .and_then(|record| record.intrinsics().iterator_helper_prototype())
+        .ok_or_else(|| type_error(cx))?;
+    let helper = allocate_iterator_object(
+        cx,
+        prototype,
+        OrdinaryObjectData::IteratorHelper,
+        slot_values.as_slice(),
+    )?;
+    Ok(Value::from_object_ref(helper))
+}
+
 fn iterator_map_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -1201,6 +1255,7 @@ fn iterator_helper_next_builtin<Cx: PublicBuiltinDispatchContext>(
         IteratorHelperKind::Drop => iterator_helper_drop_next(cx, helper),
         IteratorHelperKind::FlatMap => iterator_helper_flat_map_next(cx, helper),
         IteratorHelperKind::Wrap => iterator_helper_wrap_next(cx, helper),
+        IteratorHelperKind::Concat => iterator_helper_concat_next(cx, helper),
     };
     set_iterator_helper_running(cx, helper, false)?;
     result
@@ -1211,11 +1266,11 @@ fn iterator_helper_return_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let helper = iterator_helper_this_object(cx, invocation.this_value())?;
-    if iterator_helper_done(cx, helper)? {
-        return create_iterator_result_value(cx, Value::undefined(), true);
-    }
     if iterator_helper_running(cx, helper)? {
         return Err(type_error(cx));
+    }
+    if iterator_helper_done(cx, helper)? {
+        return create_iterator_result_value(cx, Value::undefined(), true);
     }
     set_iterator_helper_running(cx, helper, true)?;
     set_iterator_helper_done(cx, helper)?;
@@ -1228,6 +1283,11 @@ fn iterator_helper_return_builtin<Cx: PublicBuiltinDispatchContext>(
     .ok_or_else(|| type_error(cx))?;
     if kind == IteratorHelperKind::Wrap {
         let result = iterator_helper_wrap_return(cx, helper);
+        set_iterator_helper_running(cx, helper, false)?;
+        return result;
+    }
+    if kind == IteratorHelperKind::Concat {
+        let result = iterator_helper_concat_return(cx, helper);
         set_iterator_helper_running(cx, helper, false)?;
         return result;
     }
@@ -1289,6 +1349,80 @@ fn iterator_helper_wrap_return<Cx: PublicBuiltinDispatchContext>(
     }
     let return_method = cx.require_callable_object(return_value)?;
     cx.call_to_completion(return_method, Value::from_object_ref(iterated), &[])
+}
+
+fn iterator_helper_concat_next<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    helper: ObjectRef,
+) -> Result<Value, Cx::Error> {
+    loop {
+        if let Some(mut iterator_record) = iterator_helper_active_record(cx, helper)? {
+            let next = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_step(&mut bridge, &mut iterator_record)
+            };
+            let next = match next {
+                Ok(next) => next,
+                Err(error) => {
+                    set_iterator_helper_done(cx, helper)?;
+                    return Err(error);
+                }
+            };
+            let Some(next) = next else {
+                clear_iterator_helper_current(cx, helper)?;
+                continue;
+            };
+            let value = {
+                let mut bridge = BuiltinIteratorBridge { cx };
+                iterator::iterator_value(&mut bridge, next)
+            };
+            let value = match value {
+                Ok(value) => value,
+                Err(error) => {
+                    set_iterator_helper_done(cx, helper)?;
+                    return Err(error);
+                }
+            };
+            return create_iterator_result_value(cx, value, false);
+        }
+
+        let index = iterator_helper_counter(cx, helper)?;
+        let count = iterator_helper_sequence_count(cx, helper)?;
+        if index >= count {
+            set_iterator_helper_done(cx, helper)?;
+            return create_iterator_result_value(cx, Value::undefined(), true);
+        }
+        if let Err(error) = iterator_helper_concat_open_current(cx, helper, index) {
+            set_iterator_helper_done(cx, helper)?;
+            return Err(error);
+        }
+        set_iterator_slot_value_for_builtin(
+            cx,
+            helper,
+            OrdinaryObjectData::IteratorHelper,
+            ITERATOR_HELPER_COUNTER_SLOT,
+            u64_to_value(index.saturating_add(1)),
+        )?;
+    }
+}
+
+fn iterator_helper_concat_return<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    helper: ObjectRef,
+) -> Result<Value, Cx::Error> {
+    if let Some(mut iterator_record) = iterator_helper_active_record(cx, helper)? {
+        clear_iterator_helper_current(cx, helper)?;
+        let close_result = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_close(
+                &mut bridge,
+                &mut iterator_record,
+                Ok::<(), lyng_js_types::AbruptCompletion>(()),
+            )
+        };
+        close_result?;
+    }
+    create_iterator_result_value(cx, Value::undefined(), true)
 }
 
 fn iterator_helper_map_next<Cx: PublicBuiltinDispatchContext>(
@@ -1740,6 +1874,29 @@ fn iterator_helper_record<Cx: PublicBuiltinDispatchContext>(
     Ok(iterator::IteratorRecord::new(iterated, next_method))
 }
 
+fn iterator_helper_active_record<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    helper: ObjectRef,
+) -> Result<Option<iterator::IteratorRecord>, Cx::Error> {
+    let iterated = iterator_slot_value_for_builtin(
+        cx,
+        helper,
+        OrdinaryObjectData::IteratorHelper,
+        ITERATOR_HELPER_ITERATED_SLOT,
+    )?;
+    let Some(iterated) = iterated.as_object_ref() else {
+        return Ok(None);
+    };
+    let next_value = iterator_slot_value_for_builtin(
+        cx,
+        helper,
+        OrdinaryObjectData::IteratorHelper,
+        ITERATOR_HELPER_NEXT_METHOD_SLOT,
+    )?;
+    let next_method = cx.require_callable_object(next_value)?;
+    Ok(Some(iterator::IteratorRecord::new(iterated, next_method)))
+}
+
 fn iterator_helper_iterated_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     helper: ObjectRef,
@@ -1849,6 +2006,81 @@ fn set_iterator_helper_limit<Cx: PublicBuiltinDispatchContext>(
         OrdinaryObjectData::IteratorHelper,
         ITERATOR_HELPER_PARAM_SLOT,
         number_value(value),
+    )
+}
+
+fn iterator_helper_sequence_count<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    helper: ObjectRef,
+) -> Result<u64, Cx::Error> {
+    iterator_slot_value_for_builtin(
+        cx,
+        helper,
+        OrdinaryObjectData::IteratorHelper,
+        ITERATOR_HELPER_PARAM_SLOT,
+    )?
+    .as_smi()
+    .and_then(|count| u64::try_from(count).ok())
+    .ok_or_else(|| type_error(cx))
+}
+
+fn iterator_helper_concat_open_current<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    helper: ObjectRef,
+    index: u64,
+) -> Result<(), Cx::Error> {
+    let slot_base = ITERATOR_HELPER_SEQUENCE_BASE_SLOT
+        .checked_add(u32::try_from(index.saturating_mul(2)).map_err(|_| type_error(cx))?)
+        .ok_or_else(|| type_error(cx))?;
+    let iterable =
+        iterator_slot_value_for_builtin(cx, helper, OrdinaryObjectData::IteratorHelper, slot_base)?
+            .as_object_ref()
+            .ok_or_else(|| type_error(cx))?;
+    let method = iterator_slot_value_for_builtin(
+        cx,
+        helper,
+        OrdinaryObjectData::IteratorHelper,
+        slot_base.saturating_add(1),
+    )?
+    .as_object_ref()
+    .ok_or_else(|| type_error(cx))?;
+    let iterator = cx.call_to_completion(method, Value::from_object_ref(iterable), &[])?;
+    let iterator = iterator.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let next_key = property_key_from_text(cx, "next");
+    let next = cx.get_property_value(Value::from_object_ref(iterator), next_key)?;
+    set_iterator_slot_value_for_builtin(
+        cx,
+        helper,
+        OrdinaryObjectData::IteratorHelper,
+        ITERATOR_HELPER_ITERATED_SLOT,
+        Value::from_object_ref(iterator),
+    )?;
+    set_iterator_slot_value_for_builtin(
+        cx,
+        helper,
+        OrdinaryObjectData::IteratorHelper,
+        ITERATOR_HELPER_NEXT_METHOD_SLOT,
+        next,
+    )
+}
+
+fn clear_iterator_helper_current<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    helper: ObjectRef,
+) -> Result<(), Cx::Error> {
+    set_iterator_slot_value_for_builtin(
+        cx,
+        helper,
+        OrdinaryObjectData::IteratorHelper,
+        ITERATOR_HELPER_ITERATED_SLOT,
+        Value::undefined(),
+    )?;
+    set_iterator_slot_value_for_builtin(
+        cx,
+        helper,
+        OrdinaryObjectData::IteratorHelper,
+        ITERATOR_HELPER_NEXT_METHOD_SLOT,
+        Value::undefined(),
     )
 }
 

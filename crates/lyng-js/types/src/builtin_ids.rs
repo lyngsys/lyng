@@ -788,6 +788,7 @@ const ITERATOR_TAKE_RAW: u32 = 3_571;
 const ITERATOR_DROP_RAW: u32 = 3_572;
 const ITERATOR_DISPOSE_RAW: u32 = 3_573;
 const ITERATOR_FLAT_MAP_RAW: u32 = 3_574;
+const ITERATOR_CONCAT_RAW: u32 = 3_575;
 const DATA_VIEW_GET_BIG_INT64_RAW: u32 = 3_554;
 const DATA_VIEW_GET_BIG_UINT64_RAW: u32 = 3_555;
 const DATA_VIEW_SET_BIG_INT64_RAW: u32 = 3_556;
@@ -871,7 +872,7 @@ pub const CORE_BUILTIN_NAMESPACE_END: u32 = REGEXP_LEGACY_PAREN9_GETTER_RAW;
 pub const COMPLETION_BUILTIN_NAMESPACE_START: u32 = PROMISE_RAW;
 
 /// Last reserved builtin-entry payload for the public completion builtin namespace.
-pub const COMPLETION_BUILTIN_NAMESPACE_END: u32 = ITERATOR_FLAT_MAP_RAW;
+pub const COMPLETION_BUILTIN_NAMESPACE_END: u32 = ITERATOR_CONCAT_RAW;
 
 /// Returns whether a builtin ID falls inside the reserved internal helper namespace.
 #[inline]

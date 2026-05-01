@@ -17,6 +17,14 @@ pub fn iterator_from_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn iterator_concat_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ITERATOR_CONCAT_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn iterator_reduce_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(ITERATOR_REDUCE_RAW) {
         Some(id) => id,

@@ -26,6 +26,10 @@ pub(in crate::public::metadata) const PUBLIC_TEXT_BUILTIN_METADATA: &[PublicBuil
         BuiltinEntryMetadata::new("from", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        iterator_concat_builtin,
+        BuiltinEntryMetadata::new("concat", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         iterator_reduce_builtin,
         BuiltinEntryMetadata::new("reduce", 1, false, false),
     ),
