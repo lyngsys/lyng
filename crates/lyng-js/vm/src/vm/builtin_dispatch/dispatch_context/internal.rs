@@ -103,8 +103,13 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .get_template_object_builtin(self.agent, self.caller_frame, invocation.arguments())
+        self.vm.get_template_object_builtin(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            invocation.arguments(),
+        )
     }
 
     fn instance_of_builtin(

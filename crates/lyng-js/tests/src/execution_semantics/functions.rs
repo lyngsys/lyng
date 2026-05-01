@@ -1055,6 +1055,31 @@ fn phase4_functions_preserve_cooked_and_raw_tagged_template_parts() {
 }
 
 #[test]
+fn phase4_functions_freeze_tagged_template_objects_and_raw_arrays() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        (function(strings) {
+            const cooked = Object.getOwnPropertyDescriptor(strings, "0");
+            const raw = Object.getOwnPropertyDescriptor(strings, "raw");
+            const length = Object.getOwnPropertyDescriptor(strings, "length");
+            score += Object.isFrozen(strings) ? 1 : 0;
+            score += Object.isFrozen(strings.raw) ? 2 : 0;
+            score += cooked.enumerable === true && cooked.writable === false && cooked.configurable === false ? 4 : 0;
+            score += raw.enumerable === false && raw.writable === false && raw.configurable === false ? 8 : 0;
+            score += length.enumerable === false && length.writable === false && length.configurable === false ? 16 : 0;
+            strings.extra = 1;
+            strings.raw.extra = 2;
+            score += strings.extra === undefined && strings.raw.extra === undefined ? 32 : 0;
+        })`left${1}right`;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
 fn phase4_functions_dispatch_native_call_and_construct_through_registry() {
     let call_entry = BuiltinFunctionId::from_raw(1).unwrap();
     let construct_entry = BuiltinFunctionId::from_raw(2).unwrap();

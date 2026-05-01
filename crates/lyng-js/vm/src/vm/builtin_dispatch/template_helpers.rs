@@ -71,6 +71,8 @@ impl Vm {
     pub(super) fn get_template_object_builtin(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
@@ -121,6 +123,9 @@ impl Vm {
         }
         self.sync_engine_array_length(agent, cooked)?;
         self.sync_engine_array_length(agent, raw)?;
+        if !self.set_integrity_level(agent, host, registry, caller, raw, true)? {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
 
         let raw_name = agent.atoms_mut().intern_collectible("raw");
         self.define_data_property_with_attrs(
@@ -132,6 +137,9 @@ impl Vm {
             false,
             false,
         )?;
+        if !self.set_integrity_level(agent, host, registry, caller, cooked, true)? {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
         self.template_cache.insert(key, cooked);
         Ok(Value::from_object_ref(cooked))
     }
