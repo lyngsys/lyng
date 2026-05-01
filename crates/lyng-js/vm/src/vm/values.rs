@@ -998,7 +998,7 @@ fn string_view_array_index(view: PrimitiveStringView<'_>) -> Option<u32> {
 }
 
 #[inline]
-fn string_text_array_index(text: &str) -> Option<u32> {
+pub(super) fn string_text_array_index(text: &str) -> Option<u32> {
     let bytes = text.as_bytes();
     if bytes.is_empty() {
         return None;

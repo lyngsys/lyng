@@ -1142,6 +1142,59 @@ fn module_namespace_reads_initialized_local_renamed_indirect_and_default_exports
 }
 
 #[test]
+fn module_namespace_numeric_export_names_match_array_index_keys() {
+    let source = "import * as ns from './main.mjs'; var a = 0; var b = 1; export { a as \"0\", b as \"1\" }; let status = 0; if (ns[0] === 0) status += 1; if (Reflect.get(ns, 1) === 1) status += 2; if (0 in ns) status += 4; if (Reflect.has(ns, 1)) status += 8; if (!Reflect.set(ns, 1, 3)) status += 16; try { delete ns[0]; } catch (error) { if (error.constructor === TypeError) status += 32; } if (!Reflect.deleteProperty(ns, 1)) status += 64; export { status };";
+    let host = TestHost::new();
+    host.define_module_source(
+        "main.mjs",
+        LoadedModuleSource::new(ModuleKey::new("/tmp/main.mjs"), "main.mjs", source),
+    );
+    host.define_module_source(
+        "./main.mjs",
+        LoadedModuleSource::new(ModuleKey::new("/tmp/main.mjs"), "main.mjs", source),
+    );
+    let unit = compile_test_module(251, source);
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let loaded = vm
+        .load_module_graph_from_host(
+            agent,
+            realm,
+            &host,
+            &ModuleSourceRequest {
+                specifier: "main.mjs".into(),
+                referrer: None,
+                attributes: Vec::new(),
+            },
+        )
+        .unwrap();
+
+    let _ = vm
+        .evaluate_linked_module(agent, realm, loaded.key())
+        .unwrap();
+
+    let record = agent
+        .module_record(loaded.key())
+        .expect("module should stay cached after evaluation");
+    let module_env = record
+        .environment()
+        .expect("module evaluation should allocate one environment");
+    let status_slot = unit
+        .local_exports()
+        .iter()
+        .find(|entry| unit.atom_text(entry.export_name()) == Some("status"))
+        .expect("module should export status")
+        .local_slot();
+
+    assert_eq!(
+        agent.environment_slot(module_env, status_slot),
+        Some(Value::from_smi(127))
+    );
+}
+
+#[test]
 fn module_namespace_get_own_property_reports_initialized_exports() {
     let source = "import * as ns from './main.mjs'; export var local1 = 201; var local2 = 207; export { local2 as renamed }; export { local1 as indirect } from './main.mjs'; export default 302; let status = 0; let desc = Object.getOwnPropertyDescriptor(ns, 'local1'); if (Object.prototype.hasOwnProperty.call(ns, 'local1') && desc.value === 201 && desc.enumerable === true && desc.writable === true && desc.configurable === false) status += 1; desc = Object.getOwnPropertyDescriptor(ns, 'renamed'); if (Object.prototype.hasOwnProperty.call(ns, 'renamed') && desc.value === 207 && desc.enumerable === true && desc.writable === true && desc.configurable === false) status += 2; desc = Object.getOwnPropertyDescriptor(ns, 'indirect'); if (Object.prototype.hasOwnProperty.call(ns, 'indirect') && desc.value === 201 && desc.enumerable === true && desc.writable === true && desc.configurable === false) status += 4; desc = Object.getOwnPropertyDescriptor(ns, 'default'); if (Object.prototype.hasOwnProperty.call(ns, 'default') && desc.value === 302 && desc.enumerable === true && desc.writable === true && desc.configurable === false) status += 8; export { status };";
     let host = TestHost::new();

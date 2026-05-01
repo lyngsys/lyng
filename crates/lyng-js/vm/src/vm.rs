@@ -69,7 +69,7 @@ mod with_env;
 use call::RejectingNativeRegistry;
 use feedback::FeedbackVector;
 use install::InstalledFunction;
-use values::{bytecode_index, code_index};
+use values::{bytecode_index, code_index, string_text_array_index};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FeedbackVectorFootprint {
@@ -1833,6 +1833,7 @@ impl Vm {
                         }
                     },
                 )
+                .with_array_index(module_export_array_index(agent, entry.export_name()))
             })
             .collect::<Vec<_>>();
         exports.sort_by(|left, right| {
@@ -1940,6 +1941,13 @@ impl Vm {
             }
         }
     }
+}
+
+fn module_export_array_index(agent: &Agent, export_name: AtomId) -> Option<u32> {
+    agent
+        .atoms()
+        .get(export_name)
+        .and_then(string_text_array_index)
 }
 
 fn compiled_module_record(

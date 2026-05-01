@@ -7,12 +7,9 @@ impl ObjectRuntime {
         id: ObjectRef,
         key: PropertyKey,
     ) -> InternalMethodResult<Option<PropertyDescriptor>> {
-        let Some(atom) = key.as_atom() else {
-            return self.ordinary_get_own_property(heap, id, key);
-        };
         let Some(export) = self
             .module_namespace_slot(id)
-            .and_then(|namespace| namespace.export(atom))
+            .and_then(|namespace| namespace.export_for_key(key))
         else {
             return self.ordinary_get_own_property(heap, id, key);
         };
@@ -32,12 +29,9 @@ impl ObjectRuntime {
         descriptor: PropertyDescriptor,
         lifetime: AllocationLifetime,
     ) -> InternalMethodResult<bool> {
-        let Some(atom) = key.as_atom() else {
-            return self.ordinary_define_own_property(heap, id, key, descriptor, lifetime);
-        };
         let Some(export) = self
             .module_namespace_slot(id)
-            .and_then(|namespace| namespace.export(atom))
+            .and_then(|namespace| namespace.export_for_key(key))
         else {
             return self.ordinary_define_own_property(heap, id, key, descriptor, lifetime);
         };
@@ -73,7 +67,7 @@ impl ObjectRuntime {
     ) -> InternalMethodResult<bool> {
         if self
             .module_namespace_slot(id)
-            .and_then(|namespace| key.as_atom().and_then(|atom| namespace.export(atom)))
+            .and_then(|namespace| namespace.export_for_key(key))
             .is_some()
         {
             return Ok(false);
@@ -92,7 +86,7 @@ impl ObjectRuntime {
         let mut keys = namespace
             .exports()
             .iter()
-            .map(|entry| PropertyKey::from_atom(entry.export_name()))
+            .map(|entry| entry.export_key())
             .collect::<Vec<_>>();
         let (_, mut symbols) = self.collect_own_named_keys(heap, id)?;
         keys.append(&mut symbols);
