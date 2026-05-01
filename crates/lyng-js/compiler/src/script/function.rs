@@ -166,6 +166,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let activation = state.activation(sema_id).clone();
 
         let class_metadata = state.class_function_metadata(function);
+        let class_constructor = class_metadata
+            .map(|metadata| metadata.class_constructor)
+            .unwrap_or(false);
         let class_constructor_needs_environment = state
             .class_constructor_plan(function)
             .map(|plan| plan.needs_environment)
@@ -177,16 +180,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .map(|metadata| metadata.derived_class_constructor)
             .unwrap_or(false);
         let mut builder = BytecodeBuilder::new(id, function_kind);
-        builder.set_name(ast_function.name);
+        builder.set_name(if class_constructor {
+            None
+        } else {
+            ast_function.name
+        });
         builder.set_flags(
             BytecodeFunctionFlags::new(function_record.strict, false)
                 .with_constructible(constructible)
                 .with_has_prototype_property(has_prototype_property)
-                .with_class_constructor(
-                    class_metadata
-                        .map(|metadata| metadata.class_constructor)
-                        .unwrap_or(false),
-                )
+                .with_class_constructor(class_constructor)
                 .with_derived_class_constructor(derived_class_constructor)
                 .with_generator(matches!(
                     ast_function.kind,

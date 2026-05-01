@@ -243,10 +243,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             super_span,
         )?;
 
+        let class_name = name.unwrap_or_else(|| self.state.atoms.intern_collectible(""));
+        let name_value = self.alloc_temp()?;
+        self.emit_load_atom_string(name_value, class_name)?;
+        self.emit_set_function_name(dest, name_value)?;
+
         if let Some(name) = name {
-            let name_value = self.alloc_temp()?;
-            self.emit_load_atom_string(name_value, name)?;
-            self.emit_set_function_name(dest, name_value)?;
             if let Some(binding_id) = self.class_self_binding(body, class_span, name)? {
                 self.store_binding_value(binding_id, name, dest)?;
             }

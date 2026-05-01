@@ -296,6 +296,31 @@ fn phase6_anonymous_class_expressions_infer_names_before_static_initializers() {
 }
 
 #[test]
+fn phase6_class_expression_name_descriptors_match_class_names() {
+    let result = compile_and_run_string(
+        r#"
+        function describe(C) {
+            let descriptor = Object.getOwnPropertyDescriptor(C, "name");
+            return descriptor.value + ":"
+                + String(descriptor.writable) + ":"
+                + String(descriptor.enumerable) + ":"
+                + String(descriptor.configurable);
+        }
+
+        describe(class {}) + "|"
+            + describe(class Named {}) + "|"
+            + describe(class { constructor() {} }) + "|"
+            + describe(class WithCtor { constructor() {} });
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        ":false:false:true|Named:false:false:true|:false:false:true|WithCtor:false:false:true"
+    );
+}
+
+#[test]
 fn phase6_classes_link_derived_constructor_and_prototype_chains() {
     let result = compile_and_run(
         r#"
