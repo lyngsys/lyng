@@ -3093,6 +3093,51 @@ fn script_core_array_buffer_resizable_accessors_and_transfer() {
 }
 
 #[test]
+fn script_core_typed_array_concrete_prototypes_inherit_generic_surface() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let base = Object.getPrototypeOf(Uint8Array.prototype);
+        let inheritedNames = [
+            "buffer", "byteLength", "byteOffset", "length",
+            "values", "keys", "entries", "set", "slice", "subarray",
+            "copyWithin", "every", "fill", "filter", "find", "findIndex",
+            "findLast", "findLastIndex", "forEach", "includes", "indexOf",
+            "join", "lastIndexOf", "map", "reduce", "reduceRight",
+            "reverse", "some", "sort", "toLocaleString", "toString",
+            "at", "with"
+        ];
+        let concreteOwnCommon = false;
+        for (let i = 0; i < inheritedNames.length; i = i + 1) {
+            let name = inheritedNames[i];
+            if (Uint8Array.prototype.hasOwnProperty(name) ||
+                BigInt64Array.prototype.hasOwnProperty(name)) {
+                concreteOwnCommon = true;
+            }
+        }
+
+        if (!concreteOwnCommon) score += 1;
+        if (!Uint8Array.prototype.hasOwnProperty(Symbol.iterator) &&
+            !BigInt64Array.prototype.hasOwnProperty(Symbol.iterator)) score += 2;
+        if (!Uint8Array.prototype.hasOwnProperty(Symbol.toStringTag) &&
+            !BigInt64Array.prototype.hasOwnProperty(Symbol.toStringTag)) score += 4;
+        if (base.hasOwnProperty("buffer") &&
+            base.hasOwnProperty("values") &&
+            base.hasOwnProperty(Symbol.iterator) &&
+            base.hasOwnProperty(Symbol.toStringTag)) score += 8;
+        if (Uint8Array.prototype.hasOwnProperty("constructor") &&
+            Uint8Array.prototype.hasOwnProperty("BYTES_PER_ELEMENT") &&
+            BigInt64Array.prototype.hasOwnProperty("constructor") &&
+            BigInt64Array.prototype.hasOwnProperty("BYTES_PER_ELEMENT")) score += 16;
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"

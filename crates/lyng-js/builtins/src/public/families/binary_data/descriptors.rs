@@ -38,61 +38,6 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
         Some(bootstrap_atoms.atomics()),
         AllocationLifetime::Default,
     ));
-    let int8_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "Int8Array",
-        Some(bootstrap_atoms.int8_array()),
-        AllocationLifetime::Default,
-    ));
-    let int16_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "Int16Array",
-        Some(bootstrap_atoms.int16_array()),
-        AllocationLifetime::Default,
-    ));
-    let int32_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "Int32Array",
-        Some(bootstrap_atoms.int32_array()),
-        AllocationLifetime::Default,
-    ));
-    let float32_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "Float32Array",
-        Some(bootstrap_atoms.float32_array()),
-        AllocationLifetime::Default,
-    ));
-    let float64_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "Float64Array",
-        Some(bootstrap_atoms.float64_array()),
-        AllocationLifetime::Default,
-    ));
-    let big_int64_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "BigInt64Array",
-        Some(bootstrap_atoms.big_int64_array()),
-        AllocationLifetime::Default,
-    ));
-    let big_uint64_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "BigUint64Array",
-        Some(bootstrap_atoms.big_uint64_array()),
-        AllocationLifetime::Default,
-    ));
-    let uint32_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "Uint32Array",
-        Some(bootstrap_atoms.uint32_array()),
-        AllocationLifetime::Default,
-    ));
-    let uint16_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "Uint16Array",
-        Some(bootstrap_atoms.uint16_array()),
-        AllocationLifetime::Default,
-    ));
-    let uint8_clamped_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "Uint8ClampedArray",
-        Some(bootstrap_atoms.uint8_clamped_array()),
-        AllocationLifetime::Default,
-    ));
-    let uint8_array_tag = Value::from_string_ref(agent.alloc_runtime_string(
-        "Uint8Array",
-        Some(bootstrap_atoms.uint8_array()),
-        AllocationLifetime::Default,
-    ));
     let last_index_of_atom = agent.atoms_mut().intern("lastIndexOf");
     let copy_within_atom = agent.atoms_mut().intern("copyWithin");
     let entries_atom = agent.atoms_mut().intern("entries");
@@ -287,19 +232,6 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
             set_from_hex: set_from_hex_atom,
             to_base64: to_base64_atom,
             to_hex: to_hex_atom,
-        },
-        typed_arrays::TypedArrayDescriptorTags {
-            int8_array: int8_array_tag,
-            int16_array: int16_array_tag,
-            int32_array: int32_array_tag,
-            float32_array: float32_array_tag,
-            float64_array: float64_array_tag,
-            big_int64_array: big_int64_array_tag,
-            big_uint64_array: big_uint64_array_tag,
-            uint32_array: uint32_array_tag,
-            uint16_array: uint16_array_tag,
-            uint8_clamped_array: uint8_clamped_array_tag,
-            uint8_array: uint8_array_tag,
         },
     );
     let tables = [

@@ -21,7 +21,7 @@ use lyng_js_types::{
     uint8_array_length_getter_builtin, uint8_array_set_builtin,
     uint8_array_set_from_base64_builtin, uint8_array_set_from_hex_builtin,
     uint8_array_slice_builtin, uint8_array_subarray_builtin, uint8_array_to_base64_builtin,
-    uint8_array_to_hex_builtin, uint8_array_values_builtin, Value, WellKnownSymbolId,
+    uint8_array_to_hex_builtin, uint8_array_values_builtin, ObjectRef, Value, WellKnownSymbolId,
 };
 
 pub(super) struct TypedArrayDescriptorAtoms {
@@ -69,52 +69,98 @@ pub(super) struct TypedArrayDescriptorAtoms {
     pub(super) to_hex: AtomId,
 }
 
-pub(super) struct TypedArrayDescriptorTags {
-    pub(super) int8_array: Value,
-    pub(super) int16_array: Value,
-    pub(super) int32_array: Value,
-    pub(super) float32_array: Value,
-    pub(super) float64_array: Value,
-    pub(super) big_int64_array: Value,
-    pub(super) big_uint64_array: Value,
-    pub(super) uint32_array: Value,
-    pub(super) uint16_array: Value,
-    pub(super) uint8_clamped_array: Value,
-    pub(super) uint8_array: Value,
-}
-
 pub(super) struct TypedArrayDescriptorSets {
     pub(super) typed_array_descriptors: [BuiltinPropertyDescriptor; 3],
     pub(super) typed_array_prototype_descriptors: [BuiltinPropertyDescriptor; 38],
     pub(super) int8_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) int8_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) int8_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) int16_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) int16_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) int16_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) int32_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) int32_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) int32_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) float32_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) float32_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) float32_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) float64_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) float64_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) float64_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) big_int64_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) big_int64_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) big_int64_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) big_uint64_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) big_uint64_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) big_uint64_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) uint32_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) uint32_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) uint32_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) uint16_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) uint16_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) uint16_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) uint8_clamped_array_descriptors: [BuiltinPropertyDescriptor; 1],
-    pub(super) uint8_clamped_array_prototype_descriptors: [BuiltinPropertyDescriptor; 14],
+    pub(super) uint8_clamped_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) uint8_array_descriptors: [BuiltinPropertyDescriptor; 3],
-    pub(super) uint8_array_prototype_descriptors: [BuiltinPropertyDescriptor; 18],
+    pub(super) uint8_array_prototype_descriptors: [BuiltinPropertyDescriptor; 6],
+}
+
+fn concrete_typed_array_prototype_descriptors(
+    constructor: ObjectRef,
+    bytes_per_element_atom: AtomId,
+    bytes_per_element: i32,
+) -> [BuiltinPropertyDescriptor; 2] {
+    [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(constructor)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(bytes_per_element)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+    ]
+}
+
+fn uint8_array_prototype_descriptors(
+    constructor: ObjectRef,
+    bytes_per_element_atom: AtomId,
+    set_from_base64_atom: AtomId,
+    set_from_hex_atom: AtomId,
+    to_base64_atom: AtomId,
+    to_hex_atom: AtomId,
+) -> [BuiltinPropertyDescriptor; 6] {
+    [
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
+            BuiltinPropertyValueSpec::Data(Value::from_object_ref(constructor)),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
+            BuiltinAttributes::new(false, false, false),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_from_base64_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_from_base64_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(set_from_hex_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_from_hex_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(to_base64_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_to_base64_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(to_hex_atom),
+            BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_to_hex_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+    ]
 }
 
 #[allow(clippy::too_many_lines)]
 pub(super) fn descriptor_sets(
     builtins: &PublicRealmBuiltins,
     atoms: TypedArrayDescriptorAtoms,
-    tags: TypedArrayDescriptorTags,
 ) -> TypedArrayDescriptorSets {
     let TypedArrayDescriptorAtoms {
         last_index_of: last_index_of_atom,
@@ -160,20 +206,6 @@ pub(super) fn descriptor_sets(
         to_base64: to_base64_atom,
         to_hex: to_hex_atom,
     } = atoms;
-    let TypedArrayDescriptorTags {
-        int8_array: int8_array_tag,
-        int16_array: int16_array_tag,
-        int32_array: int32_array_tag,
-        float32_array: float32_array_tag,
-        float64_array: float64_array_tag,
-        big_int64_array: big_int64_array_tag,
-        big_uint64_array: big_uint64_array_tag,
-        uint32_array: uint32_array_tag,
-        uint16_array: uint16_array_tag,
-        uint8_clamped_array: uint8_clamped_array_tag,
-        uint8_array: uint8_array_tag,
-    } = tags;
-
     TypedArrayDescriptorSets {
         typed_array_descriptors: [
             BuiltinPropertyDescriptor::new(
@@ -407,893 +439,101 @@ pub(super) fn descriptor_sets(
             BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
             BuiltinAttributes::new(false, false, false),
         )],
-        int8_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.int8_array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(int8_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        int8_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.int8_array,
+            bytes_per_element_atom,
+            1,
+        ),
         int16_array_descriptors: [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
             BuiltinPropertyValueSpec::Data(Value::from_smi(2)),
             BuiltinAttributes::new(false, false, false),
         )],
-        int16_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.int16_array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(2)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(int16_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        int16_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.int16_array,
+            bytes_per_element_atom,
+            2,
+        ),
         int32_array_descriptors: [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
             BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
             BuiltinAttributes::new(false, false, false),
         )],
-        int32_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.int32_array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(int32_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        int32_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.int32_array,
+            bytes_per_element_atom,
+            4,
+        ),
         float32_array_descriptors: [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
             BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
             BuiltinAttributes::new(false, false, false),
         )],
-        float32_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.float32_array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(float32_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        float32_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.float32_array,
+            bytes_per_element_atom,
+            4,
+        ),
         float64_array_descriptors: [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
             BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
             BuiltinAttributes::new(false, false, false),
         )],
-        float64_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.float64_array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(float64_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        float64_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.float64_array,
+            bytes_per_element_atom,
+            8,
+        ),
         big_int64_array_descriptors: [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
             BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
             BuiltinAttributes::new(false, false, false),
         )],
-        big_int64_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.big_int64_array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(big_int64_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        big_int64_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.big_int64_array,
+            bytes_per_element_atom,
+            8,
+        ),
         big_uint64_array_descriptors: [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
             BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
             BuiltinAttributes::new(false, false, false),
         )],
-        big_uint64_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.big_uint64_array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(8)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(big_uint64_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        big_uint64_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.big_uint64_array,
+            bytes_per_element_atom,
+            8,
+        ),
         uint32_array_descriptors: [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
             BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
             BuiltinAttributes::new(false, false, false),
         )],
-        uint32_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.uint32_array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(4)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(uint32_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        uint32_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.uint32_array,
+            bytes_per_element_atom,
+            4,
+        ),
         uint16_array_descriptors: [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
             BuiltinPropertyValueSpec::Data(Value::from_smi(2)),
             BuiltinAttributes::new(false, false, false),
         )],
-        uint16_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.uint16_array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(2)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(uint16_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        uint16_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.uint16_array,
+            bytes_per_element_atom,
+            2,
+        ),
         uint8_clamped_array_descriptors: [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
             BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
             BuiltinAttributes::new(false, false, false),
         )],
-        uint8_clamped_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(
-                    builtins.uint8_clamped_array,
-                )),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(uint8_clamped_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        uint8_clamped_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.uint8_clamped_array,
+            bytes_per_element_atom,
+            1,
+        ),
         uint8_array_descriptors: [
             BuiltinPropertyDescriptor::new(
                 BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
@@ -1311,109 +551,13 @@ pub(super) fn descriptor_sets(
                 BuiltinAttributes::new(true, false, true),
             ),
         ],
-        uint8_array_prototype_descriptors: [
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::constructor.id()),
-                BuiltinPropertyValueSpec::Data(Value::from_object_ref(builtins.uint8_array)),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
-                BuiltinPropertyValueSpec::Data(Value::from_smi(1)),
-                BuiltinAttributes::new(false, false, false),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(buffer_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_buffer_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_length_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(byte_offset_atom),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_byte_offset_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(WellKnownAtom::length.id()),
-                BuiltinPropertyValueSpec::Accessor {
-                    get: Some(uint8_array_length_getter_builtin()),
-                    set: None,
-                },
-                BuiltinAttributes::new(false, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(values_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(keys_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_keys_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(entries_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_entries_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(slice_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_slice_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(subarray_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_subarray_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_from_base64_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_from_base64_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(set_from_hex_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_set_from_hex_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_base64_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_to_base64_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_atom(to_hex_atom),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_to_hex_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::Iterator),
-                BuiltinPropertyValueSpec::BuiltinFunction(uint8_array_values_builtin()),
-                BuiltinAttributes::new(true, false, true),
-            ),
-            BuiltinPropertyDescriptor::new(
-                BuiltinPropertyKeySpec::from_well_known_symbol(WellKnownSymbolId::ToStringTag),
-                BuiltinPropertyValueSpec::Data(uint8_array_tag),
-                BuiltinAttributes::new(false, false, true),
-            ),
-        ],
+        uint8_array_prototype_descriptors: uint8_array_prototype_descriptors(
+            builtins.uint8_array,
+            bytes_per_element_atom,
+            set_from_base64_atom,
+            set_from_hex_atom,
+            to_base64_atom,
+            to_hex_atom,
+        ),
     }
 }

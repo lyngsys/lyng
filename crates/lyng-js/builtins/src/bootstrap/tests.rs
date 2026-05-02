@@ -1903,10 +1903,10 @@ fn shared_bootstrap_installs_binary_data_family_descriptors() {
             artifacts.realm(),
             uint8_array_buffer_getter_builtin(),
         )
-        .expect("Uint8Array.prototype.buffer getter should resolve");
+        .expect("%TypedArray%.prototype.buffer getter should resolve");
     let uint8_array_values = cache
         .builtin_constant(agent, artifacts.realm(), uint8_array_values_builtin())
-        .expect("Uint8Array.prototype.values builtin should resolve");
+        .expect("%TypedArray%.prototype.values builtin should resolve");
 
     let is_view = own_descriptor(
         agent,
@@ -2053,6 +2053,34 @@ fn shared_bootstrap_installs_binary_data_family_descriptors() {
     );
     assert_eq!(typed_array_tag.setter(), Some(Value::undefined()));
 
+    let typed_array_buffer = own_descriptor(
+        agent,
+        typed_array_prototype,
+        PropertyKey::from_atom(buffer_atom),
+        "%TypedArray%.prototype.buffer",
+    );
+    assert_eq!(typed_array_buffer.getter(), Some(uint8_array_buffer_getter));
+    assert_eq!(typed_array_buffer.setter(), Some(Value::undefined()));
+
+    let typed_array_values_descriptor = own_descriptor(
+        agent,
+        typed_array_prototype,
+        PropertyKey::from_atom(values_atom),
+        "%TypedArray%.prototype.values",
+    );
+    assert_eq!(
+        typed_array_values_descriptor.value(),
+        Some(uint8_array_values)
+    );
+
+    let typed_array_iterator = own_descriptor(
+        agent,
+        typed_array_prototype,
+        PropertyKey::from_symbol(iterator_symbol),
+        "%TypedArray%.prototype[Symbol.iterator]",
+    );
+    assert_eq!(typed_array_iterator.value(), Some(uint8_array_values));
+
     let bytes_per_element = own_descriptor(
         agent,
         uint8_array,
@@ -2075,33 +2103,65 @@ fn shared_bootstrap_installs_binary_data_family_descriptors() {
         Some(Value::from_object_ref(uint8_array))
     );
 
-    let uint8_array_buffer = own_descriptor(
+    let uint8_array_prototype_bytes_per_element = own_descriptor(
         agent,
         uint8_array_prototype,
-        PropertyKey::from_atom(buffer_atom),
-        "Uint8Array.prototype.buffer",
-    );
-    assert_eq!(uint8_array_buffer.getter(), Some(uint8_array_buffer_getter));
-    assert_eq!(uint8_array_buffer.setter(), Some(Value::undefined()));
-
-    let uint8_array_values_descriptor = own_descriptor(
-        agent,
-        uint8_array_prototype,
-        PropertyKey::from_atom(values_atom),
-        "Uint8Array.prototype.values",
+        PropertyKey::from_atom(bytes_per_element_atom),
+        "Uint8Array.prototype.BYTES_PER_ELEMENT",
     );
     assert_eq!(
-        uint8_array_values_descriptor.value(),
-        Some(uint8_array_values)
+        uint8_array_prototype_bytes_per_element.value(),
+        Some(Value::from_smi(1))
+    );
+    assert_eq!(
+        uint8_array_prototype_bytes_per_element.writable(),
+        Some(false)
+    );
+    assert_eq!(
+        uint8_array_prototype_bytes_per_element.enumerable(),
+        Some(false)
+    );
+    assert_eq!(
+        uint8_array_prototype_bytes_per_element.configurable(),
+        Some(false)
     );
 
-    let uint8_array_iterator = own_descriptor(
-        agent,
-        uint8_array_prototype,
-        PropertyKey::from_symbol(iterator_symbol),
-        "Uint8Array.prototype[Symbol.iterator]",
+    assert!(
+        agent
+            .objects()
+            .get_own_property(
+                agent.heap().view(),
+                uint8_array_prototype,
+                PropertyKey::from_atom(buffer_atom),
+            )
+            .unwrap()
+            .is_none(),
+        "Uint8Array.prototype.buffer should be inherited"
     );
-    assert_eq!(uint8_array_iterator.value(), Some(uint8_array_values));
+    assert!(
+        agent
+            .objects()
+            .get_own_property(
+                agent.heap().view(),
+                uint8_array_prototype,
+                PropertyKey::from_atom(values_atom),
+            )
+            .unwrap()
+            .is_none(),
+        "Uint8Array.prototype.values should be inherited"
+    );
+    assert!(
+        agent
+            .objects()
+            .get_own_property(
+                agent.heap().view(),
+                uint8_array_prototype,
+                PropertyKey::from_symbol(iterator_symbol),
+            )
+            .unwrap()
+            .is_none(),
+        "Uint8Array.prototype[Symbol.iterator] should be inherited"
+    );
 }
 
 #[test]
