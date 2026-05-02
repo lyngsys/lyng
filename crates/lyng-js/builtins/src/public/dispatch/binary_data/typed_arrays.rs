@@ -411,9 +411,10 @@ pub(super) fn typed_array_species_create_with_arguments<Cx: PublicBuiltinDispatc
 ) -> Result<(ObjectRef, TypedArrayObjectData), Cx::Error> {
     let constructor = typed_array_species_constructor(cx, exemplar, kind)?;
     let object = cx.construct_to_completion(constructor, arguments, None)?;
-    let record = typed_array_validated_record(cx, Value::from_object_ref(object))?;
+    let (record, actual_length) =
+        typed_array_validated_record_and_length(cx, Value::from_object_ref(object))?;
     if let Some(length) = minimum_length {
-        if record.length() < length {
+        if actual_length < length {
             return Err(type_error(cx));
         }
     }
@@ -438,8 +439,9 @@ pub(super) fn typed_array_same_kind_create<Cx: PublicBuiltinDispatchContext>(
     let constructor = typed_array_default_constructor(cx, cx.builtin_realm(), kind)?;
     let arguments = [length_value_u64(u64::try_from(length).unwrap_or(u64::MAX))];
     let object = cx.construct_to_completion(constructor, &arguments, None)?;
-    let record = typed_array_validated_record(cx, Value::from_object_ref(object))?;
-    if record.kind() != kind || record.length() != length {
+    let (record, actual_length) =
+        typed_array_validated_record_and_length(cx, Value::from_object_ref(object))?;
+    if record.kind() != kind || actual_length != length {
         return Err(type_error(cx));
     }
     Ok((object, record))

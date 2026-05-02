@@ -254,6 +254,7 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
                 .get(2)
                 .copied()
                 .filter(|value| !value.is_undefined());
+            let length_tracking = buffer.is_resizable() && explicit_length.is_none();
             let length = if let Some(value) = explicit_length {
                 let requested = to_index_for_builtin(cx, value)?;
                 usize::try_from(requested).map_err(|_| range_error(cx))?
@@ -263,7 +264,7 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
                     return Err(range_error(cx));
                 }
                 let remaining_bytes = store_len - byte_offset;
-                if remaining_bytes % element_size != 0 {
+                if remaining_bytes % element_size != 0 && !length_tracking {
                     return Err(range_error(cx));
                 }
                 remaining_bytes / element_size
@@ -281,13 +282,7 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
             if byte_offset.saturating_add(byte_length) > store_len {
                 return Err(range_error(cx));
             }
-            (
-                buffer_object,
-                store,
-                byte_offset,
-                length,
-                buffer.is_resizable() && explicit_length.is_none(),
-            )
+            (buffer_object, store, byte_offset, length, length_tracking)
         } else {
             let iterator_method = if let Some(iterator_symbol) =
                 cx.agent().well_known_symbol(WellKnownSymbolId::Iterator)

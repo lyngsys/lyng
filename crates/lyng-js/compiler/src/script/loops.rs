@@ -610,6 +610,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         body: StmtId,
     ) -> LoweringResult<Option<LoopIterationEnvironmentPlan>> {
         let mut iteration_slots = self.for_in_of_binding_slots(left)?;
+        if let Some(body_scope) = self.loop_body_block_scope(body) {
+            self.collect_per_iteration_tdz_environment_slots(body_scope, &mut iteration_slots)?;
+        }
         let per_iteration_roots = if let Some(binding_id) = self.for_in_of_capture_binding(left)? {
             let loop_scope = self.binding(binding_id)?.scope;
             self.for_in_of_capture_roots(loop_scope)
@@ -667,6 +670,43 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 },
             ),
         )
+    }
+
+    fn loop_body_block_scope(&self, body: StmtId) -> Option<ScopeId> {
+        matches!(self.ast().get_stmt(body), Stmt::Block { .. })
+            .then(|| self.peek_child_scope_with_kind(ScopeKind::Block))
+            .flatten()
+    }
+
+    fn collect_per_iteration_tdz_environment_slots(
+        &self,
+        scope: ScopeId,
+        slots: &mut Vec<u16>,
+    ) -> LoweringResult<()> {
+        let record = self.state.sema.scope_table.get(scope);
+        if record.owning_function != self.current_function {
+            return Ok(());
+        }
+        for &binding_id in &record.bindings {
+            let binding = self.binding(binding_id)?;
+            if !binding.has_tdz {
+                continue;
+            }
+            let Some((depth, slot)) = self.binding_env_access(binding_id)? else {
+                continue;
+            };
+            if depth != 0 {
+                continue;
+            }
+            slots.push(
+                u16::try_from(slot)
+                    .map_err(|_| LoweringError::ConstantIndexOverflow { index: slot })?,
+            );
+        }
+        for &child in &record.children {
+            self.collect_per_iteration_tdz_environment_slots(child, slots)?;
+        }
+        Ok(())
     }
 
     fn for_in_of_head_tdz_plan(

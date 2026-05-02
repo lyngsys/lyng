@@ -45,6 +45,27 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         None
     }
 
+    pub(super) fn peek_child_scope_with_kind(&self, kind: ScopeKind) -> Option<ScopeId> {
+        let children = self
+            .state
+            .sema
+            .scope_table
+            .get(self.current_scope)
+            .children
+            .clone();
+        let mut cursor = *self
+            .scope_child_cursors
+            .get(self.current_scope.raw() as usize)?;
+        while cursor < children.len() {
+            let scope_id = children[cursor];
+            cursor += 1;
+            if self.state.sema.scope_table.get(scope_id).kind == kind {
+                return Some(scope_id);
+            }
+        }
+        None
+    }
+
     pub(super) fn active_direct_eval_scope(&self, scope: ScopeId) -> bool {
         self.state.scope_environment_base(scope).is_some()
     }
@@ -1550,7 +1571,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     value_register,
                 )?;
                 if let Some(name) = name {
-                    let binding_id = self.find_named_binding(name, DeclarationKind::Class)?;
+                    let binding_id = self.class_declaration_binding(name)?;
                     self.store_binding_value(binding_id, name, value_register)?;
                 }
             }

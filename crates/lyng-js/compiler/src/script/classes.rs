@@ -121,7 +121,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
     ) -> LoweringResult<()> {
         let name = name.ok_or(LoweringError::UnsupportedDeclaration { decl: decl_id })?;
-        let binding_id = self.find_named_binding(name, DeclarationKind::Class)?;
+        let binding_id = self.class_declaration_binding(name)?;
         let value_register = self.alloc_temp()?;
         let class_span = self.ast().get_decl(decl_id).span();
         self.lower_class_definition(Some(name), super_class, body, class_span, value_register)?;

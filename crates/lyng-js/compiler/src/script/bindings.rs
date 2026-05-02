@@ -124,6 +124,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .ok_or(LoweringError::MissingDeclarationBinding { name })
     }
 
+    pub(super) fn class_declaration_binding(
+        &self,
+        name: AtomId,
+    ) -> LoweringResult<SemanticBindingId> {
+        self.find_named_binding_in_scope(name, DeclarationKind::Class, self.current_scope)
+            .ok_or(LoweringError::MissingDeclarationBinding { name })
+    }
+
     fn find_innermost_named_binding(
         &self,
         name: AtomId,

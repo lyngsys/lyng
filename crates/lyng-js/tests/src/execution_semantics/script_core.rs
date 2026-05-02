@@ -3731,6 +3731,55 @@ fn script_core_typed_array_mutations_recheck_resizable_bounds() {
 }
 
 #[test]
+fn script_core_typed_array_species_create_checks_live_result_length() {
+    let result = compile_and_run_string(
+        r#"
+        function probe(method) {
+            let source = new Uint8Array([1, 2]);
+            let buffer = new ArrayBuffer(2, { maxByteLength: 2 });
+            let result = new Uint8Array(buffer);
+            buffer.resize(0);
+            source.constructor = {
+                [Symbol.species]: function() {
+                    return result;
+                }
+            };
+            try {
+                source[method](function() { return 1; });
+                return "missing";
+            } catch (error) {
+                return error.constructor === TypeError;
+            }
+        }
+
+        [probe("map"), probe("filter")].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "true:true");
+}
+
+#[test]
+fn script_core_typed_array_length_tracking_allows_unaligned_resizable_byte_length() {
+    let result = compile_and_run_string(
+        r#"
+        let buffer = new ArrayBuffer(10, { maxByteLength: 20 });
+        let sample = new Int32Array(buffer);
+
+        let initial = sample.length;
+        buffer.resize(7);
+        let afterShrink = sample.length;
+        buffer.resize(15);
+        let afterGrow = sample.length;
+
+        [initial, afterShrink, afterGrow].join(",");
+        "#,
+    );
+
+    assert_eq!(result, "2,1,3");
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"
@@ -6919,4 +6968,64 @@ fn script_core_captures_loop_body_lexicals_in_arrow_without_invoking_closure() {
     );
 
     assert_eq!(result, "ok");
+}
+
+#[test]
+fn script_core_lowers_sibling_block_class_declarations_with_same_name() {
+    let result = compile_and_run_string(
+        r#"
+        let values = [];
+        for (let value of [1, 2]) {
+            class Local {
+                static read() { return value; }
+            }
+            values.push(Local.read());
+        }
+        for (let value of [3]) {
+            class Local {
+                static read() { return value; }
+            }
+            values.push(Local.read());
+        }
+        values.join(",");
+        "#,
+    );
+
+    assert_eq!(result, "1,2,3");
+}
+
+#[test]
+fn script_core_lowers_loop_body_class_constructor_with_rest_parameter() {
+    let result = compile_and_run_string(
+        r#"
+        let values = [];
+        for (let Base of [
+            class {
+                constructor(...params) {
+                    this.value = params.length;
+                }
+            },
+            class {
+                constructor(...params) {
+                    this.value = params.length;
+                }
+            }
+        ]) {
+            let enabled = false;
+            class Local extends Base {
+                constructor(...params) {
+                    super(...params);
+                    if (enabled) {
+                        values.push(this.value);
+                    }
+                }
+            }
+            enabled = true;
+            new Local(1, 2);
+        }
+        values.join(",");
+        "#,
+    );
+
+    assert_eq!(result, "2,2");
 }
