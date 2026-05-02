@@ -1,4 +1,5 @@
 use super::*;
+use crate::vm::values::alloc_code_unit_string;
 use crate::vm::values::encode_number;
 use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
 use lyng_js_ops::{
@@ -6,7 +7,7 @@ use lyng_js_ops::{
     object::{self, ToPrimitiveContext},
     proxy, read,
 };
-use lyng_js_types::{PropertyDescriptor, PropertyKey};
+use lyng_js_types::{PropertyDescriptor, PropertyKey, StringRef};
 use std::collections::HashSet;
 
 pub(super) use lyng_js_ops::object::ToPrimitiveHint;
@@ -129,6 +130,35 @@ fn typed_array_numeric_property_index(agent: &Agent, key: PropertyKey) -> Option
     key.as_index()
         .map(f64::from)
         .or_else(|| typed_array_numeric_atom_index(agent, key))
+}
+
+fn primitive_string_code_unit_len(agent: &mut Agent, string: StringRef) -> VmResult<u32> {
+    if let Some(length) = agent
+        .heap()
+        .view()
+        .string_view(string)
+        .map(|view| view.code_unit_len())
+    {
+        return Ok(length);
+    }
+    Err(VmError::Abrupt(errors::throw_type_error(agent)))
+}
+
+fn primitive_string_code_unit(
+    agent: &mut Agent,
+    string: StringRef,
+    index: u32,
+) -> VmResult<Option<u16>> {
+    let Some(unit) = ({
+        agent
+            .heap()
+            .view()
+            .string_view(string)
+            .map(|view| view.code_unit_at(index as usize))
+    }) else {
+        return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+    };
+    Ok(unit)
 }
 
 struct VmToPrimitiveBridge<'a> {
@@ -560,8 +590,44 @@ impl Vm {
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<Value> {
+        if let Some(string) = receiver.as_string_ref() {
+            return self.get_property_from_string_primitive(
+                agent, host, registry, frame, string, receiver, key,
+            );
+        }
         let object = self.to_object_for_value(agent, frame.realm(), receiver)?;
         self.get_property_from_object(agent, host, registry, frame, object, receiver, key)
+    }
+
+    fn get_property_from_string_primitive(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        string: StringRef,
+        receiver: Value,
+        key: PropertyKey,
+    ) -> VmResult<Value> {
+        if let Some(index) = key.as_index() {
+            if let Some(unit) = primitive_string_code_unit(agent, string, index)? {
+                let value = Value::from_string_ref(alloc_code_unit_string(agent, &[unit], None));
+                return Ok(value);
+            }
+        } else if key.as_atom() == Some(WellKnownAtom::length.id()) {
+            let length = primitive_string_code_unit_len(agent, string)?;
+            return Ok(if let Ok(length) = i32::try_from(length) {
+                Value::from_smi(length)
+            } else {
+                Value::from_f64(f64::from(length))
+            });
+        }
+
+        let prototype = agent
+            .realm(frame.realm())
+            .and_then(|record| record.intrinsics().string_prototype())
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        self.get_property_from_object(agent, host, registry, frame, prototype, receiver, key)
     }
 
     pub(super) fn set_property_on_value(

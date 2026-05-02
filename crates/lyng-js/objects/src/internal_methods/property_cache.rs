@@ -208,7 +208,7 @@ impl ObjectRuntime {
         }
 
         match entry.path() {
-            NamedPropertyCachePath::OwnData => {}
+            NamedPropertyCachePath::OwnData => return Ok(true),
             NamedPropertyCachePath::PrototypeData => {
                 let mut current = receiver_header.prototype();
                 for index in 1..usize::from(entry.dependency_count()) {

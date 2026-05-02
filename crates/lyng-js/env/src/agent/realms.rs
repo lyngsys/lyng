@@ -4,7 +4,7 @@ use crate::{
     RealmBootstrapState, RealmMetadata, RealmRecord, RegExpLegacyStaticState, RuntimeRealmRecord,
 };
 use lyng_js_objects::ObjectAllocation;
-use lyng_js_types::RealmRef;
+use lyng_js_types::{ObjectRef, RealmRef, ShapeId};
 
 impl Agent {
     #[inline]
@@ -97,6 +97,18 @@ impl Agent {
             bootstrap_state: metadata.bootstrap_state,
             is_default: metadata.is_default,
         })
+    }
+
+    pub fn realm_intrinsics(&self, realm: RealmRef) -> Option<&Intrinsics> {
+        Some(&self.realm_metadata(realm)?.intrinsics)
+    }
+
+    pub fn realm_global_object(&self, realm: RealmRef) -> Option<ObjectRef> {
+        self.heap.view().realm(realm)?.global_object()
+    }
+
+    pub fn realm_root_shape(&self, realm: RealmRef) -> Option<ShapeId> {
+        self.heap.view().realm(realm)?.root_shape()
     }
 
     pub fn set_realm_intrinsics(&mut self, realm: RealmRef, intrinsics: Intrinsics) -> bool {

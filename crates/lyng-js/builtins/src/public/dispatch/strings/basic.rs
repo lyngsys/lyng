@@ -243,7 +243,12 @@ fn string_from_char_code_builtin<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let mut units = Vec::with_capacity(invocation.arguments().len());
     for value in invocation.arguments().iter().copied() {
-        units.push((to_uint32_for_builtin(cx, value)? & 0xffff) as u16);
+        let unit = if let Some(value) = value.as_smi() {
+            (value as u32 & 0xffff) as u16
+        } else {
+            (to_uint32_for_builtin(cx, value)? & 0xffff) as u16
+        };
+        units.push(unit);
     }
     Ok(string_from_code_units(cx, &units))
 }
@@ -265,12 +270,24 @@ fn string_from_code_point_builtin<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let mut units = Vec::with_capacity(invocation.arguments().len());
     for value in invocation.arguments().iter().copied() {
-        let number = to_number_for_builtin(cx, value)?;
-        if !number.is_finite() || number.trunc() != number || !(0.0..=1_114_111.0).contains(&number)
-        {
-            return Err(range_error(cx));
+        if let Some(value) = value.as_smi() {
+            let Ok(code_point) = u32::try_from(value) else {
+                return Err(range_error(cx));
+            };
+            if code_point > 0x0010_FFFF {
+                return Err(range_error(cx));
+            }
+            append_code_point_units(&mut units, code_point);
+        } else {
+            let number = to_number_for_builtin(cx, value)?;
+            if !number.is_finite()
+                || number.trunc() != number
+                || !(0.0..=1_114_111.0).contains(&number)
+            {
+                return Err(range_error(cx));
+            }
+            append_code_point_units(&mut units, number as u32);
         }
-        append_code_point_units(&mut units, number as u32);
     }
     Ok(string_from_code_units(cx, &units))
 }

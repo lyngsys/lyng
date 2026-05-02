@@ -289,6 +289,13 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         self.map_temporal_host_result(self.host.temporal_default_time_zone(request))
     }
 
+    fn temporal_default_time_zone_is_utc(
+        &mut self,
+        request: &TemporalDefaultTimeZoneRequest,
+    ) -> Result<bool, Self::Error> {
+        self.map_temporal_host_result(self.host.temporal_default_time_zone_is_utc(request))
+    }
+
     fn temporal_instant_to_civil_time(
         &mut self,
         request: &TemporalInstantToCivilRequest,

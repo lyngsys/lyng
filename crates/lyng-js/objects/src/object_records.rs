@@ -118,7 +118,7 @@ impl ObjectAllocation {
 
     #[inline]
     pub fn with_date_value(mut self, value: Value) -> Self {
-        self.ordinary_payload_value = Some(value);
+        self.cold = ObjectColdData::Ordinary(OrdinaryObjectData::Date(value));
         self
     }
 

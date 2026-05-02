@@ -29,8 +29,8 @@ use lyng_js_types::{
     internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
     internal_object_has_own_property_builtin, internal_object_to_string_builtin,
     internal_regexp_literal_builtin, internal_string_index_of_builtin,
-    internal_string_replace_builtin, AbruptCompletion, BuiltinFunctionId, PropertyDescriptor,
-    PropertyKey, RealmRef, Value,
+    internal_string_replace_builtin, is_date_builtin, AbruptCompletion, BuiltinFunctionId,
+    PropertyDescriptor, PropertyKey, RealmRef, Value,
 };
 use support::{
     allocate_array_like_result, allocate_json_raw_object, allocate_proxy_object,
@@ -391,6 +391,11 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         request: &TemporalDefaultTimeZoneRequest,
     ) -> Result<TemporalDefaultTimeZone, Self::Error>;
 
+    fn temporal_default_time_zone_is_utc(
+        &mut self,
+        request: &TemporalDefaultTimeZoneRequest,
+    ) -> Result<bool, Self::Error>;
+
     fn temporal_instant_to_civil_time(
         &mut self,
         request: &TemporalInstantToCivilRequest,
@@ -542,6 +547,9 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
+    if is_date_builtin(entry) {
+        return date::dispatch_date_builtin(context, entry, invocation);
+    }
     if let Some(result) = dispatch_internal_builtin(context, entry, invocation)? {
         return Ok(Some(result));
     }
@@ -587,9 +595,6 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Some(result));
     }
     if let Some(result) = regexp::dispatch_regexp_builtin(context, entry, invocation)? {
-        return Ok(Some(result));
-    }
-    if let Some(result) = date::dispatch_date_builtin(context, entry, invocation)? {
         return Ok(Some(result));
     }
     if let Some(result) = temporal::dispatch_temporal_builtin(context, entry, invocation)? {

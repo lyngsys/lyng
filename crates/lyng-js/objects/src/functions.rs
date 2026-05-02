@@ -484,7 +484,7 @@ pub enum OrdinaryObjectData {
     SharedArrayBuffer,
     DataView,
     TypedArray(TypedArrayElementKind),
-    Date,
+    Date(Value),
     Temporal(TemporalObjectKind),
     JsonRaw,
     RegExp,
@@ -513,7 +513,7 @@ impl OrdinaryObjectData {
             Self::SharedArrayBuffer => None,
             Self::DataView => None,
             Self::TypedArray(_) => None,
-            Self::Date => None,
+            Self::Date(_) => None,
             Self::Temporal(_) => None,
             Self::JsonRaw => None,
             Self::RegExp => None,
@@ -587,7 +587,15 @@ impl OrdinaryObjectData {
 
     #[inline]
     pub const fn is_date(self) -> bool {
-        matches!(self, Self::Date)
+        matches!(self, Self::Date(_))
+    }
+
+    #[inline]
+    pub const fn date_value(self) -> Option<Value> {
+        match self {
+            Self::Date(value) => Some(value),
+            _ => None,
+        }
     }
 
     #[inline]

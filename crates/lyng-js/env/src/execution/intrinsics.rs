@@ -593,7 +593,7 @@ impl Intrinsics {
     }
 
     #[inline]
-    pub const fn date_prototype(self) -> Option<ObjectRef> {
+    pub const fn date_prototype(&self) -> Option<ObjectRef> {
         self.date_prototype
     }
 

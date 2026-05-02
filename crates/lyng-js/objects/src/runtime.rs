@@ -3,11 +3,12 @@ use super::{
     ElementStorageMetadata, ElementStorageRef, InvalidationEvent, MapObjectData,
     ModuleNamespaceExport, ModuleNamespaceObject, NamedPropertyDictionaryEntry,
     NamedPropertyStorage, NamedPropertyStorageMode, NamedSlotStorageRef, ObjectAllocation,
-    ObjectColdData, ObjectHeader, ObjectMetadata, ObjectRecord, ObjectRef, PrimitiveHeapView,
-    PrimitiveMutator, PropertyKey, ProxyObjectData, RegExpPayload, RegExpPayloadAccounting,
-    RootShapeKey, RuntimeObjectRecord, RuntimeShapeRecord, SetObjectData, ShapeAllocation, ShapeId,
-    ShapeMetadata, ShapeProperty, ShapeRecord, ShapeTransitionKey, SparseElementEntry,
-    TemporalObjectData, TemporalObjectKind, TypedArrayObjectData, Value,
+    ObjectColdData, ObjectFlags, ObjectHeader, ObjectKind, ObjectMetadata, ObjectRecord, ObjectRef,
+    OrdinaryObjectData, PrimitiveHeapView, PrimitiveMutator, PropertyKey, ProxyObjectData,
+    RegExpPayload, RegExpPayloadAccounting, RootShapeKey, RuntimeObjectRecord, RuntimeShapeRecord,
+    SetObjectData, ShapeAllocation, ShapeId, ShapeMetadata, ShapeProperty, ShapeRecord,
+    ShapeTransitionKey, SparseElementEntry, TemporalObjectData, TemporalObjectKind,
+    TypedArrayObjectData, Value,
 };
 use std::collections::HashMap;
 
@@ -348,6 +349,39 @@ impl ObjectRuntime {
             );
         }
         let _ = self.refresh_integrity_level_flags(heap.view(), object);
+        object
+    }
+
+    /// Allocates one fresh ordinary Date object using the compact Date layout.
+    ///
+    /// Date construction is a hot path for Test262's DST-offset cache tests. The generic allocator
+    /// supports slots, elements, proxies, and function payloads; fresh Date objects need none of
+    /// that work beyond the ordinary payload cell that stores the time value.
+    pub fn alloc_date_object(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        shape: ShapeId,
+        prototype: Option<ObjectRef>,
+        value: Value,
+        lifetime: AllocationLifetime,
+    ) -> ObjectRef {
+        let object = heap.alloc_object(
+            RuntimeObjectRecord::new(prototype, Some(shape), None, None, None),
+            lifetime,
+        );
+        self.store_object_metadata(
+            object,
+            ObjectMetadata {
+                kind: ObjectKind::Ordinary,
+                flags: ObjectFlags::extensible(),
+                cold: ObjectColdData::Ordinary(OrdinaryObjectData::Date(value)),
+                private_brands: Vec::new(),
+                named_properties: NamedPropertyStorage::ShapeStable,
+                named_property_churn: 0,
+                element_storage: ElementStorageMetadata::Empty,
+                last_invalidation: None,
+            },
+        );
         object
     }
 
@@ -748,30 +782,34 @@ impl ObjectRuntime {
             .collect()
     }
 
-    pub fn date_value(&self, heap: PrimitiveHeapView<'_>, id: ObjectRef) -> Option<Value> {
-        self.is_date_object(id)
-            .then(|| self.ordinary_payload_value(heap, id))
-            .flatten()
+    pub fn date_value(&self, _heap: PrimitiveHeapView<'_>, id: ObjectRef) -> Option<Value> {
+        match self
+            .object_metadata(id)
+            .map(|metadata| metadata.cold.clone())
+        {
+            Some(ObjectColdData::Ordinary(data)) => data.date_value(),
+            Some(ObjectColdData::Function(_) | ObjectColdData::Proxy(_)) | None => None,
+        }
     }
 
     pub fn set_date_value(
         &mut self,
-        heap: &mut PrimitiveMutator<'_>,
+        _heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,
         value: Value,
     ) -> bool {
-        if !self.is_date_object(id) {
+        let Some(metadata) = self.object_metadata_mut(id) else {
             return false;
-        }
-        let payload = match heap
-            .view()
-            .object(id)
-            .and_then(|record| record.ordinary_payload())
-        {
-            Some(payload) => payload,
-            None => return false,
         };
-        heap.mut_store_value(lyng_js_gc::ValueStoreTarget::ValueCell(payload), value)
+        match metadata.cold {
+            ObjectColdData::Ordinary(OrdinaryObjectData::Date(_)) => {
+                metadata.cold = ObjectColdData::Ordinary(OrdinaryObjectData::Date(value));
+                true
+            }
+            ObjectColdData::Ordinary(_)
+            | ObjectColdData::Function(_)
+            | ObjectColdData::Proxy(_) => false,
+        }
     }
 
     pub fn is_temporal_object_kind(&self, id: ObjectRef, kind: TemporalObjectKind) -> bool {

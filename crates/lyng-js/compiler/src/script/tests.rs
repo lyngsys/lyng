@@ -786,6 +786,10 @@ fn compile_script_allocates_script_environment_for_captured_top_level_bindings()
             })
         })
         .expect("inner closure should capture the script lexical environment");
+    assert!(
+        !inner.needs_environment(),
+        "reading outer bindings must not allocate a redundant local environment"
+    );
     assert!(inner.captures().iter().any(|capture| {
         matches!(
             capture.source(),
@@ -842,6 +846,64 @@ fn compile_script_assigns_feedback_sites_for_minimum_phase4_kinds() {
     assert!(kinds.contains(&FeedbackSiteKind::Call));
     assert!(kinds.contains(&FeedbackSiteKind::Construct));
     assert!(!named_property_atoms.is_empty());
+}
+
+#[test]
+fn compile_script_assigns_named_load_feedback_to_global_loads() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(6),
+        "externalGlobal;",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let name = unit
+        .atoms()
+        .iter()
+        .find_map(|(atom, candidate)| {
+            (candidate.as_str() == Some("externalGlobal")).then_some(*atom)
+        })
+        .expect("compiled unit should intern global name");
+    let site = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad)
+        .expect("global load should carry named-load feedback");
+
+    assert_eq!(site.metadata(), FeedbackSiteMetadata::NamedProperty(name));
+}
+
+#[test]
+fn compile_script_assigns_named_store_feedback_to_global_stores() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(7),
+        "var globalValue; globalValue = 1;",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let name = unit
+        .atoms()
+        .iter()
+        .find_map(|(atom, candidate)| (candidate.as_str() == Some("globalValue")).then_some(*atom))
+        .expect("compiled unit should intern global name");
+    let site = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyStore)
+        .expect("global store should carry named-store feedback");
+
+    assert_eq!(site.metadata(), FeedbackSiteMetadata::NamedProperty(name));
 }
 
 #[test]

@@ -898,6 +898,18 @@ pub const fn is_core_builtin(id: BuiltinFunctionId) -> bool {
     raw >= CORE_BUILTIN_NAMESPACE_START && raw <= CORE_BUILTIN_NAMESPACE_END
 }
 
+/// Returns whether a builtin ID belongs to the public Date constructor/prototype family.
+#[inline]
+pub const fn is_date_builtin(id: BuiltinFunctionId) -> bool {
+    matches!(
+        id.get(),
+        DATE_RAW..=DATE_VALUE_OF_RAW
+            | DATE_GET_TIMEZONE_OFFSET_RAW
+            | DATE_UTC_RAW..=DATE_TO_TEMPORAL_INSTANT_RAW
+            | DATE_GET_YEAR_RAW..=DATE_SET_YEAR_RAW
+    )
+}
+
 /// Returns whether a builtin ID falls inside the public completion builtin namespace.
 #[inline]
 pub const fn is_completion_builtin(id: BuiltinFunctionId) -> bool {

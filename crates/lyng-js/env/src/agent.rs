@@ -6,6 +6,7 @@ use super::{
 };
 use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_js_host::ModuleKey;
+use lyng_js_types::StringRef;
 use std::{collections::BTreeMap, marker::PhantomData, rc::Rc};
 
 mod accounting;
@@ -32,6 +33,7 @@ struct AgentCollectionSnapshot {
     disposal_tables: super::AgentDisposalTables,
     job_queues: AgentJobQueues,
     kept_objects: Vec<WeakHeapRef>,
+    latin1_single_code_unit_strings: [Option<StringRef>; 256],
 }
 
 impl AgentCollectionSnapshot {
@@ -46,6 +48,7 @@ impl AgentCollectionSnapshot {
             disposal_tables: agent.disposal_tables.clone(),
             job_queues: agent.job_queues.clone(),
             kept_objects: agent.kept_objects.clone(),
+            latin1_single_code_unit_strings: agent.latin1_single_code_unit_strings,
         }
     }
 }
@@ -65,6 +68,9 @@ impl TraceHeapEdges for AgentCollectionSnapshot {
         self.job_queues.trace_heap_edges(tracer);
         for target in &self.kept_objects {
             target.trace_heap_edges(tracer);
+        }
+        for string in self.latin1_single_code_unit_strings {
+            string.trace_heap_edges(tracer);
         }
         for record in &self.modules {
             record.trace_heap_edges(tracer);
@@ -98,6 +104,7 @@ pub struct Agent {
     disposal_tables: super::AgentDisposalTables,
     job_queues: AgentJobQueues,
     kept_objects: Vec<WeakHeapRef>,
+    latin1_single_code_unit_strings: [Option<StringRef>; 256],
     next_job_id: u32,
     thread_affinity: PhantomData<Rc<()>>,
 }
@@ -137,6 +144,7 @@ impl Agent {
             disposal_tables: super::AgentDisposalTables::default(),
             job_queues: AgentJobQueues::default(),
             kept_objects: Vec::new(),
+            latin1_single_code_unit_strings: [None; 256],
             next_job_id: 1,
             thread_affinity: PhantomData,
         };

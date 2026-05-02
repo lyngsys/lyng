@@ -18,7 +18,7 @@ use cli::RunnerConfig;
 use execution::{PreparedTest, RunOutcome, WorkerHandle};
 use helpers::HelperCatalog;
 use metadata::{parse_metadata, variants_for_metadata};
-use report::{CategoryStats, SuiteReport};
+use report::{CategoryStats, SuiteReport, TestTiming};
 use selection::{
     category_for_test, disabled_manifest, load_manifest, relative_test_path, select_test_paths,
     skip_decision,
@@ -57,6 +57,7 @@ struct ExecutionResults {
 struct PreparedOutcome {
     index: usize,
     outcome: RunOutcome,
+    elapsed: Duration,
 }
 
 struct SummaryView<'a> {
@@ -80,12 +81,23 @@ fn push_failure(failures_lock: &Mutex<Vec<(String, String)>>, category: &str, fa
     }
 }
 
-fn push_outcome(outcomes_lock: &Mutex<Vec<PreparedOutcome>>, index: usize, outcome: RunOutcome) {
+fn push_outcome(
+    outcomes_lock: &Mutex<Vec<PreparedOutcome>>,
+    index: usize,
+    outcome: RunOutcome,
+    elapsed: Duration,
+) {
     match outcomes_lock.lock() {
-        Ok(mut outcomes) => outcomes.push(PreparedOutcome { index, outcome }),
-        Err(poisoned) => poisoned
-            .into_inner()
-            .push(PreparedOutcome { index, outcome }),
+        Ok(mut outcomes) => outcomes.push(PreparedOutcome {
+            index,
+            outcome,
+            elapsed,
+        }),
+        Err(poisoned) => poisoned.into_inner().push(PreparedOutcome {
+            index,
+            outcome,
+            elapsed,
+        }),
     }
 }
 
@@ -179,6 +191,7 @@ pub fn main_entry() {
         suite.failures.push(failure);
     }
     record_execution_outcomes(&mut suite, &execution.outcomes);
+    let timings = test_timings(&suite.prepared, &execution.outcomes, &test_dir);
 
     print_summary(&SummaryView {
         options: &options,
@@ -212,6 +225,7 @@ pub fn main_entry() {
         skip_reasons: &suite.skip_reasons,
         exclusion_reasons: &suite.exclusion_reasons,
         failures: &suite.failures,
+        timings: &timings,
         elapsed: execution.elapsed,
     });
 }
@@ -399,7 +413,7 @@ fn execute_suite(
                                         relative_prepared_test_name(test, test_dir)
                                     ),
                                 );
-                                push_outcome(&outcomes_lock, index, outcome);
+                                push_outcome(&outcomes_lock, index, outcome, Duration::ZERO);
                                 let done = done_count.fetch_add(1, Ordering::Relaxed) + 1;
                                 maybe_print_progress(
                                     done,
@@ -415,10 +429,12 @@ fn execute_suite(
                     }
 
                     let test_timeout = timeout_for_test(test, timeout);
+                    let test_start = Instant::now();
                     let execution = worker
                         .as_mut()
                         .expect("worker should exist after spawn")
                         .run_test(test, test_timeout);
+                    let test_elapsed = test_start.elapsed();
                     record_variant_execution(
                         &execution.outcome,
                         test,
@@ -428,7 +444,12 @@ fn execute_suite(
                         &fail_count,
                         &panic_count,
                     );
-                    push_outcome(&outcomes_lock, index, execution.outcome.clone());
+                    push_outcome(
+                        &outcomes_lock,
+                        index,
+                        execution.outcome.clone(),
+                        test_elapsed,
+                    );
 
                     let should_recycle = worker.as_ref().is_some_and(WorkerHandle::should_recycle);
                     if !execution.reusable || should_recycle {
@@ -468,6 +489,32 @@ fn execute_suite(
         elapsed: start.elapsed(),
         failures,
         outcomes,
+    }
+}
+
+fn test_timings(
+    prepared: &[PreparedTest],
+    outcomes: &[PreparedOutcome],
+    test_dir: &Path,
+) -> Vec<TestTiming> {
+    let mut timings = Vec::with_capacity(outcomes.len());
+    for outcome in outcomes {
+        let test = &prepared[outcome.index];
+        timings.push(TestTiming {
+            file: relative_test_path(&test.path, test_dir),
+            variant: test.variant.report_label().map(ToString::to_string),
+            outcome: timing_outcome_label(&outcome.outcome).to_string(),
+            elapsed: outcome.elapsed,
+        });
+    }
+    timings
+}
+
+fn timing_outcome_label(outcome: &RunOutcome) -> &'static str {
+    match outcome {
+        RunOutcome::Pass => "pass",
+        RunOutcome::Fail(message) if message.starts_with("PANIC") => "panic",
+        RunOutcome::Fail(_) => "fail",
     }
 }
 
@@ -914,10 +961,12 @@ mod tests {
                 PreparedOutcome {
                     index: 0,
                     outcome: RunOutcome::Pass,
+                    elapsed: Duration::from_millis(10),
                 },
                 PreparedOutcome {
                     index: 1,
                     outcome: RunOutcome::Fail("runtime error: Test262Error".to_string()),
+                    elapsed: Duration::from_millis(20),
                 },
             ],
         );

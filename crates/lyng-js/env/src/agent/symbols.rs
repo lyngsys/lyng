@@ -115,6 +115,21 @@ impl Agent {
         )
     }
 
+    pub fn latin1_single_code_unit_string(&mut self, unit: u8) -> StringRef {
+        if let Some(string) = self.latin1_single_code_unit_strings[usize::from(unit)] {
+            return string;
+        }
+        let string = self.heap.mutator().alloc_string(
+            StringEncoding::Latin1,
+            1,
+            &[unit],
+            None,
+            AllocationLifetime::LongLived,
+        );
+        self.latin1_single_code_unit_strings[usize::from(unit)] = Some(string);
+        string
+    }
+
     pub(super) fn seed_phase5_symbol_state(&mut self, lifetime: AllocationLifetime) {
         for id in WellKnownSymbolId::ALL {
             let _ = self.ensure_well_known_symbol(id, lifetime);

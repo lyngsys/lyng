@@ -119,6 +119,9 @@ mod tests {
         let time_zone = noop
             .temporal_default_time_zone(&TemporalDefaultTimeZoneRequest {})
             .unwrap();
+        let default_is_utc = noop
+            .temporal_default_time_zone_is_utc(&TemporalDefaultTimeZoneRequest {})
+            .unwrap();
         let civil = noop
             .temporal_instant_to_civil_time(&TemporalInstantToCivilRequest {
                 time_zone_id: "UTC".into(),
@@ -135,6 +138,7 @@ mod tests {
 
         assert_eq!(instant.epoch_nanoseconds, 0);
         assert_eq!(time_zone.time_zone_id, "UTC");
+        assert!(default_is_utc);
         assert_eq!(
             civil,
             TemporalCivilTime {
@@ -410,6 +414,9 @@ mod tests {
         let time_zone = host
             .temporal_default_time_zone(&TemporalDefaultTimeZoneRequest {})
             .unwrap();
+        let default_is_utc = host
+            .temporal_default_time_zone_is_utc(&TemporalDefaultTimeZoneRequest {})
+            .unwrap();
         let civil = host
             .temporal_instant_to_civil_time(&instant_request)
             .unwrap();
@@ -422,6 +429,7 @@ mod tests {
                 time_zone_id: "Europe/Berlin".into(),
             }
         );
+        assert!(!default_is_utc);
         assert_eq!(civil, civil_response);
         assert_eq!(round_trip, instant_response);
 
@@ -436,10 +444,14 @@ mod tests {
         ));
         assert!(matches!(
             snapshot.calls[2],
-            HostCall::TemporalInstantToCivil(_)
+            HostCall::TemporalDefaultTimeZoneIsUtc(_)
         ));
         assert!(matches!(
             snapshot.calls[3],
+            HostCall::TemporalInstantToCivil(_)
+        ));
+        assert!(matches!(
+            snapshot.calls[4],
             HostCall::TemporalCivilToInstant(_)
         ));
     }

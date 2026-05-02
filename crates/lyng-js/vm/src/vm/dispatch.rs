@@ -1,7 +1,7 @@
 use super::values::{
     bigint_bitwise_and_values, bigint_bitwise_or_values, bigint_bitwise_xor_values,
     bigint_shift_left_values, bigint_shift_right_values, compare_numeric_values,
-    decode_env_operand,
+    decode_env_operand, encode_number,
 };
 use super::*;
 use crate::vm::property_access::ToPrimitiveHint;
@@ -168,16 +168,12 @@ impl Vm {
                             let atom = self.read_atom_constant(frame.code(), u32::from(c))?;
                             let key = PropertyKey::from_atom(atom);
                             let value = if let Some(object) = receiver.as_object_ref() {
-                                if let Some(value) = self.try_named_property_load_inline_cache(
+                                if let Some(value) = self.try_named_property_load_inline_cache_hit(
                                     agent,
                                     frame.code(),
                                     frame.instruction_offset(),
                                     object,
                                 ) {
-                                    self.record_feedback_site(
-                                        frame.code(),
-                                        frame.instruction_offset(),
-                                    );
                                     self.write_register(frame, a, value)?;
                                     self.advance_instruction()?;
                                     continue;
@@ -1030,7 +1026,15 @@ impl Vm {
                         }
                         Opcode::LoadGlobal => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
-                            let load_result = self.load_global(agent, host, registry, frame, atom);
+                            let load_result = self.load_global_with_feedback(
+                                agent,
+                                host,
+                                registry,
+                                frame,
+                                atom,
+                                frame.code(),
+                                frame.instruction_offset(),
+                            );
                             let Some(value) = self.handle_vm_result(agent, load_result)? else {
                                 continue;
                             };
@@ -1153,7 +1157,14 @@ impl Vm {
                         Opcode::StoreGlobal => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
                             let value = self.read_register(frame, a)?;
-                            let store_result = self.store_global(agent, frame, atom, value);
+                            let store_result = self.store_global_with_feedback(
+                                agent,
+                                frame,
+                                atom,
+                                value,
+                                frame.code(),
+                                frame.instruction_offset(),
+                            );
                             let Some(_) = self.handle_vm_result(agent, store_result)? else {
                                 continue;
                             };
@@ -1162,7 +1173,14 @@ impl Vm {
                         Opcode::AssignGlobal => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
                             let value = self.read_register(frame, a)?;
-                            let assign_result = self.assign_global(agent, frame, atom, value);
+                            let assign_result = self.assign_global_with_feedback(
+                                agent,
+                                frame,
+                                atom,
+                                value,
+                                frame.code(),
+                                frame.instruction_offset(),
+                            );
                             let Some(_) = self.handle_vm_result(agent, assign_result)? else {
                                 continue;
                             };
@@ -1473,6 +1491,9 @@ impl Vm {
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
+        if let Some(value) = self.try_smi_binary_opcode(frame, opcode, left, right)? {
+            return Ok(value);
+        }
         match opcode {
             Opcode::Add => self.add_values(agent, host, registry, frame, left, right),
             Opcode::Sub => self.sub_values(agent, host, registry, frame, left, right),
@@ -1525,6 +1546,44 @@ impl Vm {
             }
             _ => unreachable!("caller filters supported ABC value opcodes"),
         }
+    }
+
+    fn try_smi_binary_opcode(
+        &self,
+        frame: FrameRecord,
+        opcode: Opcode,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Option<Value>> {
+        let left = self.read_register(frame, left)?;
+        let right = self.read_register(frame, right)?;
+        let (Some(left), Some(right)) = (left.as_smi(), right.as_smi()) else {
+            return Ok(None);
+        };
+        let value = match opcode {
+            Opcode::Add => encode_number(f64::from(left) + f64::from(right)),
+            Opcode::Sub => encode_number(f64::from(left) - f64::from(right)),
+            Opcode::Mul => encode_number(f64::from(left) * f64::from(right)),
+            Opcode::Div => encode_number(f64::from(left) / f64::from(right)),
+            Opcode::Mod => encode_number(f64::from(left) % f64::from(right)),
+            Opcode::Exp => encode_number(f64::from(left).powf(f64::from(right))),
+            Opcode::BitOr => Value::from_smi(left | right),
+            Opcode::BitAnd => Value::from_smi(left & right),
+            Opcode::BitXor => Value::from_smi(left ^ right),
+            Opcode::ShiftLeft => Value::from_smi(left.wrapping_shl((right & 0x1f) as u32)),
+            Opcode::ShiftRight => Value::from_smi(left.wrapping_shr((right & 0x1f) as u32)),
+            Opcode::UnsignedShiftRight => {
+                let shifted = (left as u32).wrapping_shr((right & 0x1f) as u32);
+                encode_number(f64::from(shifted))
+            }
+            Opcode::Equal | Opcode::StrictEqual => Value::from_bool(left == right),
+            Opcode::LessThan => Value::from_bool(left < right),
+            Opcode::LessEqual => Value::from_bool(left <= right),
+            Opcode::GreaterThan => Value::from_bool(left > right),
+            Opcode::GreaterEqual => Value::from_bool(left >= right),
+            _ => return Ok(None),
+        };
+        Ok(Some(value))
     }
 
     fn loosely_equal(

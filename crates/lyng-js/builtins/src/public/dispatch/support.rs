@@ -1542,7 +1542,42 @@ pub(super) fn string_from_code_units<Cx: PublicBuiltinDispatchContext>(
 ) -> Value {
     let string = {
         let agent = cx.agent();
-        if units.iter().all(|unit| u8::try_from(*unit).is_ok()) {
+        if units.len() == 1 && u8::try_from(units[0]).is_ok() {
+            agent.latin1_single_code_unit_string(units[0] as u8)
+        } else if units.len() <= 4 {
+            let mut latin1 = [0_u8; 4];
+            let mut is_latin1 = true;
+            for (index, unit) in units.iter().copied().enumerate() {
+                if let Ok(byte) = u8::try_from(unit) {
+                    latin1[index] = byte;
+                } else {
+                    is_latin1 = false;
+                    break;
+                }
+            }
+            if is_latin1 {
+                agent.heap_mut().mutator().alloc_string(
+                    StringEncoding::Latin1,
+                    u32::try_from(units.len()).expect("string length must fit into u32"),
+                    &latin1[..units.len()],
+                    None,
+                    AllocationLifetime::Default,
+                )
+            } else {
+                let mut bytes = [0_u8; 8];
+                for (index, unit) in units.iter().copied().enumerate() {
+                    let offset = index * 2;
+                    bytes[offset..offset + 2].copy_from_slice(&unit.to_le_bytes());
+                }
+                agent.heap_mut().mutator().alloc_string(
+                    StringEncoding::Utf16,
+                    u32::try_from(units.len()).expect("string length must fit into u32"),
+                    &bytes[..units.len() * 2],
+                    None,
+                    AllocationLifetime::Default,
+                )
+            }
+        } else if units.iter().all(|unit| u8::try_from(*unit).is_ok()) {
             let bytes: Vec<u8> = units
                 .iter()
                 .map(|unit| u8::try_from(*unit).expect("Latin-1 unit should fit into u8"))

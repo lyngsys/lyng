@@ -332,22 +332,40 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
     pub(super) fn emit_load_global(&mut self, dest: u16, name: AtomId) -> LoweringResult<()> {
         let index = self.constant_atom(name)?;
-        self.builder
-            .emit_abx(Opcode::LoadGlobal, self.encode_register(dest)?, index)?;
+        let instruction_offset =
+            self.builder
+                .emit_abx(Opcode::LoadGlobal, self.encode_register(dest)?, index)?;
+        self.builder.add_feedback_site(
+            instruction_offset,
+            FeedbackSiteKind::NamedPropertyLoad,
+            FeedbackSiteMetadata::NamedProperty(name),
+        )?;
         Ok(())
     }
 
     pub(super) fn emit_store_global(&mut self, value: u16, name: AtomId) -> LoweringResult<()> {
         let index = self.constant_atom(name)?;
-        self.builder
-            .emit_abx(Opcode::StoreGlobal, self.encode_register(value)?, index)?;
+        let instruction_offset =
+            self.builder
+                .emit_abx(Opcode::StoreGlobal, self.encode_register(value)?, index)?;
+        self.builder.add_feedback_site(
+            instruction_offset,
+            FeedbackSiteKind::NamedPropertyStore,
+            FeedbackSiteMetadata::NamedProperty(name),
+        )?;
         Ok(())
     }
 
     pub(super) fn emit_assign_global(&mut self, value: u16, name: AtomId) -> LoweringResult<()> {
         let index = self.constant_atom(name)?;
-        self.builder
-            .emit_abx(Opcode::AssignGlobal, self.encode_register(value)?, index)?;
+        let instruction_offset =
+            self.builder
+                .emit_abx(Opcode::AssignGlobal, self.encode_register(value)?, index)?;
+        self.builder.add_feedback_site(
+            instruction_offset,
+            FeedbackSiteKind::NamedPropertyStore,
+            FeedbackSiteMetadata::NamedProperty(name),
+        )?;
         Ok(())
     }
 

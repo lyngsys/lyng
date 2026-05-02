@@ -409,37 +409,64 @@ impl Vm {
         })
     }
 
-    pub(super) fn load_global(
+    pub(super) fn load_global_with_feedback(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
         name: AtomId,
+        code: CodeRef,
+        instruction_offset: u32,
     ) -> VmResult<Value> {
-        let global = self.find_global_environment(agent, frame.variable_env())?;
-        if let Some(binding) = self.lookup_global_lexical_binding(agent, &global, name) {
+        let global = self.find_global_environment_ref(agent, frame.variable_env())?;
+        if let Some(binding) = self.lookup_global_lexical_binding_ref(agent, global, name) {
             let environment =
                 self.environment_for_slot_access(agent, binding.environment(), 0, binding.slot())?;
             return self.read_environment_slot(agent, environment, binding.slot());
         }
-        self.get_global_property_binding_with_context(
+
+        let global_object = agent
+            .global_environment_object(global)
+            .ok_or(VmError::MissingEnvironment(global))?;
+        if let Some(value) = self.try_named_property_load_inline_cache_hit(
             agent,
-            host,
-            registry,
-            frame,
-            frame.variable_env(),
+            code,
+            instruction_offset,
+            global_object,
+        ) {
+            return Ok(value);
+        }
+
+        let value = self
+            .get_global_property_binding_with_context(
+                agent,
+                host,
+                registry,
+                frame,
+                frame.variable_env(),
+                name,
+            )?
+            .ok_or_else(|| VmError::Abrupt(errors::throw_reference_error(agent)))?;
+        self.observe_named_property_slow_path(
+            agent,
+            code,
+            instruction_offset,
+            global_object,
             name,
-        )?
-        .ok_or_else(|| VmError::Abrupt(errors::throw_reference_error(agent)))
+            lyng_js_objects::NamedPropertyCachePurpose::Load,
+        );
+        Ok(value)
     }
 
-    pub(super) fn store_global(
+    pub(super) fn store_global_with_feedback(
         &mut self,
         agent: &mut Agent,
         frame: FrameRecord,
         name: AtomId,
         value: Value,
+        code: CodeRef,
+        instruction_offset: u32,
     ) -> VmResult<()> {
         let global = self.find_global_environment(agent, frame.variable_env())?;
         if let Some(binding) = self.lookup_global_lexical_binding(agent, &global, name) {
@@ -447,23 +474,47 @@ impl Vm {
                 self.environment_for_slot_access(agent, binding.environment(), 0, binding.slot())?;
             return self.write_environment_slot(agent, environment, binding.slot(), value);
         }
+        let global_object = global.global_object();
+        if self
+            .try_named_property_store_inline_cache(
+                agent,
+                code,
+                instruction_offset,
+                global_object,
+                value,
+            )
+            .is_some()
+        {
+            self.record_feedback_site(code, instruction_offset);
+            return Ok(());
+        }
         let _ = object::ordinary_set(
             agent,
-            global.global_object(),
+            global_object,
             PropertyKey::from_atom(name),
             value,
             AllocationLifetime::Default,
         )
         .map_err(VmError::Abrupt)?;
+        self.observe_named_property_slow_path(
+            agent,
+            code,
+            instruction_offset,
+            global_object,
+            name,
+            lyng_js_objects::NamedPropertyCachePurpose::Store,
+        );
         Ok(())
     }
 
-    pub(super) fn assign_global(
+    pub(super) fn assign_global_with_feedback(
         &mut self,
         agent: &mut Agent,
         frame: FrameRecord,
         name: AtomId,
         value: Value,
+        code: CodeRef,
+        instruction_offset: u32,
     ) -> VmResult<()> {
         let global = self.find_global_environment(agent, frame.variable_env())?;
         if let Some(binding) = self.lookup_global_lexical_binding(agent, &global, name) {
@@ -479,15 +530,30 @@ impl Vm {
         }
 
         let key = PropertyKey::from_atom(name);
-        let has_property = object::ordinary_has_property(agent, global.global_object(), key)
-            .map_err(VmError::Abrupt)?;
+        let global_object = global.global_object();
+        if let Some(stored) = self.try_named_property_store_inline_cache(
+            agent,
+            code,
+            instruction_offset,
+            global_object,
+            value,
+        ) {
+            if !stored && self.frame_is_strict(frame) {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
+            self.record_feedback_site(code, instruction_offset);
+            return Ok(());
+        }
+
+        let has_property =
+            object::ordinary_has_property(agent, global_object, key).map_err(VmError::Abrupt)?;
         if !has_property && self.frame_is_strict(frame) {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
 
         let stored = object::ordinary_set(
             agent,
-            global.global_object(),
+            global_object,
             key,
             value,
             AllocationLifetime::Default,
@@ -496,6 +562,14 @@ impl Vm {
         if !stored && self.frame_is_strict(frame) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
+        self.observe_named_property_slow_path(
+            agent,
+            code,
+            instruction_offset,
+            global_object,
+            name,
+            lyng_js_objects::NamedPropertyCachePurpose::Store,
+        );
         Ok(())
     }
 
@@ -1082,14 +1156,12 @@ impl Vm {
         start: EnvironmentRef,
         name: AtomId,
     ) -> VmResult<Option<Value>> {
-        let global = self.find_global_environment(agent, start)?;
+        let (_, global_object) = self.find_global_environment_object(agent, start)?;
         let key = PropertyKey::from_atom(name);
-        if !object::ordinary_has_property(agent, global.global_object(), key)
-            .map_err(VmError::Abrupt)?
-        {
+        if !object::ordinary_has_property(agent, global_object, key).map_err(VmError::Abrupt)? {
             return Ok(None);
         }
-        object::ordinary_get(agent, global.global_object(), key)
+        object::ordinary_get(agent, global_object, key)
             .map(Some)
             .map_err(VmError::Abrupt)
     }
@@ -1103,11 +1175,9 @@ impl Vm {
         start: EnvironmentRef,
         name: AtomId,
     ) -> VmResult<Option<Value>> {
-        let global = self.find_global_environment(agent, start)?;
+        let (_, global_object) = self.find_global_environment_object(agent, start)?;
         let key = PropertyKey::from_atom(name);
-        if !object::ordinary_has_property(agent, global.global_object(), key)
-            .map_err(VmError::Abrupt)?
-        {
+        if !object::ordinary_has_property(agent, global_object, key).map_err(VmError::Abrupt)? {
             return Ok(None);
         }
         self.get_property_from_value(
@@ -1115,10 +1185,65 @@ impl Vm {
             host,
             registry,
             frame,
-            Value::from_object_ref(global.global_object()),
+            Value::from_object_ref(global_object),
             key,
         )
         .map(Some)
+    }
+
+    fn find_global_environment_ref(
+        &self,
+        agent: &Agent,
+        start: EnvironmentRef,
+    ) -> VmResult<EnvironmentRef> {
+        let mut current = start;
+        loop {
+            if agent.environment_is_global(current) {
+                return Ok(current);
+            }
+            current = agent
+                .environment_outer(current)
+                .ok_or(VmError::MissingEnvironment(current))?
+                .ok_or(VmError::MissingEnvironment(current))?;
+        }
+    }
+
+    fn find_global_environment_object(
+        &self,
+        agent: &Agent,
+        start: EnvironmentRef,
+    ) -> VmResult<(EnvironmentRef, ObjectRef)> {
+        let global = self.find_global_environment_ref(agent, start)?;
+        let object = agent
+            .global_environment_object(global)
+            .ok_or(VmError::MissingEnvironment(global))?;
+        Ok((global, object))
+    }
+
+    fn lookup_global_lexical_binding_ref(
+        &self,
+        agent: &Agent,
+        global: EnvironmentRef,
+        name: AtomId,
+    ) -> Option<GlobalLexicalBindingRecord> {
+        agent
+            .global_lexical_binding(global, name)
+            .or_else(|| self.lookup_global_layout_binding_ref(agent, global, name))
+    }
+
+    fn lookup_global_layout_binding_ref(
+        &self,
+        agent: &Agent,
+        global: EnvironmentRef,
+        name: AtomId,
+    ) -> Option<GlobalLexicalBindingRecord> {
+        let layout = agent.environment_layout(agent.global_environment_layout(global)?)?;
+        let index = layout
+            .bindings()
+            .iter()
+            .position(|binding| binding.name() == Some(name) && binding.flags().is_lexical())?;
+        let index = u32::try_from(index).ok()?;
+        Some(GlobalLexicalBindingRecord::new(name, global, index))
     }
 
     fn lookup_global_layout_binding(

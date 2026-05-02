@@ -10,7 +10,6 @@ use lyng_js_host::{
     TemporalCivilDateTime, TemporalCivilToInstantRequest, TemporalDefaultTimeZoneRequest,
     TemporalDisambiguation, TemporalInstantToCivilRequest,
 };
-use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData};
 use lyng_js_ops::{object, read};
 use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value};
 use parsing::date_parse_text;
@@ -291,19 +290,16 @@ fn allocate_date_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm_root_shape(realm)
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
-        objects.alloc_object(
+        objects.alloc_date_object(
             &mut mutator,
-            ObjectAllocation::ordinary(root_shape)
-                .with_prototype(Some(prototype))
-                .with_date_value(value)
-                .with_cold_data(ObjectColdData::Ordinary(OrdinaryObjectData::Date)),
+            root_shape,
+            Some(prototype),
+            value,
             AllocationLifetime::Default,
         )
     }))
@@ -819,8 +815,8 @@ fn date_builtin<Cx: PublicBuiltinDispatchContext>(
     let default_prototype = {
         let agent = cx.agent();
         agent
-            .realm(realm)
-            .and_then(|record| record.intrinsics().date_prototype())
+            .realm_intrinsics(realm)
+            .and_then(|intrinsics| intrinsics.date_prototype())
     }
     .ok_or_else(|| type_error(cx))?;
 
@@ -979,7 +975,11 @@ fn date_get_timezone_offset_builtin<Cx: PublicBuiltinDispatchContext>(
     let Some(epoch_nanoseconds) = date_value_epoch_nanoseconds(value) else {
         return Ok(Value::from_f64(f64::NAN));
     };
-    let time_zone = cx.temporal_default_time_zone(&TemporalDefaultTimeZoneRequest {})?;
+    let time_zone_request = TemporalDefaultTimeZoneRequest {};
+    if cx.temporal_default_time_zone_is_utc(&time_zone_request)? {
+        return Ok(Value::from_smi(0));
+    }
+    let time_zone = cx.temporal_default_time_zone(&time_zone_request)?;
     let civil_time = cx.temporal_instant_to_civil_time(&TemporalInstantToCivilRequest {
         time_zone_id: time_zone.time_zone_id,
         epoch_nanoseconds,

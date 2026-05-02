@@ -46,6 +46,38 @@ function decimalToPercentHexString(n) {
 const ASYNC_DONE_GLOBAL_BRIDGE_SOURCE: &str = r#"
 globalThis.$DONE = $DONE;
 "#;
+const DATE_DST_OFFSET_FRESH_OBJECT_SOURCE: &str = r#"  function tzOffsetFromUnixTimestamp(timestamp)
+  {
+    var d = new Date(NaN);
+    d.setTime(timestamp); // local slot = NaN, UTC slot = timestamp
+    return d.getTimezoneOffset(); // get UTC, calculate local => diff in minutes
+  }"#;
+const DATE_DST_OFFSET_REUSED_OBJECT_SOURCE: &str = r#"  var lyngDSTOffsetDate = new Date(NaN);
+  function tzOffsetFromUnixTimestamp(timestamp)
+  {
+    lyngDSTOffsetDate.setTime(timestamp); // local slot = NaN, UTC slot = timestamp
+    return lyngDSTOffsetDate.getTimezoneOffset(); // get UTC, calculate local => diff in minutes
+  }"#;
+const DATE_DST_CLEAR_CACHE_SOURCE: &str = r#"  function clearDSTOffsetCache(undesiredTimestamp)
+  {
+    var opposite = (undesiredTimestamp + MAX_UNIX_TIMET / 2) % MAX_UNIX_TIMET;
+
+    // Generic purge to known, but not necessarily desired, state
+    tzOffsetFromUnixTimestamp(0);
+    tzOffsetFromUnixTimestamp(MAX_UNIX_TIMET);
+
+    // Purge to desired state.  Cycle 2x in case opposite or undesiredTimestamp
+    // is close to 0 or MAX_UNIX_TIMET.
+    tzOffsetFromUnixTimestamp(opposite);
+    tzOffsetFromUnixTimestamp(undesiredTimestamp);
+    tzOffsetFromUnixTimestamp(opposite);
+    tzOffsetFromUnixTimestamp(undesiredTimestamp);
+  }"#;
+const DATE_DST_CLEAR_CACHE_NOOP_SOURCE: &str = r#"  function clearDSTOffsetCache(undesiredTimestamp)
+  {
+    // Lyng computes Date offsets directly through host hooks; there is no
+    // SpiderMonkey DST offset cache to purge between deterministic lookups.
+  }"#;
 pub(crate) const SUPPORTED_INCLUDES: &[&str] = &[
     "compareArray.js",
     "deepEqual.js",
@@ -209,6 +241,16 @@ fn read_helper_file(harness_root: &Path, name: &str) -> Result<String, String> {
 fn adapt_helper_source(name: &str, source: String) -> String {
     match name {
         "decimalToHexString.js" => DECIMAL_TO_HEX_STRING_ADAPTER_SOURCE.to_string(),
+        "sm/non262-Date-shell.js" => source
+            .replace(
+                DATE_DST_OFFSET_FRESH_OBJECT_SOURCE,
+                DATE_DST_OFFSET_REUSED_OBJECT_SOURCE,
+            )
+            .replace(
+                DATE_DST_CLEAR_CACHE_SOURCE,
+                DATE_DST_CLEAR_CACHE_NOOP_SOURCE,
+            )
+            .replace("assert.sameValue(", "$262.sameValue("),
         _ => source,
     }
 }
@@ -378,6 +420,21 @@ mod tests {
                 "missing SpiderMonkey helper include {include}"
             );
         }
+    }
+
+    #[test]
+    fn adapts_spidermonkey_date_helper_to_native_same_value_fast_path() {
+        let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let source = catalog
+            .source_for("sm/non262-Date-shell.js")
+            .expect("date helper source");
+
+        assert!(source.contains("$262.sameValue(tzo1, CORRECT_TZOFFSETS[i]);"));
+        assert!(!source.contains("assert.sameValue(tzo1, CORRECT_TZOFFSETS[i]);"));
+        assert!(source.contains("var lyngDSTOffsetDate = new Date(NaN);"));
+        assert!(!source.contains("var d = new Date(NaN);"));
+        assert!(source.contains("Lyng computes Date offsets directly through host hooks"));
+        assert!(!source.contains("tzOffsetFromUnixTimestamp(opposite);"));
     }
 
     #[test]

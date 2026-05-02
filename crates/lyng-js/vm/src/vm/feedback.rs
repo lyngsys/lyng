@@ -89,7 +89,7 @@ impl NamedPropertyFeedback {
     }
 
     #[inline]
-    fn try_load(self, agent: &Agent, receiver: ObjectRef) -> Option<Value> {
+    fn try_load(&self, agent: &Agent, receiver: ObjectRef) -> Option<Value> {
         match self.cache_state {
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {}
             InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => return None,
@@ -108,7 +108,7 @@ impl NamedPropertyFeedback {
     }
 
     #[inline]
-    fn try_store(self, agent: &mut Agent, receiver: ObjectRef, value: Value) -> Option<bool> {
+    fn try_store(&self, agent: &mut Agent, receiver: ObjectRef, value: Value) -> Option<bool> {
         match self.cache_state {
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {}
             InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => return None,
@@ -156,11 +156,11 @@ impl NamedPropertyFeedback {
     }
 
     #[inline]
-    fn active_entries(self) -> impl Iterator<Item = NamedPropertyCacheEntry> {
+    fn active_entries(&self) -> impl Iterator<Item = NamedPropertyCacheEntry> + '_ {
         self.entries
-            .into_iter()
+            .iter()
             .take(usize::from(self.entry_count))
-            .flatten()
+            .filter_map(|entry| *entry)
     }
 
     #[inline]
@@ -178,7 +178,7 @@ impl NamedPropertyFeedback {
     }
 
     #[inline]
-    fn find_entry_index(self, receiver_shape: ShapeId) -> Option<usize> {
+    fn find_entry_index(&self, receiver_shape: ShapeId) -> Option<usize> {
         self.active_entries()
             .enumerate()
             .find_map(|(index, entry)| (entry.receiver_shape() == receiver_shape).then_some(index))
@@ -198,7 +198,7 @@ impl KeyedPropertyFeedback {
     }
 
     #[inline]
-    fn try_load(self, agent: &Agent, receiver: ObjectRef, atom: AtomId) -> Option<Value> {
+    fn try_load(&self, agent: &Agent, receiver: ObjectRef, atom: AtomId) -> Option<Value> {
         if self.family != Some(KeyedPropertyFamily::NamedAtom) {
             return None;
         }
@@ -224,7 +224,7 @@ impl KeyedPropertyFeedback {
 
     #[inline]
     fn try_store(
-        self,
+        &self,
         agent: &mut Agent,
         receiver: ObjectRef,
         atom: AtomId,
@@ -321,15 +321,15 @@ impl KeyedPropertyFeedback {
     }
 
     #[inline]
-    fn active_entries(self) -> impl Iterator<Item = KeyedNamedPropertyCacheEntry> {
+    fn active_entries(&self) -> impl Iterator<Item = KeyedNamedPropertyCacheEntry> + '_ {
         self.entries
-            .into_iter()
+            .iter()
             .take(usize::from(self.entry_count))
-            .flatten()
+            .filter_map(|entry| *entry)
     }
 
     #[inline]
-    fn find_entry_index(self, atom: AtomId, receiver_shape: ShapeId) -> Option<usize> {
+    fn find_entry_index(&self, atom: AtomId, receiver_shape: ShapeId) -> Option<usize> {
         self.active_entries()
             .enumerate()
             .find_map(|(index, entry)| {
@@ -529,21 +529,57 @@ impl Vm {
         Some(descriptor)
     }
 
+    fn record_allocated_feedback_site(&mut self, code: CodeRef, instruction_offset: u32) -> bool {
+        let index = code_index(code);
+        if self
+            .feedback_vectors
+            .get(index)
+            .and_then(Option::as_ref)
+            .is_none()
+        {
+            return false;
+        }
+        let Some(descriptor) = self.feedback_descriptor_for_site(code, instruction_offset) else {
+            return false;
+        };
+        let Some(site) = self
+            .feedback_vectors
+            .get_mut(index)
+            .and_then(Option::as_mut)
+            .and_then(|vector| vector.site_mut(descriptor.slot()))
+        else {
+            return false;
+        };
+        site.record_execution();
+        true
+    }
+
     pub(super) fn record_feedback_site(&mut self, code: CodeRef, instruction_offset: u32) {
+        if self.record_allocated_feedback_site(code, instruction_offset) {
+            return;
+        }
         let _ = self.ensure_feedback_site_execution(code, instruction_offset);
     }
 
-    pub(super) fn try_named_property_load_inline_cache(
-        &self,
+    pub(super) fn try_named_property_load_inline_cache_hit(
+        &mut self,
         agent: &Agent,
         code: CodeRef,
         instruction_offset: u32,
         receiver: ObjectRef,
     ) -> Option<Value> {
-        match self.feedback_state_for_site(code, instruction_offset) {
-            Some(FeedbackSiteState::NamedProperty(feedback)) => feedback.try_load(agent, receiver),
+        let descriptor = self.feedback_descriptor_for_site(code, instruction_offset)?;
+        let site = self
+            .feedback_vectors
+            .get_mut(code_index(code))
+            .and_then(Option::as_mut)?
+            .site_mut(descriptor.slot())?;
+        let value = match site {
+            FeedbackSiteState::NamedProperty(feedback) => feedback.try_load(agent, receiver),
             _ => None,
-        }
+        }?;
+        site.record_execution();
+        Some(value)
     }
 
     pub(super) fn try_named_property_store_inline_cache(

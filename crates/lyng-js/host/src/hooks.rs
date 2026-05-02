@@ -837,6 +837,19 @@ pub trait HostHooks: Send + Sync {
         Ok(TemporalDefaultTimeZone::new(UTC_TIME_ZONE_ID))
     }
 
+    /// Checks whether the host's default time zone is UTC without requiring the
+    /// host to allocate or clone the time-zone identifier on hot paths.
+    ///
+    /// # Errors
+    /// Returns an error when the host cannot inspect its default time-zone identifier.
+    #[inline]
+    fn temporal_default_time_zone_is_utc(
+        &self,
+        request: &TemporalDefaultTimeZoneRequest,
+    ) -> HostResult<bool> {
+        Ok(self.temporal_default_time_zone(request)?.time_zone_id == UTC_TIME_ZONE_ID)
+    }
+
     /// Resolves one instant to civil time for one named time zone.
     ///
     /// # Errors

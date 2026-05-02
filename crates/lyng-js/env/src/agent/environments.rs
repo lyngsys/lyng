@@ -298,6 +298,37 @@ impl Agent {
         }
     }
 
+    pub fn environment_outer(&self, id: EnvironmentRef) -> Option<Option<EnvironmentRef>> {
+        self.heap
+            .view()
+            .environment(id)
+            .map(RuntimeEnvironmentRecord::outer)
+    }
+
+    pub fn environment_is_global(&self, id: EnvironmentRef) -> bool {
+        matches!(
+            self.environment_metadata(id),
+            Some(EnvironmentMetadata::Global { .. })
+        )
+    }
+
+    pub fn global_environment_object(&self, id: EnvironmentRef) -> Option<ObjectRef> {
+        if !self.environment_is_global(id) {
+            return None;
+        }
+        self.heap
+            .view()
+            .environment(id)
+            .and_then(RuntimeEnvironmentRecord::function_object)
+    }
+
+    pub fn global_environment_layout(&self, id: EnvironmentRef) -> Option<EnvironmentLayoutId> {
+        match self.environment_metadata(id) {
+            Some(EnvironmentMetadata::Global { layout, .. }) => Some(*layout),
+            _ => None,
+        }
+    }
+
     pub fn environment_slots(&self, id: EnvironmentRef) -> Option<&[Value]> {
         let slots = self.heap.view().environment(id)?.slots()?;
         self.heap.view().environment_slots(slots)

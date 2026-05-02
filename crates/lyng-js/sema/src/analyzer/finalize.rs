@@ -156,9 +156,7 @@ impl<'a> Analyzer<'a> {
             let parameter_scope_needs_env = function
                 .param_scope
                 .is_some_and(|scope| self.scope_tree_needs_env(scope));
-            let needs_env = !captures.is_empty()
-                || self.scope_tree_needs_env(func_scope)
-                || parameter_scope_needs_env;
+            let needs_env = self.scope_tree_needs_env(func_scope) || parameter_scope_needs_env;
 
             self.functions.get_mut(fid).captures = captures;
             self.functions.get_mut(fid).needs_environment = needs_env;

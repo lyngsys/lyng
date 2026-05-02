@@ -124,6 +124,11 @@ impl VmBuiltinDispatch<'_, '_, '_> {
         let Some(new_target) = new_target else {
             return Ok(default_prototype);
         };
+        if let Some(prototype) =
+            self.fast_ordinary_constructor_prototype(source_realm, default_prototype, new_target)?
+        {
+            return Ok(prototype);
+        }
         let prototype = self.builtin_get_property_value_from_object(
             new_target,
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),
@@ -138,6 +143,46 @@ impl VmBuiltinDispatch<'_, '_, '_> {
         Ok(self
             .remap_constructor_default_prototype(source_realm, function_realm, default_prototype)
             .unwrap_or(default_prototype))
+    }
+
+    fn fast_ordinary_constructor_prototype(
+        &mut self,
+        source_realm: RealmRef,
+        default_prototype: ObjectRef,
+        new_target: ObjectRef,
+    ) -> VmResult<Option<ObjectRef>> {
+        let is_ordinary_target = self
+            .agent
+            .objects()
+            .object_header(self.agent.heap().view(), new_target)
+            .is_some_and(|header| header.kind() != lyng_js_objects::ObjectKind::Proxy);
+        if !is_ordinary_target {
+            return Ok(None);
+        }
+        let key = PropertyKey::from_atom(WellKnownAtom::prototype.id());
+        let Some(descriptor) = object::ordinary_get_own_property(self.agent, new_target, key)
+            .map_err(VmError::Abrupt)?
+        else {
+            return Ok(None);
+        };
+        let Some(value) = descriptor.value() else {
+            return Ok(None);
+        };
+        if let Some(prototype) = value.as_object_ref() {
+            return Ok(Some(prototype));
+        }
+        let function_realm = Vm::function_realm(self.agent, new_target)?;
+        if function_realm == source_realm {
+            return Ok(Some(default_prototype));
+        }
+        Ok(Some(
+            self.remap_constructor_default_prototype(
+                source_realm,
+                function_realm,
+                default_prototype,
+            )
+            .unwrap_or(default_prototype),
+        ))
     }
 
     fn remap_constructor_default_prototype(

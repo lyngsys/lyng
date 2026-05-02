@@ -15,11 +15,21 @@ use lyng_js_types::BackingStoreRef;
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
+const UTC_TIME_ZONE_ID: &str = "UTC";
+
 /// Minimal no-op host hook implementation used by early compile smoke tests.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct NoopHostHooks;
 
-impl HostHooks for NoopHostHooks {}
+impl HostHooks for NoopHostHooks {
+    #[inline]
+    fn temporal_default_time_zone_is_utc(
+        &self,
+        _request: &TemporalDefaultTimeZoneRequest,
+    ) -> HostResult<bool> {
+        Ok(true)
+    }
+}
 
 /// Recorded host-boundary call made against [`TestHost`].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,6 +48,7 @@ pub enum HostCall {
     UnparkAgent(UnparkAgentRequest),
     TemporalCurrentInstant(TemporalCurrentInstantRequest),
     TemporalDefaultTimeZone(TemporalDefaultTimeZoneRequest),
+    TemporalDefaultTimeZoneIsUtc(TemporalDefaultTimeZoneRequest),
     TemporalInstantToCivil(TemporalInstantToCivilRequest),
     TemporalCivilToInstant(TemporalCivilToInstantRequest),
 }
@@ -368,6 +379,17 @@ impl HostHooks for TestHost {
         Ok(TemporalDefaultTimeZone::new(
             state.temporal_default_time_zone.clone(),
         ))
+    }
+
+    fn temporal_default_time_zone_is_utc(
+        &self,
+        request: &TemporalDefaultTimeZoneRequest,
+    ) -> HostResult<bool> {
+        let mut state = self.state.lock().expect("test host mutex poisoned");
+        state
+            .calls
+            .push(HostCall::TemporalDefaultTimeZoneIsUtc(*request));
+        Ok(state.temporal_default_time_zone == UTC_TIME_ZONE_ID)
     }
 
     fn temporal_instant_to_civil_time(

@@ -659,11 +659,11 @@ fn date_objects_store_explicit_payload_values() {
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();
     let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
-    let date = runtime.alloc_object(
+    let date = runtime.alloc_date_object(
         &mut mutator,
-        ObjectAllocation::ordinary(root)
-            .with_cold_data(ObjectColdData::Ordinary(OrdinaryObjectData::Date))
-            .with_date_value(Value::from_f64(123.0)),
+        root,
+        None,
+        Value::from_f64(123.0),
         AllocationLifetime::Default,
     );
 
@@ -672,10 +672,7 @@ fn date_objects_store_explicit_payload_values() {
         runtime.date_value(mutator.view(), date),
         Some(Value::from_f64(123.0))
     );
-    assert_eq!(
-        runtime.ordinary_payload_value(mutator.view(), date),
-        Some(Value::from_f64(123.0))
-    );
+    assert_eq!(runtime.ordinary_payload_value(mutator.view(), date), None);
 }
 
 #[test]

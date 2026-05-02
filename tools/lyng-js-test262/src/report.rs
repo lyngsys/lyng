@@ -8,6 +8,8 @@ use crate::selection::{ExclusionManifest, ProposalStage};
 
 const FAILURE_CLUSTER_LIMIT: usize = 50;
 const FAILURE_EXAMPLE_LIMIT: usize = 3;
+const SLOW_FILE_TIMING_LIMIT: usize = 25;
+const SLOW_VARIANT_TIMING_LIMIT: usize = 50;
 
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct CategoryStats {
@@ -58,7 +60,25 @@ pub(crate) struct SuiteReport<'a> {
     pub(crate) skip_reasons: &'a HashMap<String, u32>,
     pub(crate) exclusion_reasons: &'a HashMap<String, u32>,
     pub(crate) failures: &'a [String],
+    pub(crate) timings: &'a [TestTiming],
     pub(crate) elapsed: Duration,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct TestTiming {
+    pub(crate) file: String,
+    pub(crate) variant: Option<String>,
+    pub(crate) outcome: String,
+    pub(crate) elapsed: Duration,
+}
+
+impl TestTiming {
+    fn display_name(&self) -> String {
+        match &self.variant {
+            Some(variant) => format!("{} [{variant}]", self.file),
+            None => self.file.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -98,6 +118,7 @@ pub(crate) fn write_report(report: &SuiteReport<'_>) {
     write_selection_exclusion_section(&mut out, report, &totals);
     write_category_section(&mut out, report);
     write_variant_execution_section(&mut out, report, &totals);
+    write_slowest_timing_section(&mut out, report);
     write_skip_section(&mut out, report);
     write_manifest_section(&mut out, report);
     write_failure_cluster_section(&mut out, report);
@@ -495,6 +516,115 @@ fn write_variant_execution_section(
     let _ = writeln!(out);
 }
 
+fn write_slowest_timing_section(out: &mut String, report: &SuiteReport<'_>) {
+    let _ = writeln!(out, "## Slowest Test Timings");
+    let _ = writeln!(out);
+    if report.timings.is_empty() {
+        let _ = writeln!(out, "No per-test timings recorded.");
+        let _ = writeln!(out);
+        return;
+    }
+
+    let _ = writeln!(
+        out,
+        "Wall-clock timing is measured around each worker test request. File totals sum the selected variants for the same source file."
+    );
+    let _ = writeln!(out);
+
+    write_slowest_file_timing_table(out, report.timings);
+    write_slowest_variant_timing_table(out, report.timings);
+}
+
+#[derive(Debug)]
+struct FileTiming {
+    file: String,
+    variants: usize,
+    total_elapsed: Duration,
+    slowest_elapsed: Duration,
+}
+
+fn write_slowest_file_timing_table(out: &mut String, timings: &[TestTiming]) {
+    let _ = writeln!(out, "### Slowest Files");
+    let _ = writeln!(out);
+    let _ = writeln!(
+        out,
+        "| Test file | Variants | Total time | Slowest variant |"
+    );
+    let _ = writeln!(out, "| --- | ---: | ---: | ---: |");
+
+    for file in slowest_file_timings(timings)
+        .into_iter()
+        .take(SLOW_FILE_TIMING_LIMIT)
+    {
+        let _ = writeln!(
+            out,
+            "| {} | `{}` | `{}` | `{}` |",
+            table_code_cell(&file.file),
+            file.variants,
+            format_duration(file.total_elapsed),
+            format_duration(file.slowest_elapsed),
+        );
+    }
+    let _ = writeln!(out);
+}
+
+fn slowest_file_timings(timings: &[TestTiming]) -> Vec<FileTiming> {
+    let mut files: HashMap<String, FileTiming> = HashMap::new();
+    for timing in timings {
+        let entry = files
+            .entry(timing.file.clone())
+            .or_insert_with(|| FileTiming {
+                file: timing.file.clone(),
+                variants: 0,
+                total_elapsed: Duration::ZERO,
+                slowest_elapsed: Duration::ZERO,
+            });
+        entry.variants += 1;
+        entry.total_elapsed += timing.elapsed;
+        entry.slowest_elapsed = entry.slowest_elapsed.max(timing.elapsed);
+    }
+
+    let mut files: Vec<_> = files.into_values().collect();
+    files.sort_by(|left, right| {
+        right
+            .total_elapsed
+            .cmp(&left.total_elapsed)
+            .then_with(|| right.slowest_elapsed.cmp(&left.slowest_elapsed))
+            .then_with(|| left.file.cmp(&right.file))
+    });
+    files
+}
+
+fn write_slowest_variant_timing_table(out: &mut String, timings: &[TestTiming]) {
+    let _ = writeln!(out, "### Slowest Variants");
+    let _ = writeln!(out);
+    let _ = writeln!(out, "| Test variant | Outcome | Time |");
+    let _ = writeln!(out, "| --- | --- | ---: |");
+
+    let mut variants: Vec<_> = timings.iter().collect();
+    variants.sort_by(|left, right| {
+        right
+            .elapsed
+            .cmp(&left.elapsed)
+            .then_with(|| left.file.cmp(&right.file))
+            .then_with(|| left.variant.cmp(&right.variant))
+    });
+    for timing in variants.into_iter().take(SLOW_VARIANT_TIMING_LIMIT) {
+        let _ = writeln!(
+            out,
+            "| {} | {} | `{}` |",
+            table_code_cell(&timing.display_name()),
+            table_code_cell(&timing.outcome),
+            format_duration(timing.elapsed),
+        );
+    }
+    let _ = writeln!(out);
+}
+
+fn format_duration(duration: Duration) -> String {
+    format!("{:.3}s", duration.as_secs_f64())
+}
+
 fn write_skip_section(out: &mut String, report: &SuiteReport<'_>) {
     let _ = writeln!(out, "## Skip Breakdown");
     let _ = writeln!(out);
@@ -785,7 +915,7 @@ mod tests {
 
     use crate::selection::{ExclusionManifest, ProposalStage};
 
-    use super::{format_pass_rate, write_report, CategoryStats, SuiteReport};
+    use super::{format_pass_rate, write_report, CategoryStats, SuiteReport, TestTiming};
 
     #[test]
     fn pass_rate_counts_skips_as_non_passing_selected_tests() {
@@ -858,6 +988,7 @@ mod tests {
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
+            timings: &[],
             elapsed: Duration::from_secs(2),
         });
 
@@ -870,9 +1001,93 @@ mod tests {
         assert!(output.contains("| Failed files | `0` |"));
         assert!(output.contains("| Skipped files | `1` |"));
         assert!(output.contains("| Pass rate (selected files) | `50.00%` |"));
+        assert!(output.contains("## Slowest Test Timings"));
         assert!(output.contains("- Proposal stage: `Stage 3+`"));
         assert!(output.contains("Stage 4 implementation gaps remain visible"));
         assert!(!output.contains("Tests carrying `Error.isError` remain excluded"));
+    }
+
+    #[test]
+    fn report_lists_slowest_files_and_variants_by_elapsed_time() {
+        let selected_counts = HashMap::from([("language".to_string(), 2)]);
+        let category_stats = HashMap::from([(
+            "language".to_string(),
+            CategoryStats {
+                pass: 2,
+                fail: 0,
+                skip: 0,
+                panic: 0,
+            },
+        )]);
+        let skip_reasons = HashMap::new();
+        let exclusion_reasons = HashMap::new();
+        let failures = Vec::new();
+        let timings = vec![
+            TestTiming {
+                file: "language/slow.js".to_string(),
+                variant: Some("non-strict".to_string()),
+                outcome: "pass".to_string(),
+                elapsed: Duration::from_millis(500),
+            },
+            TestTiming {
+                file: "language/slow.js".to_string(),
+                variant: Some("strict".to_string()),
+                outcome: "pass".to_string(),
+                elapsed: Duration::from_millis(1_000),
+            },
+            TestTiming {
+                file: "language/medium.js".to_string(),
+                variant: None,
+                outcome: "fail".to_string(),
+                elapsed: Duration::from_millis(750),
+            },
+        ];
+        let manifest = ExclusionManifest {
+            path: "reports/js/lyng-js/test262-exclusions.txt".to_string(),
+            rules: Vec::new(),
+        };
+        let (report_path, report_path_string) = unique_report_path("timings");
+
+        write_report(&SuiteReport {
+            report_path: &report_path_string,
+            manifest: &manifest,
+            filter: None,
+            no_skip: false,
+            proposal_stage: ProposalStage::Stage3,
+            jobs: 1,
+            timeout: Duration::from_secs(1),
+            candidate_total: 2,
+            selected_total: 2,
+            selected_variant_total: 3,
+            selected_counts: &selected_counts,
+            category_stats: &category_stats,
+            selected_variant_counts: &selected_counts,
+            variant_category_stats: &category_stats,
+            skip_reasons: &skip_reasons,
+            exclusion_reasons: &exclusion_reasons,
+            failures: &failures,
+            timings: &timings,
+            elapsed: Duration::from_secs(2),
+        });
+
+        let output = fs::read_to_string(&report_path).expect("report should be readable");
+        let _ = fs::remove_file(&report_path);
+
+        let slow_file = output
+            .find("| `language/slow.js` | `2` | `1.500s` | `1.000s` |")
+            .expect("slow file aggregate should be listed");
+        let medium_file = output
+            .find("| `language/medium.js` | `1` | `0.750s` | `0.750s` |")
+            .expect("medium file aggregate should be listed");
+        assert!(slow_file < medium_file);
+
+        let strict_variant = output
+            .find("| `language/slow.js [strict]` | `pass` | `1.000s` |")
+            .expect("slowest variant should be listed");
+        let medium_variant = output
+            .find("| `language/medium.js` | `fail` | `0.750s` |")
+            .expect("medium variant should be listed");
+        assert!(strict_variant < medium_variant);
     }
 
     #[test]
@@ -940,6 +1155,7 @@ mod tests {
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
+            timings: &[],
             elapsed: Duration::from_secs(2),
         });
 
@@ -986,6 +1202,7 @@ mod tests {
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
+            timings: &[],
             elapsed: Duration::from_secs(2),
         });
 
@@ -1051,6 +1268,7 @@ mod tests {
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
+            timings: &[],
             elapsed: Duration::from_secs(2),
         });
 
@@ -1177,6 +1395,7 @@ mod tests {
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
+            timings: &[],
             elapsed: Duration::from_secs(1),
         });
 
@@ -1246,6 +1465,7 @@ mod tests {
             skip_reasons: &skip_reasons,
             exclusion_reasons: &exclusion_reasons,
             failures: &failures,
+            timings: &[],
             elapsed: Duration::from_secs(2),
         });
 

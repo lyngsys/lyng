@@ -831,6 +831,19 @@ fn global_and_object_environment_families_keep_binding_domains_separate() {
     assert!(global_record.has_lexical_name(AtomId::from_raw(91)));
     assert_eq!(global_record.lexical_bindings(), &[lexical_binding]);
     assert!(global_record.has_var_name(AtomId::from_raw(92)));
+    assert_eq!(
+        agent.environment_outer(global_env),
+        Some(Some(default_realm.global_env()))
+    );
+    assert!(agent.environment_is_global(global_env));
+    assert_eq!(
+        agent.global_environment_object(global_env),
+        Some(global_object)
+    );
+    assert_eq!(
+        agent.global_environment_layout(global_env),
+        Some(global_layout)
+    );
     assert!(matches!(
         agent.environment(global_env),
         Some(EnvironmentRecord::Global(_))
@@ -848,6 +861,10 @@ fn global_and_object_environment_families_keep_binding_domains_separate() {
     assert_eq!(object_record.outer(), Some(global_env));
     assert_eq!(object_record.binding_object(), binding_object);
     assert!(object_record.with_environment());
+    assert_eq!(agent.environment_outer(object_env), Some(Some(global_env)));
+    assert!(!agent.environment_is_global(object_env));
+    assert_eq!(agent.global_environment_object(object_env), None);
+    assert_eq!(agent.global_environment_layout(object_env), None);
     assert_eq!(agent.environment_slots(object_env), None);
     assert!(matches!(
         agent.environment(object_env),

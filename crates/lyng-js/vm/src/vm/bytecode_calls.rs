@@ -474,9 +474,8 @@ impl Vm {
     ) -> VmResult<Value> {
         if this_value.is_null() || this_value.is_undefined() {
             let global = agent
-                .realm(realm)
-                .ok_or(VmError::MissingRootShape(realm))?
-                .global_object();
+                .realm_global_object(realm)
+                .ok_or(VmError::MissingRootShape(realm))?;
             return Ok(Value::from_object_ref(global));
         }
         if this_value.as_object_ref().is_none() {

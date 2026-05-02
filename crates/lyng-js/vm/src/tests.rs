@@ -6385,6 +6385,44 @@ fn evaluate_script_string_from_char_code_uses_uint16_code_units() {
 }
 
 #[test]
+fn evaluate_script_string_index_reads_do_not_allocate_primitive_wrappers() {
+    let warmup = compile_test_unit(23929, "0;");
+    let unit = compile_test_unit(
+        23930,
+        r#"
+            var total = 0;
+            for (var i = 0; i < 64; i++) {
+                total += "0123456789ABCDEF"[i & 15].length;
+            }
+            total;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let _ = vm.evaluate_script(agent, realm, &warmup).unwrap();
+    let before_objects = agent.heap().view().object_stats().occupied_slots;
+    let before_strings = agent.heap().view().string_stats().occupied_slots;
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let after_objects = agent.heap().view().object_stats().occupied_slots;
+    let after_strings = agent.heap().view().string_stats().occupied_slots;
+
+    assert_eq!(result, Value::from_smi(64));
+    assert!(
+        after_objects - before_objects < 16,
+        "primitive string index reads allocated {} object slots",
+        after_objects - before_objects
+    );
+    assert!(
+        after_strings - before_strings < 32,
+        "primitive string index reads allocated {} string slots",
+        after_strings - before_strings
+    );
+}
+
+#[test]
 fn evaluate_script_string_search_uses_regexp_payloads() {
     let unit = compile_test_unit(
         2393,
@@ -10840,10 +10878,9 @@ fn feedback_vectors_allocate_lazily_without_changing_entry_script_result() {
         &mut atoms,
         SourceId::new(21),
         r#"
-            function add(left, right) {
+            (function add(left, right) {
                 return left + right;
-            }
-            add(1, 2);
+            })(1, 2);
         "#,
     );
     assert!(!parsed.diagnostics.has_errors());
@@ -11159,6 +11196,87 @@ fn named_property_load_ic_becomes_monomorphic_for_one_shape() {
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .unwrap(),
         Value::from_smi(7)
+    );
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+}
+
+#[test]
+fn global_property_load_ic_becomes_monomorphic_for_global_object_data_property() {
+    let unit = compile_test_unit(36, "globalValue;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for the global access");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "globalValue"));
+    install_global_value(agent, realm, global_value_name, Value::from_smi(11));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(11)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(11)
+    );
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+}
+
+#[test]
+fn global_property_store_ic_caches_global_object_data_property() {
+    let unit = compile_test_unit(
+        37,
+        "var globalValue; globalValue = globalValue + 1; globalValue;",
+    );
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyStore)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-store site for the global access");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "globalValue"));
+    install_global_value(agent, realm, global_value_name, Value::from_smi(0));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(1)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(2)
     );
     assert_eq!(
         vm.named_property_cache_snapshot(installed.code(), slot),

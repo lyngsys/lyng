@@ -3,7 +3,7 @@ use crate::vm::property_access::ToPrimitiveHint;
 use lyng_js_bytecode::{WideAbcOperands, WideAbxOperands};
 use lyng_js_gc::{AllocationLifetime, BigIntSign, PrimitiveStringView, StringEncoding};
 use lyng_js_ops::{errors, number_to_string, object, read};
-use lyng_js_types::{AbruptCompletion, PropertyKey};
+use lyng_js_types::{AbruptCompletion, PropertyKey, StringRef};
 
 impl Vm {
     #[inline]
@@ -76,11 +76,12 @@ impl Vm {
             ToPrimitiveHint::Default,
         )?;
         if left.is_string() || right.is_string() {
-            let left_units = self.value_to_string_code_units(agent, left)?;
-            let right_units = self.value_to_string_code_units(agent, right)?;
-            let mut units = Vec::with_capacity(left_units.len() + right_units.len());
-            units.extend(left_units);
-            units.extend(right_units);
+            let mut units = Vec::with_capacity(
+                self.value_string_code_unit_len(agent, left)?
+                    + self.value_string_code_unit_len(agent, right)?,
+            );
+            self.append_value_string_code_units(agent, left, &mut units)?;
+            self.append_value_string_code_units(agent, right, &mut units)?;
             return Ok(Value::from_string_ref(alloc_code_unit_string(
                 agent, &units, None,
             )));
@@ -354,6 +355,35 @@ impl Vm {
             .value_to_string_text(agent, value)?
             .encode_utf16()
             .collect())
+    }
+
+    fn value_string_code_unit_len(&self, agent: &mut Agent, value: Value) -> VmResult<usize> {
+        if let Some(string) = value.as_string_ref() {
+            let heap_view = agent.heap().view();
+            let Some(view) = heap_view.string_view(string) else {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            };
+            return Ok(view.code_unit_len() as usize);
+        }
+
+        Ok(self
+            .value_to_string_text(agent, value)?
+            .encode_utf16()
+            .count())
+    }
+
+    fn append_value_string_code_units(
+        &self,
+        agent: &mut Agent,
+        value: Value,
+        output: &mut Vec<u16>,
+    ) -> VmResult<()> {
+        if let Some(string) = value.as_string_ref() {
+            return append_string_ref_code_units(agent, string, output);
+        }
+
+        output.extend(self.value_to_string_text(agent, value)?.encode_utf16());
+        Ok(())
     }
 
     pub(super) fn decode_abc_operands(
@@ -837,11 +867,48 @@ pub(super) fn alloc_string(
 }
 
 #[inline]
-fn alloc_code_unit_string(
+pub(super) fn alloc_code_unit_string(
     agent: &mut Agent,
     units: &[u16],
     atom: Option<AtomId>,
 ) -> lyng_js_types::StringRef {
+    if atom.is_none() && units.len() == 1 && units[0] <= 0x00ff {
+        return agent.latin1_single_code_unit_string(units[0] as u8);
+    }
+    if units.len() <= 4 {
+        let mut latin1 = [0_u8; 4];
+        let mut is_latin1 = true;
+        for (index, unit) in units.iter().copied().enumerate() {
+            if unit <= 0x00ff {
+                latin1[index] = unit as u8;
+            } else {
+                is_latin1 = false;
+                break;
+            }
+        }
+        if is_latin1 {
+            return agent.heap_mut().mutator().alloc_string(
+                StringEncoding::Latin1,
+                u32::try_from(units.len()).expect("latin1 string length should fit into u32"),
+                &latin1[..units.len()],
+                atom,
+                AllocationLifetime::Default,
+            );
+        }
+
+        let mut utf16 = [0_u8; 8];
+        for (index, unit) in units.iter().copied().enumerate() {
+            let offset = index * 2;
+            utf16[offset..offset + 2].copy_from_slice(&unit.to_le_bytes());
+        }
+        return agent.heap_mut().mutator().alloc_string(
+            StringEncoding::Utf16,
+            u32::try_from(units.len()).expect("utf16 string length should fit into u32"),
+            &utf16[..units.len() * 2],
+            atom,
+            AllocationLifetime::Default,
+        );
+    }
     if units.iter().all(|unit| *unit <= 0x00ff) {
         let bytes: Vec<u8> = units.iter().map(|unit| *unit as u8).collect();
         return agent.heap_mut().mutator().alloc_string(
@@ -1030,6 +1097,30 @@ fn utf16_code_units(view: PrimitiveStringView<'_>) -> Option<Vec<u16>> {
     }
     view.latin1_bytes()
         .map(|bytes| bytes.iter().copied().map(u16::from).collect())
+}
+
+fn append_string_ref_code_units(
+    agent: &mut Agent,
+    string: StringRef,
+    output: &mut Vec<u16>,
+) -> VmResult<()> {
+    let heap_view = agent.heap().view();
+    let Some(view) = heap_view.string_view(string) else {
+        return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+    };
+    if let Some(bytes) = view.latin1_bytes() {
+        output.extend(bytes.iter().copied().map(u16::from));
+        return Ok(());
+    }
+    let Some(bytes) = view.utf16_bytes() else {
+        return Ok(());
+    };
+    output.extend(
+        bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
+    );
+    Ok(())
 }
 
 fn bigint_negate_value(agent: &mut Agent, value: Value) -> VmResult<Value> {

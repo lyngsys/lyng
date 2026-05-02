@@ -10,7 +10,7 @@ use lyng_js_host::{
     ParkAgentResult, ParkAgentStatus, TemporalCurrentInstantRequest, TemporalDefaultTimeZone,
     TemporalDefaultTimeZoneRequest, TemporalInstant, UnparkAgentRequest, UnparkAgentResult,
 };
-use lyng_js_ops::errors;
+use lyng_js_ops::{errors, read};
 use lyng_js_types::{
     abstract_module_source_builtin, EmbeddingFunctionId, ObjectRef, PropertyKey, Value,
 };
@@ -27,6 +27,7 @@ const TEST262_CREATE_REALM_RAW: u32 = 2;
 const TEST262_DETACH_ARRAY_BUFFER_RAW: u32 = 3;
 const TEST262_GC_RAW: u32 = 4;
 const TEST262_PRINT_RAW: u32 = 5;
+const TEST262_SAME_VALUE_RAW: u32 = 6;
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone)]
@@ -305,6 +306,13 @@ impl HostHooks for Test262Host {
             self.temporal_default_time_zone.clone(),
         ))
     }
+
+    fn temporal_default_time_zone_is_utc(
+        &self,
+        _request: &TemporalDefaultTimeZoneRequest,
+    ) -> HostResult<bool> {
+        Ok(self.temporal_default_time_zone == "UTC")
+    }
 }
 
 fn test262_eval_script_entry() -> EmbeddingFunctionId {
@@ -329,6 +337,11 @@ fn test262_gc_entry() -> EmbeddingFunctionId {
 
 fn test262_print_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_PRINT_RAW)
+        .expect("test262 embedding function ids should stay non-zero")
+}
+
+fn test262_same_value_entry() -> EmbeddingFunctionId {
+    EmbeddingFunctionId::from_raw(TEST262_SAME_VALUE_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
@@ -414,6 +427,9 @@ impl RealmExtensionProvider for Test262RealmExtension {
         if entry == test262_print_entry() {
             return Some(EmbeddingFunctionMetadata::new("print", 1, false, false));
         }
+        if entry == test262_same_value_entry() {
+            return Some(EmbeddingFunctionMetadata::new("sameValue", 2, false, false));
+        }
         None
     }
 
@@ -436,6 +452,7 @@ impl RealmExtensionProvider for Test262RealmExtension {
         let detach_key = test262_property_key(installation.agent(), "detachArrayBuffer");
         let gc_key = test262_property_key(installation.agent(), "gc");
         let print_key = test262_property_key(installation.agent(), "print");
+        let same_value_key = test262_property_key(installation.agent(), "sameValue");
         let abstract_module_source_key =
             test262_property_key(installation.agent(), "AbstractModuleSource");
 
@@ -491,6 +508,14 @@ impl RealmExtensionProvider for Test262RealmExtension {
             installation.global_object(),
             print_key,
             test262_print_entry(),
+            true,
+            false,
+            true,
+        )?;
+        let _ = installation.define_function_property(
+            harness,
+            same_value_key,
+            test262_same_value_entry(),
             true,
             false,
             true,
@@ -558,6 +583,26 @@ impl RealmExtensionProvider for Test262RealmExtension {
             let message = context.value_to_string_text(value)?;
             self.print_observer.record(message);
             return Ok(Value::undefined());
+        }
+        if entry == test262_same_value_entry() {
+            let actual = invocation
+                .arguments()
+                .first()
+                .copied()
+                .unwrap_or(Value::undefined());
+            let expected = invocation
+                .arguments()
+                .get(1)
+                .copied()
+                .unwrap_or(Value::undefined());
+            let same = {
+                let agent = context.agent();
+                read::same_value(agent.heap().view(), actual, expected).map_err(VmError::Abrupt)?
+            };
+            if same {
+                return Ok(Value::undefined());
+            }
+            return Err(VmError::Abrupt(errors::throw_type_error(context.agent())));
         }
         Err(VmError::MissingEmbeddingFunction(entry))
     }
