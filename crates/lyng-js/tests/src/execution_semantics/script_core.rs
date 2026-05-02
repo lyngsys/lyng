@@ -3317,10 +3317,7 @@ fn script_core_typed_array_numeric_get_and_has_do_not_use_prototype() {
         "#,
     );
 
-    assert_eq!(
-        result,
-        "true:true:true:true:true:true:true:true:true"
-    );
+    assert_eq!(result, "true:true:true:true:true:true:true:true:true");
 }
 
 #[test]
@@ -3396,6 +3393,77 @@ fn script_core_typed_array_define_numeric_value_converts_and_handles_detach() {
     );
 
     assert_eq!(result, "true:true:true:true:true:true:true:true");
+}
+
+#[test]
+fn script_core_typed_array_set_numeric_value_converts_and_handles_detach() {
+    let result = compile_and_run_string(
+        r#"
+        function assignmentThrows(body) {
+            try {
+                body();
+                return false;
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+
+        function strictDetachedSetDoesNotThrow() {
+            let sample = new Uint8Array([17]);
+            sample.buffer.transfer(0);
+            try {
+                (function() {
+                    "use strict";
+                    sample[0] = 42;
+                })();
+                return sample[0] === undefined;
+            } catch (error) {
+                return "threw";
+            }
+        }
+
+        function detachDuringNumberConversion() {
+            let sample = new Uint8Array([17]);
+            let result = Reflect.set(sample, "0", {
+                valueOf: function() {
+                    sample.buffer.transfer(0);
+                    return 42;
+                }
+            });
+            return result + ":" + (sample[0] === undefined);
+        }
+
+        function conversionRunsForDetachedBuffer() {
+            let sample = new Uint8Array([17]);
+            let count = 0;
+            sample.buffer.transfer(0);
+            sample[0] = {
+                valueOf: function() {
+                    count = count + 1;
+                    return 42;
+                }
+            };
+            return count;
+        }
+
+        let numberSample = new Uint8Array([0]);
+        let bigintSample = new BigInt64Array([0n]);
+
+        [
+            assignmentThrows(function() { numberSample[0] = 1n; }),
+            assignmentThrows(function() { bigintSample[0] = 1; }),
+            Reflect.set(numberSample, "0", 257),
+            numberSample[0] === 1,
+            Reflect.set(bigintSample, "0", 2n),
+            bigintSample[0] === 2n,
+            strictDetachedSetDoesNotThrow(),
+            detachDuringNumberConversion(),
+            conversionRunsForDetachedBuffer()
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "true:true:true:true:true:true:true:true:true:1");
 }
 
 #[test]

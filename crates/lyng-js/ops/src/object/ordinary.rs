@@ -59,13 +59,11 @@ pub fn ordinary_get_with_receiver(
 ) -> Completion<Value> {
     if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
         return match numeric_key {
-            TypedArrayNumericKey::Valid(index) => Ok(typed_array_index_descriptor(
-                agent,
-                object,
-                index,
-            )?
-            .and_then(|descriptor| descriptor.value())
-            .unwrap_or(Value::undefined())),
+            TypedArrayNumericKey::Valid(index) => {
+                Ok(typed_array_index_descriptor(agent, object, index)?
+                    .and_then(|descriptor| descriptor.value())
+                    .unwrap_or(Value::undefined()))
+            }
             TypedArrayNumericKey::Invalid => Ok(Value::undefined()),
         };
     }

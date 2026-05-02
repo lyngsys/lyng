@@ -87,6 +87,27 @@ fn vm_typed_array_index_is_valid(
     element_end <= byte_length
 }
 
+fn vm_typed_array_numeric_index_usize(index: f64) -> Option<usize> {
+    if !index.is_finite()
+        || index.fract() != 0.0
+        || index < 0.0
+        || (index == 0.0 && index.is_sign_negative())
+        || index > (usize::MAX as f64)
+    {
+        return None;
+    }
+    Some(index as usize)
+}
+
+fn vm_typed_array_numeric_index_is_valid(
+    agent: &Agent,
+    typed_array: TypedArrayObjectData,
+    index: f64,
+) -> Option<usize> {
+    let index = vm_typed_array_numeric_index_usize(index)?;
+    vm_typed_array_index_is_valid(agent, typed_array, index).then_some(index)
+}
+
 fn canonical_numeric_index_string(text: &str) -> Option<f64> {
     if text == "-0" {
         return Some(-0.0);
@@ -102,6 +123,12 @@ fn canonical_numeric_index_string(text: &str) -> Option<f64> {
 
 fn typed_array_numeric_atom_index(agent: &Agent, key: PropertyKey) -> Option<f64> {
     canonical_numeric_index_string(agent.atoms().resolve(key.as_atom()?))
+}
+
+fn typed_array_numeric_property_index(agent: &Agent, key: PropertyKey) -> Option<f64> {
+    key.as_index()
+        .map(f64::from)
+        .or_else(|| typed_array_numeric_atom_index(agent, key))
 }
 
 struct VmToPrimitiveBridge<'a> {
@@ -1060,12 +1087,17 @@ impl Vm {
         if !vm_typed_array_index_is_valid(agent, typed_array, index) {
             return Ok(Some(false));
         }
-        let index_key = PropertyKey::Index(u32::try_from(index).map_err(|_| {
-            VmError::Abrupt(errors::throw_type_error(agent))
-        })?);
         if let Some(value) = descriptor.value() {
             return self
-                .set_typed_array_index(agent, host, registry, caller, object, index_key, value)
+                .set_typed_array_numeric_index(
+                    agent,
+                    host,
+                    registry,
+                    caller,
+                    object,
+                    numeric_index,
+                    value,
+                )
                 .map(Some);
         }
         Ok(Some(true))
@@ -1128,24 +1160,16 @@ impl Vm {
         if agent.objects().is_module_namespace_object(object) {
             return Ok(false);
         }
-        if agent.objects().typed_array(object).is_some() {
-            if key.as_index().is_some() {
-                return self
-                    .set_typed_array_index(agent, host, registry, caller, object, key, value);
-            }
-            if let Some(index) = typed_array_numeric_atom_index(agent, key) {
-                if index.is_finite()
-                    && !(index == 0.0 && index.is_sign_negative())
-                    && index.fract() == 0.0
-                    && index >= 0.0
-                {
-                    if let Some(index_key) = PropertyKey::from_array_index(index as u64) {
-                        return self.set_typed_array_index(
-                            agent, host, registry, caller, object, index_key, value,
-                        );
-                    }
+        if let Some(typed_array) = agent.objects().typed_array(object) {
+            if let Some(index) = typed_array_numeric_property_index(agent, key) {
+                if receiver.as_object_ref() == Some(object) {
+                    return self.set_typed_array_numeric_index(
+                        agent, host, registry, caller, object, index, value,
+                    );
                 }
-                return Ok(false);
+                if vm_typed_array_numeric_index_is_valid(agent, typed_array, index).is_none() {
+                    return Ok(true);
+                }
             }
         }
         if Self::is_engine_array_length_property(agent, object, key) {
@@ -1261,9 +1285,6 @@ impl Vm {
         if Self::is_engine_array_length_property(agent, receiver, key) {
             value = self.normalize_array_length_set_value(agent, host, registry, caller, value)?;
         }
-        if key.as_index().is_some() && agent.objects().typed_array(receiver).is_some() {
-            return self.set_typed_array_index(agent, host, registry, caller, receiver, key, value);
-        }
         let receiver_descriptor = object::get_own_property_in_context(
             &mut VmProxyBridge {
                 vm: self,
@@ -1320,23 +1341,19 @@ impl Vm {
         )
     }
 
-    fn set_typed_array_index(
+    fn set_typed_array_numeric_index(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
         object: ObjectRef,
-        key: PropertyKey,
+        numeric_index: f64,
         value: Value,
     ) -> VmResult<bool> {
-        let Some(index) = key.as_index() else {
-            return Ok(false);
-        };
         let Some(typed_array) = agent.objects().typed_array(object) else {
             return Ok(false);
         };
-        let index = usize::try_from(index).unwrap_or(usize::MAX);
         let primitive = self.to_primitive(
             agent,
             host,
@@ -1349,12 +1366,17 @@ impl Vm {
             typed_array.kind(),
             TypedArrayElementKind::BigInt64 | TypedArrayElementKind::BigUint64
         ) {
+            if primitive.is_number() {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
             let bigint = object::primitive_to_bigint(agent, primitive).map_err(VmError::Abrupt)?;
             bigint_to_uint64_bits(agent, bigint)
                 .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?
         } else {
-            let number =
-                read::to_number(agent.heap().view(), primitive).map_err(VmError::Abrupt)?;
+            let number = match read::to_number(agent.heap().view(), primitive) {
+                Ok(number) => number,
+                Err(_) => return Err(VmError::Abrupt(errors::throw_type_error(agent))),
+            };
             vm_typed_array_storage_bits(
                 typed_array.kind(),
                 number
@@ -1364,6 +1386,15 @@ impl Vm {
         };
         let Some(typed_array) = agent.objects().typed_array(object) else {
             return Ok(false);
+        };
+        if agent
+            .backing_store_is_detached(typed_array.backing_store())
+            .unwrap_or(true)
+        {
+            return Ok(true);
+        }
+        let Some(index) = vm_typed_array_numeric_index_usize(numeric_index) else {
+            return Ok(true);
         };
         if !vm_typed_array_index_is_valid(agent, typed_array, index) {
             return Ok(true);
