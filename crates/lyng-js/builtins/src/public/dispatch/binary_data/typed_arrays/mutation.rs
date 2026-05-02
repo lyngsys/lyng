@@ -10,12 +10,12 @@ use super::super::{
     to_integer_or_infinity_for_builtin, type_error, PublicBuiltinDispatchContext,
 };
 use super::{
-    typed_array_read_element_value, typed_array_read_storage_bits, typed_array_same_kind_create,
-    typed_array_snapshot_storage_bits, typed_array_species_create,
+    typed_array_current_length, typed_array_read_element_value, typed_array_read_storage_bits,
+    typed_array_same_kind_create, typed_array_snapshot_storage_bits, typed_array_species_create,
     typed_array_species_create_with_arguments, typed_array_storage_bits_from_builtin_value,
     typed_array_storage_bits_to_value, typed_array_this_object, typed_array_this_record,
     typed_array_validated_object_and_record, typed_array_validated_record,
-    typed_array_write_storage_bits,
+    typed_array_validated_record_and_length, typed_array_write_storage_bits,
 };
 use crate::BuiltinInvocation;
 use lyng_js_objects::TypedArrayElementKind;
@@ -135,9 +135,9 @@ fn typed_array_reverse_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_validated_record(cx, invocation.this_value())?;
-    let half_len = record.length() / 2;
-    let last_index = record.length().saturating_sub(1);
+    let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
+    let half_len = length / 2;
+    let last_index = length.saturating_sub(1);
     for lower in 0..half_len {
         let upper = last_index - lower;
         let lower_bits = typed_array_read_storage_bits(cx.agent(), record, lower)
@@ -180,14 +180,10 @@ fn typed_array_sort_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
             j -= 1;
         }
     }
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
+    let Some(current_length) = typed_array_current_length(cx.agent(), record) else {
         return Ok(invocation.this_value());
-    }
-    for (index, bits) in elements.into_iter().enumerate() {
+    };
+    for (index, bits) in elements.into_iter().take(current_length).enumerate() {
         typed_array_write_storage_bits(cx, record, index, bits)?;
     }
     Ok(invocation.this_value())
@@ -249,8 +245,7 @@ fn typed_array_with_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_validated_record(cx, invocation.this_value())?;
-    let length = record.length();
+    let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
     let relative_index = to_integer_or_infinity_for_builtin(
         cx,
         invocation
@@ -273,16 +268,21 @@ fn typed_array_with_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     } else {
         relative_index
     };
-    if !actual_index.is_finite() || actual_index < 0.0 || actual_index >= length as f64 {
+    if !actual_index.is_finite() || actual_index < 0.0 {
         return Err(range_error(cx));
     }
     let actual_index = usize::try_from(actual_index as u64).map_err(|_| range_error(cx))?;
+    if typed_array_current_length(cx.agent(), record).is_none_or(|length| actual_index >= length) {
+        return Err(range_error(cx));
+    }
     let (result_object, result_record) = typed_array_same_kind_create(cx, record.kind(), length)?;
-    let source = typed_array_snapshot_storage_bits(cx.agent(), record);
-    for (index, mut bits) in source.into_iter().enumerate() {
-        if index == actual_index {
-            bits = replacement_bits;
-        }
+    for index in 0..length {
+        let bits = if index == actual_index {
+            replacement_bits
+        } else {
+            let value = typed_array_read_element_value(cx.agent(), record, index);
+            typed_array_storage_bits_from_builtin_value(cx, result_record.kind(), value)?
+        };
         typed_array_write_storage_bits(cx, result_record, index, bits)?;
     }
     Ok(Value::from_object_ref(result_object))
@@ -292,15 +292,8 @@ fn typed_array_fill_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_this_record(cx, invocation.this_value())?;
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
-        return Err(type_error(cx));
-    }
-    let length = u64::try_from(record.length()).unwrap_or(u64::MAX);
+    let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
+    let length = u64::try_from(length).unwrap_or(u64::MAX);
     let relative_start = to_integer_or_infinity_for_builtin(
         cx,
         invocation
@@ -326,13 +319,9 @@ fn typed_array_fill_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
-        return Err(type_error(cx));
-    }
+    let current_length =
+        typed_array_current_length(cx.agent(), record).ok_or_else(|| type_error(cx))?;
+    let end = end.min(u64::try_from(current_length).unwrap_or(u64::MAX));
     for index in start..end {
         let index = usize::try_from(index).map_err(|_| range_error(cx))?;
         typed_array_write_storage_bits(cx, record, index, fill_bits)?;
@@ -344,15 +333,8 @@ fn typed_array_copy_within_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_this_record(cx, invocation.this_value())?;
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
-        return Err(type_error(cx));
-    }
-    let length = u64::try_from(record.length()).unwrap_or(u64::MAX);
+    let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
+    let length = u64::try_from(length).unwrap_or(u64::MAX);
     let relative_target = to_integer_or_infinity_for_builtin(
         cx,
         invocation
@@ -381,15 +363,10 @@ fn typed_array_copy_within_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     let count = final_index
         .saturating_sub(from)
         .min(length.saturating_sub(to));
+    let current_length =
+        typed_array_current_length(cx.agent(), record).ok_or_else(|| type_error(cx))?;
     if count == 0 {
         return Ok(invocation.this_value());
-    }
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
-        return Err(type_error(cx));
     }
     let from_usize = usize::try_from(from).map_err(|_| range_error(cx))?;
     let to_usize = usize::try_from(to).map_err(|_| range_error(cx))?;
@@ -399,15 +376,23 @@ fn typed_array_copy_within_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         let index = from_usize
             .checked_add(offset)
             .ok_or_else(|| range_error(cx))?;
-        let bits = typed_array_read_storage_bits(cx.agent(), record, index)
-            .ok_or_else(|| type_error(cx))?;
+        let bits = if index < current_length {
+            typed_array_read_storage_bits(cx.agent(), record, index)
+        } else {
+            None
+        };
         copied_bits.push(bits);
     }
     for (offset, bits) in copied_bits.into_iter().enumerate() {
         let index = to_usize
             .checked_add(offset)
             .ok_or_else(|| range_error(cx))?;
-        typed_array_write_storage_bits(cx, record, index, bits)?;
+        if index >= current_length {
+            continue;
+        }
+        if let Some(bits) = bits {
+            typed_array_write_storage_bits(cx, record, index, bits)?;
+        }
     }
     Ok(invocation.this_value())
 }

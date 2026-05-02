@@ -3645,6 +3645,92 @@ fn script_core_typed_array_methods_use_live_resizable_lengths() {
 }
 
 #[test]
+fn script_core_typed_array_mutations_recheck_resizable_bounds() {
+    let result = compile_and_run_string(
+        r#"
+        function fillFixedThrowsAfterValueShrink() {
+            let buffer = new ArrayBuffer(4, { maxByteLength: 8 });
+            let sample = new Uint8Array(buffer, 0, 4);
+            let value = {
+                valueOf: function() {
+                    buffer.resize(2);
+                    return 7;
+                }
+            };
+            try {
+                sample.fill(value, 0, 1);
+                return "missing";
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+
+        function copyWithinTrackingTruncatesAfterShrink() {
+            let buffer = new ArrayBuffer(4, { maxByteLength: 8 });
+            let sample = new Uint8Array(buffer);
+            sample[0] = 0;
+            sample[1] = 1;
+            sample[2] = 2;
+            sample[3] = 3;
+            let target = {
+                valueOf: function() {
+                    buffer.resize(3);
+                    return 2;
+                }
+            };
+            try {
+                sample.copyWithin(target, 0);
+                return Array.from(sample).join(",");
+            } catch (error) {
+                return "threw";
+            }
+        }
+
+        function withAllowsIndexMadeValidByValueCoercion() {
+            let buffer = new ArrayBuffer(2, { maxByteLength: 5 });
+            let sample = new Int8Array(buffer);
+            sample[0] = 11;
+            sample[1] = 22;
+            let value = {
+                valueOf: function() {
+                    buffer.resize(5);
+                    return 123;
+                }
+            };
+            let result = sample.with(4, value);
+            return result.length + "," + result[0] + "," + result[1] + "," + sample.length;
+        }
+
+        function withRejectsIndexMadeInvalidByValueCoercion() {
+            let buffer = new ArrayBuffer(4, { maxByteLength: 4 });
+            let sample = new Uint8Array(buffer);
+            let value = {
+                valueOf: function() {
+                    buffer.resize(1);
+                    return 123;
+                }
+            };
+            try {
+                sample.with(-1, value);
+                return "missing";
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        }
+
+        [
+            fillFixedThrowsAfterValueShrink(),
+            copyWithinTrackingTruncatesAfterShrink(),
+            withAllowsIndexMadeValidByValueCoercion(),
+            withRejectsIndexMadeInvalidByValueCoercion()
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|0,1,0|2,11,22,5|true");
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"
