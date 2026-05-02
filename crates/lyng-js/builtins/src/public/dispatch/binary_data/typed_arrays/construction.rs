@@ -104,6 +104,9 @@ fn typed_array_construct_from_receiver<Cx: PublicBuiltinDispatchContext>(
         None,
     )?;
     let record = typed_array_this_record(cx, Value::from_object_ref(object))?;
+    if record.length() < length {
+        return Err(type_error(cx));
+    }
     Ok((object, record))
 }
 

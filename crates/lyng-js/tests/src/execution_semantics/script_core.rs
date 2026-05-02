@@ -3228,6 +3228,62 @@ fn script_core_typed_array_buffer_arg_rechecks_detached_after_coercion() {
 }
 
 #[test]
+fn script_core_typed_array_from_of_rejects_short_custom_constructor_result() {
+    let result = compile_and_run_string(
+        r#"
+        let TypedArray = Object.getPrototypeOf(Uint8Array);
+
+        function probeFromIterable(Ctor, value) {
+            let custom = function() {
+                return new Ctor(1);
+            };
+            try {
+                Ctor.from.call(custom, [value, value]);
+                return "missing";
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+
+        function probeFromArrayLike(Ctor, value) {
+            let custom = function() {
+                return new Ctor(1);
+            };
+            try {
+                Ctor.from.call(custom, { length: 2, 0: value, 1: value });
+                return "missing";
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+
+        function probeOf(Ctor, first, second) {
+            let custom = function() {
+                return new Ctor(1);
+            };
+            try {
+                TypedArray.of.call(custom, first, second);
+                return "missing";
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+
+        [
+            probeFromIterable(Uint8Array, 1),
+            probeFromArrayLike(Uint8Array, 1),
+            probeOf(Uint8Array, 1, 2),
+            probeFromIterable(BigInt64Array, 1n),
+            probeFromArrayLike(BigInt64Array, 1n),
+            probeOf(BigInt64Array, 1n, 2n)
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "true:true:true:true:true:true");
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"
