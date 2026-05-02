@@ -176,18 +176,22 @@ fn data_view_builtin<Cx: PublicBuiltinDispatchContext>(
     if byte_offset > store_len {
         return Err(range_error(cx));
     }
-    let byte_length = if let Some(value) = invocation
+    let explicit_byte_length = if let Some(value) = invocation
         .arguments()
         .get(2)
         .copied()
         .filter(|value| !value.is_undefined())
     {
         let requested = to_index_for_builtin(cx, value)?;
-        usize::try_from(requested).map_err(|_| range_error(cx))?
+        Some(usize::try_from(requested).map_err(|_| range_error(cx))?)
     } else {
-        store_len - byte_offset
+        None
     };
-    if byte_offset.saturating_add(byte_length) > store_len {
+    if explicit_byte_length.is_some_and(|byte_length| {
+        byte_offset
+            .checked_add(byte_length)
+            .is_none_or(|end| end > store_len)
+    }) {
         return Err(range_error(cx));
     }
     let realm = cx.builtin_realm();
@@ -200,12 +204,42 @@ fn data_view_builtin<Cx: PublicBuiltinDispatchContext>(
     .ok_or_else(|| type_error(cx))?;
     let prototype =
         cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)?;
-    let object = allocate_data_view_object(
-        cx,
-        realm,
-        prototype,
-        DataViewObjectData::new(buffer_object, store, byte_offset, byte_length),
-    )?;
+    if cx
+        .agent()
+        .backing_store_is_detached(store)
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Err(type_error(cx));
+    }
+    let current_store_len = cx
+        .agent()
+        .backing_store_byte_length(store)
+        .ok_or_else(|| type_error(cx))?;
+    if byte_offset > current_store_len {
+        return Err(range_error(cx));
+    }
+    if explicit_byte_length.is_some_and(|byte_length| {
+        byte_offset
+            .checked_add(byte_length)
+            .is_none_or(|end| end > current_store_len)
+    }) {
+        return Err(range_error(cx));
+    }
+    let data = match explicit_byte_length {
+        Some(byte_length) => {
+            DataViewObjectData::new(buffer_object, store, byte_offset, byte_length)
+        }
+        None if buffer.is_resizable() => {
+            DataViewObjectData::new_length_tracking(buffer_object, store, byte_offset)
+        }
+        None => DataViewObjectData::new(
+            buffer_object,
+            store,
+            byte_offset,
+            current_store_len - byte_offset,
+        ),
+    };
+    let object = allocate_data_view_object(cx, realm, prototype, data)?;
     Ok(Value::from_object_ref(object))
 }
 
@@ -222,15 +256,9 @@ fn data_view_byte_length_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let record = data_view_this_record(cx, invocation.this_value())?;
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
-        return Err(type_error(cx));
-    }
+    let byte_length = data_view_current_byte_length(cx, record)?;
     Ok(length_value_u64(
-        u64::try_from(record.byte_length()).unwrap_or(u64::MAX),
+        u64::try_from(byte_length).unwrap_or(u64::MAX),
     ))
 }
 
@@ -239,6 +267,16 @@ fn data_view_byte_offset_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let record = data_view_this_record(cx, invocation.this_value())?;
+    let _ = data_view_current_byte_length(cx, record)?;
+    Ok(length_value_u64(
+        u64::try_from(record.byte_offset()).unwrap_or(u64::MAX),
+    ))
+}
+
+fn data_view_current_byte_length<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    record: DataViewObjectData,
+) -> Result<usize, Cx::Error> {
     if cx
         .agent()
         .backing_store_is_detached(record.backing_store())
@@ -246,9 +284,23 @@ fn data_view_byte_offset_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     {
         return Err(type_error(cx));
     }
-    Ok(length_value_u64(
-        u64::try_from(record.byte_offset()).unwrap_or(u64::MAX),
-    ))
+    let store_len = cx
+        .agent()
+        .backing_store_byte_length(record.backing_store())
+        .ok_or_else(|| type_error(cx))?;
+    if record.is_length_tracking() {
+        return store_len
+            .checked_sub(record.byte_offset())
+            .ok_or_else(|| type_error(cx));
+    }
+    let end = record
+        .byte_offset()
+        .checked_add(record.byte_length())
+        .ok_or_else(|| type_error(cx))?;
+    if end > store_len {
+        return Err(type_error(cx));
+    }
+    Ok(record.byte_length())
 }
 
 fn data_view_checked_access<Cx: PublicBuiltinDispatchContext>(
@@ -265,17 +317,11 @@ fn data_view_checked_byte_offset<Cx: PublicBuiltinDispatchContext>(
     index: usize,
     byte_length: usize,
 ) -> Result<usize, Cx::Error> {
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
-        return Err(type_error(cx));
-    }
+    let view_byte_length = data_view_current_byte_length(cx, record)?;
     let end_index = index
         .checked_add(byte_length)
         .ok_or_else(|| range_error(cx))?;
-    if end_index > record.byte_length() {
+    if end_index > view_byte_length {
         return Err(range_error(cx));
     }
     record

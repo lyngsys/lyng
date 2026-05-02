@@ -3093,6 +3093,59 @@ fn script_core_array_buffer_resizable_accessors_and_transfer() {
 }
 
 #[test]
+fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let rab = new ArrayBuffer(4, { maxByteLength: 8 });
+        let tracking = new DataView(rab, 1);
+        let fixed = new DataView(rab, 0, 4);
+
+        if (tracking.byteLength === 3 && tracking.byteOffset === 1) score += 1;
+        rab.resize(6);
+        if (tracking.byteLength === 5 && fixed.byteLength === 4) score += 2;
+        rab.resize(2);
+        if (tracking.byteLength === 1 && tracking.getUint8(0) === 0) score += 4;
+
+        let fixedThrows = false;
+        try {
+            fixed.getUint8(0);
+        } catch (error) {
+            fixedThrows = error instanceof TypeError;
+        }
+        if (fixedThrows) score += 8;
+
+        rab.resize(1);
+        if (tracking.byteLength === 0 && tracking.byteOffset === 1) score += 16;
+
+        let trackingThrows = false;
+        rab.resize(0);
+        try {
+            tracking.byteLength;
+        } catch (error) {
+            trackingThrows = error instanceof TypeError;
+        }
+        if (trackingThrows) score += 32;
+
+        let buffer = new ArrayBuffer(3, { maxByteLength: 3 });
+        let newTarget = function() {}.bind(null);
+        Object.defineProperty(newTarget, "prototype", {
+            get: function() {
+                buffer.resize(2);
+                return DataView.prototype;
+            }
+        });
+        let constructed = Reflect.construct(DataView, [buffer, 2], newTarget);
+        if (constructed.byteLength === 0) score += 64;
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(127));
+}
+
+#[test]
 fn script_core_array_predicate_helpers_read_length_before_callback_validation() {
     let result = compile_and_run(
         r#"

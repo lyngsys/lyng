@@ -252,6 +252,7 @@ pub struct DataViewObjectData {
     backing_store: BackingStoreRef,
     byte_offset: usize,
     byte_length: usize,
+    length_tracking: bool,
 }
 
 impl DataViewObjectData {
@@ -267,6 +268,22 @@ impl DataViewObjectData {
             backing_store,
             byte_offset,
             byte_length,
+            length_tracking: false,
+        }
+    }
+
+    #[inline]
+    pub const fn new_length_tracking(
+        viewed_array_buffer: ObjectRef,
+        backing_store: BackingStoreRef,
+        byte_offset: usize,
+    ) -> Self {
+        Self {
+            viewed_array_buffer,
+            backing_store,
+            byte_offset,
+            byte_length: 0,
+            length_tracking: true,
         }
     }
 
@@ -288,6 +305,11 @@ impl DataViewObjectData {
     #[inline]
     pub const fn byte_length(self) -> usize {
         self.byte_length
+    }
+
+    #[inline]
+    pub const fn is_length_tracking(self) -> bool {
+        self.length_tracking
     }
 }
 
