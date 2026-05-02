@@ -6595,6 +6595,25 @@ fn evaluate_script_string_html_methods_preserve_utf16_code_units() {
 }
 
 #[test]
+fn evaluate_script_regexp_legacy_input_preserves_utf16_code_units() {
+    let unit = compile_test_unit(
+        2398,
+        r#"
+            RegExp.input = String.fromCharCode(0xD800);
+            RegExp.input.length === 1 && RegExp.input.charCodeAt(0) === 0xD800;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn evaluate_script_string_index_reads_do_not_allocate_primitive_wrappers() {
     let warmup = compile_test_unit(23929, "0;");
     let unit = compile_test_unit(

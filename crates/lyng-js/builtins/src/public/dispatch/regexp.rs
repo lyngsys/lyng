@@ -326,8 +326,8 @@ fn regexp_legacy_input_setter_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
-    let input = cx.value_to_string_text(value)?;
-    let input_units = input.encode_utf16().collect();
+    let input_ref = to_string_string_ref(cx, value)?;
+    let input_units = string_ref_code_units(cx, input_ref)?;
     let updated = {
         let agent = cx.agent();
         agent
