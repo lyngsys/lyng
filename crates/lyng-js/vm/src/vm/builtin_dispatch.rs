@@ -9,7 +9,7 @@ mod template_helpers;
 use dispatch_context::VmBuiltinDispatch;
 
 use super::property_access::VmProxyBridge;
-use super::values::{alloc_string, to_f64_number};
+use super::values::{alloc_code_unit_string, alloc_string, to_f64_number};
 use super::{
     Agent, AllocationLifetime, FrameRecord, NativeFunctionRegistry, ObjectRef, TemplateCacheKey,
     ThisState, Value, Vm, VmError, VmResult, WellKnownAtom, WellKnownSymbolId,

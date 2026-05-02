@@ -1,11 +1,11 @@
 use super::super::{
-    array_like_index_property_key,
+    append_string_ref_code_units, array_like_index_property_key,
     iterators::{string_iterator_builtin, string_iterator_next_builtin},
     map_completion, primitive_wrapper_constructor, property_key_from_text, range_error,
-    string_from_code_units, string_ref_code_units, string_ref_text, string_this_ref, string_value,
-    symbol_descriptive_string, to_integer_or_infinity_for_builtin, to_length_for_builtin,
-    to_number_for_builtin, to_string_string_ref, to_uint32_for_builtin, type_error,
-    BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
+    string_from_code_units, string_ref_code_unit_len, string_ref_code_units, string_this_ref,
+    string_value, symbol_descriptive_string, to_integer_or_infinity_for_builtin,
+    to_length_for_builtin, to_number_for_builtin, to_string_string_ref, to_uint32_for_builtin,
+    type_error, BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use lyng_js_common::WellKnownAtom;
@@ -178,12 +178,24 @@ fn string_concat_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let this_string = string_this_ref(cx, invocation.this_value())?;
-    let mut text = string_ref_text(cx, this_string)?;
+    let mut strings = Vec::with_capacity(invocation.arguments().len() + 1);
+    strings.push(this_string);
     for argument in invocation.arguments() {
-        let argument_string = to_string_string_ref(cx, *argument)?;
-        text.push_str(&string_ref_text(cx, argument_string)?);
+        strings.push(to_string_string_ref(cx, *argument)?);
     }
-    Ok(string_value(cx, &text))
+
+    let mut total_len = 0_usize;
+    for string in strings.iter().copied() {
+        total_len = total_len
+            .checked_add(string_ref_code_unit_len(cx, string)?)
+            .expect("string concat length must fit into usize");
+    }
+
+    let mut units = Vec::with_capacity(total_len);
+    for string in strings {
+        append_string_ref_code_units(cx, string, &mut units)?;
+    }
+    Ok(string_from_code_units(cx, &units))
 }
 
 fn string_position_index(position: f64, length: usize) -> Option<usize> {
@@ -322,14 +334,14 @@ fn string_raw_builtin<Cx: PublicBuiltinDispatchContext>(
         );
         let segment = cx.get_property_value(Value::from_object_ref(raw), key)?;
         let segment = to_string_string_ref(cx, segment)?;
-        result.extend_from_slice(&string_ref_code_units(cx, segment)?);
+        append_string_ref_code_units(cx, segment, &mut result)?;
 
         if index + 1 == literal_segments {
             break;
         }
         if let Some(substitution) = invocation.arguments().get(index + 1).copied() {
             let substitution = to_string_string_ref(cx, substitution)?;
-            result.extend_from_slice(&string_ref_code_units(cx, substitution)?);
+            append_string_ref_code_units(cx, substitution, &mut result)?;
         }
     }
 

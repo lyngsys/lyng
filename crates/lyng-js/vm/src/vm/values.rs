@@ -382,7 +382,7 @@ impl Vm {
             .count())
     }
 
-    fn append_value_string_code_units(
+    pub(super) fn append_value_string_code_units(
         &self,
         agent: &mut Agent,
         value: Value,

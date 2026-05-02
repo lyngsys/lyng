@@ -4,7 +4,7 @@ pub(super) use iteration::array_index_of_builtin;
 use iteration::dispatch_array_iteration_builtin;
 
 use super::{
-    array_like_index_property_key, array_like_join_text_for_length, array_like_length,
+    array_like_index_property_key, array_like_join_value_for_length, array_like_length,
     array_like_length_u64, array_result_capacity_hint, array_species_create_for_length,
     close_iterator_after_error, collect_array_like_values_for_from_builtin, create_array_result,
     create_array_result_for_length, create_array_result_with_prototype,
@@ -12,9 +12,9 @@ use super::{
     get_property_from_object, has_property_on_object, is_array_for_species, is_concat_spreadable,
     iterators::{array_iterator_factory_builtin, array_iterator_next_builtin, ArrayIterationKind},
     length_value_u64, normalize_relative_index_u64, objects, property_key_from_text, range_error,
-    set_length_property, set_property_on_object, string_value, to_integer_or_infinity_for_builtin,
-    to_number_for_builtin, type_error, valid_array_length, BuiltinIteratorBridge,
-    PublicBuiltinDispatchContext, MAX_SAFE_INTEGER_U64,
+    set_length_property, set_property_on_object, string_ref_code_units, string_value,
+    to_integer_or_infinity_for_builtin, to_number_for_builtin, to_string_string_ref, type_error,
+    valid_array_length, BuiltinIteratorBridge, PublicBuiltinDispatchContext, MAX_SAFE_INTEGER_U64,
 };
 use crate::{BuiltinInvocation, DynamicFunctionKind};
 use lyng_js_common::WellKnownAtom;
@@ -1266,12 +1266,12 @@ fn array_join_builtin<Cx: PublicBuiltinDispatchContext>(
         .copied()
         .unwrap_or(Value::undefined());
     let separator = if separator_value.is_undefined() {
-        ",".to_owned()
+        None
     } else {
-        cx.value_to_string_text(separator_value)?
+        let separator_ref = to_string_string_ref(cx, separator_value)?;
+        Some(string_ref_code_units(cx, separator_ref)?)
     };
-    let text = array_like_join_text_for_length(cx, object_ref, length, &separator)?;
-    Ok(string_value(cx, &text))
+    array_like_join_value_for_length(cx, object_ref, length, separator.as_deref())
 }
 
 pub(super) fn array_pop_builtin<Cx: PublicBuiltinDispatchContext>(

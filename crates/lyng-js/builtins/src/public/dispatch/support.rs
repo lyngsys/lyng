@@ -74,16 +74,7 @@ impl<Cx: PublicBuiltinDispatchContext> object::ToPrimitiveContext
             return Ok(None);
         }
 
-        let text = array_like_to_string_fallback(self.cx, object)?;
-        let value = {
-            let agent = self.cx.agent();
-            Value::from_string_ref(agent.alloc_runtime_string(
-                &text,
-                None,
-                AllocationLifetime::Default,
-            ))
-        };
-        Ok(Some(value))
+        array_like_to_string_fallback_value(self.cx, object).map(Some)
     }
 }
 
@@ -408,41 +399,45 @@ pub(super) fn builtin_function_entry(
     entry.builtin_entry()
 }
 
-pub(super) fn array_like_join_text<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn array_like_join_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object: lyng_js_types::ObjectRef,
-    separator: &str,
-) -> Result<String, Cx::Error> {
+    separator: Option<&[u16]>,
+) -> Result<Value, Cx::Error> {
     let length = array_like_length(cx, object)?;
-    array_like_join_text_for_length(cx, object, length, separator)
+    array_like_join_value_for_length(cx, object, length, separator)
 }
 
-pub(super) fn array_like_join_text_for_length<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn array_like_join_value_for_length<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object: lyng_js_types::ObjectRef,
     length: u32,
-    separator: &str,
-) -> Result<String, Cx::Error> {
-    let mut text = String::new();
+    separator: Option<&[u16]>,
+) -> Result<Value, Cx::Error> {
+    let mut units = Vec::new();
     for index in 0..length {
         if index != 0 {
-            text.push_str(separator);
+            if let Some(separator) = separator {
+                units.extend_from_slice(separator);
+            } else {
+                units.push(u16::from(b','));
+            }
         }
         let element =
             cx.get_property_value(Value::from_object_ref(object), PropertyKey::Index(index))?;
         if element.is_undefined() || element.is_null() {
             continue;
         }
-        text.push_str(&cx.value_to_string_text(element)?);
+        append_value_string_code_units(cx, element, &mut units)?;
     }
-    Ok(text)
+    Ok(string_from_code_units(cx, &units))
 }
 
-pub(super) fn array_like_to_string_fallback<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn array_like_to_string_fallback_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object: lyng_js_types::ObjectRef,
-) -> Result<String, Cx::Error> {
-    array_like_join_text(cx, object, ",")
+) -> Result<Value, Cx::Error> {
+    array_like_join_value(cx, object, None)
 }
 
 pub(super) fn to_number_value_for_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1509,6 +1504,30 @@ pub(super) fn string_ref_code_units<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     string: StringRef,
 ) -> Result<Vec<u16>, Cx::Error> {
+    let mut units = Vec::with_capacity(string_ref_code_unit_len(cx, string)?);
+    append_string_ref_code_units(cx, string, &mut units)?;
+    Ok(units)
+}
+
+pub(super) fn string_ref_code_unit_len<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    string: StringRef,
+) -> Result<usize, Cx::Error> {
+    let Some(view) = ({
+        let agent = cx.agent();
+        agent.heap().view().string_view(string)
+    }) else {
+        return Err(type_error(cx));
+    };
+
+    Ok(view.code_unit_len() as usize)
+}
+
+pub(super) fn append_string_ref_code_units<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    string: StringRef,
+    output: &mut Vec<u16>,
+) -> Result<(), Cx::Error> {
     let Some(view) = ({
         let agent = cx.agent();
         agent.heap().view().string_view(string)
@@ -1517,16 +1536,53 @@ pub(super) fn string_ref_code_units<Cx: PublicBuiltinDispatchContext>(
     };
 
     if let Some(bytes) = view.latin1_bytes() {
-        return Ok(bytes.iter().copied().map(u16::from).collect());
+        output.reserve(bytes.len());
+        output.extend(bytes.iter().copied().map(u16::from));
+        return Ok(());
     }
 
     let Some(bytes) = view.utf16_bytes() else {
-        return Ok(Vec::new());
+        return Ok(());
     };
-    Ok(bytes
-        .chunks_exact(2)
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-        .collect())
+    output.reserve(bytes.len() / 2);
+    output.extend(
+        bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
+    );
+    Ok(())
+}
+
+pub(super) fn append_value_string_code_units<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+    output: &mut Vec<u16>,
+) -> Result<(), Cx::Error> {
+    let primitive = if value.is_object() {
+        let mut bridge = BuiltinToPrimitiveBridge { cx };
+        object::to_primitive(&mut bridge, value, object::ToPrimitiveHint::String)?
+    } else {
+        value
+    };
+
+    if let Some(string) = primitive.as_string_ref() {
+        return append_string_ref_code_units(cx, string, output);
+    }
+    if primitive.as_symbol_ref().is_some() {
+        return Err(type_error(cx));
+    }
+    if primitive.is_bigint() {
+        let text = {
+            let agent = cx.agent();
+            object::bigint_to_string(agent, primitive, 10)
+        };
+        let text = map_completion(cx, text)?;
+        output.extend(text.encode_utf16());
+        return Ok(());
+    }
+
+    output.extend(cx.value_to_string_text(primitive)?.encode_utf16());
+    Ok(())
 }
 
 pub(super) fn string_ref_text<Cx: PublicBuiltinDispatchContext>(

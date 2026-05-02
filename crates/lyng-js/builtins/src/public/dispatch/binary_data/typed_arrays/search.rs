@@ -3,8 +3,9 @@ use super::super::super::{
     typed_array_last_index_of_builtin,
 };
 use super::super::{
-    length_value_u64, map_completion, normalize_relative_index_u64, range_error, string_value,
-    to_integer_or_infinity_for_builtin, PublicBuiltinDispatchContext,
+    length_value_u64, map_completion, normalize_relative_index_u64, range_error,
+    string_from_code_units, string_ref_code_units, to_integer_or_infinity_for_builtin,
+    to_string_string_ref, PublicBuiltinDispatchContext,
 };
 use super::{
     typed_array_read_element_value, typed_array_read_storage_bits,
@@ -42,21 +43,28 @@ fn typed_array_join_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
     let separator = match invocation.arguments().first().copied() {
-        Some(value) if !value.is_undefined() => cx.value_to_string_text(value)?,
-        _ => ",".to_owned(),
+        Some(value) if !value.is_undefined() => {
+            let separator_ref = to_string_string_ref(cx, value)?;
+            Some(string_ref_code_units(cx, separator_ref)?)
+        }
+        _ => None,
     };
-    let mut text = String::new();
+    let mut units = Vec::new();
     for index in 0..length {
         if index != 0 {
-            text.push_str(&separator);
+            if let Some(separator) = separator.as_deref() {
+                units.extend_from_slice(separator);
+            } else {
+                units.push(u16::from(b','));
+            }
         }
         let value = typed_array_read_element_value(cx.agent(), record, index);
         if value.is_undefined() || value.is_null() {
             continue;
         }
-        text.push_str(&cx.value_to_string_text(value)?);
+        units.extend(cx.value_to_string_text(value)?.encode_utf16());
     }
-    Ok(string_value(cx, &text))
+    Ok(string_from_code_units(cx, &units))
 }
 
 #[derive(Clone, Copy)]

@@ -4,11 +4,12 @@ mod escape;
 mod symbols;
 
 use super::{
-    allocate_array_like_result, builtin_function_entry, callable_object_from_value,
-    code_unit_range_value, define_data_property_with_attrs, iterators, set_data_property_value,
-    string_from_code_units, string_ref_code_units, string_value, syntax_error,
-    to_boolean_for_builtin, to_integer_or_infinity_for_builtin, to_length_for_builtin,
-    to_string_string_ref, type_error, usize_index_value, PublicBuiltinDispatchContext,
+    allocate_array_like_result, append_string_ref_code_units, builtin_function_entry,
+    callable_object_from_value, code_unit_range_value, define_data_property_with_attrs, iterators,
+    set_data_property_value, string_from_code_units, string_ref_code_units, string_value,
+    syntax_error, to_boolean_for_builtin, to_integer_or_infinity_for_builtin,
+    to_length_for_builtin, to_string_string_ref, type_error, usize_index_value,
+    PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use accessors::{
@@ -990,7 +991,7 @@ fn expand_regexp_replacement_template<Cx: PublicBuiltinDispatchContext>(
                 };
                 if !group_value.is_undefined() {
                     let group_ref = to_string_string_ref(cx, group_value)?;
-                    result.extend_from_slice(&string_ref_code_units(cx, group_ref)?);
+                    append_string_ref_code_units(cx, group_ref, &mut result)?;
                 }
                 index = end + 1;
             }

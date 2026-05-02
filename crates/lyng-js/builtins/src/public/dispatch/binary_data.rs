@@ -20,10 +20,12 @@ use super::{
     array_like_index_property_key, array_like_length_u64, arrays,
     collect_array_like_values_for_from_builtin, create_data_property_or_throw,
     get_property_from_object, iterable_to_values_list, iterators, length_value_u64, map_completion,
-    normalize_relative_index_u64, promises, property_key_from_text, range_error, string_value,
-    syntax_error, to_bigint_for_builtin, to_boolean_for_builtin, to_index_for_builtin,
-    to_integer_or_infinity_for_builtin, to_number_for_builtin, to_uint32_for_builtin,
-    to_uint8_clamp_for_builtin, to_uint8_for_builtin, type_error, PublicBuiltinDispatchContext,
+    normalize_relative_index_u64, promises, property_key_from_text, range_error,
+    string_from_code_units, string_ref_code_units, string_value, syntax_error,
+    to_bigint_for_builtin, to_boolean_for_builtin, to_index_for_builtin,
+    to_integer_or_infinity_for_builtin, to_number_for_builtin, to_string_string_ref,
+    to_uint32_for_builtin, to_uint8_clamp_for_builtin, to_uint8_for_builtin, type_error,
+    PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use lyng_js_types::{BuiltinFunctionId, Value};

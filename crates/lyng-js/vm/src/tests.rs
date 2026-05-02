@@ -6497,6 +6497,78 @@ fn evaluate_script_string_add_preserves_mixed_encodings() {
 }
 
 #[test]
+fn evaluate_script_string_concat_preserves_utf16_code_units() {
+    let unit = compile_test_unit(
+        2394,
+        r#"
+            let lone = String.fromCharCode(0xD800);
+            let text = "A".concat(lone, String.fromCodePoint(0x1F600), "\u00ff");
+            text.length === 5 &&
+                text.charCodeAt(0) === 0x0041 &&
+                text.charCodeAt(1) === 0xD800 &&
+                text.charCodeAt(2) === 0xD83D &&
+                text.charCodeAt(3) === 0xDE00 &&
+                text.charCodeAt(4) === 0x00FF;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn evaluate_script_array_join_preserves_utf16_code_units() {
+    let unit = compile_test_unit(
+        2395,
+        r#"
+            let high = String.fromCharCode(0xD800);
+            let low = String.fromCharCode(0xDFFF);
+            let text = [high, "B"].join(low);
+            text.length === 3 &&
+                text.charCodeAt(0) === 0xD800 &&
+                text.charCodeAt(1) === 0xDFFF &&
+                text.charCodeAt(2) === 0x0042;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn evaluate_script_typed_array_join_preserves_utf16_separator() {
+    let unit = compile_test_unit(
+        2396,
+        r#"
+            let separator = String.fromCharCode(0xD800);
+            let text = new Uint8Array([1, 2]).join(separator);
+            text.length === 3 &&
+                text.charCodeAt(0) === 0x0031 &&
+                text.charCodeAt(1) === 0xD800 &&
+                text.charCodeAt(2) === 0x0032;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn evaluate_script_string_index_reads_do_not_allocate_primitive_wrappers() {
     let warmup = compile_test_unit(23929, "0;");
     let unit = compile_test_unit(

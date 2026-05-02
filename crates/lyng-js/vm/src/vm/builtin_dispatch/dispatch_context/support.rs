@@ -66,10 +66,7 @@ impl object::ToPrimitiveContext for VmBuiltinDispatch<'_, '_, '_> {
             return Ok(None);
         }
 
-        let text = self.engine_array_to_string_fallback(object)?;
-        Ok(Some(Value::from_string_ref(alloc_string(
-            self.agent, &text, None,
-        ))))
+        self.engine_array_to_string_fallback_value(object).map(Some)
     }
 }
 
@@ -389,24 +386,27 @@ impl VmBuiltinDispatch<'_, '_, '_> {
         )
     }
 
-    fn engine_array_to_string_fallback(&mut self, object: ObjectRef) -> VmResult<String> {
+    fn engine_array_to_string_fallback_value(&mut self, object: ObjectRef) -> VmResult<Value> {
         let length = self.builtin_get_property_value_from_object(
             object,
             PropertyKey::from_atom(WellKnownAtom::length.id()),
         )?;
         let length = to_f64_number(self.agent, length)?.max(0.0) as u32;
-        let mut text = String::new();
+        let mut units = Vec::new();
         for index in 0..length {
             if index != 0 {
-                text.push(',');
+                units.push(u16::from(b','));
             }
             let element =
                 self.builtin_get_property_value_from_object(object, PropertyKey::Index(index))?;
             if element.is_undefined() || element.is_null() {
                 continue;
             }
-            text.push_str(&self.builtin_value_to_string_text(element)?);
+            self.vm
+                .append_value_string_code_units(self.agent, element, &mut units)?;
         }
-        Ok(text)
+        Ok(Value::from_string_ref(alloc_code_unit_string(
+            self.agent, &units, None,
+        )))
     }
 }
