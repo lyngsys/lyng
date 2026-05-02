@@ -5,9 +5,9 @@ use super::super::super::{
     uint32_array_builtin, uint8_array_builtin, uint8_clamped_array_builtin,
 };
 use super::super::{
-    buffers::allocate_array_buffer_object, collect_array_like_values_for_from_builtin,
-    iterable_to_values_list, length_value_u64, range_error, to_index_for_builtin, type_error,
-    PublicBuiltinDispatchContext,
+    array_like_index_property_key, array_like_length_u64, buffers::allocate_array_buffer_object,
+    collect_array_like_values_for_from_builtin, get_property_from_object, iterable_to_values_list,
+    length_value_u64, range_error, to_index_for_builtin, type_error, PublicBuiltinDispatchContext,
 };
 use super::{
     allocate_typed_array_object, typed_array_default_prototype,
@@ -103,6 +103,30 @@ fn typed_array_construct_from_receiver<Cx: PublicBuiltinDispatchContext>(
     )?;
     let record = typed_array_this_record(cx, Value::from_object_ref(object))?;
     Ok((object, record))
+}
+
+fn typed_array_allocation_byte_length<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    length: usize,
+    element_size: usize,
+) -> Result<usize, Cx::Error> {
+    let byte_length = length
+        .checked_mul(element_size)
+        .ok_or_else(|| range_error(cx))?;
+    if byte_length > cx.agent().backing_store_allocation_limit() {
+        return Err(range_error(cx));
+    }
+    Ok(byte_length)
+}
+
+fn typed_array_allocation_shape<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    length: u64,
+    element_size: usize,
+) -> Result<(usize, usize), Cx::Error> {
+    let length = usize::try_from(length).map_err(|_| range_error(cx))?;
+    let byte_length = typed_array_allocation_byte_length(cx, length, element_size)?;
+    Ok((length, byte_length))
 }
 
 fn typed_array_from_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
@@ -232,39 +256,67 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
                 buffer.is_resizable() && explicit_length.is_none(),
             )
         } else {
-            let elements = if let Some(iterator_symbol) =
+            let iterator_method = if let Some(iterator_symbol) =
                 cx.agent().well_known_symbol(WellKnownSymbolId::Iterator)
             {
-                let iterator_method =
-                    cx.get_property_value(argument, PropertyKey::from_symbol(iterator_symbol))?;
-                if iterator_method.is_undefined() || iterator_method.is_null() {
-                    cx.collect_array_like_arguments(realm, argument)?
-                } else {
-                    iterable_to_values_list(cx, argument)?
-                }
+                cx.get_property_value(argument, PropertyKey::from_symbol(iterator_symbol))?
             } else {
-                cx.collect_array_like_arguments(realm, argument)?
+                Value::undefined()
             };
-            let length = elements.len();
-            let byte_length = length
-                .checked_mul(element_size)
-                .ok_or_else(|| range_error(cx))?;
+            let from_iterator = !(iterator_method.is_undefined() || iterator_method.is_null());
+            let elements = if from_iterator {
+                Some(iterable_to_values_list(cx, argument)?)
+            } else {
+                None
+            };
+            let (length, byte_length) = if let Some(elements) = &elements {
+                (
+                    elements.len(),
+                    typed_array_allocation_byte_length(cx, elements.len(), element_size)?,
+                )
+            } else {
+                let length = array_like_length_u64(cx, buffer_object)?;
+                typed_array_allocation_shape(cx, length, element_size)?
+            };
             let store = cx
                 .agent()
                 .allocate_backing_store(byte_length)
                 .ok_or_else(|| range_error(cx))?;
-            for (index, element) in elements.iter().copied().enumerate() {
-                let bits = typed_array_storage_bits_from_builtin_value(cx, kind, element)?;
-                let start = index
-                    .checked_mul(element_size)
-                    .ok_or_else(|| range_error(cx))?;
-                for offset in 0..element_size {
-                    let byte_index = start.checked_add(offset).ok_or_else(|| range_error(cx))?;
-                    let shift = offset * 8;
-                    let byte =
-                        u8::try_from((bits >> shift) & 0xff).expect("element byte should fit");
-                    if !cx.agent().backing_store_set_byte(store, byte_index, byte) {
-                        return Err(range_error(cx));
+            if let Some(elements) = elements {
+                for (index, element) in elements.iter().copied().enumerate() {
+                    let bits = typed_array_storage_bits_from_builtin_value(cx, kind, element)?;
+                    let start = index
+                        .checked_mul(element_size)
+                        .ok_or_else(|| range_error(cx))?;
+                    for offset in 0..element_size {
+                        let byte_index =
+                            start.checked_add(offset).ok_or_else(|| range_error(cx))?;
+                        let shift = offset * 8;
+                        let byte =
+                            u8::try_from((bits >> shift) & 0xff).expect("element byte should fit");
+                        if !cx.agent().backing_store_set_byte(store, byte_index, byte) {
+                            return Err(range_error(cx));
+                        }
+                    }
+                }
+            } else {
+                for index in 0..length {
+                    let key =
+                        array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
+                    let element = get_property_from_object(cx, buffer_object, key)?;
+                    let bits = typed_array_storage_bits_from_builtin_value(cx, kind, element)?;
+                    let start = index
+                        .checked_mul(element_size)
+                        .ok_or_else(|| range_error(cx))?;
+                    for offset in 0..element_size {
+                        let byte_index =
+                            start.checked_add(offset).ok_or_else(|| range_error(cx))?;
+                        let shift = offset * 8;
+                        let byte =
+                            u8::try_from((bits >> shift) & 0xff).expect("element byte should fit");
+                        if !cx.agent().backing_store_set_byte(store, byte_index, byte) {
+                            return Err(range_error(cx));
+                        }
                     }
                 }
             }
@@ -275,9 +327,7 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     } else {
         let length = to_index_for_builtin(cx, argument)?;
         let length = usize::try_from(length).map_err(|_| range_error(cx))?;
-        let byte_length = length
-            .checked_mul(element_size)
-            .ok_or_else(|| range_error(cx))?;
+        let byte_length = typed_array_allocation_byte_length(cx, length, element_size)?;
         let store = cx
             .agent()
             .allocate_backing_store(byte_length)
