@@ -269,6 +269,14 @@ pub struct RegExpPayload {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RegExpFastPattern {
+    Never,
+    AnchoredAnyRun,
+    AnchoredAsciiRun,
+    AnchoredAsciiNonRun,
+    AnchoredAsciiHexRun,
+    AnchoredAsciiNonHexRun,
+    AnchoredBidiControlRun,
+    AnchoredBidiControlNonRun,
     AsciiDigit,
     AsciiNonDigit,
     Whitespace,
@@ -777,6 +785,32 @@ impl RegExpPayload {
         start: usize,
     ) -> Option<Option<RegExpMatchRecord>> {
         match self.fast_pattern? {
+            RegExpFastPattern::Never => Some(None),
+            RegExpFastPattern::AnchoredAnyRun => {
+                Some((start == 0 && !text.is_empty()).then(|| simple_match_record(0..text.len())))
+            }
+            RegExpFastPattern::AnchoredAsciiRun => {
+                Some(self.match_fast_anchored_run(text, start, is_ascii_code_unit))
+            }
+            RegExpFastPattern::AnchoredAsciiNonRun => {
+                Some(self.match_fast_anchored_run(text, start, |unit| !is_ascii_code_unit(unit)))
+            }
+            RegExpFastPattern::AnchoredAsciiHexRun => {
+                Some(self.match_fast_anchored_run(text, start, is_ascii_hex_digit_code_unit))
+            }
+            RegExpFastPattern::AnchoredAsciiNonHexRun => {
+                Some(self.match_fast_anchored_run(text, start, |unit| {
+                    !is_ascii_hex_digit_code_unit(unit)
+                }))
+            }
+            RegExpFastPattern::AnchoredBidiControlRun => {
+                Some(self.match_fast_anchored_run(text, start, is_bidi_control_code_unit))
+            }
+            RegExpFastPattern::AnchoredBidiControlNonRun => Some(self.match_fast_anchored_run(
+                text,
+                start,
+                |unit| !is_bidi_control_code_unit(unit),
+            )),
             RegExpFastPattern::AsciiDigit => {
                 Some(self.find_fast_class(text, start, is_ascii_digit_code_unit))
             }
@@ -853,6 +887,12 @@ impl RegExpPayload {
 
 fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExpFastPattern> {
     let word_classes_are_ascii = !flags.ignore_case();
+    if flags.unicode_aware() && !flags.ignore_case() {
+        if let Some(pattern) = detect_fast_unicode_property_pattern(pattern, flags) {
+            return Some(pattern);
+        }
+    }
+
     match pattern {
         r"\d" => Some(RegExpFastPattern::AsciiDigit),
         r"\D" => Some(RegExpFastPattern::AsciiNonDigit),
@@ -874,9 +914,45 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
     }
 }
 
+fn detect_fast_unicode_property_pattern(
+    pattern: &str,
+    flags: RegExpObjectFlags,
+) -> Option<RegExpFastPattern> {
+    match pattern {
+        r"\P{Any}" => Some(RegExpFastPattern::Never),
+        r"^\P{Any}+$" if !flags.multiline() => Some(RegExpFastPattern::Never),
+        r"^\p{Any}+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAnyRun),
+        r"^\p{ASCII}+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAsciiRun),
+        r"^\P{ASCII}+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAsciiNonRun),
+        r"^\p{ASCII_Hex_Digit}+$" | r"^\p{AHex}+$" if !flags.multiline() => {
+            Some(RegExpFastPattern::AnchoredAsciiHexRun)
+        }
+        r"^\P{ASCII_Hex_Digit}+$" | r"^\P{AHex}+$" if !flags.multiline() => {
+            Some(RegExpFastPattern::AnchoredAsciiNonHexRun)
+        }
+        r"^\p{Bidi_Control}+$" | r"^\p{Bidi_C}+$" if !flags.multiline() => {
+            Some(RegExpFastPattern::AnchoredBidiControlRun)
+        }
+        r"^\P{Bidi_Control}+$" | r"^\P{Bidi_C}+$" if !flags.multiline() => {
+            Some(RegExpFastPattern::AnchoredBidiControlNonRun)
+        }
+        _ => None,
+    }
+}
+
+#[inline]
+fn is_ascii_code_unit(unit: u16) -> bool {
+    unit <= 0x007F
+}
+
 #[inline]
 fn is_ascii_digit_code_unit(unit: u16) -> bool {
     (0x30..=0x39).contains(&unit)
+}
+
+#[inline]
+fn is_ascii_hex_digit_code_unit(unit: u16) -> bool {
+    is_ascii_digit_code_unit(unit) || (0x41..=0x46).contains(&unit) || (0x61..=0x66).contains(&unit)
 }
 
 #[inline]
@@ -885,6 +961,11 @@ fn is_ascii_word_code_unit(unit: u16) -> bool {
         || (0x41..=0x5A).contains(&unit)
         || unit == 0x5F
         || (0x61..=0x7A).contains(&unit)
+}
+
+#[inline]
+fn is_bidi_control_code_unit(unit: u16) -> bool {
+    matches!(unit, 0x061C | 0x200E..=0x200F | 0x202A..=0x202E | 0x2066..=0x2069)
 }
 
 #[inline]
@@ -959,5 +1040,43 @@ mod tests {
             detect_fast_pattern(r"^\W+$", flags("")),
             Some(RegExpFastPattern::AnchoredAsciiNonWordRun)
         );
+    }
+
+    #[test]
+    fn detects_fast_unicode_property_patterns() {
+        assert_eq!(
+            detect_fast_pattern(r"^\p{ASCII}+$", flags("u")),
+            Some(RegExpFastPattern::AnchoredAsciiRun)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"^\P{AHex}+$", flags("u")),
+            Some(RegExpFastPattern::AnchoredAsciiNonHexRun)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"^\p{Bidi_C}+$", flags("u")),
+            Some(RegExpFastPattern::AnchoredBidiControlRun)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"\P{Any}", flags("u")),
+            Some(RegExpFastPattern::Never)
+        );
+        assert_eq!(detect_fast_pattern(r"^\p{ASCII}+$", flags("")), None);
+    }
+
+    #[test]
+    fn fast_unicode_property_runs_match_expected_ranges() {
+        let ascii = RegExpPayload::compile(r"^\p{ASCII}+$", "u").unwrap();
+        assert!(ascii.find_from_code_units(&[0x41, 0x7F], 0).is_some());
+        assert!(ascii.find_from_code_units(&[0x41, 0x80], 0).is_none());
+
+        let non_hex = RegExpPayload::compile(r"^\P{AHex}+$", "u").unwrap();
+        assert!(non_hex
+            .find_from_code_units(&[0x47, 0xD83D, 0xDE00], 0)
+            .is_some());
+        assert!(non_hex.find_from_code_units(&[0x47, 0x46], 0).is_none());
+
+        let bidi = RegExpPayload::compile(r"^\p{Bidi_Control}+$", "u").unwrap();
+        assert!(bidi.find_from_code_units(&[0x061C, 0x202E], 0).is_some());
+        assert!(bidi.find_from_code_units(&[0x061C, 0x20], 0).is_none());
     }
 }
