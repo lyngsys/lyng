@@ -5,7 +5,7 @@ use lyng_js_env::Agent;
 use lyng_js_gc::{AllocationLifetime, StringEncoding};
 use lyng_js_objects::{
     FunctionEntryIdentity, ObjectAllocation, ObjectColdData, ObjectFlags, ObjectKind,
-    OrdinaryObjectData, PrimitiveWrapperKind, ProxyObjectData,
+    OrdinaryObjectData, PrimitiveWrapperKind, ProxyObjectData, TypedArrayObjectData,
 };
 use lyng_js_ops::{errors, iterator, object, proxy, read};
 use lyng_js_types::{
@@ -414,6 +414,15 @@ pub(super) fn array_like_join_text<Cx: PublicBuiltinDispatchContext>(
     separator: &str,
 ) -> Result<String, Cx::Error> {
     let length = array_like_length(cx, object)?;
+    array_like_join_text_for_length(cx, object, length, separator)
+}
+
+pub(super) fn array_like_join_text_for_length<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    object: lyng_js_types::ObjectRef,
+    length: u32,
+    separator: &str,
+) -> Result<String, Cx::Error> {
     let mut text = String::new();
     for index in 0..length {
         if index != 0 {
@@ -799,22 +808,15 @@ pub(super) fn set_property_on_object<Cx: PublicBuiltinDispatchContext>(
         let typed_array = cx.agent().objects().typed_array(object_ref);
         if let Some(record) = typed_array {
             let element_index = usize::try_from(index).unwrap_or(usize::MAX);
-            if element_index >= record.length()
-                || cx
-                    .agent()
-                    .backing_store_is_detached(record.backing_store())
-                    .ok_or_else(|| type_error(cx))?
-            {
-                return Err(type_error(cx));
-            }
             let bits =
                 binary_data::typed_array_storage_bits_from_builtin_value(cx, record.kind(), value)?;
-            if cx
+            let record = cx
                 .agent()
-                .backing_store_is_detached(record.backing_store())
-                .ok_or_else(|| type_error(cx))?
-            {
-                return Err(type_error(cx));
+                .objects()
+                .typed_array(object_ref)
+                .ok_or_else(|| type_error(cx))?;
+            if !typed_array_index_is_valid(cx, record, element_index)? {
+                return Ok(());
             }
             binary_data::typed_array_write_storage_bits(cx, record, element_index, bits)?;
             return Ok(());
@@ -830,6 +832,42 @@ pub(super) fn set_property_on_object<Cx: PublicBuiltinDispatchContext>(
         return Err(type_error(cx));
     }
     Ok(())
+}
+
+fn typed_array_index_is_valid<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    record: TypedArrayObjectData,
+    element_index: usize,
+) -> Result<bool, Cx::Error> {
+    if element_index >= record.length() {
+        return Ok(false);
+    }
+    if cx
+        .agent()
+        .backing_store_is_detached(record.backing_store())
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Ok(false);
+    }
+    let Some(byte_length) = cx.agent().backing_store_byte_length(record.backing_store()) else {
+        return Err(type_error(cx));
+    };
+    if record.is_length_tracking() {
+        if record.byte_offset() > byte_length {
+            return Ok(false);
+        }
+    } else if record.byte_offset().saturating_add(record.byte_length()) > byte_length {
+        return Ok(false);
+    }
+    let element_size = record.kind().bytes_per_element();
+    let Some(element_end) = element_index
+        .checked_add(1)
+        .and_then(|end| end.checked_mul(element_size))
+        .and_then(|byte_count| record.byte_offset().checked_add(byte_count))
+    else {
+        return Ok(false);
+    };
+    Ok(element_end <= byte_length)
 }
 
 pub(super) fn set_property_on_object_with_receiver<Cx: PublicBuiltinDispatchContext>(

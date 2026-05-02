@@ -1,5 +1,6 @@
 use super::{
-    array_like_length, binary_data::typed_array_validated_object_and_record,
+    array_like_length,
+    binary_data::{typed_array_is_out_of_bounds, typed_array_validated_object_and_record},
     close_iterator_after_error, create_array_result, create_data_property_or_throw,
     get_property_from_object, length_value, map_completion, number_value, property_key_from_text,
     proxy_get_own_property, proxy_own_property_keys, range_error, set_property_on_object,
@@ -409,6 +410,25 @@ fn iterator_prototype_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(invocation.this_value())
 }
 
+fn array_iterator_target_length<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    target_object: ObjectRef,
+) -> Result<u32, Cx::Error> {
+    let typed_array = cx.agent().objects().typed_array(target_object);
+    let Some(record) = typed_array else {
+        return array_like_length(cx, target_object);
+    };
+    if cx
+        .agent()
+        .backing_store_is_detached(record.backing_store())
+        .ok_or_else(|| type_error(cx))?
+        || typed_array_is_out_of_bounds(cx.agent(), record)
+    {
+        return Err(type_error(cx));
+    }
+    Ok(u32::try_from(record.length()).unwrap_or(u32::MAX))
+}
+
 pub(super) fn array_iterator_next_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -442,7 +462,7 @@ pub(super) fn array_iterator_next_builtin<Cx: PublicBuiltinDispatchContext>(
         ARRAY_ITERATOR_KIND_SLOT,
     )?)
     .ok_or_else(|| type_error(cx))?;
-    let length = array_like_length(cx, target_object)?;
+    let length = array_iterator_target_length(cx, target_object)?;
     if index >= length {
         set_iterator_slot_value_for_builtin(
             cx,

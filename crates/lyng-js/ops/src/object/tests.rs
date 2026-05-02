@@ -267,6 +267,29 @@ fn typed_array_index_reads_observe_live_backing_store_bytes() {
 }
 
 #[test]
+fn typed_array_index_reads_hide_fixed_length_view_after_backing_store_shrink() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let typed_array = install_test_uint8_array(agent, &[1, 2, 3, 4]);
+    let typed_array_record = agent
+        .objects()
+        .typed_array(typed_array)
+        .expect("test typed array should install its view record");
+    assert!(agent.backing_store_resize(typed_array_record.backing_store(), 2));
+
+    assert!(!ordinary_has_property(agent, typed_array, PropertyKey::Index(0)).unwrap());
+    assert!(
+        ordinary_get_own_property(agent, typed_array, PropertyKey::Index(0))
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        ordinary_get(agent, typed_array, PropertyKey::Index(0)).unwrap(),
+        Value::undefined()
+    );
+}
+
+#[test]
 fn call_and_construct_wrappers_delegate_to_function_runtime() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();

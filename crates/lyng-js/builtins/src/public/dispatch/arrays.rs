@@ -4,9 +4,9 @@ pub(super) use iteration::array_index_of_builtin;
 use iteration::dispatch_array_iteration_builtin;
 
 use super::{
-    array_like_index_property_key, array_like_join_text, array_like_length, array_like_length_u64,
-    array_result_capacity_hint, array_species_create_for_length, close_iterator_after_error,
-    collect_array_like_values_for_from_builtin, create_array_result,
+    array_like_index_property_key, array_like_join_text_for_length, array_like_length,
+    array_like_length_u64, array_result_capacity_hint, array_species_create_for_length,
+    close_iterator_after_error, collect_array_like_values_for_from_builtin, create_array_result,
     create_array_result_for_length, create_array_result_with_prototype,
     create_data_property_or_throw, define_array_length, delete_property_from_object,
     get_property_from_object, has_property_on_object, is_array_for_species, is_concat_spreadable,
@@ -1259,6 +1259,7 @@ fn array_join_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    let length = array_like_length(cx, object_ref)?;
     let separator_value = invocation
         .arguments()
         .first()
@@ -1269,7 +1270,7 @@ fn array_join_builtin<Cx: PublicBuiltinDispatchContext>(
     } else {
         cx.value_to_string_text(separator_value)?
     };
-    let text = array_like_join_text(cx, object_ref, &separator)?;
+    let text = array_like_join_text_for_length(cx, object_ref, length, &separator)?;
     Ok(string_value(cx, &text))
 }
 

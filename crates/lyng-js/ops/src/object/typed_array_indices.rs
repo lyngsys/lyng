@@ -69,6 +69,9 @@ fn typed_array_read_storage_bits(
     {
         return Ok(None);
     }
+    if typed_array_is_out_of_bounds(agent, record) {
+        return Ok(None);
+    }
     let element_size = record.kind().bytes_per_element();
     let Some(start) = index
         .checked_mul(element_size)
@@ -87,6 +90,19 @@ fn typed_array_read_storage_bits(
         bits |= u64::from(byte) << (offset * 8);
     }
     Ok(Some((record.kind(), bits)))
+}
+
+fn typed_array_is_out_of_bounds(
+    agent: &Agent,
+    record: lyng_js_objects::TypedArrayObjectData,
+) -> bool {
+    let Some(byte_length) = agent.backing_store_byte_length(record.backing_store()) else {
+        return true;
+    };
+    if record.is_length_tracking() {
+        return record.byte_offset() > byte_length;
+    }
+    record.byte_offset().saturating_add(record.byte_length()) > byte_length
 }
 
 pub(super) fn typed_array_index_descriptor(

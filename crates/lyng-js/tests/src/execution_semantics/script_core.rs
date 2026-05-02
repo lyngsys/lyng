@@ -2963,6 +2963,81 @@ fn script_core_array_predicate_helpers_are_generic() {
 }
 
 #[test]
+fn script_core_array_generics_observe_resizable_typed_array_oob_state() {
+    let result = compile_and_run_string(
+        r#"
+        let rab = new ArrayBuffer(4, { maxByteLength: 8 });
+        let fixed = new Uint8Array(rab, 0, 4);
+        fixed[0] = 1;
+        fixed[1] = 2;
+        fixed[2] = 3;
+        fixed[3] = 4;
+        let seen = [];
+        let every = Array.prototype.every.call(fixed, function(value) {
+            seen.push(value);
+            if (seen.length === 2) {
+                rab.resize(2);
+            }
+            return true;
+        });
+        let lengthAfterShrink = fixed.length;
+        let atAfterShrink = Array.prototype.at.call(fixed, 0);
+        let iteratorThrows = false;
+        try {
+            Array.from(Array.prototype.keys.call(fixed));
+        } catch (error) {
+            iteratorThrows = error instanceof TypeError;
+        }
+
+        let rab2 = new ArrayBuffer(4, { maxByteLength: 8 });
+        let fixed2 = new Uint8Array(rab2, 0, 4);
+        let evil = {
+            valueOf: function() {
+                rab2.resize(2);
+                return 9;
+            }
+        };
+        Array.prototype.fill.call(fixed2, evil, 0, 1);
+        let live = new Uint8Array(rab2);
+
+        let strictIndex = (function() {
+            "use strict";
+            let rab3 = new ArrayBuffer(16, { maxByteLength: 32 });
+            let floats = new Float32Array(rab3);
+            floats[0] = -Infinity;
+            floats[1] = -Infinity;
+            floats[2] = Infinity;
+            floats[3] = Infinity;
+            floats[4] = NaN;
+            return Array.prototype.indexOf.call(floats, Infinity);
+        })();
+
+        let rab4 = new ArrayBuffer(4, { maxByteLength: 8 });
+        let tracking = new Uint8Array(rab4);
+        let joined = Array.prototype.join.call(tracking, {
+            toString: function() {
+                rab4.resize(6);
+                return ".";
+            }
+        });
+
+        [
+            every,
+            seen.join(","),
+            lengthAfterShrink,
+            String(atAfterShrink),
+            iteratorThrows,
+            live.length + ":" + live[0] + "," + live[1],
+            strictIndex,
+            joined
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|1,2|0|undefined|true|2:0,0|2|0.0.0.0");
+}
+
+#[test]
 fn script_core_array_predicate_helpers_read_length_before_callback_validation() {
     let result = compile_and_run(
         r#"

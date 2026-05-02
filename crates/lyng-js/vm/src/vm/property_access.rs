@@ -1,6 +1,6 @@
 use super::*;
 use crate::vm::values::encode_number;
-use lyng_js_objects::TypedArrayElementKind;
+use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
 use lyng_js_ops::{
     errors, number_to_string,
     object::{self, ToPrimitiveContext},
@@ -46,6 +46,45 @@ fn vm_typed_array_storage_bits(kind: TypedArrayElementKind, number: f64) -> u64 
             u64::from(vm_to_uint32(number))
         }
     }
+}
+
+fn vm_typed_array_index_is_valid(
+    agent: &Agent,
+    typed_array: TypedArrayObjectData,
+    index: usize,
+) -> bool {
+    if index >= typed_array.length() {
+        return false;
+    }
+    if agent
+        .backing_store_is_detached(typed_array.backing_store())
+        .unwrap_or(false)
+    {
+        return false;
+    }
+    let Some(byte_length) = agent.backing_store_byte_length(typed_array.backing_store()) else {
+        return false;
+    };
+    if typed_array.is_length_tracking() {
+        if typed_array.byte_offset() > byte_length {
+            return false;
+        }
+    } else if typed_array
+        .byte_offset()
+        .saturating_add(typed_array.byte_length())
+        > byte_length
+    {
+        return false;
+    }
+    let element_size = typed_array.kind().bytes_per_element();
+    let Some(element_end) = index
+        .checked_add(1)
+        .and_then(|end| end.checked_mul(element_size))
+        .and_then(|byte_count| typed_array.byte_offset().checked_add(byte_count))
+    else {
+        return false;
+    };
+    element_end <= byte_length
 }
 
 fn canonical_numeric_index_string(text: &str) -> Option<f64> {
@@ -1234,16 +1273,6 @@ impl Vm {
             return Ok(false);
         };
         let index = usize::try_from(index).unwrap_or(usize::MAX);
-        if index >= typed_array.length() {
-            return Ok(false);
-        }
-        if agent
-            .backing_store_is_detached(typed_array.backing_store())
-            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?
-        {
-            return Ok(false);
-        }
-
         let primitive = self.to_primitive(
             agent,
             host,
@@ -1252,12 +1281,6 @@ impl Vm {
             value,
             ToPrimitiveHint::Number,
         )?;
-        if agent
-            .backing_store_is_detached(typed_array.backing_store())
-            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?
-        {
-            return Ok(false);
-        }
         let bits = if matches!(
             typed_array.kind(),
             TypedArrayElementKind::BigInt64 | TypedArrayElementKind::BigUint64
@@ -1275,6 +1298,12 @@ impl Vm {
                     .expect("ToNumber must always produce a numeric Value"),
             )
         };
+        let Some(typed_array) = agent.objects().typed_array(object) else {
+            return Ok(false);
+        };
+        if !vm_typed_array_index_is_valid(agent, typed_array, index) {
+            return Ok(true);
+        }
         let element_size = typed_array.kind().bytes_per_element();
         let absolute_index = typed_array
             .byte_offset()

@@ -185,7 +185,10 @@ pub(super) fn typed_array_read_element_value(
     })
 }
 
-pub(super) fn typed_array_is_out_of_bounds(agent: &Agent, record: TypedArrayObjectData) -> bool {
+pub(in crate::public::dispatch) fn typed_array_is_out_of_bounds(
+    agent: &Agent,
+    record: TypedArrayObjectData,
+) -> bool {
     let Some(byte_length) = agent.backing_store_byte_length(record.backing_store()) else {
         return true;
     };

@@ -12,8 +12,8 @@ use typed_arrays::{
     dispatch_typed_array_search_builtin, dispatch_uint8_array_base64_hex_builtin,
 };
 pub(super) use typed_arrays::{
-    typed_array_storage_bits_from_builtin_value, typed_array_validated_object_and_record,
-    typed_array_write_storage_bits,
+    typed_array_is_out_of_bounds, typed_array_storage_bits_from_builtin_value,
+    typed_array_validated_object_and_record, typed_array_write_storage_bits,
 };
 
 use super::{

@@ -80,6 +80,9 @@ fn typed_array_byte_length_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     {
         return Ok(Value::from_smi(0));
     }
+    if typed_array_is_out_of_bounds(cx.agent(), record) {
+        return Ok(Value::from_smi(0));
+    }
     Ok(length_value_u64(
         u64::try_from(record.byte_length()).unwrap_or(u64::MAX),
     ))
@@ -95,6 +98,9 @@ fn typed_array_byte_offset_getter_builtin<Cx: PublicBuiltinDispatchContext>(
         .backing_store_is_detached(record.backing_store())
         .ok_or_else(|| type_error(cx))?
     {
+        return Ok(Value::from_smi(0));
+    }
+    if typed_array_is_out_of_bounds(cx.agent(), record) {
         return Ok(Value::from_smi(0));
     }
     Ok(length_value_u64(
@@ -115,7 +121,7 @@ fn typed_array_length_getter_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Value::from_smi(0));
     }
     if typed_array_is_out_of_bounds(cx.agent(), record) {
-        return Err(type_error(cx));
+        return Ok(Value::from_smi(0));
     }
     Ok(length_value_u64(
         u64::try_from(record.length()).unwrap_or(u64::MAX),
