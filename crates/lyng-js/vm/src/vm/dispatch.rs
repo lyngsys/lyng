@@ -1602,6 +1602,10 @@ impl Vm {
         Ok(Some(value))
     }
 
+    // ECMAScript IsLooselyEqual only converts an Object operand via ToPrimitive
+    // when the other side is String/Number/BigInt/Symbol/Boolean. Object vs
+    // null/undefined returns false directly, and Object vs Object falls through
+    // to strict (reference) equality.
     fn loosely_equal(
         &mut self,
         agent: &mut Agent,
@@ -1611,6 +1615,11 @@ impl Vm {
         left: Value,
         right: Value,
     ) -> VmResult<bool> {
+        if (left.is_object() && (right.is_null() || right.is_undefined()))
+            || (right.is_object() && (left.is_null() || left.is_undefined()))
+        {
+            return Ok(false);
+        }
         if left.is_object() && !right.is_object() {
             let left =
                 self.to_primitive(agent, host, registry, frame, left, ToPrimitiveHint::Default)?;
