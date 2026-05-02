@@ -4,11 +4,11 @@ use super::super::super::{
 };
 use super::super::{
     length_value_u64, map_completion, normalize_relative_index_u64, range_error, string_value,
-    to_integer_or_infinity_for_builtin, type_error, PublicBuiltinDispatchContext,
+    to_integer_or_infinity_for_builtin, PublicBuiltinDispatchContext,
 };
 use super::{
     typed_array_read_element_value, typed_array_read_storage_bits,
-    typed_array_storage_bits_to_value, typed_array_this_record, typed_array_validated_record,
+    typed_array_storage_bits_to_value, typed_array_validated_record_and_length,
 };
 use crate::BuiltinInvocation;
 use lyng_js_ops::read;
@@ -40,13 +40,13 @@ fn typed_array_join_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_validated_record(cx, invocation.this_value())?;
+    let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
     let separator = match invocation.arguments().first().copied() {
         Some(value) if !value.is_undefined() => cx.value_to_string_text(value)?,
         _ => ",".to_owned(),
     };
     let mut text = String::new();
-    for index in 0..record.length() {
+    for index in 0..length {
         if index != 0 {
             text.push_str(&separator);
         }
@@ -87,15 +87,8 @@ fn typed_array_search_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
     kind: TypedArraySearchKind,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_this_record(cx, invocation.this_value())?;
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
-        return Err(type_error(cx));
-    }
-    let length = u64::try_from(record.length()).unwrap_or(u64::MAX);
+    let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
+    let length = u64::try_from(length).unwrap_or(u64::MAX);
     let search_element = invocation
         .arguments()
         .first()
@@ -139,23 +132,16 @@ fn typed_array_search_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
                     TypedArraySearchKind::LastIndexOf => unreachable!(),
                 });
             }
-            if cx
-                .agent()
-                .backing_store_is_detached(record.backing_store())
-                .ok_or_else(|| type_error(cx))?
-            {
-                return Ok(match kind {
-                    TypedArraySearchKind::Includes => {
-                        Value::from_bool(search_element.is_undefined())
-                    }
-                    TypedArraySearchKind::IndexOf => Value::from_smi(-1),
-                    TypedArraySearchKind::LastIndexOf => unreachable!(),
-                });
-            }
             for index in start..length {
                 let index = usize::try_from(index).map_err(|_| range_error(cx))?;
-                let bits = typed_array_read_storage_bits(cx.agent(), record, index)
-                    .ok_or_else(|| type_error(cx))?;
+                let Some(bits) = typed_array_read_storage_bits(cx.agent(), record, index) else {
+                    if matches!(kind, TypedArraySearchKind::Includes)
+                        && search_element.is_undefined()
+                    {
+                        return Ok(Value::from_bool(true));
+                    }
+                    continue;
+                };
                 let element = typed_array_storage_bits_to_value(cx.agent(), record.kind(), bits);
                 if typed_array_search_matches(cx, kind, search_element, element)? {
                     return Ok(match kind {
@@ -192,20 +178,14 @@ fn typed_array_search_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
                 }
                 computed as u64
             };
-            if cx
-                .agent()
-                .backing_store_is_detached(record.backing_store())
-                .ok_or_else(|| type_error(cx))?
-            {
-                return Ok(Value::from_smi(-1));
-            }
             let mut index = usize::try_from(start).map_err(|_| range_error(cx))?;
             loop {
-                let bits = typed_array_read_storage_bits(cx.agent(), record, index)
-                    .ok_or_else(|| type_error(cx))?;
-                let element = typed_array_storage_bits_to_value(cx.agent(), record.kind(), bits);
-                if typed_array_search_matches(cx, kind, search_element, element)? {
-                    return Ok(length_value_u64(u64::try_from(index).unwrap_or(u64::MAX)));
+                if let Some(bits) = typed_array_read_storage_bits(cx.agent(), record, index) {
+                    let element =
+                        typed_array_storage_bits_to_value(cx.agent(), record.kind(), bits);
+                    if typed_array_search_matches(cx, kind, search_element, element)? {
+                        return Ok(length_value_u64(u64::try_from(index).unwrap_or(u64::MAX)));
+                    }
                 }
                 if index == 0 {
                     break;

@@ -3565,6 +3565,86 @@ fn script_core_typed_array_own_keys_track_fixed_resizable_bounds() {
 }
 
 #[test]
+fn script_core_typed_array_methods_use_live_resizable_lengths() {
+    let result = compile_and_run_string(
+        r#"
+        function fixedAtThrows() {
+            let buffer = new ArrayBuffer(4, { maxByteLength: 8 });
+            let sample = new Uint8Array(buffer, 0, 4);
+            buffer.resize(3);
+            try {
+                sample.at(0);
+                return "missing";
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+
+        function trackingAtReadsLiveLength() {
+            let buffer = new ArrayBuffer(4, { maxByteLength: 8 });
+            let sample = new Uint8Array(buffer);
+            sample[0] = 1;
+            sample[1] = 2;
+            sample[2] = 3;
+            sample[3] = 4;
+            buffer.resize(3);
+            return sample.at(-1);
+        }
+
+        function atUsesIndexedGetAfterCoercion() {
+            let buffer = new ArrayBuffer(4, { maxByteLength: 8 });
+            let sample = new Uint8Array(buffer, 0, 4);
+            let index = {
+                valueOf: function() {
+                    buffer.resize(2);
+                    return 0;
+                }
+            };
+            return sample.at(index);
+        }
+
+        function joinUsesIndexedGetAfterCoercion() {
+            let buffer = new ArrayBuffer(4, { maxByteLength: 8 });
+            let sample = new Uint8Array(buffer);
+            sample[0] = 1;
+            sample[1] = 2;
+            sample[2] = 3;
+            sample[3] = 4;
+            let separator = {
+                toString: function() {
+                    buffer.resize(2);
+                    return ".";
+                }
+            };
+            return sample.join(separator);
+        }
+
+        function includesUndefinedAfterCoercionShrink() {
+            let buffer = new ArrayBuffer(1, { maxByteLength: 1 });
+            let sample = new Uint8Array(buffer);
+            let index = {
+                valueOf: function() {
+                    buffer.resize(0);
+                    return 0;
+                }
+            };
+            return sample.includes(undefined, index);
+        }
+
+        [
+            fixedAtThrows(),
+            trackingAtReadsLiveLength(),
+            atUsesIndexedGetAfterCoercion() === undefined,
+            joinUsesIndexedGetAfterCoercion(),
+            includesUndefinedAfterCoercionShrink()
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "true:3:true:1.2..:true");
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"

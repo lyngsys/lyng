@@ -122,6 +122,9 @@ pub(super) fn typed_array_read_storage_bits(
     typed_array: TypedArrayObjectData,
     element_index: usize,
 ) -> Option<u64> {
+    if element_index >= typed_array_current_length(agent, typed_array)? {
+        return None;
+    }
     let element_size = typed_array.kind().bytes_per_element();
     let start = typed_array
         .byte_offset()
@@ -170,7 +173,7 @@ pub(super) fn typed_array_snapshot_storage_bits(
     agent: &Agent,
     record: TypedArrayObjectData,
 ) -> Vec<u64> {
-    (0..record.length())
+    (0..typed_array_current_length(agent, record).unwrap_or(0))
         .map(|index| typed_array_read_storage_bits(agent, record, index).unwrap_or(0))
         .collect()
 }
@@ -189,13 +192,30 @@ pub(in crate::public::dispatch) fn typed_array_is_out_of_bounds(
     agent: &Agent,
     record: TypedArrayObjectData,
 ) -> bool {
-    let Some(byte_length) = agent.backing_store_byte_length(record.backing_store()) else {
-        return true;
-    };
-    if record.is_length_tracking() {
-        return record.byte_offset() > byte_length;
+    typed_array_current_length(agent, record).is_none()
+}
+
+pub(in crate::public::dispatch) fn typed_array_current_length(
+    agent: &Agent,
+    record: TypedArrayObjectData,
+) -> Option<usize> {
+    if agent.backing_store_is_detached(record.backing_store())? {
+        return None;
     }
-    record.byte_offset().saturating_add(record.byte_length()) > byte_length
+    let byte_length = agent.backing_store_byte_length(record.backing_store())?;
+    if record.is_length_tracking() {
+        return byte_length
+            .checked_sub(record.byte_offset())
+            .map(|remaining| remaining / record.kind().bytes_per_element());
+    }
+    if record
+        .byte_offset()
+        .checked_add(record.byte_length())
+        .is_none_or(|end| end > byte_length)
+    {
+        return None;
+    }
+    Some(record.length())
 }
 
 pub(super) fn allocate_typed_array_object<Cx: PublicBuiltinDispatchContext>(
@@ -257,18 +277,16 @@ pub(super) fn typed_array_validated_record<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
 ) -> Result<TypedArrayObjectData, Cx::Error> {
+    typed_array_validated_record_and_length(cx, value).map(|(record, _)| record)
+}
+
+pub(super) fn typed_array_validated_record_and_length<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<(TypedArrayObjectData, usize), Cx::Error> {
     let record = typed_array_this_record(cx, value)?;
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
-        return Err(type_error(cx));
-    }
-    if typed_array_is_out_of_bounds(cx.agent(), record) {
-        return Err(type_error(cx));
-    }
-    Ok(record)
+    let length = typed_array_current_length(cx.agent(), record).ok_or_else(|| type_error(cx))?;
+    Ok((record, length))
 }
 
 pub(in crate::public::dispatch) fn typed_array_validated_object_and_record<
@@ -280,6 +298,17 @@ pub(in crate::public::dispatch) fn typed_array_validated_object_and_record<
     let object = typed_array_this_object(cx, value)?;
     let record = typed_array_validated_record(cx, value)?;
     Ok((object, record))
+}
+
+pub(in crate::public::dispatch) fn typed_array_validated_object_record_and_length<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<(ObjectRef, TypedArrayObjectData, usize), Cx::Error> {
+    let object = typed_array_this_object(cx, value)?;
+    let (record, length) = typed_array_validated_record_and_length(cx, value)?;
+    Ok((object, record, length))
 }
 
 pub(super) fn typed_array_default_prototype<Cx: PublicBuiltinDispatchContext>(

@@ -9,8 +9,8 @@ use super::super::{
 };
 use super::{
     typed_array_read_element_value, typed_array_species_create,
-    typed_array_storage_bits_from_builtin_value, typed_array_validated_object_and_record,
-    typed_array_validated_record, typed_array_write_storage_bits,
+    typed_array_storage_bits_from_builtin_value, typed_array_validated_object_record_and_length,
+    typed_array_validated_record_and_length, typed_array_write_storage_bits,
 };
 use crate::BuiltinInvocation;
 use lyng_js_types::{BuiltinFunctionId, Value};
@@ -74,7 +74,7 @@ fn typed_array_predicate_builtin<Cx: PublicBuiltinDispatchContext>(
     kind: TypedArrayPredicateKind,
 ) -> Result<Value, Cx::Error> {
     let this_value = invocation.this_value();
-    let record = typed_array_validated_record(cx, this_value)?;
+    let (record, length) = typed_array_validated_record_and_length(cx, this_value)?;
     let callback = cx.require_callable_object(
         invocation
             .arguments()
@@ -89,9 +89,9 @@ fn typed_array_predicate_builtin<Cx: PublicBuiltinDispatchContext>(
         .unwrap_or(Value::undefined());
     let mut indices: Box<dyn Iterator<Item = usize>> = match kind {
         TypedArrayPredicateKind::FindLast | TypedArrayPredicateKind::FindLastIndex => {
-            Box::new((0..record.length()).rev())
+            Box::new((0..length).rev())
         }
-        _ => Box::new(0..record.length()),
+        _ => Box::new(0..length),
     };
     for index in indices.by_ref() {
         let element = typed_array_read_element_value(cx.agent(), record, index);
@@ -184,7 +184,8 @@ fn typed_array_filter_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let (object, record) = typed_array_validated_object_and_record(cx, invocation.this_value())?;
+    let (object, record, length) =
+        typed_array_validated_object_record_and_length(cx, invocation.this_value())?;
     let callback = cx.require_callable_object(
         invocation
             .arguments()
@@ -198,8 +199,8 @@ fn typed_array_filter_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         .copied()
         .unwrap_or(Value::undefined());
     let this_value = invocation.this_value();
-    let mut kept = Vec::with_capacity(record.length());
-    for index in 0..record.length() {
+    let mut kept = Vec::with_capacity(length);
+    for index in 0..length {
         let value = typed_array_read_element_value(cx.agent(), record, index);
         let selected = cx.call_to_completion(
             callback,
@@ -227,7 +228,7 @@ fn typed_array_for_each_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_validated_record(cx, invocation.this_value())?;
+    let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
     let callback = cx.require_callable_object(
         invocation
             .arguments()
@@ -241,7 +242,7 @@ fn typed_array_for_each_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         .copied()
         .unwrap_or(Value::undefined());
     let this_value = invocation.this_value();
-    for index in 0..record.length() {
+    for index in 0..length {
         let value = typed_array_read_element_value(cx.agent(), record, index);
         let _ = cx.call_to_completion(
             callback,
@@ -260,7 +261,8 @@ fn typed_array_map_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let (object, record) = typed_array_validated_object_and_record(cx, invocation.this_value())?;
+    let (object, record, length) =
+        typed_array_validated_object_record_and_length(cx, invocation.this_value())?;
     let callback = cx.require_callable_object(
         invocation
             .arguments()
@@ -274,9 +276,9 @@ fn typed_array_map_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         .copied()
         .unwrap_or(Value::undefined());
     let (result_object, result_record) =
-        typed_array_species_create(cx, object, record.kind(), record.length())?;
+        typed_array_species_create(cx, object, record.kind(), length)?;
     let this_value = invocation.this_value();
-    for index in 0..record.length() {
+    for index in 0..length {
         let value = typed_array_read_element_value(cx.agent(), record, index);
         let mapped = cx.call_to_completion(
             callback,
@@ -304,7 +306,7 @@ fn typed_array_reduce_common<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
     direction: TypedArrayReduceDirection,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_validated_record(cx, invocation.this_value())?;
+    let (record, len) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
     let callback = cx.require_callable_object(
         invocation
             .arguments()
@@ -313,7 +315,6 @@ fn typed_array_reduce_common<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let this_value = invocation.this_value();
-    let len = record.length();
     let mut accumulator;
     let mut next_index;
     match invocation.arguments().get(1).copied() {

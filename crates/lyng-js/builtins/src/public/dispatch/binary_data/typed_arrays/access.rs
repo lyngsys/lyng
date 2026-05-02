@@ -11,7 +11,8 @@ use super::super::{
 };
 use super::{
     typed_array_is_out_of_bounds, typed_array_read_element_value, typed_array_read_storage_bits,
-    typed_array_storage_bits_to_value, typed_array_this_record, typed_array_validated_record,
+    typed_array_storage_bits_to_value, typed_array_this_record,
+    typed_array_validated_record_and_length,
 };
 use crate::BuiltinInvocation;
 use lyng_js_objects::TypedArrayElementKind;
@@ -165,8 +166,8 @@ fn typed_array_at_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_this_record(cx, invocation.this_value())?;
-    let length = u64::try_from(record.length()).unwrap_or(u64::MAX);
+    let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
+    let length = u64::try_from(length).unwrap_or(u64::MAX);
     let relative_index = to_integer_or_infinity_for_builtin(
         cx,
         invocation
@@ -184,23 +185,22 @@ fn typed_array_at_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         return Ok(Value::undefined());
     }
     let element_index = usize::try_from(index).map_err(|_| range_error(cx))?;
-    let bits = typed_array_read_storage_bits(cx.agent(), record, element_index)
-        .ok_or_else(|| type_error(cx))?;
-    Ok(typed_array_storage_bits_to_value(
-        cx.agent(),
-        record.kind(),
-        bits,
-    ))
+    Ok(
+        typed_array_read_storage_bits(cx.agent(), record, element_index)
+            .map_or(Value::undefined(), |bits| {
+                typed_array_storage_bits_to_value(cx.agent(), record.kind(), bits)
+            }),
+    )
 }
 
 fn typed_array_to_locale_string_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_validated_record(cx, invocation.this_value())?;
+    let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
     let to_locale_string_key = property_key_from_text(cx, "toLocaleString");
-    let mut parts = Vec::with_capacity(record.length());
-    for index in 0..record.length() {
+    let mut parts = Vec::with_capacity(length);
+    for index in 0..length {
         let value = typed_array_read_element_value(cx.agent(), record, index);
         let text = if value.is_undefined() || value.is_null() {
             String::new()
