@@ -16,7 +16,9 @@ use super::{
 };
 use crate::BuiltinInvocation;
 use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value, WellKnownSymbolId};
+use lyng_js_types::{
+    BackingStoreRef, BuiltinFunctionId, ObjectRef, PropertyKey, Value, WellKnownSymbolId,
+};
 
 pub(in crate::public::dispatch::binary_data) fn dispatch_typed_array_constructor_builtin<
     Cx: PublicBuiltinDispatchContext,
@@ -129,6 +131,24 @@ fn typed_array_allocation_shape<Cx: PublicBuiltinDispatchContext>(
     Ok((length, byte_length))
 }
 
+fn typed_array_buffer_byte_length<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    store: BackingStoreRef,
+) -> Result<usize, Cx::Error> {
+    cx.agent()
+        .backing_store_byte_length(store)
+        .ok_or_else(|| type_error(cx))
+}
+
+fn typed_array_buffer_is_detached<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    store: BackingStoreRef,
+) -> Result<bool, Cx::Error> {
+    cx.agent()
+        .backing_store_is_detached(store)
+        .ok_or_else(|| type_error(cx))
+}
+
 fn typed_array_from_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -208,17 +228,9 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     {
         if let Some(buffer) = cx.agent().objects().array_buffer(buffer_object) {
             let store = buffer.backing_store();
-            if cx
-                .agent()
-                .backing_store_is_detached(store)
-                .ok_or_else(|| type_error(cx))?
-            {
+            if typed_array_buffer_is_detached(cx, store)? {
                 return Err(type_error(cx));
             }
-            let store_len = cx
-                .agent()
-                .backing_store_byte_length(store)
-                .ok_or_else(|| type_error(cx))?;
             let byte_offset = to_index_for_builtin(
                 cx,
                 invocation
@@ -228,20 +240,38 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
                     .unwrap_or(Value::undefined()),
             )?;
             let byte_offset = usize::try_from(byte_offset).map_err(|_| range_error(cx))?;
-            if byte_offset > store_len || byte_offset % element_size != 0 {
+            if typed_array_buffer_is_detached(cx, store)? {
+                return Err(type_error(cx));
+            }
+            if byte_offset % element_size != 0 {
                 return Err(range_error(cx));
             }
-            let explicit_length = invocation.arguments().get(2).copied();
+            let explicit_length = invocation
+                .arguments()
+                .get(2)
+                .copied()
+                .filter(|value| !value.is_undefined());
             let length = if let Some(value) = explicit_length {
                 let requested = to_index_for_builtin(cx, value)?;
                 usize::try_from(requested).map_err(|_| range_error(cx))?
             } else {
+                let store_len = typed_array_buffer_byte_length(cx, store)?;
+                if byte_offset > store_len {
+                    return Err(range_error(cx));
+                }
                 let remaining_bytes = store_len - byte_offset;
                 if remaining_bytes % element_size != 0 {
                     return Err(range_error(cx));
                 }
                 remaining_bytes / element_size
             };
+            if typed_array_buffer_is_detached(cx, store)? {
+                return Err(type_error(cx));
+            }
+            let store_len = typed_array_buffer_byte_length(cx, store)?;
+            if byte_offset > store_len {
+                return Err(range_error(cx));
+            }
             let byte_length = length
                 .checked_mul(element_size)
                 .ok_or_else(|| range_error(cx))?;

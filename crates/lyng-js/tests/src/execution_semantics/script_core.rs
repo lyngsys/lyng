@@ -3169,6 +3169,65 @@ fn script_core_typed_array_array_like_oversize_fails_before_element_get() {
 }
 
 #[test]
+fn script_core_typed_array_buffer_arg_undefined_length_uses_remaining_bytes() {
+    let result = compile_and_run_string(
+        r#"
+        try {
+            new Int16Array(new ArrayBuffer(1), 0, undefined);
+            "missing";
+        } catch (error) {
+            String(error instanceof RangeError);
+        }
+        "#,
+    );
+
+    assert_eq!(result, "true");
+}
+
+#[test]
+fn script_core_typed_array_buffer_arg_rechecks_detached_after_coercion() {
+    let result = compile_and_run_string(
+        r#"
+        function detachOnOffset() {
+            let buffer = new ArrayBuffer(6);
+            let offset = {
+                valueOf: function() {
+                    buffer.transfer(0);
+                    return 2;
+                }
+            };
+            try {
+                new Int16Array(buffer, offset);
+                return "missing";
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+
+        function detachOnLength() {
+            let buffer = new ArrayBuffer(6);
+            let length = {
+                valueOf: function() {
+                    buffer.transfer(0);
+                    return 1;
+                }
+            };
+            try {
+                new Int16Array(buffer, 0, length);
+                return "missing";
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+
+        detachOnOffset() + ":" + detachOnLength();
+        "#,
+    );
+
+    assert_eq!(result, "true:true");
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"
