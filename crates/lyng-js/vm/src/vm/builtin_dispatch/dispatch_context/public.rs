@@ -114,6 +114,17 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             object,
             key,
         )?;
+        if let Some(result) = self.vm.define_typed_array_numeric_property(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_frame,
+            object,
+            key,
+            descriptor,
+        )? {
+            return Ok(result);
+        }
         self.vm
             .define_property_on_object(self.agent, object, key, descriptor, lifetime)
     }

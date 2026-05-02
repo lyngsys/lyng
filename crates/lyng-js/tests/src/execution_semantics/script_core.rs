@@ -3352,6 +3352,53 @@ fn script_core_typed_array_define_rejects_invalid_numeric_indices() {
 }
 
 #[test]
+fn script_core_typed_array_define_numeric_value_converts_and_handles_detach() {
+    let result = compile_and_run_string(
+        r#"
+        function detachDuringNumberConversion() {
+            let sample = new Uint8Array([17]);
+            let result = Reflect.defineProperty(sample, "0", {
+                value: {
+                    valueOf: function() {
+                        sample.buffer.transfer(0);
+                        return 42;
+                    }
+                }
+            });
+            return result + ":" + (sample[0] === undefined);
+        }
+
+        function detachDuringBigIntConversion() {
+            let sample = new BigInt64Array([17n]);
+            let result = Reflect.defineProperty(sample, "0", {
+                value: {
+                    valueOf: function() {
+                        sample.buffer.transfer(0);
+                        return 42n;
+                    }
+                }
+            });
+            return result + ":" + (sample[0] === undefined);
+        }
+
+        let numberSample = new Uint8Array([0, 0]);
+        let bigintSample = new BigInt64Array([0n, 0n]);
+
+        [
+            Reflect.defineProperty(numberSample, "0", { value: 257 }),
+            numberSample[0] === 1,
+            Reflect.defineProperty(bigintSample, "1", { value: 2n }),
+            bigintSample[1] === 2n,
+            detachDuringNumberConversion(),
+            detachDuringBigIntConversion()
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "true:true:true:true:true:true:true:true");
+}
+
+#[test]
 fn script_core_typed_array_delete_detached_numeric_indices_returns_true() {
     let result = compile_and_run_string(
         r#"

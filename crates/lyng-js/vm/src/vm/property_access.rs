@@ -217,6 +217,17 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             object,
             key,
         )?;
+        if let Some(result) = self.vm.define_typed_array_numeric_property(
+            self.agent,
+            self.host,
+            self.registry,
+            self.frame,
+            object,
+            key,
+            descriptor,
+        )? {
+            return Ok(result);
+        }
         self.vm
             .define_property_on_object(self.agent, object, key, descriptor, lifetime)
     }
@@ -1007,6 +1018,57 @@ impl Vm {
                 .detach_mapped_argument(object_ref, index);
         }
         Ok(true)
+    }
+
+    pub(super) fn define_typed_array_numeric_property(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        object: ObjectRef,
+        key: PropertyKey,
+        descriptor: PropertyDescriptor,
+    ) -> VmResult<Option<bool>> {
+        let Some(typed_array) = agent.objects().typed_array(object) else {
+            return Ok(None);
+        };
+        let Some(numeric_index) = key
+            .as_index()
+            .map(f64::from)
+            .or_else(|| typed_array_numeric_atom_index(agent, key))
+        else {
+            return Ok(None);
+        };
+        if descriptor.has_get()
+            || descriptor.has_set()
+            || descriptor.configurable() == Some(false)
+            || descriptor.enumerable() == Some(false)
+            || descriptor.writable() == Some(false)
+        {
+            return Ok(Some(false));
+        }
+        if !numeric_index.is_finite()
+            || numeric_index.fract() != 0.0
+            || numeric_index < 0.0
+            || (numeric_index == 0.0 && numeric_index.is_sign_negative())
+            || numeric_index > f64::from(u32::MAX)
+        {
+            return Ok(Some(false));
+        }
+        let index = numeric_index as usize;
+        if !vm_typed_array_index_is_valid(agent, typed_array, index) {
+            return Ok(Some(false));
+        }
+        let index_key = PropertyKey::Index(u32::try_from(index).map_err(|_| {
+            VmError::Abrupt(errors::throw_type_error(agent))
+        })?);
+        if let Some(value) = descriptor.value() {
+            return self
+                .set_typed_array_index(agent, host, registry, caller, object, index_key, value)
+                .map(Some);
+        }
+        Ok(Some(true))
     }
 
     pub(super) fn delete_property_from_object(
