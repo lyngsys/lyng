@@ -1,5 +1,6 @@
 use super::typed_array_indices::{
-    typed_array_index_descriptor, typed_array_numeric_key, TypedArrayNumericKey,
+    typed_array_index_descriptor, typed_array_numeric_key, typed_array_own_property_keys,
+    TypedArrayNumericKey,
 };
 use crate::errors::{internal_method_error, throw_type_error};
 use lyng_js_env::Agent;
@@ -249,6 +250,9 @@ pub fn ordinary_own_property_keys(
     agent: &mut Agent,
     object: ObjectRef,
 ) -> Completion<Vec<PropertyKey>> {
+    if let Some(keys) = typed_array_own_property_keys(agent, object)? {
+        return Ok(keys);
+    }
     agent
         .objects()
         .own_property_keys(agent.heap().view(), object)

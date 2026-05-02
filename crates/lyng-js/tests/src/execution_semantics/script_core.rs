@@ -3487,6 +3487,84 @@ fn script_core_typed_array_delete_detached_numeric_indices_returns_true() {
 }
 
 #[test]
+fn script_core_typed_array_for_in_skips_detached_indices() {
+    let result = compile_and_run_string(
+        r#"
+        function testWithTypedArrayConstructors(f) {
+            let constructors = [
+                Float64Array,
+                Float32Array,
+                Int32Array,
+                Int16Array,
+                Int8Array,
+                Uint32Array,
+                Uint16Array,
+                Uint8Array,
+                Uint8ClampedArray
+            ];
+            for (let i = 0; i < constructors.length; i++) {
+                f(constructors[i]);
+            }
+        }
+
+        function testWithBigIntTypedArrayConstructors(f) {
+            f(BigInt64Array);
+            f(BigUint64Array);
+        }
+
+        function probe(TA) {
+            let sample = new TA(3);
+            sample.buffer.transfer(0);
+            let count = 0;
+            for (var key in sample) {
+                count++;
+            }
+            return count;
+        }
+
+        let total = 0;
+        testWithTypedArrayConstructors(function(TA) {
+            total = total + probe(TA);
+        });
+        testWithBigIntTypedArrayConstructors(function(TA) {
+            total = total + probe(TA);
+        });
+        String(total);
+        "#,
+    );
+
+    assert_eq!(result, "0");
+}
+
+#[test]
+fn script_core_typed_array_own_keys_track_fixed_resizable_bounds() {
+    let result = compile_and_run_string(
+        r#"
+        let bpe = Uint8Array.BYTES_PER_ELEMENT;
+        let buffer = new ArrayBuffer(bpe * 4, { maxByteLength: bpe * 5 });
+        let sample = new Uint8Array(buffer, bpe, 2);
+
+        let initial = Reflect.ownKeys(sample).join(",");
+        buffer.resize(bpe * 5);
+        let afterGrow = Reflect.ownKeys(sample).join(",");
+        buffer.resize(bpe * 3);
+        let afterInBoundsShrink = Reflect.ownKeys(sample).join(",");
+        buffer.resize(bpe * 2);
+        let afterOutOfBoundsShrink = Reflect.ownKeys(sample).join(",");
+
+        [
+            initial,
+            afterGrow,
+            afterInBoundsShrink,
+            afterOutOfBoundsShrink
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "0,1|0,1|0,1|");
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"

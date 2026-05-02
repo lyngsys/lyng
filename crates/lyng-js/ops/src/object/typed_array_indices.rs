@@ -1,4 +1,4 @@
-use crate::number_to_string;
+use crate::{errors::internal_method_error, number_to_string};
 use lyng_js_env::Agent;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::TypedArrayElementKind;
@@ -123,6 +123,34 @@ fn typed_array_is_out_of_bounds(
     record.byte_offset().saturating_add(record.byte_length()) > byte_length
 }
 
+fn typed_array_integer_index_length(
+    agent: &Agent,
+    record: lyng_js_objects::TypedArrayObjectData,
+) -> usize {
+    if agent
+        .backing_store_is_detached(record.backing_store())
+        .unwrap_or(true)
+    {
+        return 0;
+    }
+    let Some(byte_length) = agent.backing_store_byte_length(record.backing_store()) else {
+        return 0;
+    };
+    if record.is_length_tracking() {
+        return byte_length
+            .checked_sub(record.byte_offset())
+            .map_or(0, |remaining| remaining / record.kind().bytes_per_element());
+    }
+    if record
+        .byte_offset()
+        .checked_add(record.byte_length())
+        .is_none_or(|end| end > byte_length)
+    {
+        return 0;
+    }
+    record.length()
+}
+
 fn canonical_numeric_index_string(text: &str) -> Option<f64> {
     if text == "-0" {
         return Some(-0.0);
@@ -194,4 +222,26 @@ pub(super) fn typed_array_index_descriptor(
     descriptor.set_enumerable(true);
     descriptor.set_configurable(true);
     Ok(Some(descriptor))
+}
+
+pub(super) fn typed_array_own_property_keys(
+    agent: &mut Agent,
+    object: ObjectRef,
+) -> Completion<Option<Vec<PropertyKey>>> {
+    let Some(record) = agent.objects().typed_array(object) else {
+        return Ok(None);
+    };
+    let length = typed_array_integer_index_length(agent, record);
+    let mut keys = (0..u32::try_from(length).unwrap_or(u32::MAX))
+        .map(PropertyKey::Index)
+        .collect::<Vec<_>>();
+    let own_keys = match agent
+        .objects()
+        .own_property_keys(agent.heap().view(), object)
+    {
+        Ok(keys) => keys,
+        Err(error) => return Err(internal_method_error(agent, error)),
+    };
+    keys.extend(own_keys.into_iter().filter(|key| key.as_index().is_none()));
+    Ok(Some(keys))
 }
