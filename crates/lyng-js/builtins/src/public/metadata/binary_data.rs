@@ -206,6 +206,18 @@ pub(super) const PUBLIC_BINARY_DATA_BUILTIN_METADATA: &[PublicBuiltinMetadataRow
         BuiltinEntryMetadata::new("get byteLength", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        shared_array_buffer_grow_builtin,
+        BuiltinEntryMetadata::new("grow", 1, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        shared_array_buffer_growable_getter_builtin,
+        BuiltinEntryMetadata::new("get growable", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        shared_array_buffer_max_byte_length_getter_builtin,
+        BuiltinEntryMetadata::new("get maxByteLength", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         shared_array_buffer_slice_builtin,
         BuiltinEntryMetadata::new("slice", 2, false, false),
     ),

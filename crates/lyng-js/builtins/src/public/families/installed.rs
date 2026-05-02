@@ -237,6 +237,11 @@ impl InstalledBuiltinFamilies {
                 .array_buffer_transfer_to_fixed_length,
             shared_array_buffer_byte_length_getter: binary_data_family
                 .shared_array_buffer_byte_length_getter,
+            shared_array_buffer_grow: binary_data_family.shared_array_buffer_grow,
+            shared_array_buffer_growable_getter: binary_data_family
+                .shared_array_buffer_growable_getter,
+            shared_array_buffer_max_byte_length_getter: binary_data_family
+                .shared_array_buffer_max_byte_length_getter,
             shared_array_buffer_slice: binary_data_family.shared_array_buffer_slice,
             atomics_load: binary_data_family.atomics_load,
             atomics_store: binary_data_family.atomics_store,

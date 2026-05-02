@@ -184,6 +184,8 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
             slice: slice_atom,
             transfer: agent.atoms_mut().intern("transfer"),
             transfer_to_fixed_length: agent.atoms_mut().intern("transferToFixedLength"),
+            grow: agent.atoms_mut().intern("grow"),
+            growable: agent.atoms_mut().intern("growable"),
         },
         buffers::BufferDescriptorTags {
             array_buffer: array_buffer_tag,

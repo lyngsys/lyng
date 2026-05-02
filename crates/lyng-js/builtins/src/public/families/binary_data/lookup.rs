@@ -20,7 +20,9 @@ use lyng_js_types::{
     data_view_set_uint16_builtin, data_view_set_uint32_builtin, data_view_set_uint8_builtin,
     float32_array_builtin, float64_array_builtin, int16_array_builtin, int32_array_builtin,
     int8_array_builtin, shared_array_buffer_builtin,
-    shared_array_buffer_byte_length_getter_builtin, shared_array_buffer_slice_builtin,
+    shared_array_buffer_byte_length_getter_builtin, shared_array_buffer_grow_builtin,
+    shared_array_buffer_growable_getter_builtin,
+    shared_array_buffer_max_byte_length_getter_builtin, shared_array_buffer_slice_builtin,
     typed_array_at_builtin, typed_array_builtin, typed_array_copy_within_builtin,
     typed_array_every_builtin, typed_array_fill_builtin, typed_array_filter_builtin,
     typed_array_find_builtin, typed_array_find_index_builtin, typed_array_find_last_builtin,
@@ -126,6 +128,15 @@ pub(in crate::public) fn binary_data_builtin_object(
     }
     if entry == shared_array_buffer_byte_length_getter_builtin() {
         return Some(builtins.shared_array_buffer_byte_length_getter);
+    }
+    if entry == shared_array_buffer_grow_builtin() {
+        return Some(builtins.shared_array_buffer_grow);
+    }
+    if entry == shared_array_buffer_growable_getter_builtin() {
+        return Some(builtins.shared_array_buffer_growable_getter);
+    }
+    if entry == shared_array_buffer_max_byte_length_getter_builtin() {
+        return Some(builtins.shared_array_buffer_max_byte_length_getter);
     }
     if entry == shared_array_buffer_slice_builtin() {
         return Some(builtins.shared_array_buffer_slice);

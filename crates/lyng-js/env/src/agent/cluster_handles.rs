@@ -67,6 +67,11 @@ impl ClusterBackingStoreHandle {
     }
 
     #[inline]
+    fn grow_shared(&self, store: BackingStoreRef, byte_length: usize) -> bool {
+        self.0.borrow_mut().grow_shared(store, byte_length)
+    }
+
+    #[inline]
     fn atomic_load_bits(
         &self,
         store: BackingStoreRef,
@@ -150,6 +155,17 @@ impl ClusterSharedMemoryHandle {
         self.0
             .borrow_mut()
             .share_shared_backing_store(backing_store, target)
+    }
+
+    #[inline]
+    fn update_shared_backing_store_byte_length(
+        &self,
+        backing_store: BackingStoreRef,
+        byte_length: usize,
+    ) -> bool {
+        self.0
+            .borrow_mut()
+            .update_shared_backing_store_byte_length(backing_store, byte_length)
     }
 
     #[inline]
@@ -253,6 +269,19 @@ impl Agent {
     #[inline]
     pub fn backing_store_resize(&mut self, store: BackingStoreRef, byte_length: usize) -> bool {
         self.backing_stores.resize(store, byte_length)
+    }
+
+    #[inline]
+    pub fn grow_shared_backing_store(
+        &mut self,
+        store: BackingStoreRef,
+        byte_length: usize,
+    ) -> bool {
+        if !self.backing_stores.grow_shared(store, byte_length) {
+            return false;
+        }
+        self.shared_memory
+            .update_shared_backing_store_byte_length(store, byte_length)
     }
 
     #[inline]

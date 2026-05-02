@@ -9,7 +9,9 @@ use lyng_js_types::{
     array_buffer_resizable_getter_builtin, array_buffer_resize_builtin, array_buffer_slice_builtin,
     array_buffer_transfer_builtin, array_buffer_transfer_to_fixed_length_builtin,
     array_species_getter_builtin, shared_array_buffer_byte_length_getter_builtin,
-    shared_array_buffer_slice_builtin, Value, WellKnownSymbolId,
+    shared_array_buffer_grow_builtin, shared_array_buffer_growable_getter_builtin,
+    shared_array_buffer_max_byte_length_getter_builtin, shared_array_buffer_slice_builtin, Value,
+    WellKnownSymbolId,
 };
 
 pub(super) struct BufferDescriptorAtoms {
@@ -22,6 +24,8 @@ pub(super) struct BufferDescriptorAtoms {
     pub(super) slice: AtomId,
     pub(super) transfer: AtomId,
     pub(super) transfer_to_fixed_length: AtomId,
+    pub(super) grow: AtomId,
+    pub(super) growable: AtomId,
 }
 
 pub(super) struct BufferDescriptorTags {
@@ -33,7 +37,7 @@ pub(super) struct BufferDescriptorSets {
     pub(super) array_buffer: [BuiltinPropertyDescriptor; 2],
     pub(super) array_buffer_prototype: [BuiltinPropertyDescriptor; 10],
     pub(super) shared_array_buffer: [BuiltinPropertyDescriptor; 1],
-    pub(super) shared_array_buffer_prototype: [BuiltinPropertyDescriptor; 4],
+    pub(super) shared_array_buffer_prototype: [BuiltinPropertyDescriptor; 7],
 }
 
 pub(super) fn descriptor_sets(
@@ -143,6 +147,27 @@ pub(super) fn descriptor_sets(
                 BuiltinPropertyKeySpec::from_atom(atoms.byte_length),
                 BuiltinPropertyValueSpec::Accessor {
                     get: Some(shared_array_buffer_byte_length_getter_builtin()),
+                    set: None,
+                },
+                BuiltinAttributes::new(false, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(atoms.grow),
+                BuiltinPropertyValueSpec::BuiltinFunction(shared_array_buffer_grow_builtin()),
+                BuiltinAttributes::new(true, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(atoms.growable),
+                BuiltinPropertyValueSpec::Accessor {
+                    get: Some(shared_array_buffer_growable_getter_builtin()),
+                    set: None,
+                },
+                BuiltinAttributes::new(false, false, true),
+            ),
+            BuiltinPropertyDescriptor::new(
+                BuiltinPropertyKeySpec::from_atom(atoms.max_byte_length),
+                BuiltinPropertyValueSpec::Accessor {
+                    get: Some(shared_array_buffer_max_byte_length_getter_builtin()),
                     set: None,
                 },
                 BuiltinAttributes::new(false, false, true),

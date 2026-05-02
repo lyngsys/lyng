@@ -127,6 +127,56 @@ fn phase6_shared_array_buffer_bootstraps_slices_and_builds_shared_views() {
 }
 
 #[test]
+fn phase6_shared_array_buffer_growable_surface_tracks_max_byte_length() {
+    let result = run_spec_script(
+        r#"
+        let score = 0;
+        let fixed = new SharedArrayBuffer(4);
+        let growable = new SharedArrayBuffer(4, { maxByteLength: 8 });
+        let tracking = new Uint8Array(growable);
+        tracking[0] = 7;
+
+        if (fixed.growable === false) score += 1;
+        if (fixed.maxByteLength === 4) score += 2;
+        if (growable.growable === true) score += 4;
+        if (growable.maxByteLength === 8) score += 8;
+        if (typeof growable.grow === "function") score += 16;
+        if (growable.grow(6) === undefined && growable.byteLength === 6 && tracking.length === 6 && tracking[0] === 7) score += 32;
+
+        let fixedGrowThrows = false;
+        try {
+            fixed.grow(4);
+        } catch (error) {
+            fixedGrowThrows = error instanceof TypeError;
+        }
+        if (fixedGrowThrows) score += 64;
+
+        let excessiveGrowThrows = false;
+        try {
+            growable.grow(9);
+        } catch (error) {
+            excessiveGrowThrows = error instanceof RangeError;
+        }
+        if (excessiveGrowThrows) score += 128;
+
+        let arrayBufferReceiverThrows = false;
+        let growableGetter = Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, "growable").get;
+        try {
+            growableGetter.call(new ArrayBuffer(1));
+        } catch (error) {
+            arrayBufferReceiverThrows = error instanceof TypeError;
+        }
+        if (arrayBufferReceiverThrows) score += 256;
+        if (new SharedArrayBuffer(0, null).growable === false) score += 512;
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1023));
+}
+
+#[test]
 fn phase6_atomics_integer_surface_loads_stores_and_updates_shared_typed_arrays() {
     let result = run_spec_script(
         r#"

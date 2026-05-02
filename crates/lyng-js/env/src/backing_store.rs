@@ -62,6 +62,13 @@ impl BackingStoreRecord {
         }
     }
 
+    fn grow_shared(&mut self, byte_length: usize) -> bool {
+        match self {
+            Self::Shared(record) => record.grow(byte_length),
+            Self::Local(_) => false,
+        }
+    }
+
     fn atomic_load_bits(&self, index: usize, byte_width: usize) -> Option<u64> {
         match self {
             Self::Local(record) => record.atomic_load_bits(index, byte_width),
@@ -212,6 +219,27 @@ impl SharedBackingStoreRecord {
         })
     }
 
+    fn grow(&mut self, byte_length: usize) -> bool {
+        if byte_length < self.byte_length || byte_length > MAX_BACKING_STORE_BYTE_LENGTH {
+            return false;
+        }
+        let grew = self.with_bytes_mut(|bytes| {
+            if byte_length > bytes.capacity()
+                && bytes
+                    .try_reserve_exact(byte_length.saturating_sub(bytes.len()))
+                    .is_err()
+            {
+                return false;
+            }
+            bytes.resize(byte_length, 0);
+            true
+        });
+        if grew {
+            self.byte_length = byte_length;
+        }
+        grew
+    }
+
     fn atomic_load_bits(&self, index: usize, byte_width: usize) -> Option<u64> {
         self.with_bytes(|bytes| read_bits_from_bytes(bytes, false, index, byte_width))
     }
@@ -317,6 +345,13 @@ impl BackingStoreRuntime {
             return false;
         };
         record.resize(byte_length)
+    }
+
+    pub(crate) fn grow_shared(&mut self, id: BackingStoreRef, byte_length: usize) -> bool {
+        let Some(record) = self.record_mut(id) else {
+            return false;
+        };
+        record.grow_shared(byte_length)
     }
 
     pub(crate) fn atomic_load_bits(

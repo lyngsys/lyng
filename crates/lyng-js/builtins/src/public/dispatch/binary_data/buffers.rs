@@ -53,6 +53,15 @@ pub(super) fn dispatch_buffer_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::super::shared_array_buffer_byte_length_getter_builtin() {
         return shared_array_buffer_byte_length_getter_builtin(context, invocation).map(Some);
     }
+    if entry == super::super::shared_array_buffer_grow_builtin() {
+        return shared_array_buffer_grow_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::shared_array_buffer_growable_getter_builtin() {
+        return shared_array_buffer_growable_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::shared_array_buffer_max_byte_length_getter_builtin() {
+        return shared_array_buffer_max_byte_length_getter_builtin(context, invocation).map(Some);
+    }
     if entry == super::super::shared_array_buffer_slice_builtin() {
         return shared_array_buffer_slice_builtin(context, invocation).map(Some);
     }
@@ -120,11 +129,25 @@ fn allocate_shared_array_buffer_object<Cx: PublicBuiltinDispatchContext>(
     prototype: lyng_js_types::ObjectRef,
     backing_store: lyng_js_types::BackingStoreRef,
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
-    allocate_array_buffer_family_object(
+    allocate_shared_array_buffer_object_with_data(
         cx,
         realm,
         prototype,
         ArrayBufferObjectData::new(backing_store),
+    )
+}
+
+fn allocate_shared_array_buffer_object_with_data<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    realm: RealmRef,
+    prototype: lyng_js_types::ObjectRef,
+    data: ArrayBufferObjectData,
+) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+    allocate_array_buffer_family_object(
+        cx,
+        realm,
+        prototype,
+        data,
         OrdinaryObjectData::SharedArrayBuffer,
     )
 }
@@ -156,15 +179,23 @@ fn shared_array_buffer_this_store<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
 ) -> Result<lyng_js_types::BackingStoreRef, Cx::Error> {
+    Ok(shared_array_buffer_this_data(cx, value)?.1.backing_store())
+}
+
+fn shared_array_buffer_this_data<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<(ObjectRef, ArrayBufferObjectData), Cx::Error> {
     let object = value.as_object_ref().ok_or_else(|| type_error(cx))?;
     if !cx.agent().objects().is_shared_array_buffer_object(object) {
         return Err(type_error(cx));
     }
-    cx.agent()
+    let buffer = cx
+        .agent()
         .objects()
         .array_buffer(object)
-        .map(ArrayBufferObjectData::backing_store)
-        .ok_or_else(|| type_error(cx))
+        .ok_or_else(|| type_error(cx))?;
+    Ok((object, buffer))
 }
 
 fn array_buffer_family_default_constructor<Cx: PublicBuiltinDispatchContext>(
@@ -270,11 +301,8 @@ fn array_buffer_family_builtin<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let byte_length = usize::try_from(byte_length).map_err(|_| range_error(cx))?;
-    let max_byte_length = if shared {
-        None
-    } else {
-        array_buffer_max_byte_length_option(cx, invocation.arguments().get(1).copied())?
-    };
+    let max_byte_length =
+        array_buffer_max_byte_length_option(cx, invocation.arguments().get(1).copied())?;
     if max_byte_length.is_some_and(|max| byte_length > max) {
         return Err(range_error(cx));
     }
@@ -305,7 +333,16 @@ fn array_buffer_family_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     .ok_or_else(|| range_error(cx))?;
     let object = if shared {
-        allocate_shared_array_buffer_object(cx, realm, prototype, backing_store)?
+        if let Some(max_byte_length) = max_byte_length {
+            allocate_shared_array_buffer_object_with_data(
+                cx,
+                realm,
+                prototype,
+                ArrayBufferObjectData::new_resizable(backing_store, max_byte_length),
+            )?
+        } else {
+            allocate_shared_array_buffer_object(cx, realm, prototype, backing_store)?
+        }
     } else if let Some(max_byte_length) = max_byte_length {
         allocate_array_buffer_object_with_data(
             cx,
@@ -409,6 +446,31 @@ fn shared_array_buffer_byte_length_getter_builtin<Cx: PublicBuiltinDispatchConte
     shared_buffer_byte_length_value(cx, store)
 }
 
+fn shared_array_buffer_growable_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (_, buffer) = shared_array_buffer_this_data(cx, invocation.this_value())?;
+    Ok(Value::from_bool(buffer.is_resizable()))
+}
+
+fn shared_array_buffer_max_byte_length_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (_, buffer) = shared_array_buffer_this_data(cx, invocation.this_value())?;
+    let byte_length = match buffer.max_byte_length() {
+        Some(max_byte_length) => max_byte_length,
+        None => cx
+            .agent()
+            .backing_store_byte_length(buffer.backing_store())
+            .ok_or_else(|| type_error(cx))?,
+    };
+    Ok(length_value_u64(
+        u64::try_from(byte_length).unwrap_or(u64::MAX),
+    ))
+}
+
 fn shared_buffer_byte_length_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     store: lyng_js_types::BackingStoreRef,
@@ -486,6 +548,41 @@ fn array_buffer_resize_builtin<Cx: PublicBuiltinDispatchContext>(
         .backing_store_resize(buffer.backing_store(), new_byte_length)
     {
         return Err(type_error(cx));
+    }
+    refresh_length_tracking_views(cx, object, new_byte_length);
+    Ok(Value::undefined())
+}
+
+fn shared_array_buffer_grow_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (object, buffer) = shared_array_buffer_this_data(cx, invocation.this_value())?;
+    let max_byte_length = buffer.max_byte_length().ok_or_else(|| type_error(cx))?;
+    let new_byte_length = to_index_for_builtin(
+        cx,
+        invocation
+            .arguments()
+            .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    let new_byte_length = usize::try_from(new_byte_length).map_err(|_| range_error(cx))?;
+    if new_byte_length > max_byte_length {
+        return Err(range_error(cx));
+    }
+    let current_byte_length = cx
+        .agent()
+        .backing_store_byte_length(buffer.backing_store())
+        .ok_or_else(|| type_error(cx))?;
+    if new_byte_length < current_byte_length {
+        return Err(range_error(cx));
+    }
+    if !cx
+        .agent()
+        .grow_shared_backing_store(buffer.backing_store(), new_byte_length)
+    {
+        return Err(range_error(cx));
     }
     refresh_length_tracking_views(cx, object, new_byte_length);
     Ok(Value::undefined())

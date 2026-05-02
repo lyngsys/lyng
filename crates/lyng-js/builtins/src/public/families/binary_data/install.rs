@@ -24,7 +24,9 @@ use lyng_js_types::{
     data_view_set_uint16_builtin, data_view_set_uint32_builtin, data_view_set_uint8_builtin,
     float32_array_builtin, float64_array_builtin, int16_array_builtin, int32_array_builtin,
     int8_array_builtin, shared_array_buffer_builtin,
-    shared_array_buffer_byte_length_getter_builtin, shared_array_buffer_slice_builtin,
+    shared_array_buffer_byte_length_getter_builtin, shared_array_buffer_grow_builtin,
+    shared_array_buffer_growable_getter_builtin,
+    shared_array_buffer_max_byte_length_getter_builtin, shared_array_buffer_slice_builtin,
     typed_array_at_builtin, typed_array_builtin, typed_array_copy_within_builtin,
     typed_array_every_builtin, typed_array_fill_builtin, typed_array_filter_builtin,
     typed_array_find_builtin, typed_array_find_index_builtin, typed_array_find_last_builtin,
@@ -89,6 +91,10 @@ pub(in crate::public) fn install_binary_data_family(
         array_buffer_transfer_to_fixed_length: buffer_methods.array_buffer_transfer_to_fixed_length,
         shared_array_buffer_byte_length_getter: buffer_methods
             .shared_array_buffer_byte_length_getter,
+        shared_array_buffer_grow: buffer_methods.shared_array_buffer_grow,
+        shared_array_buffer_growable_getter: buffer_methods.shared_array_buffer_growable_getter,
+        shared_array_buffer_max_byte_length_getter: buffer_methods
+            .shared_array_buffer_max_byte_length_getter,
         shared_array_buffer_slice: buffer_methods.shared_array_buffer_slice,
         atomics_load: atomics_methods.load,
         atomics_store: atomics_methods.store,
@@ -324,6 +330,9 @@ struct BufferMethodBuiltins {
     array_buffer_transfer: ObjectRef,
     array_buffer_transfer_to_fixed_length: ObjectRef,
     shared_array_buffer_byte_length_getter: ObjectRef,
+    shared_array_buffer_grow: ObjectRef,
+    shared_array_buffer_growable_getter: ObjectRef,
+    shared_array_buffer_max_byte_length_getter: ObjectRef,
     shared_array_buffer_slice: ObjectRef,
 }
 
@@ -353,6 +362,17 @@ fn install_buffer_methods(agent: &mut Agent, cx: FamilyInstallContext) -> Buffer
             agent,
             cx,
             shared_array_buffer_byte_length_getter_builtin(),
+        ),
+        shared_array_buffer_grow: install(agent, cx, shared_array_buffer_grow_builtin()),
+        shared_array_buffer_growable_getter: install(
+            agent,
+            cx,
+            shared_array_buffer_growable_getter_builtin(),
+        ),
+        shared_array_buffer_max_byte_length_getter: install(
+            agent,
+            cx,
+            shared_array_buffer_max_byte_length_getter_builtin(),
         ),
         shared_array_buffer_slice: install(agent, cx, shared_array_buffer_slice_builtin()),
     }

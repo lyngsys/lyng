@@ -214,6 +214,18 @@ impl SharedMemoryRuntime {
         true
     }
 
+    pub(crate) fn update_shared_backing_store_byte_length(
+        &mut self,
+        backing_store: BackingStoreRef,
+        byte_length: usize,
+    ) -> bool {
+        let Some(record) = self.shared_backing_stores.get_mut(&backing_store) else {
+            return false;
+        };
+        record.byte_length = byte_length;
+        true
+    }
+
     pub(crate) fn shared_backing_store(
         &self,
         backing_store: BackingStoreRef,
