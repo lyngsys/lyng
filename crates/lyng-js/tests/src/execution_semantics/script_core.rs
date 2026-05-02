@@ -3923,6 +3923,45 @@ fn script_core_typed_array_set_uses_live_bounds_and_set_element() {
 }
 
 #[test]
+fn script_core_typed_array_slice_rechecks_resizable_source_bounds() {
+    let result = compile_and_run_string(
+        r#"
+        let fixedBuffer = new ArrayBuffer(4, { maxByteLength: 4 });
+        let fixed = new Int8Array(fixedBuffer, 0, 4);
+        let fixedError = false;
+        try {
+            fixed.slice({
+                valueOf() {
+                    fixedBuffer.resize(2);
+                    return 0;
+                }
+            });
+        } catch (error) {
+            fixedError = error.constructor === TypeError;
+        }
+
+        let trackingBuffer = new ArrayBuffer(32, { maxByteLength: 32 });
+        let tracking = new BigInt64Array(trackingBuffer);
+        tracking.set([1n, 2n, 3n, 4n]);
+        let sliced = tracking.slice({
+            valueOf() {
+                trackingBuffer.resize(16);
+                return 0;
+            }
+        });
+
+        [
+            fixedError,
+            sliced.length,
+            Array.from(sliced).map(Number).join(",")
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|4|1,2,0,0");
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"

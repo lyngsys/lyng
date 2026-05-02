@@ -14,7 +14,7 @@ use super::{
     typed_array_same_kind_create, typed_array_snapshot_storage_bits, typed_array_species_create,
     typed_array_species_create_with_arguments, typed_array_storage_bits_from_builtin_value,
     typed_array_storage_bits_to_value, typed_array_this_object, typed_array_this_record,
-    typed_array_validated_object_and_record, typed_array_validated_record,
+    typed_array_validated_object_record_and_length, typed_array_validated_record,
     typed_array_validated_record_and_length, typed_array_write_storage_bits,
 };
 use crate::BuiltinInvocation;
@@ -466,8 +466,9 @@ fn uint8_array_slice_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let (object, record) = typed_array_validated_object_and_record(cx, invocation.this_value())?;
-    let source_length = u64::try_from(record.length()).unwrap_or(u64::MAX);
+    let (object, record, source_length) =
+        typed_array_validated_object_record_and_length(cx, invocation.this_value())?;
+    let source_length = u64::try_from(source_length).unwrap_or(u64::MAX);
     let start = normalize_relative_index_u64(
         source_length,
         to_integer_or_infinity_for_builtin(
@@ -492,15 +493,18 @@ fn uint8_array_slice_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     let start_index = usize::try_from(start).map_err(|_| range_error(cx))?;
     let (result_object, result_record) =
         typed_array_species_create(cx, object, record.kind(), length)?;
-    if length > 0
-        && cx
-            .agent()
-            .backing_store_is_detached(record.backing_store())
-            .ok_or_else(|| type_error(cx))?
-    {
-        return Err(type_error(cx));
-    }
-    for offset in 0..length {
+    let copy_length = if length == 0 {
+        0
+    } else {
+        let current_length =
+            typed_array_current_length(cx.agent(), record).ok_or_else(|| type_error(cx))?;
+        let end_index = start_index
+            .checked_add(length)
+            .ok_or_else(|| range_error(cx))?
+            .min(current_length);
+        end_index.saturating_sub(start_index)
+    };
+    for offset in 0..copy_length {
         let source_index = start_index
             .checked_add(offset)
             .ok_or_else(|| range_error(cx))?;
