@@ -76,6 +76,16 @@ impl Vm {
             ToPrimitiveHint::Default,
         )?;
         if left.is_string() || right.is_string() {
+            if let (Some(left_string), Some(right_string)) =
+                (left.as_string_ref(), right.as_string_ref())
+            {
+                return Ok(Value::from_string_ref(concat_string_refs(
+                    agent,
+                    left_string,
+                    right_string,
+                )?));
+            }
+
             let mut units = Vec::with_capacity(
                 self.value_string_code_unit_len(agent, left)?
                     + self.value_string_code_unit_len(agent, right)?,
@@ -815,6 +825,76 @@ impl Vm {
             });
         }
         Ok(PropertyKey::from_atom(atom))
+    }
+}
+
+struct ConcatStringPayload {
+    encoding: StringEncoding,
+    code_unit_len: u32,
+    bytes: Vec<u8>,
+}
+
+fn concat_string_refs(agent: &mut Agent, left: StringRef, right: StringRef) -> VmResult<StringRef> {
+    let payload = {
+        let heap_view = agent.heap().view();
+        let Some(left_view) = heap_view.string_view(left) else {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        };
+        let Some(right_view) = heap_view.string_view(right) else {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        };
+        concat_string_views(left_view, right_view)
+    };
+
+    if payload.encoding == StringEncoding::Latin1 && payload.code_unit_len == 1 {
+        return Ok(agent.latin1_single_code_unit_string(payload.bytes[0]));
+    }
+
+    Ok(agent.heap_mut().mutator().alloc_string(
+        payload.encoding,
+        payload.code_unit_len,
+        &payload.bytes,
+        None,
+        AllocationLifetime::Default,
+    ))
+}
+
+fn concat_string_views(
+    left: PrimitiveStringView<'_>,
+    right: PrimitiveStringView<'_>,
+) -> ConcatStringPayload {
+    if let (Some(left_bytes), Some(right_bytes)) = (left.latin1_bytes(), right.latin1_bytes()) {
+        let len = left_bytes.len() + right_bytes.len();
+        let mut bytes = Vec::with_capacity(len);
+        bytes.extend_from_slice(left_bytes);
+        bytes.extend_from_slice(right_bytes);
+        return ConcatStringPayload {
+            encoding: StringEncoding::Latin1,
+            code_unit_len: u32::try_from(len).expect("latin1 concat length should fit into u32"),
+            bytes,
+        };
+    }
+
+    let code_unit_len = left.code_unit_len() + right.code_unit_len();
+    let mut bytes = Vec::with_capacity(code_unit_len as usize * 2);
+    append_string_view_utf16_bytes(left, &mut bytes);
+    append_string_view_utf16_bytes(right, &mut bytes);
+    ConcatStringPayload {
+        encoding: StringEncoding::Utf16,
+        code_unit_len,
+        bytes,
+    }
+}
+
+fn append_string_view_utf16_bytes(view: PrimitiveStringView<'_>, output: &mut Vec<u8>) {
+    if let Some(bytes) = view.utf16_bytes() {
+        output.extend_from_slice(bytes);
+        return;
+    }
+    if let Some(bytes) = view.latin1_bytes() {
+        for byte in bytes {
+            output.extend_from_slice(&u16::from(*byte).to_le_bytes());
+        }
     }
 }
 

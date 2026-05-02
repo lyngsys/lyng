@@ -6474,6 +6474,29 @@ fn evaluate_script_string_from_char_code_uses_uint16_code_units() {
 }
 
 #[test]
+fn evaluate_script_string_add_preserves_mixed_encodings() {
+    let unit = compile_test_unit(
+        2393,
+        r#"
+            let text = "A" + String.fromCodePoint(0x1F600) + "\u00ff";
+            text.length === 4 &&
+                text.charCodeAt(0) === 0x0041 &&
+                text.charCodeAt(1) === 0xD83D &&
+                text.charCodeAt(2) === 0xDE00 &&
+                text.charCodeAt(3) === 0x00FF;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn evaluate_script_string_index_reads_do_not_allocate_primitive_wrappers() {
     let warmup = compile_test_unit(23929, "0;");
     let unit = compile_test_unit(
