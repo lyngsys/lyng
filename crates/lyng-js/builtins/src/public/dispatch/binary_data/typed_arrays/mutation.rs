@@ -521,7 +521,8 @@ fn uint8_array_subarray_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let object = typed_array_this_object(cx, invocation.this_value())?;
     let record = typed_array_this_record(cx, invocation.this_value())?;
-    let source_length = u64::try_from(record.length()).unwrap_or(u64::MAX);
+    let source_length = u64::try_from(typed_array_current_length(cx.agent(), record).unwrap_or(0))
+        .unwrap_or(u64::MAX);
     let start = normalize_relative_index_u64(
         source_length,
         to_integer_or_infinity_for_builtin(
@@ -533,7 +534,9 @@ fn uint8_array_subarray_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
                 .unwrap_or(Value::undefined()),
         )?,
     );
-    let end = match invocation.arguments().get(1).copied() {
+    let end_argument = invocation.arguments().get(1).copied();
+    let end_is_undefined = end_argument.is_none_or(|value| value.is_undefined());
+    let end = match end_argument {
         Some(value) if value.is_undefined() => source_length,
         Some(value) => normalize_relative_index_u64(
             source_length,
@@ -552,12 +555,18 @@ fn uint8_array_subarray_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         )
         .ok_or_else(|| range_error(cx))?;
     let length = usize::try_from(new_end.saturating_sub(start)).map_err(|_| range_error(cx))?;
-    let arguments = [
-        Value::from_object_ref(record.viewed_array_buffer()),
-        length_value_u64(u64::try_from(byte_offset).unwrap_or(u64::MAX)),
-        length_value_u64(u64::try_from(length).unwrap_or(u64::MAX)),
-    ];
-    let (result_object, _) =
-        typed_array_species_create_with_arguments(cx, object, record.kind(), &arguments, None)?;
+    let buffer = Value::from_object_ref(record.viewed_array_buffer());
+    let byte_offset = length_value_u64(u64::try_from(byte_offset).unwrap_or(u64::MAX));
+    let (result_object, _) = if record.is_length_tracking() && end_is_undefined {
+        let arguments = [buffer, byte_offset];
+        typed_array_species_create_with_arguments(cx, object, record.kind(), &arguments, None)?
+    } else {
+        let arguments = [
+            buffer,
+            byte_offset,
+            length_value_u64(u64::try_from(length).unwrap_or(u64::MAX)),
+        ];
+        typed_array_species_create_with_arguments(cx, object, record.kind(), &arguments, None)?
+    };
     Ok(Value::from_object_ref(result_object))
 }

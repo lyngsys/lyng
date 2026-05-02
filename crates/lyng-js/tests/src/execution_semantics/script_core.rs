@@ -3962,6 +3962,39 @@ fn script_core_typed_array_slice_rechecks_resizable_source_bounds() {
 }
 
 #[test]
+fn script_core_typed_array_subarray_uses_live_length_and_auto_length_species_args() {
+    let result = compile_and_run_string(
+        r#"
+        let fixedBuffer = new ArrayBuffer(4, { maxByteLength: 4 });
+        let fixed = new Int8Array(fixedBuffer, 0, 4);
+        fixedBuffer.resize(2);
+        let fixedSubarray = fixed.subarray(0);
+
+        let trackingBuffer = new ArrayBuffer(4, { maxByteLength: 8 });
+        let tracking = new Int8Array(trackingBuffer);
+        let speciesArgCount = 0;
+        tracking.constructor = {
+            [Symbol.species]: function(buffer, offset, length) {
+                speciesArgCount = arguments.length;
+                return new Int8Array(buffer, offset, length);
+            }
+        };
+        let trackingSubarray = tracking.subarray(1);
+        trackingBuffer.resize(6);
+
+        [
+            fixedSubarray.length,
+            speciesArgCount,
+            trackingSubarray.byteOffset,
+            trackingSubarray.length
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "0|2|1|5");
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"
