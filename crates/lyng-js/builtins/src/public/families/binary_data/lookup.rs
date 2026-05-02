@@ -1,11 +1,14 @@
 use crate::public::PublicRealmBuiltins;
 use lyng_js_types::{
-    array_buffer_builtin, array_buffer_byte_length_getter_builtin, array_buffer_is_view_builtin,
-    array_buffer_resize_builtin, array_buffer_slice_builtin, atomics_add_builtin,
-    atomics_and_builtin, atomics_compare_exchange_builtin, atomics_exchange_builtin,
-    atomics_is_lock_free_builtin, atomics_load_builtin, atomics_notify_builtin, atomics_or_builtin,
-    atomics_pause_builtin, atomics_store_builtin, atomics_sub_builtin, atomics_wait_async_builtin,
-    atomics_wait_builtin, atomics_xor_builtin, big_int64_array_builtin, big_uint64_array_builtin,
+    array_buffer_builtin, array_buffer_byte_length_getter_builtin,
+    array_buffer_detached_getter_builtin, array_buffer_is_view_builtin,
+    array_buffer_max_byte_length_getter_builtin, array_buffer_resizable_getter_builtin,
+    array_buffer_resize_builtin, array_buffer_slice_builtin, array_buffer_transfer_builtin,
+    array_buffer_transfer_to_fixed_length_builtin, atomics_add_builtin, atomics_and_builtin,
+    atomics_compare_exchange_builtin, atomics_exchange_builtin, atomics_is_lock_free_builtin,
+    atomics_load_builtin, atomics_notify_builtin, atomics_or_builtin, atomics_pause_builtin,
+    atomics_store_builtin, atomics_sub_builtin, atomics_wait_async_builtin, atomics_wait_builtin,
+    atomics_xor_builtin, big_int64_array_builtin, big_uint64_array_builtin,
     data_view_buffer_getter_builtin, data_view_builtin, data_view_byte_length_getter_builtin,
     data_view_byte_offset_getter_builtin, data_view_get_big_int64_builtin,
     data_view_get_big_uint64_builtin, data_view_get_float16_builtin, data_view_get_float32_builtin,
@@ -100,11 +103,26 @@ pub(in crate::public) fn binary_data_builtin_object(
     if entry == array_buffer_byte_length_getter_builtin() {
         return Some(builtins.array_buffer_byte_length_getter);
     }
+    if entry == array_buffer_detached_getter_builtin() {
+        return Some(builtins.array_buffer_detached_getter);
+    }
+    if entry == array_buffer_max_byte_length_getter_builtin() {
+        return Some(builtins.array_buffer_max_byte_length_getter);
+    }
+    if entry == array_buffer_resizable_getter_builtin() {
+        return Some(builtins.array_buffer_resizable_getter);
+    }
     if entry == array_buffer_resize_builtin() {
         return Some(builtins.array_buffer_resize);
     }
     if entry == array_buffer_slice_builtin() {
         return Some(builtins.array_buffer_slice);
+    }
+    if entry == array_buffer_transfer_builtin() {
+        return Some(builtins.array_buffer_transfer);
+    }
+    if entry == array_buffer_transfer_to_fixed_length_builtin() {
+        return Some(builtins.array_buffer_transfer_to_fixed_length);
     }
     if entry == shared_array_buffer_byte_length_getter_builtin() {
         return Some(builtins.shared_array_buffer_byte_length_getter);

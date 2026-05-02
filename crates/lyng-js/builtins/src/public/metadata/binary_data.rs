@@ -174,12 +174,32 @@ pub(super) const PUBLIC_BINARY_DATA_BUILTIN_METADATA: &[PublicBuiltinMetadataRow
         BuiltinEntryMetadata::new("get byteLength", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        array_buffer_detached_getter_builtin,
+        BuiltinEntryMetadata::new("get detached", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        array_buffer_max_byte_length_getter_builtin,
+        BuiltinEntryMetadata::new("get maxByteLength", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        array_buffer_resizable_getter_builtin,
+        BuiltinEntryMetadata::new("get resizable", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         array_buffer_resize_builtin,
         BuiltinEntryMetadata::new("resize", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
         array_buffer_slice_builtin,
         BuiltinEntryMetadata::new("slice", 2, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        array_buffer_transfer_builtin,
+        BuiltinEntryMetadata::new("transfer", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
+        array_buffer_transfer_to_fixed_length_builtin,
+        BuiltinEntryMetadata::new("transferToFixedLength", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
         shared_array_buffer_byte_length_getter_builtin,

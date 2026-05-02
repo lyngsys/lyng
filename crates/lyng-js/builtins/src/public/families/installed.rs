@@ -226,8 +226,15 @@ impl InstalledBuiltinFamilies {
             array_buffer_prototype: binary_data_family.array_buffer_prototype,
             shared_array_buffer_prototype: binary_data_family.shared_array_buffer_prototype,
             array_buffer_byte_length_getter: binary_data_family.array_buffer_byte_length_getter,
+            array_buffer_detached_getter: binary_data_family.array_buffer_detached_getter,
+            array_buffer_max_byte_length_getter: binary_data_family
+                .array_buffer_max_byte_length_getter,
+            array_buffer_resizable_getter: binary_data_family.array_buffer_resizable_getter,
             array_buffer_resize: binary_data_family.array_buffer_resize,
             array_buffer_slice: binary_data_family.array_buffer_slice,
+            array_buffer_transfer: binary_data_family.array_buffer_transfer,
+            array_buffer_transfer_to_fixed_length: binary_data_family
+                .array_buffer_transfer_to_fixed_length,
             shared_array_buffer_byte_length_getter: binary_data_family
                 .shared_array_buffer_byte_length_getter,
             shared_array_buffer_slice: binary_data_family.shared_array_buffer_slice,

@@ -3038,6 +3038,61 @@ fn script_core_array_generics_observe_resizable_typed_array_oob_state() {
 }
 
 #[test]
+fn script_core_array_buffer_resizable_accessors_and_transfer() {
+    let result = compile_and_run(
+        r#"
+        let score = 0;
+        let fixed = new ArrayBuffer(4);
+        let resizable = new ArrayBuffer(4, { maxByteLength: 8 });
+
+        score += fixed.resizable === false ? 1 : 0;
+        score += fixed.maxByteLength === 4 ? 2 : 0;
+        score += resizable.resizable === true ? 4 : 0;
+        score += resizable.maxByteLength === 8 ? 8 : 0;
+        score += fixed.detached === false ? 16 : 0;
+
+        let fixedView = new Uint8Array(fixed);
+        fixedView[0] = 7;
+        fixedView[3] = 9;
+        let moved = fixed.transfer(6);
+        let movedView = new Uint8Array(moved);
+
+        score += fixed.detached === true && fixed.byteLength === 0 ? 32 : 0;
+        score += moved.byteLength === 6 && moved.maxByteLength === 6 && moved.resizable === false ? 64 : 0;
+        score += movedView[0] === 7 && movedView[3] === 9 && movedView[4] === 0 ? 128 : 0;
+
+        let resView = new Uint8Array(resizable);
+        resView[0] = 3;
+        resView[1] = 5;
+        let grown = resizable.transfer(6);
+        let grownView = new Uint8Array(grown);
+
+        score += resizable.detached === true ? 256 : 0;
+        score += grown.resizable === true && grown.maxByteLength === 8 && grown.byteLength === 6 ? 512 : 0;
+        score += grownView[0] === 3 && grownView[1] === 5 && grownView[5] === 0 ? 1024 : 0;
+
+        let fixedAgain = grown.transferToFixedLength(2);
+        score += grown.detached === true ? 2048 : 0;
+        score += fixedAgain.resizable === false && fixedAgain.maxByteLength === 2 && fixedAgain.byteLength === 2 ? 4096 : 0;
+        score += new ArrayBuffer(0, null).resizable === false ? 8192 : 0;
+
+        let sharedThrows = false;
+        let resizableGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, "resizable").get;
+        try {
+            resizableGetter.call(new SharedArrayBuffer(1));
+        } catch (error) {
+            sharedThrows = error instanceof TypeError;
+        }
+        score += sharedThrows ? 16384 : 0;
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(32_767));
+}
+
+#[test]
 fn script_core_array_predicate_helpers_read_length_before_callback_validation() {
     let result = compile_and_run(
         r#"

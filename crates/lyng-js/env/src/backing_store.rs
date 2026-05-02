@@ -3,6 +3,8 @@ use lyng_js_types::BackingStoreRef;
 use std::mem::size_of;
 use std::sync::{Arc, Mutex};
 
+pub(crate) const MAX_BACKING_STORE_BYTE_LENGTH: usize = 1 << 30;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum BackingStoreRecord {
     Local(LocalBackingStoreRecord),
@@ -10,15 +12,15 @@ pub(crate) enum BackingStoreRecord {
 }
 
 impl BackingStoreRecord {
-    fn new_local(byte_length: usize) -> Self {
-        Self::Local(LocalBackingStoreRecord {
-            bytes: vec![0; byte_length],
+    fn new_local(byte_length: usize) -> Option<Self> {
+        Some(Self::Local(LocalBackingStoreRecord {
+            bytes: zeroed_backing_store_bytes(byte_length)?,
             detached: false,
-        })
+        }))
     }
 
-    fn new_shared(byte_length: usize) -> Self {
-        Self::Shared(SharedBackingStoreRecord::new(byte_length))
+    fn new_shared(byte_length: usize) -> Option<Self> {
+        Some(Self::Shared(SharedBackingStoreRecord::new(byte_length)?))
     }
 
     fn byte_length(&self) -> usize {
@@ -133,6 +135,17 @@ impl LocalBackingStoreRecord {
         if self.detached {
             return false;
         }
+        if byte_length > MAX_BACKING_STORE_BYTE_LENGTH {
+            return false;
+        }
+        if byte_length > self.bytes.capacity()
+            && self
+                .bytes
+                .try_reserve_exact(byte_length - self.bytes.len())
+                .is_err()
+        {
+            return false;
+        }
         self.bytes.resize(byte_length, 0);
         true
     }
@@ -170,11 +183,11 @@ pub(crate) struct SharedBackingStoreRecord {
 }
 
 impl SharedBackingStoreRecord {
-    fn new(byte_length: usize) -> Self {
-        Self {
+    fn new(byte_length: usize) -> Option<Self> {
+        Some(Self {
             byte_length,
-            bytes: Arc::new(Mutex::new(vec![0; byte_length])),
-        }
+            bytes: Arc::new(Mutex::new(zeroed_backing_store_bytes(byte_length)?)),
+        })
     }
 
     fn byte_length(&self) -> usize {
@@ -269,11 +282,11 @@ impl BackingStoreRuntime {
     }
 
     pub(crate) fn allocate(&mut self, byte_length: usize) -> Option<BackingStoreRef> {
-        self.allocate_record(BackingStoreRecord::new_local(byte_length))
+        self.allocate_record(BackingStoreRecord::new_local(byte_length)?)
     }
 
     pub(crate) fn allocate_shared(&mut self, byte_length: usize) -> Option<BackingStoreRef> {
-        self.allocate_record(BackingStoreRecord::new_shared(byte_length))
+        self.allocate_record(BackingStoreRecord::new_shared(byte_length)?)
     }
 
     pub(crate) fn byte_length(&self, id: BackingStoreRef) -> Option<usize> {
@@ -415,6 +428,16 @@ impl BackingStoreRuntime {
 
 fn backing_store_index(id: BackingStoreRef) -> usize {
     usize::try_from(id.get().saturating_sub(1)).expect("backing-store index should fit into usize")
+}
+
+fn zeroed_backing_store_bytes(byte_length: usize) -> Option<Vec<u8>> {
+    if byte_length > MAX_BACKING_STORE_BYTE_LENGTH {
+        return None;
+    }
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(byte_length).ok()?;
+    bytes.resize(byte_length, 0);
+    Some(bytes)
 }
 
 fn read_bits_from_bytes(

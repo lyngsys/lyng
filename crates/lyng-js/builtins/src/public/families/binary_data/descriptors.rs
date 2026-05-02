@@ -177,8 +177,13 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
         buffers::BufferDescriptorAtoms {
             is_view: is_view_atom,
             byte_length: byte_length_atom,
+            detached: agent.atoms_mut().intern("detached"),
+            max_byte_length: agent.atoms_mut().intern("maxByteLength"),
+            resizable: agent.atoms_mut().intern("resizable"),
             resize: agent.atoms_mut().intern("resize"),
             slice: slice_atom,
+            transfer: agent.atoms_mut().intern("transfer"),
+            transfer_to_fixed_length: agent.atoms_mut().intern("transferToFixedLength"),
         },
         buffers::BufferDescriptorTags {
             array_buffer: array_buffer_tag,

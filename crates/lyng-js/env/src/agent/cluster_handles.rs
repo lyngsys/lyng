@@ -188,6 +188,11 @@ impl ClusterSharedMemoryHandle {
 
 impl Agent {
     #[inline]
+    pub fn backing_store_allocation_limit(&self) -> usize {
+        crate::backing_store::MAX_BACKING_STORE_BYTE_LENGTH
+    }
+
+    #[inline]
     pub fn allocate_backing_store(&mut self, byte_length: usize) -> Option<BackingStoreRef> {
         self.backing_stores.allocate(byte_length)
     }

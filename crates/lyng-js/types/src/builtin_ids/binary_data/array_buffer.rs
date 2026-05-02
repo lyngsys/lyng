@@ -25,6 +25,30 @@ pub fn array_buffer_byte_length_getter_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn array_buffer_detached_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ARRAY_BUFFER_DETACHED_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn array_buffer_max_byte_length_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ARRAY_BUFFER_MAX_BYTE_LENGTH_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn array_buffer_resizable_getter_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ARRAY_BUFFER_RESIZABLE_GETTER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn array_buffer_slice_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(ARRAY_BUFFER_SLICE_RAW) {
         Some(id) => id,
@@ -35,6 +59,22 @@ pub fn array_buffer_slice_builtin() -> BuiltinFunctionId {
 #[inline]
 pub fn array_buffer_resize_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(ARRAY_BUFFER_RESIZE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn array_buffer_transfer_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ARRAY_BUFFER_TRANSFER_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
+pub fn array_buffer_transfer_to_fixed_length_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ARRAY_BUFFER_TRANSFER_TO_FIXED_LENGTH_RAW) {
         Some(id) => id,
         None => unreachable!("builtin id should stay non-zero"),
     }

@@ -26,11 +26,26 @@ pub(super) fn dispatch_buffer_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::super::array_buffer_byte_length_getter_builtin() {
         return array_buffer_byte_length_getter_builtin(context, invocation).map(Some);
     }
+    if entry == super::super::array_buffer_detached_getter_builtin() {
+        return array_buffer_detached_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::array_buffer_max_byte_length_getter_builtin() {
+        return array_buffer_max_byte_length_getter_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::array_buffer_resizable_getter_builtin() {
+        return array_buffer_resizable_getter_builtin(context, invocation).map(Some);
+    }
     if entry == super::super::array_buffer_slice_builtin() {
         return array_buffer_slice_builtin(context, invocation).map(Some);
     }
     if entry == super::super::array_buffer_resize_builtin() {
         return array_buffer_resize_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::array_buffer_transfer_builtin() {
+        return array_buffer_transfer_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::array_buffer_transfer_to_fixed_length_builtin() {
+        return array_buffer_transfer_to_fixed_length_builtin(context, invocation).map(Some);
     }
     if entry == super::super::shared_array_buffer_builtin() {
         return shared_array_buffer_builtin(context, invocation).map(Some);
@@ -118,12 +133,23 @@ fn array_buffer_this_store<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
 ) -> Result<lyng_js_types::BackingStoreRef, Cx::Error> {
+    Ok(array_buffer_this_data(cx, value)?.1.backing_store())
+}
+
+fn array_buffer_this_data<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<(ObjectRef, ArrayBufferObjectData), Cx::Error> {
     let object = value.as_object_ref().ok_or_else(|| type_error(cx))?;
-    cx.agent()
+    if !cx.agent().objects().is_array_buffer_object(object) {
+        return Err(type_error(cx));
+    }
+    let buffer = cx
+        .agent()
         .objects()
         .array_buffer(object)
-        .map(ArrayBufferObjectData::backing_store)
-        .ok_or_else(|| type_error(cx))
+        .ok_or_else(|| type_error(cx))?;
+    Ok((object, buffer))
 }
 
 fn shared_array_buffer_this_store<Cx: PublicBuiltinDispatchContext>(
@@ -214,7 +240,9 @@ fn array_buffer_max_byte_length_option<Cx: PublicBuiltinDispatchContext>(
     if options.is_undefined() {
         return Ok(None);
     }
-    let options_object = cx.to_object_for_builtin_value(cx.builtin_realm(), options)?;
+    let Some(options_object) = options.as_object_ref() else {
+        return Ok(None);
+    };
     let key = {
         let agent = cx.agent();
         PropertyKey::from_atom(agent.atoms_mut().intern_collectible("maxByteLength"))
@@ -248,6 +276,9 @@ fn array_buffer_family_builtin<Cx: PublicBuiltinDispatchContext>(
         array_buffer_max_byte_length_option(cx, invocation.arguments().get(1).copied())?
     };
     if max_byte_length.is_some_and(|max| byte_length > max) {
+        return Err(range_error(cx));
+    }
+    if max_byte_length.is_some_and(|max| max > cx.agent().backing_store_allocation_limit()) {
         return Err(range_error(cx));
     }
     let realm = cx.builtin_realm();
@@ -324,6 +355,50 @@ fn array_buffer_byte_length_getter_builtin<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let store = array_buffer_this_store(cx, invocation.this_value())?;
     shared_buffer_byte_length_value(cx, store)
+}
+
+fn array_buffer_detached_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let store = array_buffer_this_store(cx, invocation.this_value())?;
+    let detached = cx
+        .agent()
+        .backing_store_is_detached(store)
+        .ok_or_else(|| type_error(cx))?;
+    Ok(Value::from_bool(detached))
+}
+
+fn array_buffer_max_byte_length_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (_, buffer) = array_buffer_this_data(cx, invocation.this_value())?;
+    if cx
+        .agent()
+        .backing_store_is_detached(buffer.backing_store())
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Ok(Value::from_smi(0));
+    }
+    let byte_length = match buffer.max_byte_length() {
+        Some(max_byte_length) => max_byte_length,
+        None => cx
+            .agent()
+            .backing_store_byte_length(buffer.backing_store())
+            .ok_or_else(|| type_error(cx))?,
+    };
+    Ok(length_value_u64(
+        u64::try_from(byte_length).unwrap_or(u64::MAX),
+    ))
+}
+
+fn array_buffer_resizable_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let (_, buffer) = array_buffer_this_data(cx, invocation.this_value())?;
+    Ok(Value::from_bool(buffer.is_resizable()))
 }
 
 fn shared_array_buffer_byte_length_getter_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -414,6 +489,87 @@ fn array_buffer_resize_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     refresh_length_tracking_views(cx, object, new_byte_length);
     Ok(Value::undefined())
+}
+
+fn array_buffer_transfer_family_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+    to_fixed_length: bool,
+) -> Result<Value, Cx::Error> {
+    let (source_object, source_buffer) = array_buffer_this_data(cx, invocation.this_value())?;
+    let source_store = source_buffer.backing_store();
+    if cx
+        .agent()
+        .backing_store_is_detached(source_store)
+        .ok_or_else(|| type_error(cx))?
+    {
+        return Err(type_error(cx));
+    }
+    let source_length = cx
+        .agent()
+        .backing_store_byte_length(source_store)
+        .ok_or_else(|| type_error(cx))?;
+    let new_byte_length = match invocation.arguments().first().copied() {
+        None => source_length,
+        Some(value) if value.is_undefined() => source_length,
+        Some(value) => {
+            let index = to_index_for_builtin(cx, value)?;
+            usize::try_from(index).map_err(|_| range_error(cx))?
+        }
+    };
+    let new_max_byte_length = if to_fixed_length {
+        None
+    } else {
+        source_buffer.max_byte_length()
+    };
+    if new_max_byte_length.is_some_and(|max_byte_length| new_byte_length > max_byte_length) {
+        return Err(range_error(cx));
+    }
+    let new_store = cx
+        .agent()
+        .allocate_backing_store(new_byte_length)
+        .ok_or_else(|| range_error(cx))?;
+    let copy_length = source_length.min(new_byte_length);
+    for index in 0..copy_length {
+        let byte = cx
+            .agent()
+            .backing_store_get_byte(source_store, index)
+            .ok_or_else(|| type_error(cx))?;
+        if !cx.agent().backing_store_set_byte(new_store, index, byte) {
+            return Err(type_error(cx));
+        }
+    }
+    if !cx.agent().detach_backing_store(source_store) {
+        return Err(type_error(cx));
+    }
+    refresh_length_tracking_views(cx, source_object, 0);
+
+    let realm = cx.builtin_realm();
+    let prototype = cx
+        .agent()
+        .realm(realm)
+        .and_then(|record| record.intrinsics().array_buffer_prototype())
+        .ok_or_else(|| type_error(cx))?;
+    let data = match new_max_byte_length {
+        Some(max_byte_length) => ArrayBufferObjectData::new_resizable(new_store, max_byte_length),
+        None => ArrayBufferObjectData::new(new_store),
+    };
+    let object = allocate_array_buffer_object_with_data(cx, realm, prototype, data)?;
+    Ok(Value::from_object_ref(object))
+}
+
+fn array_buffer_transfer_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_buffer_transfer_family_builtin(cx, invocation, false)
+}
+
+fn array_buffer_transfer_to_fixed_length_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    array_buffer_transfer_family_builtin(cx, invocation, true)
 }
 
 fn array_buffer_family_slice_builtin<Cx: PublicBuiltinDispatchContext>(
