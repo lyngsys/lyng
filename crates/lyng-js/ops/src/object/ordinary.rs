@@ -1,4 +1,6 @@
-use super::typed_array_indices::typed_array_index_descriptor;
+use super::typed_array_indices::{
+    typed_array_index_descriptor, typed_array_numeric_key, TypedArrayNumericKey,
+};
 use crate::errors::{internal_method_error, throw_type_error};
 use lyng_js_env::Agent;
 use lyng_js_gc::AllocationLifetime;
@@ -19,10 +21,8 @@ pub fn ordinary_has_property(
     object: ObjectRef,
     key: PropertyKey,
 ) -> Completion<bool> {
-    if let Some(index) = key.as_index() {
-        if agent.objects().typed_array(object).is_some() {
-            return Ok(typed_array_index_descriptor(agent, object, index)?.is_some());
-        }
+    if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
+        return Ok(matches!(numeric_key, TypedArrayNumericKey::Valid(_)));
     }
     agent
         .objects()
@@ -57,12 +57,17 @@ pub fn ordinary_get_with_receiver(
     key: PropertyKey,
     receiver: Value,
 ) -> Completion<Value> {
-    if let Some(index) = key.as_index() {
-        if agent.objects().typed_array(object).is_some() {
-            return Ok(typed_array_index_descriptor(agent, object, index)?
-                .and_then(|descriptor| descriptor.value())
-                .unwrap_or(Value::undefined()));
-        }
+    if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
+        return match numeric_key {
+            TypedArrayNumericKey::Valid(index) => Ok(typed_array_index_descriptor(
+                agent,
+                object,
+                index,
+            )?
+            .and_then(|descriptor| descriptor.value())
+            .unwrap_or(Value::undefined())),
+            TypedArrayNumericKey::Invalid => Ok(Value::undefined()),
+        };
     }
     agent
         .objects()
@@ -151,10 +156,13 @@ pub fn ordinary_get_own_property(
     object: ObjectRef,
     key: PropertyKey,
 ) -> Completion<Option<PropertyDescriptor>> {
-    if let Some(index) = key.as_index() {
-        if agent.objects().typed_array(object).is_some() {
-            return typed_array_index_descriptor(agent, object, index);
-        }
+    if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
+        return match numeric_key {
+            TypedArrayNumericKey::Valid(index) => {
+                typed_array_index_descriptor(agent, object, index)
+            }
+            TypedArrayNumericKey::Invalid => Ok(None),
+        };
     }
     agent
         .objects()
@@ -178,6 +186,21 @@ pub fn ordinary_define_property(
     descriptor: PropertyDescriptor,
     lifetime: AllocationLifetime,
 ) -> Completion<bool> {
+    if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
+        let TypedArrayNumericKey::Valid(index) = numeric_key else {
+            return Ok(false);
+        };
+        let result = agent.with_heap_and_objects(|heap, objects| {
+            objects.define_own_property(
+                &mut heap.mutator(),
+                object,
+                PropertyKey::Index(index),
+                descriptor,
+                lifetime,
+            )
+        });
+        return result.map_err(|error| internal_method_error(agent, error));
+    }
     let result = agent.with_heap_and_objects(|heap, objects| {
         objects.define_own_property(&mut heap.mutator(), object, key, descriptor, lifetime)
     });
@@ -314,6 +337,9 @@ pub fn ordinary_delete_property(
     object: ObjectRef,
     key: PropertyKey,
 ) -> Completion<bool> {
+    if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
+        return Ok(!matches!(numeric_key, TypedArrayNumericKey::Valid(_)));
+    }
     let result = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.delete(&mut mutator, object, key)

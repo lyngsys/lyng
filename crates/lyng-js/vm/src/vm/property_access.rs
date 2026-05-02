@@ -772,10 +772,12 @@ impl Vm {
             if let Some(result) = self.mapped_arguments_get(agent, object, index) {
                 return result;
             }
-            if agent.objects().typed_array(object).is_some() {
-                return object::ordinary_get_with_receiver(agent, object, key, receiver)
-                    .map_err(VmError::Abrupt);
-            }
+        }
+        if agent.objects().typed_array(object).is_some()
+            && (key.as_index().is_some() || typed_array_numeric_atom_index(agent, key).is_some())
+        {
+            return object::ordinary_get_with_receiver(agent, object, key, receiver)
+                .map_err(VmError::Abrupt);
         }
         let descriptor =
             object::ordinary_get_own_property(agent, object, key).map_err(VmError::Abrupt)?;

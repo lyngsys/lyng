@@ -115,6 +115,17 @@ pub fn has_property<Cx: ProxyTrapContext>(
             };
             return map_completion(cx, result);
         }
+        let is_typed_array_numeric_key = {
+            let agent = cx.agent();
+            ordinary_object::is_typed_array_numeric_key(agent, object, key)
+        };
+        if is_typed_array_numeric_key {
+            let result = {
+                let agent = cx.agent();
+                ordinary_object::ordinary_has_property(agent, object, key)
+            };
+            return map_completion(cx, result);
+        }
         if get_own_property(cx, object, key)?.is_some() {
             return Ok(true);
         }

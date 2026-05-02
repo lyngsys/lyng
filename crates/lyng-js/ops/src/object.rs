@@ -34,6 +34,7 @@ pub use self::private_elements::{
     private_shared_element_value,
 };
 pub use self::receiver_payloads::{require_date_value, require_temporal_object};
+pub(crate) use self::typed_array_indices::is_typed_array_numeric_key;
 
 pub trait ObjectOpsContext: proxy::ProxyTrapContext {}
 

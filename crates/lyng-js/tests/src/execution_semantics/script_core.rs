@@ -3284,6 +3284,94 @@ fn script_core_typed_array_from_of_rejects_short_custom_constructor_result() {
 }
 
 #[test]
+fn script_core_typed_array_numeric_get_and_has_do_not_use_prototype() {
+    let result = compile_and_run_string(
+        r#"
+        let typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
+        let thrower = {
+            get: function() {
+                throw new TypeError("prototype lookup");
+            }
+        };
+        Object.defineProperty(typedArrayPrototype, "1.1", thrower);
+        Object.defineProperty(typedArrayPrototype, "-0", thrower);
+        Object.defineProperty(typedArrayPrototype, "-1", thrower);
+        Object.defineProperty(typedArrayPrototype, "2", thrower);
+        typedArrayPrototype["0.000001"] = "prototype";
+        typedArrayPrototype["1"] = "prototype";
+
+        let sample = new Uint8Array([42, 43]);
+        let short = new Uint8Array(1);
+
+        [
+            sample["1.1"] === undefined,
+            sample["-0"] === undefined,
+            sample["-1"] === undefined,
+            sample["2"] === undefined,
+            Reflect.has(short, "1") === false,
+            Reflect.has(short, "1.1") === false,
+            Reflect.has(short, "0.000001") === false,
+            Reflect.has(short, "-0") === false,
+            Reflect.has(short, "-1") === false
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "true:true:true:true:true:true:true:true:true"
+    );
+}
+
+#[test]
+fn script_core_typed_array_define_rejects_invalid_numeric_indices() {
+    let result = compile_and_run_string(
+        r#"
+        let sample = new Uint8Array([7]);
+        let desc = Object.getOwnPropertyDescriptor(sample, "0");
+
+        function probe(key) {
+            try {
+                Object.defineProperty(sample, key, desc);
+                return "missing";
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+
+        [
+            probe("1"),
+            probe("-1"),
+            probe("1.5"),
+            probe("-0")
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "true:true:true:true");
+}
+
+#[test]
+fn script_core_typed_array_delete_detached_numeric_indices_returns_true() {
+    let result = compile_and_run_string(
+        r#"
+        let sample = new Uint8Array(1);
+        sample.buffer.transfer(0);
+
+        [
+            delete sample[0],
+            delete sample["1.1"],
+            delete sample["-0"],
+            delete sample["-1"],
+            delete sample["1"]
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "true:true:true:true:true");
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"
