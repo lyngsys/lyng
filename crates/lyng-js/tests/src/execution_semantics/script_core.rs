@@ -3830,6 +3830,99 @@ fn script_core_typed_array_from_of_use_set_for_resized_results() {
 }
 
 #[test]
+fn script_core_typed_array_set_uses_live_bounds_and_set_element() {
+    let result = compile_and_run_string(
+        r#"
+        let rab = new ArrayBuffer(5, { maxByteLength: 10 });
+        let target = new Int8Array(rab);
+        let log = [];
+        let shrinkNumber = 0;
+        let growNumber = 0;
+        let shrink = {
+            valueOf() {
+                log.push("shrink");
+                rab.resize(rab.byteLength - 1);
+                return ++shrinkNumber;
+            }
+        };
+        let grow = {
+            valueOf() {
+                log.push("grow");
+                rab.resize(rab.byteLength + 1);
+                return --growNumber;
+            }
+        };
+
+        target.set({
+            get length() { return 5; },
+            0: shrink,
+            1: shrink,
+            2: shrink,
+            3: grow,
+            4: grow
+        });
+
+        let targetOobBuffer = new ArrayBuffer(4, { maxByteLength: 4 });
+        let targetOob = new Int8Array(targetOobBuffer, 0, 4);
+        targetOobBuffer.resize(3);
+        let touched = false;
+        let targetError = false;
+        try {
+            targetOob.set(new Proxy({}, {
+                get() {
+                    touched = true;
+                    return 1;
+                }
+            }));
+        } catch (error) {
+            targetError = error.constructor === TypeError;
+        }
+
+        let sourceOobBuffer = new ArrayBuffer(4, { maxByteLength: 4 });
+        let sourceOob = new Int8Array(sourceOobBuffer, 0, 4);
+        sourceOobBuffer.resize(3);
+        let sourceError = false;
+        try {
+            new Int8Array(new ArrayBuffer(4)).set(sourceOob);
+        } catch (error) {
+            sourceError = error.constructor === TypeError;
+        }
+
+        let offsetBuffer = new ArrayBuffer(2, { maxByteLength: 2 });
+        let offsetTarget = new Int8Array(offsetBuffer, 0, 2);
+        let offsetCalled = false;
+        let offsetError = false;
+        try {
+            offsetTarget.set([1], {
+                valueOf() {
+                    offsetCalled = true;
+                    offsetBuffer.resize(1);
+                    return 0;
+                }
+            });
+        } catch (error) {
+            offsetError = error.constructor === TypeError;
+        }
+
+        [
+            log.join(","),
+            Array.from(target).join(","),
+            targetError,
+            touched,
+            sourceError,
+            offsetCalled,
+            offsetError
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "shrink,shrink,shrink,grow,grow|1,2,0,0|true|false|true|true|true"
+    );
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"

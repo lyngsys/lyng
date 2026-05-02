@@ -1,8 +1,8 @@
 use super::super::super::{
-    typed_array_copy_within_builtin, typed_array_fill_builtin, typed_array_reverse_builtin,
-    typed_array_sort_builtin, typed_array_to_reversed_builtin, typed_array_to_sorted_builtin,
-    typed_array_with_builtin, uint8_array_set_builtin, uint8_array_slice_builtin,
-    uint8_array_subarray_builtin,
+    set_property_on_object, typed_array_copy_within_builtin, typed_array_fill_builtin,
+    typed_array_reverse_builtin, typed_array_sort_builtin, typed_array_to_reversed_builtin,
+    typed_array_to_sorted_builtin, typed_array_with_builtin, uint8_array_set_builtin,
+    uint8_array_slice_builtin, uint8_array_subarray_builtin,
 };
 use super::super::{
     array_like_index_property_key, array_like_length_u64, arrays, get_property_from_object,
@@ -401,7 +401,7 @@ fn uint8_array_set_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let record = typed_array_this_record(cx, invocation.this_value())?;
+    let object = typed_array_this_object(cx, invocation.this_value())?;
     let source = invocation
         .arguments()
         .first()
@@ -416,34 +416,20 @@ fn uint8_array_set_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let offset = usize::try_from(offset).map_err(|_| range_error(cx))?;
-
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
-        return Err(type_error(cx));
-    }
+    let (_record, target_length) =
+        typed_array_validated_record_and_length(cx, Value::from_object_ref(object))?;
 
     if let Some(source_object) = source
         .as_object_ref()
         .filter(|object| cx.agent().objects().typed_array(*object).is_some())
     {
-        let source_record = typed_array_this_record(cx, Value::from_object_ref(source_object))?;
-        if cx
-            .agent()
-            .backing_store_is_detached(source_record.backing_store())
-            .ok_or_else(|| type_error(cx))?
-        {
-            return Err(type_error(cx));
-        }
-        if offset > record.length()
-            || source_record.length() > record.length().saturating_sub(offset)
-        {
+        let (source_record, source_length) =
+            typed_array_validated_record_and_length(cx, Value::from_object_ref(source_object))?;
+        if offset > target_length || source_length > target_length.saturating_sub(offset) {
             return Err(range_error(cx));
         }
-        let mut values = Vec::with_capacity(source_record.length());
-        for index in 0..source_record.length() {
+        let mut values = Vec::with_capacity(source_length);
+        for index in 0..source_length {
             values.push(typed_array_read_element_value(
                 cx.agent(),
                 source_record,
@@ -451,9 +437,10 @@ fn uint8_array_set_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
             ));
         }
         for (index, value) in values.into_iter().enumerate() {
-            let bits = typed_array_storage_bits_from_builtin_value(cx, record.kind(), value)?;
             let target_index = offset.checked_add(index).ok_or_else(|| range_error(cx))?;
-            typed_array_write_storage_bits(cx, record, target_index, bits)?;
+            let key =
+                array_like_index_property_key(cx, u64::try_from(target_index).unwrap_or(u64::MAX));
+            set_property_on_object(cx, object, key, value)?;
         }
         return Ok(Value::undefined());
     }
@@ -461,22 +448,16 @@ fn uint8_array_set_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     let source_object = cx.to_object_for_builtin_value(cx.builtin_realm(), source)?;
     let source_length = array_like_length_u64(cx, source_object)?;
     let source_length = usize::try_from(source_length).map_err(|_| range_error(cx))?;
-    if offset > record.length() || source_length > record.length().saturating_sub(offset) {
+    if offset > target_length || source_length > target_length.saturating_sub(offset) {
         return Err(range_error(cx));
     }
     for index in 0..source_length {
         let key = array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
         let value = get_property_from_object(cx, source_object, key)?;
-        let bits = typed_array_storage_bits_from_builtin_value(cx, record.kind(), value)?;
-        if cx
-            .agent()
-            .backing_store_is_detached(record.backing_store())
-            .ok_or_else(|| type_error(cx))?
-        {
-            continue;
-        }
         let target_index = offset.checked_add(index).ok_or_else(|| range_error(cx))?;
-        typed_array_write_storage_bits(cx, record, target_index, bits)?;
+        let key =
+            array_like_index_property_key(cx, u64::try_from(target_index).unwrap_or(u64::MAX));
+        set_property_on_object(cx, object, key, value)?;
     }
     Ok(Value::undefined())
 }
