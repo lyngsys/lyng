@@ -451,6 +451,7 @@ impl Vm {
                             };
                             if let Some(object) = receiver.as_object_ref() {
                                 if let Some(index) = key.as_index() {
+                                    let mut used_index_fast_path = false;
                                     let stored = if let Some(result) =
                                         self.mapped_arguments_set(agent, object, index, value)
                                     {
@@ -459,15 +460,28 @@ impl Vm {
                                         };
                                         true
                                     } else {
-                                        let set_result = self.set_property_on_value(
-                                            agent, host, registry, frame, receiver, key, value,
+                                        let fast_result = self.try_fast_set_engine_array_index(
+                                            agent, object, index, value,
                                         );
-                                        let Some(stored) =
-                                            self.handle_vm_result(agent, set_result)?
+                                        let Some(fast_result) =
+                                            self.handle_vm_result(agent, fast_result)?
                                         else {
                                             continue;
                                         };
-                                        stored
+                                        if let Some(stored) = fast_result {
+                                            used_index_fast_path = true;
+                                            stored
+                                        } else {
+                                            let set_result = self.set_property_on_value(
+                                                agent, host, registry, frame, receiver, key, value,
+                                            );
+                                            let Some(stored) =
+                                                self.handle_vm_result(agent, set_result)?
+                                            else {
+                                                continue;
+                                            };
+                                            stored
+                                        }
                                     };
                                     if assignment {
                                         let assignment_result = self
@@ -478,11 +492,13 @@ impl Vm {
                                             continue;
                                         };
                                     }
-                                    self.sync_engine_array_length(agent, object)?;
-                                    self.observe_keyed_index_slow_path(
-                                        frame.code(),
-                                        frame.instruction_offset(),
-                                    );
+                                    if !used_index_fast_path {
+                                        self.sync_engine_array_length(agent, object)?;
+                                        self.observe_keyed_index_slow_path(
+                                            frame.code(),
+                                            frame.instruction_offset(),
+                                        );
+                                    }
                                 } else if let Some(atom) = key.as_atom() {
                                     if let Some(stored) = self
                                         .try_keyed_property_store_inline_cache(

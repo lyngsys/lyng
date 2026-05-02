@@ -4510,9 +4510,98 @@ fn evaluate_script_promise_all_result_creation_avoids_array_prototype_setters() 
 }
 
 #[test]
-fn evaluate_script_resolves_promise_any_with_first_fulfillment() {
+fn evaluate_script_array_index_assignment_observes_prototype_setter() {
     let unit = compile_test_unit(
         226,
+        r#"
+            let observed = 0;
+            Object.defineProperty(Array.prototype, "0", {
+                configurable: true,
+                set: function(value) {
+                    observed = value;
+                }
+            });
+            let array = [];
+            array[0] = 42;
+            delete Array.prototype[0];
+            observed;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_smi(42));
+}
+
+#[test]
+fn evaluate_script_array_index_assignment_defers_to_typed_array_prototype_set() {
+    let unit = compile_test_unit(
+        227,
+        r#"
+            let calls = 0;
+            let value = {
+                valueOf: function() {
+                    calls = calls + 1;
+                    return 23;
+                }
+            };
+            let typed = new Uint8Array([0]);
+            let receiver = Object.setPrototypeOf([], typed);
+            receiver[1] = value;
+            (receiver.hasOwnProperty("1") ? 1 : 0) + receiver.length + calls;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_smi(0));
+}
+
+#[test]
+fn evaluate_script_function_apply_observes_array_prototype_getter() {
+    let unit = compile_test_unit(
+        228,
+        r#"
+            let observed = 0;
+            Object.defineProperty(Array.prototype, "0", {
+                configurable: true,
+                get: function() {
+                    observed = 5;
+                    return 37;
+                }
+            });
+            function first(value) {
+                return value + observed;
+            }
+            let args = [];
+            args.length = 1;
+            let result = first.apply(null, args);
+            delete Array.prototype[0];
+            result;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_smi(42));
+}
+
+#[test]
+fn evaluate_script_resolves_promise_any_with_first_fulfillment() {
+    let unit = compile_test_unit(
+        229,
         r#"
             Promise.any([Promise.reject(1), Promise.resolve(7), Promise.reject(3)]).then();
         "#,

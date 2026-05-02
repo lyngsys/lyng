@@ -270,7 +270,17 @@ pub struct RegExpPayload {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RegExpFastPattern {
     AsciiDigit,
+    AsciiNonDigit,
+    Whitespace,
+    NonWhitespace,
+    AsciiWord,
+    AsciiNonWord,
+    AnchoredAsciiDigitRun,
     AnchoredAsciiNonDigitRun,
+    AnchoredWhitespaceRun,
+    AnchoredNonWhitespaceRun,
+    AnchoredAsciiWordRun,
+    AnchoredAsciiNonWordRun,
 }
 
 fn normalize_backend_pattern(pattern: &str, flags: RegExpObjectFlags) -> String {
@@ -768,30 +778,98 @@ impl RegExpPayload {
     ) -> Option<Option<RegExpMatchRecord>> {
         match self.fast_pattern? {
             RegExpFastPattern::AsciiDigit => {
-                let matched = text.get(start..).and_then(|tail| {
-                    tail.iter()
-                        .position(|unit| is_ascii_digit_code_unit(*unit))
-                        .map(|offset| start + offset)
-                });
-                Some(matched.map(|index| simple_match_record(index..index + 1)))
+                Some(self.find_fast_class(text, start, is_ascii_digit_code_unit))
             }
-            RegExpFastPattern::AnchoredAsciiNonDigitRun => {
-                if start != 0
-                    || text.is_empty()
-                    || text.iter().any(|unit| is_ascii_digit_code_unit(*unit))
-                {
-                    return Some(None);
-                }
-                Some(Some(simple_match_record(0..text.len())))
+            RegExpFastPattern::AsciiNonDigit => {
+                Some(self.find_fast_class(text, start, |unit| !is_ascii_digit_code_unit(unit)))
             }
+            RegExpFastPattern::Whitespace => {
+                Some(self.find_fast_class(text, start, is_js_whitespace_or_line_terminator))
+            }
+            RegExpFastPattern::NonWhitespace => Some(self.find_fast_class(text, start, |unit| {
+                !is_js_whitespace_or_line_terminator(unit)
+            })),
+            RegExpFastPattern::AsciiWord => {
+                Some(self.find_fast_class(text, start, is_ascii_word_code_unit))
+            }
+            RegExpFastPattern::AsciiNonWord => {
+                Some(self.find_fast_class(text, start, |unit| !is_ascii_word_code_unit(unit)))
+            }
+            RegExpFastPattern::AnchoredAsciiDigitRun => {
+                Some(self.match_fast_anchored_run(text, start, is_ascii_digit_code_unit))
+            }
+            RegExpFastPattern::AnchoredAsciiNonDigitRun => Some(self.match_fast_anchored_run(
+                text,
+                start,
+                |unit| !is_ascii_digit_code_unit(unit),
+            )),
+            RegExpFastPattern::AnchoredWhitespaceRun => {
+                Some(self.match_fast_anchored_run(text, start, is_js_whitespace_or_line_terminator))
+            }
+            RegExpFastPattern::AnchoredNonWhitespaceRun => {
+                Some(self.match_fast_anchored_run(text, start, |unit| {
+                    !is_js_whitespace_or_line_terminator(unit)
+                }))
+            }
+            RegExpFastPattern::AnchoredAsciiWordRun => {
+                Some(self.match_fast_anchored_run(text, start, is_ascii_word_code_unit))
+            }
+            RegExpFastPattern::AnchoredAsciiNonWordRun => Some(self.match_fast_anchored_run(
+                text,
+                start,
+                |unit| !is_ascii_word_code_unit(unit),
+            )),
         }
+    }
+
+    fn find_fast_class(
+        &self,
+        text: &[u16],
+        start: usize,
+        predicate: impl Fn(u16) -> bool,
+    ) -> Option<RegExpMatchRecord> {
+        let index = text.get(start..).and_then(|tail| {
+            tail.iter()
+                .position(|unit| predicate(*unit))
+                .map(|offset| start + offset)
+        })?;
+        Some(simple_match_record(
+            index..index + fast_match_code_unit_width(text, index, self.flags.unicode_aware()),
+        ))
+    }
+
+    fn match_fast_anchored_run(
+        &self,
+        text: &[u16],
+        start: usize,
+        predicate: impl Fn(u16) -> bool,
+    ) -> Option<RegExpMatchRecord> {
+        if start != 0 || text.is_empty() || text.iter().any(|unit| !predicate(*unit)) {
+            return None;
+        }
+        Some(simple_match_record(0..text.len()))
     }
 }
 
 fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExpFastPattern> {
+    let word_classes_are_ascii = !flags.ignore_case();
     match pattern {
         r"\d" => Some(RegExpFastPattern::AsciiDigit),
+        r"\D" => Some(RegExpFastPattern::AsciiNonDigit),
+        r"\s" => Some(RegExpFastPattern::Whitespace),
+        r"\S" => Some(RegExpFastPattern::NonWhitespace),
+        r"\w" if word_classes_are_ascii => Some(RegExpFastPattern::AsciiWord),
+        r"\W" if word_classes_are_ascii => Some(RegExpFastPattern::AsciiNonWord),
+        r"^\d+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAsciiDigitRun),
         r"^\D+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAsciiNonDigitRun),
+        r"^\s+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredWhitespaceRun),
+        r"^\S+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredNonWhitespaceRun),
+        r"^\w+$" if !flags.multiline() && word_classes_are_ascii => {
+            Some(RegExpFastPattern::AnchoredAsciiWordRun)
+        }
+        r"^\W+$" if !flags.multiline() && word_classes_are_ascii => {
+            Some(RegExpFastPattern::AnchoredAsciiNonWordRun)
+        }
         _ => None,
     }
 }
@@ -801,10 +879,85 @@ fn is_ascii_digit_code_unit(unit: u16) -> bool {
     (0x30..=0x39).contains(&unit)
 }
 
+#[inline]
+fn is_ascii_word_code_unit(unit: u16) -> bool {
+    is_ascii_digit_code_unit(unit)
+        || (0x41..=0x5A).contains(&unit)
+        || unit == 0x5F
+        || (0x61..=0x7A).contains(&unit)
+}
+
+#[inline]
+fn is_js_whitespace_or_line_terminator(unit: u16) -> bool {
+    matches!(
+        unit,
+        0x0009
+            | 0x000A
+            | 0x000B
+            | 0x000C
+            | 0x000D
+            | 0x0020
+            | 0x00A0
+            | 0x1680
+            | 0x2028
+            | 0x2029
+            | 0x202F
+            | 0x205F
+            | 0x3000
+            | 0xFEFF
+    ) || (0x2000..=0x200A).contains(&unit)
+}
+
+#[inline]
+fn fast_match_code_unit_width(text: &[u16], index: usize, unicode_aware: bool) -> usize {
+    if !unicode_aware {
+        return 1;
+    }
+    let Some(unit) = text.get(index).copied() else {
+        return 1;
+    };
+    if !(0xD800..=0xDBFF).contains(&unit) {
+        return 1;
+    }
+    text.get(index + 1)
+        .copied()
+        .filter(|trail| (0xDC00..=0xDFFF).contains(trail))
+        .map_or(1, |_| 2)
+}
+
 fn simple_match_record(range: Range<usize>) -> RegExpMatchRecord {
     RegExpMatchRecord::new(
         range,
         Vec::<Option<Range<usize>>>::new().into_boxed_slice(),
         Vec::<RegExpNamedCapture>::new().into_boxed_slice(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn flags(text: &str) -> RegExpObjectFlags {
+        RegExpObjectFlags::from_flag_text(text)
+    }
+
+    #[test]
+    fn detects_fast_character_class_patterns() {
+        assert_eq!(
+            detect_fast_pattern(r"\s", flags("")),
+            Some(RegExpFastPattern::Whitespace)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"\w", flags("u")),
+            Some(RegExpFastPattern::AsciiWord)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"^\S+$", flags("v")),
+            Some(RegExpFastPattern::AnchoredNonWhitespaceRun)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"^\W+$", flags("")),
+            Some(RegExpFastPattern::AnchoredAsciiNonWordRun)
+        );
+    }
 }

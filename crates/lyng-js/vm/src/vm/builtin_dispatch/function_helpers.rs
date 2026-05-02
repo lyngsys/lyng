@@ -126,6 +126,9 @@ impl Vm {
         let object = value
             .as_object_ref()
             .ok_or_else(|| Self::abrupt_intrinsic_error(agent, realm, errors::ErrorKind::Type))?;
+        if let Some(arguments) = Self::try_collect_fast_engine_array_arguments(agent, object)? {
+            return Ok(arguments);
+        }
         let length = self.get_property_from_object(
             agent,
             host,
@@ -149,6 +152,55 @@ impl Vm {
             )?);
         }
         Ok(arguments)
+    }
+
+    fn try_collect_fast_engine_array_arguments(
+        agent: &mut Agent,
+        object: ObjectRef,
+    ) -> VmResult<Option<Vec<Value>>> {
+        if !agent
+            .objects()
+            .object_header(agent.heap().view(), object)
+            .is_some_and(|header| header.flags().is_engine_array())
+            || !Self::engine_array_index_prototype_chain_is_clear(agent, object)?
+            || agent.objects().element_mode(object) == Some(lyng_js_objects::ElementMode::Sparse)
+        {
+            return Ok(None);
+        }
+
+        let length_descriptor = agent
+            .objects()
+            .get_own_property(
+                agent.heap().view(),
+                object,
+                PropertyKey::from_atom(WellKnownAtom::length.id()),
+            )
+            .map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let Some(length_value) = length_descriptor.value() else {
+            return Ok(None);
+        };
+        let Some(length) = length_value
+            .as_smi()
+            .and_then(|value| u32::try_from(value).ok())
+            .or_else(|| length_value.as_f64().and_then(number_to_u32_length))
+        else {
+            return Ok(None);
+        };
+        let capacity = usize::try_from(length).unwrap_or(usize::MAX);
+        let mut arguments = Vec::with_capacity(capacity);
+        for index in 0..length {
+            let value = agent
+                .objects()
+                .element(agent.heap().view(), object, index)
+                .unwrap_or(Value::array_hole());
+            arguments.push(if value == Value::array_hole() {
+                Value::undefined()
+            } else {
+                value
+            });
+        }
+        Ok(Some(arguments))
     }
 
     pub(super) fn create_dynamic_function(
@@ -304,6 +356,13 @@ impl Vm {
             .diagnostics
             .has_errors()
     }
+}
+
+fn number_to_u32_length(value: f64) -> Option<u32> {
+    if !value.is_finite() || value < 0.0 || value.trunc() != value || value > f64::from(u32::MAX) {
+        return None;
+    }
+    Some(value as u32)
 }
 
 fn bound_function_length_value(target_length: Value, bound_argument_count: usize) -> Value {

@@ -653,6 +653,53 @@ impl Vm {
         self.set_property_on_object(agent, host, registry, frame, object, receiver, key, value)
     }
 
+    pub(super) fn try_fast_set_engine_array_index(
+        &mut self,
+        agent: &mut Agent,
+        object: ObjectRef,
+        index: u32,
+        value: Value,
+    ) -> VmResult<Option<bool>> {
+        if !Self::engine_array_index_prototype_chain_is_clear(agent, object)? {
+            return Ok(None);
+        }
+        agent
+            .with_heap_and_objects(|heap, objects| {
+                let mut mutator = heap.mutator();
+                objects.fast_set_engine_array_index(
+                    &mut mutator,
+                    object,
+                    index,
+                    value,
+                    AllocationLifetime::Default,
+                )
+            })
+            .map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))
+    }
+
+    pub(super) fn engine_array_index_prototype_chain_is_clear(
+        agent: &Agent,
+        object: ObjectRef,
+    ) -> VmResult<bool> {
+        let mut current = agent
+            .objects()
+            .object_header(agent.heap().view(), object)
+            .and_then(|header| header.prototype());
+        while let Some(prototype) = current {
+            if agent.objects().is_proxy_object(prototype)
+                || agent.objects().is_typed_array_object(prototype)
+                || agent.objects().element_logical_len(prototype).unwrap_or(0) != 0
+            {
+                return Ok(false);
+            }
+            current = agent
+                .objects()
+                .object_header(agent.heap().view(), prototype)
+                .and_then(|header| header.prototype());
+        }
+        Ok(true)
+    }
+
     pub(super) fn prototype_chain_has_proxy(agent: &Agent, object: ObjectRef) -> bool {
         let mut current = Some(object);
         while let Some(object) = current {

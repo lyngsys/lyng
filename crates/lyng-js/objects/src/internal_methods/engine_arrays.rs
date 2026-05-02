@@ -1,6 +1,37 @@
 use super::*;
 
 impl ObjectRuntime {
+    pub fn fast_set_engine_array_index(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        index: u32,
+        value: Value,
+        lifetime: AllocationLifetime,
+    ) -> InternalMethodResult<Option<bool>> {
+        if !self
+            .object_header(heap.view(), id)
+            .is_some_and(|header| header.flags().is_engine_array())
+        {
+            return Ok(None);
+        }
+
+        let (old_len, length_writable) = self.engine_array_length_state(heap.view(), id)?;
+        if !length_writable || !self.ordinary_is_extensible(id)? {
+            return Ok(None);
+        }
+        if !self.can_fast_set_engine_array_index(heap.view(), id, index)? {
+            return Ok(None);
+        }
+        if !self.set_element(heap, id, index, value, lifetime) {
+            return Err(InternalMethodError::CorruptObjectState);
+        }
+        if index >= old_len {
+            self.fast_update_engine_array_length(heap, id, index.saturating_add(1))?;
+        }
+        Ok(Some(true))
+    }
+
     pub(super) fn engine_array_define_own_property(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
@@ -147,6 +178,79 @@ impl ObjectRuntime {
             )?
             .ok_or(InternalMethodError::CorruptObjectState)?;
         array_length_descriptor_state(descriptor)
+    }
+
+    fn can_fast_set_engine_array_index(
+        &self,
+        heap: PrimitiveHeapView<'_>,
+        id: ObjectRef,
+        index: u32,
+    ) -> InternalMethodResult<bool> {
+        let metadata = self
+            .object_metadata(id)
+            .ok_or(InternalMethodError::MissingObject)?;
+        match &metadata.element_storage {
+            ElementStorageMetadata::Empty => Ok(true),
+            ElementStorageMetadata::Dense { logical_len } => {
+                if index >= *logical_len {
+                    return Ok(true);
+                }
+                let record = heap.object(id).ok_or(InternalMethodError::MissingObject)?;
+                let Some(elements) = record.elements() else {
+                    return Err(InternalMethodError::CorruptObjectState);
+                };
+                let Some(buffer) = heap.object_slots(elements) else {
+                    return Err(InternalMethodError::CorruptObjectState);
+                };
+                Ok(buffer
+                    .get(index as usize)
+                    .is_none_or(|value| *value != Value::array_hole()))
+            }
+            ElementStorageMetadata::Sparse { .. } => Ok(false),
+        }
+    }
+
+    fn fast_update_engine_array_length(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        length: u32,
+    ) -> InternalMethodResult<()> {
+        let key = PropertyKey::from_atom(WellKnownAtom::length.id());
+        let value = length_value(length);
+        let record = heap
+            .view()
+            .object(id)
+            .ok_or(InternalMethodError::MissingObject)?;
+        let metadata = self
+            .object_metadata_mut(id)
+            .ok_or(InternalMethodError::MissingObject)?;
+        match &mut metadata.named_properties {
+            NamedPropertyStorage::ShapeStable => {
+                let shape = record
+                    .shape()
+                    .ok_or(InternalMethodError::CorruptObjectState)?;
+                let property = self
+                    .shape_property(shape, key)
+                    .ok_or(InternalMethodError::CorruptObjectState)?;
+                if property.kind() != ShapePropertyKind::Data {
+                    return Err(InternalMethodError::CorruptObjectState);
+                }
+                if !self.mut_named_slot(heap, id, property.slot_offset(), value) {
+                    return Err(InternalMethodError::CorruptObjectState);
+                }
+            }
+            NamedPropertyStorage::Dictionary(dictionary) => {
+                let Some(entry) = dictionary.entries.get_mut(&key) else {
+                    return Err(InternalMethodError::CorruptObjectState);
+                };
+                if entry.payload().kind() != ShapePropertyKind::Data {
+                    return Err(InternalMethodError::CorruptObjectState);
+                }
+                entry.payload = NamedPropertyValue::data(value);
+            }
+        }
+        Ok(())
     }
 
     fn engine_array_set_length(

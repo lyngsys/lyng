@@ -1691,6 +1691,82 @@ fn engine_array_index_definitions_extend_length() {
 }
 
 #[test]
+fn engine_array_fast_index_store_extends_dense_array_and_length() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let shape = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let array = engine_array(&mut runtime, &mut mutator, shape, 0, true);
+
+    assert_eq!(
+        runtime
+            .fast_set_engine_array_index(
+                &mut mutator,
+                array,
+                0,
+                Value::from_smi(7),
+                AllocationLifetime::Default,
+            )
+            .unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        runtime
+            .fast_set_engine_array_index(
+                &mut mutator,
+                array,
+                1,
+                Value::from_smi(8),
+                AllocationLifetime::Default,
+            )
+            .unwrap(),
+        Some(true)
+    );
+
+    let length = array_length_descriptor(&runtime, mutator.view(), array);
+    assert_eq!(length.value(), Some(Value::from_smi(2)));
+    assert_eq!(runtime.element_logical_len(array), Some(2));
+    assert_eq!(
+        runtime.element(mutator.view(), array, 0),
+        Some(Value::from_smi(7))
+    );
+    assert_eq!(
+        runtime.element(mutator.view(), array, 1),
+        Some(Value::from_smi(8))
+    );
+}
+
+#[test]
+fn engine_array_fast_index_store_defers_for_non_writable_length() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let shape = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let array = engine_array(&mut runtime, &mut mutator, shape, 0, false);
+
+    assert_eq!(
+        runtime
+            .fast_set_engine_array_index(
+                &mut mutator,
+                array,
+                0,
+                Value::from_smi(7),
+                AllocationLifetime::Default,
+            )
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        runtime.element(mutator.view(), array, 0),
+        Some(Value::array_hole())
+    );
+    assert_eq!(
+        array_length_descriptor(&runtime, mutator.view(), array).value(),
+        Some(Value::from_smi(0))
+    );
+}
+
+#[test]
 fn engine_array_non_writable_length_blocks_extensions() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
