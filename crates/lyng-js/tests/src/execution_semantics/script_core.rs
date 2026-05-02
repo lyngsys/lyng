@@ -3780,6 +3780,56 @@ fn script_core_typed_array_length_tracking_allows_unaligned_resizable_byte_lengt
 }
 
 #[test]
+fn script_core_typed_array_from_of_use_set_for_resized_results() {
+    let result = compile_and_run_string(
+        r#"
+        let fromBuffer = new ArrayBuffer(3, { maxByteLength: 5 });
+        let fromTarget = new Int8Array(fromBuffer);
+        let fromResult = Int32Array.from.call(
+            function() { return fromTarget; },
+            [0, 1, 2],
+            function(value) {
+                if (value === 1) {
+                    fromBuffer.resize(1);
+                }
+                return value + 10;
+            }
+        );
+
+        let ofBuffer = new ArrayBuffer(3, { maxByteLength: 4 });
+        let ofTarget = new Int8Array(ofBuffer);
+        let one = {
+            valueOf() {
+                ofBuffer.resize(0);
+                return 1;
+            }
+        };
+        let two = {
+            valueOf() {
+                ofBuffer.resize(4);
+                return 2;
+            }
+        };
+        let ofResult = Int8Array.of.call(function() { return ofTarget; }, one, two, 3);
+
+        [
+            fromResult === fromTarget,
+            fromTarget.length,
+            fromTarget[0],
+            ofResult === ofTarget,
+            ofTarget.length,
+            ofTarget[0],
+            ofTarget[1],
+            ofTarget[2],
+            ofTarget[3]
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|1|10|true|4|0|2|3|0");
+}
+
+#[test]
 fn script_core_data_view_tracks_resizable_array_buffer_bounds() {
     let result = compile_and_run(
         r#"

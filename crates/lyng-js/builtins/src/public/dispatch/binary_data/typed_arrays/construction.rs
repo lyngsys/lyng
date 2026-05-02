@@ -1,8 +1,8 @@
 use super::super::super::{
     big_int64_array_builtin, big_uint64_array_builtin, float32_array_builtin,
     float64_array_builtin, int16_array_builtin, int32_array_builtin, int8_array_builtin,
-    typed_array_builtin, typed_array_from_builtin, typed_array_of_builtin, uint16_array_builtin,
-    uint32_array_builtin, uint8_array_builtin, uint8_clamped_array_builtin,
+    set_property_on_object, typed_array_builtin, typed_array_from_builtin, typed_array_of_builtin,
+    uint16_array_builtin, uint32_array_builtin, uint8_array_builtin, uint8_clamped_array_builtin,
 };
 use super::super::{
     array_like_index_property_key, array_like_length_u64, buffers::allocate_array_buffer_object,
@@ -12,7 +12,6 @@ use super::super::{
 use super::{
     allocate_typed_array_object, typed_array_default_prototype,
     typed_array_storage_bits_from_builtin_value, typed_array_this_record,
-    typed_array_write_storage_bits,
 };
 use crate::BuiltinInvocation;
 use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
@@ -172,7 +171,7 @@ fn typed_array_from_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         .copied()
         .unwrap_or(Value::undefined());
     let values = typed_array_collect_from_source(cx, source)?;
-    let (object, record) = typed_array_construct_from_receiver(cx, constructor, values.len())?;
+    let (object, _record) = typed_array_construct_from_receiver(cx, constructor, values.len())?;
     for (index, value) in values.iter().copied().enumerate() {
         let mapped = if let Some(mapper) = mapper {
             cx.call_to_completion(
@@ -186,8 +185,8 @@ fn typed_array_from_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         } else {
             value
         };
-        let bits = typed_array_storage_bits_from_builtin_value(cx, record.kind(), mapped)?;
-        typed_array_write_storage_bits(cx, record, index, bits)?;
+        let key = array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
+        set_property_on_object(cx, object, key, mapped)?;
     }
     Ok(Value::from_object_ref(object))
 }
@@ -198,10 +197,10 @@ fn typed_array_of_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let constructor = typed_array_constructor_receiver(cx, invocation.this_value())?;
     let values = invocation.arguments();
-    let (object, record) = typed_array_construct_from_receiver(cx, constructor, values.len())?;
+    let (object, _record) = typed_array_construct_from_receiver(cx, constructor, values.len())?;
     for (index, value) in values.iter().copied().enumerate() {
-        let bits = typed_array_storage_bits_from_builtin_value(cx, record.kind(), value)?;
-        typed_array_write_storage_bits(cx, record, index, bits)?;
+        let key = array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
+        set_property_on_object(cx, object, key, value)?;
     }
     Ok(Value::from_object_ref(object))
 }
