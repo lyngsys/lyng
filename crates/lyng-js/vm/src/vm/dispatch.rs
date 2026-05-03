@@ -1339,8 +1339,17 @@ impl Vm {
                     }
                 }
                 Instruction::Ax { opcode, ax } => match opcode {
-                    Opcode::Nop | Opcode::LoopHeader => self.advance_instruction()?,
-                    Opcode::Jump => self.jump_by(ax)?,
+                    Opcode::Nop => self.advance_instruction()?,
+                    Opcode::LoopHeader => {
+                        self.observe_tier_backedge_event(frame.code());
+                        self.advance_instruction()?;
+                    }
+                    Opcode::Jump => {
+                        if ax < 0 {
+                            self.observe_tier_backedge_event(frame.code());
+                        }
+                        self.jump_by(ax)?;
+                    }
                     Opcode::PushClosureEnv => {
                         let site = installed
                             .loop_iteration_environment_site(frame.instruction_offset())

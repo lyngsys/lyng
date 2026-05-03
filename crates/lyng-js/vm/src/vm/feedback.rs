@@ -525,6 +525,7 @@ impl Vm {
                 site.record_execution();
             }
         }
+        self.observe_tier_feedback_event(code);
 
         Some(descriptor)
     }
@@ -551,6 +552,7 @@ impl Vm {
             return false;
         };
         site.record_execution();
+        self.observe_tier_feedback_event(code);
         true
     }
 
@@ -579,6 +581,7 @@ impl Vm {
             _ => None,
         }?;
         site.record_execution();
+        self.observe_tier_feedback_event(code);
         Some(value)
     }
 

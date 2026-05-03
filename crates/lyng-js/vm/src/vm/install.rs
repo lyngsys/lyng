@@ -524,6 +524,8 @@ impl Vm {
         if self.feedback_vectors.len() <= index {
             self.feedback_vectors.resize_with(index + 1, || None);
         }
+        self.ensure_tiering_capacity(code);
+        self.tiering[index] = Some(TieringState::default());
         self.installed[index] = Some(Arc::new(installed));
     }
 }

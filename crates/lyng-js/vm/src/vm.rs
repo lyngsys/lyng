@@ -64,13 +64,17 @@ mod names;
 mod property_access;
 mod registers;
 mod runtime_objects;
+mod tiering;
 mod values;
 mod with_env;
 
 use call::RejectingNativeRegistry;
 use feedback::FeedbackVector;
 use install::InstalledFunction;
+use tiering::TieringState;
 use values::{bytecode_index, code_index, decode_env_operand, string_text_array_index};
+
+pub use tiering::{TierStatus, TieringSnapshot};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FeedbackVectorFootprint {
@@ -252,6 +256,7 @@ pub struct Vm {
     source_texts: HashMap<SourceId, Arc<str>>,
     feedback_warmup: Vec<u16>,
     feedback_vectors: Vec<Option<FeedbackVector>>,
+    tiering: Vec<Option<TieringState>>,
     activation_tables: ActivationSideTables,
     for_in_states: ForInStateTable,
     iterator_states: IteratorStateTable,
@@ -301,6 +306,7 @@ impl Vm {
             source_texts: HashMap::new(),
             feedback_warmup: Vec::new(),
             feedback_vectors: Vec::new(),
+            tiering: Vec::new(),
             activation_tables: ActivationSideTables::default(),
             for_in_states: ForInStateTable::default(),
             iterator_states: IteratorStateTable::default(),

@@ -32,4 +32,4 @@ pub use extensions::{
 pub use frame::{seed_registers, FrameFlags, FrameRecord, RegisterWindow};
 pub use installed::InstalledCode;
 pub use marker::VmMarker;
-pub use vm::{FeedbackVectorFootprint, LoadedModuleRoot, Vm};
+pub use vm::{FeedbackVectorFootprint, LoadedModuleRoot, TierStatus, TieringSnapshot, Vm};

@@ -1,11 +1,12 @@
 use crate::{
-    seed_registers, FrameFlags, FrameRecord, InstalledCode, RegisterWindow, Vm, VmError, VmMarker,
+    seed_registers, FrameFlags, FrameRecord, InstalledCode, RegisterWindow, TierStatus, Vm,
+    VmError, VmMarker,
 };
 use lyng_js_bytecode::{
     ArgumentsMode, BytecodeBuilder, BytecodeFunction, BytecodeFunctionId, BytecodeFunctionKind,
     BytecodeMarker, CompiledAtom, CompiledFunctionUnit, CompiledScriptUnit, ConstantValue,
     DeoptFrameValue, DeoptValueSource, ExceptionHandler, ExceptionHandlerKind, FeedbackSiteKind,
-    Instruction, Opcode, SafepointKind,
+    FeedbackSiteMetadata, Instruction, Opcode, SafepointKind,
 };
 use lyng_js_common::{AtomId, AtomTable, SourceId, WellKnownAtom};
 use lyng_js_compiler::{compile_module, compile_script, CompiledModuleUnit};
@@ -11689,6 +11690,82 @@ fn feedback_vectors_allocate_lazily_without_changing_entry_script_result() {
 }
 
 #[test]
+fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        SourceId::new(25),
+        r#"
+            (function add(left, right) {
+                return left + right;
+            })(1, 2);
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let call_slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::Call)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain one call site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    let initial = vm
+        .tiering_snapshot(installed.code())
+        .expect("installed code should expose tiering state");
+    assert!(!initial.is_eligible());
+    assert_eq!(initial.status(), TierStatus::InterpreterOnly);
+    assert_eq!(initial.hotness(), 0);
+
+    let first = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(first, Value::from_smi(3));
+    assert_eq!(vm.feedback_warmup_counter(installed.code()), Some(1));
+    assert!(!vm.has_feedback_vector(installed.code()));
+    assert_eq!(
+        vm.tiering_snapshot(installed.code())
+            .expect("installed code should expose tiering state")
+            .hotness(),
+        0
+    );
+
+    assert!(vm.set_tier_eligible(installed.code(), true));
+    let eligible = vm
+        .tiering_snapshot(installed.code())
+        .expect("installed code should expose tiering state");
+    assert!(eligible.is_eligible());
+    assert_eq!(eligible.status(), TierStatus::Collecting);
+
+    let second = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(second, Value::from_smi(3));
+    assert_eq!(vm.feedback_warmup_counter(installed.code()), Some(2));
+    assert!(vm.has_feedback_vector(installed.code()));
+    assert_eq!(
+        vm.feedback_execution_count(installed.code(), call_slot),
+        Some(1)
+    );
+    let warmed = vm
+        .tiering_snapshot(installed.code())
+        .expect("installed code should expose tiering state");
+    assert_eq!(warmed.status(), TierStatus::Collecting);
+    assert_eq!(warmed.hotness(), 1);
+    assert_eq!(warmed.feedback_events(), 1);
+    assert_eq!(warmed.backedge_events(), 0);
+}
+
+#[test]
 fn closures_sharing_one_code_ref_share_feedback_warmup_and_vector_state() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
@@ -11758,6 +11835,123 @@ fn closures_sharing_one_code_ref_share_feedback_warmup_and_vector_state() {
         vm.feedback_execution_count(inner_code, arithmetic_slot),
         Some(1)
     );
+}
+
+#[test]
+fn closures_sharing_one_code_ref_share_tiering_hotness() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        SourceId::new(26),
+        r#"
+            function makeAdder(base) {
+                return function(delta) {
+                    return base + delta;
+                };
+            }
+            let first = makeAdder(1);
+            let second = makeAdder(2);
+            first(3);
+            second(4);
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let outer = unit
+        .functions()
+        .iter()
+        .find(|function| function.name().is_some())
+        .expect("named outer function should be lowered");
+    let outer_child_index = unit
+        .function(unit.entry())
+        .expect("entry function should exist")
+        .child_functions()
+        .iter()
+        .position(|child| *child == outer.id())
+        .and_then(|index| u32::try_from(index).ok())
+        .expect("script should install the outer function as a direct child");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let outer_code = vm
+        .installed_child_code(installed.code(), outer_child_index)
+        .expect("outer function should have one installed code record");
+    let inner_code = vm
+        .installed_child_code(outer_code, 0)
+        .expect("inner closure template should install under the outer function");
+
+    assert!(vm.set_tier_eligible(inner_code, true));
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(6));
+    assert!(vm.has_feedback_vector(inner_code));
+    let snapshot = vm
+        .tiering_snapshot(inner_code)
+        .expect("inner code should expose tiering state");
+    assert_eq!(snapshot.status(), TierStatus::Collecting);
+    assert_eq!(snapshot.hotness(), 2);
+    assert_eq!(snapshot.feedback_events(), 2);
+}
+
+#[test]
+fn loop_backedges_make_eligible_code_ready_and_invalidation_resets_hotness() {
+    let unit = compile_test_unit(
+        27,
+        r#"
+            let total = 0;
+            for (let i = 0; i < 16; i = i + 1) {
+                total = total + i;
+            }
+            total;
+        "#,
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    assert!(vm.set_tier_eligible(installed.code(), true));
+    let first = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(first, Value::from_smi(120));
+
+    let ready = vm
+        .tiering_snapshot(installed.code())
+        .expect("installed code should expose tiering state");
+    assert_eq!(ready.status(), TierStatus::ReadyForNative);
+    assert!(ready.hotness() >= 8);
+    assert!(ready.backedge_events() > 0);
+    assert_eq!(ready.invalidation_epoch(), 0);
+    assert_eq!(ready.native_generation(), None);
+
+    assert!(vm.invalidate_tier_state(installed.code()));
+    let invalidated = vm
+        .tiering_snapshot(installed.code())
+        .expect("installed code should expose tiering state");
+    assert_eq!(invalidated.status(), TierStatus::Invalidated);
+    assert_eq!(invalidated.hotness(), 0);
+    assert_eq!(invalidated.invalidation_epoch(), 1);
+    assert_eq!(invalidated.native_generation(), None);
+
+    let second = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(second, Value::from_smi(120));
+    let rewarmed = vm
+        .tiering_snapshot(installed.code())
+        .expect("installed code should expose tiering state");
+    assert_eq!(rewarmed.status(), TierStatus::ReadyForNative);
+    assert_eq!(rewarmed.invalidation_epoch(), 1);
 }
 
 #[test]
@@ -12060,12 +12254,16 @@ fn global_property_store_ic_caches_global_object_data_property() {
 fn named_property_load_ic_grows_polymorphic_and_then_megamorphic() {
     let unit = compile_test_unit(31, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
     let slot = entry
         .feedback_sites()
         .iter()
-        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad)
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
         .map(|descriptor| descriptor.slot())
-        .expect("entry script should contain a named-load site");
+        .expect("entry script should contain a named-load site for source.value");
 
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();

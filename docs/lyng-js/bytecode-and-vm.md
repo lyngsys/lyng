@@ -824,6 +824,40 @@ one would need later:
 
 The goal is "JIT-ready without JIT-driven code quality debt."
 
+## VM Tiering Contract
+
+The interpreter owns tiering state per installed `CodeRef`. It does not attach this state to
+closure objects or transient frames. Closures created from the same bytecode template therefore
+share one hotness record, one feedback vector once allocated, one invalidation epoch, and one
+future native-code attachment slot.
+
+Tier states:
+
+- `InterpreterOnly`: default state for installed code; no native tier is eligible
+- `Collecting`: tiering is explicitly enabled and the interpreter is collecting hotness
+- `ReadyForNative`: the template crossed the hotness threshold and may be considered by a later
+  native backend
+- `NativeAttached`: reserved future state for an attached native code generation
+- `Invalidated`: dependency invalidation cleared hotness and any native attachment; the next
+  eligible interpreter event restarts collection without changing guest-visible execution
+
+Hotness inputs:
+
+- feedback-site execution events add one hotness point
+- loop backedges add two hotness points
+- disabled templates keep their status at `InterpreterOnly`; enabling tiering is an explicit
+  host/VM policy decision, not a guest-visible semantic effect
+
+Transition rules:
+
+- installation creates an `InterpreterOnly` state next to the installed function record
+- `set_tier_eligible(code, true)` moves `InterpreterOnly` code to `Collecting`
+- eligible code moves from `Collecting` to `ReadyForNative` when hotness reaches the VM threshold
+- invalidation increments the per-code epoch, clears hotness counters, clears native attachment
+  metadata, and moves the code to `Invalidated`
+- interpreter execution remains the only execution path in these states until a separate backend
+  issue adds native code generation and dispatch
+
 ## Invariants
 
 - bytecode is immutable once compiled
