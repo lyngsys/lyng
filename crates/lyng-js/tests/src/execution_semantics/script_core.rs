@@ -6581,6 +6581,37 @@ fn script_core_supports_annex_b_function_code_block_function_bindings() {
 }
 
 #[test]
+fn script_core_skips_annex_b_block_function_var_update_for_parameters() {
+    let result = compile_and_run_string(
+        r#"
+        var init, after, ifTrue, ifFalse;
+
+        (function(f) {
+            init = f;
+            {
+                function f() { return 'block'; }
+            }
+            after = f;
+        }(123));
+
+        (function(f) {
+            if (true) function f() { return 'true-branch'; } else function _f() {}
+            ifTrue = f;
+        }(456));
+
+        (function(f) {
+            if (false) function _f() {} else function f() { return 'false-branch'; }
+            ifFalse = f;
+        }(789));
+
+        [init, after, ifTrue, ifFalse].join(':');
+        "#,
+    );
+
+    assert_eq!(result, "123:123:456:789");
+}
+
+#[test]
 fn script_core_supports_annex_b_global_code_block_function_bindings() {
     let result = compile_and_run_string(
         r#"

@@ -1729,6 +1729,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let binding = self
             .find_named_binding_in_scope(name, DeclarationKind::Function, var_scope)
             .or_else(|| self.find_named_binding_in_scope(name, DeclarationKind::Var, var_scope))?;
+        if self.binding(binding).ok()?.kind == DeclarationKind::Parameter {
+            return None;
+        }
         (binding != lexical_binding).then_some(binding)
     }
 

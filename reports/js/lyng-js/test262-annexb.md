@@ -11,53 +11,150 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 - Proposal stage: `Stage 3+`
 - Jobs: `4`
 - Exclusion manifest: `reports/js/lyng-js/test262-exclusions.txt`
-- Category breakdown groups tests by the first path component under `testdata/test262/test/`.
-- Skipped tests are reported separately and still count against the selected-test pass rate.
+- Category breakdown groups source files by the first path component under `testdata/test262/test/`.
+- Default script files may execute strict and non-strict variants; file totals aggregate those variants into one Test262 file result.
+- Skipped files are reported separately and still count against the selected-file pass rate.
 
 ## Summary
 
 | Metric | Count |
 | --- | ---: |
-| Candidate tests | `1086` |
-| Excluded from selection | `0` |
-| Selected tests | `1377` |
-| Runnable | `1307` |
-| Passed | `1307` |
-| Failed | `0` |
-| Panicked | `0` |
-| Skipped | `70` |
-| Pass rate (selected) | `94.92%` |
-| Time | `1.8s` |
+| Candidate files | `1086` |
+| Excluded files from selection | `0` |
+| Selected files | `1086` |
+| Runnable files | `1051` |
+| Passed files | `1051` |
+| Failed files | `0` |
+| Panicked files | `0` |
+| Skipped files | `35` |
+| Pass rate (selected files) | `96.78%` |
+| Selected variant executions | `1377` |
+| Runnable variant executions | `1307` |
+| Time | `1.5s` |
 
 ## Delta From Previous Report
 
-| Metric | Previous | Current | Delta |
-| --- | ---: | ---: | ---: |
-| Candidate tests | `1086` | `1086` | `+0` |
-| Excluded from selection | `0` | `0` | `+0` |
-| Selected tests | `1377` | `1377` | `+0` |
-| Runnable | `1307` | `1307` | `+0` |
-| Passed | `1307` | `1307` | `+0` |
-| Failed | `0` | `0` | `+0` |
-| Panicked | `0` | `0` | `+0` |
-| Skipped | `70` | `70` | `+0` |
-| Pass rate (selected) | `94.92%` | `94.92%` | `-0.00pp` |
+No previous report summary was available at this report path.
 
 ## Selection Exclusions
 
-No tests were excluded from selection.
+No files were excluded from selection.
 
 ## Category Breakdown
 
-| Category | Selected | Runnable | Pass | Fail | Skip | Panic | Rate |
+| Category | Selected files | Runnable files | Pass | Fail | Skip | Panic | Rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `annexB` | `1086` | `1051` | `1051` | `0` | `35` | `0` | `96.78%` |
+
+## Variant Execution Breakdown
+
+| Metric | Count |
+| --- | ---: |
+| Selected variant executions | `1377` |
+| Runnable variant executions | `1307` |
+| Passed variants | `1307` |
+| Failed variants | `0` |
+| Panicked variants | `0` |
+| Skipped variants | `70` |
+
+| Category | Selected variants | Runnable variants | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `annexB` | `1377` | `1307` | `1307` | `0` | `70` | `0` | `94.92%` |
+
+## Slowest Test Timings
+
+Wall-clock timing is measured around each worker test request. File totals sum the selected variants for the same source file.
+
+### Slowest Files
+
+| Test file | Variants | Total time | Slowest variant |
+| --- | ---: | ---: | ---: |
+| `annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js` | `2` | `1.221s` | `0.611s` |
+| `annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js` | `2` | `1.214s` | `0.607s` |
+| `annexB/built-ins/String/prototype/substr/start-and-length-as-numbers.js` | `2` | `0.125s` | `0.063s` |
+| `annexB/built-ins/Date/prototype/getYear/B.2.4.js` | `2` | `0.020s` | `0.010s` |
+| `annexB/built-ins/Date/prototype/getYear/length.js` | `2` | `0.020s` | `0.010s` |
+| `annexB/built-ins/RegExp/RegExp-control-escape-russian-letter.js` | `2` | `0.010s` | `0.005s` |
+| `annexB/built-ins/RegExp/RegExp-invalid-control-escape-character-class.js` | `2` | `0.009s` | `0.005s` |
+| `annexB/built-ins/RegExp/legacy-accessors/index/this-cross-realm-constructor.js` | `2` | `0.009s` | `0.005s` |
+| `annexB/built-ins/RegExp/legacy-accessors/input/this-cross-realm-constructor.js` | `2` | `0.008s` | `0.004s` |
+| `annexB/built-ins/String/prototype/bold/prop-desc.js` | `2` | `0.008s` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/leftContext/this-cross-realm-constructor.js` | `2` | `0.008s` | `0.004s` |
+| `annexB/built-ins/RegExp/prototype/compile/this-cross-realm-instance.js` | `2` | `0.008s` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/rightContext/this-cross-realm-constructor.js` | `2` | `0.007s` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/lastMatch/this-cross-realm-constructor.js` | `2` | `0.007s` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/index/prop-desc.js` | `2` | `0.007s` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/lastParen/this-cross-realm-constructor.js` | `2` | `0.007s` | `0.004s` |
+| `annexB/built-ins/String/prototype/fixed/name.js` | `2` | `0.007s` | `0.003s` |
+| `annexB/built-ins/String/prototype/bold/this-val-tostring-err.js` | `2` | `0.007s` | `0.003s` |
+| `annexB/built-ins/RegExp/legacy-accessors/lastParen/prop-desc.js` | `2` | `0.007s` | `0.003s` |
+| `annexB/built-ins/String/prototype/small/length.js` | `2` | `0.006s` | `0.003s` |
+| `annexB/built-ins/String/prototype/small/name.js` | `2` | `0.006s` | `0.003s` |
+| `annexB/built-ins/RegExp/legacy-accessors/lastMatch/prop-desc.js` | `2` | `0.006s` | `0.003s` |
+| `annexB/built-ins/Date/prototype/getYear/name.js` | `2` | `0.006s` | `0.003s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-existing-block-fn-no-init.js` | `1` | `0.006s` | `0.006s` |
+| `annexB/built-ins/escape/name.js` | `2` | `0.006s` | `0.003s` |
+
+### Slowest Variants
+
+| Test variant | Outcome | Time |
+| --- | --- | ---: |
+| `annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js [non-strict]` | `pass` | `0.611s` |
+| `annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js [strict]` | `pass` | `0.610s` |
+| `annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js [non-strict]` | `pass` | `0.607s` |
+| `annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js [strict]` | `pass` | `0.607s` |
+| `annexB/built-ins/String/prototype/substr/start-and-length-as-numbers.js [strict]` | `pass` | `0.063s` |
+| `annexB/built-ins/String/prototype/substr/start-and-length-as-numbers.js [non-strict]` | `pass` | `0.063s` |
+| `annexB/built-ins/Date/prototype/getYear/length.js [non-strict]` | `pass` | `0.010s` |
+| `annexB/built-ins/Date/prototype/getYear/B.2.4.js [strict]` | `pass` | `0.010s` |
+| `annexB/built-ins/Date/prototype/getYear/B.2.4.js [non-strict]` | `pass` | `0.010s` |
+| `annexB/built-ins/Date/prototype/getYear/length.js [strict]` | `pass` | `0.010s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-existing-block-fn-no-init.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/if-stmt-else-decl-func-skip-early-err-for-in.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-existing-fn-no-init.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/if-stmt-else-decl-func-skip-early-err-for.js [non-strict]` | `pass` | `0.005s` |
+| `annexB/built-ins/RegExp/RegExp-control-escape-russian-letter.js [strict]` | `pass` | `0.005s` |
+| `annexB/built-ins/RegExp/RegExp-control-escape-russian-letter.js [non-strict]` | `pass` | `0.005s` |
+| `annexB/language/eval-code/direct/global-if-decl-else-stmt-eval-global-init.js [non-strict]` | `pass` | `0.005s` |
+| `annexB/built-ins/RegExp/legacy-accessors/index/this-cross-realm-constructor.js [strict]` | `pass` | `0.005s` |
+| `annexB/built-ins/RegExp/RegExp-invalid-control-escape-character-class.js [non-strict]` | `pass` | `0.005s` |
+| `annexB/built-ins/RegExp/RegExp-invalid-control-escape-character-class.js [strict]` | `pass` | `0.005s` |
+| `annexB/built-ins/RegExp/legacy-accessors/input/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/index/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/language/eval-code/direct/global-if-decl-else-stmt-eval-global-skip-early-err-for-in.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/language/global-code/if-decl-else-decl-a-global-init.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/language/eval-code/direct/global-if-decl-else-stmt-eval-global-skip-early-err-block.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/language/eval-code/direct/global-if-decl-else-stmt-eval-global-no-skip-try.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/prototype/compile/this-cross-realm-instance.js [strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/String/prototype/bold/prop-desc.js [strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/rightContext/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/leftContext/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/input/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/String/prototype/bold/prop-desc.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/leftContext/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/lastMatch/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/prototype/compile/this-cross-realm-instance.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/index/prop-desc.js [strict]` | `pass` | `0.004s` |
+| `annexB/language/global-code/if-decl-else-decl-a-global-no-skip-try.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/language/global-code/if-decl-else-decl-a-global-skip-early-err-block.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/lastParen/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/lastMatch/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/index/prop-desc.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/lastParen/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/language/global-code/if-decl-else-decl-a-global-skip-early-err-for-in.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/rightContext/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
+| `annexB/language/eval-code/indirect/global-if-decl-else-stmt-eval-global-existing-non-enumerable-global-init.js [non-strict]` | `pass` | `0.003s` |
+| `annexB/language/eval-code/indirect/global-if-decl-else-decl-a-eval-global-existing-global-init.js [non-strict]` | `pass` | `0.003s` |
+| `annexB/language/eval-code/indirect/global-if-stmt-else-decl-eval-global-existing-non-enumerable-global-init.js [non-strict]` | `pass` | `0.003s` |
+| `annexB/built-ins/String/prototype/fixed/name.js [non-strict]` | `pass` | `0.003s` |
+| `annexB/language/eval-code/indirect/global-switch-dflt-eval-global-existing-global-init.js [non-strict]` | `pass` | `0.003s` |
+| `annexB/language/eval-code/direct/global-block-decl-eval-global-existing-global-init.js [non-strict]` | `pass` | `0.003s` |
 
 ## Skip Breakdown
 
 | Class | Reason | Count |
 | --- | --- | ---: |
-| Manifest/out of scope | manifest exclusion (path): IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. | `70` |
+| Manifest/out of scope | manifest exclusion (path): IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. | `35` |
 
 ## Checked-in Manifest Rules
 
