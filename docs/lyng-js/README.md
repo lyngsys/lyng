@@ -21,6 +21,7 @@ crate map, and verification commands, start with
 - [Runtime Substrate](runtime-substrate.md)
 - [Shared Memory And Backing Stores](shared-memory-and-backing-stores.md)
 - [Bytecode And VM](bytecode-and-vm.md)
+- [JIT Backend Research](jit-backend-research.md)
 - [Builtin Bootstrap](builtin-bootstrap.md)
 - [Dynamic Scope And Eval](dynamic-scope-and-eval.md)
 - [Temporal Support Matrix](temporal-support-matrix.md)
