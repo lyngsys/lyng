@@ -687,6 +687,19 @@ Runtime feedback allocation policy:
 - closures that share one `CodeRef` also share the same feedback storage once it exists
 - lazy allocation must not change bytecode semantics or feedback-site identity
 
+Tiering-facing inspection policy:
+
+- `Vm::feedback_vector_snapshot` returns copied, immutable summaries of descriptor identity,
+  execution counts, scalar site details, and bounded inline-cache state
+- snapshots may expose stable handles such as `ShapeId`, `ObjectRef`, and object-owned property
+  cache dependencies, but they must not expose mutable feedback-vector storage or live cache entry
+  references
+- named and keyed property snapshots preserve the bounded monomorphic/polymorphic/megamorphic
+  state and entry counts so future tier decisions can reject unsuitable sites without walking
+  mutable VM internals
+- unallocated vectors still expose descriptor-shaped snapshots with zero execution counts, keeping
+  lazy feedback allocation visible without changing guest-visible execution
+
 Inline-cache invalidation policy:
 
 - shape-based property caches depend on invalidation state owned by `lyng-js-objects`

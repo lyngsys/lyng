@@ -1,11 +1,324 @@
 use super::*;
 use lyng_js_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
-use lyng_js_objects::{NamedPropertyCacheEntry, NamedPropertyCachePurpose};
+use lyng_js_objects::{
+    NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyCachePurpose,
+    PropertyCacheDependency,
+};
 use lyng_js_types::{FeedbackSlotId, PropertyKey, ShapeId};
 use std::mem::size_of;
 
 const FEEDBACK_ALLOCATION_THRESHOLD: u16 = 2;
 const POLYMORPHIC_PROPERTY_CACHE_LIMIT: usize = 4;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum FeedbackInlineCacheState {
+    Uninitialized,
+    Monomorphic,
+    Polymorphic,
+    Megamorphic,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum FeedbackKeyedPropertyFamily {
+    DenseIndex,
+    NamedAtom,
+    Generic,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NamedPropertyCacheEntrySnapshot {
+    receiver_shape: ShapeId,
+    holder: ObjectRef,
+    holder_shape: ShapeId,
+    slot_offset: u32,
+    path: NamedPropertyCachePath,
+    dependencies: Vec<PropertyCacheDependency>,
+}
+
+impl NamedPropertyCacheEntrySnapshot {
+    #[inline]
+    fn from_entry(entry: NamedPropertyCacheEntry) -> Self {
+        let dependencies = (0..usize::from(entry.dependency_count()))
+            .filter_map(|index| entry.dependency(index))
+            .collect();
+        Self {
+            receiver_shape: entry.receiver_shape(),
+            holder: entry.holder(),
+            holder_shape: entry.holder_shape(),
+            slot_offset: entry.slot_offset(),
+            path: entry.path(),
+            dependencies,
+        }
+    }
+
+    #[inline]
+    pub const fn receiver_shape(&self) -> ShapeId {
+        self.receiver_shape
+    }
+
+    #[inline]
+    pub const fn holder(&self) -> ObjectRef {
+        self.holder
+    }
+
+    #[inline]
+    pub const fn holder_shape(&self) -> ShapeId {
+        self.holder_shape
+    }
+
+    #[inline]
+    pub const fn slot_offset(&self) -> u32 {
+        self.slot_offset
+    }
+
+    #[inline]
+    pub const fn path(&self) -> NamedPropertyCachePath {
+        self.path
+    }
+
+    #[inline]
+    pub fn dependencies(&self) -> &[PropertyCacheDependency] {
+        &self.dependencies
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NamedPropertyFeedbackSnapshot {
+    execution_count: u32,
+    state: FeedbackInlineCacheState,
+    entries: Vec<NamedPropertyCacheEntrySnapshot>,
+}
+
+impl NamedPropertyFeedbackSnapshot {
+    #[inline]
+    fn uninitialized(execution_count: u32) -> Self {
+        Self {
+            execution_count,
+            state: FeedbackInlineCacheState::Uninitialized,
+            entries: Vec::new(),
+        }
+    }
+
+    #[inline]
+    fn from_feedback(feedback: NamedPropertyFeedback) -> Self {
+        Self {
+            execution_count: feedback.execution_count,
+            state: feedback.cache_state.into(),
+            entries: feedback
+                .active_entries()
+                .map(NamedPropertyCacheEntrySnapshot::from_entry)
+                .collect(),
+        }
+    }
+
+    #[inline]
+    pub const fn execution_count(&self) -> u32 {
+        self.execution_count
+    }
+
+    #[inline]
+    pub const fn state(&self) -> FeedbackInlineCacheState {
+        self.state
+    }
+
+    #[inline]
+    pub fn entries(&self) -> &[NamedPropertyCacheEntrySnapshot] {
+        &self.entries
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeyedNamedPropertyCacheEntrySnapshot {
+    atom: AtomId,
+    entry: NamedPropertyCacheEntrySnapshot,
+}
+
+impl KeyedNamedPropertyCacheEntrySnapshot {
+    #[inline]
+    fn from_entry(entry: KeyedNamedPropertyCacheEntry) -> Self {
+        Self {
+            atom: entry.atom,
+            entry: NamedPropertyCacheEntrySnapshot::from_entry(entry.entry),
+        }
+    }
+
+    #[inline]
+    pub const fn atom(&self) -> AtomId {
+        self.atom
+    }
+
+    #[inline]
+    pub const fn entry(&self) -> &NamedPropertyCacheEntrySnapshot {
+        &self.entry
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeyedPropertyFeedbackSnapshot {
+    execution_count: u32,
+    state: FeedbackInlineCacheState,
+    family: Option<FeedbackKeyedPropertyFamily>,
+    entries: Vec<KeyedNamedPropertyCacheEntrySnapshot>,
+}
+
+impl KeyedPropertyFeedbackSnapshot {
+    #[inline]
+    fn uninitialized(execution_count: u32) -> Self {
+        Self {
+            execution_count,
+            state: FeedbackInlineCacheState::Uninitialized,
+            family: None,
+            entries: Vec::new(),
+        }
+    }
+
+    #[inline]
+    fn from_feedback(feedback: KeyedPropertyFeedback) -> Self {
+        Self {
+            execution_count: feedback.execution_count,
+            state: feedback.cache_state.into(),
+            family: feedback.family.map(FeedbackKeyedPropertyFamily::from),
+            entries: feedback
+                .active_entries()
+                .map(KeyedNamedPropertyCacheEntrySnapshot::from_entry)
+                .collect(),
+        }
+    }
+
+    #[inline]
+    pub const fn execution_count(&self) -> u32 {
+        self.execution_count
+    }
+
+    #[inline]
+    pub const fn state(&self) -> FeedbackInlineCacheState {
+        self.state
+    }
+
+    #[inline]
+    pub const fn family(&self) -> Option<FeedbackKeyedPropertyFamily> {
+        self.family
+    }
+
+    #[inline]
+    pub fn entries(&self) -> &[KeyedNamedPropertyCacheEntrySnapshot] {
+        &self.entries
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FeedbackSiteDetail {
+    Arithmetic,
+    Comparison,
+    NamedProperty(NamedPropertyFeedbackSnapshot),
+    KeyedProperty(KeyedPropertyFeedbackSnapshot),
+    Call { expected_arity: Option<u16> },
+    Construct { expected_arity: Option<u16> },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FeedbackSiteSnapshot {
+    slot: FeedbackSlotId,
+    instruction_offset: u32,
+    kind: FeedbackSiteKind,
+    execution_count: u32,
+    detail: FeedbackSiteDetail,
+}
+
+impl FeedbackSiteSnapshot {
+    #[inline]
+    fn new(
+        descriptor: FeedbackSiteDescriptor,
+        execution_count: u32,
+        detail: FeedbackSiteDetail,
+    ) -> Self {
+        Self {
+            slot: descriptor.slot(),
+            instruction_offset: descriptor.instruction_offset(),
+            kind: descriptor.kind(),
+            execution_count,
+            detail,
+        }
+    }
+
+    #[inline]
+    pub const fn slot(&self) -> FeedbackSlotId {
+        self.slot
+    }
+
+    #[inline]
+    pub const fn instruction_offset(&self) -> u32 {
+        self.instruction_offset
+    }
+
+    #[inline]
+    pub const fn kind(&self) -> FeedbackSiteKind {
+        self.kind
+    }
+
+    #[inline]
+    pub const fn execution_count(&self) -> u32 {
+        self.execution_count
+    }
+
+    #[inline]
+    pub fn detail(&self) -> FeedbackSiteDetail {
+        self.detail.clone()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FeedbackVectorSnapshot {
+    allocated: bool,
+    warmup_counter: u16,
+    slot_count: usize,
+    live_site_count: usize,
+    sites: Vec<FeedbackSiteSnapshot>,
+}
+
+impl FeedbackVectorSnapshot {
+    #[inline]
+    fn new(
+        allocated: bool,
+        warmup_counter: u16,
+        slot_count: usize,
+        sites: Vec<FeedbackSiteSnapshot>,
+    ) -> Self {
+        let live_site_count = sites.len();
+        Self {
+            allocated,
+            warmup_counter,
+            slot_count,
+            live_site_count,
+            sites,
+        }
+    }
+
+    #[inline]
+    pub const fn allocated(&self) -> bool {
+        self.allocated
+    }
+
+    #[inline]
+    pub const fn warmup_counter(&self) -> u16 {
+        self.warmup_counter
+    }
+
+    #[inline]
+    pub const fn slot_count(&self) -> usize {
+        self.slot_count
+    }
+
+    #[inline]
+    pub const fn live_site_count(&self) -> usize {
+        self.live_site_count
+    }
+
+    #[inline]
+    pub fn sites(&self) -> &[FeedbackSiteSnapshot] {
+        &self.sites
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum InlineCacheState {
@@ -15,11 +328,34 @@ enum InlineCacheState {
     Megamorphic,
 }
 
+impl From<InlineCacheState> for FeedbackInlineCacheState {
+    #[inline]
+    fn from(value: InlineCacheState) -> Self {
+        match value {
+            InlineCacheState::Uninitialized => Self::Uninitialized,
+            InlineCacheState::Monomorphic => Self::Monomorphic,
+            InlineCacheState::Polymorphic => Self::Polymorphic,
+            InlineCacheState::Megamorphic => Self::Megamorphic,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum KeyedPropertyFamily {
     DenseIndex,
     NamedAtom,
     Generic,
+}
+
+impl From<KeyedPropertyFamily> for FeedbackKeyedPropertyFamily {
+    #[inline]
+    fn from(value: KeyedPropertyFamily) -> Self {
+        match value {
+            KeyedPropertyFamily::DenseIndex => Self::DenseIndex,
+            KeyedPropertyFamily::NamedAtom => Self::NamedAtom,
+            KeyedPropertyFamily::Generic => Self::Generic,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -398,6 +734,71 @@ impl FeedbackSiteState {
         }
     }
 
+    #[inline]
+    fn snapshot(self, descriptor: FeedbackSiteDescriptor) -> FeedbackSiteSnapshot {
+        match self {
+            Self::Arithmetic(feedback) => FeedbackSiteSnapshot::new(
+                descriptor,
+                feedback.execution_count,
+                FeedbackSiteDetail::Arithmetic,
+            ),
+            Self::Comparison(feedback) => FeedbackSiteSnapshot::new(
+                descriptor,
+                feedback.execution_count,
+                FeedbackSiteDetail::Comparison,
+            ),
+            Self::NamedProperty(feedback) => FeedbackSiteSnapshot::new(
+                descriptor,
+                feedback.execution_count,
+                FeedbackSiteDetail::NamedProperty(NamedPropertyFeedbackSnapshot::from_feedback(
+                    feedback,
+                )),
+            ),
+            Self::KeyedProperty(feedback) => FeedbackSiteSnapshot::new(
+                descriptor,
+                feedback.execution_count,
+                FeedbackSiteDetail::KeyedProperty(KeyedPropertyFeedbackSnapshot::from_feedback(
+                    feedback,
+                )),
+            ),
+            Self::Call(feedback) => FeedbackSiteSnapshot::new(
+                descriptor,
+                feedback.execution_count,
+                FeedbackSiteDetail::Call {
+                    expected_arity: feedback.expected_arity,
+                },
+            ),
+            Self::Construct(feedback) => FeedbackSiteSnapshot::new(
+                descriptor,
+                feedback.execution_count,
+                FeedbackSiteDetail::Construct {
+                    expected_arity: feedback.expected_arity,
+                },
+            ),
+        }
+    }
+
+    #[inline]
+    fn unallocated_snapshot(descriptor: FeedbackSiteDescriptor) -> FeedbackSiteSnapshot {
+        let detail = match descriptor.kind() {
+            FeedbackSiteKind::Arithmetic => FeedbackSiteDetail::Arithmetic,
+            FeedbackSiteKind::Comparison => FeedbackSiteDetail::Comparison,
+            FeedbackSiteKind::NamedPropertyLoad | FeedbackSiteKind::NamedPropertyStore => {
+                FeedbackSiteDetail::NamedProperty(NamedPropertyFeedbackSnapshot::uninitialized(0))
+            }
+            FeedbackSiteKind::KeyedPropertyAccess => {
+                FeedbackSiteDetail::KeyedProperty(KeyedPropertyFeedbackSnapshot::uninitialized(0))
+            }
+            FeedbackSiteKind::Call => FeedbackSiteDetail::Call {
+                expected_arity: descriptor.metadata().expected_arity(),
+            },
+            FeedbackSiteKind::Construct => FeedbackSiteDetail::Construct {
+                expected_arity: descriptor.metadata().expected_arity(),
+            },
+        };
+        FeedbackSiteSnapshot::new(descriptor, 0, detail)
+    }
+
     #[cfg(test)]
     #[inline]
     fn execution_count(self) -> u32 {
@@ -744,6 +1145,34 @@ impl Vm {
             allocated_bytes,
             warmup_counter: self.feedback_warmup.get(index).copied().unwrap_or(0),
         })
+    }
+
+    #[inline]
+    pub fn feedback_vector_snapshot(&self, code: CodeRef) -> Option<FeedbackVectorSnapshot> {
+        let index = code_index(code);
+        let installed = self.installed.get(index).and_then(Option::as_ref)?;
+        let vector = self.feedback_vectors.get(index).and_then(Option::as_ref);
+        let sites = installed
+            .feedback_slot_descriptors()
+            .iter()
+            .flatten()
+            .copied()
+            .map(|descriptor| {
+                vector
+                    .and_then(|vector| vector.site(descriptor.slot()))
+                    .map_or_else(
+                        || FeedbackSiteState::unallocated_snapshot(descriptor),
+                        |site| site.snapshot(descriptor),
+                    )
+            })
+            .collect::<Vec<_>>();
+
+        Some(FeedbackVectorSnapshot::new(
+            vector.is_some(),
+            self.feedback_warmup.get(index).copied().unwrap_or(0),
+            installed.feedback_slot_descriptors().len(),
+            sites,
+        ))
     }
 
     #[cfg(test)]

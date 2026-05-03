@@ -32,4 +32,10 @@ pub use extensions::{
 pub use frame::{seed_registers, FrameFlags, FrameRecord, RegisterWindow};
 pub use installed::InstalledCode;
 pub use marker::VmMarker;
-pub use vm::{FeedbackVectorFootprint, LoadedModuleRoot, TierStatus, TieringSnapshot, Vm};
+pub use vm::{
+    FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FeedbackSiteDetail,
+    FeedbackSiteSnapshot, FeedbackVectorFootprint, FeedbackVectorSnapshot,
+    KeyedNamedPropertyCacheEntrySnapshot, KeyedPropertyFeedbackSnapshot, LoadedModuleRoot,
+    NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot, TierStatus, TieringSnapshot,
+    Vm,
+};

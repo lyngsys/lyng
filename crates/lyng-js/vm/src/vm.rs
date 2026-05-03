@@ -74,6 +74,11 @@ use install::InstalledFunction;
 use tiering::TieringState;
 use values::{bytecode_index, code_index, decode_env_operand, string_text_array_index};
 
+pub use feedback::{
+    FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FeedbackSiteDetail,
+    FeedbackSiteSnapshot, FeedbackVectorSnapshot, KeyedNamedPropertyCacheEntrySnapshot,
+    KeyedPropertyFeedbackSnapshot, NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot,
+};
 pub use tiering::{TierStatus, TieringSnapshot};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
