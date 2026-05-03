@@ -144,10 +144,7 @@ pub fn duration_is_within_limits(data: TemporalDurationObjectData) -> bool {
             return false;
         }
     }
-    let Some(time_nanoseconds) = i128::from(data.days())
-        .checked_mul(NANOS_PER_DAY)
-        .and_then(|days| days.checked_add(duration_time_nanoseconds(data)))
-    else {
+    let Some(time_nanoseconds) = duration_total_time_nanoseconds(data) else {
         return false;
     };
     time_nanoseconds.abs() <= DURATION_TIME_NANOS_MAX
@@ -162,6 +159,10 @@ pub fn durations_are_equal(
 
 pub fn duration_has_calendar_relative_units(data: TemporalDurationObjectData) -> bool {
     data.years() != 0 || data.months() != 0 || data.weeks() != 0
+}
+
+pub fn duration_has_date_units(data: TemporalDurationObjectData) -> bool {
+    data.years() != 0 || data.months() != 0 || data.weeks() != 0 || data.days() != 0
 }
 
 pub fn duration_calendar_relative_components_are_equal(
@@ -1729,6 +1730,12 @@ mod tests {
         assert!(!duration_has_calendar_relative_units(
             TemporalDurationObjectData::new(0, 0, 0, 1, 0, 0, 0, 0, 0, 0)
         ));
+        assert!(duration_has_date_units(TemporalDurationObjectData::new(
+            0, 0, 0, 1, 0, 0, 0, 0, 0, 0
+        )));
+        assert!(!duration_has_date_units(TemporalDurationObjectData::new(
+            0, 0, 0, 0, 1, 0, 0, 0, 0, 0
+        )));
     }
 
     #[test]

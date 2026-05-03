@@ -980,12 +980,21 @@ fn temporal_duration_compare_builtin<Cx: PublicBuiltinDispatchContext>(
     if temporal_ops::durations_are_equal(left, right) {
         return Ok(Value::from_smi(0));
     }
-    if temporal_ops::duration_has_calendar_relative_units(left)
-        || temporal_ops::duration_has_calendar_relative_units(right)
-    {
+    let has_calendar_relative_units = temporal_ops::duration_has_calendar_relative_units(left)
+        || temporal_ops::duration_has_calendar_relative_units(right);
+    let has_date_units =
+        temporal_ops::duration_has_date_units(left) || temporal_ops::duration_has_date_units(right);
+    if has_date_units {
         let Some(relative_to) = relative_to else {
-            return Err(range_error(cx));
+            if has_calendar_relative_units {
+                return Err(range_error(cx));
+            }
+            let ordering =
+                temporal_ops::compare_time_duration(left, right).ok_or_else(|| range_error(cx))?;
+            return Ok(temporal_compare_ordering(ordering));
         };
+        temporal_duration_validate_exact_relative_to_range(cx, left, relative_to)?;
+        temporal_duration_validate_exact_relative_to_range(cx, right, relative_to)?;
         let left_total = temporal_duration_relative_total_nanoseconds(cx, left, relative_to)?;
         let right_total = temporal_duration_relative_total_nanoseconds(cx, right, relative_to)?;
         return Ok(temporal_compare_ordering(left_total.cmp(&right_total)));
@@ -1039,13 +1048,6 @@ pub(super) fn temporal_duration_part_i128_from_value<Cx: PublicBuiltinDispatchCo
         return Err(range_error(cx));
     }
     Ok(number as i128)
-}
-
-pub(super) fn temporal_duration_part_i128_to_i64<Cx: PublicBuiltinDispatchContext>(
-    cx: &mut Cx,
-    value: i128,
-) -> Result<i64, Cx::Error> {
-    i64::try_from(value).map_err(|_| range_error(cx))
 }
 
 pub(super) fn temporal_duration_part_from_argument<Cx: PublicBuiltinDispatchContext>(
@@ -1217,31 +1219,14 @@ fn temporal_duration_from_value_with_largest_unit<Cx: PublicBuiltinDispatchConte
         microseconds,
         nanoseconds,
     );
-    let [seconds, milliseconds, microseconds, nanoseconds] = match [
-        i64::try_from(seconds),
-        i64::try_from(milliseconds),
-        i64::try_from(microseconds),
-        i64::try_from(nanoseconds),
-    ] {
-        [Ok(seconds), Ok(milliseconds), Ok(microseconds), Ok(nanoseconds)] => {
-            [seconds, milliseconds, microseconds, nanoseconds]
-        }
-        _ => temporal_ops::balance_duration_subsecond_fields(
-            seconds,
-            milliseconds,
-            microseconds,
-            nanoseconds,
-        )
-        .ok_or_else(|| range_error(cx))?,
-    };
 
     let data = TemporalDurationObjectData::new(
-        temporal_duration_part_i128_to_i64(cx, years)?,
-        temporal_duration_part_i128_to_i64(cx, months)?,
-        temporal_duration_part_i128_to_i64(cx, weeks)?,
-        temporal_duration_part_i128_to_i64(cx, days)?,
-        temporal_duration_part_i128_to_i64(cx, hours)?,
-        temporal_duration_part_i128_to_i64(cx, minutes)?,
+        years,
+        months,
+        weeks,
+        days,
+        hours,
+        minutes,
         seconds,
         milliseconds,
         microseconds,

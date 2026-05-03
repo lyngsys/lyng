@@ -592,6 +592,37 @@ fn temporal_duration_compare_rejects_calendar_units_without_relative_to() {
 }
 
 #[test]
+fn temporal_duration_compare_rejects_out_of_range_relative_results() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        function throwsRangeError(callback) {
+            try {
+                callback();
+                return false;
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        }
+        let hugeSeconds = Temporal.Duration.from({ years: 1, seconds: 2**53 - 1 });
+        let twoYears = Temporal.Duration.from({ years: 2 });
+        let plainDate = new Temporal.PlainDate(2000, 1, 1);
+        let blank = new Temporal.Duration();
+        let oneDay = new Temporal.Duration(0, 0, 0, 1);
+        let zoned = new Temporal.ZonedDateTime(864n * 10n**19n, "UTC");
+        [
+            throwsRangeError(() => Temporal.Duration.compare(hugeSeconds, twoYears, { relativeTo: plainDate })),
+            throwsRangeError(() => Temporal.Duration.compare(twoYears, hugeSeconds, { relativeTo: plainDate })),
+            throwsRangeError(() => Temporal.Duration.compare(oneDay, blank, { relativeTo: zoned })),
+            throwsRangeError(() => Temporal.Duration.compare(blank, oneDay, { relativeTo: zoned })),
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "true|true|true|true");
+}
+
+#[test]
 fn temporal_duration_add_and_subtract_balance_duration_parts() {
     let result = compile_and_run_string_with_host(
         r#"
@@ -617,6 +648,32 @@ fn temporal_duration_add_and_subtract_balance_duration_parts() {
         result,
         "function|function|P3DT10M|P1DT12H5M30S|P104DT5H41M41.001001S|PT1H1M|P3DT55M|PT0S|-PT1M1.000000001S"
     );
+}
+
+#[test]
+fn temporal_duration_add_and_subtract_reject_overflow_after_largest_unit_distribution() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        function throwsRangeError(callback) {
+            try {
+                callback();
+                return false;
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        }
+        let positive = Temporal.Duration.from({ nanoseconds: 9.007199254740991e+24 });
+        let negative = Temporal.Duration.from({ nanoseconds: -9.007199254740991e+24 });
+        let oneSecondAsMicroseconds = Temporal.Duration.from({ microseconds: 1_000_000 });
+        [
+            throwsRangeError(() => positive.add(oneSecondAsMicroseconds)),
+            throwsRangeError(() => negative.subtract(oneSecondAsMicroseconds)),
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "true|true");
 }
 
 #[test]
