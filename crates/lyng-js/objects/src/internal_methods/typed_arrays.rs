@@ -1,6 +1,30 @@
 use super::*;
 
 impl ObjectRuntime {
+    pub(super) fn typed_array_prevent_extensions_rejected(
+        &self,
+        id: ObjectRef,
+    ) -> InternalMethodResult<bool> {
+        let Some(typed_array) = self.typed_array(id) else {
+            return Ok(false);
+        };
+        let buffer_id = typed_array.viewed_array_buffer();
+        let buffer = self
+            .array_buffer(buffer_id)
+            .ok_or(InternalMethodError::CorruptObjectState)?;
+
+        // RAB-backed views can change their indexed property set after shrink/grow,
+        // even when currently zero-length. Growable SharedArrayBuffer views are only
+        // variable-length when they are length-tracking.
+        if self.is_array_buffer_object(buffer_id) {
+            return Ok(buffer.is_resizable());
+        }
+        if self.is_shared_array_buffer_object(buffer_id) {
+            return Ok(buffer.is_resizable() && typed_array.is_length_tracking());
+        }
+        Err(InternalMethodError::CorruptObjectState)
+    }
+
     pub(super) fn typed_array_define_own_property(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,

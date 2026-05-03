@@ -112,6 +112,9 @@ impl ObjectRuntime {
                 }
             }
             ObjectKind::Ordinary | ObjectKind::Function => {
+                if self.typed_array_prevent_extensions_rejected(id)? {
+                    return Ok(false);
+                }
                 if self.is_module_namespace_object(id) {
                     return Ok(true);
                 }

@@ -3093,6 +3093,76 @@ fn script_core_array_buffer_resizable_accessors_and_transfer() {
 }
 
 #[test]
+fn script_core_object_freeze_throws_for_resizable_typed_arrays() {
+    let result = compile_and_run_string(
+        r#"
+        function freezeThrows(view) {
+            try {
+                Object.freeze(view);
+                return false;
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+        function preventExtensionsThrows(view) {
+            try {
+                Object.preventExtensions(view);
+                return false;
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+        function sealThrows(view) {
+            try {
+                Object.seal(view);
+                return false;
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+        function reflectPreventExtensionsFails(view) {
+            return Reflect.preventExtensions(view) === false &&
+                Object.isExtensible(view) === true;
+        }
+        function resizableView(length) {
+            return new Uint8Array(
+                new ArrayBuffer(4, { maxByteLength: 8 }),
+                0,
+                length
+            );
+        }
+
+        let rab = new ArrayBuffer(4, { maxByteLength: 8 });
+        let fixedLength = new Uint8Array(rab, 0, 4);
+        let fixedZero = new Uint8Array(rab, 0, 0);
+        let lengthTracking = new Uint8Array(rab);
+        let lengthTrackingAtEnd = new Uint8Array(rab, 4);
+
+        let shrunk = new ArrayBuffer(4, { maxByteLength: 8 });
+        let trackingShrunk = new Uint8Array(shrunk);
+        let trackingShrunkOffset = new Uint8Array(shrunk, 2);
+        shrunk.resize(2);
+        let offsetAfterShrink = freezeThrows(trackingShrunkOffset);
+        shrunk.resize(0);
+
+        [
+            freezeThrows(fixedLength),
+            freezeThrows(fixedZero),
+            freezeThrows(lengthTracking),
+            freezeThrows(lengthTrackingAtEnd),
+            offsetAfterShrink,
+            freezeThrows(trackingShrunk),
+            preventExtensionsThrows(resizableView(0)),
+            sealThrows(resizableView(0)),
+            reflectPreventExtensionsFails(resizableView(0))
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|true|true|true|true|true|true|true|true");
+}
+
+#[test]
 fn script_core_typed_array_concrete_prototypes_inherit_generic_surface() {
     let result = compile_and_run(
         r#"
