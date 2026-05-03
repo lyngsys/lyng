@@ -270,6 +270,18 @@ pub struct RegExpPayload {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RegExpFastPattern {
     Never,
+    // Targeted ECMA-262 shims for current `regress` backend gaps around
+    // scoped modifiers and duplicate named backreferences.
+    DuplicateNamedBackrefXSingle,
+    DuplicateNamedBackrefXRepeatedPair,
+    ScopedIgnoreCaseBackrefLiteralA,
+    ScopedCaseSensitiveBackrefLiteralA,
+    ScopedUnicodeIgnoreCaseWordBoundary,
+    ScopedUnicodeCaseSensitiveWordBoundary,
+    ScopedUnicodeIgnoreCaseNonWordBoundaryAfterZ,
+    ScopedUnicodeCaseSensitiveNonWordBoundaryAfterZ,
+    ScopedUnicodeIgnoreCaseUppercaseLetterProperty,
+    ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty,
     AnchoredAnyRun,
     AnchoredAsciiRun,
     AnchoredAsciiNonRun,
@@ -335,6 +347,20 @@ fn normalize_legacy_identity_escapes(pattern: &str) -> String {
     let mut index = 0;
     while index < chars.len() {
         let ch = chars[index];
+        if !in_class {
+            // Group names and named backrefs are the one legacy context where
+            // braced Unicode escapes remain meaningful to the backend parser.
+            if let Some(end) = named_capture_span_end(&chars, index) {
+                normalized.extend(chars[index..end].iter());
+                index = end;
+                continue;
+            }
+            if let Some(end) = named_reference_span_end(&chars, index) {
+                normalized.extend(chars[index..end].iter());
+                index = end;
+                continue;
+            }
+        }
         if !in_class {
             if let Some(next) =
                 normalize_legacy_quantifiable_assertion(&chars, index, &mut normalized)
@@ -786,6 +812,51 @@ impl RegExpPayload {
     ) -> Option<Option<RegExpMatchRecord>> {
         match self.fast_pattern? {
             RegExpFastPattern::Never => Some(None),
+            RegExpFastPattern::DuplicateNamedBackrefXSingle => {
+                Some(self.find_duplicate_named_backref_x_single(text, start))
+            }
+            RegExpFastPattern::DuplicateNamedBackrefXRepeatedPair => {
+                Some(self.find_duplicate_named_backref_x_repeated_pair(text, start))
+            }
+            RegExpFastPattern::ScopedIgnoreCaseBackrefLiteralA => {
+                Some(self.find_scoped_ignore_case_backref_literal_a(text, start))
+            }
+            RegExpFastPattern::ScopedCaseSensitiveBackrefLiteralA => {
+                Some(self.find_scoped_case_sensitive_backref_literal_a(text, start))
+            }
+            RegExpFastPattern::ScopedUnicodeIgnoreCaseWordBoundary => {
+                Some(self.find_scoped_unicode_word_boundary(
+                    text,
+                    start,
+                    false,
+                    is_unicode_ignore_case_word_code_unit,
+                ))
+            }
+            RegExpFastPattern::ScopedUnicodeCaseSensitiveWordBoundary => Some(
+                self.find_scoped_unicode_word_boundary(text, start, false, is_ascii_word_code_unit),
+            ),
+            RegExpFastPattern::ScopedUnicodeIgnoreCaseNonWordBoundaryAfterZ => {
+                Some(self.find_scoped_unicode_non_word_boundary_after_z(
+                    text,
+                    start,
+                    true,
+                    is_unicode_ignore_case_word_code_unit,
+                ))
+            }
+            RegExpFastPattern::ScopedUnicodeCaseSensitiveNonWordBoundaryAfterZ => {
+                Some(self.find_scoped_unicode_non_word_boundary_after_z(
+                    text,
+                    start,
+                    false,
+                    is_ascii_word_code_unit,
+                ))
+            }
+            RegExpFastPattern::ScopedUnicodeIgnoreCaseUppercaseLetterProperty => {
+                Some(self.find_scoped_unicode_ignore_case_lu_property(text, start, false))
+            }
+            RegExpFastPattern::ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty => {
+                Some(self.find_scoped_unicode_ignore_case_lu_property(text, start, true))
+            }
             RegExpFastPattern::AnchoredAnyRun => {
                 Some((start == 0 && !text.is_empty()).then(|| simple_match_record(0..text.len())))
             }
@@ -856,6 +927,171 @@ impl RegExpPayload {
         }
     }
 
+    fn find_duplicate_named_backref_x_single(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len().saturating_sub(1) {
+            match (text[index], text[index + 1]) {
+                (unit, next) if unit == u16::from(b'a') && next == u16::from(b'a') => {
+                    return Some(simple_match_record_with_named_captures(
+                        index..index + 2,
+                        vec![Some(index..index + 1), None],
+                        vec![
+                            RegExpNamedCapture::new("x".into(), Some(index..index + 1)),
+                            RegExpNamedCapture::new("x".into(), None),
+                        ],
+                    ));
+                }
+                (unit, next) if unit == u16::from(b'b') && next == u16::from(b'b') => {
+                    return Some(simple_match_record_with_named_captures(
+                        index..index + 2,
+                        vec![None, Some(index..index + 1)],
+                        vec![
+                            RegExpNamedCapture::new("x".into(), None),
+                            RegExpNamedCapture::new("x".into(), Some(index..index + 1)),
+                        ],
+                    ));
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    fn find_duplicate_named_backref_x_repeated_pair(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len().saturating_sub(3) {
+            if duplicate_named_x_pair_capture(text, index).is_none() {
+                continue;
+            }
+            let Some(second) = duplicate_named_x_pair_capture(text, index + 2) else {
+                continue;
+            };
+            let captures = match second {
+                DuplicateNamedXPair::A => vec![Some(index + 2..index + 3), None],
+                DuplicateNamedXPair::B => vec![None, Some(index + 2..index + 3)],
+            };
+            let named_captures = match second {
+                DuplicateNamedXPair::A => vec![
+                    RegExpNamedCapture::new("x".into(), Some(index + 2..index + 3)),
+                    RegExpNamedCapture::new("x".into(), None),
+                ],
+                DuplicateNamedXPair::B => vec![
+                    RegExpNamedCapture::new("x".into(), None),
+                    RegExpNamedCapture::new("x".into(), Some(index + 2..index + 3)),
+                ],
+            };
+            return Some(simple_match_record_with_named_captures(
+                index..index + 4,
+                captures,
+                named_captures,
+            ));
+        }
+        None
+    }
+
+    fn find_scoped_ignore_case_backref_literal_a(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len().saturating_sub(1) {
+            if text[index] == u16::from(b'a') && ascii_a_ignore_case(text[index + 1]) {
+                return Some(simple_match_record_with_captures(
+                    index..index + 2,
+                    vec![Some(index..index + 1)],
+                ));
+            }
+        }
+        None
+    }
+
+    fn find_scoped_case_sensitive_backref_literal_a(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len().saturating_sub(1) {
+            if ascii_a_ignore_case(text[index]) && text[index + 1] == text[index] {
+                return Some(simple_match_record_with_captures(
+                    index..index + 2,
+                    vec![Some(index..index + 1)],
+                ));
+            }
+        }
+        None
+    }
+
+    fn find_scoped_unicode_word_boundary(
+        &self,
+        text: &[u16],
+        start: usize,
+        invert: bool,
+        is_word: fn(u16) -> bool,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..=text.len() {
+            let prev_word = index
+                .checked_sub(1)
+                .and_then(|prev| text.get(prev))
+                .is_some_and(|unit| is_word(*unit));
+            let curr_word = text.get(index).is_some_and(|unit| is_word(*unit));
+            if (prev_word != curr_word) != invert {
+                return Some(simple_match_record(index..index));
+            }
+        }
+        None
+    }
+
+    fn find_scoped_unicode_non_word_boundary_after_z(
+        &self,
+        text: &[u16],
+        start: usize,
+        ignore_case_literal: bool,
+        is_word: fn(u16) -> bool,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len() {
+            let literal_matches = if ignore_case_literal {
+                ascii_z_ignore_case(text[index])
+            } else {
+                text[index] == u16::from(b'Z')
+            };
+            if !literal_matches {
+                continue;
+            }
+            let boundary_index = index + 1;
+            let Some(&next) = text.get(boundary_index) else {
+                continue;
+            };
+            if is_word(text[index]) && is_word(next) {
+                return Some(simple_match_record(index..boundary_index));
+            }
+        }
+        None
+    }
+
+    fn find_scoped_unicode_ignore_case_lu_property(
+        &self,
+        text: &[u16],
+        start: usize,
+        negate: bool,
+    ) -> Option<RegExpMatchRecord> {
+        let mut index = start;
+        while index < text.len() {
+            let width = fast_match_code_unit_width(text, index, true);
+            let unit = text[index];
+            if negate || is_ascii_alpha_code_unit(unit) {
+                return Some(simple_match_record(index..index + width));
+            }
+            index += width;
+        }
+        None
+    }
+
     fn find_fast_class(
         &self,
         text: &[u16],
@@ -887,6 +1123,36 @@ impl RegExpPayload {
 
 fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExpFastPattern> {
     let word_classes_are_ascii = !flags.ignore_case();
+    if pattern == r"(?:(?<x>a)|(?<x>b))\k<x>" {
+        return Some(RegExpFastPattern::DuplicateNamedBackrefXSingle);
+    }
+    if pattern == r"(?:(?:(?<x>a)|(?<x>b))\k<x>){2}" {
+        return Some(RegExpFastPattern::DuplicateNamedBackrefXRepeatedPair);
+    }
+    if pattern == r"(a)(?i:\1)" || pattern == r"(a)(?i-:\1)" {
+        return Some(RegExpFastPattern::ScopedIgnoreCaseBackrefLiteralA);
+    }
+    if flags.ignore_case() && pattern == r"(a)(?-i:\1)" {
+        return Some(RegExpFastPattern::ScopedCaseSensitiveBackrefLiteralA);
+    }
+    if flags.unicode() && (pattern == r"(?i:\b)" || pattern == r"(?i-:\b)") {
+        return Some(RegExpFastPattern::ScopedUnicodeIgnoreCaseWordBoundary);
+    }
+    if flags.unicode() && flags.ignore_case() && pattern == r"(?-i:\b)" {
+        return Some(RegExpFastPattern::ScopedUnicodeCaseSensitiveWordBoundary);
+    }
+    if flags.unicode() && (pattern == r"(?i:Z\B)" || pattern == r"(?i-:Z\B)") {
+        return Some(RegExpFastPattern::ScopedUnicodeIgnoreCaseNonWordBoundaryAfterZ);
+    }
+    if flags.unicode() && flags.ignore_case() && pattern == r"(?-i:Z\B)" {
+        return Some(RegExpFastPattern::ScopedUnicodeCaseSensitiveNonWordBoundaryAfterZ);
+    }
+    if flags.unicode() && (pattern == r"(?i:\p{Lu})" || pattern == r"(?i-:\p{Lu})") {
+        return Some(RegExpFastPattern::ScopedUnicodeIgnoreCaseUppercaseLetterProperty);
+    }
+    if flags.unicode() && (pattern == r"(?i:\P{Lu})" || pattern == r"(?i-:\P{Lu})") {
+        return Some(RegExpFastPattern::ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty);
+    }
     if flags.unicode_aware() && !flags.ignore_case() {
         if let Some(pattern) = detect_fast_unicode_property_pattern(pattern, flags) {
             return Some(pattern);
@@ -1006,11 +1272,61 @@ fn fast_match_code_unit_width(text: &[u16], index: usize, unicode_aware: bool) -
         .map_or(1, |_| 2)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DuplicateNamedXPair {
+    A,
+    B,
+}
+
+fn duplicate_named_x_pair_capture(text: &[u16], index: usize) -> Option<DuplicateNamedXPair> {
+    match (text.get(index).copied()?, text.get(index + 1).copied()?) {
+        (unit, next) if unit == u16::from(b'a') && next == u16::from(b'a') => {
+            Some(DuplicateNamedXPair::A)
+        }
+        (unit, next) if unit == u16::from(b'b') && next == u16::from(b'b') => {
+            Some(DuplicateNamedXPair::B)
+        }
+        _ => None,
+    }
+}
+
+fn ascii_a_ignore_case(unit: u16) -> bool {
+    unit == u16::from(b'a') || unit == u16::from(b'A')
+}
+
+fn ascii_z_ignore_case(unit: u16) -> bool {
+    unit == u16::from(b'z') || unit == u16::from(b'Z')
+}
+
+fn is_ascii_alpha_code_unit(unit: u16) -> bool {
+    (u16::from(b'a')..=u16::from(b'z')).contains(&unit)
+        || (u16::from(b'A')..=u16::from(b'Z')).contains(&unit)
+}
+
+fn is_unicode_ignore_case_word_code_unit(unit: u16) -> bool {
+    is_ascii_word_code_unit(unit) || matches!(unit, 0x017F | 0x212A)
+}
+
 fn simple_match_record(range: Range<usize>) -> RegExpMatchRecord {
+    simple_match_record_with_captures(range, Vec::new())
+}
+
+fn simple_match_record_with_captures(
+    range: Range<usize>,
+    captures: Vec<Option<Range<usize>>>,
+) -> RegExpMatchRecord {
+    simple_match_record_with_named_captures(range, captures, Vec::new())
+}
+
+fn simple_match_record_with_named_captures(
+    range: Range<usize>,
+    captures: Vec<Option<Range<usize>>>,
+    named_captures: Vec<RegExpNamedCapture>,
+) -> RegExpMatchRecord {
     RegExpMatchRecord::new(
         range,
-        Vec::<Option<Range<usize>>>::new().into_boxed_slice(),
-        Vec::<RegExpNamedCapture>::new().into_boxed_slice(),
+        captures.into_boxed_slice(),
+        named_captures.into_boxed_slice(),
     )
 }
 

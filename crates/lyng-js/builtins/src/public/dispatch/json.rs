@@ -582,7 +582,7 @@ fn json_internalize_property<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let value = get_property_from_object(cx, holder, name)?;
     if let Some(object) = value.as_object_ref() {
-        if is_engine_array(cx, object) {
+        if is_array_for_species(cx, object)? {
             let array_elements = metadata.and_then(|node| node.array_elements_for_object(object));
             let length = array_like_length(cx, object)?;
             for index in 0..length {
@@ -714,7 +714,7 @@ fn json_property_list_from_replacer<Cx: PublicBuiltinDispatchContext>(
     let Some(object) = value.as_object_ref() else {
         return Ok(None);
     };
-    if !is_engine_array(cx, object) {
+    if !is_array_for_species(cx, object)? {
         return Ok(None);
     }
 
@@ -790,7 +790,7 @@ fn json_normalize_wrapper_value<Cx: PublicBuiltinDispatchContext>(
     value: Value,
     object: ObjectRef,
 ) -> Result<Option<Value>, Cx::Error> {
-    let boolean_value = {
+    let wrapper_value = {
         let agent = cx.agent();
         agent
             .objects()
@@ -801,7 +801,7 @@ fn json_normalize_wrapper_value<Cx: PublicBuiltinDispatchContext>(
         Some(PrimitiveWrapperKind::String) => {
             Some(Value::from_string_ref(to_string_string_ref(cx, value)?))
         }
-        Some(PrimitiveWrapperKind::Boolean) => boolean_value,
+        Some(PrimitiveWrapperKind::Boolean | PrimitiveWrapperKind::BigInt) => wrapper_value,
         _ => None,
     };
     Ok(normalized)
@@ -834,12 +834,12 @@ fn json_serialize_property<Cx: PublicBuiltinDispatchContext>(
     state: &mut JsonStringifyState,
 ) -> Result<Option<String>, Cx::Error> {
     let mut value = get_property_from_object(cx, holder, key)?;
-    if let Some(object) = value.as_object_ref() {
+    if value.as_object_ref().is_some() || value.is_bigint() {
         let to_json_key = property_key_from_text(cx, "toJSON");
-        let to_json = get_property_from_object(cx, object, to_json_key)?;
+        let to_json = cx.get_property_value(value, to_json_key)?;
         if let Some(to_json) = callable_object_from_value(cx, to_json) {
             let key_value = property_key_string_value(cx, key);
-            value = cx.call_to_completion(to_json, Value::from_object_ref(object), &[key_value])?;
+            value = cx.call_to_completion(to_json, value, &[key_value])?;
         }
     }
     if let Some(replacer) = state.replacer_function {
@@ -901,7 +901,7 @@ fn json_serialize_property<Cx: PublicBuiltinDispatchContext>(
     }
 
     state.stack.push(object);
-    let result = if is_engine_array(cx, object) {
+    let result = if is_array_for_species(cx, object)? {
         json_serialize_array(cx, object, state)
     } else {
         json_serialize_object(cx, object, state)
