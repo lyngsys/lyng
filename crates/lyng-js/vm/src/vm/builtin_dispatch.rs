@@ -4,6 +4,7 @@ mod dynamic_import;
 mod function_allocation;
 mod function_helpers;
 mod object_helpers;
+mod regexp_helpers;
 mod template_helpers;
 
 use dispatch_context::VmBuiltinDispatch;
@@ -39,8 +40,9 @@ use lyng_js_ops::{errors, object, proxy, read};
 use lyng_js_parser::parse_script;
 use lyng_js_types::{
     eval_builtin, internal_dynamic_import_builtin, internal_import_meta_builtin,
-    object_to_string_builtin, promise_capability_executor_builtin, AbruptCompletion,
-    BuiltinFunctionId, EmbeddingFunctionId, PropertyDescriptor, PropertyKey, RealmRef,
+    internal_regexp_literal_builtin, object_to_string_builtin, promise_capability_executor_builtin,
+    AbruptCompletion, BuiltinFunctionId, EmbeddingFunctionId, PropertyDescriptor, PropertyKey,
+    RealmRef,
 };
 
 impl Vm {
@@ -122,6 +124,11 @@ impl Vm {
         if entry == internal_dynamic_import_builtin() {
             return self
                 .dynamic_import_builtin(agent, host, registry, caller_frame, arguments)
+                .map(Some);
+        }
+        if entry == internal_regexp_literal_builtin() {
+            return self
+                .regexp_literal_builtin(agent, caller_frame, arguments)
                 .map(Some);
         }
         let mut bridge = VmBuiltinDispatch {

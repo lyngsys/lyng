@@ -37,6 +37,7 @@ pub struct AgentPhase6Accounting {
     pub heap: PrimitiveHeapAccounting,
     pub iterator_records: RuntimeDomainAccounting,
     pub regexp_payloads: RuntimeDomainAccounting,
+    pub regexp_literal_cache: RuntimeDomainAccounting,
     pub module_caches: RuntimeDomainAccounting,
     pub promise_jobs: RuntimeDomainAccounting,
     pub live_bytes: usize,
@@ -48,6 +49,7 @@ pub struct RuntimePhase6Accounting {
     pub heap: PrimitiveHeapAccounting,
     pub iterator_records: RuntimeDomainAccounting,
     pub regexp_payloads: RuntimeDomainAccounting,
+    pub regexp_literal_cache: RuntimeDomainAccounting,
     pub module_caches: RuntimeDomainAccounting,
     pub promise_jobs: RuntimeDomainAccounting,
     pub backing_stores: RuntimeDomainAccounting,
@@ -59,6 +61,7 @@ pub(crate) const fn total_live_bytes(
     heap: PrimitiveHeapAccounting,
     iterator_records: RuntimeDomainAccounting,
     regexp_payloads: RuntimeDomainAccounting,
+    regexp_literal_cache: RuntimeDomainAccounting,
     module_caches: RuntimeDomainAccounting,
     promise_jobs: RuntimeDomainAccounting,
     backing_stores: RuntimeDomainAccounting,
@@ -66,6 +69,7 @@ pub(crate) const fn total_live_bytes(
     heap.live_bytes
         + iterator_records.live_bytes
         + regexp_payloads.live_bytes
+        + regexp_literal_cache.live_bytes
         + module_caches.live_bytes
         + promise_jobs.live_bytes
         + backing_stores.live_bytes
@@ -111,6 +115,7 @@ mod tests {
     use lyng_js_gc::AllocationLifetime;
     use lyng_js_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
     use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData, RegExpPayload};
+    use lyng_js_types::CodeRef;
 
     #[test]
     fn empty_runtime_phase6_accounting_starts_with_zero_future_domains() {
@@ -122,6 +127,10 @@ mod tests {
             RuntimeDomainAccounting::empty()
         );
         assert_eq!(accounting.regexp_payloads, RuntimeDomainAccounting::empty());
+        assert_eq!(
+            accounting.regexp_literal_cache,
+            RuntimeDomainAccounting::empty()
+        );
         assert_eq!(accounting.module_caches, RuntimeDomainAccounting::empty());
         assert_eq!(accounting.promise_jobs, RuntimeDomainAccounting::empty());
         assert_eq!(accounting.backing_stores, RuntimeDomainAccounting::empty());
@@ -179,11 +188,16 @@ mod tests {
             RuntimeDomainAccounting::empty()
         );
         assert_eq!(accounting.regexp_payloads, RuntimeDomainAccounting::empty());
+        assert_eq!(
+            accounting.regexp_literal_cache,
+            RuntimeDomainAccounting::empty()
+        );
         assert_eq!(accounting.module_caches, RuntimeDomainAccounting::empty());
         assert_eq!(
             accounting.live_bytes,
             accounting.heap.live_bytes
                 + accounting.regexp_payloads.live_bytes
+                + accounting.regexp_literal_cache.live_bytes
                 + accounting.promise_jobs.live_bytes
                 + accounting.backing_stores.live_bytes
         );
@@ -215,6 +229,47 @@ mod tests {
         assert!(
             accounting.live_bytes
                 >= accounting.heap.live_bytes + accounting.regexp_payloads.live_bytes
+        );
+    }
+
+    #[test]
+    fn runtime_phase6_accounting_reports_regexp_literal_cache() {
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let realm = agent
+            .default_realm()
+            .expect("default realm should exist")
+            .id();
+        let code = CodeRef::from_raw(17).expect("test code ref should be non-zero");
+
+        assert!(agent.cache_regexp_literal_payload(
+            realm,
+            code,
+            3,
+            RegExpPayload::compile("cache", "g").unwrap()
+        ));
+        assert!(!agent.cache_regexp_literal_payload(
+            realm,
+            code,
+            3,
+            RegExpPayload::compile("other", "").unwrap()
+        ));
+
+        let cached = agent
+            .regexp_literal_cached_payload(realm, code, 3)
+            .expect("literal payload should be cached");
+        assert_eq!(cached.source(), "cache");
+        assert_eq!(cached.flag_text(), "g");
+
+        let accounting = runtime.phase6_accounting();
+
+        assert_eq!(accounting.regexp_payloads.records, 0);
+        assert_eq!(accounting.regexp_literal_cache.records, 1);
+        assert!(accounting.regexp_literal_cache.metadata_bytes > 0);
+        assert!(accounting.regexp_literal_cache.payload_bytes > 0);
+        assert!(
+            accounting.live_bytes
+                >= accounting.heap.live_bytes + accounting.regexp_literal_cache.live_bytes
         );
     }
 }

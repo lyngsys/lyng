@@ -14,18 +14,21 @@ impl Agent {
                 live_bytes: accounting.live_bytes,
             }
         };
+        let regexp_literal_cache = self.regexp_literal_cache_accounting();
         let module_caches = Default::default();
         let promise_jobs = self.job_queues.promise_job_accounting();
         AgentPhase6Accounting {
             heap,
             iterator_records,
             regexp_payloads,
+            regexp_literal_cache,
             module_caches,
             promise_jobs,
             live_bytes: total_live_bytes(
                 heap,
                 iterator_records,
                 regexp_payloads,
+                regexp_literal_cache,
                 module_caches,
                 promise_jobs,
                 Default::default(),

@@ -1,4 +1,9 @@
-use super::support::compile_and_run_string;
+use super::support::{compile_and_run_string, compile_unit};
+use lyng_js_common::AtomTable;
+use lyng_js_env::Runtime;
+use lyng_js_host::NoopHostHooks;
+use lyng_js_types::Value;
+use lyng_js_vm::Vm;
 
 #[test]
 fn regexp_scoped_ignore_case_applies_to_backrefs_boundaries_and_properties() {
@@ -69,4 +74,46 @@ fn regexp_group_names_are_readable_through_escaped_identifier_properties() {
     );
 
     assert_eq!(result, "brown");
+}
+
+#[test]
+fn regexp_literal_cache_keeps_objects_fresh_and_last_index_independent() {
+    let mut atoms = AtomTable::new();
+    let unit = compile_unit(
+        r#"
+        function make() {
+            return /cache/g;
+        }
+        let first = make();
+        first.lastIndex = 4;
+        let second = make();
+        second.lastIndex = 9;
+        let third = make();
+        let total = 0;
+        total += (first !== second ? 1 : 0);
+        total += (second !== third ? 2 : 0);
+        total += (first.lastIndex === 4 ? 4 : 0);
+        total += (second.lastIndex === 9 ? 8 : 0);
+        total += (third.lastIndex === 0 ? 16 : 0);
+        total += (third.test("cache") && third.lastIndex === 5 ? 32 : 0);
+        total;
+        "#,
+        &mut atoms,
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    {
+        let agent = runtime.root_agent_mut();
+        let realm = agent.default_realm().expect("default realm should exist");
+        let mut vm = Vm::new();
+        let result = vm
+            .evaluate_script(agent, realm, &unit)
+            .expect("compiled script should execute");
+
+        assert_eq!(result, Value::from_smi(63));
+    }
+
+    let accounting = runtime.phase6_accounting();
+    assert_eq!(accounting.regexp_literal_cache.records, 1);
+    assert!(accounting.regexp_payloads.records >= 3);
 }

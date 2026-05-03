@@ -6,8 +6,13 @@ use super::{
 };
 use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_js_host::ModuleKey;
-use lyng_js_types::StringRef;
-use std::{collections::BTreeMap, marker::PhantomData, rc::Rc};
+use lyng_js_objects::RegExpPayload;
+use lyng_js_types::{CodeRef, StringRef};
+use std::{
+    collections::{BTreeMap, HashMap},
+    marker::PhantomData,
+    rc::Rc,
+};
 
 mod accounting;
 mod cluster_handles;
@@ -18,6 +23,7 @@ mod jobs;
 mod modules;
 mod promises;
 mod realms;
+mod regexp_literals;
 mod symbols;
 mod weak_finalization;
 
@@ -78,6 +84,20 @@ impl TraceHeapEdges for AgentCollectionSnapshot {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct RegExpLiteralCacheKey {
+    realm: RealmRef,
+    code: CodeRef,
+    site: u32,
+}
+
+impl RegExpLiteralCacheKey {
+    #[inline]
+    const fn new(realm: RealmRef, code: CodeRef, site: u32) -> Self {
+        Self { realm, code, site }
+    }
+}
+
 /// Agent-local runtime state. The `Rc` marker keeps the agent thread-affine.
 pub struct Agent {
     id: AgentId,
@@ -103,6 +123,7 @@ pub struct Agent {
     promise_tables: super::AgentPromiseTables,
     disposal_tables: super::AgentDisposalTables,
     job_queues: AgentJobQueues,
+    regexp_literal_cache: HashMap<RegExpLiteralCacheKey, RegExpPayload>,
     kept_objects: Vec<WeakHeapRef>,
     latin1_single_code_unit_strings: [Option<StringRef>; 256],
     next_job_id: u32,
@@ -143,6 +164,7 @@ impl Agent {
             promise_tables: super::AgentPromiseTables::default(),
             disposal_tables: super::AgentDisposalTables::default(),
             job_queues: AgentJobQueues::default(),
+            regexp_literal_cache: HashMap::new(),
             kept_objects: Vec::new(),
             latin1_single_code_unit_strings: [None; 256],
             next_job_id: 1,

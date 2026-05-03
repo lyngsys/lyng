@@ -2,7 +2,7 @@ use super::property_access::VmProxyBridge;
 use super::*;
 use lyng_js_objects::{
     FunctionConstructorFlags, FunctionKindFlags, FunctionObjectData, FunctionThisMode,
-    InternalMethodError, ObjectColdData, ObjectFlags,
+    InternalMethodError, ObjectColdData, ObjectFlags, OrdinaryObjectData, RegExpPayload,
 };
 use lyng_js_ops::{enumeration::ForInEnumerator, errors, iterator, object, proxy};
 use lyng_js_types::{PropertyDescriptor, PropertyKey};
@@ -253,6 +253,54 @@ impl Vm {
                 AllocationLifetime::Default,
             )
         }))
+    }
+
+    pub(super) fn allocate_regexp_object_with_payload(
+        &self,
+        agent: &mut Agent,
+        realm: RealmRef,
+        payload: RegExpPayload,
+    ) -> VmResult<ObjectRef> {
+        let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
+        let root_shape = realm_record
+            .root_shape()
+            .ok_or(VmError::MissingRootShape(realm))?;
+        let prototype = realm_record
+            .intrinsics()
+            .regexp_prototype()
+            .ok_or(VmError::MissingRootShape(realm))?;
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            let object = objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape)
+                    .with_prototype(Some(prototype))
+                    .with_cold_data(ObjectColdData::Ordinary(OrdinaryObjectData::RegExp)),
+                AllocationLifetime::Default,
+            );
+            let stored = objects.store_regexp_payload(object, payload);
+            debug_assert!(stored, "fresh RegExp objects should accept payload storage");
+            object
+        });
+        let key = PropertyKey::from_atom(agent.bootstrap_atoms().last_index());
+        let mut descriptor = PropertyDescriptor::new();
+        descriptor.set_value(Value::from_smi(0));
+        descriptor.set_writable(true);
+        descriptor.set_enumerable(false);
+        descriptor.set_configurable(false);
+        let defined = object::ordinary_define_property(
+            agent,
+            object,
+            key,
+            descriptor,
+            AllocationLifetime::Default,
+        )
+        .map_err(VmError::Abrupt)?;
+        if defined {
+            Ok(object)
+        } else {
+            Err(VmError::Abrupt(errors::throw_type_error(agent)))
+        }
     }
 
     pub(super) fn define_data_property_with_attrs(

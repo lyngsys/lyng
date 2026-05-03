@@ -516,6 +516,37 @@ fn capture_runtime_snapshots() -> Vec<RuntimeSnapshot> {
         }
     };
 
+    let regexp_literal_cache = {
+        let mut atoms = AtomTable::new();
+        let unit = compile_script_unit(
+            SourceId::new(90),
+            r#"
+            function make() {
+                return /cache/g;
+            }
+            make();
+            make();
+            make();
+            "#,
+            &mut atoms,
+        );
+        let mut runtime = Runtime::new(NoopHostHooks);
+        {
+            let agent = runtime.root_agent_mut();
+            let realm = agent.default_realm().expect("default realm should exist");
+            let mut vm = Vm::new();
+            let value = vm
+                .evaluate_script(agent, realm, &unit)
+                .expect("RegExp literal cache fixture should execute");
+            black_box(value.bits());
+        }
+        RuntimeSnapshot {
+            label: "runtime.regexp-literal-cache",
+            accounting: runtime.phase6_accounting(),
+            note: "Executed repeated RegExp literal evaluations so retained compiled literal payload cache accounting is visible.",
+        }
+    };
+
     let promise_and_backing_store = {
         let mut runtime = Runtime::new(NoopHostHooks);
         let root = runtime.root_agent_id();
@@ -551,7 +582,12 @@ fn capture_runtime_snapshots() -> Vec<RuntimeSnapshot> {
         }
     };
 
-    vec![empty, spec_bootstrapped, promise_and_backing_store]
+    vec![
+        empty,
+        spec_bootstrapped,
+        regexp_literal_cache,
+        promise_and_backing_store,
+    ]
 }
 
 fn compile_script_unit(
@@ -829,23 +865,24 @@ fn render_report(
     writeln!(&mut output).unwrap();
     writeln!(
         &mut output,
-        "| Snapshot | Heap live bytes | Heap reserved bytes | Iterator records | RegExp payloads | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
+        "| Snapshot | Heap live bytes | Heap reserved bytes | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
     )
     .unwrap();
     writeln!(
         &mut output,
-        "| --- | ---: | ---: | --- | --- | --- | --- | --- | ---: | --- |"
+        "| --- | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
     )
     .unwrap();
     for snapshot in snapshots {
         writeln!(
             &mut output,
-            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
+            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
             snapshot.label,
             snapshot.accounting.heap.live_bytes,
             snapshot.accounting.heap.reserved_bytes,
             domain_cell(snapshot.accounting.iterator_records),
             domain_cell(snapshot.accounting.regexp_payloads),
+            domain_cell(snapshot.accounting.regexp_literal_cache),
             domain_cell(snapshot.accounting.module_caches),
             domain_cell(snapshot.accounting.promise_jobs),
             domain_cell(snapshot.accounting.backing_stores),
@@ -1320,7 +1357,21 @@ mod tests {
         assert_eq!(seeded.accounting.backing_stores.payload_bytes, 4096);
         assert_eq!(seeded.accounting.iterator_records.records, 0);
         assert_eq!(seeded.accounting.regexp_payloads.records, 0);
+        assert_eq!(seeded.accounting.regexp_literal_cache.records, 0);
         assert_eq!(seeded.accounting.module_caches.records, 0);
+    }
+
+    #[test]
+    fn runtime_snapshots_report_regexp_literal_cache_accounting() {
+        let snapshots = capture_runtime_snapshots();
+        let seeded = snapshots
+            .iter()
+            .find(|snapshot| snapshot.label == "runtime.regexp-literal-cache")
+            .unwrap();
+
+        assert_eq!(seeded.accounting.regexp_literal_cache.records, 1);
+        assert!(seeded.accounting.regexp_literal_cache.live_bytes > 0);
+        assert!(seeded.accounting.regexp_payloads.records >= 3);
     }
 
     #[test]

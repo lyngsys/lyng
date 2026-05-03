@@ -112,6 +112,7 @@ impl Runtime {
         let mut heap = PrimitiveHeapAccounting::default();
         let mut iterator_records = RuntimeDomainAccounting::default();
         let mut regexp_payloads = RuntimeDomainAccounting::default();
+        let mut regexp_literal_cache = RuntimeDomainAccounting::default();
         let mut module_caches = RuntimeDomainAccounting::default();
         let mut promise_jobs = RuntimeDomainAccounting::default();
 
@@ -123,6 +124,7 @@ impl Runtime {
             heap = merge_primitive_heap_accounting(heap, accounting.heap);
             iterator_records = iterator_records.merge(accounting.iterator_records);
             regexp_payloads = regexp_payloads.merge(accounting.regexp_payloads);
+            regexp_literal_cache = regexp_literal_cache.merge(accounting.regexp_literal_cache);
             module_caches = module_caches.merge(accounting.module_caches);
             promise_jobs = promise_jobs.merge(accounting.promise_jobs);
         }
@@ -133,6 +135,7 @@ impl Runtime {
             heap,
             iterator_records,
             regexp_payloads,
+            regexp_literal_cache,
             module_caches,
             promise_jobs,
             backing_stores,
@@ -140,6 +143,7 @@ impl Runtime {
                 heap,
                 iterator_records,
                 regexp_payloads,
+                regexp_literal_cache,
                 module_caches,
                 promise_jobs,
                 backing_stores,

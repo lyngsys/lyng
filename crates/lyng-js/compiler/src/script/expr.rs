@@ -404,6 +404,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         dest: u16,
     ) -> LoweringResult<()> {
         let literal = self.ast().literals().get_regexp(value).clone();
+        let site = self.alloc_temp()?;
+        self.emit_load_i32_constant(site, i32::try_from(value.raw()).unwrap_or(i32::MAX))?;
+
         let pattern = self.alloc_temp()?;
         let pattern_atom = self.state.atoms.intern(&literal.pattern);
         self.emit_load_atom_string(pattern, pattern_atom)?;
@@ -415,7 +418,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let span = self.ast().get_expr(expr_id).span();
         self.emit_internal_builtin_call_into(
             lyng_js_types::internal_regexp_literal_builtin(),
-            &[pattern, flags],
+            &[site, pattern, flags],
             span,
             dest,
         )
