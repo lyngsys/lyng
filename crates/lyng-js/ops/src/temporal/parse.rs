@@ -99,7 +99,7 @@ pub fn parse_plain_date_time(text: &str) -> Option<ParsedPlainDateTime> {
 }
 
 pub fn parse_plain_time(text: &str) -> Option<(u8, u8, u8, i128)> {
-    let text = strip_temporal_annotations(text, CalendarAnnotationPolicy::RequireIso8601)?;
+    let text = strip_temporal_annotations(text, CalendarAnnotationPolicy::IgnoreCalendarValue)?;
     let bytes = text.as_bytes();
     let mut index = 0;
 

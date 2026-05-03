@@ -171,7 +171,19 @@ pub(super) fn temporal_time_zone_id_from_value<Cx: PublicBuiltinDispatchContext>
     cx: &mut Cx,
     value: Value,
 ) -> Result<String, Cx::Error> {
-    let string_ref = value.as_string_ref().ok_or_else(|| type_error(cx))?;
+    if let Some(object_ref) = value.as_object_ref() {
+        let temporal = {
+            let agent = cx.agent();
+            agent.objects().temporal_object(object_ref).copied()
+        };
+        if let Some(TemporalObjectData::ZonedDateTime(data)) = temporal {
+            return temporal_atom_text(cx, data.time_zone());
+        }
+        return Err(type_error(cx));
+    }
+    let Some(string_ref) = value.as_string_ref() else {
+        return Err(type_error(cx));
+    };
     let text = string_ref_text(cx, string_ref)?;
     temporal_time_zone_id_from_string(&text).ok_or_else(|| range_error(cx))
 }
@@ -298,6 +310,27 @@ pub(super) fn temporal_time_zone_id_from_iso_date_time_offset(text: &str) -> Opt
     Some(format_temporal_offset(offset_nanoseconds))
 }
 
+fn temporal_time_zone_string_has_iso_date_time_prefix(text: &str) -> bool {
+    let prefix = text.split_once('[').map_or(text, |(prefix, _)| prefix);
+    parse_temporal_instant(prefix).is_some()
+        || parse_temporal_plain_date_time(prefix).is_some()
+        || temporal_time_zone_id_from_iso_date_time_offset(text).is_some()
+}
+
+fn temporal_time_zone_id_from_constructor_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<String, Cx::Error> {
+    if let Some(string_ref) = value.as_string_ref() {
+        let text = string_ref_text(cx, string_ref)?;
+        if temporal_time_zone_string_has_iso_date_time_prefix(&text) {
+            return Err(range_error(cx));
+        }
+        return temporal_time_zone_id_from_string(&text).ok_or_else(|| range_error(cx));
+    }
+    temporal_time_zone_id_from_value(cx, value)
+}
+
 pub(super) fn temporal_time_zone_id_from_optional_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
@@ -395,55 +428,268 @@ pub(super) fn temporal_zoned_date_time_from_value<Cx: PublicBuiltinDispatchConte
     cx: &mut Cx,
     value: Value,
 ) -> Result<TemporalZonedDateTimeObjectData, Cx::Error> {
+    temporal_zoned_date_time_from_value_with_options(cx, value, Value::undefined())
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TemporalZonedDateTimeOffsetBehavior {
+    Prefer,
+    Use,
+    Ignore,
+    Reject,
+}
+
+struct TemporalZonedDateTimeFromOptions {
+    disambiguation: TemporalDisambiguation,
+    offset: TemporalZonedDateTimeOffsetBehavior,
+    overflow: TemporalOverflow,
+}
+
+fn temporal_zoned_date_time_offset_behavior_from_options<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    options: Value,
+) -> Result<TemporalZonedDateTimeOffsetBehavior, Cx::Error> {
+    temporal_zoned_date_time_offset_behavior_from_options_with_default(
+        cx,
+        options,
+        TemporalZonedDateTimeOffsetBehavior::Reject,
+    )
+}
+
+fn temporal_zoned_date_time_offset_behavior_from_options_with_default<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    options: Value,
+    default: TemporalZonedDateTimeOffsetBehavior,
+) -> Result<TemporalZonedDateTimeOffsetBehavior, Cx::Error> {
+    temporal_validate_options_object(cx, options)?;
+    let default_text = match default {
+        TemporalZonedDateTimeOffsetBehavior::Prefer => "prefer",
+        TemporalZonedDateTimeOffsetBehavior::Use => "use",
+        TemporalZonedDateTimeOffsetBehavior::Ignore => "ignore",
+        TemporalZonedDateTimeOffsetBehavior::Reject => "reject",
+    };
+    if options.is_undefined() {
+        return Ok(default);
+    }
+    let object_ref = options.as_object_ref().ok_or_else(|| type_error(cx))?;
+    let value = temporal_property_value(cx, object_ref, "offset")?;
+    match temporal_string_option(
+        cx,
+        value,
+        &["prefer", "use", "ignore", "reject"],
+        default_text,
+    )?
+    .as_str()
+    {
+        "prefer" => Ok(TemporalZonedDateTimeOffsetBehavior::Prefer),
+        "use" => Ok(TemporalZonedDateTimeOffsetBehavior::Use),
+        "ignore" => Ok(TemporalZonedDateTimeOffsetBehavior::Ignore),
+        "reject" => Ok(TemporalZonedDateTimeOffsetBehavior::Reject),
+        _ => unreachable!("temporal_string_option constrained offset"),
+    }
+}
+
+fn temporal_zoned_date_time_from_options<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    options: Value,
+) -> Result<TemporalZonedDateTimeFromOptions, Cx::Error> {
+    Ok(TemporalZonedDateTimeFromOptions {
+        disambiguation: temporal_disambiguation_from_options(cx, options)?,
+        offset: temporal_zoned_date_time_offset_behavior_from_options(cx, options)?,
+        overflow: temporal_overflow_from_options(cx, options)?,
+    })
+}
+
+fn temporal_zoned_date_time_with_options<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    options: Value,
+) -> Result<TemporalZonedDateTimeFromOptions, Cx::Error> {
+    Ok(TemporalZonedDateTimeFromOptions {
+        disambiguation: temporal_disambiguation_from_options(cx, options)?,
+        offset: temporal_zoned_date_time_offset_behavior_from_options_with_default(
+            cx,
+            options,
+            TemporalZonedDateTimeOffsetBehavior::Prefer,
+        )?,
+        overflow: temporal_overflow_from_options(cx, options)?,
+    })
+}
+
+fn temporal_zoned_date_time_offset_text_from_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+) -> Result<Option<String>, Cx::Error> {
+    if value.is_undefined() {
+        return Ok(None);
+    }
+    let offset_ref = if let Some(offset_ref) = value.as_string_ref() {
+        offset_ref
+    } else {
+        if value.as_object_ref().is_none() {
+            return Err(type_error(cx));
+        }
+        to_string_string_ref(cx, value)?
+    };
+    Ok(Some(string_ref_text(cx, offset_ref)?))
+}
+
+fn temporal_zoned_date_time_instant_from_explicit_offset<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    date_time: TemporalCivilDateTime,
+    offset_nanoseconds: i64,
+) -> Result<i128, Cx::Error> {
+    let offset_time_zone = format_temporal_offset(offset_nanoseconds);
+    let instant = cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
+        time_zone_id: offset_time_zone,
+        date_time,
+        disambiguation: TemporalDisambiguation::Compatible,
+    })?;
+    Ok(instant.epoch_nanoseconds)
+}
+
+fn temporal_zoned_date_time_civil_from_string<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    text: &str,
+) -> Result<TemporalCivilDateTime, Cx::Error> {
+    let parsed = parse_temporal_plain_date_time(text).ok_or_else(|| range_error(cx))?;
+    let (millisecond, microsecond, nanosecond) =
+        temporal_subsecond_parts_from_nanoseconds(cx, parsed.fraction_nanoseconds)?;
+    let data = temporal_plain_date_time_from_parts(
+        cx,
+        i64::from(parsed.year),
+        i64::from(parsed.month),
+        i64::from(parsed.day),
+        i64::from(parsed.hour),
+        i64::from(parsed.minute),
+        i64::from(parsed.second),
+        millisecond,
+        microsecond,
+        nanosecond,
+    )?;
+    Ok(TemporalCivilDateTime::new(
+        data.year(),
+        data.month(),
+        data.day(),
+        data.hour(),
+        data.minute(),
+        data.second(),
+        data.millisecond(),
+        data.microsecond(),
+        data.nanosecond(),
+    ))
+}
+
+fn temporal_zoned_date_time_civil_within_wall_clock_limits(
+    date_time: TemporalCivilDateTime,
+) -> bool {
+    (
+        date_time.year,
+        date_time.month,
+        date_time.day,
+        date_time.hour,
+        date_time.minute,
+        date_time.second,
+        date_time.millisecond,
+        date_time.microsecond,
+        date_time.nanosecond,
+    ) >= (-271_821, 4, 20, 0, 0, 0, 0, 0, 0)
+        && (
+            date_time.year,
+            date_time.month,
+            date_time.day,
+            date_time.hour,
+            date_time.minute,
+            date_time.second,
+            date_time.millisecond,
+            date_time.microsecond,
+            date_time.nanosecond,
+        ) <= (275_760, 9, 13, 23, 59, 59, 999, 999, 999)
+}
+
+pub(super) fn temporal_zoned_date_time_from_value_with_options<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    value: Value,
+    options: Value,
+) -> Result<TemporalZonedDateTimeObjectData, Cx::Error> {
     if let Some(string_ref) = value.as_string_ref() {
         let text = string_ref_text(cx, string_ref)?;
         let mut time_zone_id =
             temporal_zoned_date_time_zone_annotation(&text).ok_or_else(|| range_error(cx))?;
-        if let Some(explicit_offset) = temporal_zoned_date_time_explicit_offset(&text) {
+        let explicit_offset = temporal_zoned_date_time_explicit_offset(&text);
+        let parsed_instant = parse_temporal_instant(&text);
+        let parsed_date_time = if parsed_instant.is_some() && explicit_offset.is_none() {
+            None
+        } else {
+            Some(temporal_zoned_date_time_civil_from_string(cx, &text)?)
+        };
+        let options = temporal_zoned_date_time_from_options(cx, options)?;
+        if let Some(explicit_offset) = explicit_offset {
             let actual_offset = if time_zone_id == TEMPORAL_UTC_TIME_ZONE_ID {
                 Some(0)
             } else {
                 temporal_parse_fixed_offset_time_zone_id(&time_zone_id)
             };
-            if matches!(actual_offset, Some(actual_offset) if actual_offset != explicit_offset) {
+            if options.offset == TemporalZonedDateTimeOffsetBehavior::Reject
+                && matches!(actual_offset, Some(actual_offset) if actual_offset != explicit_offset)
+            {
                 return Err(range_error(cx));
             }
-            if actual_offset.is_none() {
+            if actual_offset.is_none()
+                && options.offset != TemporalZonedDateTimeOffsetBehavior::Ignore
+            {
                 time_zone_id = format_temporal_offset(explicit_offset);
             }
         }
-        let epoch_nanoseconds = if let Some(epoch_nanoseconds) = parse_temporal_instant(&text) {
+        let epoch_nanoseconds = if explicit_offset.is_none() {
+            if let Some(epoch_nanoseconds) = parsed_instant {
+                epoch_nanoseconds
+            } else {
+                let date_time = parsed_date_time.expect("date-time parsed above");
+                let instant =
+                    cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
+                        time_zone_id: time_zone_id.clone(),
+                        date_time,
+                        disambiguation: options.disambiguation,
+                    })?;
+                instant.epoch_nanoseconds
+            }
+        } else if let Some(explicit_offset) = explicit_offset {
+            let date_time = parsed_date_time.expect("explicit-offset strings parse civil fields");
+            if matches!(
+                options.offset,
+                TemporalZonedDateTimeOffsetBehavior::Use
+                    | TemporalZonedDateTimeOffsetBehavior::Prefer
+            ) {
+                if options.offset == TemporalZonedDateTimeOffsetBehavior::Prefer
+                    && !temporal_zoned_date_time_civil_within_wall_clock_limits(date_time)
+                {
+                    return Err(range_error(cx));
+                }
+                temporal_zoned_date_time_instant_from_explicit_offset(
+                    cx,
+                    date_time,
+                    explicit_offset,
+                )?
+            } else {
+                if options.offset == TemporalZonedDateTimeOffsetBehavior::Reject
+                    && !temporal_zoned_date_time_civil_within_wall_clock_limits(date_time)
+                {
+                    return Err(range_error(cx));
+                }
+                let instant =
+                    cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
+                        time_zone_id: time_zone_id.clone(),
+                        date_time,
+                        disambiguation: options.disambiguation,
+                    })?;
+                instant.epoch_nanoseconds
+            }
+        } else if let Some(epoch_nanoseconds) = parsed_instant {
             epoch_nanoseconds
         } else {
-            let parsed = parse_temporal_plain_date_time(&text).ok_or_else(|| range_error(cx))?;
-            let (millisecond, microsecond, nanosecond) =
-                temporal_subsecond_parts_from_nanoseconds(cx, parsed.fraction_nanoseconds)?;
-            let Ok(millisecond) = u16::try_from(millisecond) else {
-                return Err(range_error(cx));
-            };
-            let Ok(microsecond) = u16::try_from(microsecond) else {
-                return Err(range_error(cx));
-            };
-            let Ok(nanosecond) = u16::try_from(nanosecond) else {
-                return Err(range_error(cx));
-            };
-            let date_time = TemporalCivilDateTime::new(
-                parsed.year,
-                parsed.month,
-                parsed.day,
-                parsed.hour,
-                parsed.minute,
-                parsed.second,
-                millisecond,
-                microsecond,
-                nanosecond,
-            );
-            let instant = cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
-                time_zone_id: time_zone_id.clone(),
-                date_time,
-                disambiguation: TemporalDisambiguation::Compatible,
-            })?;
-            instant.epoch_nanoseconds
+            unreachable!("string path parsed either an instant or a plain date-time above")
         };
         return temporal_zoned_date_time_from_parts(cx, epoch_nanoseconds, &time_zone_id);
     }
@@ -454,39 +700,39 @@ pub(super) fn temporal_zoned_date_time_from_value<Cx: PublicBuiltinDispatchConte
         agent.objects().temporal_object(object_ref).copied()
     };
     if let Some(TemporalObjectData::ZonedDateTime(data)) = existing {
+        let _ = temporal_zoned_date_time_from_options(cx, options)?;
         return Ok(data);
     }
     temporal_validate_optional_iso_calendar_property(cx, object_ref)?;
+    let day = temporal_optional_integer_part_from_property(cx, object_ref, "day")?;
+    let hour = temporal_optional_time_part_from_property(cx, object_ref, "hour")?.unwrap_or(0);
+    let microsecond =
+        temporal_optional_time_part_from_property(cx, object_ref, "microsecond")?.unwrap_or(0);
+    let millisecond =
+        temporal_optional_time_part_from_property(cx, object_ref, "millisecond")?.unwrap_or(0);
+    let minute = temporal_optional_time_part_from_property(cx, object_ref, "minute")?.unwrap_or(0);
+    let month = temporal_optional_integer_part_from_property(cx, object_ref, "month")?;
+    let month_code_text = temporal_optional_month_code_text_from_property(cx, object_ref)?;
+    let nanosecond =
+        temporal_optional_time_part_from_property(cx, object_ref, "nanosecond")?.unwrap_or(0);
+    let offset = temporal_property_value(cx, object_ref, "offset")?;
+    let offset_text = temporal_zoned_date_time_offset_text_from_value(cx, offset)?;
+    let parsed_offset = if let Some(offset_text) = offset_text.as_ref() {
+        Some(temporal_parse_offset_string(offset_text, true).ok_or_else(|| range_error(cx))?)
+    } else {
+        None
+    };
+    let second = temporal_optional_time_part_from_property(cx, object_ref, "second")?.unwrap_or(0);
     let time_zone = temporal_property_value(cx, object_ref, "timeZone")?;
+    let year = temporal_optional_integer_part_from_property(cx, object_ref, "year")?;
+    let options = temporal_zoned_date_time_from_options(cx, options)?;
     if time_zone.is_undefined() {
         return Err(type_error(cx));
     }
     let time_zone_id = temporal_time_zone_id_from_value(cx, time_zone)?;
-    let offset = temporal_property_value(cx, object_ref, "offset")?;
-    if !offset.is_undefined() {
-        let offset_ref = if let Some(offset_ref) = offset.as_string_ref() {
-            offset_ref
-        } else {
-            if offset.as_object_ref().is_none() {
-                return Err(type_error(cx));
-            }
-            to_string_string_ref(cx, offset)?
-        };
-        let offset_text = string_ref_text(cx, offset_ref)?;
-        if temporal_parse_offset_string(&offset_text, true).is_none() {
-            return Err(range_error(cx));
-        }
-    }
-    let date = temporal_plain_date_from_property_bag(cx, object_ref, false)?;
-    let hour = temporal_optional_time_part_from_property(cx, object_ref, "hour")?.unwrap_or(0);
-    let minute = temporal_optional_time_part_from_property(cx, object_ref, "minute")?.unwrap_or(0);
-    let second = temporal_optional_time_part_from_property(cx, object_ref, "second")?.unwrap_or(0);
-    let millisecond =
-        temporal_optional_time_part_from_property(cx, object_ref, "millisecond")?.unwrap_or(0);
-    let microsecond =
-        temporal_optional_time_part_from_property(cx, object_ref, "microsecond")?.unwrap_or(0);
-    let nanosecond =
-        temporal_optional_time_part_from_property(cx, object_ref, "nanosecond")?.unwrap_or(0);
+    let year = year.ok_or_else(|| type_error(cx))?;
+    let day = day.ok_or_else(|| type_error(cx))?;
+    let month = temporal_resolve_month_from_fields(cx, month, month_code_text.as_deref(), None)?;
     let Ok(hour) = u8::try_from(hour) else {
         return Err(range_error(cx));
     };
@@ -509,23 +755,49 @@ pub(super) fn temporal_zoned_date_time_from_value<Cx: PublicBuiltinDispatchConte
     let Ok(nanosecond) = u16::try_from(nanosecond) else {
         return Err(range_error(cx));
     };
+    let date_time_data = temporal_plain_date_time_from_parts_with_overflow(
+        cx,
+        year,
+        month,
+        day,
+        i64::from(hour),
+        i64::from(minute),
+        i64::from(second),
+        i64::from(millisecond),
+        i64::from(microsecond),
+        i64::from(nanosecond),
+        options.overflow,
+    );
+    let date_time_data = date_time_data?;
     let date_time = TemporalCivilDateTime::new(
-        date.year(),
-        date.month(),
-        date.day(),
-        hour,
-        minute,
-        second,
-        millisecond,
-        microsecond,
-        nanosecond,
+        date_time_data.year(),
+        date_time_data.month(),
+        date_time_data.day(),
+        date_time_data.hour(),
+        date_time_data.minute(),
+        date_time_data.second(),
+        date_time_data.millisecond(),
+        date_time_data.microsecond(),
+        date_time_data.nanosecond(),
     );
     let instant = cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
         time_zone_id: time_zone_id.clone(),
         date_time,
-        disambiguation: TemporalDisambiguation::Compatible,
+        disambiguation: options.disambiguation,
     })?;
-    temporal_zoned_date_time_from_parts(cx, instant.epoch_nanoseconds, &time_zone_id)
+    let epoch_nanoseconds = match (parsed_offset, options.offset) {
+        (Some(offset), TemporalZonedDateTimeOffsetBehavior::Reject)
+            if offset != instant.offset_nanoseconds =>
+        {
+            return Err(range_error(cx));
+        }
+        (
+            Some(offset),
+            TemporalZonedDateTimeOffsetBehavior::Use | TemporalZonedDateTimeOffsetBehavior::Prefer,
+        ) => temporal_zoned_date_time_instant_from_explicit_offset(cx, date_time, offset)?,
+        _ => instant.epoch_nanoseconds,
+    };
+    temporal_zoned_date_time_from_parts(cx, epoch_nanoseconds, &time_zone_id)
 }
 
 pub(super) fn temporal_zoned_date_time_explicit_offset(text: &str) -> Option<i64> {
@@ -552,6 +824,9 @@ pub(super) fn temporal_zoned_date_time_zone_annotation(text: &str) -> Option<Str
         let body = after_start[..end].trim_start_matches('!');
         if body.eq_ignore_ascii_case(TEMPORAL_UTC_TIME_ZONE_ID) {
             return Some(TEMPORAL_UTC_TIME_ZONE_ID.to_string());
+        }
+        if body.contains('\u{2212}') {
+            return None;
         }
         if let Some(offset_nanoseconds) = temporal_parse_fixed_offset_time_zone_id(body) {
             return Some(format_temporal_offset(offset_nanoseconds));
@@ -654,7 +929,6 @@ pub(super) fn temporal_zoned_date_time_to_string_options<Cx: PublicBuiltinDispat
         return Ok(TemporalZonedDateTimeToStringOptions::default());
     }
     let object_ref = value.as_object_ref().ok_or_else(|| type_error(cx))?;
-    let (precision, rounding_mode) = temporal_instant_to_string_options(cx, value)?;
     let calendar_name_value = temporal_property_value(cx, object_ref, "calendarName")?;
     let calendar_name = match temporal_string_option(
         cx,
@@ -670,6 +944,26 @@ pub(super) fn temporal_zoned_date_time_to_string_options<Cx: PublicBuiltinDispat
         "critical" => TemporalZonedDateTimeCalendarNameOption::Critical,
         _ => unreachable!("temporal_string_option constrained calendarName"),
     };
+    let fractional_second_digits =
+        temporal_property_value(cx, object_ref, "fractionalSecondDigits")?;
+    let fractional_second_precision =
+        temporal_instant_fractional_second_digits_option(cx, fractional_second_digits)?;
+    let offset_value = temporal_property_value(cx, object_ref, "offset")?;
+    let offset =
+        match temporal_string_option(cx, offset_value, &["auto", "never"], "auto")?.as_str() {
+            "auto" => TemporalZonedDateTimeOffsetOption::Auto,
+            "never" => TemporalZonedDateTimeOffsetOption::Never,
+            _ => unreachable!("temporal_string_option constrained offset"),
+        };
+    let rounding_mode = temporal_property_value(cx, object_ref, "roundingMode")?;
+    let rounding_mode = temporal_duration_rounding_mode_option(cx, rounding_mode)?;
+    let smallest_unit = temporal_property_value(cx, object_ref, "smallestUnit")?;
+    let smallest_unit_text = if smallest_unit.is_undefined() {
+        None
+    } else {
+        let string_ref = to_string_string_ref(cx, smallest_unit)?;
+        Some(string_ref_text(cx, string_ref)?)
+    };
     let time_zone_name_value = temporal_property_value(cx, object_ref, "timeZoneName")?;
     let time_zone_name = match temporal_string_option(
         cx,
@@ -684,13 +978,11 @@ pub(super) fn temporal_zoned_date_time_to_string_options<Cx: PublicBuiltinDispat
         "critical" => TemporalZonedDateTimeTimeZoneNameOption::Critical,
         _ => unreachable!("temporal_string_option constrained timeZoneName"),
     };
-    let offset_value = temporal_property_value(cx, object_ref, "offset")?;
-    let offset =
-        match temporal_string_option(cx, offset_value, &["auto", "never"], "auto")?.as_str() {
-            "auto" => TemporalZonedDateTimeOffsetOption::Auto,
-            "never" => TemporalZonedDateTimeOffsetOption::Never,
-            _ => unreachable!("temporal_string_option constrained offset"),
-        };
+    let precision = if let Some(text) = smallest_unit_text {
+        temporal_instant_smallest_unit_precision_from_text(cx, &text)?
+    } else {
+        fractional_second_precision
+    };
     Ok(TemporalZonedDateTimeToStringOptions {
         precision,
         rounding_mode,
@@ -793,7 +1085,7 @@ pub(super) fn temporal_zoned_date_time_builtin<Cx: PublicBuiltinDispatchContext>
         temporal_bigint_to_i128(agent, bigint)
     }
     .ok_or_else(|| range_error(cx))?;
-    let time_zone_id = temporal_time_zone_id_from_value(
+    let time_zone_id = temporal_time_zone_id_from_constructor_value(
         cx,
         invocation
             .arguments()
@@ -1189,6 +1481,7 @@ pub(super) fn temporal_zoned_date_time_add_duration<Cx: PublicBuiltinDispatchCon
     cx: &mut Cx,
     zoned: TemporalZonedDateTimeObjectData,
     duration: TemporalDurationObjectData,
+    overflow: TemporalOverflow,
 ) -> Result<Value, Cx::Error> {
     let civil = temporal_zoned_date_time_civil(cx, zoned)?.date_time;
     let plain_date_time = temporal_plain_date_time_from_parts(
@@ -1203,12 +1496,7 @@ pub(super) fn temporal_zoned_date_time_add_duration<Cx: PublicBuiltinDispatchCon
         i64::from(civil.microsecond),
         i64::from(civil.nanosecond),
     )?;
-    let added = temporal_plain_date_time_add_duration(
-        cx,
-        plain_date_time,
-        duration,
-        TemporalOverflow::Constrain,
-    )?;
+    let added = temporal_plain_date_time_add_duration(cx, plain_date_time, duration, overflow)?;
     let time_zone_id = temporal_atom_text(cx, zoned.time_zone())?;
     let instant = cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
         time_zone_id: time_zone_id.clone(),
@@ -1233,7 +1521,15 @@ pub(super) fn temporal_zoned_date_time_add_builtin<Cx: PublicBuiltinDispatchCont
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    temporal_zoned_date_time_add_duration(cx, zoned, duration)
+    let overflow = temporal_overflow_from_options(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    temporal_zoned_date_time_add_duration(cx, zoned, duration, overflow)
 }
 
 pub(super) fn temporal_zoned_date_time_subtract_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1249,7 +1545,15 @@ pub(super) fn temporal_zoned_date_time_subtract_builtin<Cx: PublicBuiltinDispatc
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    temporal_zoned_date_time_add_duration(cx, zoned, negate_temporal_duration(duration))
+    let overflow = temporal_overflow_from_options(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    temporal_zoned_date_time_add_duration(cx, zoned, negate_temporal_duration(duration), overflow)
 }
 
 pub(super) fn temporal_zoned_date_time_round_to_day<Cx: PublicBuiltinDispatchContext>(
@@ -1258,35 +1562,47 @@ pub(super) fn temporal_zoned_date_time_round_to_day<Cx: PublicBuiltinDispatchCon
     rounding_mode: TemporalBuiltinRoundingMode,
 ) -> Result<i128, Cx::Error> {
     let civil = temporal_zoned_date_time_civil(cx, zoned)?.date_time;
-    let local_nanoseconds = i128::from(civil.hour) * TEMPORAL_NANOS_PER_HOUR
-        + i128::from(civil.minute) * TEMPORAL_NANOS_PER_MINUTE
-        + i128::from(civil.second) * TEMPORAL_NANOS_PER_SECOND
-        + i128::from(civil.millisecond) * TEMPORAL_NANOS_PER_MILLISECOND
-        + i128::from(civil.microsecond) * TEMPORAL_NANOS_PER_MICROSECOND
-        + i128::from(civil.nanosecond);
-    let rounded = temporal_round_epoch_nanoseconds_to_increment(
-        local_nanoseconds,
-        TEMPORAL_NANOS_PER_DAY,
-        rounding_mode,
-    )
-    .ok_or_else(|| range_error(cx))?;
-    let (year, month, day) = if rounded == TEMPORAL_NANOS_PER_DAY {
-        let date =
-            TemporalPlainDateObjectData::new(civil.year, civil.month, civil.day, zoned.calendar());
-        let next = temporal_plain_date_add_duration(
-            cx,
-            date,
-            TemporalDurationObjectData::new(0, 0, 0, 1, 0, 0, 0, 0, 0, 0),
-            TemporalOverflow::Constrain,
-        )?;
-        (next.year(), next.month(), next.day())
-    } else if rounded == 0 {
-        (civil.year, civil.month, civil.day)
-    } else {
-        return Err(range_error(cx));
-    };
     let time_zone_id = temporal_atom_text(cx, zoned.time_zone())?;
-    temporal_zoned_date_time_midnight_epoch_nanoseconds(cx, &time_zone_id, year, month, day)
+    let start = temporal_zoned_date_time_midnight_epoch_nanoseconds(
+        cx,
+        &time_zone_id,
+        civil.year,
+        civil.month,
+        civil.day,
+    )?;
+    let date = temporal_plain_date_from_parts(
+        cx,
+        i64::from(civil.year),
+        i64::from(civil.month),
+        i64::from(civil.day),
+    )?;
+    let next_date = temporal_plain_date_add_duration(
+        cx,
+        date,
+        TemporalDurationObjectData::new(0, 0, 0, 1, 0, 0, 0, 0, 0, 0),
+        TemporalOverflow::Constrain,
+    )?;
+    let end = temporal_zoned_date_time_midnight_epoch_nanoseconds(
+        cx,
+        &time_zone_id,
+        next_date.year(),
+        next_date.month(),
+        next_date.day(),
+    )?;
+    let day_length = end.checked_sub(start).ok_or_else(|| range_error(cx))?;
+    let elapsed = zoned
+        .epoch_nanoseconds()
+        .checked_sub(start)
+        .ok_or_else(|| range_error(cx))?;
+    let rounded = temporal_round_epoch_nanoseconds_to_increment(elapsed, day_length, rounding_mode)
+        .ok_or_else(|| range_error(cx))?;
+    if rounded == 0 {
+        Ok(start)
+    } else if rounded == day_length {
+        Ok(end)
+    } else {
+        Err(range_error(cx))
+    }
 }
 
 pub(super) fn temporal_zoned_date_time_round_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1314,12 +1630,33 @@ pub(super) fn temporal_zoned_date_time_round_builtin<Cx: PublicBuiltinDispatchCo
         let increment = unit_nanoseconds
             .checked_mul(options.rounding_increment)
             .ok_or_else(|| range_error(cx))?;
-        temporal_round_epoch_nanoseconds_to_increment(
-            zoned.epoch_nanoseconds(),
+        let civil = temporal_zoned_date_time_civil(cx, zoned)?.date_time;
+        let date_time = temporal_plain_date_time_from_parts(
+            cx,
+            i64::from(civil.year),
+            i64::from(civil.month),
+            i64::from(civil.day),
+            i64::from(civil.hour),
+            i64::from(civil.minute),
+            i64::from(civil.second),
+            i64::from(civil.millisecond),
+            i64::from(civil.microsecond),
+            i64::from(civil.nanosecond),
+        )?;
+        let rounded = temporal_round_epoch_nanoseconds_to_increment(
+            temporal_plain_date_time_total_nanoseconds(date_time).ok_or_else(|| range_error(cx))?,
             increment,
             options.rounding_mode,
         )
-        .ok_or_else(|| range_error(cx))?
+        .ok_or_else(|| range_error(cx))?;
+        let rounded = temporal_plain_date_time_from_total_nanoseconds(cx, rounded)?;
+        let time_zone_id = temporal_atom_text(cx, zoned.time_zone())?;
+        let instant = cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
+            time_zone_id,
+            date_time: temporal_civil_date_time_from_plain_date_time(rounded),
+            disambiguation: TemporalDisambiguation::Compatible,
+        })?;
+        instant.epoch_nanoseconds
     };
     if !temporal_instant_epoch_nanoseconds_is_valid(epoch_nanoseconds) {
         return Err(range_error(cx));
@@ -1345,39 +1682,79 @@ pub(super) fn temporal_zoned_date_time_with_builtin<Cx: PublicBuiltinDispatchCon
         .unwrap_or(Value::undefined())
         .as_object_ref()
         .ok_or_else(|| type_error(cx))?;
-    let civil = temporal_zoned_date_time_civil(cx, zoned)?.date_time;
-    let year = temporal_optional_integer_part_from_property(cx, object_ref, "year")?
-        .unwrap_or(i64::from(civil.year));
-    let month_value = temporal_optional_integer_part_from_property(cx, object_ref, "month")?;
-    let month_code_value = temporal_property_value(cx, object_ref, "monthCode")?;
-    let month = if let Some(month) = month_value {
-        if !month_code_value.is_undefined() {
-            let month_code = temporal_month_from_month_code_value(cx, month_code_value)?;
-            if month != month_code {
-                return Err(range_error(cx));
-            }
-        }
-        month
-    } else if month_code_value.is_undefined() {
-        i64::from(civil.month)
-    } else {
-        temporal_month_from_month_code_value(cx, month_code_value)?
+    let temporal = {
+        let agent = cx.agent();
+        agent.objects().temporal_object(object_ref).copied()
     };
-    let day = temporal_optional_integer_part_from_property(cx, object_ref, "day")?
-        .unwrap_or(i64::from(civil.day));
-    let hour = temporal_optional_time_part_from_property(cx, object_ref, "hour")?
-        .unwrap_or(i64::from(civil.hour));
-    let minute = temporal_optional_time_part_from_property(cx, object_ref, "minute")?
-        .unwrap_or(i64::from(civil.minute));
-    let second = temporal_optional_time_part_from_property(cx, object_ref, "second")?
-        .unwrap_or(i64::from(civil.second));
-    let millisecond = temporal_optional_time_part_from_property(cx, object_ref, "millisecond")?
-        .unwrap_or(i64::from(civil.millisecond));
-    let microsecond = temporal_optional_time_part_from_property(cx, object_ref, "microsecond")?
-        .unwrap_or(i64::from(civil.microsecond));
-    let nanosecond = temporal_optional_time_part_from_property(cx, object_ref, "nanosecond")?
-        .unwrap_or(i64::from(civil.nanosecond));
-    let date_time = temporal_plain_date_time_from_parts(
+    if temporal.is_some() {
+        return Err(type_error(cx));
+    }
+    let calendar = temporal_property_value(cx, object_ref, "calendar")?;
+    if !calendar.is_undefined() {
+        return Err(type_error(cx));
+    }
+    let time_zone = temporal_property_value(cx, object_ref, "timeZone")?;
+    if !time_zone.is_undefined() {
+        return Err(type_error(cx));
+    }
+    let civil = temporal_zoned_date_time_civil(cx, zoned)?.date_time;
+    let day = temporal_optional_integer_part_from_property(cx, object_ref, "day")?;
+    let hour = temporal_optional_time_part_from_property(cx, object_ref, "hour")?;
+    let microsecond = temporal_optional_time_part_from_property(cx, object_ref, "microsecond")?;
+    let millisecond = temporal_optional_time_part_from_property(cx, object_ref, "millisecond")?;
+    let minute = temporal_optional_time_part_from_property(cx, object_ref, "minute")?;
+    let month_value = temporal_optional_integer_part_from_property(cx, object_ref, "month")?;
+    let month_code_text = temporal_optional_string_text_from_property(cx, object_ref, "monthCode")?;
+    let nanosecond = temporal_optional_time_part_from_property(cx, object_ref, "nanosecond")?;
+    let offset = temporal_property_value(cx, object_ref, "offset")?;
+    let offset_text = temporal_zoned_date_time_offset_text_from_value(cx, offset)?;
+    let second = temporal_optional_time_part_from_property(cx, object_ref, "second")?;
+    let year = temporal_optional_integer_part_from_property(cx, object_ref, "year")?;
+    if day.is_some_and(|day| day < 1) || month_value.is_some_and(|month| month < 1) {
+        return Err(range_error(cx));
+    }
+    let options = temporal_zoned_date_time_with_options(
+        cx,
+        invocation
+            .arguments()
+            .get(1)
+            .copied()
+            .unwrap_or(Value::undefined()),
+    )?;
+    if day.is_none()
+        && hour.is_none()
+        && microsecond.is_none()
+        && millisecond.is_none()
+        && minute.is_none()
+        && month_value.is_none()
+        && month_code_text.is_none()
+        && nanosecond.is_none()
+        && offset_text.is_none()
+        && second.is_none()
+        && year.is_none()
+    {
+        return Err(type_error(cx));
+    }
+    let parsed_offset = if let Some(offset_text) = offset_text.as_ref() {
+        Some(temporal_parse_offset_string(offset_text, true).ok_or_else(|| range_error(cx))?)
+    } else {
+        None
+    };
+    let year = year.unwrap_or(i64::from(civil.year));
+    let month = temporal_resolve_month_from_fields(
+        cx,
+        month_value,
+        month_code_text.as_deref(),
+        Some(i64::from(civil.month)),
+    )?;
+    let day = day.unwrap_or(i64::from(civil.day));
+    let hour = hour.unwrap_or(i64::from(civil.hour));
+    let minute = minute.unwrap_or(i64::from(civil.minute));
+    let second = second.unwrap_or(i64::from(civil.second));
+    let millisecond = millisecond.unwrap_or(i64::from(civil.millisecond));
+    let microsecond = microsecond.unwrap_or(i64::from(civil.microsecond));
+    let nanosecond = nanosecond.unwrap_or(i64::from(civil.nanosecond));
+    let date_time = temporal_plain_date_time_from_parts_with_overflow(
         cx,
         year,
         month,
@@ -1388,15 +1765,43 @@ pub(super) fn temporal_zoned_date_time_with_builtin<Cx: PublicBuiltinDispatchCon
         millisecond,
         microsecond,
         nanosecond,
+        options.overflow,
     )?;
     let time_zone_id = temporal_atom_text(cx, zoned.time_zone())?;
+    let date_time = temporal_civil_date_time_from_plain_date_time(date_time);
     let instant = cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
-        time_zone_id,
-        date_time: temporal_civil_date_time_from_plain_date_time(date_time),
-        disambiguation: TemporalDisambiguation::Compatible,
+        time_zone_id: time_zone_id.clone(),
+        date_time,
+        disambiguation: options.disambiguation,
     })?;
+    let epoch_nanoseconds = match (parsed_offset, options.offset) {
+        (Some(offset), TemporalZonedDateTimeOffsetBehavior::Reject)
+            if offset != instant.offset_nanoseconds =>
+        {
+            return Err(range_error(cx));
+        }
+        (
+            Some(offset),
+            TemporalZonedDateTimeOffsetBehavior::Reject
+            | TemporalZonedDateTimeOffsetBehavior::Prefer,
+        ) if !temporal_zoned_date_time_civil_within_wall_clock_limits(date_time) => {
+            return Err(range_error(cx));
+        }
+        (Some(offset), TemporalZonedDateTimeOffsetBehavior::Use) => {
+            temporal_zoned_date_time_instant_from_explicit_offset(cx, date_time, offset)?
+        }
+        (Some(offset), TemporalZonedDateTimeOffsetBehavior::Prefer)
+            if offset == instant.offset_nanoseconds =>
+        {
+            temporal_zoned_date_time_instant_from_explicit_offset(cx, date_time, offset)?
+        }
+        _ => instant.epoch_nanoseconds,
+    };
+    if !temporal_instant_epoch_nanoseconds_is_valid(epoch_nanoseconds) {
+        return Err(range_error(cx));
+    }
     let data = TemporalZonedDateTimeObjectData::new(
-        instant.epoch_nanoseconds,
+        epoch_nanoseconds,
         zoned.time_zone(),
         zoned.calendar(),
     );
@@ -1493,6 +1898,9 @@ pub(super) fn temporal_zoned_date_time_midnight_epoch_nanoseconds<
         date_time: TemporalCivilDateTime::new(year, month, day, 0, 0, 0, 0, 0, 0),
         disambiguation: TemporalDisambiguation::Compatible,
     })?;
+    if !temporal_instant_epoch_nanoseconds_is_valid(instant.epoch_nanoseconds) {
+        return Err(range_error(cx));
+    }
     Ok(instant.epoch_nanoseconds)
 }
 
@@ -1669,11 +2077,16 @@ pub(super) fn temporal_zoned_date_time_from_builtin<Cx: PublicBuiltinDispatchCon
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let data = temporal_zoned_date_time_from_value(
+    let data = temporal_zoned_date_time_from_value_with_options(
         cx,
         invocation
             .arguments()
             .first()
+            .copied()
+            .unwrap_or(Value::undefined()),
+        invocation
+            .arguments()
+            .get(1)
             .copied()
             .unwrap_or(Value::undefined()),
     )?;

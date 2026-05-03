@@ -482,7 +482,12 @@ fn temporal_duration_round_builtin<Cx: PublicBuiltinDispatchContext>(
         if largest_unit == TemporalBuiltinDurationExactUnit::Day
             && smallest_unit == TemporalBuiltinDurationExactUnit::Day
         {
-            let _ = temporal_zoned_date_time_add_duration(cx, relative_to, data)?;
+            let _ = temporal_zoned_date_time_add_duration(
+                cx,
+                relative_to,
+                data,
+                TemporalOverflow::Constrain,
+            )?;
         }
         if let Some(data) = temporal_duration_round_zoned_relative_exact_remainder(
             cx,
@@ -548,7 +553,12 @@ fn temporal_duration_validate_exact_relative_to_range<Cx: PublicBuiltinDispatchC
     }
     match relative_to {
         TemporalDurationRelativeTo::ZonedDateTime(relative_to) => {
-            let _ = temporal_zoned_date_time_add_duration(cx, relative_to, duration)?;
+            let _ = temporal_zoned_date_time_add_duration(
+                cx,
+                relative_to,
+                duration,
+                TemporalOverflow::Constrain,
+            )?;
         }
         TemporalDurationRelativeTo::PlainDate(date) => {
             if sign > 0 && temporal_duration_is_min_plain_date(date) {
@@ -1725,7 +1735,12 @@ pub(super) fn temporal_duration_relative_total_nanoseconds<Cx: PublicBuiltinDisp
                 .ok_or_else(|| range_error(cx))
         }
         TemporalDurationRelativeTo::ZonedDateTime(start) => {
-            let end_value = temporal_zoned_date_time_add_duration(cx, start, duration)?;
+            let end_value = temporal_zoned_date_time_add_duration(
+                cx,
+                start,
+                duration,
+                TemporalOverflow::Constrain,
+            )?;
             let end = temporal_zoned_date_time_data(cx, end_value)?;
             end.epoch_nanoseconds()
                 .checked_sub(start.epoch_nanoseconds())

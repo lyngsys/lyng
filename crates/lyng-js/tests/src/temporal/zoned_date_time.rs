@@ -273,6 +273,35 @@ fn temporal_zoned_date_time_with_plain_time_replaces_civil_time_in_zone() {
 }
 
 #[test]
+fn temporal_zoned_date_time_uses_plain_time_annotations_but_rejects_iso_time_zone_ids() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const zoned = new Temporal.ZonedDateTime(0n, "UTC");
+        function throwsRange(run) {
+            try {
+                run();
+                return false;
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        }
+        const annotated = zoned.withPlainTime("12:34:56.987654321[!u-ca=unknown]");
+        [
+            annotated.toString(),
+            String(annotated.epochNanoseconds),
+            throwsRange(() => new Temporal.ZonedDateTime(0n, "1997-12-04T12:34[+01:00]", "iso8601"))
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "1970-01-01T12:34:56.987654321+00:00[UTC]|45296987654321|true"
+    );
+}
+
+#[test]
 fn temporal_zoned_date_time_with_plain_time_throws_range_error_for_limit_cases() {
     let result = compile_and_run_string_with_host(
         r#"
@@ -397,6 +426,44 @@ fn temporal_zoned_date_time_to_string_honors_precision_and_annotation_options() 
 }
 
 #[test]
+fn temporal_zoned_date_time_to_string_reads_options_before_smallest_unit_validation() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const zoned = new Temporal.ZonedDateTime(2n, "UTC");
+        const actual = [];
+        function option(name, value) {
+            return {
+                toString() {
+                    actual.push(name);
+                    return value;
+                }
+            };
+        }
+        let threwRange = false;
+        try {
+            zoned.toString({
+                calendarName: option("calendarName", "auto"),
+                fractionalSecondDigits: option("fractionalSecondDigits", "auto"),
+                offset: option("offset", "auto"),
+                roundingMode: option("roundingMode", "expand"),
+                smallestUnit: option("smallestUnit", "month"),
+                timeZoneName: option("timeZoneName", "auto")
+            });
+        } catch (error) {
+            threwRange = error instanceof RangeError;
+        }
+        actual.join("|") + "|" + threwRange;
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "calendarName|fractionalSecondDigits|offset|roundingMode|smallestUnit|timeZoneName|true"
+    );
+}
+
+#[test]
 fn temporal_zoned_date_time_round_uses_exact_time_options() {
     let host = TestHost::new();
     host.define_temporal_instant_to_civil(
@@ -406,6 +473,27 @@ fn temporal_zoned_date_time_round_uses_exact_time_options() {
         },
         Ok(TemporalCivilTime {
             date_time: TemporalCivilDateTime::new(1976, 11, 18, 15, 23, 30, 123, 987, 500),
+            offset_nanoseconds: 3_600_000_000_000,
+        }),
+    );
+    host.define_temporal_civil_to_instant(
+        TemporalCivilToInstantRequest {
+            time_zone_id: "+01:00".into(),
+            date_time: TemporalCivilDateTime::new(1976, 11, 18, 16, 0, 0, 0, 0, 0),
+            disambiguation: TemporalDisambiguation::Compatible,
+        },
+        Ok(TemporalInstantWithOffset {
+            epoch_nanoseconds: 217_177_200_000_000_000,
+            offset_nanoseconds: 3_600_000_000_000,
+        }),
+    );
+    host.define_temporal_instant_to_civil(
+        TemporalInstantToCivilRequest {
+            time_zone_id: "+01:00".into(),
+            epoch_nanoseconds: 217_177_200_000_000_000,
+        },
+        Ok(TemporalCivilTime {
+            date_time: TemporalCivilDateTime::new(1976, 11, 18, 16, 0, 0, 0, 0, 0),
             offset_nanoseconds: 3_600_000_000_000,
         }),
     );
@@ -448,6 +536,7 @@ fn temporal_zoned_date_time_round_uses_exact_time_options() {
         let roundedMinute = zoned.round({ smallestUnit: "minute", roundingMode: "ceil" });
         let roundedDay = zoned.round({ smallestUnit: "day" });
         let offset = new Temporal.ZonedDateTime(217175010123987500n, "+01:00");
+        let offsetHour = offset.round({ smallestUnit: "hour", roundingIncrement: 4 });
         let offsetDay = offset.round({ smallestUnit: "day", roundingMode: "ceil" });
         [
             Temporal.ZonedDateTime.prototype.round.name,
@@ -458,6 +547,8 @@ fn temporal_zoned_date_time_round_uses_exact_time_options() {
             String(roundedMinute.epochNanoseconds),
             roundedDay.toString(),
             String(roundedDay.epochNanoseconds),
+            offsetHour.toString(),
+            String(offsetHour.epochNanoseconds),
             offsetDay.toString(),
             String(offsetDay.epochNanoseconds)
         ].join("|");
@@ -467,7 +558,7 @@ fn temporal_zoned_date_time_round_uses_exact_time_options() {
 
     assert_eq!(
         result,
-        "round|1|2001-09-09T01:46:41+00:00[UTC]|1000000001000000000|2001-09-09T01:47:00+00:00[UTC]|1000000020000000000|2001-09-09T00:00:00+00:00[UTC]|999993600000000000|1976-11-19T00:00:00+01:00[+01:00]|217206000000000000"
+        "round|1|2001-09-09T01:46:41+00:00[UTC]|1000000001000000000|2001-09-09T01:47:00+00:00[UTC]|1000000020000000000|2001-09-09T00:00:00+00:00[UTC]|999993600000000000|1976-11-18T16:00:00+01:00[+01:00]|217177200000000000|1976-11-19T00:00:00+01:00[+01:00]|217206000000000000"
     );
 }
 
@@ -493,6 +584,92 @@ fn temporal_zoned_date_time_with_replaces_civil_fields() {
     assert_eq!(
         result,
         "with|1|2019-05-06T07:08:09.010011012+00:00[UTC]|1557126489010011012|1976-05-18T15:23:15.123456789+00:00[UTC]|201280995123456789"
+    );
+}
+
+#[test]
+fn temporal_zoned_date_time_with_validates_options_and_offset() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const zoned = Temporal.ZonedDateTime.from("1976-11-18T15:23:30.123456789+00:00[UTC]");
+        const offsetBase = new Temporal.ZonedDateTime(0n, "+01:00");
+        function throwsRange(run) {
+            try {
+                run();
+                return false;
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        }
+        function throwsType(run) {
+            try {
+                run();
+                return false;
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+        [
+            zoned.with({ month: 29 }).toString(),
+            zoned.with({ day: 31 }, undefined).toString(),
+            throwsRange(() => zoned.with({ day: 5 }, { disambiguation: "bad" })),
+            throwsRange(() => zoned.with({ day: 5 }, { offset: "bad" })),
+            throwsRange(() => zoned.with({ day: 5 }, { overflow: "bad" })),
+            throwsType(() => zoned.with({ calendar: "iso8601" })),
+            throwsType(() => zoned.with({ timeZone: "UTC" })),
+            throwsType(() => zoned.with({})),
+            offsetBase.with({ hour: 2, offset: "+00:00" }, { offset: "use" }).toString(),
+            offsetBase.with({ hour: 2, offset: "+00:00" }, { offset: "ignore" }).toString()
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "1976-12-18T15:23:30.123456789+00:00[UTC]|1976-11-30T15:23:30.123456789+00:00[UTC]|true|true|true|true|true|true|1970-01-01T03:00:00+01:00[+01:00]|1970-01-01T02:00:00+01:00[+01:00]"
+    );
+}
+
+#[test]
+fn temporal_zoned_date_time_add_and_subtract_validate_overflow_options() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const jan31 = Temporal.ZonedDateTime.from("2020-01-31T00:00+00:00[UTC]");
+        const mar31 = Temporal.ZonedDateTime.from("2020-03-31T00:00+00:00[UTC]");
+        function throwsRange(run) {
+            try {
+                run();
+                return false;
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        }
+        function throwsType(run) {
+            try {
+                run();
+                return false;
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+        [
+            jan31.add({ months: 1 }).toString(),
+            throwsRange(() => jan31.add({ months: 1 }, { overflow: "reject" })),
+            throwsRange(() => jan31.add({ days: 1 }, { overflow: "bad" })),
+            throwsType(() => jan31.add({ days: 1 }, null)),
+            mar31.subtract({ months: 1 }).toString(),
+            throwsRange(() => mar31.subtract({ months: 1 }, { overflow: "reject" })),
+            throwsRange(() => mar31.subtract({ days: 1 }, { overflow: "bad" })),
+            throwsType(() => mar31.subtract({ days: 1 }, null))
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "2020-02-29T00:00:00+00:00[UTC]|true|true|true|2020-02-29T00:00:00+00:00[UTC]|true|true|true"
     );
 }
 
@@ -523,6 +700,41 @@ fn temporal_zoned_date_time_from_compare_and_equals_accept_utc_strings_and_bags(
     assert_eq!(
         result,
         "1970-01-02T02:00:00+00:00[UTC]|93600000000000|1970-01-02T02:00:00+00:00[UTC]|93600000000000|-1|true"
+    );
+}
+
+#[test]
+fn temporal_zoned_date_time_from_validates_options_offset_and_overflow() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const existing = new Temporal.ZonedDateTime(0n, "UTC");
+        const mismatch = { year: 2021, month: 10, day: 28, offset: "-07:00", timeZone: "+01:00" };
+        const overflow = { year: 2019, month: 1, day: 32, timeZone: "+01:00" };
+        function throwsRange(run) {
+            try {
+                run();
+                return false;
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        }
+        [
+            throwsRange(() => Temporal.ZonedDateTime.from(existing, { disambiguation: "bad" })),
+            throwsRange(() => Temporal.ZonedDateTime.from(existing, { offset: "bad" })),
+            throwsRange(() => Temporal.ZonedDateTime.from(existing, { overflow: "bad" })),
+            throwsRange(() => Temporal.ZonedDateTime.from(mismatch)),
+            throwsRange(() => Temporal.ZonedDateTime.from(mismatch, { offset: "reject" })),
+            Temporal.ZonedDateTime.from(overflow).toString(),
+            Temporal.ZonedDateTime.from(overflow, { overflow: "constrain" }).toString(),
+            throwsRange(() => Temporal.ZonedDateTime.from(overflow, { overflow: "reject" }))
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "true|true|true|true|true|2019-01-31T00:00:00+01:00[+01:00]|2019-01-31T00:00:00+01:00[+01:00]|true"
     );
 }
 
