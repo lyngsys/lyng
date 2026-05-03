@@ -3,6 +3,10 @@ use super::super::*;
 pub(in crate::public::metadata) const PUBLIC_KEYED_COLLECTION_BUILTIN_METADATA:
     &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(map_builtin, BuiltinEntryMetadata::new("Map", 0, true, true)),
+    PublicBuiltinMetadataRow::new(
+        map_group_by_builtin,
+        BuiltinEntryMetadata::new("groupBy", 2, false, false),
+    ),
     PublicBuiltinMetadataRow::new(set_builtin, BuiltinEntryMetadata::new("Set", 0, true, true)),
     PublicBuiltinMetadataRow::new(
         weak_map_builtin,

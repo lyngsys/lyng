@@ -829,7 +829,7 @@ pub(super) fn set_property_on_object<Cx: PublicBuiltinDispatchContext>(
     Ok(())
 }
 
-fn typed_array_index_is_valid<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn typed_array_index_is_valid<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     record: TypedArrayObjectData,
     element_index: usize,

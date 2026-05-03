@@ -17,17 +17,17 @@ use lyng_js_types::{
     finalization_registry_register_builtin, finalization_registry_unregister_builtin, map_builtin,
     map_clear_builtin, map_delete_builtin, map_entries_builtin, map_for_each_builtin,
     map_get_builtin, map_get_or_insert_builtin, map_get_or_insert_computed_builtin,
-    map_has_builtin, map_keys_builtin, map_set_builtin, map_size_getter_builtin,
-    map_values_builtin, set_add_builtin, set_builtin, set_clear_builtin, set_delete_builtin,
-    set_difference_builtin, set_entries_builtin, set_for_each_builtin, set_has_builtin,
-    set_intersection_builtin, set_is_disjoint_from_builtin, set_is_subset_of_builtin,
-    set_is_superset_of_builtin, set_keys_builtin, set_size_getter_builtin,
-    set_symmetric_difference_builtin, set_union_builtin, set_values_builtin, weak_map_builtin,
-    weak_map_delete_builtin, weak_map_get_builtin, weak_map_get_or_insert_builtin,
-    weak_map_get_or_insert_computed_builtin, weak_map_has_builtin, weak_map_set_builtin,
-    weak_ref_builtin, weak_ref_deref_builtin, weak_set_add_builtin, weak_set_builtin,
-    weak_set_delete_builtin, weak_set_has_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
-    WellKnownSymbolId,
+    map_group_by_builtin, map_has_builtin, map_keys_builtin, map_set_builtin,
+    map_size_getter_builtin, map_values_builtin, set_add_builtin, set_builtin, set_clear_builtin,
+    set_delete_builtin, set_difference_builtin, set_entries_builtin, set_for_each_builtin,
+    set_has_builtin, set_intersection_builtin, set_is_disjoint_from_builtin,
+    set_is_subset_of_builtin, set_is_superset_of_builtin, set_keys_builtin,
+    set_size_getter_builtin, set_symmetric_difference_builtin, set_union_builtin,
+    set_values_builtin, weak_map_builtin, weak_map_delete_builtin, weak_map_get_builtin,
+    weak_map_get_or_insert_builtin, weak_map_get_or_insert_computed_builtin, weak_map_has_builtin,
+    weak_map_set_builtin, weak_ref_builtin, weak_ref_deref_builtin, weak_set_add_builtin,
+    weak_set_builtin, weak_set_delete_builtin, weak_set_has_builtin, BuiltinFunctionId, ObjectRef,
+    RealmRef, Value, WellKnownSymbolId,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -43,6 +43,7 @@ pub(in crate::public) fn install_collection_family(
             map_builtin(),
             Some(prototypes.map_prototype),
         ),
+        map_group_by: install_public_builtin_function(agent, cx, map_group_by_builtin(), None),
         set: install_public_builtin_function(
             agent,
             cx,
@@ -222,12 +223,16 @@ fn install_map_constructor_descriptors(
     cache: &mut BuiltinCache,
     realm: RealmRef,
 ) -> Result<(), BuiltinBootstrapError> {
-    let descriptors = [accessor_symbol_property(
-        WellKnownSymbolId::Species,
-        Some(array_species_getter_builtin()),
-        None,
-        readonly_builtin_attributes(),
-    )];
+    let atoms = CollectionDescriptorAtoms::new(agent);
+    let descriptors = [
+        builtin_function_atom_property(atoms.group_by, map_group_by_builtin()),
+        accessor_symbol_property(
+            WellKnownSymbolId::Species,
+            Some(array_species_getter_builtin()),
+            None,
+            readonly_builtin_attributes(),
+        ),
+    ];
     install_descriptor_tables(
         agent,
         cache,
@@ -535,6 +540,7 @@ struct CollectionDescriptorAtoms {
     get: AtomId,
     get_or_insert: AtomId,
     get_or_insert_computed: AtomId,
+    group_by: AtomId,
     has: AtomId,
     intersection: AtomId,
     is_disjoint_from: AtomId,
@@ -564,6 +570,7 @@ impl CollectionDescriptorAtoms {
             get: atoms.intern("get"),
             get_or_insert: atoms.intern("getOrInsert"),
             get_or_insert_computed: atoms.intern("getOrInsertComputed"),
+            group_by: atoms.intern("groupBy"),
             has: atoms.intern("has"),
             intersection: atoms.intern("intersection"),
             is_disjoint_from: atoms.intern("isDisjointFrom"),
@@ -623,6 +630,7 @@ pub(in crate::public) fn collection_builtin_object(
             finalization_registry_builtin(),
             builtins.finalization_registry,
         ),
+        (map_group_by_builtin(), builtins.map_group_by),
         (map_get_builtin(), builtins.map_get),
         (map_set_builtin(), builtins.map_set),
         (map_has_builtin(), builtins.map_has),

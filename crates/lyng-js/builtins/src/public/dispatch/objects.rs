@@ -5,8 +5,8 @@ use super::{
     length_value_u64, map_completion, property_key_string_value, proxy_define_property,
     proxy_get_own_property, proxy_get_prototype_of, proxy_is_extensible, proxy_own_property_keys,
     proxy_prevent_extensions, proxy_set_prototype_of, set_property_on_object_with_receiver,
-    string_value, type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
-    MAX_SAFE_INTEGER_U64,
+    string_value, type_error, typed_array_index_is_valid, BuiltinIteratorBridge,
+    PublicBuiltinDispatchContext, MAX_SAFE_INTEGER_U64,
 };
 use crate::BuiltinInvocation;
 use lyng_js_common::WellKnownAtom;
@@ -278,11 +278,7 @@ fn define_property_or_throw_builtin<Cx: PublicBuiltinDispatchContext>(
         let typed_array = cx.agent().objects().typed_array(target);
         if let Some(record) = typed_array {
             let element_index = usize::try_from(index).unwrap_or(usize::MAX);
-            if element_index >= record.length()
-                || cx
-                    .agent()
-                    .backing_store_is_detached(record.backing_store())
-                    .ok_or_else(|| type_error(cx))?
+            if !typed_array_index_is_valid(cx, record, element_index)?
                 || descriptor.has_get()
                 || descriptor.has_set()
                 || descriptor.configurable() == Some(false)
@@ -293,11 +289,12 @@ fn define_property_or_throw_builtin<Cx: PublicBuiltinDispatchContext>(
             }
             if let Some(value) = descriptor.value() {
                 let bits = typed_array_storage_bits_from_builtin_value(cx, record.kind(), value)?;
-                if cx
+                let record = cx
                     .agent()
-                    .backing_store_is_detached(record.backing_store())
-                    .ok_or_else(|| type_error(cx))?
-                {
+                    .objects()
+                    .typed_array(target)
+                    .ok_or_else(|| type_error(cx))?;
+                if !typed_array_index_is_valid(cx, record, element_index)? {
                     return Err(type_error(cx));
                 }
                 typed_array_write_storage_bits(cx, record, element_index, bits)?;

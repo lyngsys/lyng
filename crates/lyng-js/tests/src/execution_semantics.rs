@@ -1,5 +1,6 @@
 mod arguments_and_for_in;
 mod classes;
+mod collections;
 mod eval;
 mod exceptions;
 mod functions;

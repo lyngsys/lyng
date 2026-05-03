@@ -177,6 +177,7 @@ impl InstalledBuiltinFamilies {
             array_keys: array_family.array_keys,
             array_entries: array_family.array_entries,
             array_with: array_family.array_with,
+            map_group_by: collection_family.map_group_by,
             map_get: collection_family.map_get,
             map_set: collection_family.map_set,
             map_has: collection_family.map_has,

@@ -1,9 +1,10 @@
 mod iteration;
 
 use super::{
-    close_iterator_after_error, get_property_from_object, iterators::ArrayIterationKind,
-    length_value_u64, map_completion, property_key_from_text, to_number_for_builtin, type_error,
-    BuiltinIteratorBridge, PublicBuiltinDispatchContext,
+    close_iterator_after_error, create_array_from_values, get_property_from_object,
+    iterators::ArrayIterationKind, length_value_u64, map_completion, property_key_from_text,
+    to_number_for_builtin, type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
+    MAX_SAFE_INTEGER_U64,
 };
 use crate::BuiltinInvocation;
 use iteration::{
@@ -14,7 +15,7 @@ use lyng_js_gc::{AllocationLifetime, WeakHeapRef};
 use lyng_js_objects::{
     MapEntry, MapObjectData, ObjectAllocation, ObjectColdData, OrdinaryObjectData, SetObjectData,
 };
-use lyng_js_ops::{iterator, read};
+use lyng_js_ops::{iterator, pure, read};
 use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value};
 
 pub(super) fn dispatch_collection_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -67,6 +68,9 @@ fn dispatch_map_builtin<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Option<Value>, Cx::Error> {
     if entry == super::map_get_builtin() {
         return map_get_builtin(context, invocation).map(Some);
+    }
+    if entry == super::map_group_by_builtin() {
+        return map_group_by_builtin(context, invocation).map(Some);
     }
     if entry == super::map_set_builtin() {
         return map_set_builtin(context, invocation).map(Some);
@@ -671,6 +675,121 @@ fn perform_weak_set_constructor_values<Cx: PublicBuiltinDispatchContext>(
         {
             return close_iterator_after_error(cx, &mut iterator_record, error);
         }
+    }
+}
+
+fn add_value_to_map_group<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    groups: &mut Vec<(Value, Vec<Value>)>,
+    key: Value,
+    value: Value,
+) -> Result<(), Cx::Error> {
+    for (existing_key, values) in groups.iter_mut() {
+        let same = {
+            let heap_view = cx.agent().heap().view();
+            read::same_value(heap_view, *existing_key, key)
+        };
+        if map_completion(cx, same)? {
+            values.push(value);
+            return Ok(());
+        }
+    }
+    groups.push((key, vec![value]));
+    Ok(())
+}
+
+fn map_group_by_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    let items = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let callback = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let callback = cx.require_callable_object(callback)?;
+    let mut iterator_record = {
+        let mut bridge = BuiltinIteratorBridge { cx };
+        iterator::get_iterator(&mut bridge, items)?
+    };
+    let mut groups = Vec::new();
+    let mut index = 0_u64;
+
+    loop {
+        if index >= MAX_SAFE_INTEGER_U64 {
+            let error = type_error(cx);
+            return close_iterator_after_error(cx, &mut iterator_record, error);
+        }
+
+        let next = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_step(&mut bridge, &mut iterator_record)
+        };
+        let next = match next {
+            Ok(next) => next,
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
+        };
+        let Some(next) = next else {
+            break;
+        };
+
+        let value = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_value(&mut bridge, next)
+        };
+        let value = match value {
+            Ok(value) => value,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        let mut key = match cx.call_to_completion(
+            callback,
+            Value::undefined(),
+            &[value, length_value_u64(index)],
+        ) {
+            Ok(key) => key,
+            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+        };
+        if pure::is_negative_zero(key) {
+            key = Value::from_smi(0);
+        }
+        add_value_to_map_group(cx, &mut groups, key, value)?;
+        index += 1;
+    }
+
+    let realm = cx.builtin_realm();
+    let map_prototype = {
+        let agent = cx.agent();
+        agent
+            .realm(realm)
+            .and_then(|record| record.intrinsics().map_prototype())
+    }
+    .ok_or_else(|| type_error(cx))?;
+    let map = allocate_map_object(cx, realm, map_prototype)?;
+    let mut entries = Vec::with_capacity(groups.len());
+    for (key, values) in groups {
+        let array = create_array_from_values(cx, &values)?;
+        entries.push(MapEntry::new(key, Value::from_object_ref(array)));
+    }
+    let installed = cx.agent().with_heap_and_objects(|_, objects| {
+        objects.with_map_mut(map, |map_data| {
+            for entry in entries {
+                map_data.push(entry);
+            }
+            true
+        })
+    });
+    match installed {
+        Some(true) => Ok(Value::from_object_ref(map)),
+        Some(false) => Err(type_error(cx)),
+        None => Err(type_error(cx)),
     }
 }
 

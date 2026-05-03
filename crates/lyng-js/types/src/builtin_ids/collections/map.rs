@@ -9,6 +9,14 @@ pub fn map_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn map_group_by_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(MAP_GROUP_BY_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn map_get_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(MAP_GET_RAW) {
         Some(id) => id,

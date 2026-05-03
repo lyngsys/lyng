@@ -3396,6 +3396,49 @@ fn script_core_typed_array_define_numeric_value_converts_and_handles_detach() {
 }
 
 #[test]
+fn script_core_typed_array_define_property_uses_live_resizable_bounds() {
+    let result = compile_and_run_string(
+        r#"
+        function throwsTypeError(body) {
+            try {
+                body();
+                return false;
+            } catch (error) {
+                return error instanceof TypeError;
+            }
+        }
+
+        let buffer = new ArrayBuffer(4, { maxByteLength: 8 });
+        let fixed = new Uint8Array(buffer, 0, 4);
+        let tracking = new Uint8Array(buffer);
+
+        Object.defineProperty(fixed, "0", { value: 1 });
+        Object.defineProperty(tracking, "1", { value: 2 });
+
+        buffer.resize(3);
+        let fixedRejectsAfterShrink = throwsTypeError(function() {
+            Object.defineProperty(fixed, "0", { value: 9 });
+        });
+        let trackingRejectsPastLiveLength = throwsTypeError(function() {
+            Object.defineProperty(tracking, "3", { value: 9 });
+        });
+        Object.defineProperty(tracking, "2", { value: 7 });
+
+        buffer.resize(6);
+        Object.defineProperty(tracking, "4", { value: 8 });
+
+        [
+            fixedRejectsAfterShrink,
+            trackingRejectsPastLiveLength,
+            Array.from(tracking).join(",")
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|true|1,2,7,0,8,0");
+}
+
+#[test]
 fn script_core_typed_array_set_numeric_value_converts_and_handles_detach() {
     let result = compile_and_run_string(
         r#"

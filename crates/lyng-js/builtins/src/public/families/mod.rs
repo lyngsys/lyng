@@ -351,6 +351,7 @@ pub(super) struct CollectionFamilyPrototypes {
 #[derive(Clone, Copy, Debug)]
 pub(super) struct CollectionFamilyBuiltins {
     pub(super) map: ObjectRef,
+    pub(super) map_group_by: ObjectRef,
     pub(super) set: ObjectRef,
     pub(super) weak_map: ObjectRef,
     pub(super) weak_set: ObjectRef,
