@@ -14,7 +14,7 @@ use lyng_js_env::{
 };
 use lyng_js_ops::{errors, iterator, promise};
 use lyng_js_types::{
-    BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId,
+    AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId,
 };
 
 pub(super) fn dispatch_promise_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -101,6 +101,9 @@ fn dispatch_promise_internal_builtin<Cx: PublicBuiltinDispatchContext>(
         return promise_reject_function_builtin(context, invocation).map(Some);
     }
     if entry == super::promise_finally_function_builtin() {
+        return promise_finally_function_builtin(context, invocation).map(Some);
+    }
+    if entry == super::promise_finally_continuation_builtin() {
         return promise_finally_function_builtin(context, invocation).map(Some);
     }
     if entry == super::promise_all_resolve_element_builtin() {
@@ -950,10 +953,18 @@ pub(super) fn invoke_then_method<Cx: PublicBuiltinDispatchContext>(
     on_fulfilled: Value,
     on_rejected: Value,
 ) -> Result<Value, Cx::Error> {
+    invoke_then_method_with_args(cx, promise, &[on_fulfilled, on_rejected])
+}
+
+fn invoke_then_method_with_args<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    promise: Value,
+    arguments: &[Value],
+) -> Result<Value, Cx::Error> {
     let then_key = property_key_from_text(cx, "then");
     let then = cx.get_property_value(promise, then_key)?;
     let then = cx.require_callable_object(then)?;
-    cx.call_to_completion(then, promise, &[on_fulfilled, on_rejected])
+    cx.call_to_completion(then, promise, arguments)
 }
 
 fn allocate_promise_finally_function<Cx: PublicBuiltinDispatchContext>(
@@ -966,6 +977,19 @@ fn allocate_promise_finally_function<Cx: PublicBuiltinDispatchContext>(
     let _ = cx.agent().alloc_promise_finally_function(
         function,
         PromiseFinallyFunctionRecord::new(kind, on_finally, constructor),
+    );
+    Ok(function)
+}
+
+fn allocate_promise_finally_continuation<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    kind: PromiseFinallyFunctionKind,
+    argument: Value,
+) -> Result<ObjectRef, Cx::Error> {
+    let function = cx.allocate_builtin_function(super::promise_finally_continuation_builtin())?;
+    let _ = cx.agent().alloc_promise_finally_function(
+        function,
+        PromiseFinallyFunctionRecord::continuation(kind, argument),
     );
     Ok(function)
 }
@@ -1212,25 +1236,24 @@ pub(super) fn promise_capability_reject<Cx: PublicBuiltinDispatchContext>(
         .ok_or_else(|| type_error(cx))
 }
 
-fn perform_promise_then<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn perform_promise_then_with_capability<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     promise_object: ObjectRef,
     on_fulfilled: PromiseReactionHandler,
     on_rejected: PromiseReactionHandler,
-) -> Result<Value, Cx::Error> {
-    let constructor = promise_species_constructor(cx, promise_object)?;
-    let capability = new_promise_capability(cx, constructor)?;
+    capability: Option<lyng_js_env::PromiseCapabilityId>,
+) -> Result<(), Cx::Error> {
     let fulfill_reaction = promise::create_promise_reaction(
         cx.agent(),
         PromiseReactionKind::Fulfill,
         on_fulfilled,
-        Some(capability),
+        capability,
     );
     let reject_reaction = promise::create_promise_reaction(
         cx.agent(),
         PromiseReactionKind::Reject,
         on_rejected,
-        Some(capability),
+        capability,
     );
     let record = cx
         .agent()
@@ -1268,6 +1291,24 @@ fn perform_promise_then<Cx: PublicBuiltinDispatchContext>(
             );
         }
     }
+    Ok(())
+}
+
+fn perform_promise_then<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    promise_object: ObjectRef,
+    on_fulfilled: PromiseReactionHandler,
+    on_rejected: PromiseReactionHandler,
+) -> Result<Value, Cx::Error> {
+    let constructor = promise_species_constructor(cx, promise_object)?;
+    let capability = new_promise_capability(cx, constructor)?;
+    perform_promise_then_with_capability(
+        cx,
+        promise_object,
+        on_fulfilled,
+        on_rejected,
+        Some(capability),
+    )?;
     Ok(Value::from_object_ref(promise_capability_promise(
         cx, capability,
     )?))
@@ -1379,25 +1420,32 @@ fn promise_finally_function_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
-    let result = cx.call_to_completion(record.on_finally(), Value::undefined(), &[])?;
-    let resolve = promise_resolve_method(cx, record.constructor())?;
-    let promise = cx.call_to_completion(
-        resolve,
-        Value::from_object_ref(record.constructor()),
-        &[result],
-    )?;
+    if record.kind() == PromiseFinallyFunctionKind::ValueThunk {
+        return Ok(record.argument());
+    }
+    if record.kind() == PromiseFinallyFunctionKind::Thrower {
+        return Err(cx.abrupt(AbruptCompletion::throw(record.argument())));
+    }
+    let on_finally = record.on_finally().ok_or_else(|| type_error(cx))?;
+    let constructor = record.constructor().ok_or_else(|| type_error(cx))?;
+    let result = cx.call_to_completion(on_finally, Value::undefined(), &[])?;
+    let resolve = promise_resolve_method(cx, constructor)?;
+    let promise = cx.call_to_completion(resolve, Value::from_object_ref(constructor), &[result])?;
     let promise_object = promise
         .as_object_ref()
         .filter(|object| cx.agent().promise_record(*object).is_some())
         .ok_or_else(|| type_error(cx))?;
-    let on_fulfilled = match record.kind() {
-        PromiseFinallyFunctionKind::Then => PromiseReactionHandler::PassThrough(argument),
-        PromiseFinallyFunctionKind::Catch => PromiseReactionHandler::ThrowWith(argument),
+    let continuation_kind = match record.kind() {
+        PromiseFinallyFunctionKind::Then => PromiseFinallyFunctionKind::ValueThunk,
+        PromiseFinallyFunctionKind::Catch => PromiseFinallyFunctionKind::Thrower,
+        PromiseFinallyFunctionKind::ValueThunk | PromiseFinallyFunctionKind::Thrower => {
+            unreachable!("continuation kinds returned above")
+        }
     };
-    perform_promise_then(
+    let continuation = allocate_promise_finally_continuation(cx, continuation_kind, argument)?;
+    invoke_then_method_with_args(
         cx,
-        promise_object,
-        on_fulfilled,
-        PromiseReactionHandler::Thrower,
+        Value::from_object_ref(promise_object),
+        &[Value::from_object_ref(continuation)],
     )
 }

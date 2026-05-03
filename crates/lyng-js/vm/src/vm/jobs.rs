@@ -1,3 +1,4 @@
+use super::runtime_objects::VmIteratorBridge;
 use super::*;
 use lyng_js_env::{
     ExecutableId, JobQueueKind, PromiseCapabilityId, PromiseReactionHandler, PromiseReactionKind,
@@ -249,9 +250,13 @@ impl Vm {
         let reaction = agent
             .promise_reaction(reaction_id)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let async_generator_return = match reaction.handler() {
+            PromiseReactionHandler::AsyncGeneratorReturn { generator, .. } => Some(generator),
+            _ => None,
+        };
         let outcome =
             self.execute_promise_reaction(agent, host, registry, realm, reaction, argument)?;
-        match (reaction.capability(), outcome) {
+        let result = match (reaction.capability(), outcome) {
             (_, PromiseReactionOutcome::Deferred) | (None, PromiseReactionOutcome::Fulfill(_)) => {
                 Ok(())
             }
@@ -262,7 +267,14 @@ impl Vm {
             (None, PromiseReactionOutcome::Reject(reason)) => {
                 Err(VmError::Abrupt(AbruptCompletion::throw(reason)))
             }
+        };
+        if result.is_ok() {
+            if let Some(generator) = async_generator_return {
+                self.pop_async_generator_front_request(generator);
+                self.drain_async_generator_queue(agent, host, registry, generator)?;
+            }
         }
+        result
     }
 
     fn execute_promise_reaction(
@@ -289,6 +301,29 @@ impl Vm {
                     result,
                 )))
             }
+            PromiseReactionHandler::AsyncFromSyncIteratorReject {
+                iterator,
+                next_method,
+            } => {
+                let caller = self.synthetic_job_caller_frame(realm);
+                let mut record =
+                    iterator::IteratorRecord::new_async_from_sync(iterator, next_method);
+                let mut bridge = VmIteratorBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    frame: caller,
+                };
+                let completion = AbruptCompletion::throw(argument);
+                match iterator::iterator_close::<_, ()>(&mut bridge, &mut record, Err(completion)) {
+                    Ok(()) => Ok(PromiseReactionOutcome::Reject(argument)),
+                    Err(VmError::Abrupt(completion)) => Ok(PromiseReactionOutcome::Reject(
+                        completion.thrown_value().unwrap_or(argument),
+                    )),
+                    Err(error) => Err(error),
+                }
+            }
             PromiseReactionHandler::AsyncResume { suspended, reject } => {
                 let suspended_state = self
                     .suspended_side_states
@@ -309,6 +344,23 @@ impl Vm {
                     )?;
                 }
                 Ok(PromiseReactionOutcome::Fulfill(Value::undefined()))
+            }
+            PromiseReactionHandler::AsyncGeneratorReturnResume { suspended, reject } => {
+                self.resume_async_generator_return_from_suspended_yield(
+                    agent, host, registry, suspended, reject, argument,
+                )?;
+                Ok(PromiseReactionOutcome::Fulfill(Value::undefined()))
+            }
+            PromiseReactionHandler::AsyncGeneratorReturn { reject, .. } => {
+                if reject {
+                    return Ok(PromiseReactionOutcome::Reject(argument));
+                }
+                let result =
+                    iterator::create_iterator_result_object(agent, realm.id(), argument, true)
+                        .map_err(VmError::Abrupt)?;
+                Ok(PromiseReactionOutcome::Fulfill(Value::from_object_ref(
+                    result,
+                )))
             }
             PromiseReactionHandler::Callable(handler) => {
                 let caller = self.synthetic_job_caller_frame(realm);
@@ -645,7 +697,7 @@ impl Vm {
         self.settle_promise_capability(agent, host, registry, realm, capability, rejected, value)
     }
 
-    fn synthetic_job_caller_frame(&self, realm: RealmRecord) -> FrameRecord {
+    pub(super) fn synthetic_job_caller_frame(&self, realm: RealmRecord) -> FrameRecord {
         FrameRecord::new(
             self.job_caller_code(),
             0,

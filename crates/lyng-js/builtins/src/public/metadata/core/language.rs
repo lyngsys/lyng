@@ -167,6 +167,10 @@ pub(in crate::public::metadata) const PUBLIC_LANGUAGE_SUPPORT_BUILTIN_METADATA:
         BuiltinEntryMetadata::new("", 1, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        promise_finally_continuation_builtin,
+        BuiltinEntryMetadata::new("", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         promise_resolve_builtin,
         BuiltinEntryMetadata::new("resolve", 1, false, false),
     ),

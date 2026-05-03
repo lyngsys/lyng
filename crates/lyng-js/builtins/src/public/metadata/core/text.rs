@@ -82,6 +82,10 @@ pub(in crate::public::metadata) const PUBLIC_TEXT_BUILTIN_METADATA: &[PublicBuil
         BuiltinEntryMetadata::new("[Symbol.dispose]", 0, false, false),
     ),
     PublicBuiltinMetadataRow::new(
+        async_iterator_dispose_builtin,
+        BuiltinEntryMetadata::new("[Symbol.asyncDispose]", 0, false, false),
+    ),
+    PublicBuiltinMetadataRow::new(
         iterator_flat_map_builtin,
         BuiltinEntryMetadata::new("flatMap", 1, false, false),
     ),

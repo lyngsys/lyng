@@ -340,6 +340,7 @@ impl InstalledBuiltinFamilies {
             typed_array_to_string_tag_getter: binary_data_family.typed_array_to_string_tag_getter,
             iterator_prototype_iterator: iterator_family.iterator_prototype_iterator,
             async_iterator_method: iterator_family.async_iterator_method,
+            async_iterator_dispose: iterator_family.async_iterator_dispose,
             array_iterator_next: array_family.array_iterator_next,
             map_iterator_next: iterator_family.map_iterator_next,
             set_iterator_next: iterator_family.set_iterator_next,

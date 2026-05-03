@@ -153,6 +153,14 @@ pub fn promise_finally_function_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn promise_finally_continuation_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(PROMISE_FINALLY_CONTINUATION_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn promise_try_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(PROMISE_TRY_RAW) {
         Some(id) => id,

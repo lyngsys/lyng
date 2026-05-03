@@ -263,6 +263,30 @@ impl Vm {
         rejected: bool,
         argument: Value,
     ) -> VmResult<()> {
+        let resume_kind = if rejected {
+            GeneratorResumeKind::Throw
+        } else {
+            GeneratorResumeKind::Next
+        };
+        self.resume_async_generator_request_with_kind(
+            agent,
+            host,
+            registry,
+            suspended,
+            resume_kind,
+            argument,
+        )
+    }
+
+    pub(super) fn resume_async_generator_request_with_kind(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        suspended: SuspendedExecutionRef,
+        resume_kind: GeneratorResumeKind,
+        argument: Value,
+    ) -> VmResult<()> {
         let frame_state = self
             .suspended_side_states
             .get(&suspended)
@@ -277,11 +301,6 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
 
-        let resume_kind = if rejected {
-            GeneratorResumeKind::Throw
-        } else {
-            GeneratorResumeKind::Next
-        };
         self.restore_suspended_execution(agent, suspended, resume_kind, argument)?;
         let outcome =
             self.run_generator_frame(agent, host, registry, frame_state.generator, None)?;
@@ -298,7 +317,51 @@ impl Vm {
         self.drain_async_generator_queue(agent, host, registry, frame_state.generator)
     }
 
-    fn drain_async_generator_queue(
+    pub(super) fn resume_async_generator_return_from_suspended_yield(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        suspended: SuspendedExecutionRef,
+        rejected: bool,
+        argument: Value,
+    ) -> VmResult<()> {
+        let generator = self
+            .suspended_side_states
+            .get(&suspended)
+            .and_then(|state| state.async_generator_frame_state)
+            .map(|state| state.generator)
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let front_request = self
+            .async_generator_queues
+            .get(&generator)
+            .and_then(|queue| queue.front().copied())
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        if front_request.kind != GeneratorResumeKind::Return {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+
+        let resume_kind = if rejected {
+            GeneratorResumeKind::Throw
+        } else {
+            GeneratorResumeKind::Return
+        };
+        self.restore_suspended_execution(agent, suspended, resume_kind, argument)?;
+        let frame_state = AsyncGeneratorFrameState {
+            generator,
+            capability: front_request.capability,
+            realm: front_request.realm,
+        };
+        let outcome =
+            self.run_generator_frame(agent, host, registry, generator, Some(frame_state))?;
+        if matches!(outcome, GeneratorExecutionOutcome::AsyncSuspend) {
+            return Ok(());
+        }
+        self.finish_async_generator_front_request(agent, host, registry, generator, outcome)?;
+        self.drain_async_generator_queue(agent, host, registry, generator)
+    }
+
+    pub(super) fn drain_async_generator_queue(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -329,6 +392,12 @@ impl Vm {
             match state {
                 GeneratorState::Executing => return Ok(()),
                 GeneratorState::Completed => {
+                    if request.kind == GeneratorResumeKind::Return {
+                        self.await_async_generator_return_completion(
+                            agent, host, registry, generator, request,
+                        )?;
+                        return Ok(());
+                    }
                     let completion = self.generator_completion_result(
                         agent,
                         request.realm,
@@ -341,6 +410,12 @@ impl Vm {
                 }
                 GeneratorState::SuspendedStart if request.kind != GeneratorResumeKind::Next => {
                     self.complete_generator_object(agent, generator)?;
+                    if request.kind == GeneratorResumeKind::Return {
+                        self.await_async_generator_return_completion(
+                            agent, host, registry, generator, request,
+                        )?;
+                        return Ok(());
+                    }
                     let completion = self.generator_completion_result(
                         agent,
                         request.realm,
@@ -350,6 +425,15 @@ impl Vm {
                     self.settle_async_generator_request_completion(
                         agent, host, registry, generator, request, completion,
                     )?;
+                }
+                GeneratorState::SuspendedYield if request.kind == GeneratorResumeKind::Return => {
+                    let suspended = suspended
+                        .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+                    self.set_generator_state(agent, generator, GeneratorState::Executing, None)?;
+                    self.await_suspended_async_generator_return_completion(
+                        agent, host, registry, suspended, request,
+                    )?;
+                    return Ok(());
                 }
                 GeneratorState::SuspendedStart | GeneratorState::SuspendedYield => {
                     let suspended = suspended
@@ -485,7 +569,103 @@ impl Vm {
         Ok(())
     }
 
-    fn pop_async_generator_front_request(&mut self, generator: ObjectRef) {
+    fn await_async_generator_return_completion(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        generator: ObjectRef,
+        request: AsyncGeneratorRequest,
+    ) -> VmResult<()> {
+        let realm = agent
+            .realm(request.realm)
+            .ok_or(VmError::MissingRootShape(request.realm))?;
+        let caller = self.synthetic_job_caller_frame(realm);
+        let promise = match self.promise_resolve_in_realm(
+            agent,
+            host,
+            registry,
+            caller,
+            request.realm,
+            request.value,
+        ) {
+            Ok(promise) => promise,
+            Err(VmError::Abrupt(completion)) => {
+                self.settle_async_generator_request_completion(
+                    agent,
+                    host,
+                    registry,
+                    generator,
+                    request,
+                    Err(VmError::Abrupt(completion)),
+                )?;
+                return Ok(());
+            }
+            Err(error) => return Err(error),
+        };
+        self.enqueue_promise_then(
+            agent,
+            realm,
+            promise,
+            lyng_js_env::PromiseReactionHandler::AsyncGeneratorReturn {
+                generator,
+                reject: false,
+            },
+            lyng_js_env::PromiseReactionHandler::AsyncGeneratorReturn {
+                generator,
+                reject: true,
+            },
+            Some(request.capability),
+        )
+    }
+
+    fn await_suspended_async_generator_return_completion(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        suspended: SuspendedExecutionRef,
+        request: AsyncGeneratorRequest,
+    ) -> VmResult<()> {
+        let realm = agent
+            .realm(request.realm)
+            .ok_or(VmError::MissingRootShape(request.realm))?;
+        let caller = self.synthetic_job_caller_frame(realm);
+        let promise = match self.promise_resolve_in_realm(
+            agent,
+            host,
+            registry,
+            caller,
+            request.realm,
+            request.value,
+        ) {
+            Ok(promise) => promise,
+            Err(VmError::Abrupt(completion)) => {
+                let thrown = completion.thrown_value().unwrap_or(Value::undefined());
+                self.resume_async_generator_return_from_suspended_yield(
+                    agent, host, registry, suspended, true, thrown,
+                )?;
+                return Ok(());
+            }
+            Err(error) => return Err(error),
+        };
+        self.enqueue_promise_then(
+            agent,
+            realm,
+            promise,
+            lyng_js_env::PromiseReactionHandler::AsyncGeneratorReturnResume {
+                suspended,
+                reject: false,
+            },
+            lyng_js_env::PromiseReactionHandler::AsyncGeneratorReturnResume {
+                suspended,
+                reject: true,
+            },
+            None,
+        )
+    }
+
+    pub(super) fn pop_async_generator_front_request(&mut self, generator: ObjectRef) {
         let remove_queue = if let Some(queue) = self.async_generator_queues.get_mut(&generator) {
             let _ = queue.pop_front();
             queue.is_empty()
@@ -760,12 +940,14 @@ impl Vm {
                 }
                 GeneratorResumeKind::Return => {
                     if record.is_async() {
-                        return self.start_async_delegate_return_resume_await(
+                        return self.finish_delegate_return_resume(
                             agent,
                             host,
                             registry,
                             frame,
                             iterator_register,
+                            result_register,
+                            done_register,
                             record,
                             resume_value,
                         );
@@ -954,24 +1136,6 @@ impl Vm {
         }
     }
 
-    fn start_async_delegate_return_resume_await(
-        &mut self,
-        agent: &mut Agent,
-        host: &dyn HostHooks,
-        registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
-        iterator_register: u16,
-        mut record: iterator::IteratorRecord,
-        value: Value,
-    ) -> VmResult<()> {
-        let promise =
-            self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)?;
-        record.set_delegate_yield_await_state(iterator::DelegateYieldAwaitState::ReturnResumeValue);
-        self.iterator_states
-            .insert(frame.registers().base(), iterator_register, record);
-        self.suspend_for_await_promise(agent, frame, promise)
-    }
-
     fn start_async_delegate_next(
         &mut self,
         agent: &mut Agent,
@@ -1088,7 +1252,29 @@ impl Vm {
         return_completion: bool,
     ) -> VmResult<()> {
         let promise =
-            self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)?;
+            match self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)
+            {
+                Ok(promise) => promise,
+                Err(VmError::Abrupt(completion)) if record.is_async_from_sync() && !done => {
+                    let mut record = record;
+                    let mut bridge = VmIteratorBridge {
+                        vm: self,
+                        agent,
+                        host,
+                        registry,
+                        frame,
+                    };
+                    match iterator::iterator_close::<_, ()>(
+                        &mut bridge,
+                        &mut record,
+                        Err(completion),
+                    ) {
+                        Ok(()) => return Err(VmError::Abrupt(completion)),
+                        Err(error) => return Err(error),
+                    }
+                }
+                Err(error) => return Err(error),
+            };
         record.set_delegate_yield_await_state(iterator::DelegateYieldAwaitState::Value {
             done,
             return_completion,
@@ -1118,6 +1304,22 @@ impl Vm {
             .frame()
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         if resume_kind == GeneratorResumeKind::Throw {
+            if let iterator::DelegateYieldAwaitState::Value { done: false, .. } = await_state {
+                if record.is_async_from_sync() {
+                    let mut bridge = VmIteratorBridge {
+                        vm: self,
+                        agent,
+                        host,
+                        registry,
+                        frame,
+                    };
+                    let _: () = iterator::iterator_close(
+                        &mut bridge,
+                        &mut record,
+                        Err(lyng_js_types::AbruptCompletion::Throw(resume_value)),
+                    )?;
+                }
+            }
             return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::Throw(
                 resume_value,
             )));
@@ -1174,18 +1376,6 @@ impl Vm {
                     outcome,
                 )
             }
-            iterator::DelegateYieldAwaitState::ReturnResumeValue => self
-                .finish_delegate_return_resume(
-                    agent,
-                    host,
-                    registry,
-                    frame,
-                    iterator_register,
-                    result_register,
-                    done_register,
-                    record,
-                    resume_value,
-                ),
             iterator::DelegateYieldAwaitState::Value {
                 done,
                 return_completion,

@@ -7000,6 +7000,56 @@ fn evaluate_script_promise_finally_wraps_callable_handlers_before_invoking_then(
 }
 
 #[test]
+fn evaluate_script_promise_finally_invokes_result_then_observably() {
+    let unit = compile_test_unit(
+        2401,
+        r#"
+            var sequence = [];
+            var value = {};
+            var reason = {};
+            var rejected = Promise.reject(reason);
+            rejected.then = function() {
+                sequence.push(4);
+                return Promise.prototype.then.apply(this, arguments);
+            };
+
+            Promise.resolve(value)
+                .then(function(x) {
+                    sequence.push(2);
+                    return x;
+                })
+                .finally(function() {
+                    sequence.push(3);
+                    return rejected;
+                })
+                .catch(function(error) {
+                    sequence.push(error === reason ? 5 : 50);
+                    return sequence.join(",") === "2,3,4,5";
+                });
+        "#,
+    );
+    let host = TestHost::new();
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("finally observable-then check should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("finally observable-then promise should remain tracked");
+
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.result(), Value::from_bool(true));
+}
+
+#[test]
 fn evaluate_script_promise_then_throws_when_constructor_is_null() {
     let unit = compile_test_unit(
         241,
@@ -7350,6 +7400,54 @@ fn async_disposable_stack_dispose_async_awaits_resources_in_lifo_order() {
     let record = agent
         .promise_record(promise)
         .expect("disposeAsync result promise should remain tracked");
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.result(), Value::from_bool(true));
+}
+
+#[test]
+fn async_disposable_stack_dispose_async_awaits_null_resources_before_resolving() {
+    let unit = compile_test_unit(
+        2310,
+        r#"
+            var stack = new AsyncDisposableStack();
+            var log = [];
+
+            stack.use(null);
+
+            Promise.resolve()
+                .then(function() { return 0; })
+                .then(function() { log.push("job 1"); });
+
+            var disposed = stack.disposeAsync().then(function() {
+                log.push("dispose");
+            });
+
+            Promise.resolve()
+                .then(function() { return 0; })
+                .then(function() { log.push("job 2"); });
+
+            Promise.all([disposed]).then(function() {
+                return log.join(",") === "job 1,dispose,job 2";
+            });
+        "#,
+    );
+    let host = TestHost::new();
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("disposeAsync ordering check should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("disposeAsync ordering promise should remain tracked");
+
     assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
@@ -8594,9 +8692,62 @@ fn async_generator_yield_return_resumption_awaits_return_value() {
 }
 
 #[test]
+fn async_generator_return_promise_resolve_abrupt_resumes_suspended_yield_as_throw() {
+    let unit = compile_test_unit(
+        339,
+        r#"
+            async function main() {
+                var caught;
+                async function* f() {
+                    try {
+                        yield;
+                        return "unreachable";
+                    } catch (err) {
+                        caught = err.message;
+                        return 1;
+                    }
+                }
+
+                var brokenPromise = Promise.resolve(42);
+                Object.defineProperty(brokenPromise, "constructor", {
+                    get() {
+                        throw new Error("broken promise");
+                    }
+                });
+
+                var iter = f();
+                await iter.next();
+                var ret = await iter.return(brokenPromise);
+                return caught + "|" + ret.value + "|" + ret.done;
+            }
+            main();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("async generator abrupt return test should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("async generator abrupt return promise should remain tracked");
+    let text = record
+        .result()
+        .as_string_ref()
+        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .expect("async generator abrupt return should fulfill with a string");
+
+    assert_eq!(text, "broken promise|1|true");
+}
+
+#[test]
 fn async_generator_yield_star_return_resumption_awaits_before_delegate_return_lookup() {
     let unit = compile_test_unit(
-        338,
+        340,
         r#"
             async function main() {
                 var actual = [];
@@ -8724,6 +8875,86 @@ fn async_iterator_prototype_async_iterator_method_has_spec_name() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
 
     assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn async_iterator_prototype_async_dispose_method_has_spec_descriptor() {
+    let unit = compile_test_unit(
+        236,
+        r#"
+            var AsyncIteratorPrototype = Object.getPrototypeOf(
+                Object.getPrototypeOf((async function* () {}).prototype)
+            );
+            var descriptor = Object.getOwnPropertyDescriptor(
+                AsyncIteratorPrototype,
+                Symbol.asyncDispose
+            );
+            var method = descriptor && descriptor.value;
+            descriptor !== undefined &&
+                typeof method === "function" &&
+                method.name === "[Symbol.asyncDispose]" &&
+                method.length === 0 &&
+                descriptor.writable === true &&
+                descriptor.enumerable === false &&
+                descriptor.configurable === true;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn async_iterator_prototype_async_dispose_rejects_when_return_throws() {
+    let unit = compile_test_unit(
+        237,
+        r#"
+            var AsyncIteratorPrototype = Object.getPrototypeOf(
+                Object.getPrototypeOf((async function* () {}).prototype)
+            );
+            var calls = 0;
+            function Marker() {}
+            var iter = {
+                return: function(value) {
+                    calls += value === undefined ? 1 : 100;
+                    throw new Marker();
+                }
+            };
+
+            AsyncIteratorPrototype[Symbol.asyncDispose].call(iter).then(
+                function() {
+                    return false;
+                },
+                function(error) {
+                    return error instanceof Marker && calls === 1;
+                }
+            );
+        "#,
+    );
+    let host = TestHost::new();
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .unwrap();
+    let promise = result
+        .as_object_ref()
+        .expect("async dispose rejection handler should return a promise");
+    let record = agent
+        .promise_record(promise)
+        .expect("async dispose rejection chain should remain tracked");
+
+    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.result(), Value::from_bool(true));
 }
 
 #[test]

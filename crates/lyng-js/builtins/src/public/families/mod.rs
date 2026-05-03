@@ -310,6 +310,7 @@ pub(super) struct IteratorFamilyBuiltins {
     pub(super) async_iterator_prototype: ObjectRef,
     pub(super) iterator_prototype_iterator: ObjectRef,
     pub(super) async_iterator_method: ObjectRef,
+    pub(super) async_iterator_dispose: ObjectRef,
     pub(super) map_iterator_next: ObjectRef,
     pub(super) set_iterator_next: ObjectRef,
     pub(super) iterator: ObjectRef,

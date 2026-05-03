@@ -32,12 +32,24 @@ pub enum PromiseReactionHandler {
     AsyncFromSyncIteratorValue {
         done: bool,
     },
+    AsyncFromSyncIteratorReject {
+        iterator: ObjectRef,
+        next_method: ObjectRef,
+    },
     Finally {
         on_finally: ObjectRef,
         constructor: ObjectRef,
         reject: bool,
     },
     AsyncResume {
+        suspended: SuspendedExecutionRef,
+        reject: bool,
+    },
+    AsyncGeneratorReturn {
+        generator: ObjectRef,
+        reject: bool,
+    },
+    AsyncGeneratorReturnResume {
         suspended: SuspendedExecutionRef,
         reject: bool,
     },
@@ -183,13 +195,16 @@ impl PromiseResolvingFunctionRecord {
 pub enum PromiseFinallyFunctionKind {
     Then,
     Catch,
+    ValueThunk,
+    Thrower,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PromiseFinallyFunctionRecord {
     kind: PromiseFinallyFunctionKind,
-    on_finally: ObjectRef,
-    constructor: ObjectRef,
+    on_finally: Option<ObjectRef>,
+    constructor: Option<ObjectRef>,
+    argument: Value,
 }
 
 impl PromiseFinallyFunctionRecord {
@@ -201,8 +216,19 @@ impl PromiseFinallyFunctionRecord {
     ) -> Self {
         Self {
             kind,
-            on_finally,
-            constructor,
+            on_finally: Some(on_finally),
+            constructor: Some(constructor),
+            argument: Value::undefined(),
+        }
+    }
+
+    #[inline]
+    pub const fn continuation(kind: PromiseFinallyFunctionKind, argument: Value) -> Self {
+        Self {
+            kind,
+            on_finally: None,
+            constructor: None,
+            argument,
         }
     }
 
@@ -212,13 +238,18 @@ impl PromiseFinallyFunctionRecord {
     }
 
     #[inline]
-    pub const fn on_finally(self) -> ObjectRef {
+    pub const fn on_finally(self) -> Option<ObjectRef> {
         self.on_finally
     }
 
     #[inline]
-    pub const fn constructor(self) -> ObjectRef {
+    pub const fn constructor(self) -> Option<ObjectRef> {
         self.constructor
+    }
+
+    #[inline]
+    pub const fn argument(self) -> Value {
+        self.argument
     }
 }
 
@@ -411,6 +442,13 @@ impl TraceHeapEdges for PromiseReactionHandler {
             Self::Callable(object) => object.trace_heap_edges(tracer),
             Self::PassThrough(value) | Self::ThrowWith(value) => value.trace_heap_edges(tracer),
             Self::AsyncFromSyncIteratorValue { .. } => {}
+            Self::AsyncFromSyncIteratorReject {
+                iterator,
+                next_method,
+            } => {
+                iterator.trace_heap_edges(tracer);
+                next_method.trace_heap_edges(tracer);
+            }
             Self::Finally {
                 on_finally,
                 constructor,
@@ -420,6 +458,10 @@ impl TraceHeapEdges for PromiseReactionHandler {
                 constructor.trace_heap_edges(tracer);
             }
             Self::AsyncResume { suspended, .. } => suspended.trace_heap_edges(tracer),
+            Self::AsyncGeneratorReturn { generator, .. } => generator.trace_heap_edges(tracer),
+            Self::AsyncGeneratorReturnResume { suspended, .. } => {
+                suspended.trace_heap_edges(tracer);
+            }
         }
     }
 }
@@ -446,6 +488,7 @@ impl TraceHeapEdges for PromiseFinallyFunctionRecord {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
         self.on_finally.trace_heap_edges(tracer);
         self.constructor.trace_heap_edges(tracer);
+        self.argument.trace_heap_edges(tracer);
     }
 }
 
@@ -1156,8 +1199,8 @@ mod tests {
 
         assert_eq!(id.get(), 1);
         assert_eq!(record.kind(), PromiseFinallyFunctionKind::Then);
-        assert_eq!(record.on_finally(), on_finally);
-        assert_eq!(record.constructor(), constructor);
+        assert_eq!(record.on_finally(), Some(on_finally));
+        assert_eq!(record.constructor(), Some(constructor));
     }
 
     #[test]

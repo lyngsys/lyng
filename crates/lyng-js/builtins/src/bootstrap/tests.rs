@@ -6,21 +6,21 @@ use lyng_js_types::{
     array_buffer_byte_length_getter_builtin, array_buffer_is_view_builtin,
     array_buffer_slice_builtin, array_from_async_builtin, array_iterator_next_builtin,
     array_species_getter_builtin, array_values_builtin,
-    async_disposable_stack_dispose_async_builtin, atomics_add_builtin, bigint_as_int_n_builtin,
-    bigint_to_string_builtin, boolean_to_string_builtin, data_view_buffer_getter_builtin,
-    data_view_get_uint8_builtin, date_get_time_builtin, date_now_builtin,
-    date_set_full_year_builtin, date_to_primitive_builtin, date_to_string_builtin,
-    disposable_stack_dispose_builtin, disposable_stack_disposed_getter_builtin,
-    disposable_stack_use_builtin, error_to_string_builtin, escape_builtin,
-    iterator_prototype_iterator_builtin, json_parse_builtin, json_raw_json_builtin,
-    map_iterator_next_builtin, map_size_getter_builtin, math_abs_builtin, number_is_finite_builtin,
-    number_to_string_builtin, promise_resolve_builtin, promise_species_getter_builtin,
-    promise_then_builtin, proxy_revocable_builtin, reflect_get_builtin, regexp_escape_builtin,
-    regexp_exec_builtin, regexp_global_getter_builtin, regexp_species_getter_builtin,
-    regexp_symbol_match_builtin, set_iterator_next_builtin, set_values_builtin,
-    string_from_char_code_builtin, string_iterator_builtin, string_iterator_next_builtin,
-    string_trim_builtin, symbol_description_getter_builtin, symbol_for_builtin,
-    symbol_to_primitive_builtin, typed_array_from_builtin,
+    async_disposable_stack_dispose_async_builtin, async_iterator_dispose_builtin,
+    atomics_add_builtin, bigint_as_int_n_builtin, bigint_to_string_builtin,
+    boolean_to_string_builtin, data_view_buffer_getter_builtin, data_view_get_uint8_builtin,
+    date_get_time_builtin, date_now_builtin, date_set_full_year_builtin, date_to_primitive_builtin,
+    date_to_string_builtin, disposable_stack_dispose_builtin,
+    disposable_stack_disposed_getter_builtin, disposable_stack_use_builtin,
+    error_to_string_builtin, escape_builtin, iterator_prototype_iterator_builtin,
+    json_parse_builtin, json_raw_json_builtin, map_iterator_next_builtin, map_size_getter_builtin,
+    math_abs_builtin, number_is_finite_builtin, number_to_string_builtin, promise_resolve_builtin,
+    promise_species_getter_builtin, promise_then_builtin, proxy_revocable_builtin,
+    reflect_get_builtin, regexp_escape_builtin, regexp_exec_builtin, regexp_global_getter_builtin,
+    regexp_species_getter_builtin, regexp_symbol_match_builtin, set_iterator_next_builtin,
+    set_values_builtin, string_from_char_code_builtin, string_iterator_builtin,
+    string_iterator_next_builtin, string_trim_builtin, symbol_description_getter_builtin,
+    symbol_for_builtin, symbol_to_primitive_builtin, typed_array_from_builtin,
     typed_array_to_string_tag_getter_builtin, uint8_array_buffer_getter_builtin,
     uint8_array_values_builtin, unescape_builtin, weak_ref_deref_builtin, PropertyKey, Value,
 };
@@ -1024,6 +1024,9 @@ fn shared_bootstrap_installs_iterator_family_descriptors() {
     let async_iterator_symbol = agent
         .well_known_symbol(WellKnownSymbolId::AsyncIterator)
         .expect("Symbol.asyncIterator should exist");
+    let async_dispose_symbol = agent
+        .well_known_symbol(WellKnownSymbolId::AsyncDispose)
+        .expect("Symbol.asyncDispose should exist");
     let to_string_tag_symbol = agent
         .well_known_symbol(WellKnownSymbolId::ToStringTag)
         .expect("Symbol.toStringTag should exist");
@@ -1041,6 +1044,9 @@ fn shared_bootstrap_installs_iterator_family_descriptors() {
     let set_iterator_next = cache
         .builtin_constant(agent, artifacts.realm(), set_iterator_next_builtin())
         .expect("Set Iterator next builtin should resolve");
+    let async_iterator_dispose = cache
+        .builtin_constant(agent, artifacts.realm(), async_iterator_dispose_builtin())
+        .expect("AsyncIterator.prototype[Symbol.asyncDispose] builtin should resolve");
 
     let iterator = own_descriptor(
         agent,
@@ -1066,6 +1072,17 @@ fn shared_bootstrap_installs_iterator_family_descriptors() {
     assert_eq!(async_iterator.writable(), Some(true));
     assert_eq!(async_iterator.enumerable(), Some(false));
     assert_eq!(async_iterator.configurable(), Some(true));
+
+    let async_dispose = own_descriptor(
+        agent,
+        async_iterator_prototype,
+        PropertyKey::from_symbol(async_dispose_symbol),
+        "AsyncIterator.prototype[Symbol.asyncDispose]",
+    );
+    assert_eq!(async_dispose.value(), Some(async_iterator_dispose));
+    assert_eq!(async_dispose.writable(), Some(true));
+    assert_eq!(async_dispose.enumerable(), Some(false));
+    assert_eq!(async_dispose.configurable(), Some(true));
 
     let async_iterator_tag = own_descriptor(
         agent,

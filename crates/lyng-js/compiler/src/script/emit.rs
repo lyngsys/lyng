@@ -66,12 +66,6 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
         let return_entry = self.builder.current_offset()?;
         self.builder.patch_jump_to(jump_return, return_entry)?;
-        if self.current_function.is_some_and(|function| {
-            self.state.function_kind(function) == FunctionKind::AsyncGenerator
-        }) {
-            self.builder
-                .emit_ax(Opcode::Await, i32::from(registers.value))?;
-        }
         if let Some(finally_index) = self.nearest_active_finally() {
             self.set_completion_state(CompletionKind::Return, Some(registers.value), None)?;
             self.emit_jump_to_finally(finally_index)?;

@@ -129,6 +129,14 @@ pub fn iterator_dispose_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn async_iterator_dispose_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(ASYNC_ITERATOR_DISPOSE_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn iterator_flat_map_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(ITERATOR_FLAT_MAP_RAW) {
         Some(id) => id,

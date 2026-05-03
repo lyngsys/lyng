@@ -575,6 +575,7 @@ impl Vm {
         frame: FrameRecord,
         value: Value,
         done: bool,
+        close_on_rejection: Option<(ObjectRef, ObjectRef)>,
     ) -> VmResult<ObjectRef> {
         let capability = self.create_intrinsic_promise_capability(agent, frame.realm())?;
         let promise = self.promise_capability_promise(agent, capability)?;
@@ -583,6 +584,34 @@ impl Vm {
             {
                 Ok(value_wrapper) => value_wrapper,
                 Err(VmError::Abrupt(completion)) => {
+                    let completion = if !done {
+                        if let Some((iterator, next_method)) = close_on_rejection {
+                            let mut record = iterator::IteratorRecord::new_async_from_sync(
+                                iterator,
+                                next_method,
+                            );
+                            let mut bridge = VmIteratorBridge {
+                                vm: self,
+                                agent,
+                                host,
+                                registry,
+                                frame,
+                            };
+                            match iterator::iterator_close::<_, ()>(
+                                &mut bridge,
+                                &mut record,
+                                Err(completion),
+                            ) {
+                                Ok(()) => completion,
+                                Err(VmError::Abrupt(completion)) => completion,
+                                Err(error) => return Err(error),
+                            }
+                        } else {
+                            completion
+                        }
+                    } else {
+                        completion
+                    };
                     let realm = agent
                         .realm(frame.realm())
                         .ok_or(VmError::MissingRootShape(frame.realm()))?;
@@ -607,7 +636,19 @@ impl Vm {
             realm,
             value_wrapper,
             lyng_js_env::PromiseReactionHandler::AsyncFromSyncIteratorValue { done },
-            lyng_js_env::PromiseReactionHandler::Thrower,
+            if !done {
+                close_on_rejection.map_or(
+                    lyng_js_env::PromiseReactionHandler::Thrower,
+                    |(iterator, next_method)| {
+                        lyng_js_env::PromiseReactionHandler::AsyncFromSyncIteratorReject {
+                            iterator,
+                            next_method,
+                        }
+                    },
+                )
+            } else {
+                lyng_js_env::PromiseReactionHandler::Thrower
+            },
             Some(capability),
         )?;
         Ok(promise)
@@ -733,7 +774,16 @@ impl Vm {
                     )
                 };
                 let promise = self.async_from_sync_iterator_continuation(
-                    agent, host, registry, frame, value, done,
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                    value,
+                    done,
+                    record
+                        .next_method()
+                        .as_object_ref()
+                        .map(|next_method| (record.iterator(), next_method)),
                 )?;
                 let promise = self.promise_resolve_in_realm(
                     agent,
@@ -902,7 +952,7 @@ impl Vm {
                     }
                 };
                 let promise = match self.async_from_sync_iterator_continuation(
-                    agent, host, registry, frame, value, true,
+                    agent, host, registry, frame, value, true, None,
                 ) {
                     Ok(promise) => promise,
                     Err(_) if preserve_completion => {

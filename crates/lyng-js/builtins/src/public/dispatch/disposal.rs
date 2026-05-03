@@ -8,7 +8,7 @@ use super::{
     reference_error, type_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_env::{DisposalCapabilityKind, PromiseState, RealmRecord};
+use lyng_js_env::{DisposalCapabilityKind, RealmRecord};
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::ObjectAllocation;
 use lyng_js_ops::errors;
@@ -442,54 +442,32 @@ fn continue_async_disposal<Cx: PublicBuiltinDispatchContext>(
             }
         };
 
-        let promise_record = cx
+        let on_fulfilled = allocate_async_disposal_resume_function(cx, operation_id, false)?;
+        let on_rejected = allocate_async_disposal_resume_function(cx, operation_id, true)?;
+        let _ = cx
             .agent()
-            .promise_record(promise)
-            .cloned()
-            .ok_or_else(|| type_error(cx))?;
-        match promise_record.state() {
-            PromiseState::Fulfilled => {}
-            PromiseState::Rejected => {
-                let pending =
-                    append_disposal_error(cx, operation.pending_error(), promise_record.result())?;
+            .set_async_disposal_operation_waiting(operation_id, true);
+        match invoke_then_method(
+            cx,
+            Value::from_object_ref(promise),
+            Value::from_object_ref(on_fulfilled),
+            Value::from_object_ref(on_rejected),
+        ) {
+            Ok(_) => return Ok(()),
+            Err(error) => {
+                let _ = cx
+                    .agent()
+                    .set_async_disposal_operation_waiting(operation_id, false);
+                let Some(thrown) = cx.extract_thrown_value(error)? else {
+                    unreachable!("non-abrupt builtin error should propagate")
+                };
+                let pending = append_disposal_error(cx, operation.pending_error(), thrown)?;
                 let _ = cx
                     .agent()
                     .set_async_disposal_operation_pending_error(operation_id, Some(pending));
                 let _ = cx
                     .agent()
                     .set_async_disposal_operation_has_disposal_error(operation_id, true);
-            }
-            PromiseState::Pending => {
-                let on_fulfilled =
-                    allocate_async_disposal_resume_function(cx, operation_id, false)?;
-                let on_rejected = allocate_async_disposal_resume_function(cx, operation_id, true)?;
-                let _ = cx
-                    .agent()
-                    .set_async_disposal_operation_waiting(operation_id, true);
-                match invoke_then_method(
-                    cx,
-                    Value::from_object_ref(promise),
-                    Value::from_object_ref(on_fulfilled),
-                    Value::from_object_ref(on_rejected),
-                ) {
-                    Ok(_) => return Ok(()),
-                    Err(error) => {
-                        let _ = cx
-                            .agent()
-                            .set_async_disposal_operation_waiting(operation_id, false);
-                        let Some(thrown) = cx.extract_thrown_value(error)? else {
-                            unreachable!("non-abrupt builtin error should propagate")
-                        };
-                        let pending = append_disposal_error(cx, operation.pending_error(), thrown)?;
-                        let _ = cx.agent().set_async_disposal_operation_pending_error(
-                            operation_id,
-                            Some(pending),
-                        );
-                        let _ = cx
-                            .agent()
-                            .set_async_disposal_operation_has_disposal_error(operation_id, true);
-                    }
-                }
             }
         }
     }
@@ -709,6 +687,17 @@ fn disposal_stack_use_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
+    if matches!(kind, lyng_js_env::DisposalCapabilityKind::Async)
+        && (value.is_undefined() || value.is_null())
+    {
+        let _ = cx.agent().push_disposal_resource(
+            capability,
+            lyng_js_env::DisposableResourceRecord::no_method(
+                lyng_js_env::DisposalMethodKind::Async,
+            ),
+        );
+        return Ok(value);
+    }
     let Some((callable, method_kind)) = dispose_method_for_value(cx, value, kind)? else {
         return Ok(value);
     };

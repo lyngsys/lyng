@@ -13,13 +13,14 @@ use crate::{BuiltinDescriptorTable, BuiltinEntryMetadata, BuiltinInstallTarget, 
 use lyng_js_common::AtomId;
 use lyng_js_env::Agent;
 use lyng_js_types::{
-    iterator_builtin, iterator_concat_builtin, iterator_constructor_getter_builtin,
-    iterator_constructor_setter_builtin, iterator_dispose_builtin, iterator_drop_builtin,
-    iterator_every_builtin, iterator_filter_builtin, iterator_find_builtin,
-    iterator_flat_map_builtin, iterator_for_each_builtin, iterator_from_builtin,
-    iterator_helper_next_builtin, iterator_helper_return_builtin, iterator_map_builtin,
-    iterator_prototype_iterator_builtin, iterator_reduce_builtin, iterator_some_builtin,
-    iterator_take_builtin, iterator_to_array_builtin, iterator_to_string_tag_getter_builtin,
+    async_iterator_dispose_builtin, iterator_builtin, iterator_concat_builtin,
+    iterator_constructor_getter_builtin, iterator_constructor_setter_builtin,
+    iterator_dispose_builtin, iterator_drop_builtin, iterator_every_builtin,
+    iterator_filter_builtin, iterator_find_builtin, iterator_flat_map_builtin,
+    iterator_for_each_builtin, iterator_from_builtin, iterator_helper_next_builtin,
+    iterator_helper_return_builtin, iterator_map_builtin, iterator_prototype_iterator_builtin,
+    iterator_reduce_builtin, iterator_some_builtin, iterator_take_builtin,
+    iterator_to_array_builtin, iterator_to_string_tag_getter_builtin,
     iterator_to_string_tag_setter_builtin, iterator_zip_builtin, iterator_zip_keyed_builtin,
     map_iterator_next_builtin, set_iterator_next_builtin, BuiltinFunctionId, ObjectRef, RealmRef,
     Value, WellKnownSymbolId,
@@ -43,6 +44,12 @@ pub(in crate::public) fn install_iterator_family(
             cx,
             iterator_prototype_iterator_builtin(),
             BuiltinEntryMetadata::new("[Symbol.asyncIterator]", 0, false, false),
+            None,
+        ),
+        async_iterator_dispose: install_public_builtin_function(
+            agent,
+            cx,
+            async_iterator_dispose_builtin(),
             None,
         ),
         map_iterator_next: install_public_builtin_function(
@@ -166,6 +173,10 @@ pub(in crate::public) fn iterator_builtin_object(
         (
             iterator_prototype_iterator_builtin(),
             builtins.iterator_prototype_iterator,
+        ),
+        (
+            async_iterator_dispose_builtin(),
+            builtins.async_iterator_dispose,
         ),
         (map_iterator_next_builtin(), builtins.map_iterator_next),
         (set_iterator_next_builtin(), builtins.set_iterator_next),
@@ -291,6 +302,11 @@ pub(in crate::public) fn install_iterator_family_descriptors(
         data_symbol_property(
             WellKnownSymbolId::AsyncIterator,
             Value::from_object_ref(builtins.async_iterator_method),
+            writable_builtin_attributes(),
+        ),
+        data_symbol_property(
+            WellKnownSymbolId::AsyncDispose,
+            Value::from_object_ref(builtins.async_iterator_dispose),
             writable_builtin_attributes(),
         ),
         data_symbol_property(

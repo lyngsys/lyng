@@ -24,7 +24,6 @@ pub enum AsyncFromSyncState {
 pub enum DelegateYieldAwaitState {
     None,
     IteratorResult { return_completion: bool },
-    ReturnResumeValue,
     Value { done: bool, return_completion: bool },
 }
 
