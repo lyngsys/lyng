@@ -735,6 +735,62 @@ fn runner_temporal_helper_formats_well_known_symbol_property_names() {
 }
 
 #[test]
+fn runner_temporal_helper_exposes_plain_year_month_string_lists() {
+    let root = make_temp_dir();
+    let entry_path = root.join("temporal-plain-year-month-string-lists.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r#"
+        /*---
+        includes: [temporalHelpers.js, compareArray.js]
+        ---*/
+        assert.compareArray(TemporalHelpers.ISO.plainYearMonthStringsInvalid(), [
+          "2020-13",
+          "1976-11[u-ca=gregory]",
+          "1976-11[u-ca=hebrew]",
+          "1976-11[U-CA=iso8601]",
+          "1976-11[u-CA=iso8601]",
+          "1976-11[FOO=bar]",
+          "+999999-01",
+          "-999999-01",
+        ]);
+        assert.compareArray(TemporalHelpers.ISO.plainYearMonthStringsValid(), [
+          "1976-11",
+          "1976-11-10",
+          "1976-11-01T09:00:00+00:00",
+          "1976-11-01T00:00:00+05:00",
+          "197611",
+          "+00197611",
+          "1976-11-18T15:23:30.1-02:00",
+          "1976-11-18T152330.1+00:00",
+          "19761118T15:23:30.1+00:00",
+          "1976-11-18T15:23:30.1+0000",
+          "1976-11-18T152330.1+0000",
+          "19761118T15:23:30.1+0000",
+          "19761118T152330.1+00:00",
+          "19761118T152330.1+0000",
+          "+001976-11-18T152330.1+00:00",
+          "+0019761118T15:23:30.1+00:00",
+          "+001976-11-18T15:23:30.1+0000",
+          "+001976-11-18T152330.1+0000",
+          "+0019761118T15:23:30.1+0000",
+          "+0019761118T152330.1+00:00",
+          "+0019761118T152330.1+0000",
+          "1976-11-18T15:23",
+          "1976-11-18T15",
+          "1976-11-18",
+        ]);
+        assert.compareArray(TemporalHelpers.ISO.plainYearMonthStringsValidNegativeYear(), [
+          "-009999-11",
+        ]);
+        "#,
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn runner_passes_well_known_intrinsics_harness_self_test() {
     let report = run_filtered_test("harness/wellKnownIntrinsicObjects.js");
     assert_passed(&report, 1, 2);
