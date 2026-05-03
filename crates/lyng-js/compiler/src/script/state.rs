@@ -448,8 +448,10 @@ impl<'a> CompilationState<'a> {
     pub(super) fn root_needs_environment(&self) -> bool {
         self.sema.binding_table.as_slice().iter().any(|binding| {
             ((binding.storage_class == StorageClass::EnvironmentSlot)
-                || (binding.storage_class == StorageClass::DynamicLookup
-                    && binding.slot_index.is_some()))
+                || (matches!(
+                    binding.storage_class,
+                    StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+                ) && binding.slot_index.is_some()))
                 && self.scope_owner(binding.scope).is_none()
         }) || self.module_default_export_slot.is_some()
             || self.has_direct_root_arrow_child()
@@ -1427,8 +1429,10 @@ fn scope_environment_bindings(
         .filter_map(|binding_id| {
             let binding = sema.binding_table.get(*binding_id);
             ((binding.storage_class == StorageClass::EnvironmentSlot)
-                || (binding.storage_class == StorageClass::DynamicLookup
-                    && binding.slot_index.is_some()))
+                || (matches!(
+                    binding.storage_class,
+                    StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+                ) && binding.slot_index.is_some()))
             .then(|| {
                 binding
                     .slot_index
@@ -1447,8 +1451,10 @@ fn scope_environment_bindings(
     for binding_id in &scope.bindings {
         let binding = sema.binding_table.get(*binding_id);
         if binding.storage_class != StorageClass::EnvironmentSlot
-            && !(binding.storage_class == StorageClass::DynamicLookup
-                && binding.slot_index.is_some())
+            && !(matches!(
+                binding.storage_class,
+                StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+            ) && binding.slot_index.is_some())
         {
             continue;
         }
@@ -1529,7 +1535,10 @@ fn bytecode_environment_binding(
         binding_is_mutable(binding.kind),
         binding.kind.is_lexical(),
         binding.has_tdz,
-        matches!(binding.storage_class, StorageClass::DynamicLookup),
+        matches!(
+            binding.storage_class,
+            StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+        ),
     )
     .with_sloppy_immutable_assign_silent(matches!(binding.kind, DeclarationKind::FunctionName));
     BytecodeEnvironmentBinding::new(Some(binding.name), flags)

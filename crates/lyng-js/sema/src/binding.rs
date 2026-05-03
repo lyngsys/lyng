@@ -79,6 +79,10 @@ pub enum StorageClass {
     /// A variable under `with` or direct `eval` poisoning that requires
     /// dynamic lookup at runtime.
     DynamicLookup,
+    /// A direct-eval var/function binding that already exists in the caller's
+    /// variable environment. Declaration writes target the variable
+    /// environment, while identifier references still use dynamic lookup.
+    DynamicVariableLookup,
 }
 
 /// A single binding record in the binding table.

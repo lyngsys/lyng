@@ -91,6 +91,21 @@ impl<'a> Analyzer<'a> {
         }
     }
 
+    pub(super) fn hoist_switch_case_declarations(
+        &mut self,
+        cases: lyng_js_ast::NodeList<lyng_js_ast::SwitchCase>,
+    ) {
+        let cases = self.ast.get_switch_case_list(cases).to_vec();
+        for case in &cases {
+            self.hoist_annex_b_block_function_var_bindings(case.consequent);
+        }
+        for case in &cases {
+            for &stmt_id in self.ast.get_stmt_list(case.consequent) {
+                self.hoist_declarations(stmt_id);
+            }
+        }
+    }
+
     pub(super) fn predeclare_stmt_lexical_bindings(&mut self, stmt_id: lyng_js_ast::StmtId) {
         let Stmt::Declaration { decl, .. } = self.ast.get_stmt(stmt_id) else {
             return;
@@ -556,20 +571,9 @@ impl<'a> Analyzer<'a> {
         }
 
         for &stmt_id in self.ast.get_stmt_list(list) {
-            let Stmt::Declaration { decl, .. } = self.ast.get_stmt(stmt_id) else {
-                continue;
-            };
-            let Decl::Function { function, span, .. } = self.ast.get_decl(*decl) else {
-                continue;
-            };
-            let func = self.ast.get_function(*function);
-            if func.kind != FunctionKind::Normal {
-                continue;
+            if let Some((name, span)) = self.annex_b_block_level_function_declaration(stmt_id) {
+                self.hoist_annex_b_block_function_var_binding(name, span);
             }
-            let Some(name) = func.name else {
-                continue;
-            };
-            self.hoist_annex_b_block_function_var_binding(name, *span);
         }
     }
 
@@ -597,7 +601,7 @@ impl<'a> Analyzer<'a> {
 
         if direct_candidate_context {
             for &stmt_id in self.ast.get_stmt_list(list) {
-                if let Some((name, span)) = self.annex_b_direct_function_declaration(stmt_id) {
+                if let Some((name, span)) = self.annex_b_block_level_function_declaration(stmt_id) {
                     if !candidate_blocked_names.contains(&name) {
                         self.hoist_annex_b_block_function_var_binding(name, span);
                     }
@@ -742,6 +746,16 @@ impl<'a> Analyzer<'a> {
         (func.kind == FunctionKind::Normal).then_some((func.name?, *span))
     }
 
+    fn annex_b_block_level_function_declaration(
+        &self,
+        stmt_id: lyng_js_ast::StmtId,
+    ) -> Option<(AtomId, lyng_js_common::Span)> {
+        match self.ast.get_stmt(stmt_id) {
+            Stmt::Labeled { body, .. } => self.annex_b_block_level_function_declaration(*body),
+            _ => self.annex_b_direct_function_declaration(stmt_id),
+        }
+    }
+
     fn annex_b_direct_function_names_in_list(
         &self,
         list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
@@ -749,7 +763,7 @@ impl<'a> Analyzer<'a> {
         self.ast
             .get_stmt_list(list)
             .iter()
-            .filter_map(|&stmt| self.annex_b_direct_function_declaration(stmt))
+            .filter_map(|&stmt| self.annex_b_block_level_function_declaration(stmt))
             .map(|(name, _)| name)
             .collect()
     }
@@ -919,6 +933,7 @@ impl<'a> Analyzer<'a> {
             .annex_b_blocked_catch_names
             .iter()
             .any(|names| names.contains(&name))
+            || self.ctx.annex_b_blocked_var_names.contains(&name)
         {
             return true;
         }

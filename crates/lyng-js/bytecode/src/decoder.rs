@@ -154,6 +154,7 @@ fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::ResolveName
         | Opcode::ResolveGlobal
         | Opcode::AssignName
+        | Opcode::AssignVariableName
         | Opcode::DeleteName
         | Opcode::CaptureName
         | Opcode::LoadCapturedName

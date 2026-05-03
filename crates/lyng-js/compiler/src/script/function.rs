@@ -415,7 +415,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             let binding = self.binding(binding_id)?;
             let needs_env_copy = matches!(
                 binding.storage_class,
-                StorageClass::EnvironmentSlot | StorageClass::DynamicLookup
+                StorageClass::EnvironmentSlot
+                    | StorageClass::DynamicLookup
+                    | StorageClass::DynamicVariableLookup
             ) || activation.arguments_mode == ArgumentsMode::Mapped;
             if needs_env_copy {
                 let slot = self.state.runtime_slot_for_binding(binding_id)?;
@@ -831,6 +833,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
             StorageClass::EnvironmentSlot
             | StorageClass::DynamicLookup
+            | StorageClass::DynamicVariableLookup
             | StorageClass::GlobalName => {
                 return Err(LoweringError::UnsupportedFunction {
                     function: function_id,

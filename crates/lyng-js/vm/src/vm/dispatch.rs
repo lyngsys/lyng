@@ -1098,6 +1098,17 @@ impl Vm {
                             };
                             self.advance_instruction()?;
                         }
+                        Opcode::AssignVariableName => {
+                            let atom = self.read_atom_constant(frame.code(), bx)?;
+                            let value = self.read_register(frame, a)?;
+                            let assign_result = self.assign_variable_name_with_context(
+                                agent, host, registry, frame, atom, value,
+                            );
+                            let Some(_) = self.handle_vm_result(agent, assign_result)? else {
+                                continue;
+                            };
+                            self.advance_instruction()?;
+                        }
                         Opcode::DeleteName => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
                             let delete_result =

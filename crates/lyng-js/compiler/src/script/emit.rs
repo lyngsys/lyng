@@ -377,6 +377,20 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
+    pub(super) fn emit_assign_variable_name(
+        &mut self,
+        value: u16,
+        name: AtomId,
+    ) -> LoweringResult<()> {
+        let index = self.constant_atom(name)?;
+        self.builder.emit_abx(
+            Opcode::AssignVariableName,
+            self.encode_register(value)?,
+            index,
+        )?;
+        Ok(())
+    }
+
     pub(super) fn emit_capture_name(&mut self, reference: u16, name: AtomId) -> LoweringResult<()> {
         let index = self.constant_atom(name)?;
         self.builder

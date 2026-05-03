@@ -83,7 +83,10 @@ impl<'a> Analyzer<'a> {
             };
 
             let needs_env = new_storage == StorageClass::EnvironmentSlot
-                || new_storage == StorageClass::DynamicLookup;
+                || matches!(
+                    new_storage,
+                    StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+                );
 
             self.bindings.get_mut(bid).storage_class = new_storage;
             self.bindings.get_mut(bid).needs_environment = needs_env;
@@ -99,7 +102,10 @@ impl<'a> Analyzer<'a> {
             let needs_env = scope.bindings.iter().any(|&bid| {
                 let b = self.bindings.get(bid);
                 b.storage_class == StorageClass::EnvironmentSlot
-                    || b.storage_class == StorageClass::DynamicLookup
+                    || matches!(
+                        b.storage_class,
+                        StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+                    )
             });
             self.scopes.get_mut(sid).needs_environment = needs_env;
         }
@@ -115,7 +121,10 @@ impl<'a> Analyzer<'a> {
             for &bid in &bindings {
                 let b = self.bindings.get(bid);
                 if b.storage_class == StorageClass::EnvironmentSlot
-                    || b.storage_class == StorageClass::DynamicLookup
+                    || matches!(
+                        b.storage_class,
+                        StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+                    )
                 {
                     self.bindings.get_mut(bid).slot_index = Some(slot);
                     slot += 1;

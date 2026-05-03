@@ -937,6 +937,62 @@ impl Vm {
         }
     }
 
+    pub(super) fn assign_variable_name_with_context(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        name: AtomId,
+        value: Value,
+    ) -> VmResult<()> {
+        let target = self.resolve_dynamic_name_target_with_context(
+            agent,
+            host,
+            registry,
+            frame,
+            frame.variable_env(),
+            name,
+        )?;
+        match target {
+            CapturedNameTarget::EnvironmentSlot { environment, slot } => self
+                .assign_environment_slot(
+                    agent,
+                    environment,
+                    slot,
+                    value,
+                    self.frame_is_strict(frame),
+                ),
+            CapturedNameTarget::ObjectProperty { record } => self
+                .object_environment_set_mutable_binding_with_context(
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                    record,
+                    name,
+                    value,
+                    self.frame_is_strict(frame),
+                ),
+            CapturedNameTarget::GlobalProperty { environment } => self
+                .assign_global_property_binding(
+                    agent,
+                    environment,
+                    name,
+                    value,
+                    self.frame_is_strict(frame),
+                ),
+            CapturedNameTarget::Unresolvable { global_environment } => self
+                .assign_unresolvable_name(
+                    agent,
+                    global_environment,
+                    name,
+                    value,
+                    self.frame_is_strict(frame),
+                ),
+        }
+    }
+
     pub(super) fn delete_name_with_context(
         &mut self,
         agent: &mut Agent,

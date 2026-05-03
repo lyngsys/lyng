@@ -58,6 +58,8 @@ struct WalkContext {
     exported_names: HashSet<AtomId>,
     /// Destructured catch parameters whose names block Annex B var replacement.
     annex_b_blocked_catch_names: Vec<HashSet<AtomId>>,
+    /// Caller-sensitive names that block Annex B var replacement in direct eval.
+    annex_b_blocked_var_names: HashSet<AtomId>,
 }
 
 /// The analyzer state accumulates all side tables during the walk.
@@ -154,6 +156,7 @@ impl<'a> Analyzer<'a> {
                 in_static_block: false,
                 exported_names: HashSet::new(),
                 annex_b_blocked_catch_names: Vec::new(),
+                annex_b_blocked_var_names: HashSet::new(),
             },
         }
     }
@@ -199,6 +202,7 @@ impl<'a> Analyzer<'a> {
                 in_static_block: false,
                 exported_names: HashSet::new(),
                 annex_b_blocked_catch_names: Vec::new(),
+                annex_b_blocked_var_names: HashSet::new(),
             },
         }
     }
@@ -217,6 +221,11 @@ impl<'a> Analyzer<'a> {
         let mut this = Self::new_for_script(ast, atoms, strict);
         let script = ast.get_script(root);
         this.seed_direct_eval_private_layouts(script.span.source, &options);
+        this.ctx.annex_b_blocked_var_names = options
+            .annex_b_blocked_var_names()
+            .iter()
+            .copied()
+            .collect();
         if options.forbid_arguments_in_class_initializer()
             && this.stmt_list_contains_query(script.body, ContainmentQuery::ArgumentsIdentifier)
         {

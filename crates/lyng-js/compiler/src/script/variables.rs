@@ -77,7 +77,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     let binding = self.binding(binding_id)?;
                     (binding.storage_class, binding.name, binding.has_tdz)
                 };
-                if storage_class == StorageClass::DynamicLookup {
+                if matches!(
+                    storage_class,
+                    StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+                ) {
                     return self.emit_load_name(dest, binding_name);
                 }
                 if let Some((depth, slot)) = self.binding_env_access(binding_id)? {
@@ -96,7 +99,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             unreachable!("env-backed bindings handled above")
                         }
                         StorageClass::GlobalName => self.emit_load_global(dest, binding_name),
-                        StorageClass::DynamicLookup => {
+                        StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup => {
                             unreachable!("dynamic lookup bindings must lower through LoadName")
                         }
                     }

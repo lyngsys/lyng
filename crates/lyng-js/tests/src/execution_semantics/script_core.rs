@@ -6727,6 +6727,73 @@ fn script_core_annex_b_labeled_function_declaration_is_hoisted() {
 }
 
 #[test]
+fn script_core_annex_b_block_labeled_function_is_instantiated_before_block_body() {
+    let result = compile_and_run_string(
+        r#"
+        var before, after, directValue, labeledValue;
+
+        {
+            before = f();
+            function f() { return 'direct'; }
+            directValue = f();
+            label: function f() { return 'labeled'; }
+            labeledValue = f();
+        }
+
+        after = f();
+        [before, directValue, labeledValue, after].join(':');
+        "#,
+    );
+
+    assert_eq!(result, "labeled:labeled:labeled:labeled");
+}
+
+#[test]
+fn script_core_annex_b_block_labeled_function_creates_var_binding() {
+    let result = compile_and_run_string(
+        r#"
+        var before = typeof f;
+        var after;
+
+        {
+            label: function f() { return 'labeled'; }
+        }
+
+        try {
+            after = f();
+        } catch (error) {
+            after = error.name;
+        }
+
+        before + ':' + after;
+        "#,
+    );
+
+    assert_eq!(result, "undefined:labeled");
+}
+
+#[test]
+fn script_core_annex_b_switch_labeled_function_is_instantiated_before_case_body() {
+    let result = compile_and_run_string(
+        r#"
+        var before, after;
+
+        switch (1) {
+            case 1:
+                before = f();
+            case 2:
+                label: function f() { return 'switch'; }
+        }
+
+        after = f();
+        before + ':' + after;
+        "#,
+    );
+
+    assert_eq!(result, "switch:switch");
+}
+
+#[test]
 fn script_core_annex_b_catch_var_redeclaration_updates_simple_catch_parameter() {
     let result = compile_and_run_string(
         r#"

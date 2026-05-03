@@ -697,8 +697,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         let discriminant_register = self.lower_expr_to_temp(discriminant)?;
         self.emit_frame_local_tdz_initializers_for_current_scope()?;
-        let switch_target = self.push_control_target(label, ControlTargetKind::Switch);
         let cases = self.ast().get_switch_case_list(cases).to_vec();
+        self.emit_switch_function_declaration_instantiations(&cases)?;
+        let switch_target = self.push_control_target(label, ControlTargetKind::Switch);
         let mut case_body_offsets = vec![None; cases.len()];
         let mut case_match_jumps = Vec::new();
         let mut default_index = None;
@@ -742,6 +743,16 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
         self.patch_break_placeholders(switch_target, end)?;
         self.pop_control_target(switch_target);
+        Ok(())
+    }
+
+    fn emit_switch_function_declaration_instantiations(
+        &mut self,
+        cases: &[SwitchCase],
+    ) -> LoweringResult<()> {
+        for case in cases {
+            self.emit_block_function_declaration_instantiations(case.consequent)?;
+        }
         Ok(())
     }
 
@@ -1401,6 +1412,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if binding.storage_class == StorageClass::DynamicLookup {
             return self.emit_assign_name(value_register, name);
         }
+        if binding.storage_class == StorageClass::DynamicVariableLookup {
+            return self.emit_assign_variable_name(value_register, name);
+        }
         if let Some((depth, slot)) = self.binding_env_access(binding_id)? {
             return self.emit_store_env_slot(value_register, depth, slot);
         }
@@ -1411,8 +1425,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
             StorageClass::GlobalName => self.emit_store_global(value_register, binding.name),
             StorageClass::EnvironmentSlot => unreachable!("env-backed bindings handled above"),
-            StorageClass::DynamicLookup => {
-                unreachable!("dynamic lookup bindings must lower through AssignName")
+            StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup => {
+                unreachable!("dynamic lookup bindings must lower through name ops")
             }
         }
     }
@@ -1425,7 +1439,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         let binding = self.binding(binding_id)?;
         let has_tdz = binding.has_tdz;
-        if binding.storage_class == StorageClass::DynamicLookup {
+        if matches!(
+            binding.storage_class,
+            StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+        ) {
             return self.emit_load_name(dest, name);
         }
         if let Some((depth, slot)) = self.binding_env_access(binding_id)? {
@@ -1442,7 +1459,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
             StorageClass::GlobalName => self.emit_load_global(dest, binding.name),
             StorageClass::EnvironmentSlot => unreachable!("env-backed bindings handled above"),
-            StorageClass::DynamicLookup => {
+            StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup => {
                 unreachable!("dynamic lookup bindings must lower through LoadName")
             }
         }
@@ -1459,6 +1476,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if binding.storage_class == StorageClass::DynamicLookup {
             return self.emit_assign_name(value_register, name);
         }
+        if binding.storage_class == StorageClass::DynamicVariableLookup {
+            return self.emit_assign_variable_name(value_register, name);
+        }
         if let Some((depth, slot)) = self.binding_env_access(binding_id)? {
             return self.emit_assign_env_slot(value_register, depth, slot);
         }
@@ -1472,8 +1492,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
             StorageClass::GlobalName => self.emit_assign_global(value_register, binding.name),
             StorageClass::EnvironmentSlot => unreachable!("env-backed bindings handled above"),
-            StorageClass::DynamicLookup => {
-                unreachable!("dynamic lookup bindings must lower through AssignName")
+            StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup => {
+                unreachable!("dynamic lookup bindings must lower through name ops")
             }
         }
     }
@@ -1592,15 +1612,25 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         let stmts = self.ast().get_stmt_list(list).to_vec();
         for stmt in stmts {
-            let Stmt::Declaration { decl, .. } = self.ast().get_stmt(stmt).clone() else {
-                continue;
-            };
-            let Decl::Function { function, .. } = self.ast().get_decl(decl).clone() else {
-                continue;
-            };
-            self.instantiate_block_function_declaration(decl, function)?;
+            if let Some((decl, function)) = self.block_function_declaration_from_statement(stmt) {
+                self.instantiate_block_function_declaration(decl, function)?;
+            }
         }
         Ok(())
+    }
+
+    fn block_function_declaration_from_statement(
+        &self,
+        stmt_id: StmtId,
+    ) -> Option<(DeclId, FunctionId)> {
+        match self.ast().get_stmt(stmt_id) {
+            Stmt::Declaration { decl, .. } => match self.ast().get_decl(*decl) {
+                Decl::Function { function, .. } => Some((*decl, *function)),
+                _ => None,
+            },
+            Stmt::Labeled { body, .. } => self.block_function_declaration_from_statement(*body),
+            _ => None,
+        }
     }
 
     fn instantiate_block_function_declaration(
@@ -1937,7 +1967,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     )?;
                 }
             }
-            StorageClass::DynamicLookup => {
+            StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup => {
                 if declarator.init.is_none() && kind == VariableKind::Var {
                     return Ok(());
                 }

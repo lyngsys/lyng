@@ -881,6 +881,83 @@ fn direct_eval_annex_b_block_function_updates_global_var_binding() {
 }
 
 #[test]
+fn direct_eval_annex_b_labeled_function_declaration_is_hoisted() {
+    let result = compile_and_run_string(
+        r#"
+            var out = [];
+
+            try {
+                eval("out.push(fe()); l: function fe() { return 'eval-label'; }");
+            } catch (error) {
+                out.push(error.name);
+            }
+
+            try {
+                out.push(fe());
+            } catch (error) {
+                out.push(error.name);
+            }
+
+            out.join(':');
+        "#,
+    );
+
+    assert_eq!(result, "eval-label:eval-label");
+}
+
+#[test]
+fn direct_eval_annex_b_block_function_updates_variable_environment_through_with() {
+    let result = compile_and_run_string(
+        r#"
+            function g() { return 'outer-g'; }
+            var object = { g: function() { return 'with-g'; } };
+
+            with (object) {
+                eval("{ function g() { return 'eval-g'; } }");
+            }
+
+            g() + ':' + object.g();
+        "#,
+    );
+
+    assert_eq!(result, "eval-g:with-g");
+}
+
+#[test]
+fn direct_eval_annex_b_block_function_skips_var_binding_for_outer_lexicals() {
+    let result = compile_and_run_string(
+        r#"
+            function constCase() {
+                eval("{ function a() {} }");
+                const a = 1;
+                return a;
+            }
+
+            function letCase() {
+                eval("{ function a() {} }");
+                let a;
+                return typeof a;
+            }
+
+            var out = [];
+            try {
+                out.push(String(constCase()));
+            } catch (error) {
+                out.push(error.name);
+            }
+            try {
+                out.push(letCase());
+            } catch (error) {
+                out.push(error.name);
+            }
+            out.join(':');
+        "#,
+    );
+
+    assert_eq!(result, "1:undefined");
+}
+
+#[test]
 fn direct_eval_typeof_skips_future_annex_b_for_head_lexical_shadow() {
     let result = compile_and_run_string(
         r#"

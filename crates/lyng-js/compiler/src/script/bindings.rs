@@ -215,14 +215,18 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .unwrap_or((false, false));
         if !matches!(
             binding_record.storage_class,
-            StorageClass::EnvironmentSlot | StorageClass::DynamicLookup
+            StorageClass::EnvironmentSlot
+                | StorageClass::DynamicLookup
+                | StorageClass::DynamicVariableLookup
         ) && !synthetic_parameter
             && !synthetic_rest
         {
             return Ok(None);
         }
-        if binding_record.storage_class == StorageClass::DynamicLookup
-            && binding_record.slot_index.is_none()
+        if matches!(
+            binding_record.storage_class,
+            StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+        ) && binding_record.slot_index.is_none()
             && !synthetic_parameter
             && !synthetic_rest
         {

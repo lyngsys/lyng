@@ -23,6 +23,13 @@ impl<'a> Analyzer<'a> {
         }
     }
 
+    fn walk_stmt_list_items(&mut self, list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>) {
+        let stmts = self.ast.get_stmt_list(list).to_vec();
+        for stmt_id in stmts {
+            self.walk_stmt(stmt_id);
+        }
+    }
+
     fn walk_stmt(&mut self, stmt_id: lyng_js_ast::StmtId) {
         let stmt = self.ast.get_stmt(stmt_id);
         match stmt {
@@ -188,6 +195,7 @@ impl<'a> Analyzer<'a> {
                 self.check_switch_case_redeclarations(*cases);
                 self.push_scope(ScopeKind::Switch);
                 self.predeclare_switch_case_bindings(*cases);
+                self.hoist_switch_case_declarations(*cases);
                 let old_in_switch = self.ctx.in_switch;
                 self.ctx.in_switch = true;
                 let case_list = self.ast.get_switch_case_list(*cases);
@@ -195,7 +203,7 @@ impl<'a> Analyzer<'a> {
                     if let Some(test) = case.test {
                         self.walk_expr(test);
                     }
-                    self.walk_stmt_list(case.consequent);
+                    self.walk_stmt_list_items(case.consequent);
                 }
                 self.ctx.in_switch = old_in_switch;
                 self.pop_scope();

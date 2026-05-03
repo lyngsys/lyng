@@ -190,9 +190,13 @@ pub fn derive_environment_layout_plan(
                         global_var_names.push(binding.name);
                     }
                 }
-                StorageClass::EnvironmentSlot | StorageClass::DynamicLookup => {
-                    if binding.storage_class == StorageClass::DynamicLookup
-                        && binding.slot_index.is_none()
+                StorageClass::EnvironmentSlot
+                | StorageClass::DynamicLookup
+                | StorageClass::DynamicVariableLookup => {
+                    if matches!(
+                        binding.storage_class,
+                        StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+                    ) && binding.slot_index.is_none()
                     {
                         continue;
                     }
@@ -310,7 +314,10 @@ fn binding_flags(binding: &BindingRecord) -> EnvironmentSlotFlags {
         binding_is_mutable(binding.kind),
         binding.kind.is_lexical(),
         binding.has_tdz,
-        matches!(binding.storage_class, StorageClass::DynamicLookup),
+        matches!(
+            binding.storage_class,
+            StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+        ),
     )
     .with_sloppy_immutable_assign_silent(matches!(binding.kind, DeclarationKind::FunctionName))
 }

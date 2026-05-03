@@ -826,6 +826,66 @@ impl Vm {
         })
     }
 
+    fn collect_layout_lexical_names(
+        agent: &Agent,
+        layout: lyng_js_env::EnvironmentLayoutId,
+        out: &mut Vec<AtomId>,
+    ) {
+        let Some(layout) = agent.environment_layout(layout) else {
+            return;
+        };
+        for binding in layout.bindings() {
+            if binding.flags().is_lexical() {
+                if let Some(name) = binding.name() {
+                    Self::push_unique_atom(out, name);
+                }
+            }
+        }
+    }
+
+    fn direct_eval_lexical_names_before_var_env(
+        &self,
+        agent: &Agent,
+        start: lyng_js_types::EnvironmentRef,
+        var_env: lyng_js_types::EnvironmentRef,
+    ) -> Vec<AtomId> {
+        let mut names = Vec::new();
+        let mut current = Some(start);
+        while let Some(environment) = current {
+            let Some(record) = agent.environment(environment) else {
+                break;
+            };
+            let reached_var_env = environment == var_env;
+            match record {
+                lyng_js_env::EnvironmentRecord::Declarative(record) => {
+                    Self::collect_layout_lexical_names(agent, record.layout(), &mut names);
+                    current = record.outer();
+                }
+                lyng_js_env::EnvironmentRecord::Function(record) => {
+                    let declarative = record.declarative();
+                    Self::collect_layout_lexical_names(agent, declarative.layout(), &mut names);
+                    current = declarative.outer();
+                }
+                lyng_js_env::EnvironmentRecord::Module(record) => {
+                    Self::collect_layout_lexical_names(agent, record.layout(), &mut names);
+                    current = record.outer();
+                }
+                lyng_js_env::EnvironmentRecord::Global(record) => {
+                    for &name in record.lexical_names() {
+                        Self::push_unique_atom(&mut names, name);
+                    }
+                    current = record.outer();
+                }
+                lyng_js_env::EnvironmentRecord::Private(record) => current = record.outer(),
+                lyng_js_env::EnvironmentRecord::Object(record) => current = record.outer(),
+            }
+            if reached_var_env {
+                break;
+            }
+        }
+        names
+    }
+
     fn direct_eval_chain_lexical_binding_before_var_env(
         &self,
         agent: &Agent,
@@ -1042,7 +1102,11 @@ impl Vm {
             }
 
             let binding = sema.binding_table.get_mut(binding_id);
-            binding.storage_class = StorageClass::DynamicLookup;
+            binding.storage_class = if !always_host && binding_exists {
+                StorageClass::DynamicVariableLookup
+            } else {
+                StorageClass::DynamicLookup
+            };
             binding.needs_environment = false;
             binding.slot_index = None;
         }
@@ -1192,6 +1256,12 @@ impl Vm {
             annex_b_catch_names,
             direct_eval_parameter_names,
         ) = self.caller_direct_eval_lexical_environment(agent, caller, caller_name_env_start)?;
+        let caller_variable_env = caller.variable_env();
+        let annex_b_blocked_var_names = self.direct_eval_lexical_names_before_var_env(
+            agent,
+            caller_lexical_env,
+            caller_variable_env,
+        );
         let source_id = self.allocate_dynamic_source_id();
         let direct_eval_private_layouts =
             self.direct_eval_ambient_private_layouts(agent, caller, source_id)?;
@@ -1203,6 +1273,7 @@ impl Vm {
                 initial_strict: self.caller_is_strict(caller),
                 options: DirectEvalScriptAnalysisOptions::new()
                     .with_ambient_private_layouts(direct_eval_private_layouts)
+                    .with_annex_b_blocked_var_names(annex_b_blocked_var_names)
                     .with_forbid_arguments_in_class_initializer(
                         direct_eval_site_flags.forbid_arguments_in_class_initializer(),
                     ),
@@ -1228,7 +1299,6 @@ impl Vm {
             caller_lexical_env,
             analysis.sema_mut(),
         );
-        let caller_variable_env = caller.variable_env();
         let root_var_names = Self::direct_eval_root_var_names(analysis.sema());
         let root_function_names = Self::direct_eval_root_function_names(analysis.sema());
         if !analysis.parsed().strict

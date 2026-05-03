@@ -449,7 +449,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     name,
                 })?;
                 let binding = self.binding(binding_id)?;
-                if binding.storage_class == StorageClass::DynamicLookup {
+                if matches!(
+                    binding.storage_class,
+                    StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+                ) {
                     return self.emit_delete_name(dest, binding.name);
                 }
                 self.emit_load_bool(dest, false)

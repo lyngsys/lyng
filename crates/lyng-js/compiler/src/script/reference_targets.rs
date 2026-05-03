@@ -201,7 +201,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         name,
                     })?;
                     let binding_record = self.binding(binding_id)?;
-                    binding_record.storage_class == StorageClass::DynamicLookup
+                    matches!(
+                        binding_record.storage_class,
+                        StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
+                    )
                 }
             }
         };
