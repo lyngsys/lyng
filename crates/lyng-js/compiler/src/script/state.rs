@@ -407,7 +407,17 @@ impl<'a> CompilationState<'a> {
     }
 
     pub(super) fn function_allocates_environment(&self, function: FunctionSemaId) -> bool {
+        let ast_function = self.sema.function_table.get(function).function_id;
+        let derived_class_constructor = self
+            .class_function_metadata(ast_function)
+            .is_some_and(|metadata| metadata.derived_class_constructor);
+        let class_constructor_needs_environment = self
+            .class_constructor_plan(ast_function)
+            .is_some_and(|plan| plan.needs_environment);
+
         self.activation(function).needs_environment
+            || derived_class_constructor
+            || class_constructor_needs_environment
             || self
                 .function_environment_bindings
                 .get(function.raw() as usize)

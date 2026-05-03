@@ -24,6 +24,7 @@ enum PendingStaticClassElement {
     Block {
         body: NodeList<StmtId>,
         span: Span,
+        scope: ScopeId,
     },
 }
 
@@ -291,6 +292,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     ..
                 } => {
                     if kind == lyng_js_ast::MethodKind::Constructor {
+                        self.skip_class_body_function_scope(body);
                         continue;
                     }
                     let private_name = match self.ast().get_expr(key) {
@@ -304,6 +306,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     let method = self.alloc_temp()?;
                     let child_index = self.ensure_child_index(value)?;
                     self.emit_create_closure(method, child_index, span)?;
+                    self.skip_class_body_function_scope(body);
                     let name_register = self.alloc_temp()?;
                     self.emit_load_private_function_name(name_register, private_name, kind)?;
                     self.emit_set_function_name(method, name_register)?;
@@ -362,6 +365,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     span,
                 } => {
                     if kind == lyng_js_ast::MethodKind::Constructor {
+                        self.skip_class_body_function_scope(body);
                         continue;
                     }
                     let target = if r#static { dest } else { prototype };
@@ -370,6 +374,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     let method = self.alloc_temp()?;
                     let child_index = self.ensure_child_index(value)?;
                     self.emit_create_closure(method, child_index, span)?;
+                    self.skip_class_body_function_scope(body);
                     if kind == lyng_js_ast::MethodKind::Method {
                         if let Some(name_register) = name_register {
                             self.emit_set_function_name(method, name_register)?;
@@ -413,6 +418,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     ..
                 } if computed => {
                     let key_register = self.lower_expr_to_temp(key)?;
+                    if value.is_some() {
+                        self.skip_class_body_function_scope(body);
+                    }
                     self.emit_install_instance_field_key(
                         dest,
                         next_computed_instance_field_key,
@@ -462,9 +470,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         pending_static_elements
                             .push(PendingStaticClassElement::PublicField { key, value });
                     }
+                    if value.is_some() {
+                        self.skip_class_body_function_scope(body);
+                    }
                 }
                 lyng_js_ast::ClassElement::Property {
                     key,
+                    value,
                     private: true,
                     r#static: false,
                     span,
@@ -489,9 +501,20 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         private_define_scratch
                             .expect("private definition scratch should exist for private fields"),
                     )?;
+                    if value.is_some() {
+                        self.skip_class_body_function_scope(body);
+                    }
                 }
-                lyng_js_ast::ClassElement::StaticBlock { body, span } => {
-                    pending_static_elements.push(PendingStaticClassElement::Block { body, span });
+                lyng_js_ast::ClassElement::StaticBlock {
+                    body: block_body,
+                    span,
+                } => {
+                    let scope = self.next_class_body_function_scope(body)?;
+                    pending_static_elements.push(PendingStaticClassElement::Block {
+                        body: block_body,
+                        span,
+                        scope,
+                    });
                 }
                 lyng_js_ast::ClassElement::Property { .. }
                 | lyng_js_ast::ClassElement::InvalidElement { .. } => {}
@@ -680,15 +703,59 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     })?,
                 )
             }
-            PendingStaticClassElement::Block { body, span } => {
+            PendingStaticClassElement::Block { body, span, scope } => {
                 let previous_override = self.this_override_register.replace(class_object);
                 let previous_home_object = self.super_home_object_override.replace(class_object);
+                let previous_scope = self.current_scope;
+                self.current_scope = scope;
+                let tracked = self.active_direct_eval_scope(scope);
+                if tracked {
+                    self.active_direct_eval_scopes.push(scope);
+                }
                 let result = self.lower_statement_list_with_disposal(body, span);
+                if tracked {
+                    let _ = self.active_direct_eval_scopes.pop();
+                }
+                self.current_scope = previous_scope;
                 self.this_override_register = previous_override;
                 self.super_home_object_override = previous_home_object;
                 result
             }
         }
+    }
+
+    fn next_class_body_function_scope(
+        &mut self,
+        class_body: NodeList<lyng_js_ast::ClassElementId>,
+    ) -> LoweringResult<ScopeId> {
+        self.try_next_class_body_function_scope(class_body).ok_or(
+            LoweringError::UnsupportedDeclaration {
+                decl: DeclId::new(0),
+            },
+        )
+    }
+
+    fn try_next_class_body_function_scope(
+        &mut self,
+        class_body: NodeList<lyng_js_ast::ClassElementId>,
+    ) -> Option<ScopeId> {
+        let class_scope = self
+            .active_class_layout(class_body)
+            .map(lyng_js_sema::ClassPrivateLayoutRecord::scope)?;
+        let previous_scope = self.current_scope;
+        self.current_scope = class_scope;
+        let scope = self
+            .peek_child_scope_with_kind(ScopeKind::Function)
+            .and_then(|_| self.next_child_scope_with_kind(ScopeKind::Function));
+        self.current_scope = previous_scope;
+        scope
+    }
+
+    fn skip_class_body_function_scope(
+        &mut self,
+        class_body: NodeList<lyng_js_ast::ClassElementId>,
+    ) {
+        let _ = self.try_next_class_body_function_scope(class_body);
     }
 
     fn lower_class_field_value(

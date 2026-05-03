@@ -1399,11 +1399,49 @@ fn compile_script_forces_environments_for_explicit_derived_class_constructors() 
 }
 
 #[test]
+fn compile_script_counts_forced_derived_constructor_environment_in_capture_depths() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(14),
+        r#"
+            let source = { value: 3 };
+            class Base {
+                constructor(value) {
+                    this.value = value;
+                }
+            }
+            class Derived extends Base {
+                constructor() {
+                    super(source.value);
+                }
+            }
+            Derived;
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit =
+        compile_script(&parsed, &sema, &mut atoms).expect("derived constructor should lower");
+    let derived_constructor = unit
+        .functions()
+        .iter()
+        .find(|function| function.flags().derived_class_constructor())
+        .expect("derived constructor should be emitted");
+    let text = lyng_js_bytecode::disassemble(derived_constructor);
+
+    assert!(derived_constructor.needs_environment());
+    assert!(text.contains("LoadEnvSlot") && text.contains("depth=1, slot=0"));
+}
+
+#[test]
 fn compile_script_lowers_repeated_empty_class_bodies_with_shared_name() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(13),
+        lyng_js_common::SourceId::new(15),
         r#"
             const Base = function() {}.bind();
             class C extends Base {}

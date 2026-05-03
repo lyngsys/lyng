@@ -136,6 +136,28 @@ fn phase6_direct_eval_in_static_field_initializer_uses_class_this() {
 }
 
 #[test]
+fn phase6_class_static_blocks_lower_class_declarations_after_private_decorators() {
+    let result = compile_and_run(
+        r#"
+        class C {
+            static #dec() {}
+
+            static {
+                @C.#dec class D {
+                    static value = 7;
+                }
+                this.value = D.value;
+            }
+        }
+
+        C.value;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
 fn phase6_public_instance_fields_define_through_proxy_traps() {
     let result = compile_and_run_string(
         r#"
@@ -1608,6 +1630,31 @@ fn phase6_derived_constructors_bind_this_once_and_initialize_instance_elements()
     );
 
     assert_eq!(result, Value::from_smi(6));
+}
+
+#[test]
+fn phase6_derived_constructors_resolve_outer_lexical_bindings_with_forced_environment() {
+    let result = compile_and_run(
+        r#"
+        let source = { c: 3, d: 4 };
+
+        class Base {
+            constructor(obj) {
+                this.total = obj.c + obj.d + Object.keys(obj).length;
+            }
+        }
+
+        class Derived extends Base {
+            constructor() {
+                super({ ...source });
+            }
+        }
+
+        new Derived().total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(9));
 }
 
 #[test]
