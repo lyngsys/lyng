@@ -812,6 +812,8 @@ impl RegExpPayload {
 
     #[inline]
     pub fn payload_bytes(&self) -> usize {
+        // Lower-bound retained-size estimate: `regress::Regex` does not expose
+        // its internally owned program, class, or group-name allocations.
         self.source.len()
             + self
                 .source_units

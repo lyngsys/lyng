@@ -261,6 +261,27 @@ fn build_workloads(loop_trip_count: usize, frontend_repetitions: usize) -> Vec<W
             operations_per_run: loop_trip_count,
         },
         Workload {
+            name: "regexp-constructor-compile.runtime",
+            pipeline: WorkloadPipeline::ScriptRuntime,
+            note: "Repeated RegExp constructor compilation over a small rotating pattern set.",
+            source: regexp_constructor_compile_runtime_workload(loop_trip_count),
+            operations_per_run: loop_trip_count,
+        },
+        Workload {
+            name: "regexp-named-replace.runtime",
+            pipeline: WorkloadPipeline::ScriptRuntime,
+            note: "Global named-capture replacement without the broader mixed RegExp-heavy workload.",
+            source: regexp_named_replace_runtime_workload(loop_trip_count),
+            operations_per_run: loop_trip_count,
+        },
+        Workload {
+            name: "regexp-legacy-statics.runtime",
+            pipeline: WorkloadPipeline::ScriptRuntime,
+            note: "Successful matches followed by Annex B RegExp legacy static accessor reads.",
+            source: regexp_legacy_static_runtime_workload(loop_trip_count),
+            operations_per_run: loop_trip_count,
+        },
+        Workload {
             name: "regexp-stable-exec.runtime",
             pipeline: WorkloadPipeline::ScriptRuntime,
             note: "Repeated default exec/test over stable Latin-1, UTF-16, astral, and lone-surrogate input strings.",
@@ -550,7 +571,7 @@ fn capture_runtime_snapshots() -> Vec<RuntimeSnapshot> {
         RuntimeSnapshot {
             label: "runtime.regexp-literal-cache",
             accounting: runtime.phase6_accounting(),
-            note: "Executed repeated RegExp literal evaluations so retained compiled literal payload cache accounting is visible.",
+            note: "Executed repeated RegExp literal evaluations so retained compiled literal payload cache accounting is visible. RegExp payload bytes are a lower-bound estimate because backend-owned regex tables are opaque.",
         }
     };
 
@@ -746,6 +767,10 @@ fn render_report(
     let iterator_array_runtime = report_by_name(reports, "array-heavy.iterator-runtime");
     let string_runtime = report_by_name(reports, "string-heavy.concat-runtime");
     let regexp_runtime = report_by_name(reports, "regexp-heavy.runtime");
+    let regexp_constructor_runtime = report_by_name(reports, "regexp-constructor-compile.runtime");
+    let regexp_replace_runtime = report_by_name(reports, "regexp-named-replace.runtime");
+    let regexp_legacy_static_runtime = report_by_name(reports, "regexp-legacy-statics.runtime");
+    let regexp_stable_exec_runtime = report_by_name(reports, "regexp-stable-exec.runtime");
     let class_runtime = report_by_name(reports, "class-heavy.runtime");
     let typed_array_runtime = report_by_name(reports, "typed-array-heavy.runtime");
     let seeded_snapshot = snapshots
@@ -931,6 +956,21 @@ fn render_report(
     .unwrap();
     writeln!(
         &mut output,
+        "- RegExp observability rows separate constructor compilation (`{:.2}` ns/work-unit), stable default exec/test (`{:.2}` ns/work-unit), named replacement (`{:.2}` ns/work-unit), and legacy static accessor reads (`{:.2}` ns/work-unit).",
+        regexp_constructor_runtime
+            .throughput
+            .median_ns_per_operation,
+        regexp_stable_exec_runtime
+            .throughput
+            .median_ns_per_operation,
+        regexp_replace_runtime.throughput.median_ns_per_operation,
+        regexp_legacy_static_runtime
+            .throughput
+            .median_ns_per_operation,
+    )
+    .unwrap();
+    writeln!(
+        &mut output,
         "- `class-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering private fields, static blocks, and `super` dispatch on the executable runtime path.",
         class_runtime.throughput.median_ns_per_operation,
         opt_usize_text(class_runtime.memory.feedback_slots),
@@ -954,7 +994,7 @@ fn render_report(
     .unwrap();
     writeln!(
         &mut output,
-        "- The seeded accounting snapshot reports `{}` promise job and `{}` backing store so the retained runtime-accounting surface is exercised by real data. Retained RegExp payloads report as a distinct runtime domain, while iterator-heavy evidence still lives in the executable array/iterator workload rows because iterator state is transient VM execution state rather than a retained post-run runtime record.",
+        "- The seeded accounting snapshot reports `{}` promise job and `{}` backing store so the retained runtime-accounting surface is exercised by real data. Retained RegExp payloads report as a distinct runtime domain, with payload bytes treated as a lower-bound estimate because the current regex backend does not expose all internally owned tables. Iterator-heavy evidence still lives in the executable array/iterator workload rows because iterator state is transient VM execution state rather than a retained post-run runtime record.",
         seeded_snapshot.accounting.promise_jobs.records,
         seeded_snapshot.accounting.backing_stores.records,
     )
@@ -976,6 +1016,11 @@ fn render_report(
     writeln!(
         &mut output,
         "- Module-cache accounting remains a future retained-runtime domain. Post-run iterator-record rows are still zero because the current iterator state is transient to active VM execution, so the benchmarked array/iterator runtime rows are the authoritative memory/perf signal for that surface."
+    )
+    .unwrap();
+    writeln!(
+        &mut output,
+        "- RegExp payload accounting is currently a lower bound: it includes source text, retained UTF-16 source units, flag text, and the `regress::Regex` struct, but not the backend's private instruction vectors, class tables, and capture metadata allocations."
     )
     .unwrap();
 
@@ -1116,6 +1161,74 @@ fn regexp_heavy_runtime_workload(loop_trip_count: usize) -> String {
                         stickyRe.lastIndex = stickyRe.lastIndex + 1;
                     }}
                     total = total + source.replace(execRe, "$<digits>:$<word>").length;
+                    i = i + 1;
+                }}
+                return total;
+            }}
+            return run({loop_trip_count});
+        }})()
+        "#
+    )
+}
+
+fn regexp_constructor_compile_runtime_workload(loop_trip_count: usize) -> String {
+    format!(
+        r#"
+        (function() {{
+            function run(limit) {{
+                var sources = ["^alpha-", "^beta-", "^(?<word>[a-z]+)-", "^[\\p{{ASCII}}]+-"];
+                var flags = ["", "u", "dg", "u"];
+                var samples = ["alpha-123", "beta-456", "gamma-789", "ASCII-000"];
+                var total = 0;
+                var i = 0;
+                while (i < limit) {{
+                    var slot = i & 3;
+                    var re = new RegExp(sources[slot] + "\\d+$", flags[slot]);
+                    if (re.test(samples[slot])) {{
+                        total = total + re.lastIndex + slot + 1;
+                    }}
+                    i = i + 1;
+                }}
+                return total;
+            }}
+            return run({loop_trip_count});
+        }})()
+        "#
+    )
+}
+
+fn regexp_named_replace_runtime_workload(loop_trip_count: usize) -> String {
+    format!(
+        r#"
+        (function() {{
+            function run(limit) {{
+                var source = "alpha-123 beta-456 gamma-789 delta-000";
+                var re = /(?<word>[a-z]+)-(?<digits>\d+)/g;
+                var total = 0;
+                var i = 0;
+                while (i < limit) {{
+                    total = total + source.replace(re, "$<digits>:$<word>").length;
+                    i = i + 1;
+                }}
+                return total;
+            }}
+            return run({loop_trip_count});
+        }})()
+        "#
+    )
+}
+
+fn regexp_legacy_static_runtime_workload(loop_trip_count: usize) -> String {
+    format!(
+        r#"
+        (function() {{
+            function run(limit) {{
+                var re = /(alpha)-(\d+)/;
+                var total = 0;
+                var i = 0;
+                while (i < limit) {{
+                    re.exec("xx alpha-123 yy");
+                    total = total + RegExp.$1.length + RegExp.$2.length + RegExp.lastMatch.length;
                     i = i + 1;
                 }}
                 return total;
@@ -1405,6 +1518,30 @@ mod tests {
         assert!(workload.source.contains("utf16.test(utf16Source)"));
         assert!(workload.source.contains(r"/\u{1F600}/gu"));
         assert!(workload.source.contains("String.fromCharCode(0xD800)"));
+    }
+
+    #[test]
+    fn regexp_observability_rows_split_compile_replace_and_legacy_costs() {
+        let workloads = build_workloads(16, 4);
+        let compile = workloads
+            .iter()
+            .find(|workload| workload.name == "regexp-constructor-compile.runtime")
+            .expect("RegExp constructor compile row should exist");
+        let replace = workloads
+            .iter()
+            .find(|workload| workload.name == "regexp-named-replace.runtime")
+            .expect("RegExp named replacement row should exist");
+        let legacy = workloads
+            .iter()
+            .find(|workload| workload.name == "regexp-legacy-statics.runtime")
+            .expect("RegExp legacy statics row should exist");
+
+        assert_eq!(compile.pipeline, WorkloadPipeline::ScriptRuntime);
+        assert!(compile.source.contains("new RegExp"));
+        assert_eq!(replace.pipeline, WorkloadPipeline::ScriptRuntime);
+        assert!(replace.source.contains("$<digits>:$<word>"));
+        assert_eq!(legacy.pipeline, WorkloadPipeline::ScriptRuntime);
+        assert!(legacy.source.contains("RegExp.lastMatch"));
     }
 
     #[test]
