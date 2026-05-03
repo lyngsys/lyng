@@ -197,3 +197,37 @@ fn regexp_legacy_static_accessors_survive_collection_after_multiple_matches() {
 
     assert_eq!(result, Value::from_smi(63));
 }
+
+#[test]
+fn regexp_symbol_match_default_global_exec_does_not_materialize_per_match_arrays() {
+    let mut atoms = AtomTable::new();
+    let unit = compile_unit(
+        r#"
+        let source = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+        let matches = /x/g[Symbol.match](source);
+        matches.length;
+        "#,
+        &mut atoms,
+    );
+    let bootstrap_unit = compile_unit("0;", &mut atoms);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    vm.evaluate_script(agent, realm, &bootstrap_unit)
+        .expect("bootstrap script should execute");
+    let before_objects = runtime.phase6_accounting().heap.objects.live_bytes;
+    let agent = runtime.root_agent_mut();
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .expect("compiled script should execute");
+    let after_objects = runtime.phase6_accounting().heap.objects.live_bytes;
+
+    assert_eq!(result, Value::from_smi(64));
+    let object_delta = after_objects - before_objects;
+    assert!(
+        object_delta < 8_000,
+        "default global @@match should not retain one materialized match array per match: {object_delta}"
+    );
+}

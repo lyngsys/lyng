@@ -4,8 +4,9 @@ use super::super::{
     usize_index_value, PublicBuiltinDispatchContext,
 };
 use super::{
-    advance_string_index, regexp_exec, regexp_match_all_with_string, regexp_replace_with_string,
-    regexp_result_capture_count, regexp_species_constructor, set_property_on_object_or_throw,
+    advance_string_index, regexp_exec, regexp_exec_result, regexp_match_all_with_string,
+    regexp_replace_with_string, regexp_result_capture_count, regexp_species_constructor,
+    set_property_on_object_or_throw, RegExpExecResult,
 };
 use crate::BuiltinInvocation;
 use lyng_js_ops::read;
@@ -68,24 +69,44 @@ fn regexp_symbol_match_builtin<Cx: PublicBuiltinDispatchContext>(
 
     let mut matches = Vec::new();
     loop {
-        let result = regexp_exec(cx, object_ref, input_ref, &input_units)?;
-        if result.is_null() {
-            break;
-        }
-        let matched = cx.get_property_value(result, PropertyKey::Index(0))?;
-        let matched_ref = to_string_string_ref(cx, matched)?;
-        let matched_units = string_ref_code_units(cx, matched_ref)?;
-        matches.push(Value::from_string_ref(matched_ref));
-        if matched_units.is_empty() {
-            let this_index = cx.get_property_value(receiver, last_index_key)?;
-            let this_index = to_length_for_builtin(cx, this_index)?;
-            let next_index = advance_string_index(&input_units, this_index, full_unicode);
-            set_property_on_object_or_throw(
-                cx,
-                object_ref,
-                last_index_key,
-                usize_index_value(next_index),
-            )?;
+        match regexp_exec_result(cx, object_ref, input_ref, &input_units, false)? {
+            RegExpExecResult::Builtin(Some(state)) => {
+                let matched_range = state.matched.range();
+                let matched = code_unit_range_value(cx, &input_units, matched_range.clone());
+                matches.push(matched);
+                if matched_range.start == matched_range.end {
+                    let this_index = cx.get_property_value(receiver, last_index_key)?;
+                    let this_index = to_length_for_builtin(cx, this_index)?;
+                    let next_index = advance_string_index(&input_units, this_index, full_unicode);
+                    set_property_on_object_or_throw(
+                        cx,
+                        object_ref,
+                        last_index_key,
+                        usize_index_value(next_index),
+                    )?;
+                }
+            }
+            RegExpExecResult::Builtin(None) => break,
+            RegExpExecResult::Custom(result) => {
+                if result.is_null() {
+                    break;
+                }
+                let matched = cx.get_property_value(result, PropertyKey::Index(0))?;
+                let matched_ref = to_string_string_ref(cx, matched)?;
+                let matched_units = string_ref_code_units(cx, matched_ref)?;
+                matches.push(Value::from_string_ref(matched_ref));
+                if matched_units.is_empty() {
+                    let this_index = cx.get_property_value(receiver, last_index_key)?;
+                    let this_index = to_length_for_builtin(cx, this_index)?;
+                    let next_index = advance_string_index(&input_units, this_index, full_unicode);
+                    set_property_on_object_or_throw(
+                        cx,
+                        object_ref,
+                        last_index_key,
+                        usize_index_value(next_index),
+                    )?;
+                }
+            }
         }
     }
     if matches.is_empty() {
@@ -141,19 +162,25 @@ fn regexp_symbol_search_builtin<Cx: PublicBuiltinDispatchContext>(
     }
 
     let input_units = string_ref_code_units(cx, input_ref)?;
-    let result = regexp_exec(cx, object_ref, input_ref, &input_units)?;
+    let result = regexp_exec_result(cx, object_ref, input_ref, &input_units, false)?;
     let current_last_index = cx.get_property_value(receiver, last_index_key)?;
     if !same_value_for_builtin(cx, current_last_index, previous_last_index)? {
         set_property_on_object_or_throw(cx, object_ref, last_index_key, previous_last_index)?;
     }
-    if result.is_null() {
-        return Ok(Value::from_smi(-1));
+    match result {
+        RegExpExecResult::Builtin(Some(state)) => Ok(usize_index_value(state.matched.start())),
+        RegExpExecResult::Builtin(None) => Ok(Value::from_smi(-1)),
+        RegExpExecResult::Custom(result) => {
+            if result.is_null() {
+                return Ok(Value::from_smi(-1));
+            }
+            let index_key = {
+                let agent = cx.agent();
+                PropertyKey::from_atom(agent.atoms_mut().intern_collectible("index"))
+            };
+            cx.get_property_value(result, index_key)
+        }
     }
-    let index_key = {
-        let agent = cx.agent();
-        PropertyKey::from_atom(agent.atoms_mut().intern_collectible("index"))
-    };
-    cx.get_property_value(result, index_key)
 }
 
 fn same_value_for_builtin<Cx: PublicBuiltinDispatchContext>(

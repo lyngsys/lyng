@@ -231,6 +231,12 @@ struct RegExpExecState {
     matched: lyng_js_objects::RegExpMatchRecord,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum RegExpExecResult {
+    Builtin(Option<RegExpExecState>),
+    Custom(Value),
+}
+
 #[derive(Clone, Copy, Debug)]
 enum RegExpLegacyStaticProperty {
     Input,
@@ -830,12 +836,32 @@ fn regexp_exec<Cx: PublicBuiltinDispatchContext>(
     input_ref: StringRef,
     input_units: &[u16],
 ) -> Result<Value, Cx::Error> {
+    match regexp_exec_result(cx, object_ref, input_ref, input_units, false)? {
+        RegExpExecResult::Builtin(Some(state)) => {
+            build_regexp_match_result(cx, input_units, Value::from_string_ref(input_ref), &state)
+        }
+        RegExpExecResult::Builtin(None) => Ok(Value::null()),
+        RegExpExecResult::Custom(result) => Ok(result),
+    }
+}
+
+fn regexp_exec_result<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    object_ref: ObjectRef,
+    input_ref: StringRef,
+    input_units: &[u16],
+    advance_empty_match: bool,
+) -> Result<RegExpExecResult, Cx::Error> {
     let exec_key = {
         let agent = cx.agent();
         PropertyKey::from_atom(agent.atoms_mut().intern_collectible("exec"))
     };
     let exec = cx.get_property_value(Value::from_object_ref(object_ref), exec_key)?;
     if let Some(exec_object) = callable_object_from_value(cx, exec) {
+        if is_current_realm_regexp_exec_builtin(cx, exec_object) {
+            return regexp_exec_state(cx, object_ref, input_ref, input_units, advance_empty_match)
+                .map(RegExpExecResult::Builtin);
+        }
         let input_value = Value::from_string_ref(input_ref);
         let result = cx.call_to_completion(
             exec_object,
@@ -843,15 +869,26 @@ fn regexp_exec<Cx: PublicBuiltinDispatchContext>(
             &[input_value],
         )?;
         if result.is_null() || result.as_object_ref().is_some() {
-            return Ok(result);
+            return Ok(RegExpExecResult::Custom(result));
         }
         return Err(type_error(cx));
     }
 
-    let Some(state) = regexp_exec_state(cx, object_ref, input_ref, input_units, false)? else {
-        return Ok(Value::null());
+    regexp_exec_state(cx, object_ref, input_ref, input_units, advance_empty_match)
+        .map(RegExpExecResult::Builtin)
+}
+
+fn is_current_realm_regexp_exec_builtin<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    exec_object: ObjectRef,
+) -> bool {
+    let builtin_realm = cx.builtin_realm();
+    let agent = cx.agent();
+    let Some(data) = agent.objects().function_data(exec_object) else {
+        return false;
     };
-    build_regexp_match_result(cx, input_units, Value::from_string_ref(input_ref), &state)
+    data.realm() == Some(builtin_realm)
+        && builtin_function_entry(agent, exec_object) == Some(super::regexp_exec_builtin())
 }
 
 fn regexp_default_constructor<Cx: PublicBuiltinDispatchContext>(
