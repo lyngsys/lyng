@@ -194,6 +194,15 @@ pub fn parse_plain_year_month(text: &str) -> Option<(i32, u8, u8)> {
             return None;
         }
         day
+    } else if bytes
+        .get(index)
+        .is_some_and(std::primitive::u8::is_ascii_digit)
+    {
+        let day = parse_fixed_u8(text, &mut index, 2)?;
+        if day == 0 || day > iso_days_in_month(year, month) {
+            return None;
+        }
+        day
     } else {
         1
     };
