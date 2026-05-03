@@ -1,5 +1,5 @@
 use regress::Regex;
-use std::{fmt::Write as _, mem::size_of, ops::Range};
+use std::{borrow::Cow, fmt::Write as _, mem::size_of, ops::Range};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RegExpObjectFlags(u8);
@@ -304,15 +304,57 @@ enum RegExpFastPattern {
 }
 
 fn normalize_backend_pattern(pattern: &str, flags: RegExpObjectFlags) -> String {
+    let pattern = if flags.unicode_aware() {
+        Cow::Borrowed(pattern)
+    } else {
+        Cow::Owned(normalize_legacy_identity_escapes(pattern))
+    };
+    let normalized = normalize_unicode_property_aliases(pattern.as_ref());
+
+    if flags.unicode_aware() {
+        normalized.into_owned()
+    } else {
+        expand_astral_source_for_ucs2(&normalized)
+    }
+}
+
+fn normalize_unicode_property_aliases(pattern: &str) -> Cow<'_, str> {
+    if !pattern.contains(r"\p{") && !pattern.contains(r"\P{") {
+        return Cow::Borrowed(pattern);
+    }
+
+    let mut normalized = None::<String>;
+    let mut index = 0;
+    while index < pattern.len() {
+        let rest = &pattern[index..];
+        if let Some((from_len, replacement)) = unicode_property_alias_replacement(rest) {
+            let output = normalized.get_or_insert_with(|| {
+                let mut output = String::with_capacity(pattern.len() + replacement.len());
+                output.push_str(&pattern[..index]);
+                output
+            });
+            output.push_str(replacement);
+            index += from_len;
+            continue;
+        }
+
+        let ch = rest
+            .chars()
+            .next()
+            .expect("index should stay on a char boundary within the pattern");
+        if let Some(output) = &mut normalized {
+            output.push(ch);
+        }
+        index += ch.len_utf8();
+    }
+
+    normalized.map_or(Cow::Borrowed(pattern), Cow::Owned)
+}
+
+fn unicode_property_alias_replacement(rest: &str) -> Option<(usize, &'static str)> {
     const UNKNOWN_SCRIPT_SET: &str =
         r"[\P{Assigned}\p{General_Category=Surrogate}\p{General_Category=Private_Use}]";
-
-    let pattern = if flags.unicode_aware() {
-        pattern.to_owned()
-    } else {
-        normalize_legacy_identity_escapes(pattern)
-    };
-    let normalized = [
+    const REPLACEMENTS: [(&str, &str); 16] = [
         (r"\p{Script=Unknown}", UNKNOWN_SCRIPT_SET),
         (r"\p{Script=Zzzz}", UNKNOWN_SCRIPT_SET),
         (r"\p{sc=Unknown}", UNKNOWN_SCRIPT_SET),
@@ -329,15 +371,11 @@ fn normalize_backend_pattern(pattern: &str, flags: RegExpObjectFlags) -> String 
         (r"\P{Script_Extensions=Zzzz}", r"\p{Assigned}"),
         (r"\P{scx=Unknown}", r"\p{Assigned}"),
         (r"\P{scx=Zzzz}", r"\p{Assigned}"),
-    ]
-    .into_iter()
-    .fold(pattern, |current, (from, to)| current.replace(from, to));
+    ];
 
-    if flags.unicode_aware() {
-        normalized
-    } else {
-        expand_astral_source_for_ucs2(&normalized)
-    }
+    REPLACEMENTS
+        .into_iter()
+        .find_map(|(from, to)| rest.starts_with(from).then_some((from.len(), to)))
 }
 
 fn normalize_legacy_identity_escapes(pattern: &str) -> String {
@@ -1377,6 +1415,21 @@ mod tests {
             Some(RegExpFastPattern::Never)
         );
         assert_eq!(detect_fast_pattern(r"^\p{ASCII}+$", flags("")), None);
+    }
+
+    #[test]
+    fn unicode_property_alias_normalization_only_allocates_for_rewrites() {
+        assert!(matches!(
+            normalize_unicode_property_aliases(r"\p{ASCII}+"),
+            Cow::Borrowed(_)
+        ));
+
+        let normalized = normalize_unicode_property_aliases(r"\p{sc=Unknown}+");
+        assert!(matches!(normalized, Cow::Owned(_)));
+        assert_eq!(
+            normalized.as_ref(),
+            r"[\P{Assigned}\p{General_Category=Surrogate}\p{General_Category=Private_Use}]+"
+        );
     }
 
     #[test]

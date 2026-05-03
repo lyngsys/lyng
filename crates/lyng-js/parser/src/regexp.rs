@@ -43,18 +43,20 @@ struct RegExpFlags {
 
 pub fn validate_regexp_literal(pattern: &str, flags: &str) -> Result<(), &'static str> {
     let flags = validate_flags(flags)?;
-    let total_captures = count_capturing_groups(pattern);
-    validate_pattern(pattern, flags, total_captures, true)
+    let chars: Vec<char> = pattern.chars().collect();
+    let total_captures = count_capturing_groups(&chars);
+    validate_pattern(&chars, flags, total_captures, true)
 }
 
 pub fn validate_regexp_constructor_pattern(pattern: &str, flags: &str) -> Result<(), &'static str> {
     let flags = validate_flags(flags)?;
-    let total_captures = count_capturing_groups(pattern);
-    validate_pattern(pattern, flags, total_captures, false)
+    let chars: Vec<char> = pattern.chars().collect();
+    let total_captures = count_capturing_groups(&chars);
+    validate_pattern(&chars, flags, total_captures, false)
 }
 
 fn validate_flags(flags: &str) -> Result<RegExpFlags, &'static str> {
-    let mut seen = HashSet::new();
+    let mut seen = 0_u8;
     let mut saw_unicode_flag = false;
     let mut saw_unicode_sets_flag = false;
     let mut parsed = RegExpFlags {
@@ -63,12 +65,13 @@ fn validate_flags(flags: &str) -> Result<RegExpFlags, &'static str> {
     };
 
     for ch in flags.chars() {
-        if !matches!(ch, 'd' | 'g' | 'i' | 'm' | 's' | 'u' | 'v' | 'y') {
+        let Some(bit) = regexp_flag_bit(ch) else {
             return Err("invalid regular expression flags");
-        }
-        if !seen.insert(ch) {
+        };
+        if (seen & bit) != 0 {
             return Err("duplicate regular expression flags");
         }
+        seen |= bit;
         if ch == 'u' {
             saw_unicode_flag = true;
             parsed.unicode = true;
@@ -85,8 +88,21 @@ fn validate_flags(flags: &str) -> Result<RegExpFlags, &'static str> {
     Ok(parsed)
 }
 
-fn count_capturing_groups(pattern: &str) -> usize {
-    let chars: Vec<char> = pattern.chars().collect();
+fn regexp_flag_bit(ch: char) -> Option<u8> {
+    match ch {
+        'd' => Some(1 << 0),
+        'g' => Some(1 << 1),
+        'i' => Some(1 << 2),
+        'm' => Some(1 << 3),
+        's' => Some(1 << 4),
+        'u' => Some(1 << 5),
+        'v' => Some(1 << 6),
+        'y' => Some(1 << 7),
+        _ => None,
+    }
+}
+
+fn count_capturing_groups(chars: &[char]) -> usize {
     let mut i = 0;
     let mut count = 0;
     let mut in_class = false;
@@ -130,19 +146,27 @@ fn count_capturing_groups(pattern: &str) -> usize {
 }
 
 fn validate_pattern(
-    pattern: &str,
+    chars: &[char],
     flags: RegExpFlags,
     total_captures: usize,
     allow_annex_b_invalid_braced_quantifier: bool,
 ) -> Result<(), &'static str> {
-    let chars: Vec<char> = pattern.chars().collect();
-    validate_duplicate_named_groups(&chars)?;
+    let may_have_named_captures = pattern_may_contain_named_captures(chars);
+    if may_have_named_captures {
+        validate_duplicate_named_groups(chars)?;
+    }
 
     let mut i = 0;
     let mut last_atom = AtomKind::None;
     let mut groups = Vec::new();
     let mut named_groups = HashSet::new();
-    let all_named_groups = collect_named_group_names(pattern);
+    // Named-group validation is the only path that needs retained names across
+    // the scan. Ordinary patterns keep this as an empty, non-allocating set.
+    let all_named_groups = if may_have_named_captures {
+        collect_named_group_names(chars)
+    } else {
+        HashSet::new()
+    };
     let mut named_references = Vec::new();
 
     while i < chars.len() {
@@ -777,6 +801,10 @@ fn validate_duplicate_named_groups(chars: &[char]) -> Result<(), &'static str> {
     Ok(())
 }
 
+fn pattern_may_contain_named_captures(chars: &[char]) -> bool {
+    chars.windows(3).any(|window| window == ['(', '?', '<'])
+}
+
 fn named_capture_group_at(chars: &[char], start: usize) -> Option<(usize, String)> {
     if chars.get(start + 1) != Some(&'?') || chars.get(start + 2) != Some(&'<') {
         return None;
@@ -799,8 +827,7 @@ fn named_capture_group_at(chars: &[char], start: usize) -> Option<(usize, String
     parse_group_name_contents(&chars[start + 3..end]).map(|name| (end + 1, name))
 }
 
-fn collect_named_group_names(pattern: &str) -> HashSet<String> {
-    let chars: Vec<char> = pattern.chars().collect();
+fn collect_named_group_names(chars: &[char]) -> HashSet<String> {
     let mut i = 0;
     let mut in_class = false;
     let mut names = HashSet::new();
