@@ -77,6 +77,39 @@ fn regexp_group_names_are_readable_through_escaped_identifier_properties() {
 }
 
 #[test]
+fn regexp_execution_reusable_units_preserve_utf16_and_last_index_edges() {
+    let result = compile_and_run_string(
+        r#"
+        let latin = /a/g;
+        latin.exec("ba");
+        let latinLast = latin.lastIndex;
+
+        let sticky = /\u0100/y;
+        sticky.lastIndex = 1;
+        let stickyMatch = sticky.exec("x\u0100");
+
+        let astralMatch = /\u{1F600}/gu.exec("x\u{1F600}");
+        let lone = String.fromCharCode(0xD800);
+        let loneMatch = /\uD800/g.exec(lone);
+        let emptyUnicodeMatches = /(?:)/gu[Symbol.match]("\u{1F600}");
+
+        [
+            latinLast,
+            stickyMatch.index,
+            sticky.lastIndex,
+            stickyMatch[0].charCodeAt(0),
+            astralMatch.index,
+            astralMatch[0].length,
+            loneMatch[0].charCodeAt(0),
+            emptyUnicodeMatches.length
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "2|1|2|256|1|2|55296|2");
+}
+
+#[test]
 fn regexp_literal_cache_keeps_objects_fresh_and_last_index_independent() {
     let mut atoms = AtomTable::new();
     let unit = compile_unit(

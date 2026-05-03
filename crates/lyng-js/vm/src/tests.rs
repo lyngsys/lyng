@@ -6925,6 +6925,33 @@ fn evaluate_script_regexp_legacy_input_preserves_utf16_code_units() {
 }
 
 #[test]
+fn evaluate_script_regexp_exec_reuses_string_code_unit_scratch() {
+    let unit = compile_test_unit(
+        2399,
+        r#"
+            let source = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            let re = /a/g;
+            let count = 0;
+            let current;
+            while ((current = re.exec(source)) !== null) {
+                count = count + current[0].length;
+            }
+            count;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    assert_eq!(vm.string_code_units_scratch_capacity(), 0);
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_smi(64));
+    assert!(vm.string_code_units_scratch_capacity() >= 64);
+}
+
+#[test]
 fn evaluate_script_string_index_reads_do_not_allocate_primitive_wrappers() {
     let warmup = compile_test_unit(23929, "0;");
     let unit = compile_test_unit(

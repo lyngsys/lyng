@@ -1510,6 +1510,25 @@ pub(super) fn string_ref_code_units<Cx: PublicBuiltinDispatchContext>(
     Ok(units)
 }
 
+pub(super) fn with_string_ref_code_units<Cx, R>(
+    cx: &mut Cx,
+    string: StringRef,
+    f: impl FnOnce(&mut Cx, &[u16]) -> Result<R, Cx::Error>,
+) -> Result<R, Cx::Error>
+where
+    Cx: PublicBuiltinDispatchContext,
+{
+    let mut units = cx.take_string_code_units_scratch();
+    units.clear();
+    if let Err(error) = append_string_ref_code_units(cx, string, &mut units) {
+        cx.recycle_string_code_units_scratch(units);
+        return Err(error);
+    }
+    let result = f(cx, &units);
+    cx.recycle_string_code_units_scratch(units);
+    result
+}
+
 pub(super) fn string_from_string_ref_range<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     string: StringRef,

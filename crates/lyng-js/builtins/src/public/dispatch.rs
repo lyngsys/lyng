@@ -59,7 +59,8 @@ use support::{
     to_string_string_ref, to_uint32_for_builtin, to_uint8_clamp_for_builtin, to_uint8_for_builtin,
     try_create_data_property, try_delete_property_from_object, type_error,
     typed_array_index_is_valid, uri_error, usize_index_value, valid_array_length,
-    BuiltinIteratorBridge, BuiltinProxyBridge, BuiltinToPrimitiveBridge, MAX_SAFE_INTEGER_U64,
+    with_string_ref_code_units, BuiltinIteratorBridge, BuiltinProxyBridge,
+    BuiltinToPrimitiveBridge, MAX_SAFE_INTEGER_U64,
 };
 
 use super::{
@@ -247,6 +248,12 @@ use super::{
 #[allow(clippy::missing_errors_doc)]
 pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
     fn agent(&mut self) -> &mut Agent;
+
+    fn take_string_code_units_scratch(&mut self) -> Vec<u16> {
+        Vec::new()
+    }
+
+    fn recycle_string_code_units_scratch(&mut self, _units: Vec<u16>) {}
 
     fn callee_object(&self) -> lyng_js_types::ObjectRef;
 

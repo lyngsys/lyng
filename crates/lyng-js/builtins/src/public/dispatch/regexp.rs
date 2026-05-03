@@ -9,7 +9,7 @@ use super::{
     set_data_property_value, string_from_code_units, string_from_string_ref_range,
     string_ref_code_units, string_value, syntax_error, to_boolean_for_builtin,
     to_integer_or_infinity_for_builtin, to_length_for_builtin, to_string_string_ref, type_error,
-    usize_index_value, PublicBuiltinDispatchContext,
+    usize_index_value, with_string_ref_code_units, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use accessors::{
@@ -1215,48 +1215,49 @@ fn regexp_string_iterator_next_builtin<Cx: PublicBuiltinDispatchContext>(
     )?
     .as_bool()
     .ok_or_else(|| type_error(cx))?;
-    let source_units = string_ref_code_units(cx, source_ref)?;
-    let matched = regexp_exec(cx, regexp_object, source_ref, &source_units)?;
-    if matched.is_null() {
-        iterators::set_iterator_slot_value_for_builtin(
-            cx,
-            iterator_object,
-            OrdinaryObjectData::RegExpStringIterator,
-            REGEXP_STRING_ITERATOR_DONE_SLOT,
-            Value::from_bool(true),
-        )?;
-        return iterators::create_iterator_result_value(cx, Value::undefined(), true);
-    }
-    if !global {
-        iterators::set_iterator_slot_value_for_builtin(
-            cx,
-            iterator_object,
-            OrdinaryObjectData::RegExpStringIterator,
-            REGEXP_STRING_ITERATOR_DONE_SLOT,
-            Value::from_bool(true),
-        )?;
-        return iterators::create_iterator_result_value(cx, matched, false);
-    }
+    with_string_ref_code_units(cx, source_ref, |cx, source_units| {
+        let matched = regexp_exec(cx, regexp_object, source_ref, source_units)?;
+        if matched.is_null() {
+            iterators::set_iterator_slot_value_for_builtin(
+                cx,
+                iterator_object,
+                OrdinaryObjectData::RegExpStringIterator,
+                REGEXP_STRING_ITERATOR_DONE_SLOT,
+                Value::from_bool(true),
+            )?;
+            return iterators::create_iterator_result_value(cx, Value::undefined(), true);
+        }
+        if !global {
+            iterators::set_iterator_slot_value_for_builtin(
+                cx,
+                iterator_object,
+                OrdinaryObjectData::RegExpStringIterator,
+                REGEXP_STRING_ITERATOR_DONE_SLOT,
+                Value::from_bool(true),
+            )?;
+            return iterators::create_iterator_result_value(cx, matched, false);
+        }
 
-    let match_str = {
-        let element = cx.get_property_value(matched, PropertyKey::Index(0))?;
-        let element_ref = to_string_string_ref(cx, element)?;
-        string_ref_code_units(cx, element_ref)?
-    };
-    if match_str.is_empty() {
-        let last_index_key = regexp_last_index_key(cx);
-        let this_index =
-            cx.get_property_value(Value::from_object_ref(regexp_object), last_index_key)?;
-        let this_index = to_length_for_builtin(cx, this_index)?;
-        let next_index = advance_string_index(&source_units, this_index, full_unicode);
-        set_property_on_object_or_throw(
-            cx,
-            regexp_object,
-            last_index_key,
-            usize_index_value(next_index),
-        )?;
-    }
-    iterators::create_iterator_result_value(cx, matched, false)
+        let match_str = {
+            let element = cx.get_property_value(matched, PropertyKey::Index(0))?;
+            let element_ref = to_string_string_ref(cx, element)?;
+            string_ref_code_units(cx, element_ref)?
+        };
+        if match_str.is_empty() {
+            let last_index_key = regexp_last_index_key(cx);
+            let this_index =
+                cx.get_property_value(Value::from_object_ref(regexp_object), last_index_key)?;
+            let this_index = to_length_for_builtin(cx, this_index)?;
+            let next_index = advance_string_index(source_units, this_index, full_unicode);
+            set_property_on_object_or_throw(
+                cx,
+                regexp_object,
+                last_index_key,
+                usize_index_value(next_index),
+            )?;
+        }
+        iterators::create_iterator_result_value(cx, matched, false)
+    })
 }
 
 pub(super) fn regexp_replace_with_string<Cx: PublicBuiltinDispatchContext>(
@@ -1266,130 +1267,131 @@ pub(super) fn regexp_replace_with_string<Cx: PublicBuiltinDispatchContext>(
     replacement: Value,
 ) -> Result<Value, Cx::Error> {
     let regexp_object = regexp_value.as_object_ref().ok_or_else(|| type_error(cx))?;
-    let source_units = string_ref_code_units(cx, source_ref)?;
-    let source_value = Value::from_string_ref(source_ref);
-    let callable_replacement = callable_object_from_value(cx, replacement);
-    let replacement_template_units = if callable_replacement.is_none() {
-        let replacement_ref = to_string_string_ref(cx, replacement)?;
-        Some(string_ref_code_units(cx, replacement_ref)?)
-    } else {
-        None
-    };
-    let flags_key = {
-        let agent = cx.agent();
-        PropertyKey::from_atom(agent.bootstrap_atoms().flags())
-    };
-    let flags_value = cx.get_property_value(regexp_value, flags_key)?;
-    let flags_text = cx.value_to_string_text(flags_value)?;
-    let global = flags_text.contains('g');
-    let full_unicode = flags_text.contains('u') || flags_text.contains('v');
-    let last_index_key = regexp_last_index_key(cx);
-    if global {
-        set_property_on_object_or_throw(cx, regexp_object, last_index_key, Value::from_smi(0))?;
-    }
-
-    let mut results = Vec::new();
-    loop {
-        let result = regexp_exec(cx, regexp_object, source_ref, &source_units)?;
-        if result.is_null() {
-            break;
-        }
-        if global {
-            let matched = cx.get_property_value(result, PropertyKey::Index(0))?;
-            let matched_ref = to_string_string_ref(cx, matched)?;
-            let matched_units = string_ref_code_units(cx, matched_ref)?;
-            if matched_units.is_empty() {
-                let this_index = cx.get_property_value(regexp_value, last_index_key)?;
-                let this_index = to_length_for_builtin(cx, this_index)?;
-                let next_index = advance_string_index(&source_units, this_index, full_unicode);
-                set_property_on_object_or_throw(
-                    cx,
-                    regexp_object,
-                    last_index_key,
-                    usize_index_value(next_index),
-                )?;
-            }
-        }
-        results.push(result);
-        if !global {
-            break;
-        }
-    }
-    if results.is_empty() {
-        return Ok(Value::from_string_ref(source_ref));
-    }
-
-    let mut result = Vec::with_capacity(source_units.len());
-    let mut next_source_position = 0;
-    for match_result in results {
-        let capture_count = regexp_result_capture_count(cx, match_result)?;
-        let matched_value = cx.get_property_value(match_result, PropertyKey::Index(0))?;
-        let matched_ref = to_string_string_ref(cx, matched_value)?;
-        let matched_units = string_ref_code_units(cx, matched_ref)?;
-        let position = regexp_result_position(cx, match_result, source_units.len())?;
-        let mut capture_units = Vec::with_capacity(capture_count);
-        let mut capture_values = Vec::with_capacity(capture_count);
-        for index in 1..=capture_count {
-            let capture = cx.get_property_value(
-                match_result,
-                PropertyKey::Index(u32::try_from(index).unwrap_or(u32::MAX)),
-            )?;
-            if capture.is_undefined() {
-                capture_units.push(None);
-                capture_values.push(Value::undefined());
-            } else {
-                let capture_ref = to_string_string_ref(cx, capture)?;
-                capture_units.push(Some(string_ref_code_units(cx, capture_ref)?));
-                capture_values.push(Value::from_string_ref(capture_ref));
-            }
-        }
-        let groups_key = {
-            let agent = cx.agent();
-            PropertyKey::from_atom(agent.atoms_mut().intern_collectible("groups"))
-        };
-        let named_captures = cx.get_property_value(match_result, groups_key)?;
-        let replacement_units = if let Some(callee) = callable_replacement {
-            let mut arguments = Vec::with_capacity(capture_values.len() + 5);
-            arguments.push(Value::from_string_ref(matched_ref));
-            arguments.extend(capture_values);
-            arguments.push(usize_index_value(position));
-            arguments.push(source_value);
-            if !named_captures.is_undefined() {
-                arguments.push(named_captures);
-            }
-            let replaced = cx.call_to_completion(callee, Value::undefined(), &arguments)?;
-            let replaced_ref = to_string_string_ref(cx, replaced)?;
-            string_ref_code_units(cx, replaced_ref)?
+    with_string_ref_code_units(cx, source_ref, |cx, source_units| {
+        let source_value = Value::from_string_ref(source_ref);
+        let callable_replacement = callable_object_from_value(cx, replacement);
+        let replacement_template_units = if callable_replacement.is_none() {
+            let replacement_ref = to_string_string_ref(cx, replacement)?;
+            Some(string_ref_code_units(cx, replacement_ref)?)
         } else {
-            let named_captures = if named_captures.is_undefined() {
-                Value::undefined()
-            } else {
-                Value::from_object_ref(
-                    cx.to_object_for_builtin_value(cx.builtin_realm(), named_captures)?,
-                )
-            };
-            expand_regexp_replacement_template(
-                cx,
-                replacement_template_units
-                    .as_deref()
-                    .expect("template units should exist for non-callable replacements"),
-                &source_units,
-                &matched_units,
-                position,
-                &capture_units,
-                named_captures,
-            )?
+            None
         };
-        if position >= next_source_position {
-            result.extend_from_slice(&source_units[next_source_position..position]);
-            result.extend_from_slice(&replacement_units);
-            next_source_position = position
-                .saturating_add(matched_units.len())
-                .min(source_units.len());
+        let flags_key = {
+            let agent = cx.agent();
+            PropertyKey::from_atom(agent.bootstrap_atoms().flags())
+        };
+        let flags_value = cx.get_property_value(regexp_value, flags_key)?;
+        let flags_text = cx.value_to_string_text(flags_value)?;
+        let global = flags_text.contains('g');
+        let full_unicode = flags_text.contains('u') || flags_text.contains('v');
+        let last_index_key = regexp_last_index_key(cx);
+        if global {
+            set_property_on_object_or_throw(cx, regexp_object, last_index_key, Value::from_smi(0))?;
         }
-    }
-    result.extend_from_slice(&source_units[next_source_position..]);
-    Ok(string_from_code_units(cx, &result))
+
+        let mut results = Vec::new();
+        loop {
+            let result = regexp_exec(cx, regexp_object, source_ref, source_units)?;
+            if result.is_null() {
+                break;
+            }
+            if global {
+                let matched = cx.get_property_value(result, PropertyKey::Index(0))?;
+                let matched_ref = to_string_string_ref(cx, matched)?;
+                let matched_units = string_ref_code_units(cx, matched_ref)?;
+                if matched_units.is_empty() {
+                    let this_index = cx.get_property_value(regexp_value, last_index_key)?;
+                    let this_index = to_length_for_builtin(cx, this_index)?;
+                    let next_index = advance_string_index(source_units, this_index, full_unicode);
+                    set_property_on_object_or_throw(
+                        cx,
+                        regexp_object,
+                        last_index_key,
+                        usize_index_value(next_index),
+                    )?;
+                }
+            }
+            results.push(result);
+            if !global {
+                break;
+            }
+        }
+        if results.is_empty() {
+            return Ok(Value::from_string_ref(source_ref));
+        }
+
+        let mut result = Vec::with_capacity(source_units.len());
+        let mut next_source_position = 0;
+        for match_result in results {
+            let capture_count = regexp_result_capture_count(cx, match_result)?;
+            let matched_value = cx.get_property_value(match_result, PropertyKey::Index(0))?;
+            let matched_ref = to_string_string_ref(cx, matched_value)?;
+            let matched_units = string_ref_code_units(cx, matched_ref)?;
+            let position = regexp_result_position(cx, match_result, source_units.len())?;
+            let mut capture_units = Vec::with_capacity(capture_count);
+            let mut capture_values = Vec::with_capacity(capture_count);
+            for index in 1..=capture_count {
+                let capture = cx.get_property_value(
+                    match_result,
+                    PropertyKey::Index(u32::try_from(index).unwrap_or(u32::MAX)),
+                )?;
+                if capture.is_undefined() {
+                    capture_units.push(None);
+                    capture_values.push(Value::undefined());
+                } else {
+                    let capture_ref = to_string_string_ref(cx, capture)?;
+                    capture_units.push(Some(string_ref_code_units(cx, capture_ref)?));
+                    capture_values.push(Value::from_string_ref(capture_ref));
+                }
+            }
+            let groups_key = {
+                let agent = cx.agent();
+                PropertyKey::from_atom(agent.atoms_mut().intern_collectible("groups"))
+            };
+            let named_captures = cx.get_property_value(match_result, groups_key)?;
+            let replacement_units = if let Some(callee) = callable_replacement {
+                let mut arguments = Vec::with_capacity(capture_values.len() + 5);
+                arguments.push(Value::from_string_ref(matched_ref));
+                arguments.extend(capture_values);
+                arguments.push(usize_index_value(position));
+                arguments.push(source_value);
+                if !named_captures.is_undefined() {
+                    arguments.push(named_captures);
+                }
+                let replaced = cx.call_to_completion(callee, Value::undefined(), &arguments)?;
+                let replaced_ref = to_string_string_ref(cx, replaced)?;
+                string_ref_code_units(cx, replaced_ref)?
+            } else {
+                let named_captures = if named_captures.is_undefined() {
+                    Value::undefined()
+                } else {
+                    Value::from_object_ref(
+                        cx.to_object_for_builtin_value(cx.builtin_realm(), named_captures)?,
+                    )
+                };
+                expand_regexp_replacement_template(
+                    cx,
+                    replacement_template_units
+                        .as_deref()
+                        .expect("template units should exist for non-callable replacements"),
+                    source_units,
+                    &matched_units,
+                    position,
+                    &capture_units,
+                    named_captures,
+                )?
+            };
+            if position >= next_source_position {
+                result.extend_from_slice(&source_units[next_source_position..position]);
+                result.extend_from_slice(&replacement_units);
+                next_source_position = position
+                    .saturating_add(matched_units.len())
+                    .min(source_units.len());
+            }
+        }
+        result.extend_from_slice(&source_units[next_source_position..]);
+        Ok(string_from_code_units(cx, &result))
+    })
 }
 
 fn regexp_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1493,12 +1495,13 @@ fn regexp_exec_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let input_units = string_ref_code_units(cx, input_ref)?;
-    let input_value = Value::from_string_ref(input_ref);
-    let Some(state) = regexp_exec_state(cx, object_ref, input_ref, &input_units, false)? else {
-        return Ok(Value::null());
-    };
-    build_regexp_match_result(cx, &input_units, input_value, &state)
+    with_string_ref_code_units(cx, input_ref, |cx, input_units| {
+        let input_value = Value::from_string_ref(input_ref);
+        let Some(state) = regexp_exec_state(cx, object_ref, input_ref, input_units, false)? else {
+            return Ok(Value::null());
+        };
+        build_regexp_match_result(cx, input_units, input_value, &state)
+    })
 }
 
 fn regexp_test_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1514,7 +1517,6 @@ fn regexp_test_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let input_units = string_ref_code_units(cx, input_ref)?;
     let exec_key = {
         let agent = cx.agent();
         PropertyKey::from_atom(agent.atoms_mut().intern_collectible("exec"))
@@ -1525,11 +1527,15 @@ fn regexp_test_builtin<Cx: PublicBuiltinDispatchContext>(
         .and_then(|exec| builtin_function_entry(cx.agent(), exec))
         == Some(super::regexp_exec_builtin());
     if default_exec {
-        return Ok(Value::from_bool(
-            regexp_exec_state(cx, object_ref, input_ref, &input_units, false)?.is_some(),
-        ));
+        return with_string_ref_code_units(cx, input_ref, |cx, input_units| {
+            Ok(Value::from_bool(
+                regexp_exec_state(cx, object_ref, input_ref, input_units, false)?.is_some(),
+            ))
+        });
     }
 
-    let matched = regexp_exec(cx, object_ref, input_ref, &input_units)?;
-    Ok(Value::from_bool(!matched.is_null()))
+    with_string_ref_code_units(cx, input_ref, |cx, input_units| {
+        let matched = regexp_exec(cx, object_ref, input_ref, input_units)?;
+        Ok(Value::from_bool(!matched.is_null()))
+    })
 }

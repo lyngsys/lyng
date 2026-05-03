@@ -261,6 +261,13 @@ fn build_workloads(loop_trip_count: usize, frontend_repetitions: usize) -> Vec<W
             operations_per_run: loop_trip_count,
         },
         Workload {
+            name: "regexp-stable-exec.runtime",
+            pipeline: WorkloadPipeline::ScriptRuntime,
+            note: "Repeated default exec/test over stable Latin-1, UTF-16, astral, and lone-surrogate input strings.",
+            source: regexp_stable_exec_runtime_workload(loop_trip_count),
+            operations_per_run: loop_trip_count,
+        },
+        Workload {
             name: "typed-array-heavy.runtime",
             pipeline: WorkloadPipeline::ScriptRuntime,
             note: "ArrayBuffer-backed typed-array views plus DataView read/write traffic on the current binary-data runtime path.",
@@ -1119,6 +1126,48 @@ fn regexp_heavy_runtime_workload(loop_trip_count: usize) -> String {
     )
 }
 
+fn regexp_stable_exec_runtime_workload(loop_trip_count: usize) -> String {
+    format!(
+        r#"
+        (function() {{
+            function run(limit) {{
+                var latinSource = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+                var utf16Source = "\u0100\u0100\u0100\u0100";
+                var astralSource = "\u{{1F600}}\u{{1F600}}";
+                var loneSource = String.fromCharCode(0xD800) + String.fromCharCode(0xD800);
+                var latin = /a/g;
+                var utf16 = /\u0100/g;
+                var astral = /\u{{1F600}}/gu;
+                var lone = /\uD800/g;
+                var total = 0;
+                var i = 0;
+                while (i < limit) {{
+                    latin.lastIndex = 0;
+                    while (latin.exec(latinSource) !== null) {{
+                        total = total + latin.lastIndex;
+                    }}
+                    utf16.lastIndex = 0;
+                    while (utf16.test(utf16Source)) {{
+                        total = total + utf16.lastIndex;
+                    }}
+                    astral.lastIndex = 0;
+                    while (astral.exec(astralSource) !== null) {{
+                        total = total + astral.lastIndex;
+                    }}
+                    lone.lastIndex = 0;
+                    while (lone.test(loneSource)) {{
+                        total = total + lone.lastIndex;
+                    }}
+                    i = i + 1;
+                }}
+                return total;
+            }}
+            return run({loop_trip_count});
+        }})()
+        "#
+    )
+}
+
 fn array_heavy_runtime_workload(loop_trip_count: usize) -> String {
     format!(
         r#"
@@ -1342,6 +1391,20 @@ mod tests {
         assert!(workload.source.contains("new ArrayBuffer"));
         assert!(workload.source.contains("new Uint8Array"));
         assert!(workload.source.contains("new DataView"));
+    }
+
+    #[test]
+    fn regexp_stable_exec_row_is_focused_runtime_coverage() {
+        let workload = build_workloads(16, 4)
+            .into_iter()
+            .find(|workload| workload.name == "regexp-stable-exec.runtime")
+            .expect("stable RegExp exec runtime row should exist");
+
+        assert_eq!(workload.pipeline, WorkloadPipeline::ScriptRuntime);
+        assert!(workload.source.contains("latin.exec(latinSource)"));
+        assert!(workload.source.contains("utf16.test(utf16Source)"));
+        assert!(workload.source.contains(r"/\u{1F600}/gu"));
+        assert!(workload.source.contains("String.fromCharCode(0xD800)"));
     }
 
     #[test]

@@ -1,8 +1,24 @@
 use super::*;
 
+const MAX_REUSABLE_STRING_CODE_UNITS: usize = 1 << 20;
+
 impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     fn agent(&mut self) -> &mut Agent {
         self.agent
+    }
+
+    fn take_string_code_units_scratch(&mut self) -> Vec<u16> {
+        std::mem::take(&mut self.vm.string_code_units_scratch)
+    }
+
+    fn recycle_string_code_units_scratch(&mut self, mut units: Vec<u16>) {
+        if units.capacity() > MAX_REUSABLE_STRING_CODE_UNITS {
+            return;
+        }
+        units.clear();
+        if units.capacity() > self.vm.string_code_units_scratch.capacity() {
+            self.vm.string_code_units_scratch = units;
+        }
     }
 
     fn callee_object(&self) -> ObjectRef {

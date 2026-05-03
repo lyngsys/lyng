@@ -293,6 +293,7 @@ pub struct Vm {
     class_private_env_layout: Option<EnvironmentLayoutId>,
     internal_completion_targets: Vec<usize>,
     argument_scratch: Vec<Value>,
+    string_code_units_scratch: Vec<u16>,
     active_extension_provider: Option<SharedRealmExtensionProvider>,
     #[cfg(test)]
     peak_frame_depth: usize,
@@ -342,6 +343,7 @@ impl Vm {
             class_private_env_layout: None,
             internal_completion_targets: Vec::new(),
             argument_scratch: Vec::new(),
+            string_code_units_scratch: Vec::new(),
             active_extension_provider: None,
             #[cfg(test)]
             peak_frame_depth: 0,
@@ -361,6 +363,11 @@ impl Vm {
     #[inline]
     pub fn frame(&self) -> Option<FrameRecord> {
         self.frames.last().copied()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn string_code_units_scratch_capacity(&self) -> usize {
+        self.string_code_units_scratch.capacity()
     }
 
     pub(super) fn class_private_environment_layout(
