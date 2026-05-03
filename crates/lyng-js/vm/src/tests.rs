@@ -5136,6 +5136,46 @@ fn evaluate_script_promise_any_iterator_step_errors_reject_the_result_promise() 
 }
 
 #[test]
+fn evaluate_script_promise_any_iterator_value_errors_do_not_close_iterator() {
+    let unit = compile_test_unit(
+        235,
+        r#"
+            var error = new Error("value");
+            var returnCount = 0;
+            var poisonedValue = { done: false };
+            Object.defineProperty(poisonedValue, "value", {
+                get: function() {
+                    throw error;
+                }
+            });
+            var iterable = {
+                [Symbol.iterator]: function() {
+                    return {
+                        next: function() {
+                            return poisonedValue;
+                        },
+                        return: function() {
+                            returnCount = returnCount + 1;
+                            return {};
+                        }
+                    };
+                }
+            };
+            Promise.any(iterable);
+            returnCount;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_smi(0));
+}
+
+#[test]
 fn evaluate_script_eval_executes_string_source_in_the_current_realm() {
     let unit = compile_test_unit(
         238,

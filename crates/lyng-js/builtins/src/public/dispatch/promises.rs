@@ -828,7 +828,10 @@ fn perform_promise_any<Cx: PublicBuiltinDispatchContext>(
         };
         let next_value = match next_value {
             Ok(next_value) => next_value,
-            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            Err(error) => {
+                iterator_record.set_done(true);
+                return Err(error);
+            }
         };
         let index = cx
             .agent()
