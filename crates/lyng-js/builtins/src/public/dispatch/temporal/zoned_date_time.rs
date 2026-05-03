@@ -1483,6 +1483,24 @@ pub(super) fn temporal_zoned_date_time_add_duration<Cx: PublicBuiltinDispatchCon
     duration: TemporalDurationObjectData,
     overflow: TemporalOverflow,
 ) -> Result<Value, Cx::Error> {
+    let time_zone_id = temporal_atom_text(cx, zoned.time_zone())?;
+    if duration.years() == 0
+        && duration.months() == 0
+        && duration.weeks() == 0
+        && duration.days() == 0
+    {
+        let epoch_nanoseconds = zoned
+            .epoch_nanoseconds()
+            .checked_add(temporal_duration_time_nanoseconds(duration))
+            .ok_or_else(|| range_error(cx))?;
+        if !temporal_instant_epoch_nanoseconds_is_valid(epoch_nanoseconds) {
+            return Err(range_error(cx));
+        }
+        let data = temporal_zoned_date_time_from_parts(cx, epoch_nanoseconds, &time_zone_id)?;
+        let prototype = current_temporal_zoned_date_time_prototype(cx)?;
+        return allocate_temporal_zoned_date_time_object(cx, prototype, data);
+    }
+
     let civil = temporal_zoned_date_time_civil(cx, zoned)?.date_time;
     let plain_date_time = temporal_plain_date_time_from_parts(
         cx,
@@ -1497,7 +1515,6 @@ pub(super) fn temporal_zoned_date_time_add_duration<Cx: PublicBuiltinDispatchCon
         i64::from(civil.nanosecond),
     )?;
     let added = temporal_plain_date_time_add_duration(cx, plain_date_time, duration, overflow)?;
-    let time_zone_id = temporal_atom_text(cx, zoned.time_zone())?;
     let instant = cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
         time_zone_id: time_zone_id.clone(),
         date_time: temporal_civil_date_time_from_plain_date_time(added),
@@ -2037,6 +2054,119 @@ pub(super) fn temporal_zoned_date_time_difference_builtin<Cx: PublicBuiltinDispa
             .unwrap_or(Value::undefined()),
         TemporalDateTimeDifferenceUnit::Hour,
     )?;
+    if let Some(largest_date_unit) = temporal_date_time_date_difference_unit(options.largest_unit) {
+        let this_civil = temporal_zoned_date_time_civil(cx, zoned)?.date_time;
+        let other_civil = temporal_zoned_date_time_civil(cx, other)?.date_time;
+        let this_date_time = TemporalPlainDateTimeObjectData::new(
+            this_civil.year,
+            this_civil.month,
+            this_civil.day,
+            this_civil.hour,
+            this_civil.minute,
+            this_civil.second,
+            this_civil.millisecond,
+            this_civil.microsecond,
+            this_civil.nanosecond,
+            zoned.calendar(),
+        );
+        let other_date_time = TemporalPlainDateTimeObjectData::new(
+            other_civil.year,
+            other_civil.month,
+            other_civil.day,
+            other_civil.hour,
+            other_civil.minute,
+            other_civil.second,
+            other_civil.millisecond,
+            other_civil.microsecond,
+            other_civil.nanosecond,
+            other.calendar(),
+        );
+        let this_total = temporal_plain_date_time_total_nanoseconds(this_date_time)
+            .ok_or_else(|| range_error(cx))?;
+        let other_total = temporal_plain_date_time_total_nanoseconds(other_date_time)
+            .ok_or_else(|| range_error(cx))?;
+        let this_near_instant_limit =
+            this_date_time.year() <= -271_821 || this_date_time.year() >= 275_760;
+        let other_near_instant_limit =
+            other_date_time.year() <= -271_821 || other_date_time.year() >= 275_760;
+        let relative_duration = if !this_near_instant_limit
+            && !other_near_instant_limit
+            && temporal_plain_date_time_is_within_limits(this_date_time.calendar(), this_total)
+            && temporal_plain_date_time_is_within_limits(other_date_time.calendar(), other_total)
+        {
+            temporal_plain_date_time_calendar_difference_duration(
+                cx,
+                this_date_time,
+                other_date_time,
+                options.largest_unit,
+            )?
+        } else {
+            let nanoseconds = other
+                .epoch_nanoseconds()
+                .checked_sub(zoned.epoch_nanoseconds())
+                .ok_or_else(|| range_error(cx))?;
+            temporal_duration_from_nanoseconds_with_largest_unit(
+                cx,
+                nanoseconds,
+                TemporalBuiltinDurationExactUnit::Hour,
+            )?
+        };
+        let duration = if options.rounding_increment == 1
+            && options.rounding_mode == TemporalBuiltinRoundingMode::Trunc
+            && options.smallest_unit == TemporalDateTimeDifferenceUnit::Nanosecond
+        {
+            if sign > 0 {
+                negate_temporal_duration(relative_duration)
+            } else {
+                relative_duration
+            }
+        } else if let Some(exact_unit) = temporal_date_time_exact_unit(options.smallest_unit) {
+            let rounding_mode = if sign > 0 {
+                temporal_rounding_mode_for_negated_duration(options.rounding_mode)
+            } else {
+                options.rounding_mode
+            };
+            let rounded = temporal_duration_round_calendar_relative_exact(
+                cx,
+                relative_duration,
+                TemporalDurationRelativeTo::ZonedDateTime(zoned),
+                largest_date_unit,
+                exact_unit,
+                options.rounding_increment,
+                rounding_mode,
+            )?;
+            if sign > 0 {
+                negate_temporal_duration(rounded)
+            } else {
+                rounded
+            }
+        } else {
+            let smallest_date_unit = temporal_date_time_date_difference_unit(options.smallest_unit)
+                .expect("validated date-time difference date unit");
+            let rounding_mode = if sign > 0 {
+                temporal_rounding_mode_for_negated_duration(options.rounding_mode)
+            } else {
+                options.rounding_mode
+            };
+            let rounded = temporal_duration_round_calendar_relative(
+                cx,
+                relative_duration,
+                TemporalDurationRelativeTo::ZonedDateTime(zoned),
+                largest_date_unit,
+                smallest_date_unit,
+                options.rounding_increment,
+                rounding_mode,
+            )?;
+            if sign > 0 {
+                negate_temporal_duration(rounded)
+            } else {
+                rounded
+            }
+        };
+        validate_temporal_duration(cx, duration)?;
+        let prototype = current_temporal_duration_prototype(cx)?;
+        return allocate_temporal_duration_object(cx, prototype, duration);
+    }
     let raw_difference = zoned
         .epoch_nanoseconds()
         .checked_sub(other.epoch_nanoseconds())

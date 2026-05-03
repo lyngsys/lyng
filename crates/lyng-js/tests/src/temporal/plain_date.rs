@@ -686,6 +686,246 @@ fn temporal_plain_date_until_uses_auto_largest_unit_for_rounding() {
 }
 
 #[test]
+fn temporal_plain_date_difference_rejects_rounding_outside_iso_limits() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let from = new Temporal.PlainDate(1970, 1, 1);
+        let to = new Temporal.PlainDate(1971, 1, 1);
+        let options = { roundingIncrement: 100000000, smallestUnit: "months" };
+        let since = (() => {
+            try {
+                from.since(to, options);
+                return false;
+            } catch (error) {
+                return error.constructor === RangeError;
+            }
+        })();
+        let until = (() => {
+            try {
+                to.until(from, options);
+                return false;
+            } catch (error) {
+                return error.constructor === RangeError;
+            }
+        })();
+        [since, until].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "true|true");
+}
+
+#[test]
+fn temporal_plain_date_since_rounds_months_relative_to_receiver() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let earlier = Temporal.PlainDate.from("2019-01-01");
+        let later = Temporal.PlainDate.from("2019-02-15");
+        let positive = later.since(earlier, {
+            smallestUnit: "months",
+            roundingMode: "halfExpand",
+        });
+        let negative = earlier.since(later, {
+            smallestUnit: "months",
+            roundingMode: "halfExpand",
+        });
+        [
+            positive.months,
+            positive.days,
+            negative.months,
+            negative.days,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "1|0|-2|0");
+}
+
+#[test]
+fn temporal_plain_date_since_balances_months_relative_to_receiver() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let forward = Temporal.PlainDate.from("2019-03-01").since("2019-01-29", {
+            largestUnit: "months",
+        });
+        let backward = Temporal.PlainDate.from("2019-01-29").since("2019-03-01", {
+            largestUnit: "months",
+        });
+        [
+            forward.months,
+            forward.days,
+            backward.months,
+            backward.days,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "1|3|-1|-1");
+}
+
+#[test]
+fn temporal_plain_date_difference_reads_options_before_validation() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let log = [];
+        let options = {
+            get largestUnit() {
+                log.push("get options.largestUnit");
+                return {
+                    toString() {
+                        log.push("call options.largestUnit.toString");
+                        return "hour";
+                    }
+                };
+            },
+            get roundingIncrement() {
+                log.push("get options.roundingIncrement");
+                return {
+                    valueOf() {
+                        log.push("call options.roundingIncrement.valueOf");
+                        return 1;
+                    }
+                };
+            },
+            get roundingMode() {
+                log.push("get options.roundingMode");
+                return {
+                    toString() {
+                        log.push("call options.roundingMode.toString");
+                        return "halfFloor";
+                    }
+                };
+            },
+            get smallestUnit() {
+                log.push("get options.smallestUnit");
+                return {
+                    toString() {
+                        log.push("call options.smallestUnit.toString");
+                        return "nanosecond";
+                    }
+                };
+            },
+        };
+        let threw = (() => {
+            try {
+                new Temporal.PlainDate(2025, 8, 14).since(new Temporal.PlainDate(2025, 3, 14), options);
+                return false;
+            } catch (error) {
+                return error.constructor === RangeError;
+            }
+        })();
+        [threw, log.join(",")].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "true|get options.largestUnit,call options.largestUnit.toString,get options.roundingIncrement,call options.roundingIncrement.valueOf,get options.roundingMode,call options.roundingMode.toString,get options.smallestUnit,call options.smallestUnit.toString"
+    );
+}
+
+#[test]
+fn temporal_plain_date_difference_reads_other_bag_in_spec_order() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let log = [];
+        let other = {
+            get calendar() {
+                log.push("get other.calendar");
+                return "iso8601";
+            },
+            get day() {
+                log.push("get other.day");
+                return {
+                    valueOf() {
+                        log.push("call other.day.valueOf");
+                        return 2;
+                    }
+                };
+            },
+            get month() {
+                log.push("get other.month");
+                return {
+                    valueOf() {
+                        log.push("call other.month.valueOf");
+                        return 6;
+                    }
+                };
+            },
+            get monthCode() {
+                log.push("get other.monthCode");
+                return {
+                    toString() {
+                        log.push("call other.monthCode.toString");
+                        return "M06";
+                    }
+                };
+            },
+            get year() {
+                log.push("get other.year");
+                return {
+                    valueOf() {
+                        log.push("call other.year.valueOf");
+                        return 2001;
+                    }
+                };
+            },
+        };
+        let options = {
+            get largestUnit() {
+                log.push("get options.largestUnit");
+                return {
+                    toString() {
+                        log.push("call options.largestUnit.toString");
+                        return "years";
+                    }
+                };
+            },
+            get roundingIncrement() {
+                log.push("get options.roundingIncrement");
+                return {
+                    valueOf() {
+                        log.push("call options.roundingIncrement.valueOf");
+                        return 1;
+                    }
+                };
+            },
+            get roundingMode() {
+                log.push("get options.roundingMode");
+                return {
+                    toString() {
+                        log.push("call options.roundingMode.toString");
+                        return "halfExpand";
+                    }
+                };
+            },
+            get smallestUnit() {
+                log.push("get options.smallestUnit");
+                return {
+                    toString() {
+                        log.push("call options.smallestUnit.toString");
+                        return "days";
+                    }
+                };
+            },
+        };
+        new Temporal.PlainDate(2000, 5, 2).since(other, options);
+        log.join(",");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "get other.calendar,get other.day,call other.day.valueOf,get other.month,call other.month.valueOf,get other.monthCode,call other.monthCode.toString,get other.year,call other.year.valueOf,get options.largestUnit,call options.largestUnit.toString,get options.roundingIncrement,call options.roundingIncrement.valueOf,get options.roundingMode,call options.roundingMode.toString,get options.smallestUnit,call options.smallestUnit.toString"
+    );
+}
+
+#[test]
 fn temporal_plain_date_converts_to_partial_plain_dates() {
     let result = compile_and_run_string_with_host(
         r#"

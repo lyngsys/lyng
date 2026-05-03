@@ -808,6 +808,30 @@ fn temporal_duration_total_supports_exact_time_units() {
 }
 
 #[test]
+fn temporal_duration_total_divides_exact_nanoseconds_before_float_rounding() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let low = Temporal.Duration.from({ hours: 4000, nanoseconds: 1 });
+        let high = Temporal.Duration.from({
+            hours: 4000,
+            minutes: 59,
+            seconds: 59,
+            milliseconds: 999,
+            microseconds: 999,
+            nanoseconds: 999,
+        });
+        [
+            low.total("hours"),
+            high.total("hours"),
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "4000.0000000000005|4000.9999999999995");
+}
+
+#[test]
 fn temporal_duration_round_and_total_use_iso_relative_to_for_calendar_units() {
     let result = compile_and_run_string_with_host(
         r#"
@@ -837,6 +861,81 @@ fn temporal_duration_round_and_total_use_iso_relative_to_for_calendar_units() {
     );
 
     assert_eq!(result, "29|28|708|P29D|PT36H");
+}
+
+#[test]
+fn temporal_duration_total_supports_calendar_relative_units() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let twoYears = new Temporal.Duration(0, 11, 0, 396);
+        let fortyDays = new Temporal.Duration(0, 0, 0, 40);
+        let negativeFortyDays = new Temporal.Duration(0, 0, 0, -40);
+        let almostWeek = new Temporal.Duration(0, 0, 0, 6, 20);
+        [
+            twoYears.total({
+                unit: "years",
+                relativeTo: new Temporal.PlainDate(2017, 1, 1),
+            }),
+            fortyDays.total({
+                unit: "months",
+                relativeTo: new Temporal.PlainDate(2020, 2, 1),
+            }).toPrecision(16),
+            negativeFortyDays.total({
+                unit: "months",
+                relativeTo: new Temporal.PlainDate(2020, 3, 1),
+            }).toPrecision(16),
+            almostWeek.total({
+                unit: "weeks",
+                relativeTo: new Temporal.PlainDate(2020, 1, 1),
+            }).toPrecision(16),
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "2|1.354838709677419|-1.354838709677419|0.9761904761904762"
+    );
+}
+
+#[test]
+fn temporal_duration_total_rejects_relative_targets_outside_limits() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        function errorName(fn) {
+            try {
+                fn();
+                return "none";
+            } catch (error) {
+                return error.name;
+            }
+        }
+
+        let plain = Temporal.Duration.from({
+            years: 1,
+            seconds: 2**53 - 1,
+        });
+        let zoned = new Temporal.Duration(0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
+        [
+            errorName(() => plain.total({
+                relativeTo: new Temporal.PlainDate(2000, 1, 1),
+                unit: "days",
+            })),
+            errorName(() => zoned.total({
+                relativeTo: new Temporal.ZonedDateTime(864n * 10n**19n, "UTC"),
+                unit: "nanoseconds",
+            })),
+            errorName(() => new Temporal.Duration().total({
+                relativeTo: "+275760-09-12T00:00:01+00:00[UTC]",
+                unit: "days",
+            })),
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "RangeError|RangeError|RangeError");
 }
 
 #[test]

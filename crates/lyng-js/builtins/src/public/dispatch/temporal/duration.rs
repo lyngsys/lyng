@@ -710,28 +710,153 @@ fn temporal_duration_total_builtin<Cx: PublicBuiltinDispatchContext>(
     )?;
     let total = match options.unit {
         TemporalDurationParsedUnit::Exact(unit) => {
+            if unit == TemporalBuiltinDurationExactUnit::Day {
+                if let Some(TemporalDurationRelativeTo::ZonedDateTime(relative_to)) =
+                    options.relative_to
+                {
+                    temporal_duration_validate_zoned_relative_total_day_boundary(cx, relative_to)?;
+                }
+            }
+            if let Some(relative_to) = options.relative_to {
+                temporal_duration_validate_exact_relative_to_range(cx, data, relative_to)?;
+            }
             if temporal_ops::duration_has_calendar_relative_units(data) {
                 let Some(relative_to) = options.relative_to else {
                     return Err(range_error(cx));
                 };
                 let total_nanoseconds =
                     temporal_duration_relative_total_nanoseconds(cx, data, relative_to)?;
-                total_nanoseconds as f64 / temporal_duration_exact_unit_nanoseconds(unit) as f64
+                temporal_total_nanoseconds_as_unit(
+                    total_nanoseconds,
+                    temporal_duration_exact_unit_nanoseconds(unit),
+                )
+                .ok_or_else(|| range_error(cx))?
             } else {
                 temporal_total_duration_exact(data, unit)
                     .filter(|value| value.is_finite())
                     .ok_or_else(|| range_error(cx))?
             }
         }
-        TemporalDurationParsedUnit::CalendarRelative(_) => {
+        TemporalDurationParsedUnit::CalendarRelative(unit) => {
             if temporal_duration_sign(data) == 0 && options.relative_to.is_some() {
                 0.0
             } else {
-                return Err(range_error(cx));
+                let Some(relative_to) = options.relative_to else {
+                    return Err(range_error(cx));
+                };
+                temporal_duration_total_calendar_relative(cx, data, relative_to, unit)?
             }
         }
     };
     Ok(Value::from_f64(total))
+}
+
+fn temporal_duration_validate_zoned_relative_total_day_boundary<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    relative_to: TemporalZonedDateTimeObjectData,
+) -> Result<(), Cx::Error> {
+    let latest_start = temporal_ops::INSTANT_EPOCH_NANOSECONDS_MAX
+        .checked_sub(TEMPORAL_NANOS_PER_DAY)
+        .ok_or_else(|| range_error(cx))?;
+    if relative_to.epoch_nanoseconds() > latest_start {
+        return Err(range_error(cx));
+    }
+    Ok(())
+}
+
+fn temporal_duration_total_calendar_relative<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    duration: TemporalDurationObjectData,
+    relative_to: TemporalDurationRelativeTo,
+    unit: TemporalDurationCalendarUnit,
+) -> Result<f64, Cx::Error> {
+    let largest_unit = temporal_duration_calendar_unit_to_date_difference_unit(unit);
+    let total_nanoseconds =
+        temporal_duration_relative_total_nanoseconds(cx, duration, relative_to)?;
+    let (date, _) = temporal_duration_calendar_day_time_difference(
+        cx,
+        relative_to,
+        total_nanoseconds,
+        largest_unit,
+    )?;
+    let start = temporal_duration_relative_start_plain_date_time(cx, relative_to)?;
+    let start_date = temporal_plain_date_time_date(start);
+    let start_time = temporal_plain_time_nanoseconds(temporal_plain_date_time_time(start));
+    let start_total =
+        temporal_duration_date_with_start_time_total_nanoseconds(cx, start_date, start_time)?;
+    let end_total = start_total
+        .checked_add(total_nanoseconds)
+        .ok_or_else(|| range_error(cx))?;
+
+    let whole_units = match unit {
+        TemporalDurationCalendarUnit::Year => i128::from(date.years()),
+        TemporalDurationCalendarUnit::Month => i128::from(date.years())
+            .checked_mul(12)
+            .and_then(|years| years.checked_add(i128::from(date.months())))
+            .ok_or_else(|| range_error(cx))?,
+        TemporalDurationCalendarUnit::Week => i128::from(date.weeks()),
+    };
+    let boundary = temporal_duration_calendar_total_boundary_nanoseconds(
+        cx,
+        start_date,
+        start_time,
+        unit,
+        whole_units,
+    )?;
+    let remainder = end_total
+        .checked_sub(boundary)
+        .ok_or_else(|| range_error(cx))?;
+    if remainder == 0 {
+        return Ok(whole_units as f64);
+    }
+    let adjacent_units = if remainder < 0 {
+        whole_units.checked_sub(1)
+    } else {
+        whole_units.checked_add(1)
+    }
+    .ok_or_else(|| range_error(cx))?;
+    let adjacent = temporal_duration_calendar_total_boundary_nanoseconds(
+        cx,
+        start_date,
+        start_time,
+        unit,
+        adjacent_units,
+    )?;
+    let unit_nanoseconds = adjacent
+        .checked_sub(boundary)
+        .map(i128::abs)
+        .ok_or_else(|| range_error(cx))?;
+    let total_units = whole_units
+        .checked_mul(unit_nanoseconds)
+        .and_then(|whole| whole.checked_add(remainder))
+        .ok_or_else(|| range_error(cx))?;
+    temporal_total_nanoseconds_as_unit(total_units, unit_nanoseconds).ok_or_else(|| range_error(cx))
+}
+
+fn temporal_duration_calendar_total_boundary_nanoseconds<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    start_date: TemporalPlainDateObjectData,
+    start_time: i128,
+    unit: TemporalDurationCalendarUnit,
+    units: i128,
+) -> Result<i128, Cx::Error> {
+    let units = i64::try_from(units).map_err(|_| range_error(cx))?;
+    let duration = match unit {
+        TemporalDurationCalendarUnit::Year => {
+            TemporalDurationObjectData::new(units, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        }
+        TemporalDurationCalendarUnit::Month => {
+            TemporalDurationObjectData::new(0, units, 0, 0, 0, 0, 0, 0, 0, 0)
+        }
+        TemporalDurationCalendarUnit::Week => {
+            TemporalDurationObjectData::new(0, 0, units, 0, 0, 0, 0, 0, 0, 0)
+        }
+    };
+    let boundary =
+        temporal_plain_date_add_duration(cx, start_date, duration, TemporalOverflow::Constrain)?;
+    temporal_duration_date_with_start_time_total_nanoseconds(cx, boundary, start_time)
 }
 
 fn temporal_duration_add_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1830,7 +1955,7 @@ fn temporal_duration_calendar_unit_to_date_difference_unit(
     }
 }
 
-fn temporal_duration_round_calendar_relative<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn temporal_duration_round_calendar_relative<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     duration: TemporalDurationObjectData,
     relative_to: TemporalDurationRelativeTo,
@@ -1876,6 +2001,18 @@ fn temporal_duration_round_calendar_relative<Cx: PublicBuiltinDispatchContext>(
             let days = rounded
                 .checked_div(TEMPORAL_NANOS_PER_DAY)
                 .ok_or_else(|| range_error(cx))?;
+            temporal_duration_validate_day_rounding_boundary(cx, relative_to, days)?;
+            let days_increment = rounding_increment
+                .checked_mul(unit_days)
+                .ok_or_else(|| range_error(cx))?;
+            if days == 0 && total_nanoseconds != 0 && rounding_increment != 1 {
+                let adjacent = if total_nanoseconds < 0 {
+                    -days_increment
+                } else {
+                    days_increment
+                };
+                temporal_duration_validate_day_rounding_boundary(cx, relative_to, adjacent)?;
+            }
             if matches!(
                 largest_unit,
                 TemporalDateDifferenceUnit::Year | TemporalDateDifferenceUnit::Month
@@ -1981,7 +2118,7 @@ fn temporal_duration_round_calendar_relative_weeks<Cx: PublicBuiltinDispatchCont
     ))
 }
 
-fn temporal_duration_round_calendar_relative_exact<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn temporal_duration_round_calendar_relative_exact<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     duration: TemporalDurationObjectData,
     relative_to: TemporalDurationRelativeTo,
@@ -2020,6 +2157,22 @@ fn temporal_duration_round_calendar_relative_exact<Cx: PublicBuiltinDispatchCont
         time.microseconds(),
         time.nanoseconds(),
     ))
+}
+
+pub(super) const fn temporal_rounding_mode_for_negated_duration(
+    rounding_mode: TemporalBuiltinRoundingMode,
+) -> TemporalBuiltinRoundingMode {
+    match rounding_mode {
+        TemporalBuiltinRoundingMode::Ceil => TemporalBuiltinRoundingMode::Floor,
+        TemporalBuiltinRoundingMode::Floor => TemporalBuiltinRoundingMode::Ceil,
+        TemporalBuiltinRoundingMode::HalfCeil => TemporalBuiltinRoundingMode::HalfFloor,
+        TemporalBuiltinRoundingMode::HalfFloor => TemporalBuiltinRoundingMode::HalfCeil,
+        TemporalBuiltinRoundingMode::Expand
+        | TemporalBuiltinRoundingMode::Trunc
+        | TemporalBuiltinRoundingMode::HalfExpand
+        | TemporalBuiltinRoundingMode::HalfTrunc
+        | TemporalBuiltinRoundingMode::HalfEven => rounding_mode,
+    }
 }
 
 fn temporal_duration_calendar_day_time_difference<Cx: PublicBuiltinDispatchContext>(
@@ -2239,7 +2392,15 @@ fn temporal_duration_round_months_between_dates<Cx: PublicBuiltinDispatchContext
         } else {
             magnitude
         };
-        return temporal_round_i128_to_increment(cx, -rounded_abs, increment, rounding_mode);
+        let rounded = temporal_round_i128_to_increment(cx, -rounded_abs, increment, rounding_mode)?;
+        temporal_duration_validate_month_rounding_boundary(cx, start, rounded)?;
+        if increment != 1 {
+            let adjacent = rounded
+                .checked_sub(increment)
+                .ok_or_else(|| range_error(cx))?;
+            temporal_duration_validate_month_rounding_boundary(cx, start, adjacent)?;
+        }
+        return Ok(rounded);
     }
     let after_months_count = i64::try_from(whole_months).map_err(|_| range_error(cx))?;
     let after_months = temporal_plain_date_add_duration(
@@ -2270,7 +2431,55 @@ fn temporal_duration_round_months_between_dates<Cx: PublicBuiltinDispatchContext
     } else {
         whole_months
     };
-    temporal_round_i128_to_increment(cx, rounded_months, increment, rounding_mode)
+    let rounded = temporal_round_i128_to_increment(cx, rounded_months, increment, rounding_mode)?;
+    temporal_duration_validate_month_rounding_boundary(cx, start, rounded)?;
+    if increment != 1 {
+        let adjacent = rounded
+            .checked_add(increment)
+            .ok_or_else(|| range_error(cx))?;
+        temporal_duration_validate_month_rounding_boundary(cx, start, adjacent)?;
+    }
+    Ok(rounded)
+}
+
+pub(super) fn temporal_duration_validate_month_rounding_boundary<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    start: TemporalPlainDateObjectData,
+    months: i128,
+) -> Result<(), Cx::Error> {
+    let months = i64::try_from(months).map_err(|_| range_error(cx))?;
+    let _ = temporal_plain_date_add_duration(
+        cx,
+        start,
+        TemporalDurationObjectData::new(0, months, 0, 0, 0, 0, 0, 0, 0, 0),
+        TemporalOverflow::Constrain,
+    )?;
+    Ok(())
+}
+
+fn temporal_duration_validate_day_rounding_boundary<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    relative_to: TemporalDurationRelativeTo,
+    days: i128,
+) -> Result<(), Cx::Error> {
+    let days = i64::try_from(days).map_err(|_| range_error(cx))?;
+    let duration = TemporalDurationObjectData::new(0, 0, 0, days, 0, 0, 0, 0, 0, 0);
+    match relative_to {
+        TemporalDurationRelativeTo::PlainDate(_) | TemporalDurationRelativeTo::PlainDateTime(_) => {
+        }
+        TemporalDurationRelativeTo::ZonedDateTime(start) => {
+            let value = temporal_zoned_date_time_add_duration(
+                cx,
+                start,
+                duration,
+                TemporalOverflow::Constrain,
+            )?;
+            let _ = temporal_zoned_date_time_data(cx, value)?;
+        }
+    }
+    Ok(())
 }
 
 fn temporal_duration_should_round_positive_remainder_up(

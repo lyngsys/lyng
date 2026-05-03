@@ -186,7 +186,7 @@ pub(super) fn temporal_plain_date_time_from_parts_with_overflow<
         nanosecond,
         overflow,
     )?;
-    Ok(TemporalPlainDateTimeObjectData::new(
+    let data = TemporalPlainDateTimeObjectData::new(
         date.year(),
         date.month(),
         date.day(),
@@ -197,7 +197,13 @@ pub(super) fn temporal_plain_date_time_from_parts_with_overflow<
         time.microsecond(),
         time.nanosecond(),
         date.calendar(),
-    ))
+    );
+    let total_nanoseconds =
+        temporal_plain_date_time_total_nanoseconds(data).ok_or_else(|| range_error(cx))?;
+    if !temporal_plain_date_time_is_within_limits(data.calendar(), total_nanoseconds) {
+        return Err(range_error(cx));
+    }
+    Ok(data)
 }
 
 pub(super) fn allocate_temporal_plain_date_time_object<Cx: PublicBuiltinDispatchContext>(
@@ -300,15 +306,16 @@ pub(super) fn temporal_plain_date_time_from_value<Cx: PublicBuiltinDispatchConte
     }
 
     temporal_validate_optional_iso_calendar_property(cx, object_ref)?;
-    let year = temporal_required_integer_part_from_property(cx, object_ref, "year")?;
-    let month = temporal_month_from_property_bag(cx, object_ref, None)?;
     let day = temporal_required_integer_part_from_property(cx, object_ref, "day")?;
     let hour = temporal_time_part_from_property(cx, object_ref, "hour")?;
-    let minute = temporal_time_part_from_property(cx, object_ref, "minute")?;
-    let second = temporal_time_part_from_property(cx, object_ref, "second")?;
-    let millisecond = temporal_time_part_from_property(cx, object_ref, "millisecond")?;
     let microsecond = temporal_time_part_from_property(cx, object_ref, "microsecond")?;
+    let millisecond = temporal_time_part_from_property(cx, object_ref, "millisecond")?;
+    let minute = temporal_time_part_from_property(cx, object_ref, "minute")?;
+    let month = temporal_month_from_property_bag(cx, object_ref, None)?;
     let nanosecond = temporal_time_part_from_property(cx, object_ref, "nanosecond")?;
+    let second = temporal_time_part_from_property(cx, object_ref, "second")?;
+    let second = if second == 60 { 59 } else { second };
+    let year = temporal_required_integer_part_from_property(cx, object_ref, "year")?;
     temporal_plain_date_time_from_parts(
         cx,
         year,
@@ -1169,6 +1176,23 @@ pub(super) fn temporal_date_time_difference_unit_nanoseconds(
     }
 }
 
+pub(super) fn temporal_date_time_date_difference_unit(
+    unit: TemporalDateTimeDifferenceUnit,
+) -> Option<TemporalDateDifferenceUnit> {
+    match unit {
+        TemporalDateTimeDifferenceUnit::Year => Some(TemporalDateDifferenceUnit::Year),
+        TemporalDateTimeDifferenceUnit::Month => Some(TemporalDateDifferenceUnit::Month),
+        TemporalDateTimeDifferenceUnit::Week => Some(TemporalDateDifferenceUnit::Week),
+        TemporalDateTimeDifferenceUnit::Day => Some(TemporalDateDifferenceUnit::Day),
+        TemporalDateTimeDifferenceUnit::Hour
+        | TemporalDateTimeDifferenceUnit::Minute
+        | TemporalDateTimeDifferenceUnit::Second
+        | TemporalDateTimeDifferenceUnit::Millisecond
+        | TemporalDateTimeDifferenceUnit::Microsecond
+        | TemporalDateTimeDifferenceUnit::Nanosecond => None,
+    }
+}
+
 pub(super) fn temporal_date_time_exact_unit(
     unit: TemporalDateTimeDifferenceUnit,
 ) -> Option<TemporalBuiltinDurationExactUnit> {
@@ -1197,7 +1221,10 @@ pub(super) fn temporal_date_time_rounding_increment_is_valid(
     rounding_increment: i128,
 ) -> bool {
     match smallest_unit {
-        TemporalDateTimeDifferenceUnit::Day => rounding_increment == 1,
+        TemporalDateTimeDifferenceUnit::Year
+        | TemporalDateTimeDifferenceUnit::Month
+        | TemporalDateTimeDifferenceUnit::Week => rounding_increment > 0,
+        TemporalDateTimeDifferenceUnit::Day => rounding_increment > 0,
         TemporalDateTimeDifferenceUnit::Hour
         | TemporalDateTimeDifferenceUnit::Minute
         | TemporalDateTimeDifferenceUnit::Second
@@ -1209,9 +1236,6 @@ pub(super) fn temporal_date_time_rounding_increment_is_valid(
                 rounding_increment,
             )
         }
-        TemporalDateTimeDifferenceUnit::Year
-        | TemporalDateTimeDifferenceUnit::Month
-        | TemporalDateTimeDifferenceUnit::Week => false,
     }
 }
 
@@ -1312,6 +1336,20 @@ pub(super) fn temporal_plain_date_time_difference_options<Cx: PublicBuiltinDispa
     }
     let object_ref = value.as_object_ref().ok_or_else(|| type_error(cx))?;
     let largest_unit_value = temporal_property_value(cx, object_ref, "largestUnit")?;
+    let largest_unit_option = if largest_unit_value.is_undefined() {
+        None
+    } else {
+        let string_ref = to_string_string_ref(cx, largest_unit_value)?;
+        let text = string_ref_text(cx, string_ref)?;
+        if text == "auto" {
+            None
+        } else {
+            Some(
+                temporal_date_time_difference_unit_from_text(&text)
+                    .ok_or_else(|| range_error(cx))?,
+            )
+        }
+    };
     let rounding_increment_value = temporal_property_value(cx, object_ref, "roundingIncrement")?;
     let rounding_increment =
         temporal_duration_rounding_increment_option(cx, rounding_increment_value)?;
@@ -1323,17 +1361,14 @@ pub(super) fn temporal_plain_date_time_difference_options<Cx: PublicBuiltinDispa
     } else {
         temporal_date_time_difference_unit_from_value(cx, smallest_unit_value)?
     };
-    let largest_unit = if largest_unit_value.is_undefined() {
-        default_largest_unit
+    let default_largest_unit = if temporal_date_time_difference_unit_order(default_largest_unit)
+        > temporal_date_time_difference_unit_order(smallest_unit)
+    {
+        smallest_unit
     } else {
-        let string_ref = to_string_string_ref(cx, largest_unit_value)?;
-        let text = string_ref_text(cx, string_ref)?;
-        if text == "auto" {
-            default_largest_unit
-        } else {
-            temporal_date_time_difference_unit_from_text(&text).ok_or_else(|| range_error(cx))?
-        }
+        default_largest_unit
     };
+    let largest_unit = largest_unit_option.unwrap_or(default_largest_unit);
     if temporal_date_time_difference_unit_order(largest_unit)
         > temporal_date_time_difference_unit_order(smallest_unit)
         || !temporal_date_time_rounding_increment_is_valid(smallest_unit, rounding_increment)
@@ -1398,6 +1433,75 @@ pub(super) fn temporal_duration_from_date_time_nanoseconds<Cx: PublicBuiltinDisp
     ))
 }
 
+pub(super) fn temporal_plain_date_time_calendar_difference_duration<
+    Cx: PublicBuiltinDispatchContext,
+>(
+    cx: &mut Cx,
+    start: TemporalPlainDateTimeObjectData,
+    end: TemporalPlainDateTimeObjectData,
+    largest_unit: TemporalDateTimeDifferenceUnit,
+) -> Result<TemporalDurationObjectData, Cx::Error> {
+    let total_nanoseconds = temporal_plain_date_time_total_nanoseconds(end)
+        .and_then(|end| {
+            temporal_plain_date_time_total_nanoseconds(start)
+                .and_then(|start| end.checked_sub(start))
+        })
+        .ok_or_else(|| range_error(cx))?;
+    let start_date = temporal_plain_date_time_date(start);
+    let mut end_date = temporal_plain_date_time_date(end);
+    let start_time = temporal_plain_time_nanoseconds(temporal_plain_date_time_time(start));
+    let end_time = temporal_plain_time_nanoseconds(temporal_plain_date_time_time(end));
+    let mut time_nanoseconds = end_time
+        .checked_sub(start_time)
+        .ok_or_else(|| range_error(cx))?;
+    if total_nanoseconds >= 0 && time_nanoseconds < 0 {
+        end_date = temporal_plain_date_add_duration(
+            cx,
+            end_date,
+            TemporalDurationObjectData::new(0, 0, 0, -1, 0, 0, 0, 0, 0, 0),
+            TemporalOverflow::Constrain,
+        )?;
+        time_nanoseconds = time_nanoseconds
+            .checked_add(TEMPORAL_NANOS_PER_DAY)
+            .ok_or_else(|| range_error(cx))?;
+    } else if total_nanoseconds < 0 && time_nanoseconds > 0 {
+        end_date = temporal_plain_date_add_duration(
+            cx,
+            end_date,
+            TemporalDurationObjectData::new(0, 0, 0, 1, 0, 0, 0, 0, 0, 0),
+            TemporalOverflow::Constrain,
+        )?;
+        time_nanoseconds = time_nanoseconds
+            .checked_sub(TEMPORAL_NANOS_PER_DAY)
+            .ok_or_else(|| range_error(cx))?;
+    }
+    let date = temporal_plain_date_difference_trunc(
+        cx,
+        start_date,
+        end_date,
+        temporal_date_time_date_difference_unit(largest_unit)
+            .expect("calendar difference requires a date largest unit"),
+        TemporalDateDifferenceUnit::Day,
+    )?;
+    let time = temporal_duration_from_nanoseconds_with_largest_unit(
+        cx,
+        time_nanoseconds,
+        TemporalBuiltinDurationExactUnit::Hour,
+    )?;
+    Ok(TemporalDurationObjectData::new(
+        date.years(),
+        date.months(),
+        date.weeks(),
+        date.days(),
+        time.hours(),
+        time.minutes(),
+        time.seconds(),
+        time.milliseconds(),
+        time.microseconds(),
+        time.nanoseconds(),
+    ))
+}
+
 pub(super) fn temporal_plain_date_time_difference_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -1421,6 +1525,69 @@ pub(super) fn temporal_plain_date_time_difference_builtin<Cx: PublicBuiltinDispa
             .unwrap_or(Value::undefined()),
         TemporalDateTimeDifferenceUnit::Day,
     )?;
+    if let Some(largest_date_unit) = temporal_date_time_date_difference_unit(options.largest_unit) {
+        let (start, end) = if sign > 0 {
+            (other, date_time)
+        } else {
+            (date_time, other)
+        };
+        let unrounded = temporal_plain_date_time_calendar_difference_duration(
+            cx,
+            start,
+            end,
+            options.largest_unit,
+        )?;
+        let duration = if options.rounding_increment == 1
+            && options.rounding_mode == TemporalBuiltinRoundingMode::Trunc
+            && options.smallest_unit == TemporalDateTimeDifferenceUnit::Nanosecond
+        {
+            unrounded
+        } else {
+            let round_input = if sign > 0 {
+                negate_temporal_duration(unrounded)
+            } else {
+                unrounded
+            };
+            let rounding_mode = if sign > 0 {
+                temporal_rounding_mode_for_negated_duration(options.rounding_mode)
+            } else {
+                options.rounding_mode
+            };
+            let rounded =
+                if let Some(exact_unit) = temporal_date_time_exact_unit(options.smallest_unit) {
+                    temporal_duration_round_calendar_relative_exact(
+                        cx,
+                        round_input,
+                        TemporalDurationRelativeTo::PlainDateTime(date_time),
+                        largest_date_unit,
+                        exact_unit,
+                        options.rounding_increment,
+                        rounding_mode,
+                    )?
+                } else {
+                    let smallest_date_unit =
+                        temporal_date_time_date_difference_unit(options.smallest_unit)
+                            .expect("validated date-time difference date unit");
+                    temporal_duration_round_calendar_relative(
+                        cx,
+                        round_input,
+                        TemporalDurationRelativeTo::PlainDateTime(date_time),
+                        largest_date_unit,
+                        smallest_date_unit,
+                        options.rounding_increment,
+                        rounding_mode,
+                    )?
+                };
+            if sign > 0 {
+                negate_temporal_duration(rounded)
+            } else {
+                rounded
+            }
+        };
+        validate_temporal_duration(cx, duration)?;
+        let prototype = current_temporal_duration_prototype(cx)?;
+        return allocate_temporal_duration_object(cx, prototype, duration);
+    }
     let left =
         temporal_plain_date_time_total_nanoseconds(date_time).ok_or_else(|| range_error(cx))?;
     let right = temporal_plain_date_time_total_nanoseconds(other).ok_or_else(|| range_error(cx))?;

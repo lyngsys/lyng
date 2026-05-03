@@ -66,6 +66,7 @@ use lyng_js_ops::temporal::{
     round_epoch_nanoseconds_to_fractional_digits as temporal_round_epoch_nanoseconds_to_fractional_digits,
     round_epoch_nanoseconds_to_increment as temporal_round_epoch_nanoseconds_to_increment,
     total_duration_exact as temporal_total_duration_exact,
+    total_nanoseconds_as_unit as temporal_total_nanoseconds_as_unit,
     TemporalDurationExactUnit as TemporalBuiltinDurationExactUnit,
     TemporalRoundingMode as TemporalBuiltinRoundingMode,
     DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR as TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR,

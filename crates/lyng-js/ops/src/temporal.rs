@@ -276,7 +276,44 @@ pub fn total_duration_exact(
     if duration_has_calendar_relative_units(data) {
         return None;
     }
-    Some(duration_total_time_nanoseconds(data)? as f64 / unit.nanoseconds() as f64)
+    total_nanoseconds_as_unit(duration_total_time_nanoseconds(data)?, unit.nanoseconds())
+}
+
+pub fn total_nanoseconds_as_unit(total_nanoseconds: i128, unit_nanoseconds: i128) -> Option<f64> {
+    if unit_nanoseconds <= 0 {
+        return None;
+    }
+    rational_i128_to_f64(total_nanoseconds, unit_nanoseconds)
+}
+
+fn rational_i128_to_f64(numerator: i128, denominator: i128) -> Option<f64> {
+    if denominator <= 0 {
+        return None;
+    }
+    let negative = numerator < 0;
+    let numerator = numerator.unsigned_abs();
+    let denominator = u128::try_from(denominator).ok()?;
+    let whole = numerator / denominator;
+    let mut remainder = numerator % denominator;
+    if remainder == 0 {
+        let value = whole.to_string().parse::<f64>().ok()?;
+        return Some(if negative { -value } else { value });
+    }
+
+    let mut text = whole.to_string();
+    text.push('.');
+    for _ in 0..80 {
+        remainder = remainder.checked_mul(10)?;
+        let digit = remainder / denominator;
+        let digit = u8::try_from(digit).ok()?;
+        text.push(char::from(b'0' + digit));
+        remainder %= denominator;
+        if remainder == 0 {
+            break;
+        }
+    }
+    let value = text.parse::<f64>().ok()?;
+    Some(if negative { -value } else { value })
 }
 
 pub fn add_durations(

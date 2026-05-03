@@ -671,6 +671,74 @@ fn temporal_plain_year_month_since_until_default_to_balanced_years_and_months() 
 }
 
 #[test]
+fn temporal_plain_year_month_difference_rounds_month_remainder_when_balanced() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let earlier = new Temporal.PlainYearMonth(2019, 1);
+        let later = new Temporal.PlainYearMonth(2021, 9);
+        let sinceYears = later.since(earlier, {
+            smallestUnit: "years",
+            roundingIncrement: 4,
+            roundingMode: "halfExpand",
+        });
+        let sinceMixed = later.since(earlier, {
+            smallestUnit: "months",
+            roundingIncrement: 5,
+        });
+        let sinceMonths = later.since(earlier, {
+            largestUnit: "months",
+            smallestUnit: "months",
+            roundingIncrement: 10,
+        });
+        let untilMixed = earlier.until(later, {
+            smallestUnit: "months",
+            roundingIncrement: 5,
+        });
+        [
+            sinceYears.years,
+            sinceYears.months,
+            sinceMixed.years,
+            sinceMixed.months,
+            sinceMonths.years,
+            sinceMonths.months,
+            untilMixed.years,
+            untilMixed.months,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "4|0|2|5|0|30|2|5");
+}
+
+#[test]
+fn temporal_plain_year_month_difference_rejects_rounded_month_boundary_outside_range() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let from = new Temporal.PlainYearMonth(1970, 1);
+        let to = new Temporal.PlainYearMonth(1971, 1);
+        let options = { roundingIncrement: 100_000_000 };
+        let sinceError = "none";
+        let untilError = "none";
+        try {
+            from.since(to, options);
+        } catch (error) {
+            sinceError = error.name;
+        }
+        try {
+            from.until(to, options);
+        } catch (error) {
+            untilError = error.name;
+        }
+        `${sinceError}|${untilError}`;
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "RangeError|RangeError");
+}
+
+#[test]
 fn temporal_plain_year_month_to_plain_date_defaults_to_constrain_and_checks_limits() {
     let result = compile_and_run_string_with_host(
         r#"
@@ -743,4 +811,74 @@ fn temporal_plain_year_month_from_accepts_string_limits() {
         result,
         "-271821-04|-271821-04-01[u-ca=iso8601]|+275760-09|+275760-09-01[u-ca=iso8601]"
     );
+}
+
+#[test]
+fn temporal_plain_year_month_from_accepts_object_limits_without_plain_date_range() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let min = Temporal.PlainYearMonth.from({ year: -271821, month: 4 });
+        let max = Temporal.PlainYearMonth.from({ year: 275760, month: 9 });
+        [min.toString(), max.toString()].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "-271821-04|+275760-09");
+}
+
+#[test]
+fn temporal_plain_year_month_with_validates_bad_fields_before_bad_options() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let instance = new Temporal.PlainYearMonth(2019, 10);
+        let validFields = (() => {
+            try {
+                instance.with({ year: 2020 }, "bad options");
+                return "no throw";
+            } catch (error) {
+                return error.name;
+            }
+        })();
+        let invalidFields = (() => {
+            try {
+                instance.with({ month: -1 }, "bad options");
+                return "no throw";
+            } catch (error) {
+                return error.name;
+            }
+        })();
+        [validFields, invalidFields].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "TypeError|RangeError");
+}
+
+#[test]
+fn temporal_plain_year_month_add_validates_reference_date_after_options() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        let log = [];
+        let options = {
+            get overflow() {
+                log.push("get options.overflow");
+                return "constrain";
+            }
+        };
+        let threw = (() => {
+            try {
+                new Temporal.PlainYearMonth(-271821, 4).add({ months: 1 }, options);
+                return false;
+            } catch (error) {
+                return error.constructor === RangeError;
+            }
+        })();
+        [threw, log.join(",")].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "true|get options.overflow");
 }

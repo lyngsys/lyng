@@ -148,7 +148,12 @@ fn temporal_plain_year_month_from_parts_with_overflow<Cx: PublicBuiltinDispatchC
     }
     let year = i32::try_from(year).map_err(|_| range_error(cx))?;
     let month = match overflow {
-        TemporalOverflow::Constrain => month.clamp(1, 12),
+        TemporalOverflow::Constrain => {
+            if month < 1 {
+                return Err(range_error(cx));
+            }
+            month.min(12)
+        }
         TemporalOverflow::Reject => {
             if !(1..=12).contains(&month) {
                 return Err(range_error(cx));
@@ -256,9 +261,14 @@ fn temporal_plain_year_month_from_value<Cx: PublicBuiltinDispatchContext>(
         _ => {}
     }
 
-    temporal_validate_optional_iso_calendar_property(cx, object_ref)?;
-    let year = temporal_required_integer_part_from_property(cx, object_ref, "year")?;
-    let month = temporal_month_from_property_bag(cx, object_ref, None)?;
+    let fields = temporal_plain_year_month_bag_fields(cx, object_ref)?;
+    let year = fields.year.ok_or_else(|| type_error(cx))?;
+    let month = temporal_resolve_month_from_fields(
+        cx,
+        fields.month,
+        fields.month_code_text.as_deref(),
+        None,
+    )?;
     temporal_plain_year_month_from_parts(cx, year, month, 1)
 }
 
@@ -483,6 +493,20 @@ fn temporal_plain_year_month_with_builtin<Cx: PublicBuiltinDispatchContext>(
         .get(1)
         .copied()
         .unwrap_or(Value::undefined());
+    if !options.is_undefined() && options.as_object_ref().is_none() {
+        let month = temporal_resolve_month_from_fields(
+            cx,
+            month,
+            month_code_text.as_deref(),
+            Some(i64::from(year_month.month())),
+        )?;
+        let _ = temporal_plain_year_month_from_parts(
+            cx,
+            year.unwrap_or(i64::from(year_month.year())),
+            month,
+            i64::from(year_month.reference_day()),
+        )?;
+    }
     let overflow = temporal_overflow_from_options(cx, options)?;
     let month = temporal_resolve_month_from_fields(
         cx,
@@ -507,6 +531,12 @@ fn temporal_plain_year_month_add_duration<Cx: PublicBuiltinDispatchContext>(
     duration: TemporalDurationObjectData,
     overflow: TemporalOverflow,
 ) -> Result<TemporalPlainYearMonthObjectData, Cx::Error> {
+    let _ = temporal_plain_date_from_parts(
+        cx,
+        i64::from(year_month.year()),
+        i64::from(year_month.month()),
+        i64::from(year_month.reference_day()),
+    )?;
     if temporal_duration_has_lower_than_month_units(duration) {
         return Err(range_error(cx));
     }
@@ -531,6 +561,74 @@ fn temporal_plain_year_month_add_duration<Cx: PublicBuiltinDispatchContext>(
         reference_day,
         overflow,
     )
+}
+
+fn temporal_plain_year_month_round_relative_months<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    start: TemporalPlainDateObjectData,
+    months: i128,
+    largest_unit: TemporalDateDifferenceUnit,
+    smallest_unit: TemporalDateDifferenceUnit,
+    rounding_increment: i128,
+    rounding_mode: TemporalBuiltinRoundingMode,
+) -> Result<i128, Cx::Error> {
+    let rounded = match smallest_unit {
+        TemporalDateDifferenceUnit::Year => {
+            let increment = rounding_increment
+                .checked_mul(12)
+                .ok_or_else(|| range_error(cx))?;
+            temporal_round_i128_to_increment(cx, months, increment, rounding_mode)?
+        }
+        TemporalDateDifferenceUnit::Month if largest_unit == TemporalDateDifferenceUnit::Year => {
+            let years = months / 12;
+            let month_remainder = months % 12;
+            let rounded_remainder = temporal_round_i128_to_increment(
+                cx,
+                month_remainder,
+                rounding_increment,
+                rounding_mode,
+            )?;
+            years
+                .checked_mul(12)
+                .and_then(|year_months| year_months.checked_add(rounded_remainder))
+                .ok_or_else(|| range_error(cx))?
+        }
+        TemporalDateDifferenceUnit::Month => {
+            temporal_round_i128_to_increment(cx, months, rounding_increment, rounding_mode)?
+        }
+        TemporalDateDifferenceUnit::Week | TemporalDateDifferenceUnit::Day => {
+            unreachable!("PlainYearMonth filters lower date units")
+        }
+    };
+
+    temporal_duration_validate_month_rounding_boundary(cx, start, rounded)?;
+    if rounding_increment != 1 {
+        let adjacent = match smallest_unit {
+            TemporalDateDifferenceUnit::Year => {
+                rounding_increment.checked_mul(12).and_then(|increment| {
+                    if months < 0 {
+                        rounded.checked_sub(increment)
+                    } else {
+                        rounded.checked_add(increment)
+                    }
+                })
+            }
+            TemporalDateDifferenceUnit::Month => {
+                if months < 0 {
+                    rounded.checked_sub(rounding_increment)
+                } else {
+                    rounded.checked_add(rounding_increment)
+                }
+            }
+            TemporalDateDifferenceUnit::Week | TemporalDateDifferenceUnit::Day => {
+                unreachable!("PlainYearMonth filters lower date units")
+            }
+        }
+        .ok_or_else(|| range_error(cx))?;
+        temporal_duration_validate_month_rounding_boundary(cx, start, adjacent)?;
+    }
+
+    Ok(rounded)
 }
 
 fn temporal_plain_year_month_add_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -624,27 +722,71 @@ fn temporal_plain_year_month_difference_builtin<Cx: PublicBuiltinDispatchContext
         return Err(range_error(cx));
     }
 
+    let start_date = if year_month != other {
+        let start_date = temporal_plain_date_from_parts(
+            cx,
+            i64::from(year_month.year()),
+            i64::from(year_month.month()),
+            1,
+        )?;
+        let _ = temporal_plain_date_from_parts(
+            cx,
+            i64::from(other.year()),
+            i64::from(other.month()),
+            1,
+        )?;
+        Some(start_date)
+    } else {
+        None
+    };
+
     let left = i128::from(year_month.year()) * 12 + i128::from(year_month.month() - 1);
     let right = i128::from(other.year()) * 12 + i128::from(other.month() - 1);
-    let raw_months = left
-        .checked_sub(right)
-        .and_then(|difference| difference.checked_mul(sign))
-        .ok_or_else(|| range_error(cx))?;
-    let increment = match options.smallest_unit {
-        TemporalDateDifferenceUnit::Year => options
-            .rounding_increment
-            .checked_mul(12)
-            .ok_or_else(|| range_error(cx))?,
-        TemporalDateDifferenceUnit::Month => options.rounding_increment,
-        TemporalDateDifferenceUnit::Week | TemporalDateDifferenceUnit::Day => {
-            unreachable!("filtered lower units")
+    let relative_months = right.checked_sub(left).ok_or_else(|| range_error(cx))?;
+    let result_months = if options.rounding_increment == 1
+        && options.rounding_mode == TemporalBuiltinRoundingMode::Trunc
+        && options.smallest_unit == TemporalDateDifferenceUnit::Month
+    {
+        if sign > 0 {
+            relative_months
+                .checked_neg()
+                .ok_or_else(|| range_error(cx))?
+        } else {
+            relative_months
+        }
+    } else {
+        let rounding_mode = if sign > 0 {
+            temporal_rounding_mode_for_negated_duration(options.rounding_mode)
+        } else {
+            options.rounding_mode
+        };
+        let start_date = match start_date {
+            Some(start_date) => start_date,
+            None => temporal_plain_date_from_parts(
+                cx,
+                i64::from(year_month.year()),
+                i64::from(year_month.month()),
+                1,
+            )?,
+        };
+        let rounded = temporal_plain_year_month_round_relative_months(
+            cx,
+            start_date,
+            relative_months,
+            options.largest_unit,
+            options.smallest_unit,
+            options.rounding_increment,
+            rounding_mode,
+        )?;
+        if sign > 0 {
+            rounded.checked_neg().ok_or_else(|| range_error(cx))?
+        } else {
+            rounded
         }
     };
-    let rounded =
-        temporal_round_i128_to_increment(cx, raw_months, increment, options.rounding_mode)?;
     let duration = temporal_duration_from_date_units(
         cx,
-        rounded,
+        result_months,
         options.largest_unit,
         TemporalDateDifferenceUnit::Month,
     )?;
@@ -751,19 +893,13 @@ fn temporal_plain_year_month_from_builtin<Cx: PublicBuiltinDispatchContext>(
                     fields.month_code_text.as_deref(),
                     None,
                 )?;
-                let date = temporal_plain_date_from_parts_with_overflow(
+                temporal_plain_year_month_from_parts_with_overflow(
                     cx,
                     fields.year.expect("checked above"),
                     month,
                     1,
                     overflow,
-                )?;
-                TemporalPlainYearMonthObjectData::new(
-                    date.year(),
-                    date.month(),
-                    date.day(),
-                    date.calendar(),
-                )
+                )?
             }
         }
     };

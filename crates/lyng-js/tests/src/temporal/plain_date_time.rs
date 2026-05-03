@@ -330,6 +330,328 @@ fn temporal_plain_date_time_arithmetic_rounding_and_difference_compose_date_and_
 }
 
 #[test]
+fn temporal_plain_date_time_difference_balances_calendar_units() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const earlier = new Temporal.PlainDateTime(2020, 2, 20, 5, 45, 20);
+        const later = new Temporal.PlainDateTime(2021, 2, 21, 17, 18, 57);
+        const defaultDuration = later.since(earlier);
+        const months = later.since(earlier, { largestUnit: "months" });
+        const years = later.since(earlier, { largestUnit: "years" });
+        const negative = new Temporal.PlainDateTime(1997, 12, 1, 12, 34)
+            .since(new Temporal.PlainDateTime(2001, 6, 18, 12, 34), { largestUnit: "years" });
+        [
+            defaultDuration.days,
+            defaultDuration.hours,
+            defaultDuration.minutes,
+            defaultDuration.seconds,
+            months.years,
+            months.months,
+            months.days,
+            months.hours,
+            months.minutes,
+            months.seconds,
+            years.years,
+            years.months,
+            years.days,
+            years.hours,
+            years.minutes,
+            years.seconds,
+            negative.years,
+            negative.months,
+            negative.days,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "367|11|33|37|0|12|1|11|33|37|1|0|1|11|33|37|-3|-6|-17"
+    );
+}
+
+#[test]
+fn temporal_plain_date_time_difference_rounds_calendar_units_relative_to_start() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const earlier = new Temporal.PlainDateTime(2019, 1, 8, 8, 22, 36, 123, 456, 789);
+        const later = new Temporal.PlainDateTime(2021, 9, 7, 12, 39, 40, 987, 654, 321);
+        const years = later.since(earlier, { smallestUnit: "years", roundingMode: "halfExpand" });
+        const months = later.since(earlier, { smallestUnit: "months", roundingMode: "halfExpand" });
+        const weeks = later.since(earlier, { smallestUnit: "weeks", roundingMode: "halfExpand" });
+        const truncYears = later.since(earlier, { smallestUnit: "years", roundingMode: "trunc" });
+        [
+            years.years,
+            years.months,
+            months.months,
+            months.days,
+            weeks.weeks,
+            weeks.days,
+            truncYears.years,
+            truncYears.months,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "3|0|32|0|139|0|2|0");
+}
+
+#[test]
+fn temporal_plain_date_time_since_rounds_calendar_units_relative_to_receiver() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const dt1 = new Temporal.PlainDateTime(2019, 1, 1);
+        const dt2 = new Temporal.PlainDateTime(2020, 7, 2);
+        const positive = dt2.since(dt1, { smallestUnit: "years", roundingMode: "halfExpand" });
+        const negative = dt1.since(dt2, { smallestUnit: "years", roundingMode: "halfExpand" });
+        [
+            positive.years,
+            positive.months,
+            negative.years,
+            negative.months,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "1|0|-2|0");
+}
+
+#[test]
+fn temporal_plain_date_time_difference_accepts_leap_second_inputs() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const instance = new Temporal.PlainDateTime(2016, 12, 31, 23, 59, 59);
+        const fromString = instance.since("2016-12-31T23:59:60");
+        const fromBag = instance.since({
+            year: 2016,
+            month: 12,
+            day: 31,
+            hour: 23,
+            minute: 59,
+            second: 60,
+        });
+        [
+            fromString.years,
+            fromString.months,
+            fromString.weeks,
+            fromString.days,
+            fromString.hours,
+            fromString.minutes,
+            fromString.seconds,
+            fromBag.years,
+            fromBag.months,
+            fromBag.weeks,
+            fromBag.days,
+            fromBag.hours,
+            fromBag.minutes,
+            fromBag.seconds,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "0|0|0|0|0|0|0|0|0|0|0|0|0|0");
+}
+
+#[test]
+fn temporal_plain_date_time_difference_reads_options_before_validation() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const actual = [];
+        function stringObserver(name, value) {
+            return {
+                get toString() {
+                    actual.push("get " + name + ".toString");
+                    return function () {
+                        actual.push("call " + name + ".toString");
+                        return value;
+                    };
+                },
+            };
+        }
+        function numberObserver(name, value) {
+            return {
+                get valueOf() {
+                    actual.push("get " + name + ".valueOf");
+                    return function () {
+                        actual.push("call " + name + ".valueOf");
+                        return value;
+                    };
+                },
+            };
+        }
+        const options = {};
+        Object.defineProperty(options, "largestUnit", {
+            get() {
+                actual.push("get options.largestUnit");
+                return stringObserver("options.largestUnit", "nanosecond");
+            },
+        });
+        Object.defineProperty(options, "roundingIncrement", {
+            get() {
+                actual.push("get options.roundingIncrement");
+                return numberObserver("options.roundingIncrement", 1);
+            },
+        });
+        Object.defineProperty(options, "roundingMode", {
+            get() {
+                actual.push("get options.roundingMode");
+                return stringObserver("options.roundingMode", "halfFloor");
+            },
+        });
+        Object.defineProperty(options, "smallestUnit", {
+            get() {
+                actual.push("get options.smallestUnit");
+                return stringObserver("options.smallestUnit", "year");
+            },
+        });
+        const instance = new Temporal.PlainDateTime(2025, 8, 14, 12);
+        const other = new Temporal.PlainDateTime(2025, 3, 14, 17);
+        let threw = false;
+        try {
+            instance.since(other, options);
+        } catch (error) {
+            threw = error instanceof RangeError;
+        }
+        [threw, actual.join(",")].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "true|get options.largestUnit,get options.largestUnit.toString,call options.largestUnit.toString,get options.roundingIncrement,get options.roundingIncrement.valueOf,call options.roundingIncrement.valueOf,get options.roundingMode,get options.roundingMode.toString,call options.roundingMode.toString,get options.smallestUnit,get options.smallestUnit.toString,call options.smallestUnit.toString"
+    );
+}
+
+#[test]
+fn temporal_plain_date_time_difference_reads_other_bag_in_spec_order() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const actual = [];
+        function stringObserver(name, value) {
+            return {
+                get toString() {
+                    actual.push("get " + name + ".toString");
+                    return function () {
+                        actual.push("call " + name + ".toString");
+                        return value;
+                    };
+                },
+            };
+        }
+        function numberObserver(name, value) {
+            return {
+                get valueOf() {
+                    actual.push("get " + name + ".valueOf");
+                    return function () {
+                        actual.push("call " + name + ".valueOf");
+                        return value;
+                    };
+                },
+            };
+        }
+        const values = {
+            year: 2001,
+            month: 6,
+            monthCode: "M06",
+            day: 2,
+            hour: 1,
+            minute: 46,
+            second: 40,
+            millisecond: 250,
+            microsecond: 500,
+            nanosecond: 750,
+            calendar: "iso8601",
+        };
+        const other = {};
+        for (const name of Object.keys(values)) {
+            Object.defineProperty(other, name, {
+                get() {
+                    actual.push("get other." + name);
+                    if (name === "calendar") {
+                        return values[name];
+                    }
+                    if (name === "monthCode") {
+                        return stringObserver("other." + name, values[name]);
+                    }
+                    return numberObserver("other." + name, values[name]);
+                },
+            });
+        }
+        const instance = new Temporal.PlainDateTime(2000, 5, 2, 12, 34, 56, 987, 654, 321);
+        instance.since(other, { largestUnit: "years" });
+        actual.join(",");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "get other.calendar,get other.day,get other.day.valueOf,call other.day.valueOf,get other.hour,get other.hour.valueOf,call other.hour.valueOf,get other.microsecond,get other.microsecond.valueOf,call other.microsecond.valueOf,get other.millisecond,get other.millisecond.valueOf,call other.millisecond.valueOf,get other.minute,get other.minute.valueOf,call other.minute.valueOf,get other.month,get other.month.valueOf,call other.month.valueOf,get other.monthCode,get other.monthCode.toString,call other.monthCode.toString,get other.nanosecond,get other.nanosecond.valueOf,call other.nanosecond.valueOf,get other.second,get other.second.valueOf,call other.second.valueOf,get other.year,get other.year.valueOf,call other.year.valueOf"
+    );
+}
+
+#[test]
+fn temporal_plain_date_time_difference_rejects_string_arguments_outside_limits() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const instance = new Temporal.PlainDateTime(1976, 11, 18, 15, 23);
+        const throwsRange = (callback) => {
+            try {
+                callback();
+                return false;
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        };
+        const validLower = "-271821-04-19T00:00:00.000000001";
+        const validUpper = "+275760-09-13T23:59:59.999999999";
+        const invalidLower = "-271821-04-19T00:00";
+        const invalidUpper = "+275760-09-14T00:00";
+        [
+            throwsRange(() => instance.since(validLower)),
+            throwsRange(() => instance.until(validUpper)),
+            throwsRange(() => instance.since(invalidLower)),
+            throwsRange(() => instance.until(invalidUpper)),
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "false|false|true|true");
+}
+
+#[test]
+fn temporal_plain_date_time_difference_rejects_rounding_outside_iso_limits() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const from = new Temporal.PlainDateTime(1970, 1, 1);
+        const to = new Temporal.PlainDateTime(1971, 1, 1);
+        const options = { roundingIncrement: 100_000_000, smallestUnit: "months" };
+        const throwsRange = (callback) => {
+            try {
+                callback();
+                return false;
+            } catch (error) {
+                return error instanceof RangeError;
+            }
+        };
+        [
+            throwsRange(() => from.since(to, options)),
+            throwsRange(() => from.until(to, options)),
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "true|true");
+}
+
+#[test]
 fn temporal_plain_date_time_add_subtract_validate_overflow_options() {
     let result = compile_and_run_string_with_host(
         r#"

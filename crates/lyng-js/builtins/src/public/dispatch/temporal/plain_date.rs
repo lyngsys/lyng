@@ -288,10 +288,13 @@ pub(super) fn temporal_plain_date_from_property_bag<Cx: PublicBuiltinDispatchCon
     if validate_calendar {
         temporal_validate_optional_iso_calendar_property(cx, object_ref)?;
     }
-    let year = temporal_required_integer_part_from_property(cx, object_ref, "year")?;
-    let month = temporal_month_from_property_bag(cx, object_ref, None)?;
-    let day = temporal_required_integer_part_from_property(cx, object_ref, "day")?;
-    temporal_plain_date_from_parts(cx, year, month, day)
+    let fields = TemporalPlainDateBagFields {
+        day: temporal_optional_integer_part_from_property(cx, object_ref, "day")?,
+        month: temporal_optional_integer_part_from_property(cx, object_ref, "month")?,
+        month_code_text: temporal_optional_month_code_text_from_property(cx, object_ref)?,
+        year: temporal_optional_integer_part_from_property(cx, object_ref, "year")?,
+    };
+    temporal_plain_date_from_bag_fields(cx, fields, TemporalOverflow::Reject)
 }
 
 pub(super) struct TemporalPlainDateBagFields {
@@ -875,6 +878,12 @@ pub(super) fn temporal_date_difference_options<Cx: PublicBuiltinDispatchContext>
         return Err(type_error(cx));
     };
     let largest_unit_value = temporal_property_value(cx, object_ref, "largestUnit")?;
+    let largest_unit_text = if largest_unit_value.is_undefined() {
+        None
+    } else {
+        let string_ref = to_string_string_ref(cx, largest_unit_value)?;
+        Some(string_ref_text(cx, string_ref)?)
+    };
     let rounding_increment_value = temporal_property_value(cx, object_ref, "roundingIncrement")?;
     let rounding_increment =
         temporal_duration_rounding_increment_option(cx, rounding_increment_value)?;
@@ -893,16 +902,14 @@ pub(super) fn temporal_date_difference_options<Cx: PublicBuiltinDispatchContext>
     } else {
         default_largest_unit
     };
-    let largest_unit = if largest_unit_value.is_undefined() {
-        default_largest_unit
-    } else {
-        let string_ref = to_string_string_ref(cx, largest_unit_value)?;
-        let text = string_ref_text(cx, string_ref)?;
+    let largest_unit = if let Some(text) = largest_unit_text.as_deref() {
         if text == "auto" {
             default_largest_unit
         } else {
             temporal_date_difference_unit_from_text(&text).ok_or_else(|| range_error(cx))?
         }
+    } else {
+        default_largest_unit
     };
     if temporal_date_difference_unit_order(largest_unit)
         > temporal_date_difference_unit_order(smallest_unit)
@@ -1162,68 +1169,43 @@ pub(super) fn temporal_plain_date_difference_builtin<Cx: PublicBuiltinDispatchCo
         TemporalDateDifferenceUnit::Day,
     )?;
 
-    if options.rounding_increment == 1
+    let relative_duration = temporal_plain_date_difference_trunc(
+        cx,
+        date,
+        other,
+        options.largest_unit,
+        TemporalDateDifferenceUnit::Day,
+    )?;
+    let duration = if options.rounding_increment == 1
         && options.rounding_mode == TemporalBuiltinRoundingMode::Trunc
-        && !matches!(
-            (options.largest_unit, options.smallest_unit),
-            (
-                TemporalDateDifferenceUnit::Day | TemporalDateDifferenceUnit::Week,
-                TemporalDateDifferenceUnit::Week | TemporalDateDifferenceUnit::Day
-            )
-        )
+        && options.smallest_unit == TemporalDateDifferenceUnit::Day
     {
-        let (start, end) = if sign > 0 {
-            (other, date)
+        if sign > 0 {
+            negate_temporal_duration(relative_duration)
         } else {
-            (date, other)
+            relative_duration
+        }
+    } else {
+        let rounding_mode = if sign > 0 {
+            temporal_rounding_mode_for_negated_duration(options.rounding_mode)
+        } else {
+            options.rounding_mode
         };
-        let duration = temporal_plain_date_difference_trunc(
+        let rounded = temporal_duration_round_calendar_relative(
             cx,
-            start,
-            end,
+            relative_duration,
+            TemporalDurationRelativeTo::PlainDate(date),
             options.largest_unit,
             options.smallest_unit,
+            options.rounding_increment,
+            rounding_mode,
         )?;
-        validate_temporal_duration(cx, duration)?;
-        let prototype = current_temporal_duration_prototype(cx)?;
-        return allocate_temporal_duration_object(cx, prototype, duration);
-    }
-
-    let (raw_units, unit_kind) = match options.smallest_unit {
-        TemporalDateDifferenceUnit::Year | TemporalDateDifferenceUnit::Month => {
-            let left = i128::from(date.year()) * 12 + i128::from(date.month() - 1);
-            let right = i128::from(other.year()) * 12 + i128::from(other.month() - 1);
-            (
-                left.checked_sub(right)
-                    .and_then(|difference| difference.checked_mul(sign))
-                    .ok_or_else(|| range_error(cx))?,
-                TemporalDateDifferenceUnit::Month,
-            )
+        if sign > 0 {
+            negate_temporal_duration(rounded)
+        } else {
+            rounded
         }
-        TemporalDateDifferenceUnit::Week | TemporalDateDifferenceUnit::Day => (
-            temporal_plain_date_ordinal_day(date)
-                .checked_sub(temporal_plain_date_ordinal_day(other))
-                .and_then(|difference| difference.checked_mul(sign))
-                .ok_or_else(|| range_error(cx))?,
-            TemporalDateDifferenceUnit::Day,
-        ),
     };
-    let increment = match options.smallest_unit {
-        TemporalDateDifferenceUnit::Year => options
-            .rounding_increment
-            .checked_mul(12)
-            .ok_or_else(|| range_error(cx))?,
-        TemporalDateDifferenceUnit::Month | TemporalDateDifferenceUnit::Day => {
-            options.rounding_increment
-        }
-        TemporalDateDifferenceUnit::Week => options
-            .rounding_increment
-            .checked_mul(7)
-            .ok_or_else(|| range_error(cx))?,
-    };
-    let rounded =
-        temporal_round_i128_to_increment(cx, raw_units, increment, options.rounding_mode)?;
-    let duration = temporal_duration_from_date_units(cx, rounded, options.largest_unit, unit_kind)?;
     validate_temporal_duration(cx, duration)?;
     let prototype = current_temporal_duration_prototype(cx)?;
     allocate_temporal_duration_object(cx, prototype, duration)

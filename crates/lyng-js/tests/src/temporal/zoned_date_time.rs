@@ -768,6 +768,212 @@ fn temporal_zoned_date_time_since_and_until_return_exact_utc_durations() {
 }
 
 #[test]
+fn temporal_zoned_date_time_difference_balances_utc_calendar_units() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const earlier = Temporal.ZonedDateTime.from("2020-02-20T05:45:20+00:00[UTC]");
+        const later = Temporal.ZonedDateTime.from("2021-02-21T17:18:57+00:00[UTC]");
+        const defaultDuration = later.since(earlier);
+        const months = later.since(earlier, { largestUnit: "months" });
+        const years = later.since(earlier, { largestUnit: "years" });
+        const negative = Temporal.ZonedDateTime.from("1997-12-01T12:34+00:00[UTC]")
+            .since(Temporal.ZonedDateTime.from("2001-06-18T12:34+00:00[UTC]"), { largestUnit: "years" });
+        [
+            defaultDuration.days,
+            defaultDuration.hours,
+            defaultDuration.minutes,
+            defaultDuration.seconds,
+            months.years,
+            months.months,
+            months.days,
+            months.hours,
+            months.minutes,
+            months.seconds,
+            years.years,
+            years.months,
+            years.days,
+            years.hours,
+            years.minutes,
+            years.seconds,
+            negative.years,
+            negative.months,
+            negative.days,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "0|8819|33|37|0|12|1|11|33|37|1|0|1|11|33|37|-3|-6|-17"
+    );
+}
+
+#[test]
+fn temporal_zoned_date_time_difference_balances_fixed_offset_calendar_units() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const past = new Temporal.ZonedDateTime(1234567890123456789n, "-08:00");
+        const future = new Temporal.ZonedDateTime(2345678901234567890n, "-08:00");
+        const years = future.since(past, { largestUnit: "years" });
+        const months = future.since(past, { largestUnit: "months" });
+        const weeks = future.since(past, { largestUnit: "weeks" });
+        const days = future.since(past, { largestUnit: "days" });
+        [
+            years.years,
+            years.months,
+            years.days,
+            years.hours,
+            years.minutes,
+            years.seconds,
+            years.milliseconds,
+            years.microseconds,
+            years.nanoseconds,
+            months.months,
+            months.days,
+            months.hours,
+            weeks.weeks,
+            weeks.days,
+            weeks.hours,
+            days.days,
+            days.hours,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(
+        result,
+        "35|2|15|1|56|51|111|111|101|422|15|1|1837|1|1|12860|1"
+    );
+}
+
+#[test]
+fn temporal_zoned_date_time_since_rounds_calendar_units_relative_to_receiver() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const earlier = new Temporal.ZonedDateTime(1546300800000000000n, "UTC");
+        const later = new Temporal.ZonedDateTime(1593648000000000000n, "UTC");
+        const positive = later.since(earlier, {
+            smallestUnit: "years",
+            roundingMode: "halfExpand",
+        });
+        const negative = earlier.since(later, {
+            smallestUnit: "years",
+            roundingMode: "halfExpand",
+        });
+        [
+            positive.years,
+            positive.months,
+            positive.days,
+            negative.years,
+            negative.months,
+            negative.days,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "1|0|0|-2|0|0");
+}
+
+#[test]
+fn temporal_zoned_date_time_since_balances_calendar_units_relative_to_receiver() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const leap = new Temporal.ZonedDateTime(1582930800000000000n, "+01:00");
+        const common = new Temporal.ZonedDateTime(1614466800000000000n, "+01:00");
+        const years = common.since(leap, { largestUnit: "years" });
+        const months = common.since(leap, { largestUnit: "months" });
+        [
+            years.years,
+            years.months,
+            years.days,
+            months.months,
+            months.days,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "0|11|28|11|28");
+}
+
+#[test]
+fn temporal_zoned_date_time_difference_handles_minimum_instant_with_calendar_units() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const min = new Temporal.ZonedDateTime(-86400_0000_0000_000_000_000n, "UTC");
+        const instance = new Temporal.PlainDateTime(1970, 9, 1, 15, 47, 32)
+            .toZonedDateTime("UTC");
+        const forward = (() => {
+            try {
+                instance.since(min, { largestUnit: "years" });
+                return true;
+            } catch (_) {
+                return false;
+            }
+        })();
+        const backward = (() => {
+            try {
+                min.until(instance, { largestUnit: "years" });
+                return true;
+            } catch (_) {
+                return false;
+            }
+        })();
+        [forward, backward].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "true|true");
+}
+
+#[test]
+fn temporal_zoned_date_time_difference_rejects_day_rounding_boundary_outside_limits() {
+    let result = compile_and_run_string_with_host(
+        r#"
+        const earlier = new Temporal.ZonedDateTime(0n, "UTC");
+        const later = new Temporal.ZonedDateTime(5n, "UTC");
+        const tooLarge = { smallestUnit: "days", roundingIncrement: 100000001 };
+        const valid = {
+            smallestUnit: "days",
+            roundingIncrement: 100000000,
+            roundingMode: "expand",
+        };
+        const sinceThrows = (() => {
+            try {
+                later.since(earlier, tooLarge);
+                return false;
+            } catch (error) {
+                return error.constructor === RangeError;
+            }
+        })();
+        const untilThrows = (() => {
+            try {
+                earlier.until(later, tooLarge);
+                return false;
+            } catch (error) {
+                return error.constructor === RangeError;
+            }
+        })();
+        const sinceValid = later.since(earlier, valid);
+        const untilValid = earlier.until(later, valid);
+        [
+            sinceThrows,
+            untilThrows,
+            sinceValid.days,
+            untilValid.days,
+        ].join("|");
+        "#,
+        lyng_js_host::NoopHostHooks,
+    );
+
+    assert_eq!(result, "true|true|100000000|100000000");
+}
+
+#[test]
 fn temporal_zoned_date_time_converts_to_instant_and_plain_types() {
     let result = compile_and_run_string_with_host(
         r#"
