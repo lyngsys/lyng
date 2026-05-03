@@ -1,13 +1,15 @@
 use super::{
     create_data_property_or_throw, length_value_u64, map_completion, promises,
-    property_key_from_text, range_error, string_value, to_index_for_builtin,
+    property_key_from_text, range_error, string_value, to_bigint_for_builtin, to_index_for_builtin,
     to_integer_or_infinity_for_builtin, to_number_for_builtin, type_error,
     typed_array_storage_bits_from_builtin_value, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_env::{AsyncWaiterRecord, ParkedAgentRecord, WaiterKind};
-use lyng_js_host::{ParkAgentRequest, ParkAgentStatus, UnparkAgentRequest};
-use lyng_js_objects::TypedArrayObjectData;
+use lyng_js_env::{
+    AsyncWaiterRecord, ExecutableId, ParkedAgentRecord, RuntimeJobPayload, WaiterKind,
+};
+use lyng_js_host::{HostJobKind, ParkAgentRequest, ParkAgentStatus, UnparkAgentRequest};
+use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
 use lyng_js_ops::{promise, shared_memory as shared_memory_ops};
 use lyng_js_types::{BuiltinFunctionId, ObjectRef, Value};
 
@@ -137,6 +139,59 @@ fn atomics_value_argument<Cx: PublicBuiltinDispatchContext>(
     typed_array_storage_bits_from_builtin_value(cx, record.typed_array().kind(), value)
 }
 
+fn integer_storage_bits(integer: f64, width: u32) -> u64 {
+    if integer == 0.0 || !integer.is_finite() {
+        return 0;
+    }
+    let modulus = 2_f64.powi(i32::try_from(width).expect("integer width should fit"));
+    let mut wrapped = integer % modulus;
+    if wrapped < 0.0 {
+        wrapped += modulus;
+    }
+    wrapped as u64
+}
+
+fn integer_value(integer: f64) -> Value {
+    if integer.is_finite() && integer >= f64::from(i32::MIN) && integer <= f64::from(i32::MAX) {
+        Value::from_smi(integer as i32)
+    } else {
+        Value::from_f64(integer)
+    }
+}
+
+fn atomics_store_value_argument<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    record: shared_memory_ops::AtomicAccessRecord,
+    value: Value,
+) -> Result<(u64, Value), Cx::Error> {
+    match record.typed_array().kind() {
+        TypedArrayElementKind::BigInt64 | TypedArrayElementKind::BigUint64 => {
+            let bigint = to_bigint_for_builtin(cx, value)?;
+            let bits = typed_array_storage_bits_from_builtin_value(
+                cx,
+                record.typed_array().kind(),
+                bigint,
+            )?;
+            Ok((bits, bigint))
+        }
+        TypedArrayElementKind::Int8 | TypedArrayElementKind::Uint8 => {
+            let integer = to_integer_or_infinity_for_builtin(cx, value)?;
+            Ok((integer_storage_bits(integer, 8), integer_value(integer)))
+        }
+        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => {
+            let integer = to_integer_or_infinity_for_builtin(cx, value)?;
+            Ok((integer_storage_bits(integer, 16), integer_value(integer)))
+        }
+        TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => {
+            let integer = to_integer_or_infinity_for_builtin(cx, value)?;
+            Ok((integer_storage_bits(integer, 32), integer_value(integer)))
+        }
+        TypedArrayElementKind::Float32
+        | TypedArrayElementKind::Float64
+        | TypedArrayElementKind::Uint8Clamped => Err(type_error(cx)),
+    }
+}
+
 fn atomics_load_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -156,7 +211,7 @@ fn atomics_store_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let record = atomics_access_record(cx, invocation, false, false)?;
-    let value = atomics_value_argument(
+    let (bits, converted_value) = atomics_store_value_argument(
         cx,
         record,
         invocation
@@ -165,13 +220,9 @@ fn atomics_store_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let bits = shared_memory_ops::atomic_store_bits(cx.agent(), record, value)
+    let _ = shared_memory_ops::atomic_store_bits(cx.agent(), record, bits)
         .ok_or_else(|| type_error(cx))?;
-    Ok(shared_memory_ops::atomic_value_from_bits(
-        cx.agent(),
-        record.typed_array().kind(),
-        bits,
-    ))
+    Ok(converted_value)
 }
 
 fn atomics_rmw_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -473,10 +524,24 @@ fn atomics_wait_async_builtin<Cx: PublicBuiltinDispatchContext>(
     let promise_object = promises::promise_capability_promise(cx, capability)?;
     let location = shared_memory_ops::wait_location(record);
     let agent_id = cx.agent().id();
-    let _ = cx.agent().park_async_shared_memory_waiter(
+    let token = cx.agent().park_async_shared_memory_waiter(
         location,
         AsyncWaiterRecord::new(agent_id, promise_object),
     );
+    if timeout_ns.is_some() {
+        let realm = cx.builtin_realm();
+        let _ = cx.agent().enqueue_job_with_payload(
+            HostJobKind::Harness,
+            ExecutableId::Builtin,
+            RuntimeJobPayload::AtomicsWaitAsyncTimeout {
+                location,
+                token,
+                promise: promise_object,
+            },
+            Some(realm),
+            Some("AtomicsWaitAsyncTimeout".into()),
+        );
+    }
     wait_async_result_object(cx, true, Value::from_object_ref(promise_object))
 }
 

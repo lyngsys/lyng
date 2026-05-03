@@ -1,10 +1,10 @@
 use super::*;
 use lyng_js_env::{
     ExecutableId, JobQueueKind, PromiseCapabilityId, PromiseReactionHandler, PromiseReactionKind,
-    PromiseReactionRecord, RuntimeJob, RuntimeJobPayload,
+    PromiseReactionRecord, PromiseState, RuntimeJob, RuntimeJobPayload, WaiterToken,
 };
-use lyng_js_host::{HostError, HostHooks, HostJobPhase, JobObservation};
-use lyng_js_ops::{errors, iterator, object};
+use lyng_js_host::{HostError, HostHooks, HostJobPhase, JobObservation, WaitLocation};
+use lyng_js_ops::{errors, iterator, object, promise as promise_ops};
 use lyng_js_types::{
     promise_reject_function_builtin, promise_resolve_function_builtin, AbruptCompletion, ObjectRef,
     PropertyKey, Value,
@@ -24,7 +24,17 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<()> {
-        self.drain_job_queue_with_registry(agent, host, registry, JobQueueKind::Promise)
+        loop {
+            self.drain_job_queue_with_registry(agent, host, registry, JobQueueKind::Promise)?;
+            if !self.run_next_job_from_queue_with_registry(
+                agent,
+                host,
+                registry,
+                JobQueueKind::Harness,
+            )? {
+                return Ok(());
+            }
+        }
     }
 
     pub fn drain_job_queue_with_registry(
@@ -34,19 +44,31 @@ impl Vm {
         registry: &mut dyn NativeFunctionRegistry,
         queue_kind: JobQueueKind,
     ) -> VmResult<()> {
-        while let Some(job) = agent.dequeue_job(queue_kind) {
-            self.observe_job_phase(agent, host, &job, HostJobPhase::Enqueued)?;
-            self.observe_job_phase(agent, host, &job, HostJobPhase::Started)?;
-            let result = self.execute_runtime_job(agent, host, registry, &job);
-            match result {
-                Ok(()) => self.observe_job_phase(agent, host, &job, HostJobPhase::Completed)?,
-                Err(error) => {
-                    self.observe_job_phase(agent, host, &job, HostJobPhase::Failed)?;
-                    return Err(error);
-                }
+        while self.run_next_job_from_queue_with_registry(agent, host, registry, queue_kind)? {}
+        Ok(())
+    }
+
+    fn run_next_job_from_queue_with_registry(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        queue_kind: JobQueueKind,
+    ) -> VmResult<bool> {
+        let Some(job) = agent.dequeue_job(queue_kind) else {
+            return Ok(false);
+        };
+        self.observe_job_phase(agent, host, &job, HostJobPhase::Enqueued)?;
+        self.observe_job_phase(agent, host, &job, HostJobPhase::Started)?;
+        let result = self.execute_runtime_job(agent, host, registry, &job);
+        match result {
+            Ok(()) => self.observe_job_phase(agent, host, &job, HostJobPhase::Completed)?,
+            Err(error) => {
+                self.observe_job_phase(agent, host, &job, HostJobPhase::Failed)?;
+                return Err(error);
             }
         }
-        Ok(())
+        Ok(true)
     }
 
     fn observe_job_phase(
@@ -91,6 +113,7 @@ impl Vm {
                 script_or_module_referrer,
                 ..
             } => script_or_module_referrer,
+            RuntimeJobPayload::AtomicsWaitAsyncTimeout { .. } => None,
             _ => None,
         };
         agent.push_execution_context(
@@ -139,6 +162,11 @@ impl Vm {
                 value,
                 rejected,
             ),
+            RuntimeJobPayload::AtomicsWaitAsyncTimeout {
+                location,
+                token,
+                promise,
+            } => self.execute_atomics_wait_async_timeout_job(agent, location, token, promise),
             RuntimeJobPayload::FinalizationCleanup {
                 registry: registry_object,
             } => self.execute_finalization_cleanup_job(
@@ -152,6 +180,27 @@ impl Vm {
         let _ = agent.pop_execution_context();
         agent.clear_kept_objects();
         result
+    }
+
+    fn execute_atomics_wait_async_timeout_job(
+        &mut self,
+        agent: &mut Agent,
+        location: WaitLocation,
+        token: WaiterToken,
+        promise: ObjectRef,
+    ) -> VmResult<()> {
+        if promise_ops::promise_state(agent, promise) != Some(PromiseState::Pending) {
+            return Ok(());
+        }
+        if !agent.remove_shared_memory_waiter(location, token) {
+            return Ok(());
+        }
+        let value = Value::from_string_ref(agent.alloc_runtime_string(
+            "timed-out",
+            None,
+            lyng_js_gc::AllocationLifetime::Default,
+        ));
+        promise_ops::fulfill_promise(agent, promise, value).map_err(VmError::Abrupt)
     }
 
     fn execute_executable_job(

@@ -3992,6 +3992,274 @@ fn evaluate_script_resolves_promise_all_values_in_order() {
 }
 
 #[test]
+fn evaluate_script_promise_reaction_can_update_global_lexical_binding() {
+    let unit = compile_test_unit(
+        221,
+        r#"
+            let outcomes = [];
+            Promise.all([Promise.resolve(1), 2, Promise.resolve(3)])
+                .then(results => (outcomes = results), function() {});
+        "#,
+    );
+    let readback = compile_test_unit(222, "outcomes[2];");
+    let host = TestHost::new();
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let _ = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .unwrap();
+    vm.checkpoint_promise_jobs(agent, &host, &mut registry)
+        .expect("promise job should update top-level lexical binding");
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &readback, &host, &mut registry)
+        .expect("readback should load updated top-level lexical");
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn evaluate_script_promise_reaction_rebinding_is_visible_to_existing_closure() {
+    let unit = compile_test_unit(
+        223,
+        r#"
+            let outcomes = [];
+            let events = [];
+            function observe() {
+                events.push("observe:" + outcomes.length);
+            }
+            observe();
+            Promise.resolve([1]).then(results => {
+                events.push("then:" + results.length);
+                outcomes = results;
+            }, function() {});
+        "#,
+    );
+    let readback = compile_test_unit(
+        224,
+        r#"
+            observe();
+            events.join(",");
+        "#,
+    );
+    let host = TestHost::new();
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let _ = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .unwrap();
+    vm.checkpoint_promise_jobs(agent, &host, &mut registry)
+        .expect("promise job should update top-level lexical binding");
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &readback, &host, &mut registry)
+        .expect("readback should call existing closure");
+    let text = result
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("event trace should be a string");
+
+    assert_eq!(text, "observe:0,then:1,observe:1");
+}
+
+#[test]
+fn checkpoint_harness_callback_observes_rebound_lexical_from_promise_job() {
+    let unit = compile_test_unit(
+        225,
+        r#"
+            let outcomes = [];
+            let events = [];
+            function observe() {
+                events.push("observe:" + outcomes.length);
+            }
+            observe();
+            Promise.resolve([1]).then(results => {
+                events.push("then:" + results.length);
+                outcomes = results;
+            }, function() {});
+        "#,
+    );
+    let readback = compile_test_unit(226, "events.join(',');");
+    let host = TestHost::new();
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let _ = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .unwrap();
+
+    let observe_key = PropertyKey::from_atom(agent.atoms_mut().intern_collectible("observe"));
+    let observe = ordinary_get(agent, realm.global_object(), observe_key)
+        .unwrap()
+        .as_object_ref()
+        .expect("observe should be installed as a global function");
+    let reaction = agent.alloc_promise_reaction(PromiseReactionRecord::new(
+        PromiseReactionKind::Fulfill,
+        PromiseReactionHandler::Callable(observe),
+        None,
+    ));
+    let _ = agent.enqueue_job_with_payload(
+        HostJobKind::Harness,
+        ExecutableId::Builtin,
+        RuntimeJobPayload::PromiseReaction {
+            reaction,
+            argument: Value::undefined(),
+        },
+        Some(realm.id()),
+        Some("HarnessObserve".into()),
+    );
+
+    vm.checkpoint_promise_jobs(agent, &host, &mut registry)
+        .expect("promise and harness jobs should drain");
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &readback, &host, &mut registry)
+        .expect("readback should evaluate");
+    let text = result
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("event trace should be a string");
+
+    assert_eq!(text, "observe:0,then:1,observe:1");
+}
+
+#[test]
+fn evaluate_script_top_level_closures_share_rebound_lexical_binding() {
+    let unit = compile_test_unit(
+        223,
+        r#"
+            let outcomes = [];
+            let events = [];
+            function observe() {
+                events.push("observe:" + outcomes.length);
+            }
+            function update(results) {
+                events.push("update:" + results.length);
+                outcomes = results;
+            }
+            observe();
+            update([1]);
+            observe();
+            events.join(",");
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .expect("script should evaluate");
+
+    let text = result
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("event trace should be a string");
+    assert_eq!(text, "observe:0,update:1,observe:1");
+}
+
+#[test]
+fn evaluate_script_top_level_arrow_and_function_share_rebound_lexical_binding() {
+    let unit = compile_test_unit(
+        224,
+        r#"
+            let outcomes = [];
+            let events = [];
+            function observe() {
+                events.push("observe:" + outcomes.length);
+            }
+            const update = results => {
+                events.push("update:" + results.length);
+                outcomes = results;
+            };
+            observe();
+            update([1]);
+            observe();
+            events.join(",");
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .expect("script should evaluate");
+
+    let text = result
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("event trace should be a string");
+    assert_eq!(text, "observe:0,update:1,observe:1");
+}
+
+#[test]
+fn evaluate_script_named_function_expression_closure_observes_rebound_lexical_binding() {
+    let unit = compile_test_unit(
+        227,
+        r#"
+            let outcomes = [];
+            let events = [];
+            let saved;
+            (function observe() {
+                events.push("observe:" + outcomes.length);
+                saved = observe;
+            })();
+            Promise.resolve([1]).then(results => {
+                events.push("then:" + results.length);
+                outcomes = results;
+            }, function() {});
+        "#,
+    );
+    let readback = compile_test_unit(
+        228,
+        r#"
+            saved();
+            events.join(",");
+        "#,
+    );
+    let host = TestHost::new();
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    let _ = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .unwrap();
+    vm.checkpoint_promise_jobs(agent, &host, &mut registry)
+        .expect("promise job should update top-level lexical binding");
+
+    let result = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &readback, &host, &mut registry)
+        .expect("readback should call saved closure");
+    let text = result
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(decode_string)
+        .expect("event trace should be a string");
+    assert_eq!(text, "observe:0,then:1,observe:1");
+}
+
+#[test]
 fn evaluate_script_array_from_async_resolves_sync_iterable_values() {
     let unit = compile_test_unit(
         220,

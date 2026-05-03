@@ -206,6 +206,32 @@ fn phase6_atomics_integer_surface_loads_stores_and_updates_shared_typed_arrays()
 }
 
 #[test]
+fn phase6_atomics_store_returns_converted_value_before_storage_truncation() {
+    let result = run_spec_script(
+        r#"
+        let sab = new SharedArrayBuffer(32);
+        let i8 = new Int8Array(sab, 0, 8);
+        let u8 = new Uint8Array(sab, 8, 8);
+        let big = new BigUint64Array(sab, 16, 1);
+        let score = 0;
+
+        if (Atomics.store(i8, 0, 12345) === 12345) score += 1;
+        if (Atomics.load(i8, 0) === 57) score += 2;
+        if (Atomics.store(u8, 0, -1) === -1) score += 4;
+        if (Atomics.load(u8, 0) === 255) score += 8;
+
+        let huge = 18446744073709551617n;
+        if (Atomics.store(big, 0, huge) === huge) score += 16;
+        if (Atomics.load(big, 0) === 1n) score += 32;
+
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
 fn phase6_atomics_bigint_wait_and_timeout_paths_work_on_bigint64_arrays() {
     let result = run_spec_script(
         r#"
@@ -254,4 +280,91 @@ fn phase6_wait_async_notifies_pending_waiters_and_reports_immediate_states() {
     );
 
     assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
+fn phase6_wait_async_positive_timeout_settles_timeout_promise() {
+    let result = run_spec_script_with_readback(
+        r#"
+        let sab = new SharedArrayBuffer(8);
+        let i32 = new Int32Array(sab);
+        let result = Atomics.waitAsync(i32, 0, 0, 1);
+        globalThis.phase6WaitAsyncPositiveTimeoutScore = 0;
+        globalThis.phase6WaitAsyncPositiveTimeoutValue = "";
+        result.value.then(value => {
+            globalThis.phase6WaitAsyncPositiveTimeoutValue = value;
+        });
+        if (result.async === true) phase6WaitAsyncPositiveTimeoutScore += 1;
+        "#,
+        r#"
+        let score = phase6WaitAsyncPositiveTimeoutScore;
+        if (phase6WaitAsyncPositiveTimeoutValue === "timed-out") score += 2;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn phase6_wait_async_positive_timeout_can_be_notified_before_timeout() {
+    let result = run_spec_script_with_readback(
+        r#"
+        let sab = new SharedArrayBuffer(8);
+        let i32 = new Int32Array(sab);
+        let result = Atomics.waitAsync(i32, 0, 0, 1000);
+        globalThis.phase6WaitAsyncNotifyBeforeTimeoutScore = 0;
+        globalThis.phase6WaitAsyncNotifyBeforeTimeoutValue = "";
+        result.value.then(value => {
+            globalThis.phase6WaitAsyncNotifyBeforeTimeoutValue = value;
+        });
+        if (result.async === true) phase6WaitAsyncNotifyBeforeTimeoutScore += 1;
+        Atomics.add(i32, 0, 1);
+        if (Atomics.notify(i32, 0, 1) === 1) phase6WaitAsyncNotifyBeforeTimeoutScore += 2;
+        "#,
+        r#"
+        let score = phase6WaitAsyncNotifyBeforeTimeoutScore;
+        if (phase6WaitAsyncNotifyBeforeTimeoutValue === "ok") score += 4;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn phase6_wait_async_positive_timeout_coerces_timeout_objects() {
+    let result = run_spec_script_with_readback(
+        r#"
+        let sab = new SharedArrayBuffer(8);
+        let i32 = new Int32Array(sab);
+        const valueOf = {
+            valueOf() {
+                return true;
+            }
+        };
+        const toPrimitive = {
+            [Symbol.toPrimitive]() {
+                return true;
+            }
+        };
+        globalThis.phase6WaitAsyncTimeoutObjectValues = [];
+        Promise.all([
+            Atomics.waitAsync(i32, 0, 0, true).value,
+            Atomics.waitAsync(i32, 0, 0, valueOf).value,
+            Atomics.waitAsync(i32, 0, 0, toPrimitive).value,
+        ]).then(values => {
+            globalThis.phase6WaitAsyncTimeoutObjectValues = values;
+        });
+        "#,
+        r#"
+        let score = 0;
+        if (phase6WaitAsyncTimeoutObjectValues[0] === "timed-out") score += 1;
+        if (phase6WaitAsyncTimeoutObjectValues[1] === "timed-out") score += 2;
+        if (phase6WaitAsyncTimeoutObjectValues[2] === "timed-out") score += 4;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
 }

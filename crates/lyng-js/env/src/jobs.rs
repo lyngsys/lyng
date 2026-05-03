@@ -1,10 +1,12 @@
 use super::{ExecutableId, JobId, PromiseCapabilityId, PromiseReactionId, RuntimeDomainAccounting};
 use lyng_js_common::AtomId;
 use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
-use lyng_js_host::{HostJobId, HostJobKind};
+use lyng_js_host::{HostJobId, HostJobKind, WaitLocation};
 use lyng_js_types::{ObjectRef, RealmRef, Value};
 use std::collections::VecDeque;
 use std::mem::size_of;
+
+use crate::WaiterToken;
 
 /// Frozen queue families owned by one `Agent`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -49,6 +51,11 @@ pub enum RuntimeJobPayload {
         value: Value,
         rejected: bool,
         script_or_module_referrer: Option<AtomId>,
+    },
+    AtomicsWaitAsyncTimeout {
+        location: WaitLocation,
+        token: WaiterToken,
+        promise: ObjectRef,
     },
     FinalizationCleanup {
         registry: ObjectRef,
@@ -196,6 +203,7 @@ impl TraceHeapEdges for RuntimeJobPayload {
             }
             Self::DynamicImportEvaluate { .. } => {}
             Self::DynamicImportSettle { value, .. } => value.trace_heap_edges(tracer),
+            Self::AtomicsWaitAsyncTimeout { promise, .. } => promise.trace_heap_edges(tracer),
             Self::FinalizationCleanup { registry } => registry.trace_heap_edges(tracer),
         }
     }

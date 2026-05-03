@@ -368,7 +368,7 @@ impl<'a> CompilationState<'a> {
         let mut current = from;
 
         while current != owner {
-            if self.activation(current).needs_environment {
+            if self.function_allocates_environment(current) {
                 depth = depth
                     .checked_add(1)
                     .ok_or(LoweringError::InvalidCapturedBindingDepth {
@@ -392,7 +392,7 @@ impl<'a> CompilationState<'a> {
         let mut current = Some(from);
 
         while let Some(function) = current {
-            if self.activation(function).needs_environment {
+            if self.function_allocates_environment(function) {
                 depth = depth
                     .checked_add(1)
                     .ok_or(LoweringError::InvalidCapturedBindingDepth {
@@ -404,6 +404,14 @@ impl<'a> CompilationState<'a> {
         }
 
         Ok(depth)
+    }
+
+    pub(super) fn function_allocates_environment(&self, function: FunctionSemaId) -> bool {
+        self.activation(function).needs_environment
+            || self
+                .function_environment_bindings
+                .get(function.raw() as usize)
+                .is_some_and(|bindings| !bindings.is_empty())
     }
 
     pub(crate) fn runtime_slot_for_binding(

@@ -197,12 +197,290 @@ fn runner_exposes_eval_script_and_create_realm_through_external_embedding() {
         assert.sameValue(other.global === globalThis, false);
         assert.sameValue(other.evalScript("typeof $262"), "object");
         assert.sameValue(typeof $262.AbstractModuleSource, "function");
-        assert.sameValue("agent" in $262, false);
+        assert.sameValue(typeof $262.agent, "object");
+        assert.sameValue(typeof $262.agent.getReport, "function");
+        assert.sameValue(typeof $262.agent.sleep, "function");
+        assert.sameValue(typeof $262.agent.monotonicNow, "function");
         assert.sameValue("IsHTMLDDA" in $262, false);
         "#,
     );
 
     assert_skipped(&report, 0, 0);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_supports_single_agent_atomics_helper_surface() {
+    let root = make_temp_dir();
+    let entry_path = root.join("atomics-agent-helper.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r#"
+        /*---
+        includes: [atomicsHelper.js]
+        features: [Atomics, SharedArrayBuffer, TypedArray]
+        ---*/
+
+        let before = $262.agent.monotonicNow();
+        assert.sameValue($262.agent.sleep(1), undefined);
+        assert($262.agent.monotonicNow() >= before);
+        assert.sameValue(typeof setTimeout, "function");
+        assert.sameValue(typeof $262.agent.setTimeout, "function");
+        "#,
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_supports_single_agent_atomics_helper_set_timeout_callback() {
+    let root = make_temp_dir();
+    let entry_path = root.join("atomics-agent-helper-set-timeout.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r#"
+        /*---
+        flags: [async]
+        includes: [atomicsHelper.js]
+        features: [Atomics, SharedArrayBuffer, TypedArray, arrow-function]
+        ---*/
+
+        $262.agent.setTimeout(() => $DONE(), 0);
+        "#,
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_supports_single_agent_start_broadcast_and_reports() {
+    let root = make_temp_dir();
+    let entry_path = root.join("atomics-agent-helper-start-broadcast.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r#"
+        /*---
+        flags: [async]
+        includes: [atomicsHelper.js]
+        features: [Atomics, SharedArrayBuffer, TypedArray, arrow-function]
+        ---*/
+
+        const RUNNING = 1;
+        $262.agent.start(`
+          $262.agent.receiveBroadcast((sab) => {
+            const i32a = new Int32Array(sab);
+            Atomics.add(i32a, ${RUNNING}, 1);
+            $262.agent.report("started:" + Atomics.load(i32a, ${RUNNING}));
+            $262.agent.leaving();
+          });
+        `);
+
+        const i32a = new Int32Array(
+          new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 2)
+        );
+        $262.agent.safeBroadcastAsync(i32a, RUNNING, 1).then(async count => {
+          assert.sameValue(count, 1);
+          assert.sameValue(await $262.agent.getReportAsync(), "started:1");
+        }).then($DONE, $DONE);
+        "#,
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_reports_async_failure_from_single_agent_set_timeout_callback() {
+    let root = make_temp_dir();
+    let entry_path = root.join("atomics-agent-helper-set-timeout-failure.js");
+    let report_path = root.join("report.md");
+    fs::write(
+        &entry_path,
+        r#"
+        /*---
+        flags: [async]
+        includes: [atomicsHelper.js]
+        features: [Atomics, SharedArrayBuffer, TypedArray, arrow-function]
+        ---*/
+
+        $262.agent.setTimeout(() => $DONE("timer failure"), 0);
+        "#,
+    )
+    .expect("fixture should be written");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+        .args([
+            "--filter",
+            entry_path.to_str().expect("path should be utf-8"),
+            "--report",
+            report_path.to_str().expect("path should be utf-8"),
+            "--timeout-ms",
+            "1000",
+            "-j1",
+        ])
+        .output()
+        .expect("runner should execute");
+
+    assert!(
+        output.status.success(),
+        "runner exited with {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let report = fs::read_to_string(&report_path).expect("report should be written");
+    assert_failed(&report, 1, 2);
+    assert!(
+        report.contains("timer failure"),
+        "unexpected report:\n{report}"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_supports_single_agent_wait_async_timeout_promise_all_without_polling() {
+    let root = make_temp_dir();
+    let entry_path = root.join("atomics-wait-async-timeout-promise-all.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r#"
+        /*---
+        flags: [async]
+        includes: [atomicsHelper.js]
+        features: [Atomics.waitAsync, SharedArrayBuffer, TypedArray, Atomics, computed-property-names, Symbol, Symbol.toPrimitive, arrow-function]
+        ---*/
+
+        const i32a = new Int32Array(
+          new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 4)
+        );
+        const valueOf = {
+          valueOf() {
+            return true;
+          }
+        };
+        const toPrimitive = {
+          [Symbol.toPrimitive]() {
+            return true;
+          }
+        };
+        let outcomes = [];
+
+        Promise.all([
+          Atomics.waitAsync(i32a, 0, 0, true).value,
+          Atomics.waitAsync(i32a, 0, 0, valueOf).value,
+          Atomics.waitAsync(i32a, 0, 0, toPrimitive).value,
+        ]).then(results => {
+          outcomes = results;
+          assert.sameValue(outcomes[0], 'timed-out');
+          assert.sameValue(outcomes[1], 'timed-out');
+          assert.sameValue(outcomes[2], 'timed-out');
+          $DONE();
+        }, $DONE);
+        "#,
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_supports_single_agent_set_timeout_polling_promise_update() {
+    let root = make_temp_dir();
+    let entry_path = root.join("atomics-agent-helper-polling-promise.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r#"
+        /*---
+        flags: [async]
+        includes: [atomicsHelper.js]
+        features: [Atomics, SharedArrayBuffer, TypedArray, arrow-function]
+        ---*/
+
+        let outcomes = [];
+        let attempts = 0;
+
+        (function wait() {
+          if (outcomes.length) {
+            assert.sameValue(outcomes[0], 1);
+            $DONE();
+            return;
+          }
+          if (++attempts > 4) {
+            $DONE("promise update was not observed before repeated timer callbacks");
+            return;
+          }
+          $262.agent.setTimeout(wait, 0);
+        })();
+
+        Promise.resolve([1]).then(results => {
+          outcomes = results;
+        }, $DONE);
+        "#,
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_supports_single_agent_wait_async_timeout_with_atomics_helper() {
+    let root = make_temp_dir();
+    let entry_path = root.join("atomics-wait-async-timeout.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r#"
+        /*---
+        flags: [async]
+        includes: [atomicsHelper.js]
+        features: [Atomics.waitAsync, SharedArrayBuffer, TypedArray, Atomics, computed-property-names, Symbol, Symbol.toPrimitive, arrow-function]
+        ---*/
+
+        const i32a = new Int32Array(
+          new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 4)
+        );
+        const valueOf = {
+          valueOf() {
+            return true;
+          }
+        };
+        const toPrimitive = {
+          [Symbol.toPrimitive]() {
+            return true;
+          }
+        };
+        let outcomes = [];
+        let start = $262.agent.monotonicNow();
+
+        (function wait() {
+          if ($262.agent.monotonicNow() - start > 1000) {
+            $DONE("timed out waiting for Atomics.waitAsync Promise.all");
+            return;
+          }
+          if (outcomes.length) {
+            assert.sameValue(outcomes[0], 'timed-out');
+            assert.sameValue(outcomes[1], 'timed-out');
+            assert.sameValue(outcomes[2], 'timed-out');
+            $DONE();
+            return;
+          }
+
+          $262.agent.setTimeout(wait, 0);
+        })();
+
+        Promise.all([
+          Atomics.waitAsync(i32a, 0, 0, true).value,
+          Atomics.waitAsync(i32a, 0, 0, valueOf).value,
+          Atomics.waitAsync(i32a, 0, 0, toPrimitive).value,
+        ]).then(results => {
+          outcomes = results;
+        }, $DONE);
+        "#,
+    );
+
     let _ = fs::remove_dir_all(root);
 }
 

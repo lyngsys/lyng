@@ -23,14 +23,14 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Excluded files from selection | `96` |
 | Selected files | `53029` |
 | Runnable files | `49664` |
-| Passed files | `48906` |
-| Failed files | `758` |
+| Passed files | `49051` |
+| Failed files | `613` |
 | Panicked files | `0` |
 | Skipped files | `3365` |
-| Pass rate (selected files) | `92.23%` |
+| Pass rate (selected files) | `92.50%` |
 | Selected variant executions | `101854` |
 | Runnable variant executions | `95124` |
-| Time | `109.3s` |
+| Time | `111.6s` |
 
 ## Delta From Previous Report
 
@@ -40,11 +40,11 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Excluded files from selection | `96` | `96` | `+0` |
 | Selected files | `53029` | `53029` | `+0` |
 | Runnable files | `49664` | `49664` | `+0` |
-| Passed files | `48912` | `48906` | `-6` |
-| Failed files | `752` | `758` | `+6` |
+| Passed files | `48906` | `49051` | `+145` |
+| Failed files | `758` | `613` | `-145` |
 | Panicked files | `0` | `0` | `+0` |
 | Skipped files | `3365` | `3365` | `+0` |
-| Pass rate (selected files) | `92.24%` | `92.23%` | `-0.01pp` |
+| Pass rate (selected files) | `92.23%` | `92.50%` | `+0.27pp` |
 | Selected variant executions | `101854` | `101854` | `+0` |
 | Runnable variant executions | `95124` | `95124` | `+0` |
 
@@ -61,11 +61,11 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Category | Selected files | Runnable files | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `annexB` | `1086` | `1051` | `1043` | `8` | `35` | `0` | `96.04%` |
-| `built-ins` | `23388` | `23388` | `22890` | `498` | `0` | `0` | `97.87%` |
+| `built-ins` | `23388` | `23388` | `22983` | `405` | `0` | `0` | `98.27%` |
 | `harness` | `116` | `116` | `116` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `3323` | `0` | `0` | `0` | `3323` | `0` | `0.00%` |
-| `language` | `23632` | `23632` | `23577` | `55` | `0` | `0` | `99.77%` |
-| `staging` | `1484` | `1477` | `1280` | `197` | `7` | `0` | `86.25%` |
+| `language` | `23632` | `23632` | `23620` | `12` | `0` | `0` | `99.95%` |
+| `staging` | `1484` | `1477` | `1289` | `188` | `7` | `0` | `86.86%` |
 
 ## Variant Execution Breakdown
 
@@ -73,19 +73,19 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | --- | ---: |
 | Selected variant executions | `101854` |
 | Runnable variant executions | `95124` |
-| Passed variants | `93711` |
-| Failed variants | `1413` |
+| Passed variants | `93957` |
+| Failed variants | `1167` |
 | Panicked variants | `0` |
 | Skipped variants | `6730` |
 
 | Category | Selected variants | Runnable variants | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `annexB` | `1377` | `1307` | `1299` | `8` | `70` | `0` | `94.34%` |
-| `built-ins` | `46475` | `46475` | `45479` | `996` | `0` | `0` | `97.86%` |
+| `built-ins` | `46475` | `46475` | `45665` | `810` | `0` | `0` | `98.26%` |
 | `harness` | `232` | `232` | `232` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `6646` | `0` | `0` | `0` | `6646` | `0` | `0.00%` |
-| `language` | `44339` | `44339` | `44268` | `71` | `0` | `0` | `99.84%` |
-| `staging` | `2785` | `2771` | `2433` | `338` | `14` | `0` | `87.36%` |
+| `language` | `44339` | `44339` | `44315` | `24` | `0` | `0` | `99.95%` |
+| `staging` | `2785` | `2771` | `2446` | `325` | `14` | `0` | `87.83%` |
 
 ## Slowest Test Timings
 
@@ -95,86 +95,86 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Test file | Variants | Total time | Slowest variant |
 | --- | ---: | ---: | ---: |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `9.821s` | `5.021s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `9.796s` | `4.922s` |
-| `built-ins/RegExp/character-class-escape-non-whitespace.js` | `2` | `3.246s` | `1.626s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js` | `2` | `3.026s` | `1.515s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js` | `2` | `3.018s` | `1.510s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js` | `2` | `3.007s` | `1.511s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js` | `2` | `2.997s` | `1.510s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js` | `2` | `2.996s` | `1.503s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js` | `2` | `2.940s` | `1.520s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Miao.js` | `2` | `2.801s` | `1.459s` |
-| `built-ins/RegExp/property-escapes/generated/Uppercase.js` | `2` | `2.686s` | `1.344s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Modi.js` | `2` | `2.639s` | `1.347s` |
-| `built-ins/RegExp/property-escapes/generated/Variation_Selector.js` | `2` | `2.550s` | `1.295s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Egyptian_Hieroglyphs.js` | `2` | `2.529s` | `1.289s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Meroitic_Hieroglyphs.js` | `2` | `2.516s` | `1.266s` |
-| `built-ins/RegExp/property-escapes/generated/Sentence_Terminal.js` | `2` | `2.490s` | `1.269s` |
-| `built-ins/RegExp/property-escapes/generated/XID_Continue.js` | `2` | `2.490s` | `1.263s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Yi.js` | `2` | `2.485s` | `1.253s` |
-| `built-ins/RegExp/property-escapes/generated/White_Space.js` | `2` | `2.457s` | `1.263s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mongolian.js` | `2` | `2.456s` | `1.252s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mro.js` | `2` | `2.425s` | `1.223s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Meroitic_Cursive.js` | `2` | `2.423s` | `1.297s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Duployan.js` | `2` | `2.418s` | `1.216s` |
-| `built-ins/RegExp/property-escapes/generated/Soft_Dotted.js` | `2` | `2.398s` | `1.280s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Zanabazar_Square.js` | `2` | `2.388s` | `1.281s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `10.148s` | `5.110s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `9.961s` | `5.027s` |
+| `built-ins/RegExp/character-class-escape-non-whitespace.js` | `2` | `3.443s` | `1.842s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Gujarati.js` | `2` | `2.555s` | `1.292s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Greek.js` | `2` | `2.535s` | `1.317s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Grantha.js` | `2` | `2.528s` | `1.284s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Bopomofo.js` | `2` | `2.484s` | `1.290s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Gothic.js` | `2` | `2.476s` | `1.244s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Canadian_Aboriginal.js` | `2` | `2.472s` | `1.295s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Lowercase_Letter.js` | `2` | `2.469s` | `1.236s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Ahom.js` | `2` | `2.451s` | `1.233s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Chakma.js` | `2` | `2.450s` | `1.270s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Punctuation.js` | `2` | `2.446s` | `1.243s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Carian.js` | `2` | `2.444s` | `1.255s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js` | `2` | `2.438s` | `1.225s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Gunjala_Gondi.js` | `2` | `2.417s` | `1.260s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Cham.js` | `2` | `2.417s` | `1.215s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js` | `2` | `2.405s` | `1.204s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Adlam.js` | `2` | `2.396s` | `1.200s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Caucasian_Albanian.js` | `2` | `2.394s` | `1.253s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Gurmukhi.js` | `2` | `2.393s` | `1.224s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js` | `2` | `2.390s` | `1.213s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js` | `2` | `2.389s` | `1.209s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Letter.js` | `2` | `2.387s` | `1.229s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js` | `2` | `2.373s` | `1.194s` |
 
 ### Slowest Variants
 
 | Test variant | Outcome | Time |
 | --- | --- | ---: |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `5.021s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `4.922s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `4.874s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `4.800s` |
-| `built-ins/RegExp/character-class-escape-non-whitespace.js [non-strict]` | `pass` | `1.626s` |
-| `built-ins/RegExp/character-class-escape-non-whitespace.js [strict]` | `pass` | `1.620s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js [non-strict]` | `pass` | `1.520s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js [non-strict]` | `pass` | `1.515s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [non-strict]` | `pass` | `1.511s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js [strict]` | `pass` | `1.511s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [non-strict]` | `pass` | `1.510s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [non-strict]` | `pass` | `1.510s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [strict]` | `pass` | `1.508s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [non-strict]` | `pass` | `1.503s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [strict]` | `pass` | `1.496s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [strict]` | `pass` | `1.494s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [strict]` | `pass` | `1.487s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Miao.js [strict]` | `pass` | `1.459s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js [strict]` | `pass` | `1.419s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Modi.js [non-strict]` | `pass` | `1.347s` |
-| `built-ins/RegExp/property-escapes/generated/Uppercase.js [non-strict]` | `pass` | `1.344s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Miao.js [non-strict]` | `pass` | `1.343s` |
-| `built-ins/RegExp/property-escapes/generated/Uppercase.js [strict]` | `pass` | `1.341s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Meroitic_Cursive.js [non-strict]` | `pass` | `1.297s` |
-| `built-ins/RegExp/property-escapes/generated/Variation_Selector.js [non-strict]` | `pass` | `1.295s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Modi.js [strict]` | `pass` | `1.292s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Egyptian_Hieroglyphs.js [non-strict]` | `pass` | `1.289s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Zanabazar_Square.js [strict]` | `pass` | `1.281s` |
-| `built-ins/RegExp/property-escapes/generated/Soft_Dotted.js [non-strict]` | `pass` | `1.280s` |
-| `built-ins/RegExp/property-escapes/generated/Sentence_Terminal.js [non-strict]` | `pass` | `1.269s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Meroitic_Hieroglyphs.js [strict]` | `pass` | `1.266s` |
-| `built-ins/RegExp/property-escapes/generated/White_Space.js [non-strict]` | `pass` | `1.263s` |
-| `built-ins/RegExp/property-escapes/generated/XID_Continue.js [non-strict]` | `pass` | `1.263s` |
-| `built-ins/RegExp/property-escapes/generated/Variation_Selector.js [strict]` | `pass` | `1.255s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Yi.js [non-strict]` | `pass` | `1.253s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mongolian.js [non-strict]` | `pass` | `1.252s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Meroitic_Hieroglyphs.js [non-strict]` | `pass` | `1.250s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Egyptian_Hieroglyphs.js [strict]` | `pass` | `1.240s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Ethiopic.js [non-strict]` | `pass` | `1.235s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Yi.js [strict]` | `pass` | `1.233s` |
-| `built-ins/RegExp/property-escapes/generated/XID_Continue.js [strict]` | `pass` | `1.228s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mro.js [strict]` | `pass` | `1.223s` |
-| `built-ins/RegExp/property-escapes/generated/Sentence_Terminal.js [strict]` | `pass` | `1.221s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Duployan.js [non-strict]` | `pass` | `1.216s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mongolian.js [strict]` | `pass` | `1.204s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mro.js [non-strict]` | `pass` | `1.203s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Duployan.js [strict]` | `pass` | `1.201s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Elymaic.js [non-strict]` | `pass` | `1.198s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Khudawadi.js [strict]` | `pass` | `1.196s` |
-| `built-ins/RegExp/property-escapes/generated/White_Space.js [strict]` | `pass` | `1.194s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `5.110s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `5.038s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `5.027s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `4.934s` |
+| `built-ins/RegExp/character-class-escape-non-whitespace.js [non-strict]` | `pass` | `1.842s` |
+| `built-ins/RegExp/character-class-escape-non-whitespace.js [strict]` | `pass` | `1.601s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Greek.js [strict]` | `pass` | `1.317s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Canadian_Aboriginal.js [strict]` | `pass` | `1.295s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Gujarati.js [non-strict]` | `pass` | `1.292s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Bopomofo.js [strict]` | `pass` | `1.290s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Grantha.js [non-strict]` | `pass` | `1.284s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Chakma.js [non-strict]` | `pass` | `1.270s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Gujarati.js [strict]` | `pass` | `1.262s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Gunjala_Gondi.js [non-strict]` | `pass` | `1.260s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Carian.js [strict]` | `pass` | `1.255s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Caucasian_Albanian.js [strict]` | `pass` | `1.253s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Grantha.js [strict]` | `pass` | `1.244s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Gothic.js [non-strict]` | `pass` | `1.244s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Punctuation.js [strict]` | `pass` | `1.243s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Symbol.js [non-strict]` | `pass` | `1.242s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Lowercase_Letter.js [strict]` | `pass` | `1.236s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Lowercase_Letter.js [non-strict]` | `pass` | `1.233s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Ahom.js [strict]` | `pass` | `1.233s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Punctuation.js [non-strict]` | `pass` | `1.232s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Gothic.js [strict]` | `pass` | `1.232s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Letter.js [strict]` | `pass` | `1.229s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [non-strict]` | `pass` | `1.225s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Gurmukhi.js [non-strict]` | `pass` | `1.224s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Batak.js [strict]` | `pass` | `1.222s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Number.js [non-strict]` | `pass` | `1.221s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Greek.js [non-strict]` | `pass` | `1.218s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Bhaiksuki.js [strict]` | `pass` | `1.218s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Ahom.js [non-strict]` | `pass` | `1.218s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Number.js [non-strict]` | `pass` | `1.215s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Cham.js [strict]` | `pass` | `1.215s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [strict]` | `pass` | `1.213s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Elymaic.js [strict]` | `pass` | `1.213s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [strict]` | `pass` | `1.213s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Arabic.js [strict]` | `pass` | `1.213s` |
+| `built-ins/RegExp/property-escapes/generated/Changes_When_Casefolded.js [non-strict]` | `pass` | `1.213s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other.js [strict]` | `pass` | `1.211s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [non-strict]` | `pass` | `1.209s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [non-strict]` | `pass` | `1.204s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Punctuation.js [non-strict]` | `pass` | `1.203s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Cham.js [non-strict]` | `pass` | `1.202s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [strict]` | `pass` | `1.201s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Adlam.js [non-strict]` | `pass` | `1.200s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Bengali.js [non-strict]` | `pass` | `1.199s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Elbasan.js [non-strict]` | `pass` | `1.199s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Buhid.js [non-strict]` | `pass` | `1.198s` |
 
 ## Skip Breakdown
 
@@ -235,56 +235,56 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Cluster | Outcome | Count | Examples |
 | --- | --- | ---: | --- |
-| `built-ins/Atomics/wait` | `runtime error: TypeError` | `54` | `built-ins/Atomics/wait/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/good-views.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/good-views.js [strict]: runtime error: TypeError` |
-| `built-ins/Atomics/waitAsync` | `runtime error: TypeError` | `54` | `built-ins/Atomics/waitAsync/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/waitAsync/false-for-timeout-agent.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/waitAsync/good-views.js [non-strict]: runtime error: TypeError` |
-| `built-ins/Atomics/waitAsync/bigint` | `runtime error: TypeError` | `52` | `built-ins/Atomics/waitAsync/bigint/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/waitAsync/bigint/false-for-timeout-agent.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/waitAsync/bigint/nan-for-timeout-agent.js [strict]: runtime error: TypeError` |
-| `built-ins/Temporal/ZonedDateTime/prototype/with` | `runtime error: Test262Error` | `40` | `built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-invalid-string.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-wrong-type.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-wrong-type.js [strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/PlainDateTime/prototype/withPlainTime` | `runtime error: TypeError` | `36` | `built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-object-insufficient-data.js [non-strict]: runtime error: TypeError`<br>`built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-object-insufficient-data.js [strict]: runtime error: TypeError`<br>`built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-propertybag-optional-properties.js [strict]: runtime error: TypeError` |
+| `built-ins/Temporal/ZonedDateTime/prototype/with` | `runtime error: Test262Error` | `40` | `built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-invalid-string.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-invalid-string.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-wrong-type.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/PlainDateTime/prototype/withPlainTime` | `runtime error: TypeError` | `36` | `built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-object-insufficient-data.js [strict]: runtime error: TypeError`<br>`built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-propertybag-optional-properties.js [non-strict]: runtime error: TypeError`<br>`built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-propertybag-optional-properties.js [strict]: runtime error: TypeError` |
 | `built-ins/Temporal/ZonedDateTime/from` | `runtime error: Test262Error` | `36` | `built-ins/Temporal/ZonedDateTime/from/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/from/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/from/argument-string-minus-sign.js [strict]: runtime error: Test262Error` |
-| `built-ins/Atomics/wait/bigint` | `runtime error: TypeError` | `32` | `built-ins/Atomics/wait/bigint/false-for-timeout-agent.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/bigint/false-for-timeout-agent.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/bigint/nan-for-timeout.js [strict]: runtime error: TypeError` |
-| `built-ins/Temporal/PlainDateTime/prototype/since` | `runtime error: RangeError` | `32` | `built-ins/Temporal/PlainDateTime/prototype/since/leap-second.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/since/leap-second.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/since/round-cross-unit-boundary.js [non-strict]: runtime error: RangeError` |
-| `built-ins/Temporal/PlainDateTime/prototype/until` | `runtime error: RangeError` | `32` | `built-ins/Temporal/PlainDateTime/prototype/until/leap-second.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/until/leap-second.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/until/round-cross-unit-boundary.js [non-strict]: runtime error: RangeError` |
-| `built-ins/Atomics/notify` | `runtime error: TypeError` | `30` | `built-ins/Atomics/notify/count-defaults-to-infinity-missing.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/notify/count-defaults-to-infinity-undefined.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/notify/count-defaults-to-infinity-undefined.js [strict]: runtime error: TypeError` |
+| `built-ins/Temporal/PlainDateTime/prototype/since` | `runtime error: RangeError` | `32` | `built-ins/Temporal/PlainDateTime/prototype/since/leap-second.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/since/leap-second.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/since/round-cross-unit-boundary.js [strict]: runtime error: RangeError` |
+| `built-ins/Temporal/PlainDateTime/prototype/until` | `runtime error: RangeError` | `32` | `built-ins/Temporal/PlainDateTime/prototype/until/leap-second.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/until/leap-second.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/PlainDateTime/prototype/until/round-cross-unit-boundary.js [strict]: runtime error: RangeError` |
 | `built-ins/Temporal/ZonedDateTime/prototype/since` | `runtime error: RangeError` | `30` | `built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-default.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-default.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/round-cross-unit-boundary.js [strict]: runtime error: RangeError` |
 | `built-ins/Temporal/ZonedDateTime/prototype/until` | `runtime error: RangeError` | `30` | `built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-default.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-default.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/round-cross-unit-boundary.js [non-strict]: runtime error: RangeError` |
-| `built-ins/Temporal/PlainDateTime/prototype/withPlainTime` | `runtime error: Test262Error` | `28` | `built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-string-calendar-annotation-invalid-key.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-string-calendar-annotation-invalid-key.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-string-critical-unknown-annotation.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/PlainDateTime/prototype/withPlainTime` | `runtime error: Test262Error` | `28` | `built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-string-calendar-annotation-invalid-key.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-string-critical-unknown-annotation.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/withPlainTime/argument-string-critical-unknown-annotation.js [strict]: runtime error: Test262Error` |
 | `built-ins/Temporal/ZonedDateTime/prototype/since` | `runtime error: Test262Error` | `24` | `built-ins/Temporal/ZonedDateTime/prototype/since/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/since/argument-string-limits.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/RegExp` | `runtime error: Test262Error` | `24` | `staging/sm/RegExp/constructor-ordering-2.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/RegExp/constructor-ordering-2.js [strict]: runtime error: Test262Error`<br>`staging/sm/RegExp/constructor-regexp.js [strict]: runtime error: Test262Error` |
+| `staging/sm/RegExp` | `runtime error: Test262Error` | `24` | `staging/sm/RegExp/constructor-ordering-2.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/RegExp/constructor-ordering-2.js [strict]: runtime error: Test262Error`<br>`staging/sm/RegExp/constructor-regexp.js [non-strict]: runtime error: Test262Error` |
 | `built-ins/Temporal/Duration/prototype/total` | `runtime error: RangeError` | `22` | `built-ins/Temporal/Duration/prototype/total/balances-days-up-to-both-years-and-months.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/Duration/prototype/total/balances-days-up-to-both-years-and-months.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/Duration/prototype/total/incorrect-properties-ignored.js [non-strict]: runtime error: RangeError` |
-| `built-ins/Temporal/ZonedDateTime/prototype/until` | `runtime error: Test262Error` | `22` | `built-ins/Temporal/ZonedDateTime/prototype/until/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/argument-string-limits.js [non-strict]: runtime error: Test262Error` |
-| `language/expressions/super` | `runtime error: MissingEnvironment(EnvironmentRef(3))` | `22` | `language/expressions/super/call-spread-mult-obj-ident.js [non-strict]: runtime error: MissingEnvironment(EnvironmentRef(3))`<br>`language/expressions/super/call-spread-mult-obj-ident.js [strict]: runtime error: MissingEnvironment(EnvironmentRef(3))`<br>`language/expressions/super/call-spread-obj-getter-init.js [strict]: runtime error: MissingEnvironment(EnvironmentRef(3))` |
-| `built-ins/Map/groupBy` | `runtime error: TypeError` | `20` | `built-ins/Map/groupBy/callback-arg.js [strict]: runtime error: TypeError`<br>`built-ins/Map/groupBy/emptyList.js [non-strict]: runtime error: TypeError`<br>`built-ins/Map/groupBy/emptyList.js [strict]: runtime error: TypeError` |
-| `staging/sm/Function` | `runtime error: Test262Error` | `20` | `staging/sm/Function/arguments-parameter-shadowing.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Function/create-function-parse-before-getprototype.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Function/function-bind.js [non-strict]: runtime error: Test262Error` |
-| `built-ins/JSON/stringify` | `runtime error: Test262Error` | `18` | `built-ins/JSON/stringify/replacer-array-abrupt.js [non-strict]: runtime error: Test262Error`<br>`built-ins/JSON/stringify/replacer-array-abrupt.js [strict]: runtime error: Test262Error`<br>`built-ins/JSON/stringify/replacer-array-proxy-revoked.js [strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/Duration/prototype/total` | `runtime error: Test262Error` | `18` | `built-ins/Temporal/Duration/prototype/total/precision-exact-mathematical-values-1.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/Duration/prototype/total/precision-exact-mathematical-values-2.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/Duration/prototype/total/precision-exact-mathematical-values-5.js [strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/ZonedDateTime/prototype/until` | `runtime error: Test262Error` | `22` | `built-ins/Temporal/ZonedDateTime/prototype/until/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/until/argument-string-limits.js [strict]: runtime error: Test262Error` |
+| `language/expressions/super` | `runtime error: MissingEnvironment(EnvironmentRef(3))` | `22` | `language/expressions/super/call-spread-mult-obj-ident.js [non-strict]: runtime error: MissingEnvironment(EnvironmentRef(3))`<br>`language/expressions/super/call-spread-obj-getter-descriptor.js [strict]: runtime error: MissingEnvironment(EnvironmentRef(3))`<br>`language/expressions/super/call-spread-obj-getter-init.js [strict]: runtime error: MissingEnvironment(EnvironmentRef(3))` |
+| `staging/sm/Function` | `runtime error: Test262Error` | `21` | `staging/sm/Function/arguments-parameter-shadowing.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Function/constructor-binding.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Function/create-function-parse-before-getprototype.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Map/groupBy` | `runtime error: TypeError` | `20` | `built-ins/Map/groupBy/callback-arg.js [non-strict]: runtime error: TypeError`<br>`built-ins/Map/groupBy/callback-arg.js [strict]: runtime error: TypeError`<br>`built-ins/Map/groupBy/emptyList.js [non-strict]: runtime error: TypeError` |
+| `built-ins/JSON/stringify` | `runtime error: Test262Error` | `18` | `built-ins/JSON/stringify/replacer-array-abrupt.js [non-strict]: runtime error: Test262Error`<br>`built-ins/JSON/stringify/replacer-array-abrupt.js [strict]: runtime error: Test262Error`<br>`built-ins/JSON/stringify/replacer-array-proxy-revoked.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/Duration/prototype/total` | `runtime error: Test262Error` | `18` | `built-ins/Temporal/Duration/prototype/total/precision-exact-mathematical-values-1.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/Duration/prototype/total/precision-exact-mathematical-values-1.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/Duration/prototype/total/precision-exact-mathematical-values-2.js [non-strict]: runtime error: Test262Error` |
 | `built-ins/Temporal/PlainDate/prototype/since` | `runtime error: Test262Error` | `18` | `built-ins/Temporal/PlainDate/prototype/since/basic-arithmetic.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDate/prototype/since/basic-arithmetic.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDate/prototype/since/largestunit-higher-units.js [non-strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/PlainDateTime/prototype/until` | `runtime error: Test262Error` | `18` | `built-ins/Temporal/PlainDateTime/prototype/until/argument-string-limits.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/until/argument-string-limits.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/until/basic.js [strict]: runtime error: Test262Error` |
-| `built-ins/RegExp/regexp-modifiers` | `runtime error: Test262Error` | `16` | `built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-backreferences.js [non-strict]: runtime error: Test262Error`<br>`built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-backreferences.js [strict]: runtime error: Test262Error`<br>`built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-lower-p.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/PlainDateTime/prototype/until` | `runtime error: Test262Error` | `18` | `built-ins/Temporal/PlainDateTime/prototype/until/argument-string-limits.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/until/argument-string-limits.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/until/balance.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/RegExp/regexp-modifiers` | `runtime error: Test262Error` | `16` | `built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-backreferences.js [non-strict]: runtime error: Test262Error`<br>`built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-lower-p.js [non-strict]: runtime error: Test262Error`<br>`built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-slash-lower-p.js [strict]: runtime error: Test262Error` |
 | `built-ins/Temporal/PlainDateTime/prototype/since` | `runtime error: Test262Error` | `16` | `built-ins/Temporal/PlainDateTime/prototype/since/argument-string-limits.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/since/argument-string-limits.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/since/basic.js [non-strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/PlainDate/prototype/until` | `runtime error: Test262Error` | `14` | `built-ins/Temporal/PlainDate/prototype/until/options-read-before-algorithmic-validation.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDate/prototype/until/options-read-before-algorithmic-validation.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDate/prototype/until/round-cross-unit-boundary.js [non-strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/ZonedDateTime/prototype/add` | `runtime error: Test262Error` | `14` | `built-ins/Temporal/ZonedDateTime/prototype/add/math-order-of-operations-add-reject.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/add/options-wrong-type.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/add/options-wrong-type.js [strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/PlainDate/prototype/until` | `runtime error: Test262Error` | `14` | `built-ins/Temporal/PlainDate/prototype/until/options-read-before-algorithmic-validation.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDate/prototype/until/options-read-before-algorithmic-validation.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDate/prototype/until/order-of-operations.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/ZonedDateTime/prototype/add` | `runtime error: Test262Error` | `14` | `built-ins/Temporal/ZonedDateTime/prototype/add/math-order-of-operations-add-reject.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/add/math-order-of-operations-add-reject.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/add/options-wrong-type.js [strict]: runtime error: Test262Error` |
 | `built-ins/Temporal/ZonedDateTime/prototype/subtract` | `runtime error: Test262Error` | `14` | `built-ins/Temporal/ZonedDateTime/prototype/subtract/math-order-of-operations-subtract-reject.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/subtract/math-order-of-operations-subtract-reject.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/subtract/options-wrong-type.js [non-strict]: runtime error: Test262Error` |
 | `staging/sm/strict` | `runtime error: Test262Error` | `14` | `staging/sm/strict/10.4.2.js [strict]: runtime error: Test262Error`<br>`staging/sm/strict/10.6.js [strict]: runtime error: Test262Error`<br>`staging/sm/strict/12.10.1.js [strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/PlainYearMonth/prototype/since` | `runtime error: Test262Error` | `12` | `built-ins/Temporal/PlainYearMonth/prototype/since/argument-string-limits.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainYearMonth/prototype/since/argument-string-limits.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainYearMonth/prototype/since/options-read-before-algorithmic-validation.js [strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/PlainYearMonth/prototype/since` | `runtime error: Test262Error` | `12` | `built-ins/Temporal/PlainYearMonth/prototype/since/argument-string-limits.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainYearMonth/prototype/since/argument-string-limits.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainYearMonth/prototype/since/options-read-before-algorithmic-validation.js [non-strict]: runtime error: Test262Error` |
 | `built-ins/Temporal/PlainYearMonth/prototype/until` | `runtime error: Test262Error` | `12` | `built-ins/Temporal/PlainYearMonth/prototype/until/argument-string-limits.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainYearMonth/prototype/until/argument-string-limits.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainYearMonth/prototype/until/options-read-before-algorithmic-validation.js [strict]: runtime error: Test262Error` |
-| `staging/sm/Date` | `timeout after 1.0s` | `9` | `staging/sm/Date/dst-offset-caching-2-of-8.js [strict]: timeout after 1.0s`<br>`staging/sm/Date/dst-offset-caching-3-of-8.js [strict]: timeout after 1.0s`<br>`staging/sm/Date/dst-offset-caching-4-of-8.js [strict]: timeout after 1.0s` |
+| `built-ins/Atomics/notify` | `runtime error: TypeError` | `10` | `built-ins/Atomics/notify/count-defaults-to-infinity-missing.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/notify/count-defaults-to-infinity-missing.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/notify/count-defaults-to-infinity-undefined.js [non-strict]: runtime error: TypeError` |
 | `staging/sm/class` | `runtime error: Test262Error` | `9` | `staging/sm/class/boundFunctionSubclassing.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/class/boundFunctionSubclassing.js [strict]: runtime error: Test262Error`<br>`staging/sm/class/fields-instance-class-name-binding-eval.js [non-strict]: runtime error: Test262Error` |
 | `annexB/language/function-code` | `runtime error: Test262Error` | `8` | `annexB/language/function-code/block-decl-func-skip-param.js [non-strict]: runtime error: Test262Error`<br>`annexB/language/function-code/if-decl-else-decl-a-func-skip-param.js [non-strict]: runtime error: Test262Error`<br>`annexB/language/function-code/if-decl-else-decl-b-func-skip-param.js [non-strict]: runtime error: Test262Error` |
 | `built-ins/AsyncFromSyncIteratorPrototype/next` | `Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«0», «1») to be true` | `8` | `built-ins/AsyncFromSyncIteratorPrototype/next/for-await-iterator-next-rejected-promise-close.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«0», «1») to be true`<br>`built-ins/AsyncFromSyncIteratorPrototype/next/for-await-iterator-next-rejected-promise-close.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«0», «1») to be true`<br>`built-ins/AsyncFromSyncIteratorPrototype/next/for-await-next-rejected-promise-close.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«0», «1») to be true` |
-| `built-ins/Promise/prototype/finally` | `Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«4», «5») to be true` | `8` | `built-ins/Promise/prototype/finally/rejected-observable-then-calls-PromiseResolve.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«4», «5») to be true`<br>`built-ins/Promise/prototype/finally/rejected-observable-then-calls-PromiseResolve.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«4», «5») to be true`<br>`built-ins/Promise/prototype/finally/rejected-observable-then-calls.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«4», «5») to be true` |
+| `built-ins/Atomics/wait` | `runtime error: TypeError` | `8` | `built-ins/Atomics/wait/nan-for-timeout.js [non-strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/nan-for-timeout.js [strict]: runtime error: TypeError`<br>`built-ins/Atomics/wait/undefined-for-timeout.js [non-strict]: runtime error: TypeError` |
+| `built-ins/Promise/prototype/finally` | `Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«4», «5») to be true` | `8` | `built-ins/Promise/prototype/finally/rejected-observable-then-calls-PromiseResolve.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«4», «5») to be true`<br>`built-ins/Promise/prototype/finally/rejected-observable-then-calls.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«4», «5») to be true`<br>`built-ins/Promise/prototype/finally/rejected-observable-then-calls.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«4», «5») to be true` |
 | `built-ins/Temporal/PlainDateTime/prototype/with` | `runtime error: Test262Error` | `8` | `built-ins/Temporal/PlainDateTime/prototype/with/calendar-temporal-object-throws.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/with/calendar-temporal-object-throws.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/PlainDateTime/prototype/with/options-wrong-type.js [non-strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/ZonedDateTime/compare` | `runtime error: Test262Error` | `8` | `built-ins/Temporal/ZonedDateTime/compare/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/compare/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/compare/argument-string-limits.js [non-strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/ZonedDateTime/from` | `runtime error: RangeError` | `8` | `built-ins/Temporal/ZonedDateTime/from/offset-overrides-critical-flag.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/from/offset-overrides-critical-flag.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/from/overflow-undefined.js [non-strict]: runtime error: RangeError` |
-| `built-ins/Temporal/ZonedDateTime/prototype/equals` | `runtime error: Test262Error` | `8` | `built-ins/Temporal/ZonedDateTime/prototype/equals/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/equals/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/equals/argument-string-minus-sign.js [non-strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/ZonedDateTime/prototype/round` | `runtime error: Test262Error` | `8` | `built-ins/Temporal/ZonedDateTime/prototype/round/day-rounding-out-of-range.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/round/day-rounding-out-of-range.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/round/get-start-of-day-throws.js [strict]: runtime error: Test262Error` |
-| `built-ins/Temporal/ZonedDateTime/prototype/with` | `runtime error: RangeError` | `8` | `built-ins/Temporal/ZonedDateTime/prototype/with/constrain-day.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/constrain-day.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/options-undefined.js [non-strict]: runtime error: RangeError` |
+| `built-ins/Temporal/ZonedDateTime/compare` | `runtime error: Test262Error` | `8` | `built-ins/Temporal/ZonedDateTime/compare/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/compare/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/compare/argument-string-minus-sign.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/ZonedDateTime/from` | `runtime error: RangeError` | `8` | `built-ins/Temporal/ZonedDateTime/from/offset-overrides-critical-flag.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/from/offset-overrides-critical-flag.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/from/overflow-undefined.js [strict]: runtime error: RangeError` |
+| `built-ins/Temporal/ZonedDateTime/prototype/equals` | `runtime error: Test262Error` | `8` | `built-ins/Temporal/ZonedDateTime/prototype/equals/argument-propertybag-offset-not-agreeing-with-timezone.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/equals/argument-propertybag-offset-not-agreeing-with-timezone.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/equals/argument-string-limits.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/ZonedDateTime/prototype/round` | `runtime error: Test262Error` | `8` | `built-ins/Temporal/ZonedDateTime/prototype/round/day-rounding-out-of-range.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/round/day-rounding-out-of-range.js [strict]: runtime error: Test262Error`<br>`built-ins/Temporal/ZonedDateTime/prototype/round/get-start-of-day-throws.js [non-strict]: runtime error: Test262Error` |
+| `built-ins/Temporal/ZonedDateTime/prototype/with` | `runtime error: RangeError` | `8` | `built-ins/Temporal/ZonedDateTime/prototype/with/constrain-day.js [non-strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/constrain-day.js [strict]: runtime error: RangeError`<br>`built-ins/Temporal/ZonedDateTime/prototype/with/options-undefined.js [strict]: runtime error: RangeError` |
 | `staging/sm/Array` | `runtime error: Test262Error` | `8` | `staging/sm/Array/change-array-by-copy-errors-from-correct-realm.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Array/change-array-by-copy-errors-from-correct-realm.js [strict]: runtime error: Test262Error`<br>`staging/sm/Array/from-iterator-close.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/Iterator/from` | `runtime error: Test262Error` | `8` | `staging/sm/Iterator/from/modify-return.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Iterator/from/modify-return.js [strict]: runtime error: Test262Error`<br>`staging/sm/Iterator/from/proxy-not-wrapped.js [strict]: runtime error: Test262Error` |
+| `staging/sm/Iterator/from` | `runtime error: Test262Error` | `8` | `staging/sm/Iterator/from/modify-return.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Iterator/from/modify-return.js [strict]: runtime error: Test262Error`<br>`staging/sm/Iterator/from/proxy-not-wrapped.js [non-strict]: runtime error: Test262Error` |
 | `staging/sm/Iterator/prototype` | `runtime error: Test262Error` | `8` | `staging/sm/Iterator/prototype/lazy-methods-iterator-not-closed-on-next-throws.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Iterator/prototype/lazy-methods-iterator-not-closed-on-next-throws.js [strict]: runtime error: Test262Error`<br>`staging/sm/Iterator/prototype/lazy-methods-iterator-not-closed-on-value-throws.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/String` | `runtime error: Test262Error` | `8` | `staging/sm/String/normalize-generic.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/String/normalize-generic.js [strict]: runtime error: Test262Error`<br>`staging/sm/String/normalize-rope.js [strict]: runtime error: Test262Error` |
-| `staging/sm/TypedArray` | `runtime error: Test262Error` | `8` | `staging/sm/TypedArray/constructor-buffer-sequence.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/TypedArray/constructor-buffer-sequence.js [strict]: runtime error: Test262Error`<br>`staging/sm/TypedArray/from_errors.js [strict]: runtime error: Test262Error` |
-| `staging/sm/class` | `runtime error: SyntaxError` | `8` | `staging/sm/class/derivedConstructorArrowEvalNestedSuperCall.js [non-strict]: runtime error: SyntaxError`<br>`staging/sm/class/derivedConstructorArrowEvalNestedSuperCall.js [strict]: runtime error: SyntaxError`<br>`staging/sm/class/derivedConstructorArrowEvalSuperCall.js [strict]: runtime error: SyntaxError` |
-| `staging/sm/expressions` | `runtime error: ReferenceError` | `8` | `staging/sm/expressions/destructuring-array-default-call.js [non-strict]: runtime error: ReferenceError`<br>`staging/sm/expressions/destructuring-array-default-call.js [strict]: runtime error: ReferenceError`<br>`staging/sm/expressions/destructuring-array-default-function-nested.js [strict]: runtime error: ReferenceError` |
+| `staging/sm/String` | `runtime error: Test262Error` | `8` | `staging/sm/String/normalize-generic.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/String/normalize-generic.js [strict]: runtime error: Test262Error`<br>`staging/sm/String/normalize-rope.js [non-strict]: runtime error: Test262Error` |
+| `staging/sm/TypedArray` | `runtime error: Test262Error` | `8` | `staging/sm/TypedArray/constructor-buffer-sequence.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/TypedArray/constructor-buffer-sequence.js [strict]: runtime error: Test262Error`<br>`staging/sm/TypedArray/from_errors.js [non-strict]: runtime error: Test262Error` |
+| `staging/sm/class` | `runtime error: SyntaxError` | `8` | `staging/sm/class/derivedConstructorArrowEvalNestedSuperCall.js [non-strict]: runtime error: SyntaxError`<br>`staging/sm/class/derivedConstructorArrowEvalNestedSuperCall.js [strict]: runtime error: SyntaxError`<br>`staging/sm/class/derivedConstructorArrowEvalSuperCall.js [non-strict]: runtime error: SyntaxError` |
+| `staging/sm/expressions` | `runtime error: ReferenceError` | `8` | `staging/sm/expressions/destructuring-array-default-call.js [non-strict]: runtime error: ReferenceError`<br>`staging/sm/expressions/destructuring-array-default-call.js [strict]: runtime error: ReferenceError`<br>`staging/sm/expressions/destructuring-array-default-function.js [strict]: runtime error: ReferenceError` |
+| `built-ins/AsyncIteratorPrototype/Symbol.asyncDispose` | `Test262:AsyncTestFailure:Test262Error: Test262Error: Promise should be rejected Expected a CatchError to be thrown asynchronously but the function threw synchronously` | `6` | `built-ins/AsyncIteratorPrototype/Symbol.asyncDispose/throw-rejected-return.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Promise should be rejected Expected a CatchError to be thrown asynchronously but the function threw synchronously`<br>`built-ins/AsyncIteratorPrototype/Symbol.asyncDispose/throw-return-getter.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Promise should be rejected Expected a CatchError to be thrown asynchronously but the function threw synchronously`<br>`built-ins/AsyncIteratorPrototype/Symbol.asyncDispose/throw-return.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Promise should be rejected Expected a CatchError to be thrown asynchronously but the function threw synchronously` |
+| `built-ins/AsyncIteratorPrototype/Symbol.asyncDispose` | `runtime error: TypeError` | `6` | `built-ins/AsyncIteratorPrototype/Symbol.asyncDispose/length.js [non-strict]: runtime error: TypeError`<br>`built-ins/AsyncIteratorPrototype/Symbol.asyncDispose/length.js [strict]: runtime error: TypeError`<br>`built-ins/AsyncIteratorPrototype/Symbol.asyncDispose/name.js [non-strict]: runtime error: TypeError` |
+| `built-ins/Atomics/notify` | `runtime error: Test262Error` | `6` | `built-ins/Atomics/notify/notify-one.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Atomics/notify/notify-one.js [strict]: runtime error: Test262Error`<br>`built-ins/Atomics/notify/notify-renotify-noop.js [strict]: runtime error: Test262Error` |
+| `built-ins/Atomics/wait` | `runtime error: Test262Error` | `6` | `built-ins/Atomics/wait/cannot-suspend-throws.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Atomics/wait/cannot-suspend-throws.js [strict]: runtime error: Test262Error`<br>`built-ins/Atomics/wait/undefined-index-defaults-to-zero.js [strict]: runtime error: Test262Error` |
 
 ## Notes
 

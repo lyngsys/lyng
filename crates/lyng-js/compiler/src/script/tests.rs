@@ -545,6 +545,56 @@ fn compile_script_places_dead_eval_branch_after_jump_in_function_expression() {
 }
 
 #[test]
+fn compile_script_named_function_expression_self_binding_allocates_own_environment() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(33),
+        r#"
+            let outcomes = [];
+            let saved;
+            (function observe() {
+                saved = observe;
+                return outcomes.length;
+            })();
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function_expr = unit
+        .functions()
+        .iter()
+        .find(|function| {
+            function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Function
+                && function.name() == Some(atoms.intern("observe"))
+        })
+        .expect("named function expression should be lowered");
+
+    assert!(function_expr.needs_environment());
+    assert_eq!(function_expr.environment_slot_count(), 1);
+    assert_eq!(
+        function_expr.environment_bindings()[0].name(),
+        Some(atoms.intern("observe"))
+    );
+    assert!(function_expr
+        .instructions()
+        .iter()
+        .any(|instruction| matches!(
+            instruction,
+            lyng_js_bytecode::Instruction::Abx {
+                opcode: Opcode::StoreEnvSlot,
+                bx: 0,
+                ..
+            }
+        )));
+    let text = lyng_js_bytecode::disassemble(function_expr);
+    assert!(text.contains("LoadEnvSlot") && text.contains("depth=1, slot=0"));
+}
+
+#[test]
 fn compile_script_does_not_poison_root_scope_from_nested_function_eval() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(

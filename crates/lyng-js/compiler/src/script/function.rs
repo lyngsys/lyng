@@ -203,12 +203,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         builder.set_this_mode(this_mode);
         builder.set_arguments_mode(activation.arguments_mode);
         builder.set_parameter_counts(parameter_count, minimum_argument_count);
+        let environment_bindings = state.function_environment_bindings(sema_id).to_vec();
         builder.set_needs_environment(
             activation.needs_environment
                 || derived_class_constructor
-                || class_constructor_needs_environment,
+                || class_constructor_needs_environment
+                || !environment_bindings.is_empty(),
         );
-        builder.set_environment_bindings(state.function_environment_bindings(sema_id).to_vec());
+        builder.set_environment_bindings(environment_bindings);
         builder.set_has_rest_parameter(activation.has_rest_parameter);
         builder.set_source_span(
             class_metadata

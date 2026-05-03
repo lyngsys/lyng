@@ -46,6 +46,60 @@ function decimalToPercentHexString(n) {
 const ASYNC_DONE_GLOBAL_BRIDGE_SOURCE: &str = r#"
 globalThis.$DONE = $DONE;
 "#;
+const SINGLE_PROCESS_AGENT_ADAPTER_SOURCE: &str = r#"
+(function() {
+  var reports = [];
+  var workers = [];
+  var activeWorker = null;
+
+  $262.agent.start = function(source) {
+    var worker = { callback: null };
+    var previous = activeWorker;
+    workers.push(worker);
+    activeWorker = worker;
+    try {
+      Function(String(source))();
+    } finally {
+      activeWorker = previous;
+    }
+  };
+
+  $262.agent.receiveBroadcast = function(callback) {
+    if (activeWorker === null) {
+      throw new Test262Error("$262.agent.receiveBroadcast called outside $262.agent.start");
+    }
+    activeWorker.callback = callback;
+  };
+
+  $262.agent.broadcast = function(sab) {
+    for (var i = 0; i < workers.length; i += 1) {
+      if (workers[i].callback !== null) {
+        workers[i].callback(sab);
+      }
+    }
+  };
+
+  $262.agent.report = function(value) {
+    reports.push(String(value));
+  };
+
+  $262.agent.getReport = function() {
+    if (reports.length === 0) {
+      return null;
+    }
+    return reports.shift();
+  };
+
+  $262.agent.leaving = function() {};
+}());
+"#;
+const SINGLE_PROCESS_AGENT_TIMEOUTS_SOURCE: &str = r#"
+// The single-process harness drives async wait timeouts as queued jobs instead
+// of sleeping wall-clock threads. Keep the short harness timeout deterministic
+// so no-spurious-wakeup tests do not burn real time.
+$262.agent.timeouts.yield = 0;
+$262.agent.timeouts.small = 0;
+"#;
 const DATE_DST_OFFSET_FRESH_OBJECT_SOURCE: &str = r#"  function tzOffsetFromUnixTimestamp(timestamp)
   {
     var d = new Date(NaN);
@@ -240,6 +294,21 @@ fn read_helper_file(harness_root: &Path, name: &str) -> Result<String, String> {
 
 fn adapt_helper_source(name: &str, source: String) -> String {
     match name {
+        "atomicsHelper.js" => {
+            let mut adapted = String::with_capacity(
+                SINGLE_PROCESS_AGENT_ADAPTER_SOURCE.len()
+                    + 1
+                    + source.len()
+                    + 1
+                    + SINGLE_PROCESS_AGENT_TIMEOUTS_SOURCE.len(),
+            );
+            adapted.push_str(SINGLE_PROCESS_AGENT_ADAPTER_SOURCE);
+            adapted.push('\n');
+            adapted.push_str(&source);
+            adapted.push('\n');
+            adapted.push_str(SINGLE_PROCESS_AGENT_TIMEOUTS_SOURCE);
+            adapted
+        }
         "decimalToHexString.js" => DECIMAL_TO_HEX_STRING_ADAPTER_SOURCE.to_string(),
         "sm/non262-Date-shell.js" => source
             .replace(
