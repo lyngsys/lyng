@@ -240,6 +240,47 @@ var TemporalHelpers = {};
     assert.compareArray(actual, expected, (message || "checkPlainDateTimeConversionFastPath") + ": property getters not called");
   };
 
+  TemporalHelpers.checkToTemporalPlainDateTimeFastPath = function (func) {
+    var actual = [];
+    var expected = [];
+    var date = new Temporal.PlainDate(2000, 5, 2, "iso8601");
+    var dateProperties = ["year", "month", "monthCode", "day"];
+    for (var i = 0; i < dateProperties.length; i++) {
+      var dateProperty = dateProperties[i];
+      var datePrototypeDescr = Object.getOwnPropertyDescriptor(Temporal.PlainDate.prototype, dateProperty);
+      Object.defineProperty(date, dateProperty, {
+        get: (function (propertyName, descriptor) {
+          return function () {
+            var value;
+            actual.push("get " + formatPropertyName(propertyName));
+            value = descriptor.get.call(this);
+            return TemporalHelpers.toPrimitiveObserver(actual, value, propertyName);
+          };
+        }(dateProperty, datePrototypeDescr))
+      });
+    }
+    var timeProperties = ["hour", "minute", "second", "millisecond", "microsecond", "nanosecond"];
+    for (var j = 0; j < timeProperties.length; j++) {
+      var timeProperty = timeProperties[j];
+      Object.defineProperty(date, timeProperty, {
+        get: (function (propertyName) {
+          return function () {
+            actual.push("get " + formatPropertyName(propertyName));
+            return undefined;
+          };
+        }(timeProperty))
+      });
+    }
+    Object.defineProperty(date, "calendar", {
+      get: function () {
+        actual.push("get calendar");
+        return "iso8601";
+      }
+    });
+    func(date);
+    assert.compareArray(actual, expected, "property getters not called");
+  };
+
   TemporalHelpers.checkSubclassingIgnored = function (construct, constructArgs, method, methodArgs, resultAssertions) {
     function constructInstance(C) {
       switch (constructArgs.length) {

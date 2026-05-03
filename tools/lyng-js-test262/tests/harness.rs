@@ -735,6 +735,56 @@ fn runner_temporal_helper_formats_well_known_symbol_property_names() {
 }
 
 #[test]
+fn runner_temporal_helper_exposes_plain_date_time_fast_path_check() {
+    let root = make_temp_dir();
+    let entry_path = root.join("temporal-plain-date-time-fast-path.js");
+
+    let _report = run_passing_test(
+        &entry_path,
+        r#"
+        /*---
+        includes: [temporalHelpers.js, compareArray.js]
+        ---*/
+        let called = false;
+        TemporalHelpers.checkToTemporalPlainDateTimeFastPath((date) => {
+          called = true;
+          assert(date instanceof Temporal.PlainDate);
+          assert.sameValue(date.toString(), "2000-05-02");
+        });
+        assert.sameValue(called, true);
+        "#,
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_temporal_helper_plain_date_time_fast_path_check_catches_getter_reads() {
+    let root = make_temp_dir();
+    let entry_path = root.join("temporal-plain-date-time-fast-path-getter-read.js");
+
+    let report = run_single_test(
+        &entry_path,
+        r#"
+        /*---
+        includes: [temporalHelpers.js, compareArray.js]
+        ---*/
+        TemporalHelpers.checkToTemporalPlainDateTimeFastPath((date) => {
+          date.year;
+        });
+        "#,
+    );
+
+    assert_passed(&report, 0, 0);
+    assert_failed(&report, 1, 2);
+    assert!(
+        report.contains("runtime error: Test262Error"),
+        "unexpected report:\n{report}"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn runner_temporal_helper_exposes_plain_year_month_string_lists() {
     let root = make_temp_dir();
     let entry_path = root.join("temporal-plain-year-month-string-lists.js");
