@@ -724,6 +724,9 @@ pub(super) fn temporal_plain_date_time_for_string_precision<Cx: PublicBuiltinDis
             .ok_or_else(|| range_error(cx))?
         }
     };
+    if !temporal_plain_date_time_is_within_limits(data.calendar(), total_nanoseconds) {
+        return Err(range_error(cx));
+    }
     temporal_plain_date_time_from_total_nanoseconds(cx, total_nanoseconds)
 }
 
@@ -815,48 +818,78 @@ pub(super) fn temporal_plain_date_time_with_builtin<Cx: PublicBuiltinDispatchCon
         .unwrap_or(Value::undefined())
         .as_object_ref()
         .ok_or_else(|| type_error(cx))?;
+    {
+        let temporal = {
+            let agent = cx.agent();
+            agent.objects().temporal_object(object_ref).copied()
+        };
+        if temporal.is_some() {
+            return Err(type_error(cx));
+        }
+    }
     temporal_reject_calendar_or_time_zone_properties(cx, object_ref)?;
-    let overflow = temporal_overflow_from_options(
-        cx,
-        invocation
-            .arguments()
-            .get(1)
-            .copied()
-            .unwrap_or(Value::undefined()),
-    )?;
+    let day_value = temporal_optional_integer_part_from_property(cx, object_ref, "day")?;
+    let day = day_value.unwrap_or(i64::from(date_time.day()));
+    let hour_value = temporal_optional_time_part_from_property(cx, object_ref, "hour")?;
+    let hour = hour_value.unwrap_or(i64::from(date_time.hour()));
+    let microsecond_value =
+        temporal_optional_time_part_from_property(cx, object_ref, "microsecond")?;
+    let microsecond = microsecond_value.unwrap_or(i64::from(date_time.microsecond()));
+    let millisecond_value =
+        temporal_optional_time_part_from_property(cx, object_ref, "millisecond")?;
+    let millisecond = millisecond_value.unwrap_or(i64::from(date_time.millisecond()));
+    let minute_value = temporal_optional_time_part_from_property(cx, object_ref, "minute")?;
+    let minute = minute_value.unwrap_or(i64::from(date_time.minute()));
+    let month_value = temporal_optional_integer_part_from_property(cx, object_ref, "month")?;
+    let month_code_value = temporal_property_value(cx, object_ref, "monthCode")?;
+    let month_code_text = if month_code_value.is_undefined() {
+        None
+    } else {
+        let string_ref = to_string_string_ref(cx, month_code_value)?;
+        Some(string_ref_text(cx, string_ref)?)
+    };
+    let nanosecond_value = temporal_optional_time_part_from_property(cx, object_ref, "nanosecond")?;
+    let nanosecond = nanosecond_value.unwrap_or(i64::from(date_time.nanosecond()));
+    let second_value = temporal_optional_time_part_from_property(cx, object_ref, "second")?;
+    let second = second_value.unwrap_or(i64::from(date_time.second()));
     let year = temporal_optional_integer_part_from_property(cx, object_ref, "year")?;
-    let month =
-        temporal_month_from_property_bag(cx, object_ref, Some(i64::from(date_time.month())))?;
-    let month_value_missing =
-        temporal_optional_integer_part_from_property(cx, object_ref, "month")?.is_none();
-    let month_code_missing = temporal_property_value(cx, object_ref, "monthCode")?.is_undefined();
-    let day = temporal_optional_integer_part_from_property(cx, object_ref, "day")?
-        .unwrap_or(i64::from(date_time.day()));
-    let hour = temporal_optional_time_part_from_property(cx, object_ref, "hour")?
-        .unwrap_or(i64::from(date_time.hour()));
-    let minute = temporal_optional_time_part_from_property(cx, object_ref, "minute")?
-        .unwrap_or(i64::from(date_time.minute()));
-    let second = temporal_optional_time_part_from_property(cx, object_ref, "second")?
-        .unwrap_or(i64::from(date_time.second()));
-    let millisecond = temporal_optional_time_part_from_property(cx, object_ref, "millisecond")?
-        .unwrap_or(i64::from(date_time.millisecond()));
-    let microsecond = temporal_optional_time_part_from_property(cx, object_ref, "microsecond")?
-        .unwrap_or(i64::from(date_time.microsecond()));
-    let nanosecond = temporal_optional_time_part_from_property(cx, object_ref, "nanosecond")?
-        .unwrap_or(i64::from(date_time.nanosecond()));
     if year.is_none()
-        && month_value_missing
-        && month_code_missing
-        && day == i64::from(date_time.day())
-        && hour == i64::from(date_time.hour())
-        && minute == i64::from(date_time.minute())
-        && second == i64::from(date_time.second())
-        && millisecond == i64::from(date_time.millisecond())
-        && microsecond == i64::from(date_time.microsecond())
-        && nanosecond == i64::from(date_time.nanosecond())
+        && month_value.is_none()
+        && month_code_value.is_undefined()
+        && day_value.is_none()
+        && hour_value.is_none()
+        && microsecond_value.is_none()
+        && millisecond_value.is_none()
+        && minute_value.is_none()
+        && nanosecond_value.is_none()
+        && second_value.is_none()
     {
         return Err(type_error(cx));
     }
+    let options = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let overflow = if options.is_undefined() || options.as_object_ref().is_some() {
+        temporal_overflow_from_options(cx, options)?
+    } else {
+        TemporalOverflow::Constrain
+    };
+    let month = if let Some(month) = month_value {
+        if let Some(text) = month_code_text.as_deref() {
+            let month_code =
+                temporal_month_from_month_code_text(text).ok_or_else(|| range_error(cx))?;
+            if month != month_code {
+                return Err(range_error(cx));
+            }
+        }
+        month
+    } else if let Some(text) = month_code_text.as_deref() {
+        temporal_month_from_month_code_text(text).ok_or_else(|| range_error(cx))?
+    } else {
+        i64::from(date_time.month())
+    };
     let data = temporal_plain_date_time_from_parts_with_overflow(
         cx,
         year.unwrap_or(i64::from(date_time.year())),
@@ -870,6 +903,9 @@ pub(super) fn temporal_plain_date_time_with_builtin<Cx: PublicBuiltinDispatchCon
         nanosecond,
         overflow,
     )?;
+    if !options.is_undefined() && options.as_object_ref().is_none() {
+        return Err(type_error(cx));
+    }
     let prototype = current_temporal_plain_date_time_prototype(cx)?;
     allocate_temporal_plain_date_time_object(cx, prototype, data)
 }
@@ -983,7 +1019,7 @@ pub(super) fn temporal_plain_date_time_from_total_nanoseconds<Cx: PublicBuiltinD
     let time_nanoseconds = total_nanoseconds.rem_euclid(TEMPORAL_NANOS_PER_DAY);
     let date = temporal_plain_date_from_ordinal_day(cx, ordinal_day)?;
     let time = temporal_plain_time_from_nanoseconds(cx, time_nanoseconds)?;
-    Ok(TemporalPlainDateTimeObjectData::new(
+    let data = TemporalPlainDateTimeObjectData::new(
         date.year(),
         date.month(),
         date.day(),
@@ -994,7 +1030,13 @@ pub(super) fn temporal_plain_date_time_from_total_nanoseconds<Cx: PublicBuiltinD
         time.microsecond(),
         time.nanosecond(),
         date.calendar(),
-    ))
+    );
+    let total_nanoseconds =
+        temporal_plain_date_time_total_nanoseconds(data).ok_or_else(|| range_error(cx))?;
+    if !temporal_plain_date_time_is_within_limits(data.calendar(), total_nanoseconds) {
+        return Err(range_error(cx));
+    }
+    Ok(data)
 }
 
 pub(super) fn temporal_plain_date_time_add_duration<Cx: PublicBuiltinDispatchContext>(
@@ -1033,7 +1075,7 @@ pub(super) fn temporal_plain_date_time_add_duration<Cx: PublicBuiltinDispatchCon
         return Err(range_error(cx));
     };
     let date = temporal_plain_date_from_ordinal_day(cx, ordinal_day)?;
-    Ok(TemporalPlainDateTimeObjectData::new(
+    let data = TemporalPlainDateTimeObjectData::new(
         date.year(),
         date.month(),
         date.day(),
@@ -1044,7 +1086,13 @@ pub(super) fn temporal_plain_date_time_add_duration<Cx: PublicBuiltinDispatchCon
         time.microsecond(),
         time.nanosecond(),
         date.calendar(),
-    ))
+    );
+    let total_nanoseconds =
+        temporal_plain_date_time_total_nanoseconds(data).ok_or_else(|| range_error(cx))?;
+    if !temporal_plain_date_time_is_within_limits(data.calendar(), total_nanoseconds) {
+        return Err(range_error(cx));
+    }
+    Ok(data)
 }
 
 pub(super) fn temporal_plain_date_time_add_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1239,6 +1287,29 @@ pub(super) fn temporal_date_time_rounding_increment_is_valid(
     }
 }
 
+fn temporal_plain_date_time_rounding_increment_is_valid(
+    smallest_unit: TemporalDateTimeDifferenceUnit,
+    rounding_increment: i128,
+) -> bool {
+    match smallest_unit {
+        TemporalDateTimeDifferenceUnit::Year
+        | TemporalDateTimeDifferenceUnit::Month
+        | TemporalDateTimeDifferenceUnit::Week => false,
+        TemporalDateTimeDifferenceUnit::Day => rounding_increment == 1,
+        TemporalDateTimeDifferenceUnit::Hour
+        | TemporalDateTimeDifferenceUnit::Minute
+        | TemporalDateTimeDifferenceUnit::Second
+        | TemporalDateTimeDifferenceUnit::Millisecond
+        | TemporalDateTimeDifferenceUnit::Microsecond
+        | TemporalDateTimeDifferenceUnit::Nanosecond => {
+            temporal_exact_time_rounding_increment_is_valid(
+                temporal_date_time_exact_unit(smallest_unit).expect("exact unit"),
+                rounding_increment,
+            )
+        }
+    }
+}
+
 pub(super) struct TemporalPlainDateTimeRoundOptions {
     pub(super) smallest_unit: TemporalDateTimeDifferenceUnit,
     pub(super) rounding_increment: i128,
@@ -1251,7 +1322,7 @@ pub(super) fn temporal_plain_date_time_round_options<Cx: PublicBuiltinDispatchCo
 ) -> Result<TemporalPlainDateTimeRoundOptions, Cx::Error> {
     if value.is_string() {
         let smallest_unit = temporal_date_time_difference_unit_from_value(cx, value)?;
-        if !temporal_date_time_rounding_increment_is_valid(smallest_unit, 1) {
+        if !temporal_plain_date_time_rounding_increment_is_valid(smallest_unit, 1) {
             return Err(range_error(cx));
         }
         return Ok(TemporalPlainDateTimeRoundOptions {
@@ -1275,7 +1346,7 @@ pub(super) fn temporal_plain_date_time_round_options<Cx: PublicBuiltinDispatchCo
         return Err(range_error(cx));
     }
     let smallest_unit = temporal_date_time_difference_unit_from_value(cx, smallest_unit_value)?;
-    if !temporal_date_time_rounding_increment_is_valid(smallest_unit, rounding_increment) {
+    if !temporal_plain_date_time_rounding_increment_is_valid(smallest_unit, rounding_increment) {
         return Err(range_error(cx));
     }
     Ok(TemporalPlainDateTimeRoundOptions {
@@ -1309,6 +1380,9 @@ pub(super) fn temporal_plain_date_time_round_builtin<Cx: PublicBuiltinDispatchCo
         options.rounding_mode,
     )
     .ok_or_else(|| range_error(cx))?;
+    if !temporal_plain_date_time_is_within_limits(date_time.calendar(), rounded) {
+        return Err(range_error(cx));
+    }
     let data = temporal_plain_date_time_from_total_nanoseconds(cx, rounded)?;
     let prototype = current_temporal_plain_date_time_prototype(cx)?;
     allocate_temporal_plain_date_time_object(cx, prototype, data)

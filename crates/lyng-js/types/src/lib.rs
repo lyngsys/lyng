@@ -180,7 +180,15 @@ mod tests {
         assert_eq!(CORE_BUILTIN_NAMESPACE_START, 2_001);
         assert_eq!(CORE_BUILTIN_NAMESPACE_END, 2_321);
         assert_eq!(COMPLETION_BUILTIN_NAMESPACE_START, 3_101);
-        assert_eq!(COMPLETION_BUILTIN_NAMESPACE_END, 3_588);
+        assert_eq!(COMPLETION_BUILTIN_NAMESPACE_END, 3_589);
+    }
+
+    #[test]
+    fn builtin_ids_do_not_alias_temporal_plain_datetime_with_plain_time() {
+        assert_ne!(
+            array_buffer_resize_builtin(),
+            temporal_plain_date_time_with_plain_time_builtin()
+        );
     }
 
     #[test]
