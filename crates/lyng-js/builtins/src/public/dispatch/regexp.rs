@@ -6,10 +6,10 @@ mod symbols;
 use super::{
     allocate_array_like_result, append_string_ref_code_units, builtin_function_entry,
     callable_object_from_value, code_unit_range_value, define_data_property_with_attrs, iterators,
-    set_data_property_value, string_from_code_units, string_ref_code_units, string_value,
-    syntax_error, to_boolean_for_builtin, to_integer_or_infinity_for_builtin,
-    to_length_for_builtin, to_string_string_ref, type_error, usize_index_value,
-    PublicBuiltinDispatchContext,
+    set_data_property_value, string_from_code_units, string_from_string_ref_range,
+    string_ref_code_units, string_value, syntax_error, to_boolean_for_builtin,
+    to_integer_or_infinity_for_builtin, to_length_for_builtin, to_string_string_ref, type_error,
+    usize_index_value, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use accessors::{
@@ -21,6 +21,7 @@ use construction::{
 };
 use escape::regexp_escape_builtin;
 use lyng_js_common::WellKnownAtom;
+use lyng_js_env::RegExpLegacyStaticText;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData};
 use lyng_js_parser::{validate_regexp_constructor_pattern, validate_regexp_literal};
@@ -298,7 +299,7 @@ fn regexp_legacy_static_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     property: RegExpLegacyStaticProperty,
 ) -> Result<Value, Cx::Error> {
     let realm = require_legacy_static_regexp_constructor(cx, invocation.this_value())?;
-    let units = {
+    let text = {
         let agent = cx.agent();
         agent.regexp_legacy_static_state(realm).map(|state| {
             match property {
@@ -307,13 +308,28 @@ fn regexp_legacy_static_getter_builtin<Cx: PublicBuiltinDispatchContext>(
                 RegExpLegacyStaticProperty::LastParen => state.last_paren(),
                 RegExpLegacyStaticProperty::LeftContext => state.left_context(),
                 RegExpLegacyStaticProperty::RightContext => state.right_context(),
-                RegExpLegacyStaticProperty::Paren(index) => state.paren(index).unwrap_or(&[]),
+                RegExpLegacyStaticProperty::Paren(index) => {
+                    state.paren(index).unwrap_or(&RegExpLegacyStaticText::Empty)
+                }
             }
-            .to_vec()
+            .clone()
         })
     }
     .ok_or_else(|| type_error(cx))?;
-    Ok(string_from_code_units(cx, &units))
+    regexp_legacy_static_text_value(cx, text)
+}
+
+fn regexp_legacy_static_text_value<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    text: RegExpLegacyStaticText,
+) -> Result<Value, Cx::Error> {
+    match text {
+        RegExpLegacyStaticText::Empty => Ok(string_from_code_units(cx, &[])),
+        RegExpLegacyStaticText::Owned(units) => Ok(string_from_code_units(cx, &units)),
+        RegExpLegacyStaticText::SourceSlice { source, range } => {
+            string_from_string_ref_range(cx, source, range)
+        }
+    }
 }
 
 fn regexp_legacy_input_setter_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -343,6 +359,7 @@ fn regexp_legacy_input_setter_builtin<Cx: PublicBuiltinDispatchContext>(
 
 fn record_regexp_legacy_static_match<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
+    input_ref: StringRef,
     units: &[u16],
     state: &RegExpExecState,
 ) -> Result<(), Cx::Error> {
@@ -352,7 +369,12 @@ fn record_regexp_legacy_static_match<Cx: PublicBuiltinDispatchContext>(
         agent
             .regexp_legacy_static_state_mut(realm)
             .map(|legacy_state| {
-                legacy_state.record_match(units, state.matched.range(), state.matched.captures());
+                legacy_state.record_match(
+                    input_ref,
+                    units.len(),
+                    state.matched.range(),
+                    state.matched.captures(),
+                );
             })
             .is_some()
     };
@@ -750,6 +772,7 @@ fn build_regexp_match_result<Cx: PublicBuiltinDispatchContext>(
 fn regexp_exec_state<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: lyng_js_types::ObjectRef,
+    input_ref: StringRef,
     units: &[u16],
     advance_empty_match: bool,
 ) -> Result<Option<RegExpExecState>, Cx::Error> {
@@ -791,7 +814,7 @@ fn regexp_exec_state<Cx: PublicBuiltinDispatchContext>(
             )?;
         }
         let state = RegExpExecState { flags, matched };
-        record_regexp_legacy_static_match(cx, units, &state)?;
+        record_regexp_legacy_static_match(cx, input_ref, units, &state)?;
         return Ok(Some(state));
     }
 
@@ -825,7 +848,7 @@ fn regexp_exec<Cx: PublicBuiltinDispatchContext>(
         return Err(type_error(cx));
     }
 
-    let Some(state) = regexp_exec_state(cx, object_ref, input_units, false)? else {
+    let Some(state) = regexp_exec_state(cx, object_ref, input_ref, input_units, false)? else {
         return Ok(Value::null());
     };
     build_regexp_match_result(cx, input_units, Value::from_string_ref(input_ref), &state)
@@ -1435,7 +1458,7 @@ fn regexp_exec_builtin<Cx: PublicBuiltinDispatchContext>(
     )?;
     let input_units = string_ref_code_units(cx, input_ref)?;
     let input_value = Value::from_string_ref(input_ref);
-    let Some(state) = regexp_exec_state(cx, object_ref, &input_units, false)? else {
+    let Some(state) = regexp_exec_state(cx, object_ref, input_ref, &input_units, false)? else {
         return Ok(Value::null());
     };
     build_regexp_match_result(cx, &input_units, input_value, &state)
@@ -1466,7 +1489,7 @@ fn regexp_test_builtin<Cx: PublicBuiltinDispatchContext>(
         == Some(super::regexp_exec_builtin());
     if default_exec {
         return Ok(Value::from_bool(
-            regexp_exec_state(cx, object_ref, &input_units, false)?.is_some(),
+            regexp_exec_state(cx, object_ref, input_ref, &input_units, false)?.is_some(),
         ));
     }
 

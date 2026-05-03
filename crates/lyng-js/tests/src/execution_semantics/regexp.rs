@@ -1,6 +1,6 @@
 use super::support::{compile_and_run_string, compile_unit};
 use lyng_js_common::AtomTable;
-use lyng_js_env::Runtime;
+use lyng_js_env::{RegExpLegacyStaticText, Runtime};
 use lyng_js_host::NoopHostHooks;
 use lyng_js_types::Value;
 use lyng_js_vm::Vm;
@@ -116,4 +116,84 @@ fn regexp_literal_cache_keeps_objects_fresh_and_last_index_independent() {
     let accounting = runtime.phase6_accounting();
     assert_eq!(accounting.regexp_literal_cache.records, 1);
     assert!(accounting.regexp_payloads.records >= 3);
+}
+
+#[test]
+fn regexp_legacy_static_state_stays_lazy_when_global_loop_never_reads_accessors() {
+    let mut atoms = AtomTable::new();
+    let unit = compile_unit(
+        r#"
+        (function () {
+            let source = "xxxxxxxxxxxxxxxx";
+            let rx = /x/g;
+            while (rx.exec(source) !== null) {}
+        })();
+        "#,
+        &mut atoms,
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    vm.evaluate_script(agent, realm, &unit)
+        .expect("compiled script should execute");
+
+    let state = agent
+        .regexp_legacy_static_state(realm.id())
+        .expect("default realm should have RegExp legacy static state");
+    assert!(matches!(
+        state.input(),
+        RegExpLegacyStaticText::SourceSlice { range, .. } if range == &(0..16)
+    ));
+    assert!(matches!(
+        state.last_match(),
+        RegExpLegacyStaticText::SourceSlice { range, .. } if range == &(15..16)
+    ));
+    assert!(matches!(
+        state.right_context(),
+        RegExpLegacyStaticText::Empty
+    ));
+}
+
+#[test]
+fn regexp_legacy_static_accessors_survive_collection_after_multiple_matches() {
+    let mut atoms = AtomTable::new();
+    let record_unit = compile_unit(
+        r#"
+        (function () {
+            let source = "zzababyy";
+            let rx = /(a)(b)?/g;
+            rx.exec(source);
+            rx.exec(source);
+        })();
+        "#,
+        &mut atoms,
+    );
+    let access_unit = compile_unit(
+        r#"
+        let total = 0;
+        total += (RegExp.input === "zzababyy" ? 1 : 0);
+        total += (RegExp.lastMatch === "ab" && RegExp["$&"] === "ab" ? 2 : 0);
+        total += (RegExp.leftContext === "zzab" && RegExp["$`"] === "zzab" ? 4 : 0);
+        total += (RegExp.rightContext === "yy" && RegExp["$'"] === "yy" ? 8 : 0);
+        total += (RegExp.lastParen === "b" && RegExp["$+"] === "b" ? 16 : 0);
+        total += (RegExp.$1 === "a" && RegExp.$2 === "b" && RegExp.$9 === "" ? 32 : 0);
+        total;
+        "#,
+        &mut atoms,
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    vm.evaluate_script(agent, realm, &record_unit)
+        .expect("recording script should execute");
+    agent.force_collect();
+    let result = vm
+        .evaluate_script(agent, realm, &access_unit)
+        .expect("accessor script should execute after collection");
+
+    assert_eq!(result, Value::from_smi(63));
 }

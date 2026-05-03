@@ -12,6 +12,7 @@ use lyng_js_types::{
     object_to_string_builtin, AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyDescriptor,
     PropertyKey, RealmRef, StringRef, Value, WellKnownSymbolId,
 };
+use std::ops::Range;
 
 pub(super) struct BuiltinToPrimitiveBridge<'a, Cx: PublicBuiltinDispatchContext> {
     pub(super) cx: &'a mut Cx,
@@ -1507,6 +1508,68 @@ pub(super) fn string_ref_code_units<Cx: PublicBuiltinDispatchContext>(
     let mut units = Vec::with_capacity(string_ref_code_unit_len(cx, string)?);
     append_string_ref_code_units(cx, string, &mut units)?;
     Ok(units)
+}
+
+pub(super) fn string_from_string_ref_range<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    string: StringRef,
+    range: Range<usize>,
+) -> Result<Value, Cx::Error> {
+    if range.start > range.end {
+        return Err(type_error(cx));
+    }
+
+    enum StringRangePayload {
+        Latin1(Vec<u8>),
+        Utf16(Vec<u8>),
+    }
+
+    let start = range.start;
+    let end = range.end;
+    let code_unit_len = end - start;
+    let payload = {
+        let Some(view) = ({
+            let agent = cx.agent();
+            agent.heap().view().string_view(string)
+        }) else {
+            return Err(type_error(cx));
+        };
+        if end > view.code_unit_len() as usize {
+            return Err(type_error(cx));
+        }
+
+        if let Some(bytes) = view.latin1_bytes() {
+            StringRangePayload::Latin1(bytes[start..end].to_vec())
+        } else if let Some(bytes) = view.utf16_bytes() {
+            let byte_start = start * 2;
+            let byte_end = end * 2;
+            StringRangePayload::Utf16(bytes[byte_start..byte_end].to_vec())
+        } else {
+            StringRangePayload::Latin1(Vec::new())
+        }
+    };
+
+    let string = {
+        let agent = cx.agent();
+        match payload {
+            StringRangePayload::Latin1(bytes) => agent.heap_mut().mutator().alloc_string(
+                StringEncoding::Latin1,
+                u32::try_from(code_unit_len).expect("string length must fit into u32"),
+                &bytes,
+                None,
+                AllocationLifetime::Default,
+            ),
+            StringRangePayload::Utf16(bytes) => agent.heap_mut().mutator().alloc_string(
+                StringEncoding::Utf16,
+                u32::try_from(code_unit_len).expect("string length must fit into u32"),
+                &bytes,
+                None,
+                AllocationLifetime::Default,
+            ),
+        }
+    };
+
+    Ok(Value::from_string_ref(string))
 }
 
 pub(super) fn string_ref_code_unit_len<Cx: PublicBuiltinDispatchContext>(

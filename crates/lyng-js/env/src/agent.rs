@@ -2,7 +2,7 @@ use super::{
     AgentId, AgentJobQueues, AllocationLifetime, AtomTable, BootstrapAtoms, EnvironmentLayout,
     EnvironmentMetadata, ExecutionContext, GlobalSymbolRegistry, HostAgentId, HostThreadId,
     ModuleRecord, ObjectRuntime, PrimitiveHeap, PrimitiveRoots, RealmMetadata, RealmRef,
-    WellKnownSymbols,
+    RegExpLegacyStaticState, WellKnownSymbols,
 };
 use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_js_host::ModuleKey;
@@ -35,6 +35,7 @@ struct AgentCollectionSnapshot {
     realms: Vec<RealmRef>,
     execution_contexts: Vec<ExecutionContext>,
     modules: Vec<ModuleRecord>,
+    regexp_legacy_static_states: Vec<RegExpLegacyStaticState>,
     promise_tables: super::AgentPromiseTables,
     disposal_tables: super::AgentDisposalTables,
     job_queues: AgentJobQueues,
@@ -50,6 +51,15 @@ impl AgentCollectionSnapshot {
             realms: agent.realms.clone(),
             execution_contexts: agent.execution_contexts.clone(),
             modules: agent.modules.values().cloned().collect(),
+            regexp_legacy_static_states: agent
+                .realm_metadata
+                .iter()
+                .filter_map(|metadata| {
+                    metadata
+                        .as_ref()
+                        .map(|metadata| metadata.regexp_legacy_static_state.clone())
+                })
+                .collect(),
             promise_tables: agent.promise_tables.clone(),
             disposal_tables: agent.disposal_tables.clone(),
             job_queues: agent.job_queues.clone(),
@@ -80,6 +90,9 @@ impl TraceHeapEdges for AgentCollectionSnapshot {
         }
         for record in &self.modules {
             record.trace_heap_edges(tracer);
+        }
+        for state in &self.regexp_legacy_static_states {
+            state.trace_heap_edges(tracer);
         }
     }
 }

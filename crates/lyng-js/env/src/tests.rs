@@ -9,7 +9,8 @@ use lyng_js_host::{
 };
 use lyng_js_objects::{ObjectAllocation, ObjectFlags, ObjectKind, ObjectSubstrateMarker};
 use lyng_js_types::{
-    BackingStoreRef, CodeRef, ObjectRef, PropertyKey, TypeOwnershipMarker, Value, WellKnownSymbolId,
+    BackingStoreRef, CodeRef, ObjectRef, PropertyKey, StringRef, TypeOwnershipMarker, Value,
+    WellKnownSymbolId,
 };
 use std::mem::size_of;
 
@@ -95,6 +96,84 @@ fn runtime_boots_root_cluster_and_thread_affine_root_agent() {
     assert!(default_realm.global_env().get() > 0);
     assert!(default_realm.root_shape().is_some());
     assert!(runtime.root_agent().heap().view().collection_budget_bytes() > 0);
+}
+
+#[test]
+fn regexp_legacy_static_state_records_matches_as_lazy_source_ranges() {
+    let source = StringRef::from_raw(17).expect("non-zero string ref");
+    let mut state = RegExpLegacyStaticState::default();
+
+    state.record_match(
+        source,
+        10,
+        2..7,
+        &[Some(3..5), None, Some(6..7), Some(4..6)],
+    );
+
+    assert_eq!(
+        state.input(),
+        &RegExpLegacyStaticText::SourceSlice {
+            source,
+            range: 0..10,
+        }
+    );
+    assert_eq!(
+        state.last_match(),
+        &RegExpLegacyStaticText::SourceSlice {
+            source,
+            range: 2..7,
+        }
+    );
+    assert_eq!(
+        state.left_context(),
+        &RegExpLegacyStaticText::SourceSlice {
+            source,
+            range: 0..2,
+        }
+    );
+    assert_eq!(
+        state.right_context(),
+        &RegExpLegacyStaticText::SourceSlice {
+            source,
+            range: 7..10,
+        }
+    );
+    assert_eq!(
+        state.last_paren(),
+        &RegExpLegacyStaticText::SourceSlice {
+            source,
+            range: 4..6,
+        }
+    );
+    assert_eq!(
+        state.paren(1),
+        Some(&RegExpLegacyStaticText::SourceSlice {
+            source,
+            range: 3..5,
+        })
+    );
+    assert_eq!(state.paren(2), Some(&RegExpLegacyStaticText::Empty));
+    assert_eq!(
+        state.paren(3),
+        Some(&RegExpLegacyStaticText::SourceSlice {
+            source,
+            range: 6..7,
+        })
+    );
+
+    state.set_input(vec![b's' as u16, b'e' as u16, b'e' as u16, b'd' as u16]);
+
+    assert_eq!(
+        state.input(),
+        &RegExpLegacyStaticText::Owned(vec![b's' as u16, b'e' as u16, b'e' as u16, b'd' as u16])
+    );
+    assert_eq!(
+        state.last_match(),
+        &RegExpLegacyStaticText::SourceSlice {
+            source,
+            range: 2..7,
+        }
+    );
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use lyng_js_common::AtomId;
 use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
-use lyng_js_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, ShapeId, Value};
+use lyng_js_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, ShapeId, StringRef, Value};
 use std::ops::Range;
 
 /// Execution identity categories reserved by the Phase 3 runtime substrate.
@@ -365,86 +365,132 @@ pub(crate) struct RealmMetadata {
 /// Annex B state exposed by the legacy static accessors on a realm's `%RegExp%`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RegExpLegacyStaticState {
-    input: Vec<u16>,
-    last_match: Vec<u16>,
-    last_paren: Vec<u16>,
-    left_context: Vec<u16>,
-    right_context: Vec<u16>,
-    parens: [Vec<u16>; 9],
+    input: RegExpLegacyStaticText,
+    last_match: RegExpLegacyStaticText,
+    last_paren: RegExpLegacyStaticText,
+    left_context: RegExpLegacyStaticText,
+    right_context: RegExpLegacyStaticText,
+    parens: [RegExpLegacyStaticText; 9],
+}
+
+/// Lazily materialized text backing for Annex B RegExp legacy static accessors.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RegExpLegacyStaticText {
+    Empty,
+    Owned(Vec<u16>),
+    SourceSlice {
+        source: StringRef,
+        range: Range<usize>,
+    },
 }
 
 impl Default for RegExpLegacyStaticState {
     fn default() -> Self {
         Self {
-            input: Vec::new(),
-            last_match: Vec::new(),
-            last_paren: Vec::new(),
-            left_context: Vec::new(),
-            right_context: Vec::new(),
-            parens: std::array::from_fn(|_| Vec::new()),
+            input: RegExpLegacyStaticText::Empty,
+            last_match: RegExpLegacyStaticText::Empty,
+            last_paren: RegExpLegacyStaticText::Empty,
+            left_context: RegExpLegacyStaticText::Empty,
+            right_context: RegExpLegacyStaticText::Empty,
+            parens: std::array::from_fn(|_| RegExpLegacyStaticText::Empty),
         }
     }
 }
 
 impl RegExpLegacyStaticState {
     #[inline]
-    pub fn input(&self) -> &[u16] {
+    pub fn input(&self) -> &RegExpLegacyStaticText {
         &self.input
     }
 
     #[inline]
-    pub fn last_match(&self) -> &[u16] {
+    pub fn last_match(&self) -> &RegExpLegacyStaticText {
         &self.last_match
     }
 
     #[inline]
-    pub fn last_paren(&self) -> &[u16] {
+    pub fn last_paren(&self) -> &RegExpLegacyStaticText {
         &self.last_paren
     }
 
     #[inline]
-    pub fn left_context(&self) -> &[u16] {
+    pub fn left_context(&self) -> &RegExpLegacyStaticText {
         &self.left_context
     }
 
     #[inline]
-    pub fn right_context(&self) -> &[u16] {
+    pub fn right_context(&self) -> &RegExpLegacyStaticText {
         &self.right_context
     }
 
     #[inline]
-    pub fn paren(&self, one_based_index: usize) -> Option<&[u16]> {
+    pub fn paren(&self, one_based_index: usize) -> Option<&RegExpLegacyStaticText> {
         one_based_index
             .checked_sub(1)
             .and_then(|index| self.parens.get(index))
-            .map(Vec::as_slice)
     }
 
     #[inline]
     pub fn set_input(&mut self, input: Vec<u16>) {
-        self.input = input;
+        self.input = if input.is_empty() {
+            RegExpLegacyStaticText::Empty
+        } else {
+            RegExpLegacyStaticText::Owned(input)
+        };
     }
 
     pub fn record_match(
         &mut self,
-        input: &[u16],
+        source: StringRef,
+        input_len: usize,
         matched: Range<usize>,
         captures: &[Option<Range<usize>>],
     ) {
-        self.input.clear();
-        self.input.extend_from_slice(input);
-        self.last_match = input[matched.clone()].to_vec();
-        self.left_context = input[..matched.start].to_vec();
-        self.right_context = input[matched.end..].to_vec();
-        self.last_paren.clear();
+        self.input = RegExpLegacyStaticText::source_slice(source, 0..input_len);
+        self.last_match = RegExpLegacyStaticText::source_slice(source, matched.clone());
+        self.left_context = RegExpLegacyStaticText::source_slice(source, 0..matched.start);
+        self.right_context = RegExpLegacyStaticText::source_slice(source, matched.end..input_len);
+        self.last_paren = RegExpLegacyStaticText::Empty;
 
         for (index, slot) in self.parens.iter_mut().enumerate() {
-            slot.clear();
             let Some(Some(range)) = captures.get(index) else {
+                *slot = RegExpLegacyStaticText::Empty;
                 continue;
             };
-            slot.extend_from_slice(&input[range.clone()]);
+            *slot = RegExpLegacyStaticText::source_slice(source, range.clone());
             self.last_paren = slot.clone();
+        }
+    }
+}
+
+impl RegExpLegacyStaticText {
+    #[inline]
+    fn source_slice(source: StringRef, range: Range<usize>) -> Self {
+        if range.start == range.end {
+            Self::Empty
+        } else {
+            Self::SourceSlice { source, range }
+        }
+    }
+}
+
+impl TraceHeapEdges for RegExpLegacyStaticText {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        if let Self::SourceSlice { source, .. } = self {
+            source.trace_heap_edges(tracer);
+        }
+    }
+}
+
+impl TraceHeapEdges for RegExpLegacyStaticState {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.input.trace_heap_edges(tracer);
+        self.last_match.trace_heap_edges(tracer);
+        self.last_paren.trace_heap_edges(tracer);
+        self.left_context.trace_heap_edges(tracer);
+        self.right_context.trace_heap_edges(tracer);
+        for paren in &self.parens {
+            paren.trace_heap_edges(tracer);
         }
     }
 }
