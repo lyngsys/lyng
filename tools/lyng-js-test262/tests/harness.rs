@@ -292,6 +292,18 @@ fn runner_supports_single_agent_start_broadcast_and_reports() {
 }
 
 #[test]
+fn runner_supports_single_process_agent_notify_one_waiter() {
+    let report = run_filtered_test("built-ins/Atomics/notify/notify-one.js");
+    assert_passed(&report, 1, 2);
+}
+
+#[test]
+fn runner_honors_can_block_false_atomics_wait_metadata() {
+    let report = run_filtered_test("built-ins/Atomics/wait/cannot-suspend-throws.js");
+    assert_passed(&report, 1, 2);
+}
+
+#[test]
 fn runner_reports_async_failure_from_single_agent_set_timeout_callback() {
     let root = make_temp_dir();
     let entry_path = root.join("atomics-agent-helper-set-timeout-failure.js");

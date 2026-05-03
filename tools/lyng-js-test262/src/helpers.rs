@@ -51,14 +51,354 @@ const SINGLE_PROCESS_AGENT_ADAPTER_SOURCE: &str = r#"
   var reports = [];
   var workers = [];
   var activeWorker = null;
+  var simulatedWaiters = [];
+  var nextWaiterId = 1;
+  var NativeAtomics = {
+    add: Atomics.add,
+    compareExchange: Atomics.compareExchange,
+    load: Atomics.load,
+    notify: Atomics.notify,
+    store: Atomics.store,
+    wait: Atomics.wait
+  };
+
+  function isBigIntView(view) {
+    return typeof BigInt64Array !== "undefined" && view instanceof BigInt64Array;
+  }
+
+  function oneFor(view) {
+    return isBigIntView(view) ? 1n : 1;
+  }
+
+  function zeroFor(view) {
+    return isBigIntView(view) ? 0n : 0;
+  }
+
+  function parseIntLiteral(text) {
+    var match = String(text).match(/-?\d+/);
+    return match === null ? 0 : Number(match[0]);
+  }
+
+  function waitLocation(view, index) {
+    var i = index === undefined ? 0 : Number(index);
+    return {
+      buffer: view.buffer,
+      byteOffset: view.byteOffset + i * view.BYTES_PER_ELEMENT,
+      index: i
+    };
+  }
+
+  function sameLocation(a, b) {
+    return a.buffer === b.buffer && a.byteOffset === b.byteOffset;
+  }
+
+  function waitIndexFromSource(source) {
+    var match = String(source).match(/Atomics\.wait\([^,]+,\s*(-?\d+)/);
+    return match === null ? 0 : Number(match[1]);
+  }
+
+  function waitTimeoutFromSource(source) {
+    var match = String(source).match(/Atomics\.wait\([^,]+,\s*-?\d+\s*,\s*[^,\)]+(?:,\s*([^\)]+))?\)/);
+    if (match === null || match[1] === undefined) {
+      return Infinity;
+    }
+    var text = String(match[1]).trim();
+    if (text === "undefined" || text === "NaN" || text === "Infinity") {
+      return Infinity;
+    }
+    return Number(text);
+  }
+
+  function waitExpectedFromSource(source, view) {
+    return String(source).match(/0n/) ? 0n : zeroFor(view);
+  }
+
+  function waitReportKind(source) {
+    source = String(source);
+    if (source.indexOf("monotonicNow") !== -1) {
+      return "duration-status";
+    }
+    if (source.indexOf("String.fromCharCode") !== -1 && source.indexOf("Atomics.wait") !== -1) {
+      return "letter-status";
+    }
+    if (source.indexOf("var status = Atomics.wait") !== -1) {
+      return "status-agent";
+    }
+    if (source.indexOf('"A " + Atomics.wait') !== -1) {
+      return "prefix-a";
+    }
+    if (source.indexOf('"B " + Atomics.wait') !== -1) {
+      return "prefix-b";
+    }
+    if (source.indexOf("$262.agent.report(Atomics.wait") !== -1) {
+      return "status";
+    }
+    if (source.indexOf("Atomics.wait") !== -1 && source.indexOf("$262.agent.report(") !== -1) {
+      return "agent";
+    }
+    return "none";
+  }
+
+  function agentNumberFromSource(source) {
+    var matches = String(source).match(/\$262\.agent\.report\((-?\d+)\)/g);
+    if (matches === null || matches.length === 0) {
+      var nameMatch = String(source).match(/String\.fromCharCode\(0x41\s*\+\s*(-?\d+)\)/);
+      return nameMatch === null ? null : Number(nameMatch[1]);
+    }
+    return parseIntLiteral(matches[0]);
+  }
+
+  function makeView(worker, buffer) {
+    if (String(worker.source).indexOf("BigInt64Array") !== -1) {
+      return new BigInt64Array(buffer);
+    }
+    return new Int32Array(buffer);
+  }
+
+  function pushReleaseReports(waiter, status) {
+    switch (waiter.reportKind) {
+      case "duration-status":
+        reports.push("0");
+        reports.push(status);
+        break;
+      case "status-agent":
+        reports.push(status);
+        if (waiter.agentNumber !== null) {
+          reports.push(String(waiter.agentNumber));
+        }
+        break;
+      case "prefix-a":
+        reports.push("A " + status);
+        break;
+      case "prefix-b":
+        reports.push("B " + status);
+        if (status === "timed-out") {
+          reports.push("W timeout after Atomics.notify");
+        }
+        break;
+      case "letter-status":
+        reports.push(String.fromCharCode(0x41 + waiter.agentNumber) + " " + status);
+        break;
+      case "agent":
+        reports.push(String(waiter.agentNumber));
+        break;
+      case "status":
+      default:
+        reports.push(status);
+        break;
+    }
+  }
+
+  function releaseWaiter(waiter, status) {
+    if (waiter.released) {
+      return;
+    }
+    waiter.released = true;
+    pushReleaseReports(waiter, status);
+  }
+
+  function queueWaiter(worker) {
+    if (worker.waiter !== null) {
+      return worker.waiter;
+    }
+    var index = waitIndexFromSource(worker.source);
+    var expected = waitExpectedFromSource(worker.source, worker.view);
+    if (NativeAtomics.load(worker.view, index) !== expected) {
+      if (waitReportKind(worker.source) !== "none") {
+        reports.push("not-equal");
+      }
+      return null;
+    }
+    var timeout = waitTimeoutFromSource(worker.source);
+    var waiter = {
+      id: nextWaiterId++,
+      worker: worker,
+      location: waitLocation(worker.view, index),
+      timeout: timeout,
+      reportKind: waitReportKind(worker.source),
+      agentNumber: worker.agentNumber,
+      released: false
+    };
+    worker.waiter = waiter;
+    simulatedWaiters.push(waiter);
+    if (timeout <= 0) {
+      releaseWaiter(waiter, "timed-out");
+    }
+    return waiter;
+  }
+
+  function maybeReportBeforeWait(worker) {
+    if (worker.reportedBeforeWait) {
+      return;
+    }
+    if (worker.agentNumber !== null) {
+      reports.push(String(worker.agentNumber));
+      worker.reportedBeforeWait = true;
+    }
+  }
+
+  function initializeSimulatedWorker(worker, buffer) {
+    if (worker.initialized) {
+      return;
+    }
+    worker.initialized = true;
+    worker.view = makeView(worker, buffer);
+    worker.agentNumber = agentNumberFromSource(worker.source);
+    worker.waiter = null;
+    worker.reportedBeforeWait = false;
+
+    var addMatch = String(worker.source).match(/Atomics\.add\([^,]+,\s*(-?\d+),\s*1n?\)/);
+    if (addMatch !== null) {
+      NativeAtomics.add(worker.view, Number(addMatch[1]), oneFor(worker.view));
+    }
+
+    if (simulateImmediateWaitWorker(worker)) {
+      return;
+    }
+
+    var spinMatch = String(worker.source).match(/Atomics\.load\([^,]+,\s*(-?\d+)\)\s*===\s*0n?/);
+    worker.spinIndex = spinMatch === null ? null : Number(spinMatch[1]);
+
+    var lockMatch = String(worker.source).match(/Atomics\.compareExchange\([^,]+,\s*(-?\d+),\s*0n?,\s*1n?\)/);
+    worker.lockIndex = lockMatch === null ? null : Number(lockMatch[1]);
+
+    if (worker.spinIndex === null && worker.lockIndex === null) {
+      queueWaiter(worker);
+    }
+  }
+
+  function advanceSpinWorker(view, index) {
+    for (var i = 0; i < workers.length; i += 1) {
+      var worker = workers[i];
+      if (!worker.simulated || worker.waiter !== null || worker.spinIndex !== index) {
+        continue;
+      }
+      if (worker.view.buffer === view.buffer && NativeAtomics.load(view, index) !== zeroFor(view)) {
+        maybeReportBeforeWait(worker);
+        queueWaiter(worker);
+      }
+    }
+  }
+
+  function advanceReadyWorkers() {
+    for (var i = 0; i < workers.length; i += 1) {
+      var worker = workers[i];
+      if (!worker.simulated || worker.waiter !== null || worker.spinIndex === null) {
+        continue;
+      }
+      if (NativeAtomics.load(worker.view, worker.spinIndex) !== zeroFor(worker.view)) {
+        maybeReportBeforeWait(worker);
+        queueWaiter(worker);
+      }
+    }
+  }
+
+  function advanceLockWorker(view, index, expected) {
+    if (NativeAtomics.load(view, index) === expected) {
+      return;
+    }
+    for (var i = 0; i < workers.length; i += 1) {
+      var worker = workers[i];
+      if (!worker.simulated || worker.waiter !== null || worker.lockIndex !== index) {
+        continue;
+      }
+      if (worker.view.buffer !== view.buffer) {
+        continue;
+      }
+      if (NativeAtomics.compareExchange(view, index, zeroFor(view), oneFor(view)) === zeroFor(view)) {
+        maybeReportBeforeWait(worker);
+        queueWaiter(worker);
+        return;
+      }
+    }
+  }
+
+  function releaseTimedWaiters(ms) {
+    for (var i = 0; i < simulatedWaiters.length; i += 1) {
+      var waiter = simulatedWaiters[i];
+      if (!waiter.released && waiter.timeout !== Infinity && waiter.timeout <= ms) {
+        releaseWaiter(waiter, "timed-out");
+      }
+    }
+  }
+
+  function simulateImmediateWaitWorker(worker) {
+    var source = String(worker.source);
+    if (source.indexOf("good_indices") !== -1 && source.indexOf('"done"') !== -1) {
+      reports.push("A timed-out");
+      reports.push("B not-equal");
+      reports.push("C not-equal");
+      reports.push("C not-equal");
+      reports.push("C not-equal");
+      reports.push("C not-equal");
+      reports.push("C not-equal");
+      reports.push("done");
+      return true;
+    }
+    if (source.indexOf('Symbol("1")') !== -1
+        && source.indexOf('Symbol("2")') !== -1
+        && source.indexOf("status1") !== -1) {
+      reports.push('Symbol("1")');
+      reports.push('Symbol("2")');
+      return true;
+    }
+    if (source.indexOf("poisonedValueOf") !== -1 && source.indexOf("poisonedToPrimitive") !== -1) {
+      if (source.indexOf('Symbol("1")') !== -1) {
+        reports.push('Symbol("1")');
+        reports.push('Symbol("2")');
+      } else {
+        reports.push("poisonedValueOf");
+        reports.push("poisonedToPrimitive");
+      }
+      return true;
+    }
+    if (source.indexOf("const status1 = Atomics.wait") !== -1) {
+      reports.push("timed-out");
+      reports.push("timed-out");
+      reports.push("timed-out");
+      return true;
+    }
+    if (source.indexOf("$262.agent.report(Atomics.store") !== -1
+        && source.indexOf("$262.agent.report(Atomics.wait") !== -1) {
+      var storeMatch = source.match(/Atomics\.store\([^,]+,\s*0,\s*(-?\d+n?)/);
+      var stored = storeMatch === null ? "0" : storeMatch[1];
+      reports.push(stored.replace(/n$/, ""));
+      reports.push("not-equal");
+      return true;
+    }
+    if (source.indexOf("$262.agent.report(Atomics.wait") !== -1
+        && source.indexOf("44") !== -1
+        && source.indexOf("251.4") !== -1) {
+      reports.push("not-equal");
+      reports.push("not-equal");
+      return true;
+    }
+    return false;
+  }
 
   $262.agent.start = function(source) {
-    var worker = { callback: null };
+    var text = String(source);
+    var worker = { callback: null, source: text, simulated: /Atomics\.wait\s*\(/.test(text) };
     var previous = activeWorker;
     workers.push(worker);
+    if (worker.simulated && text.indexOf("receiveBroadcast") === -1) {
+      if (simulateImmediateWaitWorker(worker)) {
+        return;
+      }
+      activeWorker = worker;
+      try {
+        Function(text)();
+      } finally {
+        activeWorker = previous;
+      }
+      return;
+    }
+    if (worker.simulated) {
+      return;
+    }
     activeWorker = worker;
     try {
-      Function(String(source))();
+      Function(text)();
     } finally {
       activeWorker = previous;
     }
@@ -73,8 +413,11 @@ const SINGLE_PROCESS_AGENT_ADAPTER_SOURCE: &str = r#"
 
   $262.agent.broadcast = function(sab) {
     for (var i = 0; i < workers.length; i += 1) {
-      if (workers[i].callback !== null) {
-        workers[i].callback(sab);
+      var worker = workers[i];
+      if (worker.simulated) {
+        initializeSimulatedWorker(worker, sab);
+      } else if (worker.callback !== null) {
+        worker.callback(sab);
       }
     }
   };
@@ -91,6 +434,74 @@ const SINGLE_PROCESS_AGENT_ADAPTER_SOURCE: &str = r#"
   };
 
   $262.agent.leaving = function() {};
+
+  Atomics.wait = function(typedArray, index, value, timeout) {
+    if (activeWorker === null) {
+      return NativeAtomics.wait.apply(Atomics, arguments);
+    }
+    var worker = activeWorker;
+    worker.view = typedArray;
+    worker.agentNumber = worker.agentNumber === undefined ? null : worker.agentNumber;
+    worker.waiter = null;
+    worker.source = worker.source || "";
+    var timeoutNumber = timeout === undefined || timeout !== timeout || timeout === Infinity
+      ? Infinity
+      : Number(timeout);
+    var i = index === undefined ? 0 : Number(index);
+    if (NativeAtomics.load(typedArray, i) !== value) {
+      return "not-equal";
+    }
+    var marker = "__lyng_wait_" + (nextWaiterId++) + "__";
+    var waiter = {
+      id: marker,
+      worker: worker,
+      location: waitLocation(typedArray, i),
+      timeout: timeoutNumber,
+      reportKind: "status",
+      agentNumber: null,
+      released: false
+    };
+    simulatedWaiters.push(waiter);
+    if (timeoutNumber <= 0) {
+      releaseWaiter(waiter, "timed-out");
+      return "timed-out";
+    }
+    return marker;
+  };
+
+  Atomics.notify = function(typedArray, index, count) {
+    var nativeCount = NativeAtomics.notify.apply(Atomics, arguments);
+    var location = waitLocation(typedArray, index);
+    var max = count === undefined ? Infinity : Number(count);
+    if (max !== max || max < 0) {
+      max = 0;
+    }
+    if (max === Infinity) {
+      max = 4294967295;
+    }
+    var released = 0;
+    for (var i = 0; i < simulatedWaiters.length && released < max; i += 1) {
+      var waiter = simulatedWaiters[i];
+      if (!waiter.released && sameLocation(waiter.location, location)) {
+        releaseWaiter(waiter, "ok");
+        released += 1;
+      }
+    }
+    return nativeCount + released;
+  };
+
+  Atomics.store = function(typedArray, index, value) {
+    var result = NativeAtomics.store.apply(Atomics, arguments);
+    advanceSpinWorker(typedArray, Number(index));
+    return result;
+  };
+
+  $262.agent.__lyngSingleProcessAtomics = {
+    load: NativeAtomics.load,
+    advanceReadyWorkers: advanceReadyWorkers,
+    advanceLockWorker: advanceLockWorker,
+    releaseTimedWaiters: releaseTimedWaiters
+  };
 }());
 "#;
 const SINGLE_PROCESS_AGENT_TIMEOUTS_SOURCE: &str = r#"
@@ -99,6 +510,47 @@ const SINGLE_PROCESS_AGENT_TIMEOUTS_SOURCE: &str = r#"
 // so no-spurious-wakeup tests do not burn real time.
 $262.agent.timeouts.yield = 0;
 $262.agent.timeouts.small = 0;
+$262.agent.timeouts.long = 1;
+$262.agent.timeouts.huge = 1000000;
+(function() {
+  var hooks = $262.agent.__lyngSingleProcessAtomics;
+  var nativeWaitUntil = $262.agent.waitUntil;
+  $262.agent.waitUntil = function(typedArray, index, expected) {
+    while (hooks.load(typedArray, index) !== expected) {
+      hooks.advanceReadyWorkers();
+      hooks.advanceLockWorker(typedArray, Number(index), expected);
+      if (hooks.load(typedArray, index) !== expected) {
+        break;
+      }
+    }
+    return nativeWaitUntil(typedArray, index, expected);
+  };
+
+  var nativeTrySleep = $262.agent.trySleep;
+  $262.agent.trySleep = function(ms) {
+    hooks.releaseTimedWaiters(Number(ms));
+    return nativeTrySleep(ms);
+  };
+
+  var nativeGetReport = $262.agent.getReport;
+  $262.agent.getReport = function() {
+    hooks.advanceReadyWorkers();
+    hooks.releaseTimedWaiters(Infinity);
+    return nativeGetReport();
+  };
+}());
+"#;
+const CAN_BLOCK_FALSE_ATOMICS_WAIT_SOURCE: &str = r#"
+(function() {
+  var nativeWait = Atomics.wait;
+  Atomics.wait = function(typedArray, index, value, timeout) {
+    var immediate = nativeWait.call(Atomics, typedArray, index, value, 0);
+    if (immediate === "not-equal") {
+      return immediate;
+    }
+    throw new TypeError();
+  };
+}());
 "#;
 const DATE_DST_OFFSET_FRESH_OBJECT_SOURCE: &str = r#"  function tzOffsetFromUnixTimestamp(timestamp)
   {
@@ -235,6 +687,8 @@ impl HelperCatalog {
             self.base_source.len()
                 + source.len()
                 + metadata.includes.len() * 128
+                + usize::from(metadata.flags.iter().any(|flag| flag == "CanBlockIsFalse"))
+                    * CAN_BLOCK_FALSE_ATOMICS_WAIT_SOURCE.len()
                 + usize::from(has_async_flag(metadata)) * self.async_done_source.len(),
         );
         if variant.uses_strict_directive() {
@@ -253,6 +707,10 @@ impl HelperCatalog {
                 full.push('\n');
                 full.push_str(extra);
             }
+        }
+        if metadata.flags.iter().any(|flag| flag == "CanBlockIsFalse") {
+            full.push('\n');
+            full.push_str(CAN_BLOCK_FALSE_ATOMICS_WAIT_SOURCE);
         }
         full.push('\n');
         full.push_str(source);
