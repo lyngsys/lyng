@@ -187,6 +187,13 @@ pub(crate) fn variants_for_metadata(metadata: &TestMetadata) -> Vec<TestVariant>
     if is_module_test(metadata) {
         return vec![TestVariant::Default];
     }
+    if metadata
+        .includes
+        .iter()
+        .any(|include| include == "sm/non262-strict-shell.js")
+    {
+        return vec![TestVariant::NonStrict];
+    }
     if metadata.flags.iter().any(|flag| flag == "onlyStrict") {
         return vec![TestVariant::Strict];
     }
@@ -206,7 +213,7 @@ pub(crate) fn effective_parse_source(source: &str, variant: TestVariant) -> Stri
 
 #[cfg(test)]
 mod tests {
-    use super::parse_metadata;
+    use super::{parse_metadata, variants_for_metadata, TestVariant};
 
     #[test]
     fn parse_metadata_preserves_negative_type() {
@@ -227,5 +234,21 @@ mod tests {
             .expect("negative metadata should be parsed");
         assert_eq!(negative.phase, "runtime");
         assert_eq!(negative.error_type.as_deref(), Some("TypeError"));
+    }
+
+    #[test]
+    fn spidermonkey_strict_shell_tests_are_non_strict_only() {
+        let metadata = parse_metadata(
+            r"
+            /*---
+            includes: [sm/non262-strict-shell.js]
+            ---*/
+            ",
+        );
+
+        assert_eq!(
+            variants_for_metadata(&metadata),
+            vec![TestVariant::NonStrict]
+        );
     }
 }
