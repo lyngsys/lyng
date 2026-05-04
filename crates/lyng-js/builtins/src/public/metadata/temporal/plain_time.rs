@@ -68,14 +68,6 @@ pub(super) fn plain_time_public_builtin_metadata(
     if entry == lyng_js_types::temporal_plain_time_until_builtin() {
         return Some(BuiltinEntryMetadata::new("until", 1, false, false));
     }
-    if entry == lyng_js_types::temporal_plain_time_to_plain_date_time_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "toPlainDateTime",
-            1,
-            false,
-            false,
-        ));
-    }
     if entry == lyng_js_types::temporal_plain_time_from_builtin() {
         return Some(BuiltinEntryMetadata::new("from", 1, false, false));
     }

@@ -53,7 +53,6 @@ pub(super) struct PlainTimeFunctions {
     round: ObjectRef,
     since: ObjectRef,
     until: ObjectRef,
-    to_plain_date_time: ObjectRef,
     from: ObjectRef,
     compare: ObjectRef,
 }
@@ -75,7 +74,6 @@ pub(super) struct PlainTimePrototypeProperties {
     pub(super) round_key: PropertyKey,
     pub(super) since_key: PropertyKey,
     pub(super) until_key: PropertyKey,
-    pub(super) to_plain_date_time_key: PropertyKey,
     pub(super) to_string_tag_key: PropertyKey,
     pub(super) prototype_tag: Value,
 }
@@ -283,17 +281,6 @@ pub(super) fn allocate_functions(
         public_builtin_metadata(lyng_js_types::temporal_plain_time_until_builtin())?,
         None,
     );
-    let to_plain_date_time = allocate_builtin_function_object(
-        agent,
-        context.realm,
-        context.global_env,
-        context.root_shape,
-        context.function_prototype,
-        context.object_prototype,
-        lyng_js_types::temporal_plain_time_to_plain_date_time_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_to_plain_date_time_builtin())?,
-        None,
-    );
     let from = allocate_builtin_function_object(
         agent,
         context.realm,
@@ -336,7 +323,6 @@ pub(super) fn allocate_functions(
         round,
         since,
         until,
-        to_plain_date_time,
         from,
         compare,
     })
@@ -540,15 +526,6 @@ pub(super) fn install_prototype_properties(
         plain_time_prototype,
         properties.until_key,
         Value::from_object_ref(functions.until),
-        true,
-        false,
-        true,
-    );
-    define_builtin_data_property(
-        agent,
-        plain_time_prototype,
-        properties.to_plain_date_time_key,
-        Value::from_object_ref(functions.to_plain_date_time),
         true,
         false,
         true,

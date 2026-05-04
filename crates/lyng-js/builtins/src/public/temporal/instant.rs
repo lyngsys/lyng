@@ -42,7 +42,6 @@ pub(super) struct InstantFunctions {
     compare: ObjectRef,
     epoch_nanoseconds_getter: ObjectRef,
     epoch_milliseconds_getter: ObjectRef,
-    epoch_seconds_getter: ObjectRef,
     to_string: ObjectRef,
     to_json: ObjectRef,
     to_locale_string: ObjectRef,
@@ -60,7 +59,6 @@ pub(super) struct InstantFunctions {
 pub(super) struct InstantPrototypeProperties {
     pub(super) epoch_nanoseconds_key: PropertyKey,
     pub(super) epoch_milliseconds_key: PropertyKey,
-    pub(super) epoch_seconds_key: PropertyKey,
     pub(super) to_json_key: PropertyKey,
     pub(super) to_locale_string_key: PropertyKey,
     pub(super) equals_key: PropertyKey,
@@ -158,17 +156,6 @@ pub(super) fn allocate_functions(
         public_builtin_metadata(
             lyng_js_types::temporal_instant_epoch_milliseconds_getter_builtin(),
         )?,
-        None,
-    );
-    let epoch_seconds_getter = allocate_builtin_function_object(
-        agent,
-        context.realm,
-        context.global_env,
-        context.root_shape,
-        context.function_prototype,
-        context.object_prototype,
-        lyng_js_types::temporal_instant_epoch_seconds_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_epoch_seconds_getter_builtin())?,
         None,
     );
     let to_string = allocate_builtin_function_object(
@@ -301,7 +288,6 @@ pub(super) fn allocate_functions(
         compare,
         epoch_nanoseconds_getter,
         epoch_milliseconds_getter,
-        epoch_seconds_getter,
         to_string,
         to_json,
         to_locale_string,
@@ -408,15 +394,6 @@ pub(super) fn install_prototype_properties(
         instant_prototype,
         properties.epoch_milliseconds_key,
         Some(functions.epoch_milliseconds_getter),
-        None,
-        false,
-        true,
-    );
-    define_builtin_accessor_property(
-        agent,
-        instant_prototype,
-        properties.epoch_seconds_key,
-        Some(functions.epoch_seconds_getter),
         None,
         false,
         true,

@@ -17,6 +17,7 @@ mod plain_month_day;
 mod plain_shared;
 mod plain_time;
 mod plain_year_month;
+mod surface;
 mod zoned_date_time;
 
 fn compile_unit(source: &str, atoms: &mut AtomTable) -> lyng_js_bytecode::CompiledScriptUnit {

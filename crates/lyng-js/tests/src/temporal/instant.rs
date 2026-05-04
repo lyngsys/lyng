@@ -62,13 +62,12 @@ fn temporal_instant_constructor_and_epoch_getters_round_trip_epoch_nanoseconds()
         r#"
         let instant = new Temporal.Instant(1234567890123456789n);
         (instant.epochNanoseconds === 1234567890123456789n ? 1 : 0)
-            + (instant.epochMilliseconds === 1234567890123 ? 2 : 0)
-            + (instant.epochSeconds === 1234567890 ? 4 : 0);
+            + (instant.epochMilliseconds === 1234567890123 ? 2 : 0);
         "#,
         lyng_js_host::NoopHostHooks,
     );
 
-    assert_eq!(result, Value::from_smi(7));
+    assert_eq!(result, Value::from_smi(3));
 }
 
 #[test]

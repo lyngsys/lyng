@@ -674,20 +674,17 @@ fn temporal_plain_time_to_string_honors_precision_and_rounding_options() {
 }
 
 #[test]
-fn temporal_plain_date_and_time_convert_to_plain_date_time() {
+fn temporal_plain_date_converts_to_plain_date_time() {
     let result = compile_and_run_string_with_host(
         r#"
         let date = new Temporal.PlainDate(2024, 2, 29);
         let time = new Temporal.PlainTime(1, 2, 3, 4, 5, 6);
         let defaultDateTime = date.toPlainDateTime();
         let dateTimeWithTime = date.toPlainDateTime(time);
-        let dateTimeWithDate = time.toPlainDateTime({ year: 1976, month: 11, day: 18 });
         [
             defaultDateTime instanceof Temporal.PlainDateTime,
             defaultDateTime.toString(),
             dateTimeWithTime.toString(),
-            dateTimeWithDate instanceof Temporal.PlainDateTime,
-            dateTimeWithDate.toString(),
         ].join("|");
         "#,
         lyng_js_host::NoopHostHooks,
@@ -695,6 +692,6 @@ fn temporal_plain_date_and_time_convert_to_plain_date_time() {
 
     assert_eq!(
         result,
-        "true|2024-02-29T00:00:00|2024-02-29T01:02:03.004005006|true|1976-11-18T01:02:03.004005006"
+        "true|2024-02-29T00:00:00|2024-02-29T01:02:03.004005006"
     );
 }

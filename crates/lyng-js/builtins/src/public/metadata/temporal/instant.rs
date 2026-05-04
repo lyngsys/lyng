@@ -45,14 +45,6 @@ pub(super) fn instant_public_builtin_metadata(
             false,
         ));
     }
-    if entry == lyng_js_types::temporal_instant_epoch_seconds_getter_builtin() {
-        return Some(BuiltinEntryMetadata::new(
-            "get epochSeconds",
-            0,
-            false,
-            false,
-        ));
-    }
     if entry == lyng_js_types::temporal_instant_to_string_builtin() {
         return Some(BuiltinEntryMetadata::new("toString", 0, false, false));
     }
