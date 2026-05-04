@@ -48,9 +48,17 @@ enum RegExpSource {
 
 fn escape_regexp_pattern_units(units: &[u16]) -> Vec<u16> {
     let mut escaped = Vec::with_capacity(units.len());
+    let mut trailing_backslashes = 0usize;
     for unit in units {
         match *unit {
-            0x002F => escaped.extend_from_slice(&[b'\\' as u16, b'/' as u16]),
+            0x002F if trailing_backslashes % 2 == 0 => {
+                escaped.extend_from_slice(&[b'\\' as u16, b'/' as u16]);
+                trailing_backslashes = 0;
+            }
+            0x002F => {
+                escaped.push(b'/' as u16);
+                trailing_backslashes = 0;
+            }
             0x000A => escaped.extend_from_slice(&[b'\\' as u16, b'n' as u16]),
             0x000D => escaped.extend_from_slice(&[b'\\' as u16, b'r' as u16]),
             0x2028 => escaped.extend_from_slice(&[
@@ -70,6 +78,11 @@ fn escape_regexp_pattern_units(units: &[u16]) -> Vec<u16> {
                 b'9' as u16,
             ]),
             unit => escaped.push(unit),
+        }
+        if *unit == b'\\' as u16 {
+            trailing_backslashes += 1;
+        } else if *unit != 0x002F {
+            trailing_backslashes = 0;
         }
     }
     escaped

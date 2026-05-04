@@ -6489,6 +6489,36 @@ fn script_core_regexp_source_escapes_literal_delimiters() {
 }
 
 #[test]
+fn script_core_regexp_source_preserves_escaped_slashes_for_clones() {
+    let result = compile_and_run(
+        r#"
+        let literal = /<(\/)?([^<>]+)>/;
+        let clone = new RegExp(literal, "y");
+        let match = clone.exec("</B>");
+        let split = "A<B>bold</B>and<CODE>coded</CODE>".split(literal);
+
+        let total = 0;
+        total += clone.source === literal.source ? 1 : 0;
+        total += match !== null && match[1] === "/" && match[2] === "B" ? 2 : 0;
+        total += split.length === 13
+            && split[1] === undefined
+            && split[2] === "B"
+            && split[4] === "/"
+            && split[5] === "B"
+            && split[7] === undefined
+            && split[8] === "CODE"
+            && split[10] === "/"
+            && split[11] === "CODE" ? 4 : 0;
+        total += new RegExp("/").source === "\\/" ? 8 : 0;
+        total += new RegExp("\n").source === "\\n" ? 16 : 0;
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
 fn script_core_regexp_unknown_script_property_aliases_match_generated_sets() {
     let result = compile_and_run_string(
         r#"
