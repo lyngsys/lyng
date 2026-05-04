@@ -12,7 +12,6 @@ use crate::public::{
     allocate_builtin_primitive_wrapper_object, public_builtin_metadata, reparent_builtin_object,
 };
 use lyng_js_env::{Agent, Intrinsics};
-use lyng_js_gc::{AllocationLifetime, SymbolFlags};
 use lyng_js_objects::{ObjectFlags, PrimitiveWrapperKind};
 use lyng_js_types::{
     function_prototype_builtin, internal_throw_type_error_builtin, EnvironmentRef, ObjectRef,
@@ -448,22 +447,9 @@ fn allocate_primitive_prototypes(
     let symbol_prototype = request
         .intrinsics
         .symbol_prototype()
-        .filter(|object| {
-            agent.objects().primitive_wrapper_kind(*object) == Some(PrimitiveWrapperKind::Symbol)
-        })
+        .filter(|object| agent.objects().primitive_wrapper_kind(*object).is_none())
         .unwrap_or_else(|| {
-            let symbol = agent.heap_mut().mutator().alloc_symbol(
-                None,
-                SymbolFlags::ordinary(),
-                AllocationLifetime::Default,
-            );
-            allocate_builtin_primitive_wrapper_object(
-                agent,
-                request.root_shape,
-                Some(object_prototype),
-                PrimitiveWrapperKind::Symbol,
-                Value::from_symbol_ref(symbol),
-            )
+            allocate_builtin_ordinary_object(agent, request.root_shape, Some(object_prototype))
         });
     reparent_builtin_object(agent, boolean_prototype, Some(object_prototype));
     reparent_builtin_object(agent, symbol_prototype, Some(object_prototype));

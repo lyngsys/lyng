@@ -7085,6 +7085,40 @@ fn script_core_supports_phase5_boolean_and_symbol_basics() {
 }
 
 #[test]
+fn script_core_symbol_prototype_and_wrapper_conversions_match_spec() {
+    let result = compile_and_run(
+        r#"
+        let sym = Symbol("phase6.symbol");
+        let score = 0;
+
+        try {
+            Symbol.prototype.valueOf();
+        } catch (error) {
+            score += error instanceof TypeError ? 1 : 0;
+        }
+
+        try {
+            Object.getOwnPropertyDescriptor(Symbol.prototype, "description").get.call(Symbol.prototype);
+        } catch (error) {
+            score += error instanceof TypeError ? 2 : 0;
+        }
+
+        try {
+            String(Object(sym));
+        } catch (error) {
+            score += error instanceof TypeError ? 4 : 0;
+        }
+
+        score += Object(sym).valueOf() === sym ? 8 : 0;
+        score += Object.prototype.toString.call(Object(sym)) === "[object Symbol]" ? 16 : 0;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(31));
+}
+
+#[test]
 fn script_core_rejects_symbol_construction() {
     let result = compile_and_run(
         r#"

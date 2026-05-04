@@ -80,30 +80,31 @@ fn string_value_from_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
 ) -> Result<Value, Cx::Error> {
-    let primitive = if value.is_object() {
-        let mut bridge = BuiltinToPrimitiveBridge { cx };
-        object::to_primitive(&mut bridge, value, object::ToPrimitiveHint::String)?
-    } else {
-        value
-    };
-
-    if let Some(string) = primitive.as_string_ref() {
+    if let Some(string) = value.as_string_ref() {
         return Ok(Value::from_string_ref(string));
     }
-    if let Some(symbol) = primitive.as_symbol_ref() {
+    if let Some(symbol) = value.as_symbol_ref() {
         let text = symbol_descriptive_string(cx, symbol)?;
         return Ok(string_value(cx, &text));
     }
-    if primitive.is_bigint() {
+    if value.is_object() {
+        let primitive = {
+            let mut bridge = BuiltinToPrimitiveBridge { cx };
+            object::to_primitive(&mut bridge, value, object::ToPrimitiveHint::String)?
+        };
+        let string = to_string_string_ref(cx, primitive)?;
+        return Ok(Value::from_string_ref(string));
+    }
+    if value.is_bigint() {
         let text = {
             let agent = cx.agent();
-            object::bigint_to_string(agent, primitive, 10)
+            object::bigint_to_string(agent, value, 10)
         };
         let text = map_completion(cx, text)?;
         return Ok(string_value(cx, &text));
     }
 
-    let text = cx.value_to_string_text(primitive)?;
+    let text = cx.value_to_string_text(value)?;
     Ok(string_value(cx, &text))
 }
 
