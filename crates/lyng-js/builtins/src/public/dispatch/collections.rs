@@ -610,7 +610,7 @@ fn perform_weak_map_constructor_entries<Cx: PublicBuiltinDispatchContext>(
         };
         let next_value = match next_value {
             Ok(next_value) => next_value,
-            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            Err(error) => return Err(error),
         };
         let Some(entry) = next_value.as_object_ref() else {
             let error = type_error(cx);
@@ -668,7 +668,7 @@ fn perform_weak_set_constructor_values<Cx: PublicBuiltinDispatchContext>(
         };
         let next_value = match next_value {
             Ok(next_value) => next_value,
-            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
+            Err(error) => return Err(error),
         };
         if let Err(error) =
             cx.call_to_completion(adder, Value::from_object_ref(object), &[next_value])

@@ -220,11 +220,11 @@ fn get_method<Cx: IteratorOpsContext>(
 
 fn get_iterator_from_method<Cx: IteratorOpsContext>(
     cx: &mut Cx,
-    object: ObjectRef,
+    receiver: Value,
     method: ObjectRef,
     kind: IteratorKind,
 ) -> Result<IteratorRecord, Cx::Error> {
-    let iterator = cx.call_to_completion(method, Value::from_object_ref(object), &[])?;
+    let iterator = cx.call_to_completion(method, receiver, &[])?;
     let iterator_object = iterator.as_object_ref().ok_or_else(|| cx.type_error())?;
     let next_key = {
         let agent = cx.agent();
@@ -294,47 +294,27 @@ pub fn get_iterator<Cx: IteratorOpsContext>(
     cx: &mut Cx,
     value: Value,
 ) -> Result<IteratorRecord, Cx::Error> {
-    let realm = cx.realm();
-    let object = {
-        let agent = cx.agent();
-        object::to_object(agent, realm, value)
-    };
-    let object = map_completion(cx, object)?;
     let iterator_symbol = {
         let agent = cx.agent();
         agent.well_known_symbol(WellKnownSymbolId::Iterator)
     }
     .ok_or_else(|| cx.type_error())?;
-    let method = get_method(
-        cx,
-        Value::from_object_ref(object),
-        PropertyKey::from_symbol(iterator_symbol),
-    )?
-    .ok_or_else(|| cx.type_error())?;
-    get_iterator_from_method(cx, object, method, IteratorKind::Sync)
+    let method = get_method(cx, value, PropertyKey::from_symbol(iterator_symbol))?
+        .ok_or_else(|| cx.type_error())?;
+    get_iterator_from_method(cx, value, method, IteratorKind::Sync)
 }
 
 pub fn get_async_iterator<Cx: IteratorOpsContext>(
     cx: &mut Cx,
     value: Value,
 ) -> Result<IteratorRecord, Cx::Error> {
-    let realm = cx.realm();
-    let object = {
-        let agent = cx.agent();
-        object::to_object(agent, realm, value)
-    };
-    let object = map_completion(cx, object)?;
     let async_iterator_symbol = {
         let agent = cx.agent();
         agent.well_known_symbol(WellKnownSymbolId::AsyncIterator)
     }
     .ok_or_else(|| cx.type_error())?;
-    if let Some(method) = get_method(
-        cx,
-        Value::from_object_ref(object),
-        PropertyKey::from_symbol(async_iterator_symbol),
-    )? {
-        return get_iterator_from_method(cx, object, method, IteratorKind::Async);
+    if let Some(method) = get_method(cx, value, PropertyKey::from_symbol(async_iterator_symbol))? {
+        return get_iterator_from_method(cx, value, method, IteratorKind::Async);
     }
 
     let iterator_symbol = {
@@ -342,13 +322,9 @@ pub fn get_async_iterator<Cx: IteratorOpsContext>(
         agent.well_known_symbol(WellKnownSymbolId::Iterator)
     }
     .ok_or_else(|| cx.type_error())?;
-    let method = get_method(
-        cx,
-        Value::from_object_ref(object),
-        PropertyKey::from_symbol(iterator_symbol),
-    )?
-    .ok_or_else(|| cx.type_error())?;
-    get_iterator_from_method(cx, object, method, IteratorKind::AsyncFromSync)
+    let method = get_method(cx, value, PropertyKey::from_symbol(iterator_symbol))?
+        .ok_or_else(|| cx.type_error())?;
+    get_iterator_from_method(cx, value, method, IteratorKind::AsyncFromSync)
 }
 
 pub fn iterator_next<Cx: IteratorOpsContext>(

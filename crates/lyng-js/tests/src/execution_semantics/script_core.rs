@@ -5938,6 +5938,114 @@ fn script_core_map_and_set_iterables_preserve_size_and_insertion_order() {
 }
 
 #[test]
+fn script_core_collection_constructors_follow_iterator_protocol_edges() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+
+        let nextArgCount = -1;
+        let iterable = {
+            [Symbol.iterator]() {
+                return this;
+            },
+            next() {
+                nextArgCount = arguments.length;
+                return { done: true };
+            }
+        };
+        new Map(iterable);
+        total += nextArgCount === 0 ? 1 : 0;
+
+        let typeofThis = "unset";
+        Number.prototype[Symbol.iterator] = function() {
+            "use strict";
+            typeofThis = typeof this;
+            return {
+                next() {
+                    return { done: true };
+                }
+            };
+        };
+        new Map(0);
+        delete Number.prototype[Symbol.iterator];
+        total += typeofThis === "number" ? 2 : 0;
+
+        function doesNotCloseWhenIteratorValueThrows(Ctor) {
+            let closed = false;
+            let caught = false;
+            let source = {
+                [Symbol.iterator]() {
+                    return {
+                        next() {
+                            return {
+                                get value() {
+                                    throw "value throws";
+                                },
+                                done: false
+                            };
+                        },
+                        return() {
+                            closed = true;
+                            return {};
+                        }
+                    };
+                }
+            };
+
+            try {
+                new Ctor(source);
+            } catch (error) {
+                caught = error === "value throws";
+            }
+            return caught && closed === false;
+        }
+
+        function closesWhenMapEntryKeyThrows(Ctor) {
+            let closed = false;
+            let caught = false;
+            let source = {
+                [Symbol.iterator]() {
+                    return {
+                        next() {
+                            return {
+                                value: {
+                                    get 0() {
+                                        throw "key throws";
+                                    }
+                                },
+                                done: false
+                            };
+                        },
+                        return() {
+                            closed = true;
+                            return {};
+                        }
+                    };
+                }
+            };
+
+            try {
+                new Ctor(source);
+            } catch (error) {
+                caught = error === "key throws";
+            }
+            return caught && closed === true;
+        }
+
+        total += doesNotCloseWhenIteratorValueThrows(Map) ? 4 : 0;
+        total += doesNotCloseWhenIteratorValueThrows(WeakMap) ? 8 : 0;
+        total += doesNotCloseWhenIteratorValueThrows(Set) ? 16 : 0;
+        total += doesNotCloseWhenIteratorValueThrows(WeakSet) ? 32 : 0;
+        total += closesWhenMapEntryKeyThrows(Map) ? 64 : 0;
+        total += closesWhenMapEntryKeyThrows(WeakMap) ? 128 : 0;
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(255));
+}
+
+#[test]
 fn script_core_set_methods_observe_receiver_mutation_order() {
     let result = compile_and_run(
         r#"
