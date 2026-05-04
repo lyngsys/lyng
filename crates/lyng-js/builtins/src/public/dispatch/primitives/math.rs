@@ -5,7 +5,11 @@ use super::super::{
 use crate::BuiltinInvocation;
 use lyng_js_ops::iterator;
 use lyng_js_types::{BuiltinFunctionId, Value};
+use std::f64::consts::LN_2;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+const ACOSH_LARGE_THRESHOLD: f64 = 268_435_456.0;
+const ATANH_TINY_THRESHOLD: f64 = 3.725_290_298_461_914e-9;
 
 pub(super) fn dispatch_math_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
@@ -184,7 +188,7 @@ fn math_acosh_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    math_unary_number_builtin(cx, invocation, f64::acosh)
+    math_unary_number_builtin(cx, invocation, acosh_number)
 }
 
 fn math_asin_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -221,7 +225,53 @@ fn math_atanh_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    math_unary_number_builtin(cx, invocation, f64::atanh)
+    math_unary_number_builtin(cx, invocation, atanh_number)
+}
+
+fn acosh_number(value: f64) -> f64 {
+    if value.is_nan() || value < 1.0 {
+        return f64::NAN;
+    }
+    if value == 1.0 {
+        return 0.0;
+    }
+    if value.is_infinite() {
+        return value;
+    }
+    if value >= ACOSH_LARGE_THRESHOLD {
+        return value.ln() + LN_2;
+    }
+    if value > 2.0 {
+        return (2.0 * value - 1.0 / (value + (value * value - 1.0).sqrt())).ln();
+    }
+
+    let delta = value - 1.0;
+    (delta + (2.0 * delta + delta * delta).sqrt()).ln_1p()
+}
+
+fn atanh_number(value: f64) -> f64 {
+    let abs = value.abs();
+    if value.is_nan() || abs > 1.0 {
+        return f64::NAN;
+    }
+    if abs == 1.0 {
+        return value / 0.0;
+    }
+    if abs < ATANH_TINY_THRESHOLD {
+        return value;
+    }
+
+    let result = if abs < 0.5 {
+        let doubled = abs + abs;
+        0.5 * (doubled + doubled * abs / (1.0 - abs)).ln_1p()
+    } else {
+        0.5 * ((abs + abs) / (1.0 - abs)).ln_1p()
+    };
+    if value.is_sign_negative() {
+        -result
+    } else {
+        result
+    }
 }
 
 fn math_cbrt_builtin<Cx: PublicBuiltinDispatchContext>(

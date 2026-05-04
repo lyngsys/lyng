@@ -5447,6 +5447,44 @@ fn script_core_supports_extended_math_builtins() {
 }
 
 #[test]
+fn script_core_math_approximation_builtins_match_staging_tolerances() {
+    let result = compile_and_run(
+        r#"
+        const f = new Float64Array([0, 0]);
+        const u = new Uint32Array(f.buffer);
+        let endian = 0;
+
+        function diff(a, b) {
+            f[0] = a;
+            f[1] = b;
+            return Math.abs(
+                (u[3 - endian] - u[1 - endian]) * 0x100000000 +
+                u[2 + endian] - u[0 + endian]
+            );
+        }
+
+        if (diff(2, 4) === 0x100000) endian = 1;
+
+        function near(a, b, tolerance) {
+            let target = b === 0 ? a * 0 : b;
+            return diff(a, target) <= tolerance;
+        }
+
+        let score = 0;
+        score += near(Math.acosh(1.000007152557373), 0.003782208044661295, 9) ? 1 : 0;
+        score += near(Math.acosh(1.0000000001), 0.000014142136208675862, 9) ? 2 : 0;
+        score += near(Math.acosh(1e300), 691.4686750787737, 9) ? 4 : 0;
+        score += near(Math.atanh(-0.999992847442627), -6.2705920974657525, 2) ? 8 : 0;
+        score += near(Math.atanh(-0.9999828338623047), -5.832855225378502, 2) ? 16 : 0;
+        score += near(Math.atanh(0.3), 0.3095196042031117, 2) ? 32 : 0;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
 fn script_core_number_prototype_carries_primitive_data_slot_but_bigint_does_not() {
     let result = compile_and_run(
         r#"
