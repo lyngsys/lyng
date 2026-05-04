@@ -8,10 +8,10 @@ use super::{
         promise_capability_reject, promise_capability_resolve, promise_default_constructor,
         promise_resolve_method,
     },
-    property_key_from_text, proxy_get_own_property, proxy_own_property_keys, range_error,
-    set_property_on_object, string_from_code_units, string_ref_code_units, string_ref_text,
-    string_this_ref, to_number_for_builtin, type_error, BuiltinIteratorBridge,
-    PublicBuiltinDispatchContext,
+    property_key_from_text, proxy_get_own_property, proxy_get_prototype_of,
+    proxy_own_property_keys, range_error, set_property_on_object, string_from_code_units,
+    string_ref_code_units, string_ref_text, string_this_ref, to_number_for_builtin, type_error,
+    BuiltinIteratorBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use lyng_js_common::{AtomId, WellKnownAtom};
@@ -1630,9 +1630,6 @@ fn iterator_helper_return_builtin<Cx: PublicBuiltinDispatchContext>(
     if iterator_helper_running(cx, helper)? {
         return Err(type_error(cx));
     }
-    if iterator_helper_done(cx, helper)? {
-        return create_iterator_result_value(cx, Value::undefined(), true);
-    }
     let kind = IteratorHelperKind::from_value(iterator_slot_value_for_builtin(
         cx,
         helper,
@@ -1640,6 +1637,15 @@ fn iterator_helper_return_builtin<Cx: PublicBuiltinDispatchContext>(
         ITERATOR_HELPER_KIND_SLOT,
     )?)
     .ok_or_else(|| type_error(cx))?;
+    if kind == IteratorHelperKind::Wrap {
+        set_iterator_helper_running(cx, helper, true)?;
+        let result = iterator_helper_wrap_return(cx, helper);
+        set_iterator_helper_running(cx, helper, false)?;
+        return result;
+    }
+    if iterator_helper_done(cx, helper)? {
+        return create_iterator_result_value(cx, Value::undefined(), true);
+    }
     if matches!(kind, IteratorHelperKind::Zip | IteratorHelperKind::ZipKeyed) {
         set_iterator_helper_done(cx, helper)?;
         let started = iterator_helper_zip_started(cx, helper)?;
@@ -1654,11 +1660,6 @@ fn iterator_helper_return_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     set_iterator_helper_running(cx, helper, true)?;
     set_iterator_helper_done(cx, helper)?;
-    if kind == IteratorHelperKind::Wrap {
-        let result = iterator_helper_wrap_return(cx, helper);
-        set_iterator_helper_running(cx, helper, false)?;
-        return result;
-    }
     if kind == IteratorHelperKind::Concat {
         let result = iterator_helper_concat_return(cx, helper);
         set_iterator_helper_running(cx, helper, false)?;
@@ -1702,12 +1703,15 @@ fn iterator_helper_wrap_next<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     helper: ObjectRef,
 ) -> Result<Value, Cx::Error> {
-    let iterator_record = iterator_helper_record(cx, helper)?;
-    let result = {
-        let mut bridge = BuiltinIteratorBridge { cx };
-        iterator::iterator_next(&mut bridge, &iterator_record, None)
-    }?;
-    Ok(Value::from_object_ref(result))
+    let iterated = iterator_helper_iterated_object(cx, helper)?;
+    let next_method = iterator_slot_value_for_builtin(
+        cx,
+        helper,
+        OrdinaryObjectData::IteratorHelper,
+        ITERATOR_HELPER_NEXT_METHOD_SLOT,
+    )?;
+    let next_method = cx.require_callable_object(next_method)?;
+    cx.call_to_completion(next_method, Value::from_object_ref(iterated), &[])
 }
 
 fn iterator_helper_wrap_return<Cx: PublicBuiltinDispatchContext>(
@@ -3068,18 +3072,7 @@ fn iterator_prototype_in_chain<Cx: PublicBuiltinDispatchContext>(
         if steps > 1024 {
             break;
         }
-        let parent = {
-            let agent = cx.agent();
-            agent
-                .objects()
-                .get_prototype_of(agent.heap().view(), object)
-        };
-        let next = match parent {
-            Ok(Some(parent_object)) => Some(parent_object),
-            Ok(None) => None,
-            Err(_) => return Err(type_error(cx)),
-        };
-        current = next;
+        current = proxy_get_prototype_of(cx, object)?;
     }
     Ok(false)
 }

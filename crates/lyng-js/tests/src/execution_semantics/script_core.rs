@@ -6046,6 +6046,99 @@ fn script_core_collection_constructors_follow_iterator_protocol_edges() {
 }
 
 #[test]
+fn script_core_iterator_from_wrappers_forward_without_helper_state() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+
+        try {
+            let primitiveNext = Iterator.from({
+                next() {
+                    return 42;
+                }
+            }).next();
+            total += primitiveNext === 42 ? 1 : 0;
+        } catch (error) {
+        }
+
+        let iter = {
+            next() {
+                return { done: false, value: 0 };
+            },
+            return(value = "old return") {
+                return { done: true, value };
+            }
+        };
+        let wrap = Iterator.from(iter);
+        let firstReturn = wrap.return("ignored");
+        total += firstReturn.done === true && firstReturn.value === "old return" ? 2 : 0;
+
+        iter.return = function() {
+            throw "new return";
+        };
+        try {
+            wrap.return();
+        } catch (error) {
+            total += error === "new return" ? 4 : 0;
+        }
+
+        iter.return = null;
+        let nullReturn = wrap.return("ignored");
+        total += nullReturn.done === true && nullReturn.value === undefined ? 8 : 0;
+
+        let log = [];
+        let proxyHandler = {
+            get(target, key, receiver) {
+                log.push("get:" + String(key));
+                let item = Reflect.get(target, key, receiver);
+                if (typeof item === "function") {
+                    return item.bind(receiver);
+                }
+                return item;
+            },
+            getPrototypeOf(target) {
+                log.push("proto");
+                return Reflect.getPrototypeOf(target);
+            }
+        };
+        let proxiedIterator = new Proxy({
+            next() {
+                return { done: false, value: 1 };
+            }
+        }, proxyHandler);
+        let proxiedWrap = Iterator.from(proxiedIterator);
+        proxiedWrap.next();
+        proxiedWrap.next();
+        total += log.join("|") === "get:Symbol(Symbol.iterator)|get:next|proto" ? 16 : 0;
+
+        let prototypeHits = 0;
+        class Iter extends Iterator {
+            [Symbol.iterator]() {
+                return this;
+            }
+            next() {
+                return { done: false, value: 2 };
+            }
+        }
+        let iteratorProxy = new Proxy(new Iter(), {
+            get(target, key, receiver) {
+                return Reflect.get(target, key, receiver);
+            },
+            getPrototypeOf(target) {
+                prototypeHits += 1;
+                return Reflect.getPrototypeOf(target);
+            }
+        });
+        total += Iterator.from(iteratorProxy) === iteratorProxy && prototypeHits > 0 ? 32 : 0;
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
 fn script_core_set_methods_observe_receiver_mutation_order() {
     let result = compile_and_run(
         r#"
