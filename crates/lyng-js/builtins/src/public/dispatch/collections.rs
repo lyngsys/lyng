@@ -1334,7 +1334,7 @@ fn set_record_has<Cx: PublicBuiltinDispatchContext>(
     let result =
         cx.call_to_completion(record.has, Value::from_object_ref(record.object), &[value])?;
     let agent = cx.agent();
-    let to_bool = read::to_boolean(agent.heap().view(), result);
+    let to_bool = read::to_boolean_agent(agent, result);
     map_completion(cx, to_bool)
 }
 

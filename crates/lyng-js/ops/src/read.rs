@@ -5,6 +5,7 @@ use crate::convert::{
 };
 use crate::pure;
 use lyng_js_common::AtomId;
+use lyng_js_env::Agent;
 use lyng_js_gc::{BigIntSign, PrimitiveHeapView};
 use lyng_js_types::{BigIntRef, Completion, StringRef, Value};
 
@@ -133,6 +134,22 @@ pub fn to_boolean(heap: PrimitiveHeapView<'_>, value: Value) -> Completion<bool>
             .is_zero());
     }
     Ok(true)
+}
+
+/// ECMAScript `ToBoolean` with Annex B `[[IsHTMLDDA]]` object support.
+///
+/// # Errors
+///
+/// Returns a Phase 2 type error if a string or bigint handle does not resolve
+/// in the shared primitive heap.
+pub fn to_boolean_agent(agent: &Agent, value: Value) -> Completion<bool> {
+    if value
+        .as_object_ref()
+        .is_some_and(|object| agent.objects().is_html_dda_object(object))
+    {
+        return Ok(false);
+    }
+    to_boolean(agent.heap().view(), value)
 }
 
 /// ECMAScript `IsStrictlyEqual` over the shared primitive heap view.

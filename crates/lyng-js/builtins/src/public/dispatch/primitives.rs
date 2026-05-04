@@ -372,7 +372,7 @@ fn boolean_builtin<Cx: PublicBuiltinDispatchContext>(
         .unwrap_or(Value::undefined());
     let boolean = {
         let agent = cx.agent();
-        read::to_boolean(agent.heap().view(), argument)
+        read::to_boolean_agent(agent, argument)
     };
     let boolean = map_completion(cx, boolean)?;
     if invocation.new_target().is_none() {

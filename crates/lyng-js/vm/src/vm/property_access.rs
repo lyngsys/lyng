@@ -388,7 +388,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
                 PropertyKey::from_atom(WellKnownAtom::enumerable.id()),
             )?;
             descriptor.set_enumerable(
-                read::to_boolean(self.agent.heap().view(), enumerable).map_err(VmError::Abrupt)?,
+                read::to_boolean_agent(self.agent, enumerable).map_err(VmError::Abrupt)?,
             );
         }
         if object::has_property_in_context(
@@ -401,8 +401,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
                 PropertyKey::from_atom(WellKnownAtom::configurable.id()),
             )?;
             descriptor.set_configurable(
-                read::to_boolean(self.agent.heap().view(), configurable)
-                    .map_err(VmError::Abrupt)?,
+                read::to_boolean_agent(self.agent, configurable).map_err(VmError::Abrupt)?,
             );
         }
         if object::has_property_in_context(
@@ -426,7 +425,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
                 PropertyKey::from_atom(WellKnownAtom::writable.id()),
             )?;
             descriptor.set_writable(
-                read::to_boolean(self.agent.heap().view(), writable).map_err(VmError::Abrupt)?,
+                read::to_boolean_agent(self.agent, writable).map_err(VmError::Abrupt)?,
             );
         }
         if object::has_property_in_context(

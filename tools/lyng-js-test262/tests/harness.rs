@@ -201,7 +201,35 @@ fn runner_exposes_eval_script_and_create_realm_through_external_embedding() {
         assert.sameValue(typeof $262.agent.getReport, "function");
         assert.sameValue(typeof $262.agent.sleep, "function");
         assert.sameValue(typeof $262.agent.monotonicNow, "function");
-        assert.sameValue("IsHTMLDDA" in $262, false);
+        assert.sameValue("IsHTMLDDA" in $262, true);
+        "#,
+    );
+
+    assert_skipped(&report, 0, 0);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn runner_installs_is_htmldda_test262_host_object() {
+    let root = make_temp_dir();
+    let entry_path = root.join("is-html-dda.js");
+
+    let report = run_passing_test(
+        &entry_path,
+        r#"
+        /*---
+        features: [IsHTMLDDA, coalesce-expression]
+        ---*/
+        const value = $262.IsHTMLDDA;
+        assert.sameValue(typeof value, "undefined");
+        assert.sameValue(Boolean(value), false);
+        assert.sameValue(value == undefined, true);
+        assert.sameValue(value == null, true);
+        assert.sameValue(value === undefined, false);
+        assert.sameValue(value === null, false);
+        assert.sameValue(Object.is(value, undefined), false);
+        assert.sameValue(value ?? "fallback", value);
+        assert.sameValue(value(), null);
         "#,
     );
 

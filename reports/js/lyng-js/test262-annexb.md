@@ -22,19 +22,31 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Candidate files | `1086` |
 | Excluded files from selection | `0` |
 | Selected files | `1086` |
-| Runnable files | `1051` |
-| Passed files | `1051` |
+| Runnable files | `1086` |
+| Passed files | `1086` |
 | Failed files | `0` |
 | Panicked files | `0` |
-| Skipped files | `35` |
-| Pass rate (selected files) | `96.78%` |
+| Skipped files | `0` |
+| Pass rate (selected files) | `100.00%` |
 | Selected variant executions | `1377` |
-| Runnable variant executions | `1307` |
-| Time | `1.5s` |
+| Runnable variant executions | `1377` |
+| Time | `1.4s` |
 
 ## Delta From Previous Report
 
-No previous report summary was available at this report path.
+| Metric | Previous | Current | Delta |
+| --- | ---: | ---: | ---: |
+| Candidate files | `1086` | `1086` | `+0` |
+| Excluded files from selection | `0` | `0` | `+0` |
+| Selected files | `1086` | `1086` | `+0` |
+| Runnable files | `1051` | `1086` | `+35` |
+| Passed files | `1051` | `1086` | `+35` |
+| Failed files | `0` | `0` | `+0` |
+| Panicked files | `0` | `0` | `+0` |
+| Skipped files | `35` | `0` | `-35` |
+| Pass rate (selected files) | `96.78%` | `100.00%` | `+3.22pp` |
+| Selected variant executions | `1377` | `1377` | `+0` |
+| Runnable variant executions | `1307` | `1377` | `+70` |
 
 ## Selection Exclusions
 
@@ -44,22 +56,22 @@ No files were excluded from selection.
 
 | Category | Selected files | Runnable files | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `annexB` | `1086` | `1051` | `1051` | `0` | `35` | `0` | `96.78%` |
+| `annexB` | `1086` | `1086` | `1086` | `0` | `0` | `0` | `100.00%` |
 
 ## Variant Execution Breakdown
 
 | Metric | Count |
 | --- | ---: |
 | Selected variant executions | `1377` |
-| Runnable variant executions | `1307` |
-| Passed variants | `1307` |
+| Runnable variant executions | `1377` |
+| Passed variants | `1377` |
 | Failed variants | `0` |
 | Panicked variants | `0` |
-| Skipped variants | `70` |
+| Skipped variants | `0` |
 
 | Category | Selected variants | Runnable variants | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `annexB` | `1377` | `1307` | `1307` | `0` | `70` | `0` | `94.92%` |
+| `annexB` | `1377` | `1377` | `1377` | `0` | `0` | `0` | `100.00%` |
 
 ## Slowest Test Timings
 
@@ -69,140 +81,96 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Test file | Variants | Total time | Slowest variant |
 | --- | ---: | ---: | ---: |
-| `annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js` | `2` | `1.221s` | `0.611s` |
-| `annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js` | `2` | `1.214s` | `0.607s` |
-| `annexB/built-ins/String/prototype/substr/start-and-length-as-numbers.js` | `2` | `0.125s` | `0.063s` |
-| `annexB/built-ins/Date/prototype/getYear/B.2.4.js` | `2` | `0.020s` | `0.010s` |
-| `annexB/built-ins/Date/prototype/getYear/length.js` | `2` | `0.020s` | `0.010s` |
-| `annexB/built-ins/RegExp/RegExp-control-escape-russian-letter.js` | `2` | `0.010s` | `0.005s` |
-| `annexB/built-ins/RegExp/RegExp-invalid-control-escape-character-class.js` | `2` | `0.009s` | `0.005s` |
-| `annexB/built-ins/RegExp/legacy-accessors/index/this-cross-realm-constructor.js` | `2` | `0.009s` | `0.005s` |
-| `annexB/built-ins/RegExp/legacy-accessors/input/this-cross-realm-constructor.js` | `2` | `0.008s` | `0.004s` |
-| `annexB/built-ins/String/prototype/bold/prop-desc.js` | `2` | `0.008s` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/leftContext/this-cross-realm-constructor.js` | `2` | `0.008s` | `0.004s` |
+| `annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js` | `2` | `0.968s` | `0.486s` |
+| `annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js` | `2` | `0.947s` | `0.475s` |
+| `annexB/built-ins/String/prototype/substr/start-and-length-as-numbers.js` | `2` | `0.128s` | `0.065s` |
+| `annexB/built-ins/Date/prototype/getYear/B.2.4.js` | `2` | `0.021s` | `0.011s` |
+| `annexB/built-ins/Array/from/iterator-method-emulates-undefined.js` | `2` | `0.020s` | `0.010s` |
+| `annexB/language/expressions/does-not-equals/emulates-undefined.js` | `2` | `0.013s` | `0.007s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-block-scoping.js` | `1` | `0.011s` | `0.011s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-existing-block-fn-update.js` | `1` | `0.010s` | `0.010s` |
+| `annexB/built-ins/RegExp/RegExp-control-escape-russian-letter.js` | `2` | `0.009s` | `0.005s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-existing-block-fn-no-init.js` | `1` | `0.009s` | `0.009s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-existing-fn-no-init.js` | `1` | `0.009s` | `0.009s` |
+| `annexB/built-ins/RegExp/legacy-accessors/index/this-cross-realm-constructor.js` | `2` | `0.009s` | `0.004s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err-for-of.js` | `1` | `0.008s` | `0.008s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err-for-in.js` | `1` | `0.008s` | `0.008s` |
+| `annexB/built-ins/String/prototype/substr/length.js` | `2` | `0.008s` | `0.004s` |
 | `annexB/built-ins/RegExp/prototype/compile/this-cross-realm-instance.js` | `2` | `0.008s` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/rightContext/this-cross-realm-constructor.js` | `2` | `0.007s` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/lastMatch/this-cross-realm-constructor.js` | `2` | `0.007s` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/index/prop-desc.js` | `2` | `0.007s` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/lastParen/this-cross-realm-constructor.js` | `2` | `0.007s` | `0.004s` |
-| `annexB/built-ins/String/prototype/fixed/name.js` | `2` | `0.007s` | `0.003s` |
-| `annexB/built-ins/String/prototype/bold/this-val-tostring-err.js` | `2` | `0.007s` | `0.003s` |
-| `annexB/built-ins/RegExp/legacy-accessors/lastParen/prop-desc.js` | `2` | `0.007s` | `0.003s` |
-| `annexB/built-ins/String/prototype/small/length.js` | `2` | `0.006s` | `0.003s` |
-| `annexB/built-ins/String/prototype/small/name.js` | `2` | `0.006s` | `0.003s` |
-| `annexB/built-ins/RegExp/legacy-accessors/lastMatch/prop-desc.js` | `2` | `0.006s` | `0.003s` |
-| `annexB/built-ins/Date/prototype/getYear/name.js` | `2` | `0.006s` | `0.003s` |
-| `annexB/language/function-code/if-decl-else-decl-a-func-existing-block-fn-no-init.js` | `1` | `0.006s` | `0.006s` |
-| `annexB/built-ins/escape/name.js` | `2` | `0.006s` | `0.003s` |
+| `annexB/built-ins/RegExp/legacy-accessors/input/this-cross-realm-constructor.js` | `2` | `0.008s` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/lastMatch/this-cross-realm-constructor.js` | `2` | `0.008s` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/lastParen/this-cross-realm-constructor.js` | `2` | `0.008s` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/rightContext/this-cross-realm-constructor.js` | `2` | `0.008s` | `0.004s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err-try.js` | `1` | `0.007s` | `0.007s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err-for.js` | `1` | `0.007s` | `0.007s` |
+| `annexB/built-ins/Date/prototype/getYear/length.js` | `2` | `0.007s` | `0.004s` |
+| `annexB/built-ins/RegExp/RegExp-invalid-control-escape-character-class.js` | `2` | `0.007s` | `0.004s` |
+| `annexB/built-ins/Date/prototype/getYear/name.js` | `2` | `0.007s` | `0.004s` |
 
 ### Slowest Variants
 
 | Test variant | Outcome | Time |
 | --- | --- | ---: |
-| `annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js [non-strict]` | `pass` | `0.611s` |
-| `annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js [strict]` | `pass` | `0.610s` |
-| `annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js [non-strict]` | `pass` | `0.607s` |
-| `annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js [strict]` | `pass` | `0.607s` |
-| `annexB/built-ins/String/prototype/substr/start-and-length-as-numbers.js [strict]` | `pass` | `0.063s` |
+| `annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js [non-strict]` | `pass` | `0.486s` |
+| `annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js [strict]` | `pass` | `0.482s` |
+| `annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js [non-strict]` | `pass` | `0.475s` |
+| `annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js [strict]` | `pass` | `0.473s` |
+| `annexB/built-ins/String/prototype/substr/start-and-length-as-numbers.js [strict]` | `pass` | `0.065s` |
 | `annexB/built-ins/String/prototype/substr/start-and-length-as-numbers.js [non-strict]` | `pass` | `0.063s` |
-| `annexB/built-ins/Date/prototype/getYear/length.js [non-strict]` | `pass` | `0.010s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-block-scoping.js [non-strict]` | `pass` | `0.011s` |
+| `annexB/built-ins/Date/prototype/getYear/B.2.4.js [non-strict]` | `pass` | `0.011s` |
 | `annexB/built-ins/Date/prototype/getYear/B.2.4.js [strict]` | `pass` | `0.010s` |
-| `annexB/built-ins/Date/prototype/getYear/B.2.4.js [non-strict]` | `pass` | `0.010s` |
-| `annexB/built-ins/Date/prototype/getYear/length.js [strict]` | `pass` | `0.010s` |
-| `annexB/language/function-code/if-decl-else-decl-a-func-existing-block-fn-no-init.js [non-strict]` | `pass` | `0.006s` |
-| `annexB/language/function-code/if-stmt-else-decl-func-skip-early-err-for-in.js [non-strict]` | `pass` | `0.006s` |
-| `annexB/language/function-code/if-decl-else-decl-a-func-existing-fn-no-init.js [non-strict]` | `pass` | `0.006s` |
-| `annexB/language/function-code/if-stmt-else-decl-func-skip-early-err-for.js [non-strict]` | `pass` | `0.005s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-existing-block-fn-update.js [non-strict]` | `pass` | `0.010s` |
+| `annexB/built-ins/Array/from/iterator-method-emulates-undefined.js [strict]` | `pass` | `0.010s` |
+| `annexB/built-ins/Array/from/iterator-method-emulates-undefined.js [non-strict]` | `pass` | `0.010s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-existing-block-fn-no-init.js [non-strict]` | `pass` | `0.009s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-existing-fn-no-init.js [non-strict]` | `pass` | `0.009s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err-for-of.js [non-strict]` | `pass` | `0.008s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err-for-in.js [non-strict]` | `pass` | `0.008s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err-try.js [non-strict]` | `pass` | `0.007s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err-for.js [non-strict]` | `pass` | `0.007s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err.js [non-strict]` | `pass` | `0.007s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-init.js [non-strict]` | `pass` | `0.007s` |
+| `annexB/language/function-code/switch-case-func-init.js [non-strict]` | `pass` | `0.007s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-existing-var-update.js [non-strict]` | `pass` | `0.007s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-param.js [non-strict]` | `pass` | `0.007s` |
+| `annexB/language/expressions/does-not-equals/emulates-undefined.js [non-strict]` | `pass` | `0.007s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-existing-fn-update.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err-block.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/switch-case-func-skip-dft-param.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-update.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/switch-case-func-no-skip-try.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-skip-early-err-try.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/if-decl-else-decl-b-func-existing-var-no-init.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/expressions/does-not-equals/emulates-undefined.js [strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/if-decl-else-stmt-func-existing-block-fn-update.js [non-strict]` | `pass` | `0.006s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-dft-param.js [non-strict]` | `pass` | `0.005s` |
+| `annexB/language/function-code/switch-case-func-existing-var-no-init.js [non-strict]` | `pass` | `0.005s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-no-skip-try.js [non-strict]` | `pass` | `0.005s` |
+| `annexB/language/function-code/if-decl-else-decl-a-func-skip-early-err-switch.js [non-strict]` | `pass` | `0.005s` |
+| `annexB/language/function-code/switch-case-func-skip-early-err-block.js [non-strict]` | `pass` | `0.005s` |
 | `annexB/built-ins/RegExp/RegExp-control-escape-russian-letter.js [strict]` | `pass` | `0.005s` |
 | `annexB/built-ins/RegExp/RegExp-control-escape-russian-letter.js [non-strict]` | `pass` | `0.005s` |
-| `annexB/language/eval-code/direct/global-if-decl-else-stmt-eval-global-init.js [non-strict]` | `pass` | `0.005s` |
-| `annexB/built-ins/RegExp/legacy-accessors/index/this-cross-realm-constructor.js [strict]` | `pass` | `0.005s` |
-| `annexB/built-ins/RegExp/RegExp-invalid-control-escape-character-class.js [non-strict]` | `pass` | `0.005s` |
-| `annexB/built-ins/RegExp/RegExp-invalid-control-escape-character-class.js [strict]` | `pass` | `0.005s` |
-| `annexB/built-ins/RegExp/legacy-accessors/input/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/String/prototype/substr/length.js [non-strict]` | `pass` | `0.004s` |
 | `annexB/built-ins/RegExp/legacy-accessors/index/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/language/eval-code/direct/global-if-decl-else-stmt-eval-global-skip-early-err-for-in.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/language/global-code/if-decl-else-decl-a-global-init.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/language/eval-code/direct/global-if-decl-else-stmt-eval-global-skip-early-err-block.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/language/eval-code/direct/global-if-decl-else-stmt-eval-global-no-skip-try.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/prototype/compile/this-cross-realm-instance.js [strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/String/prototype/bold/prop-desc.js [strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/rightContext/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/leftContext/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/input/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/String/prototype/bold/prop-desc.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/leftContext/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/lastMatch/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/index/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
+| `annexB/language/function-code/switch-case-func-existing-fn-no-init.js [non-strict]` | `pass` | `0.004s` |
 | `annexB/built-ins/RegExp/prototype/compile/this-cross-realm-instance.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/index/prop-desc.js [strict]` | `pass` | `0.004s` |
-| `annexB/language/global-code/if-decl-else-decl-a-global-no-skip-try.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/language/global-code/if-decl-else-decl-a-global-skip-early-err-block.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/lastParen/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
+| `annexB/language/function-code/switch-case-func-skip-early-err-for-in.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/language/function-code/switch-case-func-existing-fn-update.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/input/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
+| `annexB/built-ins/RegExp/legacy-accessors/input/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
 | `annexB/built-ins/RegExp/legacy-accessors/lastMatch/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/index/prop-desc.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/lastParen/this-cross-realm-constructor.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/language/global-code/if-decl-else-decl-a-global-skip-early-err-for-in.js [non-strict]` | `pass` | `0.004s` |
-| `annexB/built-ins/RegExp/legacy-accessors/rightContext/this-cross-realm-constructor.js [strict]` | `pass` | `0.004s` |
-| `annexB/language/eval-code/indirect/global-if-decl-else-stmt-eval-global-existing-non-enumerable-global-init.js [non-strict]` | `pass` | `0.003s` |
-| `annexB/language/eval-code/indirect/global-if-decl-else-decl-a-eval-global-existing-global-init.js [non-strict]` | `pass` | `0.003s` |
-| `annexB/language/eval-code/indirect/global-if-stmt-else-decl-eval-global-existing-non-enumerable-global-init.js [non-strict]` | `pass` | `0.003s` |
-| `annexB/built-ins/String/prototype/fixed/name.js [non-strict]` | `pass` | `0.003s` |
-| `annexB/language/eval-code/indirect/global-switch-dflt-eval-global-existing-global-init.js [non-strict]` | `pass` | `0.003s` |
-| `annexB/language/eval-code/direct/global-block-decl-eval-global-existing-global-init.js [non-strict]` | `pass` | `0.003s` |
 
 ## Skip Breakdown
 
-| Class | Reason | Count |
-| --- | --- | ---: |
-| Manifest/out of scope | manifest exclusion (path): IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. | `35` |
+No skips recorded.
 
 ## Checked-in Manifest Rules
 
 | Kind | Pattern | Reason |
 | --- | --- | --- |
 | `suite` | `intl402/*` | ECMA-402 Intl is out of scope for the active ECMA-262 conformance sweep. |
-| `path` | `annexB/language/expressions/typeof/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/coalesce/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/logical-or/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/yield/star-iterable-return-emulates-undefined-throws-when-called.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/yield/star-iterable-throw-emulates-undefined-throws-when-called.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/logical-assignment/emulates-undefined-or.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/logical-assignment/emulates-undefined-and.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/logical-assignment/emulates-undefined-coalesce.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/strict-equals/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/logical-not/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/equals/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/strict-does-not-equals/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/assignment/dstr/object-pattern-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/assignment/dstr/array-pattern-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/built-ins/String/prototype/replaceAll/custom-replacer-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/built-ins/String/prototype/matchAll/custom-matcher-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/does-not-equals/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/conditional/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/expressions/logical-and/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/built-ins/String/prototype/replace/custom-replacer-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/statements/class/subclass/superclass-prototype-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/statements/class/subclass/superclass-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/statements/switch/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/statements/const/dstr/object-pattern-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/statements/const/dstr/array-pattern-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/statements/function/default-parameters-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/statements/for-of/iterator-close-return-emulates-undefined-throws-when-called.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/statements/if/emulated-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/language/statements/for-await-of/iterator-close-return-emulates-undefined-throws-when-called.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/built-ins/String/prototype/search/custom-searcher-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `staging/sm/generators/yield-star-throw-htmldda.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/built-ins/String/prototype/match/custom-matcher-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/built-ins/String/prototype/split/custom-splitter-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/built-ins/Object/is/emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/built-ins/Array/from/iterator-method-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `staging/sm/Reflect/defineProperty.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `annexB/built-ins/TypedArrayConstructors/from/iterator-method-emulates-undefined.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `staging/sm/expressions/nullish-coalescing.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `staging/sm/Iterator/prototype/some/coerce-result-to-boolean.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `staging/sm/Iterator/prototype/filter/coerce-result-to-boolean.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `staging/sm/Iterator/prototype/find/coerce-result-to-boolean.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
-| `path` | `staging/sm/Iterator/prototype/every/coerce-result-to-boolean.js` | IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness. |
 
 ## Failure Clusters
 

@@ -746,8 +746,8 @@ fn call_trap<Cx: ProxyTrapContext>(
 
 fn to_boolean<Cx: ProxyTrapContext>(cx: &mut Cx, value: Value) -> Result<bool, Cx::Error> {
     let result = {
-        let view = cx.agent().heap().view();
-        read::to_boolean(view, value)
+        let agent = cx.agent();
+        read::to_boolean_agent(agent, value)
     };
     map_completion(cx, result)
 }

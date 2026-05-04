@@ -383,7 +383,7 @@ pub fn iterator_complete<Cx: IteratorOpsContext>(
     let done = cx.get_property_value(Value::from_object_ref(iter_result), done_key)?;
     let completion = {
         let agent = cx.agent();
-        read::to_boolean(agent.heap().view(), done)
+        read::to_boolean_agent(agent, done)
     };
     map_completion(cx, completion)
 }

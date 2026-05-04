@@ -966,7 +966,7 @@ fn iterator_predicate_helper<Cx: PublicBuiltinDispatchContext>(
         let truthy = {
             let completion = {
                 let agent = cx.agent();
-                read::to_boolean(agent.heap().view(), result)
+                read::to_boolean_agent(agent, result)
             };
             map_completion(cx, completion)?
         };
@@ -1051,7 +1051,7 @@ fn iterator_find_builtin<Cx: PublicBuiltinDispatchContext>(
         let truthy = {
             let completion = {
                 let agent = cx.agent();
-                read::to_boolean(agent.heap().view(), result)
+                read::to_boolean_agent(agent, result)
             };
             map_completion(cx, completion)?
         };
@@ -2252,7 +2252,7 @@ fn iterator_helper_filter_next<Cx: PublicBuiltinDispatchContext>(
         let selected = {
             let completion = {
                 let agent = cx.agent();
-                read::to_boolean(agent.heap().view(), selected)
+                read::to_boolean_agent(agent, selected)
             };
             map_completion(cx, completion)?
         };

@@ -87,7 +87,7 @@ impl Vm {
             Value::from_object_ref(unscopables_object),
             key,
         )?;
-        Ok(!read::to_boolean(agent.heap().view(), blocked).map_err(VmError::Abrupt)?)
+        Ok(!read::to_boolean_agent(agent, blocked).map_err(VmError::Abrupt)?)
     }
 
     fn object_environment_get_binding_value_with_context(
@@ -1172,7 +1172,9 @@ impl Vm {
         } else if value.is_bigint() {
             "bigint"
         } else if let Some(object) = value.as_object_ref() {
-            if agent.objects().is_callable(object) {
+            if agent.objects().is_html_dda_object(object) {
+                "undefined"
+            } else if agent.objects().is_callable(object) {
                 "function"
             } else {
                 "object"

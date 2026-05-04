@@ -4,7 +4,7 @@ use lyng_js_builtins::BootstrapArtifacts;
 use lyng_js_env::Agent;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_host::HostHooks;
-use lyng_js_objects::{NativeFunctionRegistry, ObjectAllocation};
+use lyng_js_objects::{NativeFunctionRegistry, ObjectAllocation, ObjectFlags};
 use lyng_js_ops::errors;
 use lyng_js_types::{
     BuiltinFunctionId, EmbeddingFunctionId, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
@@ -227,6 +227,17 @@ impl<'a> RealmExtensionInstallation<'a> {
             configurable,
         )?;
         Ok(function)
+    }
+
+    pub fn mark_is_html_dda_object(&mut self, object: ObjectRef) -> Result<(), VmError> {
+        if self
+            .agent
+            .objects_mut()
+            .insert_flags(object, ObjectFlags::IS_HTMLDDA)
+        {
+            return Ok(());
+        }
+        Err(VmError::Abrupt(errors::throw_type_error(self.agent)))
     }
 }
 

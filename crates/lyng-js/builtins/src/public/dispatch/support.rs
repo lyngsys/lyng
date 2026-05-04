@@ -952,7 +952,7 @@ pub(super) fn to_boolean_for_builtin<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<bool, Cx::Error> {
     let boolean = {
         let agent = cx.agent();
-        read::to_boolean(agent.heap().view(), value)
+        read::to_boolean_agent(agent, value)
     };
     map_completion(cx, boolean)
 }

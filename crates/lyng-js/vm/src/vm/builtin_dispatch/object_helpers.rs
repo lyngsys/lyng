@@ -229,8 +229,7 @@ impl Vm {
                 constructor_value,
                 &[value],
             )?;
-            let is_instance =
-                read::to_boolean(agent.heap().view(), result).map_err(VmError::Abrupt)?;
+            let is_instance = read::to_boolean_agent(agent, result).map_err(VmError::Abrupt)?;
             return Ok(Value::from_bool(is_instance));
         }
 

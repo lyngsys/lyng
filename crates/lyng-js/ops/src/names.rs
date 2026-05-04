@@ -77,7 +77,7 @@ pub fn object_environment_has_binding(
         key,
         Value::from_object_ref(unscopables_object),
     )?;
-    Ok(!read::to_boolean(agent.heap().view(), blocked)?)
+    Ok(!read::to_boolean_agent(agent, blocked)?)
 }
 
 /// ECMAScript `GetBindingValue` for one object environment record.

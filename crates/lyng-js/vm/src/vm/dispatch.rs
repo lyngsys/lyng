@@ -1264,8 +1264,7 @@ impl Vm {
                             let condition = self.read_register(frame, a)?;
                             let Some(truthy) = self.handle_vm_result(
                                 agent,
-                                read::to_boolean(agent.heap().view(), condition)
-                                    .map_err(VmError::Abrupt),
+                                read::to_boolean_agent(agent, condition).map_err(VmError::Abrupt),
                             )?
                             else {
                                 continue;
@@ -1635,6 +1634,9 @@ impl Vm {
         left: Value,
         right: Value,
     ) -> VmResult<bool> {
+        if Self::is_html_dda_equal_nullish(agent, left, right) {
+            return Ok(true);
+        }
         if (left.is_object() && (right.is_null() || right.is_undefined()))
             || (right.is_object() && (left.is_null() || left.is_undefined()))
         {
@@ -1658,6 +1660,17 @@ impl Vm {
         }
 
         read::is_loosely_equal(agent.heap().view(), left, right).map_err(VmError::Abrupt)
+    }
+
+    fn is_html_dda_equal_nullish(agent: &Agent, left: Value, right: Value) -> bool {
+        fn is_html_dda(agent: &Agent, value: Value) -> bool {
+            value
+                .as_object_ref()
+                .is_some_and(|object| agent.objects().is_html_dda_object(object))
+        }
+
+        (is_html_dda(agent, left) && (right.is_null() || right.is_undefined()))
+            || (is_html_dda(agent, right) && (left.is_null() || left.is_undefined()))
     }
 
     fn check_property_assignment_result(

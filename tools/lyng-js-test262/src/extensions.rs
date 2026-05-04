@@ -36,6 +36,7 @@ const TEST262_AGENT_GET_REPORT_RAW: u32 = 7;
 const TEST262_AGENT_SLEEP_RAW: u32 = 8;
 const TEST262_AGENT_MONOTONIC_NOW_RAW: u32 = 9;
 const TEST262_SET_TIMEOUT_RAW: u32 = 10;
+const TEST262_IS_HTMLDDA_RAW: u32 = 11;
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone)]
@@ -373,6 +374,11 @@ fn test262_set_timeout_entry() -> EmbeddingFunctionId {
         .expect("test262 embedding function ids should stay non-zero")
 }
 
+fn test262_is_html_dda_entry() -> EmbeddingFunctionId {
+    EmbeddingFunctionId::from_raw(TEST262_IS_HTMLDDA_RAW)
+        .expect("test262 embedding function ids should stay non-zero")
+}
+
 fn test262_property_key(agent: &mut Agent, text: &str) -> PropertyKey {
     PropertyKey::from_atom(agent.atoms_mut().intern_collectible(text))
 }
@@ -480,6 +486,9 @@ impl RealmExtensionProvider for Test262RealmExtension {
                 false,
             ));
         }
+        if entry == test262_is_html_dda_entry() {
+            return Some(EmbeddingFunctionMetadata::new("IsHTMLDDA", 0, false, false));
+        }
         None
     }
 
@@ -505,6 +514,7 @@ impl RealmExtensionProvider for Test262RealmExtension {
         let print_key = test262_property_key(installation.agent(), "print");
         let set_timeout_key = test262_property_key(installation.agent(), "setTimeout");
         let same_value_key = test262_property_key(installation.agent(), "sameValue");
+        let is_html_dda_key = test262_property_key(installation.agent(), "IsHTMLDDA");
         let get_report_key = test262_property_key(installation.agent(), "getReport");
         let sleep_key = test262_property_key(installation.agent(), "sleep");
         let monotonic_now_key = test262_property_key(installation.agent(), "monotonicNow");
@@ -592,6 +602,15 @@ impl RealmExtensionProvider for Test262RealmExtension {
             false,
             true,
         )?;
+        let is_html_dda = installation.define_function_property(
+            harness,
+            is_html_dda_key,
+            test262_is_html_dda_entry(),
+            true,
+            false,
+            true,
+        )?;
+        installation.mark_is_html_dda_object(is_html_dda)?;
         let _ = installation.define_function_property(
             agent,
             get_report_key,
@@ -742,6 +761,9 @@ impl RealmExtensionProvider for Test262RealmExtension {
                 Some("Test262SetTimeout".into()),
             );
             return Ok(Value::undefined());
+        }
+        if entry == test262_is_html_dda_entry() {
+            return Ok(Value::null());
         }
         Err(VmError::MissingEmbeddingFunction(entry))
     }

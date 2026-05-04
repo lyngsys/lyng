@@ -21,6 +21,7 @@ impl ObjectFlags {
     pub const ARGUMENTS_OBJECT: Self = Self(1 << 5);
     pub const IMMUTABLE_PROTOTYPE: Self = Self(1 << 6);
     pub const ERROR_OBJECT: Self = Self(1 << 7);
+    pub const IS_HTMLDDA: Self = Self(1 << 8);
 
     #[inline]
     pub const fn empty() -> Self {
@@ -85,6 +86,11 @@ impl ObjectFlags {
     #[inline]
     pub const fn is_error_object(self) -> bool {
         self.contains(Self::ERROR_OBJECT)
+    }
+
+    #[inline]
+    pub const fn is_html_dda(self) -> bool {
+        self.contains(Self::IS_HTMLDDA)
     }
 }
 

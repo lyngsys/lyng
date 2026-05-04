@@ -151,16 +151,16 @@ fn dynamic_function_parameter_validation_source(
 ) -> String {
     match kind {
         DynamicFunctionKind::Ordinary => {
-            format!("(function anonymous({parameters_source}) {{}})")
+            format!("(function anonymous({parameters_source}\n) {{}})")
         }
         DynamicFunctionKind::Generator => {
-            format!("(function* anonymous({parameters_source}) {{}})")
+            format!("(function* anonymous({parameters_source}\n) {{}})")
         }
         DynamicFunctionKind::Async => {
-            format!("(async function anonymous({parameters_source}) {{}})")
+            format!("(async function anonymous({parameters_source}\n) {{}})")
         }
         DynamicFunctionKind::AsyncGenerator => {
-            format!("(async function* anonymous({parameters_source}) {{}})")
+            format!("(async function* anonymous({parameters_source}\n) {{}})")
         }
     }
 }
@@ -323,5 +323,28 @@ mod tests {
             result.err().map(|error| error.stage().clone()),
             Some(DynamicCompilationStage::Parse)
         );
+    }
+
+    #[test]
+    fn dynamic_function_parameter_validation_allows_annex_b_html_comments() {
+        let mut atoms = AtomTable::new();
+
+        let open = compile_dynamic_function(
+            &mut atoms,
+            SourceId::new(1),
+            "<!--",
+            "",
+            DynamicFunctionKind::Ordinary,
+        );
+        assert_eq!(open.err().map(|error| error.stage().clone()), None);
+
+        let close = compile_dynamic_function(
+            &mut atoms,
+            SourceId::new(2),
+            "\n-->",
+            "",
+            DynamicFunctionKind::Ordinary,
+        );
+        assert_eq!(close.err().map(|error| error.stage().clone()), None);
     }
 }

@@ -460,6 +460,12 @@ impl ObjectRuntime {
     }
 
     #[inline]
+    pub fn is_html_dda_object(&self, id: ObjectRef) -> bool {
+        self.object_metadata(id)
+            .is_some_and(|metadata| metadata.flags.is_html_dda())
+    }
+
+    #[inline]
     pub fn is_constructor(&self, id: ObjectRef) -> bool {
         match self
             .object_metadata(id)
