@@ -2087,7 +2087,15 @@ fn iterator_helper_flat_map_next<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let mut outer_record = iterator_helper_record(cx, helper)?;
     loop {
-        if let Some(mut inner_record) = iterator_helper_inner_record(cx, helper)? {
+        let inner_record = match iterator_helper_inner_record(cx, helper) {
+            Ok(record) => record,
+            Err(error) => {
+                clear_iterator_helper_inner(cx, helper)?;
+                set_iterator_helper_done(cx, helper)?;
+                return close_iterator_after_error(cx, &mut outer_record, error);
+            }
+        };
+        if let Some(mut inner_record) = inner_record {
             let next = {
                 let mut bridge = BuiltinIteratorBridge { cx };
                 iterator::iterator_step(&mut bridge, &mut inner_record)
@@ -2286,8 +2294,7 @@ fn get_iterator_flattenable<Cx: PublicBuiltinDispatchContext>(
     };
     let next_key = property_key_from_text(cx, "next");
     let next = cx.get_property_value(Value::from_object_ref(iterator), next_key)?;
-    let next = cx.require_callable_object(next)?;
-    Ok((iterator, Value::from_object_ref(next)))
+    Ok((iterator, next))
 }
 
 fn iterator_helper_this_object<Cx: PublicBuiltinDispatchContext>(

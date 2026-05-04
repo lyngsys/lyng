@@ -6161,6 +6161,130 @@ fn script_core_iterator_from_wrappers_forward_without_helper_state() {
 }
 
 #[test]
+fn script_core_iterator_zip_defers_direct_next_validation() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+
+        let throwingIterator = {
+            next() {
+                throw new Error("next should not be called during construction");
+            },
+            return() {
+                throw new Error("return should not be called during construction");
+            }
+        };
+
+        let iterableReturningThrowingIterator = {
+            [Symbol.iterator]() {
+                return throwingIterator;
+            }
+        };
+
+        function makeGetProxy(name, object, log) {
+            return new Proxy(object, {
+                get(target, key, receiver) {
+                    log.push(name + "::" + String(key));
+                    return Reflect.get(target, key, receiver);
+                }
+            });
+        }
+
+        function zipConstructionLog() {
+            let log = [];
+            let elements = [
+                makeGetProxy("first", throwingIterator, log),
+                makeGetProxy("second", iterableReturningThrowingIterator, log),
+                makeGetProxy("third", Object.create(null), log),
+            ];
+            let elementsIter = elements.values();
+            let iterables = makeGetProxy("iterables", {
+                [Symbol.iterator]() {
+                    return this;
+                },
+                next() {
+                    log.push("call next");
+                    return elementsIter.next();
+                },
+                return() {
+                    throw new Error("input should not close during construction");
+                }
+            }, log);
+            Iterator.zip(iterables);
+            return log.join("|");
+        }
+
+        function makeAllProxy(name, object, log) {
+            return new Proxy(object, {
+                ownKeys(target) {
+                    log.push(name + "::keys");
+                    return Reflect.ownKeys(target);
+                },
+                getOwnPropertyDescriptor(target, key) {
+                    log.push(name + "::desc:" + String(key));
+                    return Reflect.getOwnPropertyDescriptor(target, key);
+                },
+                get(target, key, receiver) {
+                    log.push(name + "::get:" + String(key));
+                    return Reflect.get(target, key, receiver);
+                },
+            });
+        }
+
+        function zipKeyedConstructionLog() {
+            let log = [];
+            let iterables = makeAllProxy("iterables", {
+                a: makeAllProxy("first", throwingIterator, log),
+                b: makeAllProxy("second", iterableReturningThrowingIterator, log),
+                c: makeAllProxy("third", {}, log),
+            }, log);
+            Iterator.zipKeyed(iterables);
+            return log.join("|");
+        }
+
+        try {
+            total += zipConstructionLog() === [
+                "iterables::Symbol(Symbol.iterator)",
+                "iterables::next",
+                "call next",
+                "first::Symbol(Symbol.iterator)",
+                "first::next",
+                "call next",
+                "second::Symbol(Symbol.iterator)",
+                "call next",
+                "third::Symbol(Symbol.iterator)",
+                "third::next",
+                "call next"
+            ].join("|") ? 1 : 0;
+        } catch (error) {
+        }
+
+        try {
+            total += zipKeyedConstructionLog() === [
+                "iterables::keys",
+                "iterables::desc:a",
+                "iterables::get:a",
+                "first::get:Symbol(Symbol.iterator)",
+                "first::get:next",
+                "iterables::desc:b",
+                "iterables::get:b",
+                "second::get:Symbol(Symbol.iterator)",
+                "iterables::desc:c",
+                "iterables::get:c",
+                "third::get:Symbol(Symbol.iterator)",
+                "third::get:next"
+            ].join("|") ? 2 : 0;
+        } catch (error) {
+        }
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
 fn script_core_iterator_helpers_do_not_close_source_on_source_abrupts() {
     let result = compile_and_run(
         r#"
