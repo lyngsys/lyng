@@ -5938,6 +5938,73 @@ fn script_core_map_and_set_iterables_preserve_size_and_insertion_order() {
 }
 
 #[test]
+fn script_core_set_methods_observe_receiver_mutation_order() {
+    let result = compile_and_run(
+        r#"
+        function setItems(set) {
+            let items = [];
+            for (let value of set) {
+                items.push(value);
+            }
+            return items.join(",");
+        }
+
+        function mutateOnNextLookup(set) {
+            return {
+                size: 0,
+                has() {
+                    throw new Error("has should not be called");
+                },
+                keys() {
+                    return {
+                        get next() {
+                            set.clear();
+                            set.add(4);
+                            return function() {
+                                return { done: true };
+                            };
+                        }
+                    };
+                }
+            };
+        }
+
+        let unionSet = new Set([1, 2, 3]);
+        let unionResult = unionSet.union(mutateOnNextLookup(unionSet));
+
+        let symmetricSet = new Set([1, 2, 3]);
+        let symmetricResult = symmetricSet.symmetricDifference(mutateOnNextLookup(symmetricSet));
+
+        let seen = [];
+        let intersectionSet = new Set([1, 2, 3]);
+        let intersectionResult = intersectionSet.intersection({
+            size: 100,
+            has(value) {
+                if (value === 2 && seen.indexOf(value) === -1) {
+                    intersectionSet.delete(value);
+                    intersectionSet.add(value);
+                }
+                seen.push(value);
+                return true;
+            },
+            keys() {
+                throw new Error("keys should not be called");
+            }
+        });
+
+        let score = 0;
+        score += setItems(unionResult) === "4" ? 1 : 0;
+        score += setItems(symmetricResult) === "4" ? 2 : 0;
+        score += setItems(intersectionResult) === "1,2,3" ? 4 : 0;
+        score += seen.join(",") === "1,2,3,2" ? 8 : 0;
+        score;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
 fn script_core_supports_phase6_regexp_literals_and_constructor_state() {
     let result = compile_and_run(
         r#"

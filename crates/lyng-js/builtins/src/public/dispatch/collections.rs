@@ -1356,6 +1356,21 @@ fn collect_set_values<Cx: PublicBuiltinDispatchContext>(
     Ok(values)
 }
 
+fn set_entry_at<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    object: ObjectRef,
+    index: usize,
+) -> Result<Option<Option<Value>>, Cx::Error> {
+    let entry = {
+        let agent = cx.agent();
+        let Some(set) = agent.objects().set_object_data(object) else {
+            return Err(type_error(cx));
+        };
+        set.entries().get(index).copied()
+    };
+    Ok(entry)
+}
+
 fn allocate_result_set<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
 ) -> Result<ObjectRef, Cx::Error> {
@@ -1410,10 +1425,10 @@ fn set_union_builtin<Cx: PublicBuiltinDispatchContext>(
         .unwrap_or(Value::undefined());
     let record = get_set_record(cx, other)?;
     let result = allocate_result_set(cx)?;
+    let mut iterator_record = set_record_iterator(cx, &record)?;
     for value in collect_set_values(cx, object)? {
         set_push_value(cx, result, value)?;
     }
-    let mut iterator_record = set_record_iterator(cx, &record)?;
     loop {
         let next = {
             let mut bridge = BuiltinIteratorBridge { cx };
@@ -1468,7 +1483,15 @@ fn set_intersection_builtin<Cx: PublicBuiltinDispatchContext>(
     .unwrap_or(u64::MAX);
     let this_size_f = this_size as f64;
     if this_size_f <= record.size {
-        for value in collect_set_values(cx, object)? {
+        let mut index = 0_usize;
+        loop {
+            let Some(entry) = set_entry_at(cx, object, index)? else {
+                break;
+            };
+            index = index.saturating_add(1);
+            let Some(value) = entry else {
+                continue;
+            };
             if set_record_has(cx, &record, value)? {
                 let canonical = canonical_set_value(value);
                 if !set_contains_value(cx, result, canonical)? {
@@ -1601,10 +1624,10 @@ fn set_symmetric_difference_builtin<Cx: PublicBuiltinDispatchContext>(
         .unwrap_or(Value::undefined());
     let record = get_set_record(cx, other)?;
     let result = allocate_result_set(cx)?;
+    let mut iterator_record = set_record_iterator(cx, &record)?;
     for value in collect_set_values(cx, object)? {
         set_push_value(cx, result, value)?;
     }
-    let mut iterator_record = set_record_iterator(cx, &record)?;
     loop {
         let next = {
             let mut bridge = BuiltinIteratorBridge { cx };
