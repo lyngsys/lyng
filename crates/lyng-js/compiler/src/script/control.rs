@@ -280,8 +280,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let normal_entry = self.builder.current_offset()?;
         self.set_finally_normal_entry(finally_index, normal_entry)?;
         self.mark_finally_body(finally_index, true);
+        let saved_completion = self.save_completion_state()?;
         self.reset_statement_result()?;
         self.lower_statement(finalizer)?;
+        self.restore_completion_state(saved_completion)?;
         self.emit_leave_handler()?;
         self.emit_finally_dispatch(finally_index)?;
         self.mark_finally_body(finally_index, false);
@@ -329,8 +331,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let normal_entry = self.builder.current_offset()?;
         self.set_finally_normal_entry(finally_index, normal_entry)?;
         self.mark_finally_body(finally_index, true);
+        let saved_completion = self.save_completion_state()?;
         self.reset_statement_result()?;
         self.lower_statement(finalizer)?;
+        self.restore_completion_state(saved_completion)?;
         self.emit_leave_handler()?;
         self.emit_finally_dispatch(finally_index)?;
         self.mark_finally_body(finally_index, false);
@@ -625,6 +629,30 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         } else {
             self.emit_load_smi(registers.target, 0)?;
         }
+        Ok(())
+    }
+
+    pub(super) fn save_completion_state(&mut self) -> LoweringResult<CompletionRegisters> {
+        let registers = self.ensure_completion_registers()?;
+        let saved = CompletionRegisters {
+            kind: self.alloc_temp()?,
+            value: self.alloc_temp()?,
+            target: self.alloc_temp()?,
+        };
+        self.emit_move(saved.kind, registers.kind)?;
+        self.emit_move(saved.value, registers.value)?;
+        self.emit_move(saved.target, registers.target)?;
+        Ok(saved)
+    }
+
+    pub(super) fn restore_completion_state(
+        &mut self,
+        saved: CompletionRegisters,
+    ) -> LoweringResult<()> {
+        let registers = self.ensure_completion_registers()?;
+        self.emit_move(registers.kind, saved.kind)?;
+        self.emit_move(registers.value, saved.value)?;
+        self.emit_move(registers.target, saved.target)?;
         Ok(())
     }
 

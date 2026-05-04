@@ -14,7 +14,7 @@ mod finalize;
 mod functions;
 mod statements;
 
-use lyng_js_ast::Ast;
+use lyng_js_ast::{Ast, FunctionId};
 use std::collections::{HashMap, HashSet};
 
 use lyng_js_common::{AtomId, AtomTable, DiagnosticList, SourceId, Span};
@@ -76,6 +76,7 @@ pub(crate) struct Analyzer<'a> {
     pub(crate) class_private_layouts: ClassPrivateLayoutTable,
     pub(crate) diagnostics: DiagnosticList,
     ctx: WalkContext,
+    suppressed_function_name_bindings: HashSet<FunctionId>,
     /// Fast name-to-binding lookup per scope, avoiding O(n) linear scans
     /// in `declare_binding` and `declare_var_binding`.
     scope_binding_names: HashMap<(ScopeId, AtomId), SemanticBindingId>,
@@ -141,6 +142,7 @@ impl<'a> Analyzer<'a> {
             private_uses: PrivateUseTable::new(),
             class_private_layouts: ClassPrivateLayoutTable::new(),
             diagnostics: DiagnosticList::new(),
+            suppressed_function_name_bindings: HashSet::new(),
             scope_binding_names: HashMap::new(),
             ctx: WalkContext {
                 current_scope: global_scope,
@@ -187,6 +189,7 @@ impl<'a> Analyzer<'a> {
             private_uses: PrivateUseTable::new(),
             class_private_layouts: ClassPrivateLayoutTable::new(),
             diagnostics: DiagnosticList::new(),
+            suppressed_function_name_bindings: HashSet::new(),
             scope_binding_names: HashMap::new(),
             ctx: WalkContext {
                 current_scope: module_scope,
@@ -220,6 +223,11 @@ impl<'a> Analyzer<'a> {
     ) -> Self {
         let mut this = Self::new_for_script(ast, atoms, strict);
         let script = ast.get_script(root);
+        this.suppressed_function_name_bindings = options
+            .suppressed_function_name_bindings()
+            .iter()
+            .copied()
+            .collect();
         this.seed_direct_eval_private_layouts(script.span.source, &options);
         this.ctx.annex_b_blocked_var_names = options
             .annex_b_blocked_var_names()

@@ -322,7 +322,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             return Ok(());
         };
 
-        let value = self.lower_expr_to_temp(init)?;
+        let value = self.alloc_temp()?;
+        self.lower_initializer_with_inferred_name(
+            init,
+            self.binding_pattern_name(declarator.id),
+            value,
+        )?;
         self.lower_binding_pattern_initialization(declarator.id, DeclarationKind::Var, value)
     }
 

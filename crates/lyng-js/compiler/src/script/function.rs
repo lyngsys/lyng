@@ -273,6 +273,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
         self.emit_parameter_environment_prologue()?;
         self.current_scope = self.body_scope;
+        self.emit_parameter_expression_arguments_var_binding_initializer()?;
         self.builder
             .set_parameter_initializer_end_offset(self.builder.current_offset()?);
         self.emit_hoisted_function_declarations()?;
@@ -445,6 +446,32 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
         }
         Ok(())
+    }
+
+    fn emit_parameter_expression_arguments_var_binding_initializer(
+        &mut self,
+    ) -> LoweringResult<()> {
+        let Some(function) = self.current_function else {
+            return Ok(());
+        };
+        let activation = self.state.activation(function).clone();
+        if !activation.has_parameter_expressions || !activation.needs_arguments_object() {
+            return Ok(());
+        }
+        let Some(binding) = self.find_named_binding_in_scope(
+            WellKnownAtom::arguments.id(),
+            DeclarationKind::Var,
+            self.body_scope,
+        ) else {
+            return Ok(());
+        };
+        let Some(arguments_slot) = activation.arguments_slot() else {
+            return Ok(());
+        };
+
+        let arguments_object = self.alloc_temp()?;
+        self.emit_load_env_slot(arguments_object, 0, u32::from(arguments_slot))?;
+        self.store_binding_value(binding, WellKnownAtom::arguments.id(), arguments_object)
     }
 
     fn lower_parameter_pattern_initialization(
@@ -696,7 +723,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
-    fn binding_pattern_name(&self, pattern: lyng_js_ast::PatternId) -> Option<AtomId> {
+    pub(super) fn binding_pattern_name(&self, pattern: lyng_js_ast::PatternId) -> Option<AtomId> {
         match self.ast().get_pattern(pattern) {
             Pattern::Identifier { name, .. } => Some(*name),
             Pattern::Assignment { left, .. } => self.binding_pattern_name(*left),

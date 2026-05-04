@@ -4,6 +4,7 @@ use super::*;
 pub(super) struct FunctionActivationPlan {
     pub(super) arguments_mode: ArgumentsMode,
     pub(super) has_rest_parameter: bool,
+    pub(super) has_parameter_expressions: bool,
     pub(super) parameter_ordinals: HashMap<SemanticBindingId, u16>,
     pub(super) rest_binding: Option<SemanticBindingId>,
     pub(super) needs_environment: bool,
@@ -89,6 +90,41 @@ fn function_has_non_simple_params(
             .any(|pattern| !is_simple_parameter_pattern(ast, *pattern))
 }
 
+fn pattern_contains_initializer(ast: &lyng_js_ast::Ast, pattern: lyng_js_ast::PatternId) -> bool {
+    match ast.get_pattern(pattern) {
+        Pattern::Assignment { .. } => true,
+        Pattern::Object {
+            properties, rest, ..
+        } => {
+            ast.get_obj_pattern_prop_list(*properties)
+                .iter()
+                .any(|property| pattern_contains_initializer(ast, property.value))
+                || rest.is_some_and(|rest| pattern_contains_initializer(ast, rest))
+        }
+        Pattern::Array { elements, rest, .. } => {
+            ast.get_opt_pattern_elem_list(*elements)
+                .iter()
+                .flatten()
+                .any(|element| pattern_contains_initializer(ast, element.pattern))
+                || rest.is_some_and(|rest| pattern_contains_initializer(ast, rest))
+        }
+        Pattern::Identifier { .. } | Pattern::InvalidPattern { .. } => false,
+    }
+}
+
+fn function_has_parameter_expressions(
+    ast: &lyng_js_ast::Ast,
+    function: &lyng_js_ast::Function,
+) -> bool {
+    ast.get_pattern_list(function.params.params)
+        .iter()
+        .any(|&pattern| pattern_contains_initializer(ast, pattern))
+        || function
+            .params
+            .rest
+            .is_some_and(|rest| pattern_contains_initializer(ast, rest))
+}
+
 fn nearest_non_arrow_owner_for(
     program: ProgramSource<'_>,
     sema: ProgramSemaView<'_>,
@@ -150,7 +186,8 @@ pub(super) fn collect_arguments_owners(
     sema: ProgramSemaView<'_>,
     parent_functions: &[Option<FunctionSemaId>],
 ) -> HashSet<FunctionSemaId> {
-    sema.use_sites
+    let mut owners = sema
+        .use_sites
         .as_slice()
         .iter()
         .filter_map(|record| {
@@ -172,7 +209,20 @@ pub(super) fn collect_arguments_owners(
             }
             Some(owner)
         })
-        .collect()
+        .collect::<HashSet<_>>();
+
+    for (index, record) in sema.function_table.as_slice().iter().enumerate() {
+        if !record.has_eval {
+            continue;
+        }
+        let function = FunctionSemaId::new(index as u32);
+        if let Some(owner) = nearest_non_arrow_owner_for(program, sema, parent_functions, function)
+        {
+            owners.insert(owner);
+        }
+    }
+
+    owners
 }
 
 fn find_parameter_binding_for_plan(
@@ -204,6 +254,7 @@ pub(super) fn build_function_activation_plan(
     parent_functions: &[Option<FunctionSemaId>],
 ) -> LoweringResult<FunctionActivationPlan> {
     let ast_function = program.ast.get_function(record.function_id).clone();
+    let has_parameter_expressions = function_has_parameter_expressions(program.ast, &ast_function);
     let arguments_mode = if matches!(
         ast_function.kind,
         FunctionKind::Arrow | FunctionKind::AsyncArrow
@@ -245,6 +296,7 @@ pub(super) fn build_function_activation_plan(
     Ok(FunctionActivationPlan {
         arguments_mode,
         has_rest_parameter: ast_function.params.rest.is_some(),
+        has_parameter_expressions,
         parameter_ordinals,
         rest_binding,
         needs_environment: record.needs_environment

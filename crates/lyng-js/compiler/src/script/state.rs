@@ -465,10 +465,14 @@ impl<'a> CompilationState<'a> {
     }
 
     pub(super) fn scope_environment_base(&self, scope: ScopeId) -> Option<u32> {
-        self.scope_environment_bases
+        let base = self
+            .scope_environment_bases
             .get(scope.raw() as usize)
             .copied()
-            .flatten()
+            .flatten()?;
+        Some(self.scope_owner(scope).map_or(base, |owner| {
+            base + u32::from(self.activation(owner).synthetic_prefix_slots())
+        }))
     }
 
     pub(super) fn scope_environment_bindings_for(

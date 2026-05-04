@@ -1,4 +1,4 @@
-use lyng_js_ast::ParsedScript;
+use lyng_js_ast::{Expr, FunctionId, ParsedScript, Stmt};
 use lyng_js_bytecode::CompiledScriptUnit;
 use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_parser::{parse_script, parse_script_with_initial_strict};
@@ -73,6 +73,7 @@ impl DynamicCompilationError {
 pub enum DynamicScriptAnalysisMode {
     Script,
     InitialStrict(bool),
+    DynamicFunction,
     DirectEval {
         initial_strict: bool,
         options: DirectEvalScriptAnalysisOptions,
@@ -144,6 +145,26 @@ pub fn dynamic_function_source(
     }
 }
 
+fn dynamic_function_parameter_validation_source(
+    parameters_source: &str,
+    kind: DynamicFunctionKind,
+) -> String {
+    match kind {
+        DynamicFunctionKind::Ordinary => {
+            format!("(function anonymous({parameters_source}) {{}})")
+        }
+        DynamicFunctionKind::Generator => {
+            format!("(function* anonymous({parameters_source}) {{}})")
+        }
+        DynamicFunctionKind::Async => {
+            format!("(async function anonymous({parameters_source}) {{}})")
+        }
+        DynamicFunctionKind::AsyncGenerator => {
+            format!("(async function* anonymous({parameters_source}) {{}})")
+        }
+    }
+}
+
 pub fn analyze_dynamic_script(
     atoms: &mut AtomTable,
     source_id: SourceId,
@@ -166,7 +187,9 @@ pub fn analyze_dynamic_script_with_diagnostics(
     mode: DynamicScriptAnalysisMode,
 ) -> Result<DynamicScriptAnalysis, DynamicCompilationError> {
     let parsed = match mode {
-        DynamicScriptAnalysisMode::Script => parse_script(atoms, source_id, source_text),
+        DynamicScriptAnalysisMode::Script | DynamicScriptAnalysisMode::DynamicFunction => {
+            parse_script(atoms, source_id, source_text)
+        }
         DynamicScriptAnalysisMode::InitialStrict(initial_strict)
         | DynamicScriptAnalysisMode::DirectEval { initial_strict, .. } => {
             parse_script_with_initial_strict(atoms, source_id, source_text, initial_strict)
@@ -180,12 +203,44 @@ pub fn analyze_dynamic_script_with_diagnostics(
         DynamicScriptAnalysisMode::DirectEval { options, .. } => {
             analyze_direct_eval_script(&parsed, atoms, options)
         }
+        DynamicScriptAnalysisMode::DynamicFunction => {
+            let options = dynamic_function_wrapper_function(&parsed).map_or_else(
+                DirectEvalScriptAnalysisOptions::new,
+                |function| {
+                    DirectEvalScriptAnalysisOptions::new()
+                        .with_suppressed_function_name_bindings(vec![function])
+                },
+            );
+            analyze_direct_eval_script(&parsed, atoms, options)
+        }
         DynamicScriptAnalysisMode::Script | DynamicScriptAnalysisMode::InitialStrict(_) => {
             analyze_script(&parsed, atoms)
         }
     };
 
     Ok(DynamicScriptAnalysis { parsed, sema })
+}
+
+fn dynamic_function_wrapper_function(parsed: &ParsedScript) -> Option<FunctionId> {
+    let script = parsed.ast.get_script(parsed.root);
+    let [stmt] = parsed.ast.get_stmt_list(script.body) else {
+        return None;
+    };
+    let Stmt::Expression { expression, .. } = parsed.ast.get_stmt(*stmt) else {
+        return None;
+    };
+
+    let mut expr = *expression;
+    while let Expr::ParenthesizedExpression {
+        expression: inner, ..
+    } = parsed.ast.get_expr(expr)
+    {
+        expr = *inner;
+    }
+    let Expr::FunctionExpression { function, .. } = parsed.ast.get_expr(expr) else {
+        return None;
+    };
+    Some(*function)
 }
 
 pub fn compile_analyzed_dynamic_script(
@@ -214,12 +269,20 @@ pub fn compile_dynamic_function(
     body_source: &str,
     kind: DynamicFunctionKind,
 ) -> Result<DynamicScriptCompilation, DynamicCompilationError> {
+    let parameters_text = dynamic_function_parameter_validation_source(parameters_source, kind);
+    if parse_script(atoms, source_id, &parameters_text)
+        .diagnostics
+        .has_errors()
+    {
+        return Err(DynamicCompilationError::new(DynamicCompilationStage::Parse));
+    }
+
     let source_text = dynamic_function_source(parameters_source, body_source, kind);
     compile_dynamic_script_source(
         atoms,
         source_id,
         &source_text,
-        DynamicScriptAnalysisMode::Script,
+        DynamicScriptAnalysisMode::DynamicFunction,
     )
 }
 

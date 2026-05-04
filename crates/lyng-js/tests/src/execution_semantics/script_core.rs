@@ -1541,6 +1541,19 @@ fn script_core_assigns_names_to_for_of_default_anonymous_functions() {
 }
 
 #[test]
+fn script_core_assigns_names_to_for_in_var_initializer_anonymous_functions() {
+    let result = compile_and_run_string(
+        r#"
+        for (var forInHead = function() {} in {}) {
+        }
+        forInHead.name;
+        "#,
+    );
+
+    assert_eq!(result, "forInHead");
+}
+
+#[test]
 fn script_core_assigns_names_to_for_of_assignment_pattern_defaults() {
     let result = compile_and_run(
         r#"

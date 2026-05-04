@@ -416,6 +416,14 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         kind: DynamicFunctionKind,
         new_target: Option<ObjectRef>,
     ) -> Result<ObjectRef, Self::Error> {
+        let installed = self.vm.install_dynamic_function(
+            self.agent,
+            realm,
+            parameters_source,
+            body_source,
+            strict_caller,
+            kind,
+        )?;
         let default_prototype = self
             .agent
             .realm(realm)
@@ -431,15 +439,12 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             })
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(self.agent)))?;
         let prototype = self.builtin_constructor_prototype(realm, default_prototype, new_target)?;
-        self.vm.create_dynamic_function(
+        self.vm.instantiate_dynamic_function(
             self.agent,
             self.host,
             self.registry,
             realm,
-            parameters_source,
-            body_source,
-            strict_caller,
-            kind,
+            installed,
             prototype,
         )
     }
@@ -599,9 +604,11 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             lyng_js_objects::FunctionEntryIdentity::Bytecode(code) => self
                 .vm
                 .source_function_source_text(self.agent, code, function),
-            lyng_js_objects::FunctionEntryIdentity::Native(_)
-            | lyng_js_objects::FunctionEntryIdentity::Bound => {
+            lyng_js_objects::FunctionEntryIdentity::Native(_) => {
                 self.vm.native_function_source_text(self.agent, function)
+            }
+            lyng_js_objects::FunctionEntryIdentity::Bound => {
+                Ok("function () { [native code] }".to_owned())
             }
         }
     }

@@ -679,6 +679,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         self.emit_define_property_by_atom(class_object, value_register, atom)
                     }
                     StaticPublicFieldKey::Register(key_register) => {
+                        if value.is_some_and(|value| self.is_anonymous_function_definition(value)) {
+                            self.emit_set_function_name(value_register, key_register)?;
+                        }
                         self.emit_define_keyed_property(class_object, value_register, key_register)
                     }
                 }
@@ -1182,6 +1185,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             self.ast().get_expr(key).span(),
                             key_register,
                         )?;
+                        if value.is_some_and(|value| self.is_anonymous_function_definition(value)) {
+                            self.emit_set_function_name(value_register, key_register)?;
+                        }
                         self.emit_define_keyed_property(
                             this_register,
                             value_register,

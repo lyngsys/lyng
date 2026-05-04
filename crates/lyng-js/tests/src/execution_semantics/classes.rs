@@ -924,6 +924,52 @@ fn phase6_class_field_anonymous_function_names_follow_field_keys() {
 }
 
 #[test]
+fn phase6_computed_class_field_anonymous_function_names_follow_property_keys() {
+    let result = compile_and_run_string(
+        r#"
+        class C {
+            ["field"] = () => {};
+            [5] = function() {};
+            static ["staticField"] = async () => {};
+            static [6] = function*() {};
+        }
+
+        let instance = new C();
+        [
+            instance.field.name,
+            instance[5].name,
+            C.staticField.name,
+            C[6].name
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "field|5|staticField|6");
+}
+
+#[test]
+fn phase6_class_fields_after_arrow_initializers_do_not_require_semicolons() {
+    let result = compile_and_run_string(
+        r#"
+        class C {
+            ["first"] = () => {}
+            ["second"] = async () => {};
+        }
+
+        let instance = new C();
+        [
+            instance.first.name,
+            instance.second.name,
+            typeof instance.first,
+            typeof instance.second
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "first|second|function|function");
+}
+
+#[test]
 fn phase6_private_method_initialization_throws_on_duplicate_install() {
     let result = compile_and_run(
         r#"

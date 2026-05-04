@@ -188,10 +188,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if binding_record.kind == DeclarationKind::Var
             && binding_record.name == WellKnownAtom::arguments.id()
             && owner.is_some_and(|owner| {
+                let activation = self.state.activation(owner);
                 !matches!(
                     self.state.function_kind(owner),
                     FunctionKind::Arrow | FunctionKind::AsyncArrow
                 ) && self.state.function_needs_arguments(owner)
+                    && !activation.has_parameter_expressions
             })
         {
             if let Some(slot) =
@@ -247,7 +249,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         };
         let binding = self.binding(binding_id)?;
         if binding.kind == DeclarationKind::Var {
-            return Ok(false);
+            let Some(binding_owner) = self.scope_owner(binding.scope) else {
+                return Ok(false);
+            };
+            return Ok(
+                self.state.nearest_non_arrow_owner(binding_owner) == Some(owner)
+                    && self.state.activation(owner).has_parameter_expressions,
+            );
         }
         let Some(binding_owner) = self.scope_owner(binding.scope) else {
             return Ok(false);

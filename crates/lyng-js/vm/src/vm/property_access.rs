@@ -751,8 +751,10 @@ impl Vm {
             return Ok(Some(Value::null()));
         };
         if let Some(caller) = active_frame.tail_caller() {
-            if active_frame.tail_caller_strict() {
-                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            if active_frame.tail_caller_strict()
+                || self.legacy_function_caller_is_restricted(agent, caller)
+            {
+                return Ok(Some(Value::null()));
             }
             return Ok(Some(Value::from_object_ref(caller)));
         }
@@ -766,13 +768,20 @@ impl Vm {
         let Some(caller) = caller_frame.callee() else {
             return Ok(Some(Value::null()));
         };
-        if Self::bytecode_entry(agent, caller).is_some_and(|caller_code| {
-            self.installed_function(caller_code)
-                .is_some_and(|function| function.flags().strict())
-        }) {
-            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        if self.legacy_function_caller_is_restricted(agent, caller) {
+            return Ok(Some(Value::null()));
         }
         Ok(Some(Value::from_object_ref(caller)))
+    }
+
+    fn legacy_function_caller_is_restricted(&self, agent: &Agent, function: ObjectRef) -> bool {
+        Self::bytecode_entry(agent, function).is_some_and(|code| {
+            self.installed_function(code).is_some_and(|function| {
+                function.flags().strict()
+                    || function.flags().generator()
+                    || function.flags().async_function()
+            })
+        })
     }
 
     pub(super) fn copy_data_properties(

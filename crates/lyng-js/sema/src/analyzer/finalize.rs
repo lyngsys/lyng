@@ -7,6 +7,7 @@ use crate::use_site::ResolutionKind;
 impl<'a> Analyzer<'a> {
     pub(super) fn finalize(&mut self) {
         self.propagate_eval_with();
+        self.promote_bindings_visible_to_nested_eval();
 
         let use_crosses_dynamic_scope = self
             .use_sites
@@ -169,6 +170,35 @@ impl<'a> Analyzer<'a> {
 
             self.functions.get_mut(fid).captures = captures;
             self.functions.get_mut(fid).needs_environment = needs_env;
+        }
+    }
+
+    fn promote_bindings_visible_to_nested_eval(&mut self) {
+        let eval_scopes = self
+            .scopes
+            .as_slice()
+            .iter()
+            .enumerate()
+            .filter_map(|(index, scope)| scope.has_eval.then_some(ScopeId::new(index as u32)))
+            .collect::<Vec<_>>();
+
+        for eval_scope in eval_scopes {
+            let eval_owner = self.scopes.get(eval_scope).owning_function;
+            let mut current = self.scopes.get(eval_scope).parent;
+            while let Some(scope_id) = current {
+                let scope = self.scopes.get(scope_id);
+                if matches!(scope.kind, ScopeKind::Global | ScopeKind::Module) {
+                    break;
+                }
+
+                if scope.owning_function != eval_owner {
+                    for binding in scope.bindings.clone() {
+                        self.bindings.get_mut(binding).is_captured = true;
+                    }
+                }
+
+                current = scope.parent;
+            }
         }
     }
 

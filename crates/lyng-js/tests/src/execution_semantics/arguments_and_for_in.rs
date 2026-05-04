@@ -113,6 +113,23 @@ fn phase4_var_arguments_initializer_updates_arguments_binding() {
 }
 
 #[test]
+fn phase6_parameter_default_closure_sees_arguments_before_body_var_shadowing() {
+    let result = compile_and_run(
+        r#"
+        function inspect(read = () => arguments) {
+            var arguments = 0;
+            return (arguments === 0 ? 1 : 0)
+                + (arguments === read() ? 0 : 2)
+                + (typeof read() === "object" ? 4 : 0);
+        }
+        inspect();
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
 fn phase4_nested_function_arguments_shadow_outer_var_arguments() {
     let result = compile_and_run(
         r#"

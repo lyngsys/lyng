@@ -16,6 +16,44 @@ fn direct_eval_creates_local_var_binding_visible_after_eval() {
 }
 
 #[test]
+fn nested_direct_eval_resolves_outer_function_parameters() {
+    let result = compile_and_run_string(
+        r#"
+        function outer(source, value) {
+            "use strict";
+            function inner() {
+                eval(source);
+            }
+            inner();
+            return value + ":" + arguments[1];
+        }
+        outer("value = 2", 17);
+        "#,
+    );
+
+    assert_eq!(result, "2:17");
+}
+
+#[test]
+fn nested_direct_eval_uses_callee_arguments_object() {
+    let result = compile_and_run_string(
+        r#"
+        function outer(source, value) {
+            "use strict";
+            function inner() {
+                eval(source);
+            }
+            inner();
+            return arguments[0] + ":" + arguments[1];
+        }
+        outer("arguments[0] = 17", 42);
+        "#,
+    );
+
+    assert_eq!(result, "arguments[0] = 17:42");
+}
+
+#[test]
 fn eval_treats_comment_like_slash_sources_as_script_comments() {
     let result = compile_and_run_string(
         r#"

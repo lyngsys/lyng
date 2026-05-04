@@ -129,6 +129,14 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     fn parse_call_member_chain(&mut self, mut expr: ExprId) -> ExprId {
         loop {
+            if self.preceded_by_line_terminator()
+                && matches!(
+                    self.ast().get_expr(expr),
+                    Expr::ArrowFunctionExpression { .. }
+                )
+            {
+                break;
+            }
             match self.current_kind() {
                 TokenKind::Dot => {
                     self.advance();

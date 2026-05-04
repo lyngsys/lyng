@@ -263,6 +263,52 @@ fn phase5_functions_support_function_prototype_apply_with_array_like_arguments()
 }
 
 #[test]
+fn phase6_function_apply_coerces_array_like_length_with_ordinary_to_primitive() {
+    let result = compile_and_run(
+        r#"
+        let steps = 0;
+        function count() {
+            return arguments.length;
+        }
+        let args = {
+            0: "a",
+            1: "b",
+            length: {
+                valueOf() {
+                    steps = steps + 1;
+                    return {};
+                },
+                toString() {
+                    steps = steps + 10;
+                    return 2;
+                }
+            }
+        };
+        count.apply(null, args) * 100 + steps;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(211));
+}
+
+#[test]
+fn phase6_function_caller_returns_null_for_restricted_actual_caller() {
+    let result = compile_and_run(
+        r#"
+        function probe() {
+            return probe.caller;
+        }
+        (function strictCaller() {
+            "use strict";
+            return probe();
+        })() === null;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn phase5_functions_support_bound_function_calls() {
     let result = compile_and_run(
         r#"
@@ -370,10 +416,10 @@ fn phase6_legacy_function_caller_respects_immediate_caller_strictness() {
     let result = compile_and_run(
         r#"
         function nonStrictCaller() {
-            return target();
+            return target() === nonStrictCaller ? 1 : 0;
         }
         function target() {
-            return target.caller === nonStrictCaller ? 1 : 0;
+            return target.caller;
         }
         function strictCaller() {
             "use strict";
@@ -381,12 +427,8 @@ fn phase6_legacy_function_caller_respects_immediate_caller_strictness() {
         }
 
         let total = nonStrictCaller();
-        try {
-            strictCaller();
-        } catch (error) {
-            if (error.constructor === TypeError) {
-                total += 2;
-            }
+        if (strictCaller() === null) {
+            total += 2;
         }
         total;
         "#,
@@ -419,6 +461,40 @@ fn phase5_functions_bind_uses_spec_length_and_name_rules() {
     );
 
     assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn phase6_function_bind_uses_proxy_length_and_name() {
+    let result = compile_and_run(
+        r#"
+        let log = "";
+        let proxy = new Proxy(function target(a, b, c) {}, {
+            getOwnPropertyDescriptor(target, name) {
+                log += "own:" + name + "|";
+                if (name === "length") {
+                    return { value: 3, configurable: true };
+                }
+                return Reflect.getOwnPropertyDescriptor(target, name);
+            },
+            get(target, name, receiver) {
+                log += "get:" + name + "|";
+                if (name === "length") {
+                    return 3;
+                }
+                if (name === "name") {
+                    return "proxied";
+                }
+                return Reflect.get(target, name, receiver);
+            }
+        });
+        let bound = Function.prototype.bind.call(proxy, null, 1);
+        (bound.length === 2 ? 1 : 0)
+            + (bound.name === "bound proxied" ? 2 : 0)
+            + (log === "own:length|get:length|get:name|" ? 4 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
 }
 
 #[test]
@@ -656,6 +732,97 @@ fn phase5_functions_to_string_formats_native_functions_stably() {
     let result = compile_and_run_string("Function.prototype.toString();");
 
     assert_eq!(result, "function () { [native code] }");
+}
+
+#[test]
+fn phase6_function_to_string_formats_bound_functions_as_native() {
+    let result = compile_and_run_string(r#"function target() {} target.bind(null).toString();"#);
+
+    assert_eq!(result, "function () { [native code] }");
+}
+
+#[test]
+fn phase6_function_constructor_parses_before_new_target_prototype_lookup() {
+    let result = compile_and_run(
+        r#"
+        let prototypeLookup = 0;
+        let newTarget = Object.defineProperty(function() {}.bind(null), "prototype", {
+            get() {
+                prototypeLookup = 1;
+                return null;
+            }
+        });
+        try {
+            Reflect.construct(Function, ["@"], newTarget);
+        } catch (error) {
+            (error.constructor === SyntaxError ? 1 : 0) + (prototypeLookup === 0 ? 2 : 0);
+        }
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn phase6_function_constructor_does_not_bind_anonymous_in_body() {
+    let result = compile_and_run_string(
+        r#"
+        let outer = new Function("return typeof anonymous")();
+        let nested = new Function("return function() { return typeof anonymous; }")()();
+        let evalNested = new Function("return function() { eval(''); return typeof anonymous; }")()();
+        outer + "|" + nested + "|" + evalNested;
+        "#,
+    );
+
+    assert_eq!(result, "undefined|undefined|undefined");
+}
+
+#[test]
+fn phase6_non_simple_parameters_reject_body_lexical_redeclarations() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        try {
+            eval("function f1(a = 0) { var a; }");
+            total += 1;
+        } catch (error) {}
+        try {
+            eval("function f2(a = 0) { let a; }");
+        } catch (error) {
+            total += error.constructor === SyntaxError ? 2 : 0;
+        }
+        try {
+            eval("function f3(a = 0) { const a = 0; }");
+        } catch (error) {
+            total += error.constructor === SyntaxError ? 4 : 0;
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn phase6_function_constructor_rejects_parameter_text_that_consumes_wrapper_syntax() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+        try {
+            new Function("/*", "*/) {");
+        } catch (error) {
+            total += error.constructor === SyntaxError ? 1 : 0;
+        }
+        try {
+            new Function("//", ") {");
+        } catch (error) {
+            total += error.constructor === SyntaxError ? 2 : 0;
+        }
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
 }
 
 #[test]

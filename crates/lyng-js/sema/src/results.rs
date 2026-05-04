@@ -1,4 +1,4 @@
-use lyng_js_ast::{ParsedModule, ParsedScript, PatternId};
+use lyng_js_ast::{FunctionId, ParsedModule, ParsedScript, PatternId};
 use lyng_js_common::{AtomId, AtomTable, DiagnosticList};
 
 use crate::{
@@ -11,6 +11,7 @@ pub struct DirectEvalScriptAnalysisOptions {
     ambient_private_layouts: Vec<Vec<ClassPrivateElementRecord>>,
     forbid_arguments_in_class_initializer: bool,
     annex_b_blocked_var_names: Vec<AtomId>,
+    suppressed_function_name_bindings: Vec<FunctionId>,
 }
 
 impl DirectEvalScriptAnalysisOptions {
@@ -41,6 +42,12 @@ impl DirectEvalScriptAnalysisOptions {
     }
 
     #[inline]
+    pub fn with_suppressed_function_name_bindings(mut self, functions: Vec<FunctionId>) -> Self {
+        self.suppressed_function_name_bindings = functions;
+        self
+    }
+
+    #[inline]
     pub fn ambient_private_layouts(&self) -> &[Vec<ClassPrivateElementRecord>] {
         &self.ambient_private_layouts
     }
@@ -53,6 +60,11 @@ impl DirectEvalScriptAnalysisOptions {
     #[inline]
     pub fn annex_b_blocked_var_names(&self) -> &[AtomId] {
         &self.annex_b_blocked_var_names
+    }
+
+    #[inline]
+    pub fn suppressed_function_name_bindings(&self) -> &[FunctionId] {
+        &self.suppressed_function_name_bindings
     }
 }
 

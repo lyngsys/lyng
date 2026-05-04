@@ -128,6 +128,28 @@ fn phase6_finally_abrupt_completion_uses_finalizer_value() {
 }
 
 #[test]
+fn phase6_nested_finally_normal_completion_preserves_outer_return() {
+    let result = compile_and_run(
+        r#"
+        function run() {
+            try {
+                return 42;
+            } finally {
+                do try {
+                    return 43;
+                } finally {
+                    break;
+                } while (false);
+            }
+        }
+        run();
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(42));
+}
+
+#[test]
 fn phase4_typeof_identifier_reference_probes_without_throwing() {
     let result = compile_and_run_string("typeof missingName;");
 

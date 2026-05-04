@@ -11,12 +11,14 @@ impl Vm {
         bound_this: Value,
         bound_arguments: &[Value],
     ) -> VmResult<ObjectRef> {
-        let target_data = agent
-            .objects()
-            .function_data(target)
-            .cloned()
-            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
-        let realm = target_data.realm().unwrap_or(caller.realm());
+        if !agent.objects().is_callable(target) {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        let target_data = bound_target_function_data(agent, target)?;
+        let realm = target_data
+            .as_ref()
+            .and_then(FunctionObjectData::realm)
+            .unwrap_or(caller.realm());
         let realm_record = agent
             .realm(realm)
             .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
@@ -28,9 +30,10 @@ impl Vm {
             .function_prototype()
             .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
         let environment = target_data
-            .environment()
+            .as_ref()
+            .and_then(FunctionObjectData::environment)
             .unwrap_or(realm_record.global_env());
-        let function_data = FunctionObjectData::bound(
+        let mut function_data = FunctionObjectData::bound(
             realm,
             environment,
             target,
@@ -38,13 +41,15 @@ impl Vm {
             bound_arguments.to_vec().into_boxed_slice(),
         )
         .with_has_prototype_property(false)
-        .with_constructor_flags(if target_data.is_constructible() {
+        .with_constructor_flags(if agent.objects().is_constructor(target) {
             FunctionConstructorFlags::constructible()
         } else {
             FunctionConstructorFlags::empty()
         })
-        .with_kind_flags(target_data.kind_flags())
         .with_this_mode(FunctionThisMode::Strict);
+        if let Some(target_data) = target_data.as_ref() {
+            function_data = function_data.with_kind_flags(target_data.kind_flags());
+        }
         let function = agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
             objects.alloc_object(
@@ -57,9 +62,18 @@ impl Vm {
         });
 
         let length_key = PropertyKey::from_atom(WellKnownAtom::length.id());
-        let target_has_own_length = object::ordinary_get_own_property(agent, target, length_key)
-            .map_err(VmError::Abrupt)?
-            .is_some();
+        let target_has_own_length = object::get_own_property_in_context(
+            &mut VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame: caller,
+            },
+            target,
+            length_key,
+        )?
+        .is_some();
         let bound_length = if target_has_own_length {
             let target_length = self.get_property_from_object(
                 agent,
@@ -138,7 +152,8 @@ impl Vm {
             Value::from_object_ref(object),
             PropertyKey::from_atom(WellKnownAtom::length.id()),
         )?;
-        let length = to_f64_number(agent, length)?.max(0.0) as u32;
+        let length =
+            self.to_length_for_array_like_arguments(agent, host, registry, caller_frame, length)?;
         let mut arguments = Vec::with_capacity(usize::try_from(length).unwrap_or(usize::MAX));
         for index in 0..length {
             arguments.push(self.get_property_from_object(
@@ -152,6 +167,35 @@ impl Vm {
             )?);
         }
         Ok(arguments)
+    }
+
+    fn to_length_for_array_like_arguments(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller_frame: FrameRecord,
+        value: Value,
+    ) -> VmResult<u32> {
+        const MAX_SAFE_LENGTH: f64 = 9_007_199_254_740_991.0;
+        let primitive = self.to_primitive(
+            agent,
+            host,
+            registry,
+            caller_frame,
+            value,
+            ToPrimitiveHint::Number,
+        )?;
+        let number = read::to_number(agent.heap().view(), primitive)
+            .map_err(|_| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let number = number_value_to_f64(number);
+        if number.is_nan() || number <= 0.0 {
+            return Ok(0);
+        }
+        if !number.is_finite() {
+            return Ok(u32::MAX);
+        }
+        Ok(number.trunc().min(MAX_SAFE_LENGTH).min(f64::from(u32::MAX)) as u32)
     }
 
     fn try_collect_fast_engine_array_arguments(
@@ -203,26 +247,15 @@ impl Vm {
         Ok(Some(arguments))
     }
 
-    pub(super) fn create_dynamic_function(
+    pub(super) fn instantiate_dynamic_function(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         realm: RealmRef,
-        parameters_source: &str,
-        body_source: &str,
-        strict_caller: bool,
-        kind: DynamicFunctionKind,
+        installed: crate::InstalledCode,
         prototype: ObjectRef,
     ) -> VmResult<ObjectRef> {
-        let installed = self.install_dynamic_function(
-            agent,
-            realm,
-            parameters_source,
-            body_source,
-            strict_caller,
-            kind,
-        )?;
         let (lexical_env, variable_env) = if let Some(realm_record) = agent.realm(realm) {
             (realm_record.global_env(), realm_record.global_env())
         } else {
@@ -358,11 +391,40 @@ impl Vm {
     }
 }
 
+fn bound_target_function_data(
+    agent: &mut Agent,
+    mut target: ObjectRef,
+) -> VmResult<Option<FunctionObjectData>> {
+    loop {
+        if let Some(data) = agent.objects().function_data(target) {
+            return Ok(Some(data.clone()));
+        }
+        if !agent.objects().is_proxy_object(target) {
+            return Ok(None);
+        }
+        let Some(data) = agent.objects().proxy_data(target) else {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        };
+        if data.revoked() {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        target = data.target();
+    }
+}
+
 fn number_to_u32_length(value: f64) -> Option<u32> {
     if !value.is_finite() || value < 0.0 || value.trunc() != value || value > f64::from(u32::MAX) {
         return None;
     }
     Some(value as u32)
+}
+
+fn number_value_to_f64(value: Value) -> f64 {
+    value
+        .as_smi()
+        .map(f64::from)
+        .or_else(|| value.as_f64())
+        .expect("ToNumber must produce a numeric value")
 }
 
 fn bound_function_length_value(target_length: Value, bound_argument_count: usize) -> Value {

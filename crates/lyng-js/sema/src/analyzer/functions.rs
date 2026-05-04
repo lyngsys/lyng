@@ -36,6 +36,9 @@ impl<'a> Analyzer<'a> {
         if function_strict || has_non_simple_params {
             self.check_duplicate_params(&params);
         }
+        if has_non_simple_params && expression_body.is_none() {
+            self.check_body_lexical_redeclarations_of_parameters(&params, body);
+        }
 
         if matches!(
             func_kind,
@@ -103,7 +106,7 @@ impl<'a> Analyzer<'a> {
                 })
             });
 
-            if !is_declaration {
+            if !is_declaration && !self.suppressed_function_name_bindings.contains(&func_id) {
                 self.declare_binding(name, DeclarationKind::FunctionName, func_scope, func_span);
                 has_named_function_expression_scope = true;
             }
@@ -208,6 +211,41 @@ impl<'a> Analyzer<'a> {
                 );
             } else {
                 checked.push(name);
+            }
+        }
+    }
+
+    fn check_body_lexical_redeclarations_of_parameters(
+        &mut self,
+        params: &lyng_js_ast::FormalParameters,
+        body: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+    ) {
+        let mut parameter_names = Vec::new();
+        let param_ids = self.ast.get_pattern_list(params.params);
+        for &pid in param_ids {
+            self.collect_pattern_names(pid, &mut parameter_names);
+        }
+        if let Some(rest) = params.rest {
+            self.collect_pattern_names(rest, &mut parameter_names);
+        }
+
+        let mut lexical_names = Vec::new();
+        self.collect_lexically_declared_names_from_stmt_list(
+            body,
+            ScopeKind::Function,
+            &mut lexical_names,
+        );
+
+        let mut reported = Vec::new();
+        for entry in lexical_names {
+            if parameter_names.iter().any(|&(name, _)| name == entry.name)
+                && !reported.contains(&entry.name)
+            {
+                reported.push(entry.name);
+                self.diagnostics.error(
+                    entry.span,
+                    "function body lexical declaration conflicts with parameter",
+                );
             }
         }
     }
