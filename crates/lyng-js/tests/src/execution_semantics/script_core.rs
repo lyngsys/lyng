@@ -836,6 +836,28 @@ fn phase6_string_edge_cases_cover_remaining_text_failures() {
 }
 
 #[test]
+fn script_core_string_normalize_covers_staging_composition_edges() {
+    let result = compile_and_run_string(
+        r#"
+        let generic = {
+            toString() {
+                return "a\u0301";
+            },
+            normalize: String.prototype.normalize
+        };
+
+        [
+            generic.normalize(),
+            "\u0100".normalize("NFD"),
+            "A\u0304".normalize()
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "á|A\u{0304}|Ā");
+}
+
+#[test]
 fn script_core_supports_annex_b_string_substr() {
     let result = compile_and_run_string(
         r#"
