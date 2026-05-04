@@ -1914,6 +1914,15 @@ fn iterator_helper_zip_return<Cx: PublicBuiltinDispatchContext>(
     create_iterator_result_value(cx, Value::undefined(), true)
 }
 
+fn iterator_helper_source_error<Cx: PublicBuiltinDispatchContext, T>(
+    cx: &mut Cx,
+    helper: ObjectRef,
+    error: Cx::Error,
+) -> Result<T, Cx::Error> {
+    set_iterator_helper_done(cx, helper)?;
+    Err(error)
+}
+
 fn iterator_helper_map_next<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     helper: ObjectRef,
@@ -1926,8 +1935,7 @@ fn iterator_helper_map_next<Cx: PublicBuiltinDispatchContext>(
     let next = match next {
         Ok(next) => next,
         Err(error) => {
-            set_iterator_helper_done(cx, helper)?;
-            return close_iterator_after_error(cx, &mut iterator_record, error);
+            return iterator_helper_source_error(cx, helper, error);
         }
     };
     let Some(next) = next else {
@@ -1941,8 +1949,7 @@ fn iterator_helper_map_next<Cx: PublicBuiltinDispatchContext>(
     let value = match value {
         Ok(value) => value,
         Err(error) => {
-            set_iterator_helper_done(cx, helper)?;
-            return close_iterator_after_error(cx, &mut iterator_record, error);
+            return iterator_helper_source_error(cx, helper, error);
         }
     };
     let mapper = iterator_slot_value_for_builtin(
@@ -2001,8 +2008,7 @@ fn iterator_helper_take_next<Cx: PublicBuiltinDispatchContext>(
     let next = match next {
         Ok(next) => next,
         Err(error) => {
-            set_iterator_helper_done(cx, helper)?;
-            return close_iterator_after_error(cx, &mut iterator_record, error);
+            return iterator_helper_source_error(cx, helper, error);
         }
     };
     let Some(next) = next else {
@@ -2016,8 +2022,7 @@ fn iterator_helper_take_next<Cx: PublicBuiltinDispatchContext>(
     let value = match value {
         Ok(value) => value,
         Err(error) => {
-            set_iterator_helper_done(cx, helper)?;
-            return close_iterator_after_error(cx, &mut iterator_record, error);
+            return iterator_helper_source_error(cx, helper, error);
         }
     };
     create_iterator_result_value(cx, value, false)
@@ -2037,8 +2042,7 @@ fn iterator_helper_drop_next<Cx: PublicBuiltinDispatchContext>(
         let next = match next {
             Ok(next) => next,
             Err(error) => {
-                set_iterator_helper_done(cx, helper)?;
-                return close_iterator_after_error(cx, &mut iterator_record, error);
+                return iterator_helper_source_error(cx, helper, error);
             }
         };
         if next.is_none() {
@@ -2057,8 +2061,7 @@ fn iterator_helper_drop_next<Cx: PublicBuiltinDispatchContext>(
     let next = match next {
         Ok(next) => next,
         Err(error) => {
-            set_iterator_helper_done(cx, helper)?;
-            return close_iterator_after_error(cx, &mut iterator_record, error);
+            return iterator_helper_source_error(cx, helper, error);
         }
     };
     let Some(next) = next else {
@@ -2072,8 +2075,7 @@ fn iterator_helper_drop_next<Cx: PublicBuiltinDispatchContext>(
     let value = match value {
         Ok(value) => value,
         Err(error) => {
-            set_iterator_helper_done(cx, helper)?;
-            return close_iterator_after_error(cx, &mut iterator_record, error);
+            return iterator_helper_source_error(cx, helper, error);
         }
     };
     create_iterator_result_value(cx, value, false)
@@ -2124,8 +2126,7 @@ fn iterator_helper_flat_map_next<Cx: PublicBuiltinDispatchContext>(
         let next = match next {
             Ok(next) => next,
             Err(error) => {
-                set_iterator_helper_done(cx, helper)?;
-                return close_iterator_after_error(cx, &mut outer_record, error);
+                return iterator_helper_source_error(cx, helper, error);
             }
         };
         let Some(next) = next else {
@@ -2139,8 +2140,7 @@ fn iterator_helper_flat_map_next<Cx: PublicBuiltinDispatchContext>(
         let value = match value {
             Ok(value) => value,
             Err(error) => {
-                set_iterator_helper_done(cx, helper)?;
-                return close_iterator_after_error(cx, &mut outer_record, error);
+                return iterator_helper_source_error(cx, helper, error);
             }
         };
         let mapper = iterator_slot_value_for_builtin(
@@ -2207,8 +2207,7 @@ fn iterator_helper_filter_next<Cx: PublicBuiltinDispatchContext>(
         let next = match next {
             Ok(next) => next,
             Err(error) => {
-                set_iterator_helper_done(cx, helper)?;
-                return close_iterator_after_error(cx, &mut iterator_record, error);
+                return iterator_helper_source_error(cx, helper, error);
             }
         };
         let Some(next) = next else {
@@ -2222,8 +2221,7 @@ fn iterator_helper_filter_next<Cx: PublicBuiltinDispatchContext>(
         let value = match value {
             Ok(value) => value,
             Err(error) => {
-                set_iterator_helper_done(cx, helper)?;
-                return close_iterator_after_error(cx, &mut iterator_record, error);
+                return iterator_helper_source_error(cx, helper, error);
             }
         };
         let predicate = iterator_slot_value_for_builtin(
@@ -2288,7 +2286,8 @@ fn get_iterator_flattenable<Cx: PublicBuiltinDispatchContext>(
     };
     let next_key = property_key_from_text(cx, "next");
     let next = cx.get_property_value(Value::from_object_ref(iterator), next_key)?;
-    Ok((iterator, next))
+    let next = cx.require_callable_object(next)?;
+    Ok((iterator, Value::from_object_ref(next)))
 }
 
 fn iterator_helper_this_object<Cx: PublicBuiltinDispatchContext>(

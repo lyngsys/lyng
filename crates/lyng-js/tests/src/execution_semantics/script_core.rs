@@ -6139,6 +6139,114 @@ fn script_core_iterator_from_wrappers_forward_without_helper_state() {
 }
 
 #[test]
+fn script_core_iterator_helpers_do_not_close_source_on_source_abrupts() {
+    let result = compile_and_run(
+        r#"
+        let total = 0;
+
+        let methods = [
+            iter => iter.map(value => value),
+            iter => iter.filter(value => true),
+            iter => iter.take(1),
+            iter => iter.drop(0),
+            iter => iter.flatMap(value => [value]),
+        ];
+
+        function makeIterator(mode, close) {
+            let iter = {
+                next() {
+                    if (mode === "next") {
+                        throw "next";
+                    }
+                    if (mode === "done") {
+                        return {
+                            get done() {
+                                throw "done";
+                            },
+                            value: 1
+                        };
+                    }
+                    if (mode === "value") {
+                        return {
+                            done: false,
+                            get value() {
+                                throw "value";
+                            }
+                        };
+                    }
+                    if (mode === "primitive") {
+                        return 1;
+                    }
+                    return { done: false, value: 1 };
+                },
+                return() {
+                    close();
+                    return { done: true };
+                }
+            };
+            Object.setPrototypeOf(iter, Iterator.prototype);
+            return iter;
+        }
+
+        function sourceAbruptDoesNotClose(method, mode, matches) {
+            let closed = false;
+            let iter = makeIterator(mode, () => { closed = true; });
+            try {
+                method(iter).next();
+            } catch (error) {
+                return matches(error) && closed === false;
+            }
+            return false;
+        }
+
+        for (let method of methods) {
+            total += sourceAbruptDoesNotClose(method, "next", error => error === "next") ? 1 : 0;
+            total += sourceAbruptDoesNotClose(method, "done", error => error === "done") ? 1 : 0;
+            total += sourceAbruptDoesNotClose(method, "value", error => error === "value") ? 1 : 0;
+            total += sourceAbruptDoesNotClose(method, "primitive", error => error instanceof TypeError) ? 1 : 0;
+        }
+
+        function callbackThrowCloses(method) {
+            let closed = false;
+            let iter = makeIterator("ok", () => { closed = true; });
+            try {
+                method(iter).next();
+            } catch (error) {
+                return error === "callback" && closed === true;
+            }
+            return false;
+        }
+
+        total += callbackThrowCloses(iter => iter.map(() => { throw "callback"; })) ? 1 : 0;
+        total += callbackThrowCloses(iter => iter.filter(() => { throw "callback"; })) ? 1 : 0;
+        total += callbackThrowCloses(iter => iter.flatMap(() => { throw "callback"; })) ? 1 : 0;
+
+        function flatMapInnerFailureCloses(inner) {
+            let closed = false;
+            let iter = makeIterator("ok", () => { closed = true; });
+            try {
+                iter.flatMap(() => inner).next();
+            } catch (error) {
+                return error instanceof TypeError && closed === true;
+            }
+            return false;
+        }
+
+        total += flatMapInnerFailureCloses({}) ? 1 : 0;
+        total += flatMapInnerFailureCloses({
+            [Symbol.iterator]() {
+                return {};
+            }
+        }) ? 1 : 0;
+
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(25));
+}
+
+#[test]
 fn script_core_set_methods_observe_receiver_mutation_order() {
     let result = compile_and_run(
         r#"
