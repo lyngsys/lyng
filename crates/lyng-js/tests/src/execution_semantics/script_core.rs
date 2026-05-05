@@ -6717,6 +6717,38 @@ fn script_core_regexp_source_escapes_literal_delimiters() {
 }
 
 #[test]
+fn script_core_regexp_source_round_trips_line_terminator_after_backslash() {
+    let result = compile_and_run_string(
+        r#"
+        let lineExpected = "\\" + "n";
+        let lineMatches = false;
+        try {
+            let line = RegExp("\\\n");
+            lineMatches = line.source === lineExpected
+                && eval("/" + line.source + "/").source === lineExpected
+                && line.toString() === "/" + lineExpected + "/";
+        } catch (error) {
+            lineMatches = error instanceof SyntaxError ? "syntax" : "other";
+        }
+
+        let classExpected = "[/]";
+        let escapedClassExpected = "[" + "\\" + "/" + "]";
+        let classLiteral = /[/]/;
+        let classConstructor = RegExp("[/]");
+        let escapedClassLiteral = /[\/]/;
+
+        String(lineMatches) + ":"
+            + String(classLiteral.source === classExpected
+                && eval("/" + classLiteral.source + "/").source === classExpected) + ":"
+            + String(classConstructor.source === classExpected) + ":"
+            + String(escapedClassLiteral.source === escapedClassExpected);
+        "#,
+    );
+
+    assert_eq!(result, "true:true:true:true");
+}
+
+#[test]
 fn script_core_regexp_source_preserves_escaped_slashes_for_clones() {
     let result = compile_and_run(
         r#"

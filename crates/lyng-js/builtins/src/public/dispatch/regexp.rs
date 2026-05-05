@@ -1442,7 +1442,7 @@ fn regexp_compile_builtin<Cx: PublicBuiltinDispatchContext>(
             let pattern_text = if pattern_value.is_undefined() {
                 String::new()
             } else {
-                normalize_regexp_constructor_pattern_text(&cx.value_to_string_text(pattern_value)?)
+                cx.value_to_string_text(pattern_value)?
             };
             let flags_text = if flags_value.is_undefined() {
                 String::new()
@@ -1455,7 +1455,7 @@ fn regexp_compile_builtin<Cx: PublicBuiltinDispatchContext>(
         let pattern_text = if pattern_value.is_undefined() {
             String::new()
         } else {
-            normalize_regexp_constructor_pattern_text(&cx.value_to_string_text(pattern_value)?)
+            cx.value_to_string_text(pattern_value)?
         };
         let flags_text = if flags_value.is_undefined() {
             String::new()
@@ -1465,6 +1465,10 @@ fn regexp_compile_builtin<Cx: PublicBuiltinDispatchContext>(
         (pattern_text, flags_text)
     };
 
+    let pattern_text = normalize_regexp_constructor_pattern_text(
+        &pattern_text,
+        flags_text.contains('u') || flags_text.contains('v'),
+    );
     if validate_regexp_constructor_pattern(&pattern_text, &flags_text).is_err() {
         return Err(syntax_error(cx));
     }

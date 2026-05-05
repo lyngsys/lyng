@@ -21,15 +21,26 @@ pub(super) fn regexp_species_getter_builtin(invocation: BuiltinInvocation<'_>) -
     invocation.this_value()
 }
 
-pub(super) fn normalize_regexp_constructor_pattern_text(pattern: &str) -> String {
+pub(super) fn normalize_regexp_constructor_pattern_text(
+    pattern: &str,
+    unicode_aware: bool,
+) -> String {
     let mut normalized = String::with_capacity(pattern.len());
     let mut trailing_backslashes = 0usize;
     for ch in pattern.chars() {
         match ch {
             '\n' if trailing_backslashes % 2 == 0 => normalized.push_str("\\n"),
+            '\n' if !unicode_aware => normalized.push('n'),
+            '\n' => normalized.push(ch),
             '\r' if trailing_backslashes % 2 == 0 => normalized.push_str("\\r"),
+            '\r' if !unicode_aware => normalized.push('r'),
+            '\r' => normalized.push(ch),
             '\u{2028}' if trailing_backslashes % 2 == 0 => normalized.push_str("\\u2028"),
+            '\u{2028}' if !unicode_aware => normalized.push_str("u2028"),
+            '\u{2028}' => normalized.push(ch),
             '\u{2029}' if trailing_backslashes % 2 == 0 => normalized.push_str("\\u2029"),
+            '\u{2029}' if !unicode_aware => normalized.push_str("u2029"),
+            '\u{2029}' => normalized.push(ch),
             _ => normalized.push(ch),
         }
         if ch == '\\' {
@@ -47,9 +58,7 @@ fn regexp_pattern_seed_text<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<String, Cx::Error> {
     match seed {
         RegExpPatternSeed::Text(text) => Ok(text),
-        RegExpPatternSeed::Value(value) => Ok(normalize_regexp_constructor_pattern_text(
-            &cx.value_to_string_text(value)?,
-        )),
+        RegExpPatternSeed::Value(value) => cx.value_to_string_text(value),
     }
 }
 
@@ -153,8 +162,12 @@ pub(super) fn regexp_builtin<Cx: PublicBuiltinDispatchContext>(
     } else {
         default_prototype
     };
-    let pattern_text = regexp_pattern_seed_text(cx, pattern_seed)?;
     let flags_text = regexp_flags_seed_text(cx, flags_seed)?;
+    let pattern_text = regexp_pattern_seed_text(cx, pattern_seed)?;
+    let pattern_text = normalize_regexp_constructor_pattern_text(
+        &pattern_text,
+        flags_text.contains('u') || flags_text.contains('v'),
+    );
     if validate_regexp_constructor_pattern(&pattern_text, &flags_text).is_err() {
         return Err(syntax_error(cx));
     }

@@ -49,9 +49,19 @@ enum RegExpSource {
 fn escape_regexp_pattern_units(units: &[u16]) -> Vec<u16> {
     let mut escaped = Vec::with_capacity(units.len());
     let mut trailing_backslashes = 0usize;
+    let mut in_character_class = false;
     for unit in units {
+        let is_escaped = trailing_backslashes % 2 == 1;
         match *unit {
-            0x002F if trailing_backslashes % 2 == 0 => {
+            ch if ch == b'[' as u16 && !is_escaped => {
+                in_character_class = true;
+                escaped.push(ch);
+            }
+            ch if ch == b']' as u16 && !is_escaped => {
+                in_character_class = false;
+                escaped.push(ch);
+            }
+            0x002F if !in_character_class && !is_escaped => {
                 escaped.extend_from_slice(&[b'\\' as u16, b'/' as u16]);
                 trailing_backslashes = 0;
             }
