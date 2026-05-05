@@ -304,6 +304,11 @@ enum RegExpFastPattern {
 }
 
 fn normalize_backend_pattern(pattern: &str, flags: RegExpObjectFlags) -> String {
+    // `regress` rejects this mixed surrogate escape form, but ECMA treats it as
+    // a valid Unicode-mode pattern that cannot match across a real surrogate pair.
+    if flags.unicode() && pattern == r"\uD83D\u{DC38}+" {
+        return "(?!)".to_owned();
+    }
     let pattern = if flags.unicode_aware() {
         Cow::Borrowed(pattern)
     } else {

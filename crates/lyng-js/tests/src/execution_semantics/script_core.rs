@@ -6814,6 +6814,27 @@ fn script_core_regexp_unknown_script_property_aliases_match_generated_sets() {
 }
 
 #[test]
+fn script_core_regexp_unicode_braced_surrogate_pairs_compile_as_never_matches() {
+    let result = compile_and_run_string(
+        r#"
+        function probe(source) {
+            try {
+                return eval(source).exec("\uD83D\uDC38\uDC38") === null;
+            } catch (error) {
+                return error instanceof SyntaxError ? "syntax" : "other";
+            }
+        }
+
+        String(probe("/\\u{D83D}\\u{DC38}+/u")) + ":"
+            + String(probe("/\\uD83D\\u{DC38}+/u")) + ":"
+            + String(probe("/\\u{D83D}\\uDC38+/u"));
+        "#,
+    );
+
+    assert_eq!(result, "true:true:true");
+}
+
+#[test]
 fn script_core_regexp_unicode_sets_exec_uses_unicode_aware_matching() {
     let result = compile_and_run(
         r#"
