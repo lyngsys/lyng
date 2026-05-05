@@ -6843,6 +6843,51 @@ fn script_core_regexp_unicode_ignore_case_word_escapes_include_special_folds() {
 }
 
 #[test]
+fn script_core_regexp_ignore_case_literal_folds_cross_latin1() {
+    let result = compile_and_run_string(
+        r#"
+        function hit(re, input, whole, capture) {
+            let match = re.exec(input);
+            return match !== null && match[0] === whole && match[1] === capture;
+        }
+        function miss(re, input) {
+            return re.exec(input) === null;
+        }
+
+        [
+            hit(/(\u039C)/i, "\xB5", "\xB5", "\xB5"),
+            hit(/(\u039C)+/i, "\xB5\xB5", "\xB5\xB5", "\xB5"),
+            hit(/(\xB5)/iu, "\u039C", "\u039C", "\u039C"),
+            hit(/(\xB5)+/iu, "\u039C\u039C", "\u039C\u039C", "\u039C"),
+            hit(/(\u0178)/i, "\xFF", "\xFF", "\xFF"),
+            hit(/(\xFF)+/iu, "\u0178\u0178", "\u0178\u0178", "\u0178"),
+            miss(/(\u017F)/i, "\x73"),
+            miss(/(\x73)/i, "\u017F"),
+            hit(/(\u017F)/iu, "\x73", "\x73", "\x73"),
+            hit(/(\x73)+/iu, "\u017F\u017F", "\u017F\u017F", "\u017F"),
+            miss(/(\u1E9E)/i, "\xDF"),
+            miss(/(\xDF)/i, "\u1E9E"),
+            hit(/(\u1E9E)/iu, "\xDF", "\xDF", "\xDF"),
+            hit(/(\xDF)+/iu, "\u1E9E\u1E9E", "\u1E9E\u1E9E", "\u1E9E"),
+            miss(/(\u212A)/i, "\x6B"),
+            miss(/(\x6B)/i, "\u212A"),
+            hit(/(\u212A)/iu, "\x6B", "\x6B", "\x6B"),
+            hit(/(\x6B)+/iu, "\u212A\u212A", "\u212A\u212A", "\u212A"),
+            miss(/(\u212B)/i, "\xE5"),
+            miss(/(\xE5)/i, "\u212B"),
+            hit(/(\u212B)/iu, "\xE5", "\xE5", "\xE5"),
+            hit(/(\xE5)+/iu, "\u212B\u212B", "\u212B\u212B", "\u212B")
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "true:true:true:true:true:true:true:true:true:true:true:true:true:true:true:true:true:true:true:true:true:true"
+    );
+}
+
+#[test]
 fn script_core_regexp_unicode_braced_surrogate_pairs_compile_as_never_matches() {
     let result = compile_and_run_string(
         r#"

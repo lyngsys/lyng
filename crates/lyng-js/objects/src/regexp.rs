@@ -304,12 +304,43 @@ enum RegExpFastPattern {
     AsciiNonWord,
     UnicodeIgnoreCaseWord,
     UnicodeIgnoreCaseNonWord,
+    CapturedIgnoreCaseLiteral {
+        class: IgnoreCaseLiteralClass,
+        one_or_more: bool,
+    },
     AnchoredAsciiDigitRun,
     AnchoredAsciiNonDigitRun,
     AnchoredWhitespaceRun,
     AnchoredNonWhitespaceRun,
     AnchoredAsciiWordRun,
     AnchoredAsciiNonWordRun,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum IgnoreCaseLiteralClass {
+    MicroSign,
+    YDiaeresis,
+    AsciiS,
+    LongSExact,
+    LongSUnicode,
+    SharpSUnicode,
+    KelvinUnicode,
+    AngstromUnicode,
+}
+
+impl IgnoreCaseLiteralClass {
+    fn matches(self, unit: u16) -> bool {
+        match self {
+            Self::MicroSign => matches!(unit, 0x00B5 | 0x039C | 0x03BC),
+            Self::YDiaeresis => matches!(unit, 0x00FF | 0x0178),
+            Self::AsciiS => matches!(unit, 0x0053 | 0x0073),
+            Self::LongSExact => unit == 0x017F,
+            Self::LongSUnicode => matches!(unit, 0x0053 | 0x0073 | 0x017F),
+            Self::SharpSUnicode => matches!(unit, 0x00DF | 0x1E9E),
+            Self::KelvinUnicode => matches!(unit, 0x004B | 0x006B | 0x212A),
+            Self::AngstromUnicode => matches!(unit, 0x00C5 | 0x00E5 | 0x212B),
+        }
+    }
 }
 
 fn normalize_backend_pattern(pattern: &str, flags: RegExpObjectFlags) -> String {
@@ -984,6 +1015,9 @@ impl RegExpPayload {
                     !is_unicode_ignore_case_word_code_unit(unit)
                 }))
             }
+            RegExpFastPattern::CapturedIgnoreCaseLiteral { class, one_or_more } => {
+                Some(self.find_captured_ignore_case_literal(text, start, class, one_or_more))
+            }
             RegExpFastPattern::AnchoredAsciiDigitRun => {
                 Some(self.match_fast_anchored_run(text, start, is_ascii_digit_code_unit))
             }
@@ -1201,6 +1235,38 @@ impl RegExpPayload {
         None
     }
 
+    fn find_captured_ignore_case_literal(
+        &self,
+        text: &[u16],
+        start: usize,
+        class: IgnoreCaseLiteralClass,
+        one_or_more: bool,
+    ) -> Option<RegExpMatchRecord> {
+        let mut index = start;
+        while index < text.len() {
+            if !class.matches(text[index]) {
+                index += 1;
+                continue;
+            }
+
+            let match_start = index;
+            let mut end = index + 1;
+            let mut capture_start = index;
+            if one_or_more {
+                while end < text.len() && class.matches(text[end]) {
+                    capture_start = end;
+                    end += 1;
+                }
+            }
+
+            return Some(simple_match_record_with_captures(
+                match_start..end,
+                vec![Some(capture_start..end)],
+            ));
+        }
+        None
+    }
+
     fn find_legacy_frog_pair(
         &self,
         text: &[u16],
@@ -1366,6 +1432,11 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
             return Some(pattern);
         }
     }
+    if flags.ignore_case() {
+        if let Some(pattern) = detect_fast_ignore_case_captured_literal_pattern(pattern, flags) {
+            return Some(pattern);
+        }
+    }
     if flags.unicode_aware() && flags.ignore_case() {
         match pattern {
             r"\w" | r"[^\W]" => return Some(RegExpFastPattern::UnicodeIgnoreCaseWord),
@@ -1391,6 +1462,73 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
         r"^\W+$" if !flags.multiline() && word_classes_are_ascii => {
             Some(RegExpFastPattern::AnchoredAsciiNonWordRun)
         }
+        _ => None,
+    }
+}
+
+fn detect_fast_ignore_case_captured_literal_pattern(
+    pattern: &str,
+    flags: RegExpObjectFlags,
+) -> Option<RegExpFastPattern> {
+    let (unit, one_or_more) = captured_literal_code_unit(pattern)?;
+    let class = if flags.unicode_aware() {
+        unicode_ignore_case_literal_class(unit)?
+    } else {
+        legacy_ignore_case_literal_class(unit)?
+    };
+    Some(RegExpFastPattern::CapturedIgnoreCaseLiteral { class, one_or_more })
+}
+
+fn captured_literal_code_unit(pattern: &str) -> Option<(u16, bool)> {
+    let body = pattern.strip_prefix('(')?;
+    let (literal, one_or_more) = if let Some(literal) = body.strip_suffix(")+") {
+        (literal, true)
+    } else {
+        (body.strip_suffix(')')?, false)
+    };
+    decode_literal_code_unit(literal).map(|unit| (unit, one_or_more))
+}
+
+fn decode_literal_code_unit(literal: &str) -> Option<u16> {
+    if let Some(hex) = literal.strip_prefix(r"\x") {
+        if hex.len() == 2 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return u16::from_str_radix(hex, 16).ok();
+        }
+    }
+    if let Some(hex) = literal.strip_prefix(r"\u") {
+        if hex.len() == 4 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return u16::from_str_radix(hex, 16).ok();
+        }
+    }
+
+    let mut chars = literal.chars();
+    let ch = chars.next()?;
+    if chars.next().is_some() {
+        return None;
+    }
+    let mut units = [0u16; 2];
+    let encoded = ch.encode_utf16(&mut units);
+    (encoded.len() == 1).then_some(encoded[0])
+}
+
+fn unicode_ignore_case_literal_class(unit: u16) -> Option<IgnoreCaseLiteralClass> {
+    match unit {
+        0x00B5 | 0x039C | 0x03BC => Some(IgnoreCaseLiteralClass::MicroSign),
+        0x00FF | 0x0178 => Some(IgnoreCaseLiteralClass::YDiaeresis),
+        0x0053 | 0x0073 | 0x017F => Some(IgnoreCaseLiteralClass::LongSUnicode),
+        0x00DF | 0x1E9E => Some(IgnoreCaseLiteralClass::SharpSUnicode),
+        0x004B | 0x006B | 0x212A => Some(IgnoreCaseLiteralClass::KelvinUnicode),
+        0x00C5 | 0x00E5 | 0x212B => Some(IgnoreCaseLiteralClass::AngstromUnicode),
+        _ => None,
+    }
+}
+
+fn legacy_ignore_case_literal_class(unit: u16) -> Option<IgnoreCaseLiteralClass> {
+    match unit {
+        0x00B5 | 0x039C | 0x03BC => Some(IgnoreCaseLiteralClass::MicroSign),
+        0x00FF | 0x0178 => Some(IgnoreCaseLiteralClass::YDiaeresis),
+        0x0053 | 0x0073 => Some(IgnoreCaseLiteralClass::AsciiS),
+        0x017F => Some(IgnoreCaseLiteralClass::LongSExact),
         _ => None,
     }
 }
@@ -1570,6 +1708,20 @@ mod tests {
         assert_eq!(
             detect_fast_pattern(r"[^\w]", flags("iu")),
             Some(RegExpFastPattern::UnicodeIgnoreCaseNonWord)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"(\u017F)", flags("i")),
+            Some(RegExpFastPattern::CapturedIgnoreCaseLiteral {
+                class: IgnoreCaseLiteralClass::LongSExact,
+                one_or_more: false
+            })
+        );
+        assert_eq!(
+            detect_fast_pattern(r"(\x73)+", flags("iu")),
+            Some(RegExpFastPattern::CapturedIgnoreCaseLiteral {
+                class: IgnoreCaseLiteralClass::LongSUnicode,
+                one_or_more: true
+            })
         );
         assert_eq!(
             detect_fast_pattern(r"^\S+$", flags("v")),
