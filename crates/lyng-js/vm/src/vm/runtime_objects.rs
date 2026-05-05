@@ -163,9 +163,19 @@ impl Vm {
             .current_execution_context()
             .and_then(|context| context.private_env());
         let environment = if child.captures().is_empty() {
-            self.active_direct_eval_environment(self.frames.len())
-                .or_else(|| self.active_loop_iteration_environment_for_captures(child.captures()))
-                .unwrap_or_else(|| frame.lexical_env())
+            let lexical_env = frame.lexical_env();
+            if matches!(
+                agent.environment(lexical_env),
+                Some(lyng_js_env::EnvironmentRecord::Object(_))
+            ) {
+                lexical_env
+            } else {
+                self.active_direct_eval_environment(self.frames.len())
+                    .or_else(|| {
+                        self.active_loop_iteration_environment_for_captures(child.captures())
+                    })
+                    .unwrap_or(lexical_env)
+            }
         } else {
             self.active_loop_iteration_environment_for_captures(child.captures())
                 .unwrap_or_else(|| frame.lexical_env())

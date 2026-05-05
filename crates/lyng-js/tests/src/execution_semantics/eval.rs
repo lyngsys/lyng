@@ -224,6 +224,43 @@ fn with_statement_var_object_binding_resolves_target_before_property_get() {
 }
 
 #[test]
+fn strict_closure_inside_with_assigns_through_captured_object_environment() {
+    let result = compile_and_run_string(
+        r#"
+        function obj() {
+            var object = { x: 1, y: 1 };
+            Object.defineProperty(object, "x", { writable: false });
+            return object;
+        }
+
+        function sourceFor(expr) {
+            return "with (obj()) { (function() { 'use strict'; " + expr + " })(); }";
+        }
+
+        function throwsTypeError(source) {
+            try {
+                eval(source);
+                return 0;
+            } catch (error) {
+                return error.name === "TypeError" ? 1 : 0;
+            }
+        }
+
+        var score = 0;
+        score += throwsTypeError(sourceFor("x = 2; y = 2;")) * 1;
+        score += throwsTypeError(sourceFor("x++;")) * 2;
+        score += throwsTypeError(sourceFor("++x;")) * 4;
+        score += throwsTypeError(sourceFor("x--;")) * 8;
+        score += throwsTypeError(sourceFor("--x;")) * 16;
+
+        String(score);
+        "#,
+    );
+
+    assert_eq!(result, "31");
+}
+
+#[test]
 fn direct_eval_can_create_arguments_binding_in_non_arrow_function() {
     let result = compile_and_run_string(
         r#"
