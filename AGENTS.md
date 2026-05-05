@@ -7,7 +7,7 @@ This file is the repo-level operating guide for coding agents working in `lyng`.
 `lyng` is a Rust workspace with two active implementation tracks:
 
 - A WHATWG-style HTML parser in `crates/html_parser`, backed by an arena DOM in `crates/dom`
-- The `lyng-js` JavaScript engine in `crates/lyng-js/*`, which is the active JavaScript implementation and remains under active ECMA-262 completion and conformance work
+- The `lyng-js` JavaScript engine in `crates/lyng-js/*`, which is the active JavaScript implementation
 
 The root workspace members are defined in `Cargo.toml`. Several other directories exist as placeholders (`crates/css`, `crates/gfx`, `crates/layout`, `crates/net`, `crates/platform`, `components/webview`) but are not active workspace crates today.
 
@@ -21,7 +21,6 @@ Start here before making non-trivial changes:
 - `crates/html_parser/docs/implementation-notes.md`
 - `docs/lyng-js/README.md`
 - `docs/lyng-js/architecture.md`
-- `docs/lyng-js/ecma262-completion.md`
 - `docs/lyng-js/engineering-standards.md`
 
 If you are changing a specific subsystem, read the crate-local sources and tests for that subsystem before editing.
@@ -71,9 +70,9 @@ Follow these project-specific constraints when making changes:
 
 ## Lyng JS Priorities
 
-- Lyng JS remains focused on ECMA-262 completion and conformance work. Treat the remaining work as a prioritized backlog, not as phase-based milestones.
+- Lyng JS remains focused on ECMA-262 semantics and conformance.
 - Aim for a gold-standard implementation bar. Do not treat code quality or readability as secondary to feature completion.
-- Prioritize code quality, readability, performance, memory behavior, cleanup, auditability, and verification clarity while broadening the remaining ECMA-262 surface.
+- Prioritize code quality, readability, performance, memory behavior, cleanup, auditability, and verification clarity.
 - Keep docs, tooling, reports, and issue tracking aligned with the live Lyng JS docs and the checked-in report/report-manifest flow under `reports/js/lyng-js/`.
 - Do not blur core ECMA-262 completion work with ECMA-402 Intl or other extension work unless the user explicitly asks for that scope.
 - The old JavaScript engine has been removed. Treat Lyng JS as the only in-repo JavaScript engine and keep docs, tooling, and verification aligned with that cutover.

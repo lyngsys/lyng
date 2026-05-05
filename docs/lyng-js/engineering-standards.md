@@ -1,209 +1,111 @@
 # Lyng JS Engineering Standards
 
-This document defines the implementation standards for take 3. These are not optional
-style preferences. They are part of the architecture because they directly affect
-maintainability, performance, and the risk of future rewrites.
+Lyng JS code is held to a high bar for correctness, readability, maintainability,
+performance, memory behavior, and verification clarity.
 
 ## Principles
 
-- spec fidelity before cleverness
-- clear ownership before convenience
-- measured performance before folklore
-- readable systems code before framework-style abstraction
-- explicit invariants before "it should be fine"
+- Spec fidelity beats clever abstraction.
+- Crate ownership is explicit.
+- Public APIs are intentional and narrow.
+- Hot paths stay compact and allocation-aware.
+- Guest-visible behavior is traceable to ECMA-262 concepts.
+- Dependencies are added only when their ownership and maintenance cost is justified.
 
 ## Layering Rules
 
-Crate boundaries are architectural boundaries.
-
-- `lyng-js-ops` is the only owner of abstract operations
-- `lyng-js-objects` is the owner of internal method behavior
-- `lyng-js-env` owns realms, environments, execution contexts, and jobs
-- `lyng-js-vm` executes bytecode; it does not become the backup home for semantics that
-  belong elsewhere
-- `lyng-js-compiler::dynamic` owns dynamic source parse/sema/compile policy; VM dynamic
-  compilation owns installed-code caching, caller-sensitive frame/environment discovery, and
-  execution
-- `lyng-js-builtins` installs and implements builtin objects, but should call shared
-  abstract operations and object helpers rather than duplicating semantics
-- public builtin bootstrap allocation should live in family installers under
-  `public/families/`; `public.rs` should remain orchestration plus shared bootstrap helpers
-- `lyng-js-ops::object` is the public semantic surface for proxy-observable object
-  operations such as `Get`, `Set`, `HasProperty`, `GetOwnProperty`,
-  `DefineOwnProperty`, prototype operations, and own-key collection
-- conformance embeddings such as `lyng-js-test262` own `$262`, helper catalogs, and
-  runner/report policy; engine crates only expose generic embedding hooks
-
-Rejected patterns:
-
-- duplicating coercion logic in builtins and VM handlers
-- hiding environment logic inside compiler or VM code
-- property semantics implemented one way in objects and another in reflect or builtin helpers
-- choosing ordinary-object and proxy-object paths at VM or builtin call sites when an
-  `ObjectOpsContext` can select the right path inside `lyng-js-ops`
-- implementing Function-constructor or eval parse/sema/compile flows inside builtin dispatch
-  instead of the shared dynamic-compilation service
+- Frontend crates do not depend on runtime or VM crates.
+- `lyng-js-types` remains representation-only.
+- `lyng-js-gc` owns allocation/rooting/tracing mechanics, not JavaScript semantics.
+- `lyng-js-objects` owns object storage and ordinary internal methods.
+- `lyng-js-env` owns agents, realms, execution contexts, environments, jobs, modules, and
+  backing-store coordination.
+- `lyng-js-ops` owns reusable abstract operations.
+- `lyng-js-compiler` owns lowering.
+- `lyng-js-bytecode` owns bytecode templates and metadata containers.
+- `lyng-js-vm` owns installation and interpretation.
+- `lyng-js-builtins` owns realm bootstrap and builtin dispatch.
+- `lyng-js-host` owns embedding hooks.
 
 ## API Ownership
 
-Public APIs should be stable and intentional.
-
-- use typed handles and typed IDs across crate boundaries
-- avoid `usize` as a cross-crate semantic type when a dedicated typed ID should exist
-- prefer explicit structs over loose tuples in public APIs
-- make ownership obvious in type names and function signatures
-- keep raw object-storage/internal-method helpers private or clearly named as
-  ordinary-only/bootstrap-only when bypassing the proxy-aware object operation surface
-
-If an API is intentionally temporary, that must be documented in the owning phase file.
+- Prefer typed IDs over `usize` or strings across crate boundaries.
+- Keep visibility private by default.
+- Use `pub(crate)` for crate-internal sharing and `pub` only for intentional public API.
+- Put shared semantic helpers in the owning crate instead of copying logic across call sites.
+- Keep `lib.rs` thin: module declarations, re-exports, and top-level wiring.
 
 ## Hot Path Rules
 
-The engine must treat hot-path discipline as a code quality requirement.
-
-- no `Rc`, `Arc`, `RefCell`, `Mutex`, or trait-object dispatch in interpreter hot paths
-- no string-keyed lookup in normal lexical access or normal named-property access
-- no per-access heap allocation in:
-  - arithmetic
-  - local variable access
-  - environment-slot access
-  - shape-based property reads or writes
-- no hidden cloning of large metadata structures in parser, compiler, or VM paths
-
-Allowed tradeoffs:
-
-- explicit slow paths for dynamic cases
-- specialized data-oriented code in hot modules
-- benchmark-proven complexity when the performance gain is real and the invariants remain clear
+- No heap allocation in normal local access.
+- Avoid string maps in normal lexical or named-property access.
+- Use atoms, shapes, slots, registers, and typed handles in hot paths.
+- Keep VM dispatch direct and easy to profile.
+- Avoid trait-object dispatch in core interpreter loops unless measurement justifies it.
+- Route proxy-observable operations through shared operation contexts.
 
 ## Data Structure Rules
 
-- prefer compact, contiguous storage for hot runtime data
-- split hot state from cold metadata
-- use side tables when they keep the hot structure small
-- use fallback dictionary modes rather than making every normal object or array pay for highly dynamic cases
-- avoid general-purpose hash maps in the fast path for properties or lexical bindings
+- Preserve compact handle and value representations.
+- Keep object, environment, code, and backing-store records domain-owned.
+- Store metadata in tables when it is cold or sparse.
+- Keep runtime feedback separate from immutable bytecode templates.
+- Represent sentinels explicitly and prevent them from escaping as guest values.
 
-## Spec Citation and Documentation Rules
+## Documentation Rules
 
-- normative implementations cite the owning ECMA-262 section in module docs or function comments
-- comments explain invariants, ownership, and non-obvious tradeoffs
-- comments do not narrate obvious Rust syntax
-- every major runtime structure should have a short module-level comment explaining:
-  - what it owns
-  - why it has its current shape
-  - what the hot path is
+- Architecture docs describe the current engine shape and invariants.
+- Reports under `reports/js/lyng-js/` record verification output.
+- Source comments explain non-obvious algorithms, ownership constraints, or spec mapping.
+- Avoid comments that restate obvious code.
 
 ## Safety Rules
 
-- `unsafe` is allowed only when:
-  - there is a measurable or strongly justified reason
-  - the invariants are documented locally
-  - a safe alternative was considered and rejected for a clear reason
-- guest-triggered execution paths must not panic
-- use typed error or completion paths for guest-visible failures
-- `panic!` is reserved for:
-  - impossible internal states
-  - debug-time invariant failures
-  - process setup failures outside guest semantics
-
-Debug assertions are encouraged. Release-mode guest behavior must remain explicit and typed.
+- Guest-visible failure uses `Completion` and `AbruptCompletion`.
+- Unsafe Rust requires a local invariant comment and a narrow scope.
+- Rooting and tracing must be explicit around allocation paths.
+- Host callbacks and embedding functions must have clear ownership and error propagation.
+- Shared-memory behavior must remain behind backing-store and shared-memory operation APIs.
 
 ## Testing Rules
 
-Every owned semantic area needs direct tests.
+Use focused tests first:
 
-- unit tests for abstract operations, object semantics, environment semantics, compiler lowering, and VM behavior
-- integration tests for multi-crate behavior such as compile-plus-execute and bootstrap-plus-execute
-- targeted test262 slices per phase
-- negative tests for parser and early-error behavior
-- any phase that claims whole-engine ECMA-262 completion must also produce a whole-suite
-  test262 report plus a checked-in exclusion manifest for intentionally out-of-scope cases
-- fuzzing for:
-  - lexer
-  - parser
-  - bytecode decoder or disassembler
+```sh
+cargo test -p lyng-js-parser
+cargo test -p lyng-js-compiler
+cargo test -p lyng-js-vm
+cargo test -p lyng-js-tests
+```
 
-A passing end-to-end test is not a substitute for direct unit tests of the owning layer.
+Use targeted Test262 filters for semantic changes and whole-corpus reports for broad
+conformance changes:
 
-## Benchmark and Memory Rules
+```sh
+cargo run --release -p lyng-js-test262 -- --filter built-ins/Temporal/Instant --report /tmp/lyng-js-test262-temporal.md -j 4
+cargo run --release -p lyng-js-test262 -- --report /tmp/lyng-js-test262-report.md -j 12
+```
 
-Performance claims require measurements.
+Use benchmark tooling for hot-path, memory, or bytecode-density changes:
 
-- changes in hot crates should come with benchmark coverage or justification for why that is not yet practical
-- any change to a frozen data structure requires benchmark impact review
-- benchmark groups should include:
-  - frontend latency
-  - interpreter throughput
-  - bytecode density and instruction-cache pressure
-  - property access
-  - function call overhead
-  - allocation and GC behavior
-  - memory footprint, including explicit accounting for atoms, feedback, shapes, environments,
-    and code templates
-- initial memory budgeting targets should be tracked explicitly:
-  - hot object header at or below 32 bytes on supported 64-bit builds
-  - declarative environment record at or below 32 bytes before slot storage
-  - default-realm bootstrap live heap within the current documented budget
-- barrier-ready store helpers in barrier-free collectors are expected to compile to direct
-  stores in optimized builds; benchmark or generated-code inspection is an acceptable proof
-- reports belong under `reports/js/lyng-js/`
-
-Known regressions may be accepted only if they are documented and the tradeoff is explicit.
-
-## Readability Rules
-
-- large semantic domains must be split across multiple modules
-- names should follow spec concepts unless doing so would materially damage readability or performance
-- helper functions should reduce complexity, not hide it
-- avoid deep abstraction stacks in hot runtime modules
-- prefer straightforward control flow over metaprogramming
-
-The target style is rigorous systems code, not clever library code.
+```sh
+cargo run --release -p lyng-js-bench -- runtime --report /tmp/lyng-js-bench.md
+cargo run --release -p lyng-js-bench -- density --report /tmp/lyng-js-bytecode-density.md
+```
 
 ## Review Checklist
 
-Every meaningful change should be reviewable against these questions:
-
-- does this code live in the right crate
-- does it duplicate existing semantic ownership
-- does it add allocation or string lookup to a hot path
-- does it preserve the frozen structure decisions
-- does it write a `Value` or typed handle into traced heap storage without going through the
-  barrier-ready helper API
-- are the invariants documented
-- are tests at the owning layer present
-- if hot-path behavior changed, are benchmarks or memory notes included
-
-If the answer is unclear, the change is not ready.
-
-## Change Control for Frozen Structures
-
-The following changes require plan and architecture updates in the same patch series:
-
-- changing `Value` shape or size
-- changing handle widths or handle stability assumptions
-- changing object header or property storage structure
-- changing environment layout strategy
-- changing bytecode encoding or frame layout
-- changing the host boundary
-- changing generic embedding-extension surfaces that external tools depend on
-
-Required justification:
-
-- why the previous choice is no longer viable
-- what code and docs must change
-- expected correctness, performance, and memory impact
-- migration risk for already-built phases
+- Is the behavior spec-traceable?
+- Does the change preserve crate ownership?
+- Are guest-visible failures represented through completion paths?
+- Are hot paths free of accidental allocation or string lookup?
+- Are typed handles and metadata tables used consistently?
+- Are proxy, environment, and host observability routed through the owning APIs?
+- Is verification scoped to the changed behavior?
 
 ## Done Criteria
 
-Work is not done when it compiles. It is done when:
-
-- the owning semantics are implemented in the correct layer
-- unit tests and targeted integration tests exist
-- the relevant plan or architecture docs are updated if ownership changed
-- whole-engine conformance claims come with zero unexplained failing test262 cases outside
-  the checked-in exclusion manifest
-- any material hot-path effect is measured or explicitly deferred with a reason
-- the resulting code is still readable enough that the next engineer does not need to reverse-engineer intent
+- Relevant docs and source agree on ownership and current behavior.
+- Focused tests or reports have been run for the changed area.
+- Unrun verification is called out explicitly.
+- Generated reports are not hand-edited.
