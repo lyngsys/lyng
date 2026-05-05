@@ -6877,6 +6877,42 @@ fn script_core_regexp_unicode_surrogate_sequences_match_pair_and_invalid_trail()
 }
 
 #[test]
+fn script_core_regexp_unicode_surrogate_character_classes_match_pair_edges() {
+    let result = compile_and_run_string(
+        r#"
+        let pairClass = /[\uD83D\uDC38]/u;
+        let constructedPairClass = new RegExp("[\uD83D\uDC38]", "u");
+        let legacyPairClass = /[\uD83D\uDC38]/;
+        let legacyConstructedPairClass = new RegExp("[\uD83D\uDC38]", "");
+        let leadClass = /[\uD83D]/u;
+        let legacyLeadClass = /[\uD83D]/;
+        let trailClass = /[\uDC38]/u;
+        let legacyTrailClass = /[\uDC38]/;
+        let invalidTrailClass = /[\uD83D\u3042]*/u;
+        let invalidTrailBracedClass = /[\uD83D\u{3042}]*/u;
+
+        String(pairClass.exec("\uD83D\uDC38")?.[0] === "\uD83D\uDC38") + ":"
+            + String(constructedPairClass.exec("\uD83D\uDC38")?.[0] === "\uD83D\uDC38") + ":"
+            + String(pairClass.exec("\uD83D") === null) + ":"
+            + String(pairClass.exec("\uDC38") === null) + ":"
+            + String(legacyPairClass.exec("\uD83D\uDC38")?.[0] === "\uD83D") + ":"
+            + String(legacyConstructedPairClass.exec("\uD83D\uDC38")?.[0] === "\uD83D") + ":"
+            + String(leadClass.exec("\uD83D\uDC00") === null) + ":"
+            + String(legacyLeadClass.exec("\uD83D\uDC00")?.[0] === "\uD83D") + ":"
+            + String(trailClass.exec("\uD800\uDC38") === null) + ":"
+            + String(legacyTrailClass.exec("\uD800\uDC38")?.[0] === "\uDC38") + ":"
+            + String(invalidTrailClass.exec("\uD83D\u3042\u3042\uD83D")?.[0] === "\uD83D\u3042\u3042\uD83D") + ":"
+            + String(invalidTrailBracedClass.exec("\uD83D\u3042\u3042\uD83D")?.[0] === "\uD83D\u3042\u3042\uD83D");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "true:true:true:true:true:true:true:true:true:true:true:true"
+    );
+}
+
+#[test]
 fn script_core_regexp_unicode_sets_exec_uses_unicode_aware_matching() {
     let result = compile_and_run(
         r#"

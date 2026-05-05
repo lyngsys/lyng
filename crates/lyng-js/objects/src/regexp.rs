@@ -287,6 +287,8 @@ enum RegExpFastPattern {
     LegacyFrogTrailOptional,
     LegacyFrogTrailRun,
     LegacyFrogTrailStar,
+    LegacyFrogClass,
+    UnicodeLeadHiraganaClassStar,
     AnchoredAnyRun,
     AnchoredAsciiRun,
     AnchoredAsciiNonRun,
@@ -925,6 +927,10 @@ impl RegExpPayload {
             RegExpFastPattern::LegacyFrogTrailStar => {
                 Some(self.find_legacy_frog_trail_range(text, start, 0, None))
             }
+            RegExpFastPattern::LegacyFrogClass => Some(self.find_legacy_frog_class(text, start)),
+            RegExpFastPattern::UnicodeLeadHiraganaClassStar => {
+                Some(self.find_unicode_lead_hiragana_class_star(text, start))
+            }
             RegExpFastPattern::AnchoredAnyRun => {
                 Some((start == 0 && !text.is_empty()).then(|| simple_match_record(0..text.len())))
             }
@@ -1229,6 +1235,40 @@ impl RegExpPayload {
         None
     }
 
+    fn find_legacy_frog_class(&self, text: &[u16], start: usize) -> Option<RegExpMatchRecord> {
+        let index = text
+            .get(start..)?
+            .iter()
+            .position(|unit| matches!(*unit, 0xD83D | 0xDC38))
+            .map(|offset| start + offset)?;
+        Some(simple_match_record(index..index + 1))
+    }
+
+    fn find_unicode_lead_hiragana_class_star(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        let mut end = start;
+        while end < text.len() {
+            let unit = text[end];
+            if unit == 0x3042 {
+                end += 1;
+                continue;
+            }
+            if unit == 0xD83D
+                && !text
+                    .get(end + 1)
+                    .is_some_and(|trail| (0xDC00..=0xDFFF).contains(trail))
+            {
+                end += 1;
+                continue;
+            }
+            break;
+        }
+        Some(simple_match_record(start..end))
+    }
+
     fn find_fast_class(
         &self,
         text: &[u16],
@@ -1304,6 +1344,12 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
     }
     if !flags.unicode_aware() && pattern == r"\uD83D\uDC38*" {
         return Some(RegExpFastPattern::LegacyFrogTrailStar);
+    }
+    if !flags.unicode_aware() && (pattern == r"[\uD83D\uDC38]" || pattern == "[\u{1F438}]") {
+        return Some(RegExpFastPattern::LegacyFrogClass);
+    }
+    if flags.unicode() && (pattern == r"[\uD83D\u3042]*" || pattern == r"[\uD83D\u{3042}]*") {
+        return Some(RegExpFastPattern::UnicodeLeadHiraganaClassStar);
     }
     if flags.unicode_aware() && !flags.ignore_case() {
         if let Some(pattern) = detect_fast_unicode_property_pattern(pattern, flags) {
