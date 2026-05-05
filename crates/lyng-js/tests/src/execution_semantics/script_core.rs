@@ -6814,6 +6814,35 @@ fn script_core_regexp_unknown_script_property_aliases_match_generated_sets() {
 }
 
 #[test]
+fn script_core_regexp_unicode_ignore_case_word_escapes_include_special_folds() {
+    let result = compile_and_run_string(
+        r#"
+        let longS = "\u017F";
+        let kelvin = "\u212A";
+
+        [
+            /\w/iu.exec("S")?.[0] === "S",
+            /\w/iu.exec("s")?.[0] === "s",
+            /\w/iu.exec(longS)?.[0] === longS,
+            /[^\W]/iu.exec(longS)?.[0] === longS,
+            /\W/iu.exec(longS) === null,
+            /[^\w]/iu.exec(longS) === null,
+            /\w/iu.exec("k")?.[0] === "k",
+            /\w/iu.exec(kelvin)?.[0] === kelvin,
+            /[^\W]/iu.exec(kelvin)?.[0] === kelvin,
+            /\W/iu.exec(kelvin) === null,
+            /[^\w]/iu.exec(kelvin) === null
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "true:true:true:true:true:true:true:true:true:true:true"
+    );
+}
+
+#[test]
 fn script_core_regexp_unicode_braced_surrogate_pairs_compile_as_never_matches() {
     let result = compile_and_run_string(
         r#"

@@ -302,6 +302,8 @@ enum RegExpFastPattern {
     NonWhitespace,
     AsciiWord,
     AsciiNonWord,
+    UnicodeIgnoreCaseWord,
+    UnicodeIgnoreCaseNonWord,
     AnchoredAsciiDigitRun,
     AnchoredAsciiNonDigitRun,
     AnchoredWhitespaceRun,
@@ -974,6 +976,14 @@ impl RegExpPayload {
             RegExpFastPattern::AsciiNonWord => {
                 Some(self.find_fast_class(text, start, |unit| !is_ascii_word_code_unit(unit)))
             }
+            RegExpFastPattern::UnicodeIgnoreCaseWord => {
+                Some(self.find_fast_class(text, start, is_unicode_ignore_case_word_code_unit))
+            }
+            RegExpFastPattern::UnicodeIgnoreCaseNonWord => {
+                Some(self.find_fast_class(text, start, |unit| {
+                    !is_unicode_ignore_case_word_code_unit(unit)
+                }))
+            }
             RegExpFastPattern::AnchoredAsciiDigitRun => {
                 Some(self.match_fast_anchored_run(text, start, is_ascii_digit_code_unit))
             }
@@ -1356,6 +1366,13 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
             return Some(pattern);
         }
     }
+    if flags.unicode_aware() && flags.ignore_case() {
+        match pattern {
+            r"\w" | r"[^\W]" => return Some(RegExpFastPattern::UnicodeIgnoreCaseWord),
+            r"\W" | r"[^\w]" => return Some(RegExpFastPattern::UnicodeIgnoreCaseNonWord),
+            _ => {}
+        }
+    }
 
     match pattern {
         r"\d" => Some(RegExpFastPattern::AsciiDigit),
@@ -1545,6 +1562,14 @@ mod tests {
         assert_eq!(
             detect_fast_pattern(r"\w", flags("u")),
             Some(RegExpFastPattern::AsciiWord)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"[^\W]", flags("iu")),
+            Some(RegExpFastPattern::UnicodeIgnoreCaseWord)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"[^\w]", flags("iu")),
+            Some(RegExpFastPattern::UnicodeIgnoreCaseNonWord)
         );
         assert_eq!(
             detect_fast_pattern(r"^\S+$", flags("v")),
