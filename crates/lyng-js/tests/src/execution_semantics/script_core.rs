@@ -6624,6 +6624,36 @@ fn script_core_regexp_test_accepts_custom_exec_object_receivers() {
 }
 
 #[test]
+fn script_core_regexp_exec_observes_last_index_recompile_side_effects() {
+    let result = compile_and_run_string(
+        r#"
+        let matchRegExp = /a/;
+        matchRegExp.lastIndex = {
+            valueOf() {
+                matchRegExp.compile("a", "g");
+                return 0;
+            }
+        };
+        matchRegExp[Symbol.match]("a");
+
+        let replaceRegExp = /a/y;
+        replaceRegExp.lastIndex = {
+            valueOf() {
+                replaceRegExp.compile("a", "");
+                replaceRegExp.lastIndex = 9000;
+                return 0;
+            }
+        };
+        replaceRegExp[Symbol.replace]("a", "");
+
+        String(matchRegExp.lastIndex) + ":" + String(replaceRegExp.lastIndex);
+        "#,
+    );
+
+    assert_eq!(result, "1:9000");
+}
+
+#[test]
 fn script_core_supports_regexp_exec_for_escaped_literal_patterns() {
     let result = compile_and_run(
         r#"

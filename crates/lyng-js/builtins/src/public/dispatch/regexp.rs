@@ -782,10 +782,10 @@ fn regexp_exec_state<Cx: PublicBuiltinDispatchContext>(
     units: &[u16],
     advance_empty_match: bool,
 ) -> Result<Option<RegExpExecState>, Cx::Error> {
-    let flags = regexp_object_flags(cx, object_ref)?;
     let last_index_key = regexp_last_index_key(cx);
     let last_index = cx.get_property_value(Value::from_object_ref(object_ref), last_index_key)?;
     let last_index = to_length_for_builtin(cx, last_index)?;
+    let flags = regexp_object_flags(cx, object_ref)?;
     let uses_stateful_last_index = flags.global() || flags.sticky();
     let start_index = if uses_stateful_last_index {
         last_index
