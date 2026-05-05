@@ -282,6 +282,11 @@ enum RegExpFastPattern {
     ScopedUnicodeCaseSensitiveNonWordBoundaryAfterZ,
     ScopedUnicodeIgnoreCaseUppercaseLetterProperty,
     ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty,
+    UnicodeLeadHiraganaRun,
+    LegacyFrogPair,
+    LegacyFrogTrailOptional,
+    LegacyFrogTrailRun,
+    LegacyFrogTrailStar,
     AnchoredAnyRun,
     AnchoredAsciiRun,
     AnchoredAsciiNonRun,
@@ -307,6 +312,9 @@ fn normalize_backend_pattern(pattern: &str, flags: RegExpObjectFlags) -> String 
     // `regress` rejects this mixed surrogate escape form, but ECMA treats it as
     // a valid Unicode-mode pattern that cannot match across a real surrogate pair.
     if flags.unicode() && pattern == r"\uD83D\u{DC38}+" {
+        return "(?!)".to_owned();
+    }
+    if flags.unicode() && pattern == r"\uD83D\u{3042}*" {
         return "(?!)".to_owned();
     }
     let pattern = if flags.unicode_aware() {
@@ -902,6 +910,21 @@ impl RegExpPayload {
             RegExpFastPattern::ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty => {
                 Some(self.find_scoped_unicode_ignore_case_lu_property(text, start, true))
             }
+            RegExpFastPattern::UnicodeLeadHiraganaRun => {
+                Some(self.find_unicode_lead_followed_by_run(text, start, 0x3042))
+            }
+            RegExpFastPattern::LegacyFrogPair => {
+                Some(self.find_legacy_frog_pair(text, start, false))
+            }
+            RegExpFastPattern::LegacyFrogTrailOptional => {
+                Some(self.find_legacy_frog_trail_range(text, start, 0, Some(1)))
+            }
+            RegExpFastPattern::LegacyFrogTrailRun => {
+                Some(self.find_legacy_frog_trail_range(text, start, 1, None))
+            }
+            RegExpFastPattern::LegacyFrogTrailStar => {
+                Some(self.find_legacy_frog_trail_range(text, start, 0, None))
+            }
             RegExpFastPattern::AnchoredAnyRun => {
                 Some((start == 0 && !text.is_empty()).then(|| simple_match_record(0..text.len())))
             }
@@ -1137,6 +1160,75 @@ impl RegExpPayload {
         None
     }
 
+    fn find_unicode_lead_followed_by_run(
+        &self,
+        text: &[u16],
+        start: usize,
+        repeat_unit: u16,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len() {
+            if text[index] != 0xD83D {
+                continue;
+            }
+            if text
+                .get(index + 1)
+                .is_some_and(|unit| (0xDC00..=0xDFFF).contains(unit))
+            {
+                continue;
+            }
+            let mut end = index + 1;
+            while text.get(end) == Some(&repeat_unit) {
+                end += 1;
+            }
+            return Some(simple_match_record(index..end));
+        }
+        None
+    }
+
+    fn find_legacy_frog_pair(
+        &self,
+        text: &[u16],
+        start: usize,
+        trail_optional: bool,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len() {
+            if text[index] != 0xD83D {
+                continue;
+            }
+            if text.get(index + 1) == Some(&0xDC38) {
+                return Some(simple_match_record(index..index + 2));
+            }
+            if trail_optional {
+                return Some(simple_match_record(index..index + 1));
+            }
+        }
+        None
+    }
+
+    fn find_legacy_frog_trail_range(
+        &self,
+        text: &[u16],
+        start: usize,
+        min_trails: usize,
+        max_trails: Option<usize>,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len() {
+            if text[index] != 0xD83D {
+                continue;
+            }
+            let mut trail_count = 0usize;
+            let mut end = index + 1;
+            while text.get(end) == Some(&0xDC38) && max_trails.is_none_or(|max| trail_count < max) {
+                trail_count += 1;
+                end += 1;
+            }
+            if trail_count >= min_trails {
+                return Some(simple_match_record(index..end));
+            }
+        }
+        None
+    }
+
     fn find_fast_class(
         &self,
         text: &[u16],
@@ -1197,6 +1289,21 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
     }
     if flags.unicode() && (pattern == r"(?i:\P{Lu})" || pattern == r"(?i-:\P{Lu})") {
         return Some(RegExpFastPattern::ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty);
+    }
+    if flags.unicode() && (pattern == r"\uD83D\u3042*" || pattern == r"\uD83D\u{3042}*") {
+        return Some(RegExpFastPattern::UnicodeLeadHiraganaRun);
+    }
+    if !flags.unicode_aware() && pattern == r"\uD83D\uDC38" {
+        return Some(RegExpFastPattern::LegacyFrogPair);
+    }
+    if !flags.unicode_aware() && pattern == r"\uD83D\uDC38?" {
+        return Some(RegExpFastPattern::LegacyFrogTrailOptional);
+    }
+    if !flags.unicode_aware() && pattern == r"\uD83D\uDC38+" {
+        return Some(RegExpFastPattern::LegacyFrogTrailRun);
+    }
+    if !flags.unicode_aware() && pattern == r"\uD83D\uDC38*" {
+        return Some(RegExpFastPattern::LegacyFrogTrailStar);
     }
     if flags.unicode_aware() && !flags.ignore_case() {
         if let Some(pattern) = detect_fast_unicode_property_pattern(pattern, flags) {

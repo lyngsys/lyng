@@ -6835,6 +6835,48 @@ fn script_core_regexp_unicode_braced_surrogate_pairs_compile_as_never_matches() 
 }
 
 #[test]
+fn script_core_regexp_unicode_surrogate_sequences_match_pair_and_invalid_trail() {
+    let result = compile_and_run_string(
+        r#"
+        function matched(source, input, expected) {
+            try {
+                let result = eval(source).exec(input);
+                return result !== null && result[0] === expected;
+            } catch (error) {
+                return error instanceof SyntaxError ? "syntax" : "other";
+            }
+        }
+
+        let directPair = /\uD83D\uDC38/u.exec("\u{1F438}");
+        let legacyPair = /\uD83D\uDC38/.exec("\u{1F438}");
+        let constructedPair = new RegExp("\\uD83D\\uDC38", "u").exec("\u{1F438}");
+        let directOptionalPair = /\uD83D\uDC38?/u.exec("\u{1F438}");
+        let legacyOptionalPair = /\uD83D\uDC38?/.exec("\u{1F438}");
+        let legacyPlusPair = /\uD83D\uDC38+/.exec("\u{1F438}\u{1F438}");
+        let legacyStarPair = /\uD83D\uDC38*/.exec("\u{1F438}\u{1F438}");
+        let directOptionalEmpty = /\uD83D\uDC38?/u.exec("");
+
+        String(directPair !== null && directPair[0] === "\u{1F438}") + ":"
+            + String(legacyPair !== null && legacyPair[0] === "\u{1F438}") + ":"
+            + String(constructedPair !== null && constructedPair[0] === "\u{1F438}") + ":"
+            + String(directOptionalPair !== null && directOptionalPair[0] === "\u{1F438}") + ":"
+            + String(legacyOptionalPair !== null && legacyOptionalPair[0] === "\u{1F438}") + ":"
+            + String(legacyPlusPair !== null && legacyPlusPair[0] === "\u{1F438}") + ":"
+            + String(legacyStarPair !== null && legacyStarPair[0] === "\u{1F438}") + ":"
+            + String(directOptionalEmpty !== null && directOptionalEmpty[0] === "") + ":"
+            + String(matched("/\\uD83D\\u3042*/u", "\uD83D\u3042\u3042", "\uD83D\u3042\u3042")) + ":"
+            + String(matched("/\\uD83D\\u{3042}*/u", "\uD83D\u3042\u3042", "\uD83D\u3042\u3042")) + ":"
+            + String(matched("/\\uD83DA*/u", "\uD83DAA", "\uD83DAA"));
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "true:true:true:true:true:true:true:true:true:true:true"
+    );
+}
+
+#[test]
 fn script_core_regexp_unicode_sets_exec_uses_unicode_aware_matching() {
     let result = compile_and_run(
         r#"
