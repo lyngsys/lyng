@@ -6523,6 +6523,57 @@ fn script_core_regexp_constructor_reads_regexp_like_source_and_flags() {
 }
 
 #[test]
+fn script_core_regexp_constructor_uses_internal_slots_and_orders_new_target_lookup() {
+    let result = compile_and_run_string(
+        r#"
+        let regexp = /foo/;
+        let accessors = "";
+        Object.defineProperty(regexp, "source", {
+            get: function() {
+                accessors += "source";
+                return "bar";
+            }
+        });
+        Object.defineProperty(regexp, "flags", {
+            get: function() {
+                accessors += "flags";
+                return "i";
+            }
+        });
+
+        let cloned = new RegExp(regexp);
+
+        let order = "";
+        let flags = {
+            toString: function() {
+                order += "flags";
+                return "g";
+            }
+        };
+        let newTarget = Object.defineProperty(function(){}.bind(null), "prototype", {
+            get: function() {
+                order += "prototype";
+                return RegExp.prototype;
+            }
+        });
+        let constructed = Reflect.construct(RegExp, [/a/, flags], newTarget);
+
+        [
+            cloned.source,
+            cloned.flags,
+            accessors,
+            order,
+            constructed.source,
+            constructed.flags,
+            Object.getPrototypeOf(constructed) === RegExp.prototype
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "foo|||prototypeflags|a|g|true");
+}
+
+#[test]
 fn script_core_supports_regexp_exec_test_and_flag_getters() {
     let result = compile_and_run(
         r#"

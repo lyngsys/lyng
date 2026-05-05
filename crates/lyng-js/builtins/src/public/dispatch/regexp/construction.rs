@@ -1,9 +1,21 @@
 use super::super::{syntax_error, type_error, PublicBuiltinDispatchContext};
-use super::{allocate_regexp_object, is_regexp_value};
+use super::{
+    allocate_regexp_object, is_regexp_object, is_regexp_value, regexp_object_source_and_flags,
+};
 use crate::BuiltinInvocation;
 use lyng_js_common::WellKnownAtom;
 use lyng_js_parser::validate_regexp_constructor_pattern;
 use lyng_js_types::{PropertyKey, Value};
+
+enum RegExpPatternSeed {
+    Text(String),
+    Value(Value),
+}
+
+enum RegExpFlagsSeed {
+    Text(String),
+    Value(Value),
+}
 
 pub(super) fn regexp_species_getter_builtin(invocation: BuiltinInvocation<'_>) -> Value {
     invocation.this_value()
@@ -27,6 +39,28 @@ pub(super) fn normalize_regexp_constructor_pattern_text(pattern: &str) -> String
         }
     }
     normalized
+}
+
+fn regexp_pattern_seed_text<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    seed: RegExpPatternSeed,
+) -> Result<String, Cx::Error> {
+    match seed {
+        RegExpPatternSeed::Text(text) => Ok(text),
+        RegExpPatternSeed::Value(value) => Ok(normalize_regexp_constructor_pattern_text(
+            &cx.value_to_string_text(value)?,
+        )),
+    }
+}
+
+fn regexp_flags_seed_text<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    seed: RegExpFlagsSeed,
+) -> Result<String, Cx::Error> {
+    match seed {
+        RegExpFlagsSeed::Text(text) => Ok(text),
+        RegExpFlagsSeed::Value(value) => cx.value_to_string_text(value),
+    }
 }
 
 pub(super) fn regexp_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -74,41 +108,57 @@ pub(super) fn regexp_builtin<Cx: PublicBuiltinDispatchContext>(
         }
     }
 
-    let pattern_text = if pattern_is_regexp {
-        let source_key = {
-            let agent = cx.agent();
-            PropertyKey::from_atom(agent.bootstrap_atoms().source())
-        };
-        let source_value = cx.get_property_value(pattern_value, source_key)?;
-        normalize_regexp_constructor_pattern_text(&cx.value_to_string_text(source_value)?)
-    } else if pattern_value.is_undefined() {
-        String::new()
-    } else {
-        normalize_regexp_constructor_pattern_text(&cx.value_to_string_text(pattern_value)?)
-    };
-    let flags_text = if flags_value.is_undefined() {
-        if pattern_is_regexp {
-            let flags_key = {
-                let agent = cx.agent();
-                PropertyKey::from_atom(agent.bootstrap_atoms().flags())
-            };
-            let flags_value = cx.get_property_value(pattern_value, flags_key)?;
-            cx.value_to_string_text(flags_value)?
+    let pattern_object = pattern_value.as_object_ref();
+    let pattern_has_regexp_slots =
+        pattern_object.is_some_and(|object| is_regexp_object(cx, object));
+    let (pattern_seed, flags_seed) = if pattern_has_regexp_slots {
+        let object = pattern_object.ok_or_else(|| type_error(cx))?;
+        let (source, flags) = regexp_object_source_and_flags(cx, object)?;
+        let flags_seed = if flags_value.is_undefined() {
+            RegExpFlagsSeed::Text(flags)
         } else {
-            String::new()
-        }
+            RegExpFlagsSeed::Value(flags_value)
+        };
+        (RegExpPatternSeed::Text(source), flags_seed)
     } else {
-        cx.value_to_string_text(flags_value)?
+        let pattern_seed = if pattern_is_regexp {
+            let source_key = {
+                let agent = cx.agent();
+                PropertyKey::from_atom(agent.bootstrap_atoms().source())
+            };
+            RegExpPatternSeed::Value(cx.get_property_value(pattern_value, source_key)?)
+        } else if pattern_value.is_undefined() {
+            RegExpPatternSeed::Text(String::new())
+        } else {
+            RegExpPatternSeed::Value(pattern_value)
+        };
+        let flags_seed = if flags_value.is_undefined() {
+            if pattern_is_regexp {
+                let flags_key = {
+                    let agent = cx.agent();
+                    PropertyKey::from_atom(agent.bootstrap_atoms().flags())
+                };
+                RegExpFlagsSeed::Value(cx.get_property_value(pattern_value, flags_key)?)
+            } else {
+                RegExpFlagsSeed::Text(String::new())
+            }
+        } else {
+            RegExpFlagsSeed::Value(flags_value)
+        };
+        (pattern_seed, flags_seed)
     };
-    if validate_regexp_constructor_pattern(&pattern_text, &flags_text).is_err() {
-        return Err(syntax_error(cx));
-    }
 
     let prototype = if invocation.new_target().is_some() {
         cx.ordinary_constructor_prototype(realm, invocation.new_target(), default_prototype)?
     } else {
         default_prototype
     };
+    let pattern_text = regexp_pattern_seed_text(cx, pattern_seed)?;
+    let flags_text = regexp_flags_seed_text(cx, flags_seed)?;
+    if validate_regexp_constructor_pattern(&pattern_text, &flags_text).is_err() {
+        return Err(syntax_error(cx));
+    }
+
     let regexp = allocate_regexp_object(cx, realm, prototype, &pattern_text, &flags_text)?;
     Ok(Value::from_object_ref(regexp))
 }
