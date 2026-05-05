@@ -6601,6 +6601,29 @@ fn script_core_supports_regexp_exec_test_and_flag_getters() {
 }
 
 #[test]
+fn script_core_regexp_test_accepts_custom_exec_object_receivers() {
+    let result = compile_and_run_string(
+        r#"
+        let receiver = {
+            exec: function() {
+                return function(){};
+            }
+        };
+        let prototypeThrows = false;
+        try {
+            RegExp.prototype.test("x");
+        } catch (error) {
+            prototypeThrows = error instanceof TypeError;
+        }
+
+        String(RegExp.prototype.test.call(receiver, "")) + ":" + String(prototypeThrows);
+        "#,
+    );
+
+    assert_eq!(result, "true:true");
+}
+
+#[test]
 fn script_core_supports_regexp_exec_for_escaped_literal_patterns() {
     let result = compile_and_run(
         r#"

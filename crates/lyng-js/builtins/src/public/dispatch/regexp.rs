@@ -1508,7 +1508,10 @@ fn regexp_test_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let object_ref = regexp_matcher_this_object(cx, invocation.this_value())?;
+    let object_ref = invocation
+        .this_value()
+        .as_object_ref()
+        .ok_or_else(|| type_error(cx))?;
     let input_ref = to_string_string_ref(
         cx,
         invocation
@@ -1527,6 +1530,7 @@ fn regexp_test_builtin<Cx: PublicBuiltinDispatchContext>(
         .and_then(|exec| builtin_function_entry(cx.agent(), exec))
         == Some(super::regexp_exec_builtin());
     if default_exec {
+        let object_ref = regexp_matcher_this_object(cx, Value::from_object_ref(object_ref))?;
         return with_string_ref_code_units(cx, input_ref, |cx, input_units| {
             Ok(Value::from_bool(
                 regexp_exec_state(cx, object_ref, input_ref, input_units, false)?.is_some(),
