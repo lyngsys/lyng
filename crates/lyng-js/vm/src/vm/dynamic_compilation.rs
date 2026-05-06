@@ -773,16 +773,19 @@ impl Vm {
             && descriptor.enumerable() == Some(true))
     }
 
-    fn layout_has_binding(
+    fn environment_has_active_layout_binding(
         agent: &Agent,
+        _environment: lyng_js_types::EnvironmentRef,
         layout: lyng_js_env::EnvironmentLayoutId,
         name: AtomId,
     ) -> bool {
         agent.environment_layout(layout).is_some_and(|layout| {
-            layout
-                .bindings()
-                .iter()
-                .any(|binding| binding.name() == Some(name))
+            layout.bindings().iter().any(|binding| {
+                if binding.name() != Some(name) {
+                    return false;
+                }
+                !binding.flags().is_dynamic()
+            })
         })
     }
 
@@ -922,7 +925,13 @@ impl Vm {
         var_env: lyng_js_types::EnvironmentRef,
         function_names: &[AtomId],
         var_names: &[AtomId],
-        annex_b_catch_environments: &[(lyng_js_types::EnvironmentRef, AtomId)],
+        annex_b_catch_environments: &[(
+            lyng_js_types::EnvironmentRef,
+            u32,
+            lyng_js_types::EnvironmentRef,
+            u32,
+            AtomId,
+        )],
         annex_b_catch_names: &[AtomId],
     ) -> VmResult<()> {
         if lexical_env == var_env {
@@ -942,7 +951,9 @@ impl Vm {
             {
                 if !annex_b_catch_environments
                     .iter()
-                    .any(|&(catch_env, catch_name)| catch_env == environment && catch_name == name)
+                    .any(|&(_, _, catch_env, _, catch_name)| {
+                        catch_env == environment && catch_name == name
+                    })
                     && (is_lexical || !annex_b_catch_names.contains(&name))
                 {
                     return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
@@ -956,7 +967,9 @@ impl Vm {
             {
                 if !annex_b_catch_environments
                     .iter()
-                    .any(|&(catch_env, catch_name)| catch_env == environment && catch_name == name)
+                    .any(|&(_, _, catch_env, _, catch_name)| {
+                        catch_env == environment && catch_name == name
+                    })
                     && (is_lexical || !annex_b_catch_names.contains(&name))
                 {
                     return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
@@ -1007,13 +1020,28 @@ impl Vm {
         };
         match record {
             lyng_js_env::EnvironmentRecord::Declarative(record) => {
-                Self::layout_has_binding(agent, record.layout(), name)
+                Self::environment_has_active_layout_binding(
+                    agent,
+                    variable_env,
+                    record.layout(),
+                    name,
+                )
             }
             lyng_js_env::EnvironmentRecord::Function(record) => {
-                Self::layout_has_binding(agent, record.declarative().layout(), name)
+                Self::environment_has_active_layout_binding(
+                    agent,
+                    variable_env,
+                    record.declarative().layout(),
+                    name,
+                )
             }
             lyng_js_env::EnvironmentRecord::Module(record) => {
-                Self::layout_has_binding(agent, record.layout(), name)
+                Self::environment_has_active_layout_binding(
+                    agent,
+                    variable_env,
+                    record.layout(),
+                    name,
+                )
             }
             lyng_js_env::EnvironmentRecord::Global(record) => record.has_var_name(name),
             lyng_js_env::EnvironmentRecord::Private(_)
@@ -1087,6 +1115,36 @@ impl Vm {
         Ok(hosted_names)
     }
 
+    fn force_host_annex_b_direct_eval_catch_bindings(
+        sema: &mut ScriptSema,
+        annex_b_catch_names: &[AtomId],
+        hosted_names: &mut Vec<AtomId>,
+    ) {
+        if annex_b_catch_names.is_empty() {
+            return;
+        }
+        let root_scope = ScopeId::new(0);
+        let bindings = sema.scope_table.get(root_scope).bindings.clone();
+        for binding_id in bindings {
+            let binding = sema.binding_table.get_mut(binding_id);
+            if binding.scope != root_scope
+                || !matches!(
+                    binding.kind,
+                    DeclarationKind::Var | DeclarationKind::Function
+                )
+                || !annex_b_catch_names.contains(&binding.name)
+            {
+                continue;
+            }
+            if !hosted_names.contains(&binding.name) {
+                hosted_names.push(binding.name);
+            }
+            binding.storage_class = StorageClass::DynamicLookup;
+            binding.needs_environment = false;
+            binding.slot_index = None;
+        }
+    }
+
     fn create_direct_eval_var_environment(
         &mut self,
         agent: &mut Agent,
@@ -1125,6 +1183,116 @@ impl Vm {
             }
         }
         Ok(Some(environment))
+    }
+
+    fn direct_eval_named_environment_slot(
+        agent: &Agent,
+        environment: lyng_js_types::EnvironmentRef,
+        name: AtomId,
+    ) -> Option<u32> {
+        let layout = match agent.environment(environment)? {
+            lyng_js_env::EnvironmentRecord::Declarative(record) => record.layout(),
+            lyng_js_env::EnvironmentRecord::Function(record) => record.declarative().layout(),
+            lyng_js_env::EnvironmentRecord::Module(record) => record.layout(),
+            lyng_js_env::EnvironmentRecord::Global(record) => record.layout(),
+            lyng_js_env::EnvironmentRecord::Private(_)
+            | lyng_js_env::EnvironmentRecord::Object(_) => return None,
+        };
+        agent
+            .environment_layout(layout)?
+            .bindings()
+            .iter()
+            .enumerate()
+            .find_map(|(index, binding)| {
+                (binding.name() == Some(name)).then(|| u32::try_from(index).ok())?
+            })
+    }
+
+    fn direct_eval_chain_named_environment_slot(
+        &self,
+        agent: &Agent,
+        start: lyng_js_types::EnvironmentRef,
+        stop: lyng_js_types::EnvironmentRef,
+        name: AtomId,
+    ) -> Option<(lyng_js_types::EnvironmentRef, u32)> {
+        let mut current = Some(start);
+        while let Some(environment) = current {
+            if let Some(slot) = Self::direct_eval_named_environment_slot(agent, environment, name) {
+                return Some((environment, slot));
+            }
+            if environment == stop {
+                return None;
+            }
+            current = match agent.environment(environment)? {
+                lyng_js_env::EnvironmentRecord::Declarative(record) => record.outer(),
+                lyng_js_env::EnvironmentRecord::Function(record) => record.declarative().outer(),
+                lyng_js_env::EnvironmentRecord::Module(record) => record.outer(),
+                lyng_js_env::EnvironmentRecord::Global(record) => record.outer(),
+                lyng_js_env::EnvironmentRecord::Private(record) => record.outer(),
+                lyng_js_env::EnvironmentRecord::Object(record) => record.outer(),
+            };
+        }
+        None
+    }
+
+    fn sync_direct_eval_annex_b_catch_bindings(
+        agent: &mut Agent,
+        annex_b_catch_environments: &[(
+            lyng_js_types::EnvironmentRef,
+            u32,
+            lyng_js_types::EnvironmentRef,
+            u32,
+            AtomId,
+        )],
+    ) -> VmResult<()> {
+        for &(source_environment, source_slot, cloned_environment, cloned_slot, _) in
+            annex_b_catch_environments
+        {
+            let value = agent
+                .environment_slot(cloned_environment, cloned_slot)
+                .ok_or(VmError::MissingEnvironment(cloned_environment))?;
+            if !agent.set_environment_slot(source_environment, source_slot, value) {
+                return Err(VmError::MissingEnvironment(source_environment));
+            }
+        }
+        Ok(())
+    }
+
+    fn sync_direct_eval_annex_b_catch_var_bindings(
+        &self,
+        agent: &mut Agent,
+        source_start: lyng_js_types::EnvironmentRef,
+        var_environment: lyng_js_types::EnvironmentRef,
+        hosted_names: &[AtomId],
+        annex_b_catch_names: &[AtomId],
+    ) -> VmResult<()> {
+        for &name in annex_b_catch_names {
+            if !hosted_names.contains(&name) {
+                continue;
+            }
+            let Some((source_environment, source_slot)) = self
+                .direct_eval_chain_named_environment_slot(
+                    agent,
+                    source_start,
+                    var_environment,
+                    name,
+                )
+            else {
+                continue;
+            };
+            let Some(var_slot) =
+                Self::direct_eval_named_environment_slot(agent, var_environment, name)
+            else {
+                continue;
+            };
+            let value = agent
+                .environment_slot(var_environment, var_slot)
+                .ok_or(VmError::MissingEnvironment(var_environment))?;
+            if !agent.set_environment_slot(source_environment, source_slot, value) {
+                return Err(VmError::MissingEnvironment(source_environment));
+            }
+        }
+        Ok(())
     }
 
     fn seed_direct_eval_global_var_bindings(
@@ -1235,11 +1403,12 @@ impl Vm {
         let allow_super_call = allow_super
             && caller_active_function
                 .is_some_and(|function| agent.objects().is_constructor(function));
-        let annex_b_blocked_var_names = self.direct_eval_lexical_names_before_var_env(
+        let mut annex_b_blocked_var_names = self.direct_eval_lexical_names_before_var_env(
             agent,
             caller_lexical_env,
             caller_variable_env,
         );
+        annex_b_blocked_var_names.retain(|name| !annex_b_catch_names.contains(name));
         let source_id = self.allocate_dynamic_source_id();
         let direct_eval_private_layouts =
             self.direct_eval_ambient_private_layouts(agent, caller, source_id)?;
@@ -1326,12 +1495,28 @@ impl Vm {
                 )?;
             }
         }
-        let hosted_names = self.rewrite_direct_eval_root_bindings(
+        let caller_is_script = self
+            .installed_function(caller.code())
+            .is_some_and(|function| {
+                function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Script
+            });
+        let caller_variable_env_is_global = matches!(
+            agent.environment(caller_variable_env),
+            Some(lyng_js_env::EnvironmentRecord::Global(_))
+        );
+        let host_root_bindings =
+            analysis.parsed().strict || (caller_variable_env_is_global && !caller_is_script);
+        let mut hosted_names = self.rewrite_direct_eval_root_bindings(
             agent,
             caller_variable_env,
-            analysis.parsed().strict,
+            host_root_bindings,
             analysis.sema_mut(),
         )?;
+        Self::force_host_annex_b_direct_eval_catch_bindings(
+            analysis.sema_mut(),
+            &annex_b_catch_names,
+            &mut hosted_names,
+        );
         if analysis.sema().diagnostics.has_errors() {
             return Err(Self::syntax_error(
                 agent,
@@ -1351,9 +1536,12 @@ impl Vm {
             direct_eval_env
                 .map(|environment| (environment, environment))
                 .unwrap_or((caller_lexical_env, caller_variable_env))
-        } else if let Some(lyng_js_env::EnvironmentRecord::Global(record)) =
-            agent.environment(caller_variable_env)
-        {
+        } else if let Some(record) = caller_is_script.then_some(()).and_then(|()| {
+            match agent.environment(caller_variable_env) {
+                Some(lyng_js_env::EnvironmentRecord::Global(record)) => Some(record),
+                _ => None,
+            }
+        }) {
             self.seed_direct_eval_global_var_bindings(
                 agent,
                 caller_variable_env,
@@ -1395,7 +1583,7 @@ impl Vm {
             self.push_direct_eval_environment(self.frames.len(), environment);
         }
         self.push_direct_eval_environment(self.frames.len() + 1, lexical_env);
-        self.evaluate_installed_with_registry_and_host_with_entry_override(
+        let result = self.evaluate_installed_with_registry_and_host_with_entry_override(
             agent,
             installed,
             lexical_env,
@@ -1409,6 +1597,17 @@ impl Vm {
             entry_lexical_this,
             host,
             registry,
-        )
+        );
+        if let Some(environment) = persistent_direct_eval_env {
+            self.sync_direct_eval_annex_b_catch_var_bindings(
+                agent,
+                caller_lexical_env,
+                environment,
+                &hosted_names,
+                &annex_b_catch_names,
+            )?;
+        }
+        Self::sync_direct_eval_annex_b_catch_bindings(agent, &annex_b_catch_environments)?;
+        result
     }
 }

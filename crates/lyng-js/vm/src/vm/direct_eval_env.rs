@@ -123,7 +123,7 @@ impl Vm {
     ) -> VmResult<(
         EnvironmentRef,
         DirectEvalSiteFlags,
-        Vec<(EnvironmentRef, AtomId)>,
+        Vec<(EnvironmentRef, u32, EnvironmentRef, u32, AtomId)>,
         Vec<AtomId>,
         Vec<AtomId>,
     )> {
@@ -184,7 +184,25 @@ impl Vm {
                 }
             }
             if let Some(name) = scope.annex_b_catch_name() {
-                annex_b_catch_environments.push((environment, name));
+                if let Some((index, _)) = scope
+                    .bindings()
+                    .iter()
+                    .enumerate()
+                    .find(|(_, binding)| binding.name() == Some(name))
+                {
+                    let cloned_slot = u32::try_from(index).unwrap_or(u32::MAX);
+                    let source_slot = scope
+                        .source_base()
+                        .checked_add(cloned_slot)
+                        .ok_or(VmError::MissingEnvironment(source_environment))?;
+                    annex_b_catch_environments.push((
+                        source_environment,
+                        source_slot,
+                        environment,
+                        cloned_slot,
+                        name,
+                    ));
+                }
             }
             current_outer = environment;
         }

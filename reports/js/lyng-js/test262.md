@@ -22,31 +22,31 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Candidate files | `53125` |
 | Excluded files from selection | `96` |
 | Selected files | `53029` |
-| Runnable files | `49697` |
-| Passed files | `49695` |
+| Runnable files | `49701` |
+| Passed files | `49699` |
 | Failed files | `2` |
 | Panicked files | `0` |
-| Skipped files | `3332` |
-| Pass rate (selected files) | `93.71%` |
+| Skipped files | `3328` |
+| Pass rate (selected files) | `93.72%` |
 | Selected variant executions | `101813` |
-| Runnable variant executions | `95151` |
-| Time | `92.4s` |
+| Runnable variant executions | `95158` |
+| Time | `121.2s` |
 
 ## Delta From Previous Report
 
 | Metric | Previous | Current | Delta |
 | --- | ---: | ---: | ---: |
-| Candidate files | `53125` | `53125` | `+0` |
-| Excluded files from selection | `96` | `96` | `+0` |
-| Selected files | `53029` | `53029` | `+0` |
-| Runnable files | `49697` | `49697` | `+0` |
-| Passed files | `49692` | `49695` | `+3` |
-| Failed files | `5` | `2` | `-3` |
+| Candidate files | `1484` | `53125` | `+51641` |
+| Excluded files from selection | `0` | `96` | `+96` |
+| Selected files | `1484` | `53029` | `+51545` |
+| Runnable files | `1479` | `49701` | `+48222` |
+| Passed files | `1479` | `49699` | `+48220` |
+| Failed files | `0` | `2` | `+2` |
 | Panicked files | `0` | `0` | `+0` |
-| Skipped files | `3332` | `3332` | `+0` |
-| Pass rate (selected files) | `93.71%` | `93.71%` | `+0.00pp` |
-| Selected variant executions | `101813` | `101813` | `+0` |
-| Runnable variant executions | `95151` | `95151` | `+0` |
+| Skipped files | `5` | `3328` | `+3323` |
+| Pass rate (selected files) | `99.66%` | `93.72%` | `-5.94pp` |
+| Selected variant executions | `2744` | `101813` | `+99069` |
+| Runnable variant executions | `2735` | `95158` | `+92423` |
 
 ## Selection Exclusions
 
@@ -65,18 +65,18 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | `harness` | `116` | `116` | `116` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `3323` | `0` | `0` | `0` | `3323` | `0` | `0.00%` |
 | `language` | `23632` | `23632` | `23632` | `0` | `0` | `0` | `100.00%` |
-| `staging` | `1484` | `1475` | `1475` | `0` | `9` | `0` | `99.39%` |
+| `staging` | `1484` | `1479` | `1479` | `0` | `5` | `0` | `99.66%` |
 
 ## Variant Execution Breakdown
 
 | Metric | Count |
 | --- | ---: |
 | Selected variant executions | `101813` |
-| Runnable variant executions | `95151` |
-| Passed variants | `95148` |
+| Runnable variant executions | `95158` |
+| Passed variants | `95155` |
 | Failed variants | `3` |
 | Panicked variants | `0` |
-| Skipped variants | `6662` |
+| Skipped variants | `6655` |
 
 | Category | Selected variants | Runnable variants | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -85,7 +85,7 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | `harness` | `232` | `232` | `232` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `6646` | `0` | `0` | `0` | `6646` | `0` | `0.00%` |
 | `language` | `44339` | `44339` | `44339` | `0` | `0` | `0` | `100.00%` |
-| `staging` | `2744` | `2728` | `2728` | `0` | `16` | `0` | `99.42%` |
+| `staging` | `2744` | `2735` | `2735` | `0` | `9` | `0` | `99.67%` |
 
 ## Slowest Test Timings
 
@@ -95,98 +95,94 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Test file | Variants | Total time | Slowest variant |
 | --- | ---: | ---: | ---: |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `8.465s` | `4.252s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `8.310s` | `4.167s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js` | `2` | `2.730s` | `1.365s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js` | `2` | `2.728s` | `1.367s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js` | `2` | `2.728s` | `1.365s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js` | `2` | `2.709s` | `1.358s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js` | `2` | `2.692s` | `1.352s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js` | `2` | `2.673s` | `1.354s` |
-| `staging/sm/String/string-upper-lower-mapping.js` | `2` | `2.436s` | `1.248s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Letter.js` | `2` | `2.062s` | `1.054s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Symbol.js` | `2` | `1.996s` | `1.028s` |
-| `built-ins/RegExp/property-escapes/generated/ID_Start.js` | `2` | `1.987s` | `1.033s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Lowercase_Letter.js` | `2` | `1.975s` | `0.993s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Uppercase_Letter.js` | `2` | `1.964s` | `1.024s` |
-| `built-ins/RegExp/property-escapes/generated/Grapheme_Extend.js` | `2` | `1.946s` | `0.973s` |
-| `built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js` | `2` | `1.944s` | `0.978s` |
-| `built-ins/RegExp/property-escapes/generated/IDS_Binary_Operator.js` | `2` | `1.927s` | `1.006s` |
-| `built-ins/RegExp/property-escapes/generated/Assigned.js` | `2` | `1.921s` | `0.970s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Number.js` | `2` | `1.878s` | `0.993s` |
-| `built-ins/RegExp/property-escapes/generated/ID_Continue.js` | `2` | `1.877s` | `0.945s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Titlecase_Letter.js` | `2` | `1.867s` | `0.978s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Mark.js` | `2` | `1.864s` | `0.955s` |
-| `built-ins/RegExp/property-escapes/generated/Case_Ignorable.js` | `2` | `1.862s` | `1.012s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Paragraph_Separator.js` | `2` | `1.861s` | `0.937s` |
-| `built-ins/RegExp/property-escapes/generated/Pattern_Syntax.js` | `2` | `1.861s` | `0.968s` |
+| `staging/sm/Array/toSpliced-dense.js` | `2` | `56.717s` | `28.376s` |
+| `staging/sm/regress/regress-1507322-deep-weakmap.js` | `2` | `14.093s` | `7.057s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `8.678s` | `4.339s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `8.488s` | `4.267s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js` | `2` | `2.972s` | `1.497s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js` | `2` | `2.938s` | `1.476s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js` | `2` | `2.937s` | `1.484s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js` | `2` | `2.937s` | `1.472s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js` | `2` | `2.932s` | `1.471s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js` | `2` | `2.917s` | `1.465s` |
+| `staging/sm/String/string-upper-lower-mapping.js` | `2` | `2.692s` | `1.374s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js` | `2` | `2.579s` | `1.298s` |
+| `built-ins/RegExp/property-escapes/generated/ASCII.js` | `2` | `2.161s` | `1.134s` |
+| `built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js` | `2` | `2.065s` | `1.037s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Punctuation.js` | `2` | `2.049s` | `1.065s` |
+| `built-ins/RegExp/property-escapes/generated/ASCII_Hex_Digit.js` | `2` | `2.026s` | `1.106s` |
+| `built-ins/RegExp/property-escapes/generated/Changes_When_Titlecased.js` | `2` | `2.022s` | `1.019s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Symbol.js` | `2` | `2.021s` | `1.029s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other.js` | `2` | `2.019s` | `1.060s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Close_Punctuation.js` | `2` | `2.010s` | `1.013s` |
+| `built-ins/RegExp/property-escapes/generated/Changes_When_Uppercased.js` | `2` | `2.005s` | `1.029s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Braille.js` | `2` | `2.002s` | `1.002s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Decimal_Number.js` | `2` | `1.995s` | `1.016s` |
+| `built-ins/RegExp/property-escapes/generated/Grapheme_Base.js` | `2` | `1.982s` | `0.995s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Connector_Punctuation.js` | `2` | `1.982s` | `0.992s` |
 
 ### Slowest Variants
 
 | Test variant | Outcome | Time |
 | --- | --- | ---: |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `4.252s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `4.213s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `4.167s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `4.143s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js [non-strict]` | `pass` | `1.367s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [strict]` | `pass` | `1.365s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [non-strict]` | `pass` | `1.365s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [strict]` | `pass` | `1.365s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [non-strict]` | `pass` | `1.363s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js [strict]` | `pass` | `1.361s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js [non-strict]` | `pass` | `1.358s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [strict]` | `pass` | `1.354s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [strict]` | `pass` | `1.352s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js [strict]` | `pass` | `1.351s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [non-strict]` | `pass` | `1.340s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [non-strict]` | `pass` | `1.319s` |
-| `staging/sm/String/string-upper-lower-mapping.js [non-strict]` | `pass` | `1.248s` |
-| `staging/sm/String/string-upper-lower-mapping.js [strict]` | `pass` | `1.187s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Letter.js [strict]` | `pass` | `1.054s` |
-| `built-ins/RegExp/property-escapes/generated/Extender.js [non-strict]` | `pass` | `1.044s` |
-| `built-ins/RegExp/property-escapes/generated/ID_Start.js [non-strict]` | `pass` | `1.033s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Symbol.js [strict]` | `pass` | `1.028s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Uppercase_Letter.js [strict]` | `pass` | `1.024s` |
-| `built-ins/RegExp/property-escapes/generated/Case_Ignorable.js [strict]` | `pass` | `1.012s` |
-| `built-ins/RegExp/property-escapes/generated/Alphabetic.js [strict]` | `pass` | `1.011s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Letter.js [non-strict]` | `pass` | `1.009s` |
-| `built-ins/RegExp/property-escapes/generated/Hex_Digit.js [strict]` | `pass` | `1.007s` |
-| `built-ins/RegExp/property-escapes/generated/IDS_Binary_Operator.js [strict]` | `pass` | `1.006s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Imperial_Aramaic.js [strict]` | `pass` | `0.993s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Lowercase_Letter.js [non-strict]` | `pass` | `0.993s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Number.js [strict]` | `pass` | `0.993s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Control.js [strict]` | `pass` | `0.989s` |
-| `built-ins/RegExp/property-escapes/generated/Emoji_Presentation.js [strict]` | `pass` | `0.988s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Lowercase_Letter.js [strict]` | `pass` | `0.981s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Titlecase_Letter.js [non-strict]` | `pass` | `0.978s` |
-| `built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js [strict]` | `pass` | `0.978s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Connector_Punctuation.js [strict]` | `pass` | `0.977s` |
-| `built-ins/RegExp/property-escapes/generated/Grapheme_Extend.js [strict]` | `pass` | `0.973s` |
-| `built-ins/RegExp/property-escapes/generated/Grapheme_Extend.js [non-strict]` | `pass` | `0.972s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Space_Separator.js [strict]` | `pass` | `0.971s` |
-| `built-ins/RegExp/property-escapes/generated/Assigned.js [strict]` | `pass` | `0.970s` |
-| `built-ins/RegExp/property-escapes/generated/Pattern_Syntax.js [non-strict]` | `pass` | `0.968s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Symbol.js [non-strict]` | `pass` | `0.968s` |
-| `built-ins/RegExp/property-escapes/generated/Emoji_Component.js [non-strict]` | `pass` | `0.967s` |
-| `built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js [non-strict]` | `pass` | `0.966s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Unassigned.js [strict]` | `pass` | `0.966s` |
-| `built-ins/RegExp/property-escapes/generated/Ideographic.js [strict]` | `pass` | `0.958s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Mark.js [strict]` | `pass` | `0.955s` |
-| `built-ins/RegExp/property-escapes/generated/ID_Start.js [strict]` | `pass` | `0.954s` |
-| `built-ins/RegExp/property-escapes/generated/Assigned.js [non-strict]` | `pass` | `0.951s` |
+| `staging/sm/Array/toSpliced-dense.js [strict]` | `pass` | `28.376s` |
+| `staging/sm/Array/toSpliced-dense.js [non-strict]` | `pass` | `28.341s` |
+| `staging/sm/regress/regress-1507322-deep-weakmap.js [non-strict]` | `pass` | `7.057s` |
+| `staging/sm/regress/regress-1507322-deep-weakmap.js [strict]` | `pass` | `7.036s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `4.339s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `4.339s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `4.267s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `4.221s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [non-strict]` | `pass` | `1.497s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js [strict]` | `pass` | `1.484s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js [strict]` | `pass` | `1.476s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [strict]` | `pass` | `1.474s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [strict]` | `pass` | `1.472s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [non-strict]` | `pass` | `1.471s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [non-strict]` | `pass` | `1.466s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [strict]` | `pass` | `1.465s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [strict]` | `pass` | `1.462s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js [non-strict]` | `pass` | `1.461s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js [non-strict]` | `pass` | `1.454s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [non-strict]` | `pass` | `1.452s` |
+| `staging/sm/String/string-upper-lower-mapping.js [strict]` | `pass` | `1.374s` |
+| `staging/sm/String/string-upper-lower-mapping.js [non-strict]` | `pass` | `1.318s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]` | `pass` | `1.298s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]` | `pass` | `1.281s` |
+| `built-ins/RegExp/property-escapes/generated/ASCII.js [strict]` | `pass` | `1.134s` |
+| `built-ins/RegExp/property-escapes/generated/ASCII_Hex_Digit.js [non-strict]` | `pass` | `1.106s` |
+| `built-ins/RegExp/property-escapes/generated/ID_Start.js [strict]` | `pass` | `1.071s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Punctuation.js [non-strict]` | `pass` | `1.065s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other.js [non-strict]` | `pass` | `1.060s` |
+| `built-ins/RegExp/property-escapes/generated/Dash.js [strict]` | `pass` | `1.055s` |
+| `built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js [non-strict]` | `pass` | `1.037s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Symbol.js [non-strict]` | `pass` | `1.029s` |
+| `built-ins/RegExp/property-escapes/generated/Changes_When_Uppercased.js [non-strict]` | `pass` | `1.029s` |
+| `built-ins/RegExp/property-escapes/generated/Hex_Digit.js [strict]` | `pass` | `1.028s` |
+| `built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js [strict]` | `pass` | `1.028s` |
+| `built-ins/RegExp/property-escapes/generated/ASCII.js [non-strict]` | `pass` | `1.027s` |
+| `built-ins/RegExp/property-escapes/generated/Changes_When_Titlecased.js [strict]` | `pass` | `1.019s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Modifier_Symbol.js [strict]` | `pass` | `1.018s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Decimal_Number.js [non-strict]` | `pass` | `1.016s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Close_Punctuation.js [strict]` | `pass` | `1.013s` |
+| `built-ins/RegExp/property-escapes/generated/ID_Continue.js [strict]` | `pass` | `1.013s` |
+| `built-ins/RegExp/property-escapes/generated/Alphabetic.js [strict]` | `pass` | `1.009s` |
+| `built-ins/RegExp/property-escapes/generated/Changes_When_Titlecased.js [non-strict]` | `pass` | `1.003s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Braille.js [strict]` | `pass` | `1.002s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Braille.js [non-strict]` | `pass` | `1.000s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Close_Punctuation.js [non-strict]` | `pass` | `0.998s` |
+| `built-ins/RegExp/property-escapes/generated/Grapheme_Base.js [non-strict]` | `pass` | `0.995s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Connector_Punctuation.js [strict]` | `pass` | `0.992s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Symbol.js [strict]` | `pass` | `0.992s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Connector_Punctuation.js [non-strict]` | `pass` | `0.989s` |
 
 ## Skip Breakdown
 
 | Class | Reason | Count |
 | --- | --- | ---: |
-| Host/runtime policy | host-GC deep WeakMap stress test exceeds the current standalone harness timeout | `1` |
 | Host/runtime policy | host-GC recursion stress test can abort the standalone harness | `1` |
 | Manifest/out of scope | manifest exclusion (suite): ECMA-402 Intl is out of scope for the active ECMA-262 conformance sweep. | `3323` |
-| Other | Annex B direct-eval catch var replacement is not implemented yet | `1` |
-| Other | Array.prototype.toSpliced dense matrix stress test exceeds the current standalone harness timeout | `1` |
 | Other | deep empty-block eval stress test exceeds the current standalone harness timeout | `1` |
-| Other | typed-array ToNumber conversion stress test exceeds the current standalone harness timeout | `1` |
 | Other | typed-array stress test exceeds the current standalone harness timeout | `1` |
 | Unsupported ECMA-262 feature | unsupported feature: Float16Array | `2` |
 

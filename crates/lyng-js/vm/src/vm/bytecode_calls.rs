@@ -8,6 +8,8 @@ use lyng_js_objects::{FunctionEntryIdentity, FunctionThisMode, NativeFunctionReg
 use lyng_js_ops::errors;
 use lyng_js_types::PropertyKey;
 
+const MAX_BYTECODE_CALL_DEPTH: usize = 8_192;
+
 impl Vm {
     pub(super) fn enter_bytecode_call(
         &mut self,
@@ -239,6 +241,9 @@ impl Vm {
         construct_this: Option<ObjectRef>,
         construct_call: bool,
     ) -> VmResult<()> {
+        if self.frames.len() >= MAX_BYTECODE_CALL_DEPTH {
+            return Err(VmError::Abrupt(errors::throw_range_error(agent)));
+        }
         let register_len = prepared
             .register_count
             .checked_add(prepared.hidden_register_count)

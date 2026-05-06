@@ -7925,6 +7925,52 @@ fn script_core_annex_b_catch_var_redeclaration_updates_simple_catch_parameter() 
 }
 
 #[test]
+fn script_core_annex_b_direct_eval_var_redeclaration_updates_simple_catch_parameter() {
+    let result = compile_and_run_string(
+        r#"
+        var x = "global-x";
+        var log = "";
+
+        function g() {
+            try {
+                throw 8;
+            } catch (x) {
+                eval("var x = 42;");
+                log += x;
+            }
+            x = "g";
+            log += x;
+        }
+
+        g();
+        x + ":" + log;
+        "#,
+    );
+
+    assert_eq!(result, "global-x:42g");
+}
+
+#[test]
+fn script_core_recursive_calls_throw_before_native_stack_overflow() {
+    let result = compile_and_run_string(
+        r#"
+        function recurse() {
+            recurse();
+        }
+
+        try {
+            recurse();
+            "missing";
+        } catch (error) {
+            error.constructor === RangeError ? "true" : "false";
+        }
+        "#,
+    );
+
+    assert_eq!(result, "true");
+}
+
+#[test]
 fn script_core_annex_b_regexp_legacy_pattern_extensions() {
     let result = compile_and_run_string(
         r#"

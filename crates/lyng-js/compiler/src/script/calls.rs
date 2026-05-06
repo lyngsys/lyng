@@ -13,6 +13,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if *name != WellKnownAtom::eval.id() {
             return Ok(false);
         }
+        if self.use_site(current)?.resolved_binding.is_some() {
+            return Ok(false);
+        }
 
         Ok(true)
     }

@@ -556,7 +556,21 @@ fn timeout_for_test(test: &PreparedTest, default: Duration) -> Duration {
     if is_generated_string_mapping_test(&test.path) {
         return default.max(Duration::from_secs(30));
     }
+    if is_staging_slow_stress_test(&test.path) {
+        return default.max(Duration::from_secs(60));
+    }
     default
+}
+
+fn is_staging_slow_stress_test(path: &Path) -> bool {
+    matches!(
+        path.file_name().and_then(|name| name.to_str()),
+        Some(
+            "regress-1507322-deep-weakmap.js"
+                | "toSpliced-dense.js"
+                | "element-setting-converts-using-ToNumber.js"
+        )
+    )
 }
 
 fn is_generated_string_mapping_test(path: &Path) -> bool {
@@ -918,6 +932,21 @@ mod tests {
         assert_eq!(
             timeout_for_test(&test, Duration::from_secs(1)),
             Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn staging_slow_stress_tests_receive_extended_timeout() {
+        let test = PreparedTest {
+            path: PathBuf::from("test/staging/sm/Array/toSpliced-dense.js"),
+            category: "staging".to_string(),
+            metadata: parse_metadata("/*---\ndescription: |\n  pending\n---*/"),
+            variant: crate::metadata::TestVariant::Default,
+        };
+
+        assert_eq!(
+            timeout_for_test(&test, Duration::from_secs(1)),
+            Duration::from_secs(60)
         );
     }
 

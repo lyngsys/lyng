@@ -83,24 +83,8 @@ const EXPLICIT_TEST_SKIPS: &[(&str, &str)] = &[
         "host-GC recursion stress test can abort the standalone harness",
     ),
     (
-        "staging/sm/regress/regress-1507322-deep-weakmap.js",
-        "host-GC deep WeakMap stress test exceeds the current standalone harness timeout",
-    ),
-    (
         "staging/sm/regress/regress-610026.js",
         "deep empty-block eval stress test exceeds the current standalone harness timeout",
-    ),
-    (
-        "staging/sm/lexical-environment/var-in-catch-body-annex-b-eval.js",
-        "Annex B direct-eval catch var replacement is not implemented yet",
-    ),
-    (
-        "staging/sm/Array/toSpliced-dense.js",
-        "Array.prototype.toSpliced dense matrix stress test exceeds the current standalone harness timeout",
-    ),
-    (
-        "staging/sm/TypedArray/element-setting-converts-using-ToNumber.js",
-        "typed-array ToNumber conversion stress test exceeds the current standalone harness timeout",
     ),
 ];
 
@@ -1085,34 +1069,6 @@ mod tests {
     }
 
     #[test]
-    fn skip_decision_classifies_staging_deep_weakmap_host_gc_stress() {
-        let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
-        let path = test_dir.join("staging/sm/regress/regress-1507322-deep-weakmap.js");
-        let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
-        let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
-
-        let decision = skip_decision(
-            &path,
-            &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
-            &metadata,
-            &helpers,
-            false,
-            ProposalStage::Stage3,
-        );
-
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "host-GC deep WeakMap stress test exceeds the current standalone harness timeout"
-                    .to_string()
-            ))
-        );
-    }
-
-    #[test]
     fn skip_decision_classifies_staging_deep_empty_block_eval_stress() {
         let root = workspace_root();
         let test_dir = root.join("testdata/test262/test");
@@ -1135,91 +1091,6 @@ mod tests {
             decision,
             Some(SkipDecision::Skip(
                 "deep empty-block eval stress test exceeds the current standalone harness timeout"
-                    .to_string()
-            ))
-        );
-    }
-
-    #[test]
-    fn skip_decision_classifies_staging_annex_b_catch_eval_gap() {
-        let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
-        let path =
-            test_dir.join("staging/sm/lexical-environment/var-in-catch-body-annex-b-eval.js");
-        let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
-        let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
-
-        let decision = skip_decision(
-            &path,
-            &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
-            &metadata,
-            &helpers,
-            false,
-            ProposalStage::Stage3,
-        );
-
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "Annex B direct-eval catch var replacement is not implemented yet".to_string()
-            ))
-        );
-    }
-
-    #[test]
-    fn skip_decision_classifies_staging_array_tospliced_dense_stress() {
-        let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
-        let path = test_dir.join("staging/sm/Array/toSpliced-dense.js");
-        let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
-        let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
-
-        let decision = skip_decision(
-            &path,
-            &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
-            &metadata,
-            &helpers,
-            false,
-            ProposalStage::Stage3,
-        );
-
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "Array.prototype.toSpliced dense matrix stress test exceeds the current standalone harness timeout"
-                    .to_string()
-            ))
-        );
-    }
-
-    #[test]
-    fn skip_decision_classifies_staging_typedarray_tonumber_stress() {
-        let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
-        let path =
-            test_dir.join("staging/sm/TypedArray/element-setting-converts-using-ToNumber.js");
-        let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
-        let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
-
-        let decision = skip_decision(
-            &path,
-            &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
-            &metadata,
-            &helpers,
-            false,
-            ProposalStage::Stage3,
-        );
-
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "typed-array ToNumber conversion stress test exceeds the current standalone harness timeout"
                     .to_string()
             ))
         );
