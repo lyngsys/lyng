@@ -1796,6 +1796,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         name: AtomId,
         lexical_binding: SemanticBindingId,
     ) -> Option<SemanticBindingId> {
+        if name == WellKnownAtom::arguments.id()
+            && self
+                .current_function
+                .is_some_and(|function| self.state.activation(function).needs_arguments_object())
+            && self.block_function_binding_has_use(lexical_binding)
+        {
+            return None;
+        }
         if self.annex_b_var_update_would_conflict(name, lexical_binding) {
             return None;
         }
@@ -1807,6 +1815,15 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             return None;
         }
         (binding != lexical_binding).then_some(binding)
+    }
+
+    fn block_function_binding_has_use(&self, lexical_binding: SemanticBindingId) -> bool {
+        self.state
+            .sema
+            .use_sites
+            .as_slice()
+            .iter()
+            .any(|site| site.resolved_binding == Some(lexical_binding))
     }
 
     fn annex_b_var_update_would_conflict(

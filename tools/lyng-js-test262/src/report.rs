@@ -1341,8 +1341,16 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_annexb_report_has_only_manifest_skips() {
-        assert_checked_in_report_has_only_manifest_skips("reports/js/lyng-js/test262-annexb.md");
+    fn checked_in_annexb_report_has_no_skips() {
+        let report_path = workspace_root().join("reports/js/lyng-js/test262-annexb.md");
+        let report = fs::read_to_string(&report_path).unwrap_or_else(|error| {
+            panic!("{} should be readable: {error}", report_path.display())
+        });
+        assert!(
+            skip_breakdown_rows(&report).is_empty(),
+            "{} should not record Annex B skips",
+            report_path.display()
+        );
     }
 
     #[test]

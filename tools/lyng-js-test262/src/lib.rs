@@ -563,15 +563,18 @@ fn timeout_for_test(test: &PreparedTest, default: Duration) -> Duration {
 }
 
 fn is_staging_slow_stress_test(path: &Path) -> bool {
-    matches!(
-        path.file_name().and_then(|name| name.to_str()),
-        Some(
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    file_name.starts_with("dst-offset-caching-")
+        || matches!(
+            file_name,
             "regress-1507322-deep-weakmap.js"
                 | "toSpliced-dense.js"
                 | "sort_large_countingsort.js"
                 | "element-setting-converts-using-ToNumber.js"
+                | "unicode-braced.js"
         )
-    )
 }
 
 fn is_generated_string_mapping_test(path: &Path) -> bool {
@@ -940,6 +943,36 @@ mod tests {
     fn staging_slow_stress_tests_receive_extended_timeout() {
         let test = PreparedTest {
             path: PathBuf::from("test/staging/sm/Array/toSpliced-dense.js"),
+            category: "staging".to_string(),
+            metadata: parse_metadata("/*---\ndescription: |\n  pending\n---*/"),
+            variant: crate::metadata::TestVariant::Default,
+        };
+
+        assert_eq!(
+            timeout_for_test(&test, Duration::from_secs(1)),
+            Duration::from_secs(60)
+        );
+    }
+
+    #[test]
+    fn staging_date_dst_stress_tests_receive_extended_timeout() {
+        let test = PreparedTest {
+            path: PathBuf::from("test/staging/sm/Date/dst-offset-caching-4-of-8.js"),
+            category: "staging".to_string(),
+            metadata: parse_metadata("/*---\ndescription: |\n  pending\n---*/"),
+            variant: crate::metadata::TestVariant::Default,
+        };
+
+        assert_eq!(
+            timeout_for_test(&test, Duration::from_secs(1)),
+            Duration::from_secs(60)
+        );
+    }
+
+    #[test]
+    fn staging_regexp_unicode_braced_stress_test_receives_extended_timeout() {
+        let test = PreparedTest {
+            path: PathBuf::from("test/staging/sm/RegExp/unicode-braced.js"),
             category: "staging".to_string(),
             metadata: parse_metadata("/*---\ndescription: |\n  pending\n---*/"),
             variant: crate::metadata::TestVariant::Default,

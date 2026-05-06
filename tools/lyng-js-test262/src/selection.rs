@@ -1073,7 +1073,7 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_manifest_classifies_is_htmldda_as_host_only_scope() {
+    fn checked_in_manifest_runs_is_htmldda_tests() {
         let root = workspace_root();
         let test_dir = root.join("testdata/test262/test");
         let path = test_dir.join("annexB/language/expressions/typeof/emulates-undefined.js");
@@ -1093,12 +1093,7 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "manifest exclusion (path): IsHTMLDDA requires the browser document.all host object and is out of scope for the standalone Lyng JS Test262 harness.".to_string()
-            ))
-        );
+        assert_eq!(decision, None);
     }
 
     #[test]

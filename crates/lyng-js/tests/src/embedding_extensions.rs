@@ -285,6 +285,36 @@ fn array_constructor_uses_new_target_realm_default_prototype() {
 }
 
 #[test]
+fn typed_array_constructor_uses_new_target_realm_default_prototype() {
+    let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
+    let result = compile_and_run_string(
+        r#"
+        let childGlobal = embedding.createRealm();
+        let newTarget = new childGlobal.Function();
+        newTarget.prototype = undefined;
+        let names = [
+            "Float64Array", "Float32Array", "Float16Array",
+            "Int32Array", "Int16Array", "Int8Array",
+            "Uint32Array", "Uint16Array", "Uint8Array", "Uint8ClampedArray",
+            "BigInt64Array", "BigUint64Array"
+        ];
+
+        let matches = 0;
+        for (let name of names) {
+            let typedArray = Reflect.construct(globalThis[name], [], newTarget);
+            if (Object.getPrototypeOf(typedArray) === childGlobal[name].prototype) {
+                matches += 1;
+            }
+        }
+        matches + ":" + names.length;
+        "#,
+        Some(&provider),
+    );
+
+    assert_eq!(result, "12:12");
+}
+
+#[test]
 fn embedding_cross_realm_data_view_methods_accept_foreign_views_and_buffers() {
     let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
     let result = compile_and_run_string(

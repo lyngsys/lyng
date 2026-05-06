@@ -1,6 +1,9 @@
-use lyng_js_ast::{Expr, FunctionId, ParsedScript, Stmt};
+use lyng_js_ast::{
+    Ast, Decl, Expr, ForInOfLeft, ForInit, FunctionId, ParsedScript, Pattern, Stmt, StmtId,
+    VariableKind,
+};
 use lyng_js_bytecode::CompiledScriptUnit;
-use lyng_js_common::{AtomTable, SourceId};
+use lyng_js_common::{AtomId, AtomTable, SourceId};
 use lyng_js_parser::{parse_script, parse_script_with_initial_strict};
 use lyng_js_sema::{
     analyze_direct_eval_script, analyze_script, DirectEvalScriptAnalysisOptions, ScriptSema,
@@ -99,6 +102,142 @@ impl DynamicScriptAnalysis {
     #[inline]
     pub fn sema_mut(&mut self) -> &mut ScriptSema {
         &mut self.sema
+    }
+
+    pub fn root_var_initializer_names(&self) -> Vec<AtomId> {
+        let ast = &self.parsed.ast;
+        let body = ast.get_script(self.parsed.root).body;
+        let mut names = Vec::new();
+        for &stmt in ast.get_stmt_list(body) {
+            collect_var_initializer_names_from_stmt(ast, stmt, &mut names);
+        }
+        names
+    }
+}
+
+fn push_unique_atom(names: &mut Vec<AtomId>, name: AtomId) {
+    if !names.contains(&name) {
+        names.push(name);
+    }
+}
+
+fn collect_var_initializer_names_from_pattern(
+    ast: &Ast,
+    pattern: lyng_js_ast::PatternId,
+    names: &mut Vec<AtomId>,
+) {
+    match ast.get_pattern(pattern) {
+        Pattern::Identifier { name, .. } => push_unique_atom(names, *name),
+        Pattern::Object {
+            properties, rest, ..
+        } => {
+            for property in ast.get_obj_pattern_prop_list(*properties) {
+                collect_var_initializer_names_from_pattern(ast, property.value, names);
+            }
+            if let Some(rest) = rest {
+                collect_var_initializer_names_from_pattern(ast, *rest, names);
+            }
+        }
+        Pattern::Array { elements, rest, .. } => {
+            for element in ast.get_opt_pattern_elem_list(*elements).iter().flatten() {
+                collect_var_initializer_names_from_pattern(ast, element.pattern, names);
+            }
+            if let Some(rest) = rest {
+                collect_var_initializer_names_from_pattern(ast, *rest, names);
+            }
+        }
+        Pattern::Assignment { left, .. } => {
+            collect_var_initializer_names_from_pattern(ast, *left, names);
+        }
+        Pattern::InvalidPattern { .. } => {}
+    }
+}
+
+fn collect_var_initializer_names_from_decl(
+    ast: &Ast,
+    decl: lyng_js_ast::DeclId,
+    names: &mut Vec<AtomId>,
+) {
+    let Decl::Variable {
+        kind: VariableKind::Var,
+        declarators,
+        ..
+    } = ast.get_decl(decl)
+    else {
+        return;
+    };
+    for declarator in ast.get_var_declarator_list(*declarators) {
+        if declarator.init.is_some() {
+            collect_var_initializer_names_from_pattern(ast, declarator.id, names);
+        }
+    }
+}
+
+fn collect_var_initializer_names_from_stmt(ast: &Ast, stmt: StmtId, names: &mut Vec<AtomId>) {
+    match ast.get_stmt(stmt) {
+        Stmt::Block { body, .. } => {
+            for &stmt in ast.get_stmt_list(*body) {
+                collect_var_initializer_names_from_stmt(ast, stmt, names);
+            }
+        }
+        Stmt::If {
+            consequent,
+            alternate,
+            ..
+        } => {
+            collect_var_initializer_names_from_stmt(ast, *consequent, names);
+            if let Some(alternate) = alternate {
+                collect_var_initializer_names_from_stmt(ast, *alternate, names);
+            }
+        }
+        Stmt::DoWhile { body, .. } | Stmt::While { body, .. } | Stmt::With { body, .. } => {
+            collect_var_initializer_names_from_stmt(ast, *body, names);
+        }
+        Stmt::For { init, body, .. } => {
+            if let Some(ForInit::Declaration(decl)) = init {
+                collect_var_initializer_names_from_decl(ast, *decl, names);
+            }
+            collect_var_initializer_names_from_stmt(ast, *body, names);
+        }
+        Stmt::ForIn { left, body, .. } | Stmt::ForOf { left, body, .. } => {
+            if let ForInOfLeft::Declaration(decl) = left {
+                collect_var_initializer_names_from_decl(ast, *decl, names);
+            }
+            collect_var_initializer_names_from_stmt(ast, *body, names);
+        }
+        Stmt::Switch { cases, .. } => {
+            for case in ast.get_switch_case_list(*cases) {
+                for &stmt in ast.get_stmt_list(case.consequent) {
+                    collect_var_initializer_names_from_stmt(ast, stmt, names);
+                }
+            }
+        }
+        Stmt::Labeled { body, .. } => collect_var_initializer_names_from_stmt(ast, *body, names),
+        Stmt::Try {
+            block,
+            handler,
+            finalizer,
+            ..
+        } => {
+            collect_var_initializer_names_from_stmt(ast, *block, names);
+            if let Some(handler) = handler {
+                collect_var_initializer_names_from_stmt(ast, handler.body, names);
+            }
+            if let Some(finalizer) = finalizer {
+                collect_var_initializer_names_from_stmt(ast, *finalizer, names);
+            }
+        }
+        Stmt::Declaration { decl, .. } => {
+            collect_var_initializer_names_from_decl(ast, *decl, names)
+        }
+        Stmt::Empty { .. }
+        | Stmt::Expression { .. }
+        | Stmt::Continue { .. }
+        | Stmt::Break { .. }
+        | Stmt::Return { .. }
+        | Stmt::Throw { .. }
+        | Stmt::Debugger { .. }
+        | Stmt::InvalidStatement { .. } => {}
     }
 }
 

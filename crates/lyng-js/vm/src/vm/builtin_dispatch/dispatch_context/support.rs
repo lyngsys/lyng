@@ -222,6 +222,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
         remap_intrinsic_prototype!(int8_array_prototype);
         remap_intrinsic_prototype!(int16_array_prototype);
         remap_intrinsic_prototype!(int32_array_prototype);
+        remap_intrinsic_prototype!(float16_array_prototype);
         remap_intrinsic_prototype!(float32_array_prototype);
         remap_intrinsic_prototype!(float64_array_prototype);
         remap_intrinsic_prototype!(big_int64_array_prototype);

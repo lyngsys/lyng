@@ -1273,10 +1273,14 @@ impl Vm {
             u32,
             AtomId,
         )],
+        sync_names: &[AtomId],
     ) -> VmResult<()> {
-        for &(source_environment, source_slot, cloned_environment, cloned_slot, _) in
+        for &(source_environment, source_slot, cloned_environment, cloned_slot, name) in
             annex_b_catch_environments
         {
+            if !sync_names.contains(&name) {
+                continue;
+            }
             let value = agent
                 .environment_slot(cloned_environment, cloned_slot)
                 .ok_or(VmError::MissingEnvironment(cloned_environment))?;
@@ -1288,6 +1292,44 @@ impl Vm {
     }
 
     fn sync_direct_eval_annex_b_catch_var_bindings(
+        &self,
+        agent: &mut Agent,
+        source_start: lyng_js_types::EnvironmentRef,
+        var_environment: lyng_js_types::EnvironmentRef,
+        hosted_names: &[AtomId],
+        annex_b_catch_names: &[AtomId],
+        sync_names: &[AtomId],
+    ) -> VmResult<()> {
+        for &name in annex_b_catch_names {
+            if !hosted_names.contains(&name) || !sync_names.contains(&name) {
+                continue;
+            }
+            let Some((source_environment, source_slot)) = self
+                .direct_eval_chain_named_environment_slot(
+                    agent,
+                    source_start,
+                    var_environment,
+                    name,
+                )
+            else {
+                continue;
+            };
+            let Some(var_slot) =
+                Self::direct_eval_named_environment_slot(agent, var_environment, name)
+            else {
+                continue;
+            };
+            let value = agent
+                .environment_slot(var_environment, var_slot)
+                .ok_or(VmError::MissingEnvironment(var_environment))?;
+            if !agent.set_environment_slot(source_environment, source_slot, value) {
+                return Err(VmError::MissingEnvironment(source_environment));
+            }
+        }
+        Ok(())
+    }
+
+    fn seed_direct_eval_annex_b_catch_var_bindings(
         &self,
         agent: &mut Agent,
         source_start: lyng_js_types::EnvironmentRef,
@@ -1315,10 +1357,10 @@ impl Vm {
                 continue;
             };
             let value = agent
-                .environment_slot(var_environment, var_slot)
-                .ok_or(VmError::MissingEnvironment(var_environment))?;
-            if !agent.set_environment_slot(source_environment, source_slot, value) {
-                return Err(VmError::MissingEnvironment(source_environment));
+                .environment_slot(source_environment, source_slot)
+                .ok_or(VmError::MissingEnvironment(source_environment))?;
+            if !agent.set_environment_slot(var_environment, var_slot, value) {
+                return Err(VmError::MissingEnvironment(var_environment));
             }
         }
         Ok(())
@@ -1486,6 +1528,7 @@ impl Vm {
         );
         let root_var_names = Self::direct_eval_root_var_names(analysis.sema());
         let root_function_names = Self::direct_eval_root_function_names(analysis.sema());
+        let annex_b_catch_sync_names = analysis.root_var_initializer_names();
         if !analysis.parsed().strict
             && Self::caller_in_parameter_initializer(caller)
             && Self::direct_eval_declares_parameter_name(
@@ -1590,6 +1633,13 @@ impl Vm {
             let direct_eval_env =
                 self.create_direct_eval_var_environment(agent, direct_eval_outer, &hosted_names)?;
             if let Some(environment) = direct_eval_env {
+                self.seed_direct_eval_annex_b_catch_var_bindings(
+                    agent,
+                    caller_lexical_env,
+                    environment,
+                    &hosted_names,
+                    &annex_b_catch_names,
+                )?;
                 self.register_direct_eval_environment_overlay(caller_lexical_env, environment);
                 persistent_direct_eval_env = Some(environment);
                 (environment, caller_variable_env)
@@ -1638,9 +1688,14 @@ impl Vm {
                 environment,
                 &hosted_names,
                 &annex_b_catch_names,
+                &annex_b_catch_sync_names,
             )?;
         }
-        Self::sync_direct_eval_annex_b_catch_bindings(agent, &annex_b_catch_environments)?;
+        Self::sync_direct_eval_annex_b_catch_bindings(
+            agent,
+            &annex_b_catch_environments,
+            &annex_b_catch_sync_names,
+        )?;
         result
     }
 }

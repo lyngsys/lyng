@@ -3689,6 +3689,31 @@ fn script_core_typed_array_buffer_constructor_observes_new_target_prototype_firs
 }
 
 #[test]
+fn script_core_typed_array_length_symbol_throws_before_new_target_prototype_lookup() {
+    let result = compile_and_run_string(
+        r#"
+        class ExpectedError extends Error {}
+        let NewTarget = Object.defineProperty(function(){}.bind(null), "prototype", {
+            get() {
+                throw new ExpectedError();
+            }
+        });
+
+        try {
+            Reflect.construct(Int32Array, [Symbol()], NewTarget);
+            "no throw";
+        } catch (error) {
+            error instanceof TypeError ? "type" :
+                error instanceof ExpectedError ? "prototype" :
+                error.constructor.name;
+        }
+        "#,
+    );
+
+    assert_eq!(result, "type");
+}
+
+#[test]
 fn script_core_typed_array_from_constructs_before_reading_array_like_elements() {
     let result = compile_and_run_string(
         r#"

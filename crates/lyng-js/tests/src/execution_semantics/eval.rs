@@ -1331,6 +1331,24 @@ fn direct_eval_allows_var_redeclaration_of_simple_catch_parameter() {
 }
 
 #[test]
+fn direct_eval_var_initializer_updates_simple_catch_parameter() {
+    let result = compile_and_run_string(
+        r#"
+            let status = "missing";
+            try {
+                throw "caught";
+            } catch (err) {
+                eval("var err = 'updated';");
+                status = err;
+            }
+            status;
+        "#,
+    );
+
+    assert_eq!(result, "updated");
+}
+
+#[test]
 fn direct_eval_in_nested_block_rejects_var_collision_with_enclosing_lexical() {
     let result = compile_and_run_string(
         r#"

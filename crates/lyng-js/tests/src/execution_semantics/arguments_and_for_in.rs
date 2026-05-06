@@ -113,6 +113,82 @@ fn phase4_var_arguments_initializer_updates_arguments_binding() {
 }
 
 #[test]
+fn phase6_annex_b_block_function_named_arguments_skips_var_binding_update() {
+    let result = compile_and_run_string(
+        r#"
+        function probe() {
+            let before = Object.prototype.toString.call(arguments);
+            let call;
+            {
+                call = arguments();
+                function arguments() {}
+            }
+            let after = Object.prototype.toString.call(arguments);
+            return before + ":" + String(call) + ":" + after;
+        }
+
+        function probeNamed(x) {
+            let before = Object.prototype.toString.call(arguments);
+            let call;
+            {
+                call = arguments();
+                function arguments() {}
+            }
+            let after = Object.prototype.toString.call(arguments);
+            return before + ":" + String(call) + ":" + after;
+        }
+
+        function probeRest(..._) {
+            let before = Object.prototype.toString.call(arguments);
+            let call;
+            {
+                call = arguments();
+                function arguments() {}
+            }
+            let after = Object.prototype.toString.call(arguments);
+            return before + ":" + String(call) + ":" + after;
+        }
+
+        probe() + "|" + probeNamed(1) + "|" + probeRest(1, 2);
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "[object Arguments]:undefined:[object Arguments]|\
+         [object Arguments]:undefined:[object Arguments]|\
+         [object Arguments]:undefined:[object Arguments]"
+    );
+}
+
+#[test]
+fn phase6_annex_b_block_function_named_arguments_updates_when_block_binding_unused() {
+    let result = compile_and_run_string(
+        r#"
+        function probe() {
+            let before = typeof arguments;
+            {
+                function arguments() {}
+            }
+            return before + ":" + typeof arguments;
+        }
+
+        function probeEval(source) {
+            eval(source);
+            {
+                function arguments() {}
+            }
+            return typeof arguments;
+        }
+
+        probe() + "|" + probeEval("42");
+        "#,
+    );
+
+    assert_eq!(result, "object:function|function");
+}
+
+#[test]
 fn phase6_parameter_default_closure_sees_arguments_before_body_var_shadowing() {
     let result = compile_and_run(
         r#"

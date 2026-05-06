@@ -147,6 +147,16 @@ fn typed_array_allocation_shape<Cx: PublicBuiltinDispatchContext>(
     Ok((length, byte_length))
 }
 
+fn typed_array_constructor_prototype<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    realm: lyng_js_types::RealmRef,
+    new_target: ObjectRef,
+    kind: TypedArrayElementKind,
+) -> Result<ObjectRef, Cx::Error> {
+    let default_prototype = typed_array_default_prototype(cx, realm, kind)?;
+    cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)
+}
+
 fn typed_array_buffer_byte_length<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     store: BackingStoreRef,
@@ -254,9 +264,14 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
             .and_then(|record| record.intrinsics().array_buffer_prototype())
     }
     .ok_or_else(|| type_error(cx))?;
-    let default_prototype = typed_array_default_prototype(cx, realm, kind)?;
-    let prototype =
-        cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)?;
+    let eager_prototype = if invocation.arguments().is_empty() || argument.as_object_ref().is_some()
+    {
+        Some(typed_array_constructor_prototype(
+            cx, realm, new_target, kind,
+        )?)
+    } else {
+        None
+    };
     let (buffer_object, store, byte_offset, length, length_tracking) = if let Some(buffer_object) =
         argument.as_object_ref()
     {
@@ -393,6 +408,11 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
             .ok_or_else(|| range_error(cx))?;
         let buffer_object = allocate_array_buffer_object(cx, realm, array_buffer_prototype, store)?;
         (buffer_object, store, 0, length, false)
+    };
+    let prototype = if let Some(prototype) = eager_prototype {
+        prototype
+    } else {
+        typed_array_constructor_prototype(cx, realm, new_target, kind)?
     };
     let record = if length_tracking {
         TypedArrayObjectData::new_length_tracking(buffer_object, store, byte_offset, length, kind)
