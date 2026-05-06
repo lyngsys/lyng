@@ -25,6 +25,14 @@ pub fn internal_super_base_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn internal_super_constructor_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(INTERNAL_SUPER_CONSTRUCTOR_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn internal_construct_super_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(INTERNAL_CONSTRUCT_SUPER_RAW) {
         Some(id) => id,

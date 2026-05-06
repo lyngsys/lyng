@@ -574,12 +574,22 @@ impl Vm {
         ))
     }
 
-    fn caller_allows_direct_eval_function_code(&self, caller: FrameRecord) -> bool {
-        matches!(
-            self.installed_function(caller.code())
-                .map(|function| function.kind()),
-            Some(lyng_js_bytecode::BytecodeFunctionKind::Function)
-        )
+    fn caller_allows_direct_eval_function_code(&self, agent: &Agent, caller: FrameRecord) -> bool {
+        match self
+            .installed_function(caller.code())
+            .map(|function| function.kind())
+        {
+            Some(lyng_js_bytecode::BytecodeFunctionKind::Function) => true,
+            Some(lyng_js_bytecode::BytecodeFunctionKind::Arrow) => {
+                let global_object = agent
+                    .realm(caller.realm())
+                    .map(|realm| realm.global_object());
+                Self::this_environment_record(agent, caller.lexical_env()).is_ok_and(|record| {
+                    record.is_some_and(|record| Some(record.function_object()) != global_object)
+                })
+            }
+            _ => false,
+        }
     }
 
     fn caller_direct_eval_home_object(
@@ -588,10 +598,6 @@ impl Vm {
         lexical_env: lyng_js_types::EnvironmentRef,
         caller: FrameRecord,
     ) -> Option<ObjectRef> {
-        if !self.caller_allows_direct_eval_function_code(caller) {
-            return None;
-        }
-
         if let Ok(Some(record)) = Self::this_environment_record(agent, lexical_env) {
             if let Some(home_object) = record.home_object() {
                 return Some(home_object);
@@ -605,12 +611,28 @@ impl Vm {
             }
         }
 
+        if !self.caller_allows_direct_eval_function_code(agent, caller) {
+            return None;
+        }
+
         caller.callee().and_then(|callee| {
             agent
                 .objects()
                 .function_data(callee)
                 .and_then(|data| data.home_object())
         })
+    }
+
+    fn caller_direct_eval_active_function(
+        agent: &Agent,
+        lexical_env: lyng_js_types::EnvironmentRef,
+        caller: FrameRecord,
+    ) -> Option<ObjectRef> {
+        Self::this_environment_record(agent, lexical_env)
+            .ok()
+            .flatten()
+            .map(|record| record.function_object())
+            .or_else(|| caller.callee())
     }
 
     fn caller_direct_eval_private_env(
@@ -697,16 +719,10 @@ impl Vm {
 
     fn filter_direct_eval_function_code_diagnostics(
         &self,
-        agent: &Agent,
-        caller: FrameRecord,
-        caller_lexical_env: lyng_js_types::EnvironmentRef,
+        allow_new_target: bool,
+        allow_super: bool,
         sema: &mut ScriptSema,
     ) {
-        let allow_new_target = self.caller_allows_direct_eval_function_code(caller);
-        let allow_super = allow_new_target
-            && self
-                .caller_direct_eval_home_object(agent, caller_lexical_env, caller)
-                .is_some();
         if !allow_new_target && !allow_super {
             return;
         }
@@ -1143,9 +1159,6 @@ impl Vm {
             if !defined {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             }
-            if !agent.global_has_var_name(global_env, name) {
-                let _ = agent.global_add_var_name(global_env, name);
-            }
         }
 
         for &name in var_names {
@@ -1181,10 +1194,6 @@ impl Vm {
                     return Err(VmError::Abrupt(errors::throw_type_error(agent)));
                 }
             }
-
-            if !agent.global_has_var_name(global_env, name) {
-                let _ = agent.global_add_var_name(global_env, name);
-            }
         }
 
         Ok(())
@@ -1215,6 +1224,17 @@ impl Vm {
             direct_eval_parameter_names,
         ) = self.caller_direct_eval_lexical_environment(agent, caller, caller_name_env_start)?;
         let caller_variable_env = caller.variable_env();
+        let caller_home_object =
+            self.caller_direct_eval_home_object(agent, caller_name_env_start, caller);
+        let allow_new_target = direct_eval_site_flags.allow_new_target()
+            || self.caller_allows_direct_eval_function_code(agent, caller);
+        let allow_super = direct_eval_site_flags.allow_super()
+            || (allow_new_target && caller_home_object.is_some());
+        let caller_active_function =
+            Self::caller_direct_eval_active_function(agent, caller_name_env_start, caller);
+        let allow_super_call = allow_super
+            && caller_active_function
+                .is_some_and(|function| agent.objects().is_constructor(function));
         let annex_b_blocked_var_names = self.direct_eval_lexical_names_before_var_env(
             agent,
             caller_lexical_env,
@@ -1234,7 +1254,13 @@ impl Vm {
                     .with_annex_b_blocked_var_names(annex_b_blocked_var_names)
                     .with_forbid_arguments_in_class_initializer(
                         direct_eval_site_flags.forbid_arguments_in_class_initializer(),
-                    ),
+                    )
+                    .with_forbid_direct_super_call(!allow_super_call)
+                    .with_forbid_super_call_in_class_initializer(
+                        direct_eval_site_flags.forbid_super_call_in_class_initializer(),
+                    )
+                    .with_allow_new_target(allow_new_target)
+                    .with_allow_super(allow_super),
             },
         )
         .map_err(|error| {
@@ -1252,9 +1278,8 @@ impl Vm {
         Self::rewrite_direct_eval_use_sites(analysis.sema_mut());
         Self::rewrite_direct_eval_root_lexical_uses(analysis.sema_mut());
         self.filter_direct_eval_function_code_diagnostics(
-            agent,
-            caller,
-            caller_lexical_env,
+            allow_new_target,
+            allow_super,
             analysis.sema_mut(),
         );
         let root_var_names = Self::direct_eval_root_var_names(analysis.sema());
@@ -1362,9 +1387,10 @@ impl Vm {
         } else {
             self.caller_direct_eval_call_state(agent, caller_name_env_start, caller)?
         };
-        let entry_home_object =
-            self.caller_direct_eval_home_object(agent, caller_name_env_start, caller);
+        let entry_home_object = caller_home_object;
+        let entry_active_function = allow_super.then_some(caller_active_function).flatten();
         let entry_private_env = self.caller_direct_eval_private_env(agent, caller);
+        let entry_lexical_this = this_override.is_none() && entry_active_function.is_some();
         if let Some(environment) = persistent_direct_eval_env {
             self.push_direct_eval_environment(self.frames.len(), environment);
         }
@@ -1378,7 +1404,9 @@ impl Vm {
             entry_this_value,
             entry_new_target,
             entry_home_object,
+            entry_active_function,
             entry_private_env,
+            entry_lexical_this,
             host,
             registry,
         )

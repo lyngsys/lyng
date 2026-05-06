@@ -553,7 +553,17 @@ fn timeout_for_test(test: &PreparedTest, default: Duration) -> Duration {
     if is_generated_regexp_test(test) || is_exhaustive_regexp_legacy_test(&test.path) {
         return default.max(Duration::from_secs(30));
     }
+    if is_generated_string_mapping_test(&test.path) {
+        return default.max(Duration::from_secs(30));
+    }
     default
+}
+
+fn is_generated_string_mapping_test(path: &Path) -> bool {
+    matches!(
+        path.file_name().and_then(|name| name.to_str()),
+        Some("string-upper-lower-mapping.js")
+    )
 }
 
 fn is_generated_regexp_test(test: &PreparedTest) -> bool {
@@ -887,6 +897,21 @@ mod tests {
             ),
             category: "built-ins".to_string(),
             metadata: parse_metadata("/*---\nfeatures: [regexp-unicode-property-escapes]\n---*/"),
+            variant: crate::metadata::TestVariant::Default,
+        };
+
+        assert_eq!(
+            timeout_for_test(&test, Duration::from_secs(1)),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn generated_string_mapping_test_receives_extended_timeout() {
+        let test = PreparedTest {
+            path: PathBuf::from("test/staging/sm/String/string-upper-lower-mapping.js"),
+            category: "staging".to_string(),
+            metadata: parse_metadata("/*---\ndescription: |\n  pending\n---*/"),
             variant: crate::metadata::TestVariant::Default,
         };
 

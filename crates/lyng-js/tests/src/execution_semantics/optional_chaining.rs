@@ -64,6 +64,62 @@ fn optional_calls_support_builtin_and_spread_arguments() {
 }
 
 #[test]
+fn optional_chain_class_heritage_allows_runtime_null_superclass() {
+    let result = compile_and_run_string(
+        r#"
+            const holder = { base: null };
+            class Derived extends holder?.base {}
+            String(Object.getPrototypeOf(Derived.prototype) === null);
+        "#,
+    );
+
+    assert_eq!(result, "true");
+}
+
+#[test]
+fn optional_chain_delete_deletes_present_properties_and_skips_nullish_keys() {
+    let result = compile_and_run_string(
+        r#"
+            const object = { x: 1, y: 2 };
+            const missing = null;
+            let effects = 0;
+            let tailEffects = 0;
+
+            [
+                delete object?.x,
+                String(object.x),
+                delete object?.["y"],
+                String(object.y),
+                delete missing?.[effects++],
+                effects,
+                delete undefined?.x[tailEffects++],
+                tailEffects,
+            ].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "true:undefined:true:undefined:true:0:true:0");
+}
+
+#[test]
+fn optional_call_short_circuit_skips_following_call_continuations() {
+    let result = compile_and_run_string(
+        r#"
+            const missing = { a: { b: undefined } };
+            const returnsUndefined = { a: { b() { return undefined; } } };
+
+            [
+                String(missing.a.b?.()()()),
+                String(missing.a.b?.()?.()()),
+                String(returnsUndefined.a.b?.()?.()),
+            ].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "undefined:undefined:undefined");
+}
+
+#[test]
 fn delete_super_property_throws_reference_error() {
     let result = compile_and_run(
         r#"

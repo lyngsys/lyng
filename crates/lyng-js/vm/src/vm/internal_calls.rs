@@ -180,12 +180,10 @@ impl Vm {
                 Some(effective_new_target),
             );
         }
+        if !agent.objects().is_constructor(callee) {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
         if Self::bytecode_entry(agent, callee).is_none() {
-            if Self::builtin_entry(agent, callee).is_some()
-                && !agent.objects().is_constructor(callee)
-            {
-                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
-            }
             if let Some(result) = self.call_builtin(
                 agent,
                 host,

@@ -1,8 +1,20 @@
 use super::{Agent, AgentCollectionSnapshot};
 use crate::{ExecutableId, RuntimeJobPayload};
-use lyng_js_gc::{PrimitiveCollectionReport, WeakHeapRef};
+use lyng_js_gc::{PrimitiveCollectionReport, PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_js_host::HostJobKind;
 use lyng_js_types::{internal_finalization_registry_cleanup_job_builtin, ObjectRef, Value};
+
+struct AgentCollectionRoots<'a, T: TraceHeapEdges + ?Sized> {
+    snapshot: AgentCollectionSnapshot,
+    additional_roots: &'a T,
+}
+
+impl<T: TraceHeapEdges + ?Sized> TraceHeapEdges for AgentCollectionRoots<'_, T> {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.snapshot.trace_heap_edges(tracer);
+        self.additional_roots.trace_heap_edges(tracer);
+    }
+}
 
 impl Agent {
     pub fn keep_weak_target_alive(&mut self, target: WeakHeapRef) {
@@ -16,8 +28,18 @@ impl Agent {
     }
 
     pub fn force_collect(&mut self) -> PrimitiveCollectionReport {
-        let snapshot = AgentCollectionSnapshot::from_agent(self);
-        let report = self.heap.force_collect_tracing(&self.roots, &snapshot);
+        self.force_collect_with_additional_roots(&())
+    }
+
+    pub fn force_collect_with_additional_roots<T: TraceHeapEdges + ?Sized>(
+        &mut self,
+        additional_roots: &T,
+    ) -> PrimitiveCollectionReport {
+        let roots = AgentCollectionRoots {
+            snapshot: AgentCollectionSnapshot::from_agent(self),
+            additional_roots,
+        };
+        let report = self.heap.force_collect_tracing(&self.roots, &roots);
         self.enqueue_pending_finalization_cleanup_jobs();
         report
     }

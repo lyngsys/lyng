@@ -2079,6 +2079,32 @@ fn script_core_supports_date_conformance_edges() {
 }
 
 #[test]
+fn script_core_date_parse_accepts_space_separated_non_iso_forms() {
+    let result = compile_and_run_string(
+        r#"
+        function same(left, right) {
+            return Object.is(new Date(left).getTime(), new Date(right).getTime()) ? "1" : "0";
+        }
+
+        [
+            same("1997-03-08 1:1:1.01", "1997-03-08T01:01:01.01"),
+            same("1997-03-08 11:19:20", "1997-03-08T11:19:20"),
+            same("1997-3-08 11:19:20", "1997-03-08T11:19:20"),
+            same("1997-3-8 11:19:20", "1997-03-08T11:19:20"),
+            same("+001997-3-8 11:19:20", "1997-03-08T11:19:20"),
+            same("1997-03-08 1:1", "1997-03-08T01:01"),
+            same("1997-03-08 11", NaN),
+            same("1997-03-08 11:19:10-07", "1997-03-08 11:19:10-0700"),
+            same("1997-3-8T11:19:20", NaN),
+            same("1997-03-08T1:1:1", NaN)
+        ].join("");
+        "#,
+    );
+
+    assert_eq!(result, "1111111111");
+}
+
+#[test]
 fn script_core_supports_annex_b_date_legacy_methods() {
     let result = compile_and_run(
         r#"
@@ -3615,6 +3641,105 @@ fn script_core_typed_array_set_numeric_value_converts_and_handles_detach() {
 }
 
 #[test]
+fn script_core_typed_array_buffer_constructor_observes_new_target_prototype_first() {
+    let result = compile_and_run_string(
+        r#"
+        class ExpectedError extends Error {}
+        let poisonedOffset = {
+            valueOf() {
+                throw new Error("offset");
+            }
+        };
+        let NewTarget = Object.defineProperty(function(){}.bind(null), "prototype", {
+            get() {
+                throw new ExpectedError();
+            }
+        });
+
+        try {
+            Reflect.construct(Int32Array, [new ArrayBuffer(8), poisonedOffset, 0], NewTarget);
+            "no throw";
+        } catch (error) {
+            error instanceof ExpectedError ? "prototype" : error.message;
+        }
+        "#,
+    );
+
+    assert_eq!(result, "prototype");
+}
+
+#[test]
+fn script_core_typed_array_from_constructs_before_reading_array_like_elements() {
+    let result = compile_and_run_string(
+        r#"
+        let log = "";
+        let object;
+        function C(...args) {
+            log += "C";
+            object = new Uint8Array(...args);
+            return object;
+        }
+        let source = {
+            get length() {
+                log += "l";
+                return 1;
+            },
+            get 0() {
+                log += "0";
+                return 7;
+            }
+        };
+
+        try {
+            Uint8Array.from.call(C, source, value => {
+                log += "m";
+                throw "stop";
+            });
+        } catch (error) {}
+
+        log + ":" + (object instanceof Uint8Array);
+        "#,
+    );
+
+    assert_eq!(result, "lC0m:true");
+}
+
+#[test]
+fn script_core_typed_array_of_rejects_generator_constructors_catchably() {
+    let result = compile_and_run_string(
+        r#"
+        try {
+            Uint8Array.of.call(function*(length) { return length; }, "a");
+            "no throw";
+        } catch (error) {
+            String(error instanceof TypeError);
+        }
+        "#,
+    );
+
+    assert_eq!(result, "true");
+}
+
+#[test]
+fn script_core_typed_array_iterators_accept_own_properties() {
+    let result = compile_and_run(
+        r#"
+        let array = new Int8Array(3);
+        Object.defineProperty(array, "length", { value: 0 });
+        let iterator = array[Symbol.iterator]();
+        iterator.next = Array.prototype[Symbol.iterator]().next;
+        let count = 0;
+        while (!iterator.next().done) {
+            count += 1;
+        }
+        count;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
 fn script_core_typed_array_delete_detached_numeric_indices_returns_true() {
     let result = compile_and_run_string(
         r#"
@@ -4107,6 +4232,54 @@ fn script_core_typed_array_slice_rechecks_resizable_source_bounds() {
     );
 
     assert_eq!(result, "true|4|1,2,0,0");
+}
+
+#[test]
+fn script_core_typed_array_slice_preserves_same_kind_float_nan_payload_bits() {
+    let result = compile_and_run_string(
+        r#"
+        let f32 = new Float32Array(1);
+        let f32Bits = new Int32Array(f32.buffer);
+        f32Bits[0] = 0x7F800001 | 0;
+        let sliced32 = f32.slice(0);
+        let sliced32Bits = new Int32Array(sliced32.buffer)[0];
+
+        let littleEndian = new Uint8Array(new Uint16Array([1]).buffer)[0] !== 0;
+        let f64 = new Float64Array(1);
+        let f64Bits = new Int32Array(f64.buffer);
+        f64Bits[littleEndian ? 0 : 1] = 0x00000001 | 0;
+        f64Bits[littleEndian ? 1 : 0] = 0x7FF00000 | 0;
+        let sliced64Bits = new Int32Array(f64.slice(0).buffer);
+
+        [
+            sliced32Bits,
+            sliced64Bits[littleEndian ? 0 : 1],
+            sliced64Bits[littleEndian ? 1 : 0]
+        ].join(",");
+        "#,
+    );
+
+    assert_eq!(result, "2139095041,1,2146435072");
+}
+
+#[test]
+fn script_core_typed_array_to_locale_string_omits_element_arguments_without_intl() {
+    let result = compile_and_run_string(
+        r#"
+        let original = Number.prototype.toLocaleString;
+        let calls = [];
+        Number.prototype.toLocaleString = function() {
+            calls.push(arguments.length);
+            return "x";
+        };
+
+        let joined = new Uint8Array(2).toLocaleString({}, {});
+        Number.prototype.toLocaleString = original;
+        joined + "|" + calls.join(",");
+        "#,
+    );
+
+    assert_eq!(result, "x,x|0,0");
 }
 
 #[test]
@@ -7812,6 +7985,47 @@ fn script_core_block_function_named_arguments_shadows_arguments_object() {
 }
 
 #[test]
+fn script_core_annex_b_block_function_named_arguments_updates_function_binding() {
+    let result = compile_and_run_string(
+        r#"
+        (function() {
+            var before = typeof arguments;
+            {
+                function arguments() { return 'block'; }
+            }
+            return before + ':' + typeof arguments + ':' + arguments();
+        }());
+        "#,
+    );
+
+    assert_eq!(result, "object:function:block");
+}
+
+#[test]
+fn script_core_global_property_lookup_ignores_unscopables_outside_with() {
+    let result = compile_and_run_string(
+        r#"
+        this.x = "global property x";
+        let y = "global lexical y";
+        this[Symbol.unscopables] = { x: true, y: true };
+
+        let before = x + ":" + y + ":" + eval("x") + ":" + eval("y");
+        {
+            let x = "local x";
+            with (this) {
+                before + ":" + x;
+            }
+        }
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "global property x:global lexical y:global property x:global lexical y:local x"
+    );
+}
+
+#[test]
 fn script_core_skips_annex_b_block_function_var_binding_for_destructured_catch_conflicts() {
     let result = compile_and_run_string(
         r#"
@@ -8157,6 +8371,74 @@ fn script_core_array_from_closes_iterators_when_mapper_throws() {
     );
 
     assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn script_core_array_from_does_not_close_when_iterator_value_throws() {
+    let result = compile_and_run(
+        r#"
+        let closed = 0;
+        let threw = 0;
+        let items = {
+            [Symbol.iterator]() {
+                return {
+                    next() {
+                        return {
+                            get value() {
+                                throw "value";
+                            },
+                            done: false
+                        };
+                    },
+                    return() {
+                        closed += 1;
+                        return {};
+                    }
+                };
+            }
+        };
+
+        try {
+            Array.from(items);
+        } catch (error) {
+            threw = error === "value" ? 1 : 0;
+        }
+
+        threw + closed * 2;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn script_core_array_from_array_like_constructs_before_reading_elements() {
+    let result = compile_and_run_string(
+        r#"
+        let log = "";
+        let constructed;
+        function C(length) {
+            log += "C" + length;
+            constructed = this;
+        }
+        let source = {
+            get length() { log += "l"; return 1; },
+            get 0() { log += "0"; return "value"; }
+        };
+        let thrown = { marker: true };
+
+        try {
+            Array.from.call(C, source, () => { throw thrown; });
+            log += "no-throw";
+        } catch (error) {
+            log += error === thrown ? "!" : "?";
+        }
+
+        log + ":" + String(constructed instanceof C);
+        "#,
+    );
+
+    assert_eq!(result, "lC10!:true");
 }
 
 #[test]

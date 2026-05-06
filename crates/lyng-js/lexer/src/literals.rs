@@ -78,7 +78,7 @@ pub struct RegExpLiteral {
 pub struct TemplateChunk {
     /// The cooked value (with escape sequences processed), or `None` if
     /// the chunk contains an invalid escape (tagged template).
-    pub cooked: Option<String>,
+    pub cooked: Option<StringLiteral>,
     /// The raw source text between the delimiters.
     pub raw: String,
 }
@@ -130,9 +130,12 @@ impl LiteralTable {
         LiteralId::new(TAG_REGEXP | idx)
     }
 
-    pub fn push_template(&mut self, cooked: Option<String>, raw: String) -> LiteralId {
+    pub fn push_template(&mut self, cooked: Option<Vec<u16>>, raw: String) -> LiteralId {
         let idx = self.templates.len() as u32;
-        self.templates.push(TemplateChunk { cooked, raw });
+        self.templates.push(TemplateChunk {
+            cooked: cooked.map(StringLiteral::from_utf16),
+            raw,
+        });
         LiteralId::new(TAG_TEMPLATE | idx)
     }
 

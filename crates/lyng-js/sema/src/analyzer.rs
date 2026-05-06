@@ -242,6 +242,20 @@ impl<'a> Analyzer<'a> {
                 "class field initializer cannot contain 'arguments'",
             );
         }
+        if options.forbid_direct_super_call()
+            && this.stmt_list_contains_query(script.body, ContainmentQuery::DirectSuperCall)
+        {
+            this.diagnostics
+                .error(script.span, "direct eval cannot contain super() here");
+        }
+        if options.forbid_super_call_in_class_initializer()
+            && this.stmt_list_contains_query(script.body, ContainmentQuery::DirectSuperCall)
+        {
+            this.diagnostics.error(
+                script.span,
+                "class field initializer cannot contain direct super()",
+            );
+        }
         this.apply_directive_prologue(script.body);
         this.walk_stmt_list(script.body);
         this.check_global_code_contains(script.body);

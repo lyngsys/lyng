@@ -114,6 +114,23 @@ fn parse_class_declaration() {
 }
 
 #[test]
+fn parse_string_literal_constructor_as_class_constructor() {
+    let p = script_ok(r#"class Foo { "constructor"() {} }"#);
+    let stmts = body(&p);
+    let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) else {
+        panic!("expected declaration statement");
+    };
+    let Decl::Class { body, .. } = p.ast.get_decl(*decl) else {
+        panic!("expected class declaration");
+    };
+    let elements = p.ast.get_class_element_list(*body);
+    let ClassElement::Method { kind, .. } = p.ast.get_class_element(elements[0]) else {
+        panic!("expected method element");
+    };
+    assert_eq!(*kind, MethodKind::Constructor);
+}
+
+#[test]
 fn parse_decorator_syntax_on_classes_and_elements() {
     let p = script_ok(
         r#"
@@ -200,6 +217,17 @@ fn parse_class_field() {
             ));
         }
     }
+}
+
+#[test]
+fn class_field_initializer_does_not_inherit_async_await_context() {
+    script_ok("var await = 1; async function f() { return class { x = await; }; }");
+
+    let bad = script("async () => class { x = await 1 };");
+    assert!(
+        bad.diagnostics.has_errors(),
+        "expected await expression in class field initializer to be rejected"
+    );
 }
 
 #[test]

@@ -333,6 +333,26 @@ fn parse_for_await_of_with_async_identifier_lhs() {
 }
 
 #[test]
+fn parse_for_await_rejects_non_for_of_heads() {
+    for source in [
+        "async function* f() { for await (;;) ; }",
+        "async function* f() { for await (a ;;) ; }",
+        "async function* f() { for await (a in null) ; }",
+        "async function* f() { for await (var a ;;) ; }",
+        "async function* f() { for await (var a in null) ; }",
+    ] {
+        let p = script(source);
+        assert!(p.diagnostics.has_errors(), "{source}");
+    }
+}
+
+#[test]
+fn parse_for_await_of_requires_await_context() {
+    let p = script("for await (let x of []) {}");
+    assert!(p.diagnostics.has_errors());
+}
+
+#[test]
 fn parse_for_of_rejects_unescaped_async_identifier_lhs() {
     let p = script("var async; for (async of [1]) ;");
     assert!(p.diagnostics.has_errors());

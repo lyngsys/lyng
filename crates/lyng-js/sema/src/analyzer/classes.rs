@@ -162,8 +162,17 @@ impl<'a> Analyzer<'a> {
                     private,
                     span,
                     r#static,
+                    auto_accessor_private_name,
                     ..
                 } => {
+                    if let Some(backing_name) = auto_accessor_private_name {
+                        private_layout_entries.push(ClassPrivateElementRecord::new(
+                            *backing_name,
+                            *r#static,
+                            ClassPrivateElementKind::Field,
+                            *span,
+                        ));
+                    }
                     if !computed && *private {
                         if let Expr::Identifier { name, .. } = self.ast.get_expr(*key) {
                             private_layout_entries.push(ClassPrivateElementRecord::new(
@@ -239,6 +248,12 @@ impl<'a> Analyzer<'a> {
                     if *kind == MethodKind::Get && (param_len != 0 || func.params.rest.is_some()) {
                         self.diagnostics
                             .error(*span, "getter methods must not declare parameters");
+                    }
+                    if *kind == MethodKind::Set && (param_len != 1 || func.params.rest.is_some()) {
+                        self.diagnostics.error(
+                            *span,
+                            "setter methods must declare exactly one non-rest parameter",
+                        );
                     }
                     let is_constructor = !*private
                         && !*computed

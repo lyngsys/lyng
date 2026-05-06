@@ -29,6 +29,71 @@ fn phase6_classes_execute_base_constructors_methods_and_instance_fields() {
 }
 
 #[test]
+fn phase6_unused_named_class_self_binding_does_not_reinitialize_in_loops() {
+    let result = compile_and_run_string(
+        r#"
+        let count = 0;
+        for (let i = 0; i < 3; i++) {
+            class C {}
+            (class D {});
+            count++;
+        }
+        String(count);
+        "#,
+    );
+
+    assert_eq!(result, "3");
+}
+
+#[test]
+fn phase6_named_class_inner_bindings_are_immutable_and_tdz_for_computed_keys() {
+    let result = compile_and_run_string(
+        r#"
+        function thrownName(fn) {
+            try {
+                fn();
+                return "none";
+            } catch (error) {
+                return error.constructor.name;
+            }
+        }
+
+        class Declared {
+            tryBreak() { Declared = 4; }
+        }
+        let Expr = class Inner {
+            tryBreak() { Inner = 4; }
+        };
+
+        let assignment =
+            thrownName(() => new Declared().tryBreak()) + ":" +
+            thrownName(() => new Expr().tryBreak());
+        let tdz =
+            thrownName(() => eval("class Bar { [Bar]() {} }")) + ":" +
+            thrownName(() => eval("(class Baz { [Baz]() {} })"));
+
+        class Outer {
+            test(Outer) { return Outer; }
+        }
+        class Separate {
+            method() { return Separate; }
+        }
+        const original = Separate;
+        Separate = 13;
+
+        assignment + "|" + tdz + "|" +
+            String(new Outer().test(4)) + ":" +
+            String(new original().method() === original);
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "TypeError:TypeError|ReferenceError:ReferenceError|4:true"
+    );
+}
+
+#[test]
 fn phase6_classes_instance_fields_capture_outer_bindings() {
     let result = compile_and_run(
         r#"
@@ -47,6 +112,38 @@ fn phase6_classes_instance_fields_capture_outer_bindings() {
 }
 
 #[test]
+fn phase6_public_auto_accessors_install_backed_accessor_descriptors() {
+    let result = compile_and_run(
+        r#"
+        var key = "computed";
+        class C {
+            accessor x = 1;
+            accessor [key] = 2;
+            static accessor sx = 3;
+        }
+
+        var c = new C();
+        var x = Object.getOwnPropertyDescriptor(C.prototype, "x");
+        var computed = Object.getOwnPropertyDescriptor(C.prototype, key);
+        var sx = Object.getOwnPropertyDescriptor(C, "sx");
+
+        x.set.call(c, 10);
+        computed.set.call(c, 20);
+        sx.set.call(C, 30);
+
+        (x.get.call(c) === 10 ? 1 : 0)
+            + (computed.get.call(c) === 20 ? 2 : 0)
+            + (sx.get.call(C) === 30 ? 4 : 0)
+            + (c.x === 10 ? 8 : 0)
+            + (c[key] === 20 ? 16 : 0)
+            + (C.sx === 30 ? 32 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
 fn phase6_classes_reject_calling_class_constructors_without_new() {
     let result = compile_and_run(
         r#"
@@ -62,6 +159,29 @@ fn phase6_classes_reject_calling_class_constructors_without_new() {
     );
 
     assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn phase6_string_literal_constructor_method_defines_class_constructor() {
+    let result = compile_and_run_string(
+        r#"
+        class Base {
+            "constructor"() {
+                return {};
+            }
+        }
+
+        class Derived extends class {} {
+            "constructor"() {
+                return {};
+            }
+        }
+
+        String(new Base() instanceof Base) + ":" + String(new Derived() instanceof Derived);
+        "#,
+    );
+
+    assert_eq!(result, "false:false");
 }
 
 #[test]
@@ -101,6 +221,103 @@ fn phase6_classes_execute_static_fields_blocks_and_self_bindings() {
     );
 
     assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn phase6_class_field_initializers_capture_inner_class_name_binding() {
+    let result = compile_and_run(
+        r#"
+        class InstanceDecl {
+            field = () => InstanceDecl;
+        }
+        const InstanceAlias = InstanceDecl;
+        InstanceDecl = null;
+
+        let InstanceExpr = class InnerInstance {
+            field = () => InnerInstance;
+        };
+        const InstanceExprAlias = InstanceExpr;
+        InstanceExpr = null;
+
+        class StaticDecl {
+            static field = () => StaticDecl;
+        }
+        const StaticAlias = StaticDecl;
+        StaticDecl = null;
+
+        let StaticExpr = class InnerStatic {
+            static field = () => InnerStatic;
+        };
+        const StaticExprAlias = StaticExpr;
+        StaticExpr = null;
+
+        (new InstanceAlias().field() === InstanceAlias ? 1 : 0)
+            + (new InstanceExprAlias().field() === InstanceExprAlias ? 2 : 0)
+            + (StaticAlias.field() === StaticAlias ? 4 : 0)
+            + (StaticExprAlias.field() === StaticExprAlias ? 8 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn phase6_class_field_direct_eval_resolves_inner_class_name_binding() {
+    let result = compile_and_run(
+        r#"
+        class InstanceDecl {
+            field = eval("InstanceDecl");
+            arrow = () => eval("InstanceDecl");
+        }
+        const InstanceAlias = InstanceDecl;
+        InstanceDecl = null;
+        const instance = new InstanceAlias();
+
+        let InstanceExpr = class InnerInstance {
+            field = eval("InnerInstance");
+            arrow = () => eval("InnerInstance");
+        };
+        const InstanceExprAlias = InstanceExpr;
+        InstanceExpr = null;
+        const instanceExpr = new InstanceExprAlias();
+
+        class StaticDecl {
+            static field = eval("StaticDecl");
+            static arrow = () => eval("StaticDecl");
+        }
+        const StaticAlias = StaticDecl;
+        StaticDecl = null;
+
+        let StaticExpr = class InnerStatic {
+            static field = eval("InnerStatic");
+            static arrow = () => eval("InnerStatic");
+        };
+        const StaticExprAlias = StaticExpr;
+        StaticExpr = null;
+
+        let anonymousStaticResult = "none";
+        try {
+            let C = class {
+                static field = eval("C");
+            };
+            anonymousStaticResult = "no error";
+        } catch (error) {
+            anonymousStaticResult = error.name;
+        }
+
+        (instance.field === InstanceAlias ? 1 : 0)
+            + (instance.arrow() === InstanceAlias ? 2 : 0)
+            + (instanceExpr.field === InstanceExprAlias ? 4 : 0)
+            + (instanceExpr.arrow() === InstanceExprAlias ? 8 : 0)
+            + (StaticAlias.field === StaticAlias ? 16 : 0)
+            + (StaticAlias.arrow() === StaticAlias ? 32 : 0)
+            + (StaticExprAlias.field === StaticExprAlias ? 64 : 0)
+            + (StaticExprAlias.arrow() === StaticExprAlias ? 128 : 0)
+            + (anonymousStaticResult === "ReferenceError" ? 256 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(511));
 }
 
 #[test]
@@ -501,6 +718,25 @@ fn phase6_computed_class_element_keys_apply_to_property_key() {
 }
 
 #[test]
+fn phase6_class_computed_names_use_strict_assignment_semantics() {
+    let result = compile_and_run(
+        r#"
+        var threw = false;
+        try {
+            class C {
+                [Object.preventExtensions({}).x = 1]() {}
+            }
+        } catch (error) {
+            threw = error instanceof TypeError;
+        }
+        threw;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn phase6_computed_class_function_expression_keys_use_trimmed_source_text() {
     let result = compile_and_run(
         r#"
@@ -570,6 +806,24 @@ fn phase6_classes_execute_private_instance_fields_and_brand_checks() {
     );
 
     assert_eq!(result, Value::from_smi(5));
+}
+
+#[test]
+fn phase6_base_class_private_fields_initialize_before_constructor_defaults() {
+    let result = compile_and_run(
+        r#"
+        class A {
+            #x = 41;
+            constructor(value = this.#x) {
+                this.value = value;
+            }
+        }
+
+        new A().value;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(41));
 }
 
 #[test]
@@ -945,6 +1199,34 @@ fn phase6_computed_class_field_anonymous_function_names_follow_property_keys() {
     );
 
     assert_eq!(result, "field|5|staticField|6");
+}
+
+#[test]
+fn phase6_numeric_class_field_anonymous_class_names_follow_property_keys() {
+    let result = compile_and_run_string(
+        r#"
+        class C {
+            128 = class { static observed = this.name; };
+            129n = class { static observed = this.name; };
+            static 130 = class { static observed = this.name; };
+            static 131n = class { static observed = this.name; };
+        }
+
+        let instance = new C();
+        [
+            instance[128].name,
+            instance[128].observed,
+            instance[129].name,
+            instance[129].observed,
+            C[130].name,
+            C[130].observed,
+            C[131].name,
+            C[131].observed
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "128|128|129|129|130|130|131|131");
 }
 
 #[test]
@@ -1510,6 +1792,40 @@ fn phase6_super_computed_property_resolves_base_before_to_property_key() {
 }
 
 #[test]
+fn phase6_super_property_targets_work_in_for_in_and_for_of_heads() {
+    let result = compile_and_run_string(
+        r#"
+        let log = [];
+
+        class ForInCase {
+            constructor() {
+                let hits = 0;
+                for (super.prop in { first: 1, second: 2 }) {
+                    hits++;
+                }
+                log.push(this.prop + ":" + hits);
+            }
+        }
+
+        ({
+            method() {
+                let hits = 0;
+                for (super["prop"] of [1, 2]) {
+                    hits++;
+                }
+                log.push(this.prop + ":" + hits);
+            }
+        }).method();
+
+        new ForInCase();
+        log.join("|");
+        "#,
+    );
+
+    assert_eq!(result, "2:2|second:2");
+}
+
+#[test]
 fn phase6_super_computed_compound_assignment_reuses_base_before_to_property_key() {
     let result = compile_and_run_string(
         r#"
@@ -1751,6 +2067,47 @@ fn phase6_derived_constructors_reject_primitive_return_before_super() {
     );
 
     assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn phase6_derived_super_call_selects_constructor_before_evaluating_arguments() {
+    let result = compile_and_run_string(
+        r#"
+        function Base() {}
+        function MyError() {}
+        let log = [];
+
+        class BeforeSwizzle extends Base {
+            constructor() {
+                super(log.push("arg") && Object.setPrototypeOf(BeforeSwizzle, null));
+                log.push("constructed");
+            }
+        }
+
+        new BeforeSwizzle();
+
+        class BeforeThrow extends Base {
+            constructor() {
+                function thrower() {
+                    throw new MyError();
+                }
+                super(thrower());
+            }
+        }
+
+        Object.setPrototypeOf(BeforeThrow, Math.sin);
+        try {
+            new BeforeThrow();
+            log.push("no throw");
+        } catch (error) {
+            log.push(error instanceof MyError ? "my-error" : error.constructor.name);
+        }
+
+        log.join("|");
+        "#,
+    );
+
+    assert_eq!(result, "arg|constructed|my-error");
 }
 
 #[test]

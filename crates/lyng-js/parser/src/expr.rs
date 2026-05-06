@@ -8,6 +8,7 @@ use lyng_js_ast::{
     AssignOp, Expr, ExprId, FunctionKind, ImportExpressionPhase, LogicalOp, TemplateQuasi,
 };
 use lyng_js_common::{AtomId, Span, WellKnownAtom};
+use lyng_js_lexer::StringLiteral as LexerStringLiteral;
 use lyng_js_lexer::{LexerMode, TokenKind, TokenPayload};
 
 use self::operators::{token_can_start_expression, token_to_assign_op};
@@ -205,7 +206,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 self.ast_mut().alloc_expr(Expr::Identifier { span, name })
             }
 
-            TokenKind::Await if !self.allow_await => {
+            TokenKind::Await if !self.allow_await && !self.is_module() => {
                 // await used as identifier
                 let span = self.current_span();
                 let name = self.current_atom().unwrap_or(WellKnownAtom::r#await.id());
@@ -334,10 +335,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             TokenPayload::Literal(lit_id) => {
                 let chunk = self.lexer.literals.get_template(lit_id);
                 let raw = self.ast.literals_mut().alloc_string(&chunk.raw);
-                let cooked = chunk
-                    .cooked
-                    .as_deref()
-                    .map(|s| self.ast.literals_mut().alloc_string(s));
+                let cooked = chunk.cooked.as_ref().map(|value| match value {
+                    LexerStringLiteral::Utf8(text) => self.ast.literals_mut().alloc_string(text),
+                    LexerStringLiteral::Utf16(units) => {
+                        self.ast.literals_mut().alloc_utf16_string(units)
+                    }
+                });
 
                 TemplateQuasi { cooked, raw }
             }

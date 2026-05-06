@@ -252,10 +252,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             let Some(binding_owner) = self.scope_owner(binding.scope) else {
                 return Ok(false);
             };
-            return Ok(
-                self.state.nearest_non_arrow_owner(binding_owner) == Some(owner)
-                    && self.state.activation(owner).has_parameter_expressions,
-            );
+            return Ok(self.state.nearest_non_arrow_owner(binding_owner) == Some(owner));
         }
         let Some(binding_owner) = self.scope_owner(binding.scope) else {
             return Ok(false);
@@ -268,6 +265,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         use_site: &lyng_js_sema::UseSiteRecord,
     ) -> LoweringResult<Option<(u8, u32)>> {
         if use_site.name != WellKnownAtom::arguments.id() {
+            return Ok(None);
+        }
+        if use_site.resolution_kind == ResolutionKind::Dynamic {
             return Ok(None);
         }
         let Some(current) = self.current_function else {
@@ -324,7 +324,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<u8> {
         let binding_scope = self.binding(binding)?.scope;
         let binding_owner = self.scope_owner(binding_scope);
-        match (self.current_function, binding_owner) {
+        let depth = match (self.current_function, binding_owner) {
             (None, None) => Ok(0),
             (Some(current), Some(owner)) if current == owner => Ok(0),
             (Some(current), Some(owner)) => self
@@ -344,7 +344,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 binding,
                 function: self.current_function,
             }),
-        }
+        }?;
+        self.add_class_field_arrow_context_depth(depth, binding_owner)
     }
 
     pub(super) fn capture_source_depth(&self, binding_scope: ScopeId) -> LoweringResult<u8> {
@@ -352,20 +353,40 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             return Ok(0);
         };
         let Some(owner) = self.scope_owner(binding_scope) else {
-            return self.state.environment_depth_to_root(current).map_err(|_| {
+            let depth = self.state.environment_depth_to_root(current).map_err(|_| {
                 LoweringError::UnsupportedFunction {
                     function: self
                         .current_function_ast
                         .expect("capture depth only queried for functions"),
                 }
-            });
+            })?;
+            return self.add_class_field_arrow_context_depth(depth, None);
         };
-        self.state
+        let depth = self
+            .state
             .environment_depth_to_function(current, owner)
             .map_err(|_| LoweringError::UnsupportedFunction {
                 function: self
                     .current_function_ast
                     .expect("capture depth only queried for functions"),
+            })?;
+        self.add_class_field_arrow_context_depth(depth, Some(owner))
+    }
+
+    fn add_class_field_arrow_context_depth(
+        &self,
+        depth: u8,
+        owner: Option<FunctionSemaId>,
+    ) -> LoweringResult<u8> {
+        let Some(current) = self.current_function else {
+            return Ok(depth);
+        };
+        let extra = self.state.class_field_arrow_context_depth(current, owner)?;
+        depth
+            .checked_add(extra)
+            .ok_or(LoweringError::InvalidCapturedBindingDepth {
+                binding: SemanticBindingId::new(0),
+                function: self.current_function,
             })
     }
 }

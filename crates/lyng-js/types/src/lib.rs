@@ -176,7 +176,7 @@ mod tests {
         assert!(!is_core_builtin(phase6));
         assert!(is_completion_builtin(phase6));
         assert_eq!(INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
-        assert_eq!(INTERNAL_BUILTIN_NAMESPACE_END, 1_040);
+        assert_eq!(INTERNAL_BUILTIN_NAMESPACE_END, 1_041);
         assert_eq!(CORE_BUILTIN_NAMESPACE_START, 2_001);
         assert_eq!(CORE_BUILTIN_NAMESPACE_END, 2_321);
         assert_eq!(COMPLETION_BUILTIN_NAMESPACE_START, 3_101);

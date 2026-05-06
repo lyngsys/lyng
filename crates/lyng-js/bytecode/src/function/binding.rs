@@ -8,6 +8,7 @@ pub struct BytecodeEnvironmentSlotFlags {
     lexical: bool,
     needs_tdz: bool,
     dynamic: bool,
+    scoped: bool,
     sloppy_immutable_assign_silent: bool,
 }
 
@@ -20,6 +21,7 @@ impl BytecodeEnvironmentSlotFlags {
             lexical,
             needs_tdz,
             dynamic,
+            scoped: false,
             sloppy_immutable_assign_silent: false,
         }
     }
@@ -47,6 +49,17 @@ impl BytecodeEnvironmentSlotFlags {
     #[inline]
     pub const fn is_dynamic(self) -> bool {
         self.dynamic
+    }
+
+    #[inline]
+    pub const fn is_scoped(self) -> bool {
+        self.scoped
+    }
+
+    #[inline]
+    pub const fn with_scoped(mut self, scoped: bool) -> Self {
+        self.scoped = scoped;
+        self
     }
 
     #[inline]

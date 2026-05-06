@@ -1,10 +1,9 @@
 use super::super::{
     array_like_index_property_key, array_like_length, array_like_length_u64,
-    array_species_create_for_length, create_data_property_or_throw, define_array_length,
-    get_property_from_object, has_property_on_object, is_array_for_species, length_value,
-    length_value_u64, map_completion, normalize_relative_index_u64, to_boolean_for_builtin,
-    to_integer_or_infinity_for_builtin, type_error, PublicBuiltinDispatchContext,
-    MAX_SAFE_INTEGER_U64,
+    array_species_create_for_length, create_data_property_or_throw, get_property_from_object,
+    has_property_on_object, is_array_for_species, length_value, length_value_u64, map_completion,
+    normalize_relative_index_u64, to_boolean_for_builtin, to_integer_or_infinity_for_builtin,
+    type_error, PublicBuiltinDispatchContext, MAX_SAFE_INTEGER_U64,
 };
 use crate::BuiltinInvocation;
 use lyng_js_ops::read;
@@ -566,7 +565,6 @@ fn array_filter_builtin<Cx: PublicBuiltinDispatchContext>(
             to = to.saturating_add(1);
         }
     }
-    define_array_length(cx, result, to)?;
     Ok(Value::from_object_ref(result))
 }
 

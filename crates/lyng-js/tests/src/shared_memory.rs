@@ -98,6 +98,69 @@ fn run_spec_script_with_readback(source: &str, readback: &str) -> Value {
     value
 }
 
+fn run_spec_script_with_forced_collection_and_readback(source: &str, readback: &str) -> Value {
+    let mut atoms = AtomTable::new();
+    let unit = compile_unit(source, &mut atoms);
+    let readback = compile_unit(readback, &mut atoms);
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let host = NoopHostHooks;
+    let mut registry = RejectingRegistry;
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let _ = vm
+        .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
+        .expect("spec bootstrap should succeed");
+    let _ = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .expect("script should execute before collection");
+    vm.checkpoint_promise_jobs(agent, &host, &mut registry)
+        .expect("promise jobs should drain before collection");
+    let _ = agent.force_collect();
+    let value = vm
+        .evaluate_script_with_registry_and_host(agent, realm, &readback, &host, &mut registry)
+        .expect("readback script should execute after collection");
+    vm.checkpoint_promise_jobs(agent, &host, &mut registry)
+        .expect("promise jobs should drain after collection readback");
+    value
+}
+
+#[test]
+fn phase6_forced_collection_keeps_typed_array_construction_surface_live() {
+    let result = run_spec_script_with_forced_collection_and_readback(
+        r#"
+        let buffer = new ArrayBuffer(4);
+        let view = new DataView(buffer);
+        view = 1;
+        "#,
+        r#"
+        let dv = new DataView(new ArrayBuffer(20 * 1024 * 1024));
+        dv.setInt8(dv.byteLength - 10, 99);
+        if (dv.getInt8(dv.byteLength - 10) !== 99) {
+            throw new Error("large DataView readback mismatch");
+        }
+        dv = new DataView(new ArrayBuffer(4));
+        if (DataView.prototype.getFloat16) {
+            dv.setInt16(0, 18688);
+            if (dv.getFloat16(0) !== 10) {
+                throw new Error("DataView getFloat16 readback mismatch");
+            }
+            dv.setFloat16(1, 10);
+            if (dv.getFloat16(1) !== 10) {
+                throw new Error("DataView setFloat16 readback mismatch");
+            }
+            if (dv.getInt16(1) !== 18688) {
+                throw new Error("DataView setFloat16 bits mismatch");
+            }
+        }
+        let bytes = new Uint8Array([1, 2]);
+        bytes[0] + bytes[1];
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
 #[test]
 fn phase6_shared_array_buffer_bootstraps_slices_and_builds_shared_views() {
     let result = run_spec_script(

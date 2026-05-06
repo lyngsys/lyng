@@ -187,11 +187,12 @@ pub(crate) fn variants_for_metadata(metadata: &TestMetadata) -> Vec<TestVariant>
     if is_module_test(metadata) {
         return vec![TestVariant::Default];
     }
-    if metadata
-        .includes
-        .iter()
-        .any(|include| include == "sm/non262-strict-shell.js")
-    {
+    if metadata.includes.iter().any(|include| {
+        matches!(
+            include.as_str(),
+            "sm/non262-strict-shell.js" | "sm/non262-expressions-shell.js"
+        )
+    }) {
         return vec![TestVariant::NonStrict];
     }
     if metadata.flags.iter().any(|flag| flag == "onlyStrict") {
@@ -242,6 +243,22 @@ mod tests {
             r"
             /*---
             includes: [sm/non262-strict-shell.js]
+            ---*/
+            ",
+        );
+
+        assert_eq!(
+            variants_for_metadata(&metadata),
+            vec![TestVariant::NonStrict]
+        );
+    }
+
+    #[test]
+    fn spidermonkey_expression_shell_tests_are_non_strict_only() {
+        let metadata = parse_metadata(
+            r"
+            /*---
+            includes: [sm/non262-expressions-shell.js]
             ---*/
             ",
         );

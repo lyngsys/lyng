@@ -285,6 +285,312 @@ fn array_constructor_uses_new_target_realm_default_prototype() {
 }
 
 #[test]
+fn embedding_cross_realm_data_view_methods_accept_foreign_views_and_buffers() {
+    let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
+    let result = compile_and_run_string(
+        r#"
+        let failures = "";
+        function record(label, condition) {
+            if (!condition) failures += label + ";";
+        }
+        function recordThrows(label, expectedConstructor, callback) {
+            try {
+                callback();
+                failures += label + ":missing;";
+            } catch (error) {
+                if (!(error instanceof expectedConstructor)) {
+                    failures += label + ":" + error.constructor.name + ";";
+                }
+            }
+        }
+
+        let childGlobal = embedding.createRealm();
+        for (let constructorName of ["ArrayBuffer", "SharedArrayBuffer"]) {
+        childGlobal.eval(`
+            var data = [0, 1, 2, 3, 100, 101, 102, 103, 128, 129, 130, 131, 252, 253, 254, 255];
+            var buffer = new ${constructorName}(data.length);
+            new Uint8Array(buffer).set(data);
+            var view = new DataView(buffer, 0, 16);
+        `);
+
+        record(constructorName + ":foreign-view-buffer", childGlobal.view.buffer.byteLength > 0);
+        record(constructorName + ":foreign-view-method", childGlobal.view.getUint8(4) === 100);
+
+        let inheritedForeignView = Object.create(childGlobal.view);
+        recordThrows(constructorName + ":foreign-inherited-method", childGlobal.TypeError, () => {
+            inheritedForeignView.getUint8(4);
+        });
+        recordThrows(constructorName + ":foreign-inherited-buffer", childGlobal.TypeError, () => {
+            inheritedForeignView.buffer;
+        });
+
+        let localViewOnForeignBuffer = new DataView(childGlobal.buffer);
+        record(constructorName + ":local-view-foreign-buffer", localViewOnForeignBuffer.getUint8(4) === 100);
+        record(constructorName + ":local-view-prototype", Object.getPrototypeOf(localViewOnForeignBuffer) === DataView.prototype);
+
+        let localBuffer = new Int8Array(3).buffer;
+        let foreignViewOnLocalBuffer = new childGlobal.DataView(localBuffer);
+        record(constructorName + ":foreign-constructor-local-buffer", foreignViewOnLocalBuffer.byteLength === 3);
+        record(constructorName + ":foreign-constructor-prototype", Object.getPrototypeOf(foreignViewOnLocalBuffer) === childGlobal.DataView.prototype);
+        }
+
+        failures || "ok";
+        "#,
+        Some(&provider),
+    );
+
+    assert_eq!(result, "ok");
+}
+
+#[test]
+fn array_species_create_handles_cross_realm_constructors() {
+    let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
+    let result = compile_and_run_string(
+        r#"
+        let failures = "";
+        function record(label, condition) {
+            if (!condition) failures += label + ";";
+        }
+        function recordThrows(label, expectedConstructor, callback) {
+            try {
+                callback();
+                failures += label + ":missing;";
+            } catch (error) {
+                if (!(error instanceof expectedConstructor)) {
+                    failures += label + ":" + error.constructor.name + ";";
+                }
+            }
+        }
+
+        let expected = {
+            concat: "get:concat,get:constructor,c-get:Symbol(Symbol.species),get:Symbol(Symbol.isConcatSpreadable),get:length,get:0,define:0:1:true:true:true,get:1,define:1:2:true:true:true,get:2,define:2:3:true:true:true,get:3,define:3:4:true:true:true,get:4,define:4:5:true:true:true,set:length:5,",
+            filter: "get:filter,get:length,get:constructor,c-get:Symbol(Symbol.species),get:0,define:0:1:true:true:true,get:1,get:2,define:1:3:true:true:true,get:3,get:4,define:2:5:true:true:true,",
+            map: "get:map,get:length,get:constructor,c-get:Symbol(Symbol.species),get:0,define:0:2:true:true:true,get:1,define:1:4:true:true:true,get:2,define:2:6:true:true:true,get:3,define:3:8:true:true:true,get:4,define:4:10:true:true:true,",
+            slice: "get:slice,get:length,get:constructor,c-get:Symbol(Symbol.species),get:0,define:0:1:true:true:true,get:1,define:1:2:true:true:true,get:2,define:2:3:true:true:true,get:3,define:3:4:true:true:true,get:4,define:4:5:true:true:true,set:length:5,",
+            splice: "get:splice,get:length,get:constructor,c-get:Symbol(Symbol.species),get:0,define:0:1:true:true:true,get:1,define:1:2:true:true:true,get:2,define:2:3:true:true:true,get:3,define:3:4:true:true:true,get:4,define:4:5:true:true:true,set:length:5,",
+        };
+        let expectedLength = {
+            concat: 0,
+            filter: 0,
+            map: 5,
+            slice: 5,
+            splice: 5,
+        };
+
+        let childGlobal = embedding.createRealm();
+        childGlobal.eval("function EvalFakeArray(n) { this.length = n; }");
+        record("foreign-direct-eval-function-global", typeof childGlobal.EvalFakeArray === "function");
+        childGlobal.embedding.evalScript(`
+            function FakeArray(n) { this.length = n; }
+            function FakeArrayWithSpecies(n) { this.length = n; }
+            FakeArrayWithSpecies[Symbol.species] = FakeArrayWithSpecies;
+            var a = [1, 2, 3, 4, 5];
+        `);
+
+        for (let name of ["concat", "filter", "map", "slice", "splice"]) {
+            let args =
+                name === "filter" ? [x => x % 2] :
+                name === "map" ? [x => x * 2] :
+                name === "splice" ? [0, 5] :
+                [];
+
+            let a = [1, 2, 3, 4, 5];
+            a.constructor = { [Symbol.species]: childGlobal.FakeArray };
+            let b = a[name](...args);
+            record(name + ":foreign-species-function", b.constructor === childGlobal.FakeArray);
+
+            a = [1, 2, 3, 4, 5];
+            a.constructor = { [Symbol.species]: childGlobal.Array };
+            b = a[name](...args);
+            record(name + ":foreign-array-species", b.constructor === childGlobal.Array);
+
+            a = [1, 2, 3, 4, 5];
+            a.constructor = childGlobal.FakeArrayWithSpecies;
+            b = a[name](...args);
+            record(name + ":foreign-constructor-species", b.constructor === childGlobal.FakeArrayWithSpecies);
+
+            b = Array.prototype[name].apply(childGlobal.a, args);
+            record(name + ":current-method-foreign-default-array", b.constructor === Array);
+
+            b = childGlobal.a[name](...args);
+            record(name + ":foreign-method-foreign-default-array", b.constructor === childGlobal.Array);
+
+            function FakeArray(n) { this.length = n; }
+            function FakeArrayWithHook(n) {
+                return new Proxy(new FakeArray(n), {
+                    set(that, property, value) {
+                        logs += "set:" + property + ":" + value + ",";
+                        return true;
+                    },
+                    defineProperty(that, property, desc) {
+                        logs += "define:" + property + ":" + desc.value + ":" + desc.configurable + ":" + desc.enumerable + ":" + desc.writable + ",";
+                        return true;
+                    },
+                });
+            }
+            let logs = "";
+            let ctorProxy = new Proxy({}, {
+                get(that, property) {
+                    logs += "c-get:" + property.toString() + ",";
+                    return property == Symbol.species ? FakeArrayWithHook : undefined;
+                },
+            });
+            a = new Proxy([1, 2, 3, 4, 5], {
+                get(that, property) {
+                    logs += "get:" + property.toString() + ",";
+                    return property == "constructor" ? ctorProxy : that[property];
+                },
+            });
+            b = a[name](...args);
+            record(name + ":proxy-constructor", b.constructor === FakeArray);
+            record(name + ":proxy-keys", Object.keys(b).sort().join(",") === "length");
+            record(name + ":proxy-length", b.length === expectedLength[name]);
+            record(name + ":proxy-log", logs === expected[name]);
+
+            for (let species of [0, 1.1, true, false, "a", /a/, Symbol.iterator, [], {}]) {
+                a = [1, 2, 3, 4, 5];
+                a.constructor = { [Symbol.species]: species };
+                recordThrows(name + ":invalid-species:" + typeof species, TypeError, () => a[name](...args));
+            }
+
+            for (let constructor of [null, 0, 1.1, true, false, "a", Symbol.iterator]) {
+                a = [1, 2, 3, 4, 5];
+                a.constructor = constructor;
+                recordThrows(name + ":invalid-constructor:" + typeof constructor, TypeError, () => a[name](...args));
+            }
+
+            a = new Proxy({
+                0: 1, 1: 2, 2: 3, 3: 4, 4: 5,
+                length: 5,
+                [name]: Array.prototype[name],
+            }, {
+                get(that, property) {
+                    record(name + ":non-array-constructor-access", property !== "constructor");
+                    return that[property];
+                },
+            });
+            b = a[name](...args);
+            record(name + ":non-array-default-result", b.constructor === Array);
+
+            class SubArray extends Array {}
+            a = new SubArray(1, 2, 3, 4, 5);
+            b = a[name](...args);
+            record(name + ":subclass-default-species", b.constructor === SubArray);
+
+            class DateSpeciesArray extends Array {
+                static get [Symbol.species]() {
+                    return Date;
+                }
+            }
+            a = new DateSpeciesArray(1, 2, 3, 4, 5);
+            b = a[name](...args);
+            record(name + ":subclass-custom-species", b.constructor === Date);
+        }
+
+        failures || "ok";
+        "#,
+        Some(&provider),
+    );
+
+    assert_eq!(result, "ok");
+}
+
+#[test]
+fn array_copying_methods_throw_errors_from_their_function_realm() {
+    let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
+    let result = compile_and_run_string(
+        r#"
+        let failures = "";
+        function recordThrows(label, expectedConstructor, callback) {
+            try {
+                callback();
+                failures += label + ":missing;";
+            } catch (error) {
+                if (!(error instanceof expectedConstructor)) {
+                    failures += label + ":" + error.constructor.name + ";";
+                }
+            }
+        }
+
+        let childGlobal = embedding.createRealm();
+        let arrayLike = {
+            get "0"() {
+                throw new Error("Get 0");
+            },
+            get "4294967295"() {
+                throw new Error("Get 4294967295");
+            },
+            get "4294967296"() {
+                throw new Error("Get 4294967296");
+            },
+            length: 2 ** 32,
+        };
+
+        let toSorted = childGlobal.Array.prototype.toSorted;
+        let toSpliced = childGlobal.Array.prototype.toSpliced;
+        let toReversed = childGlobal.Array.prototype.toReversed;
+        let withMethod = childGlobal.Array.prototype.with;
+
+        recordThrows("toSorted:bad-comparator", childGlobal.TypeError, () => toSorted.call([], 5));
+        recordThrows("toSorted:null-this", childGlobal.TypeError, () => toSorted.call(null));
+        recordThrows("toSpliced:too-long-type", childGlobal.TypeError, () => {
+            let oldLen = arrayLike.length;
+            arrayLike.length = 2 ** 53 - 1;
+            try {
+                toSpliced.call(arrayLike, 0, 0, 1);
+            } finally {
+                arrayLike.length = oldLen;
+            }
+        });
+
+        recordThrows("toSorted:array-too-long", childGlobal.RangeError, () => toSorted.call(arrayLike));
+        recordThrows("toReversed:array-too-long", childGlobal.RangeError, () => toReversed.call(arrayLike));
+        recordThrows("toSpliced:array-too-long", childGlobal.RangeError, () => toSpliced.call(arrayLike, 0, 0));
+        recordThrows("with:index-out-of-range", childGlobal.RangeError, () => withMethod.call([0, 1, 2], 3, 7));
+        recordThrows("with:negative-index", childGlobal.RangeError, () => withMethod.call([0, 1, 2], -4, 7));
+        recordThrows("with:array-too-long", childGlobal.RangeError, () => withMethod.call(arrayLike, 0, 0));
+
+        failures || "ok";
+        "#,
+        Some(&provider),
+    );
+
+    assert_eq!(result, "ok");
+}
+
+#[test]
+fn array_copying_methods_create_results_in_their_function_realm() {
+    let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
+    let result = compile_and_run_string(
+        r#"
+        let failures = "";
+        function record(label, condition) {
+            if (!condition) failures += label + ";";
+        }
+
+        let childGlobal = embedding.createRealm();
+        let methods = [
+            ["with", childGlobal.Array.prototype.with.call([1, 2, 3], 1, 3)],
+            ["toSpliced", childGlobal.Array.prototype.toSpliced.call([1, 2, 3], 0, 1, 4, 5)],
+            ["toReversed", childGlobal.Array.prototype.toReversed.call([1, 2, 3])],
+            ["toSorted", childGlobal.Array.prototype.toSorted.call([1, 2, 3], (left, right) => right > left)]
+        ];
+
+        for (let [name, value] of methods) {
+            record(name + ":not-current-array", !(value instanceof Array));
+            record(name + ":child-array", value instanceof childGlobal.Array);
+            record(name + ":child-prototype", Object.getPrototypeOf(value) === childGlobal.Array.prototype);
+        }
+
+        failures || "ok";
+        "#,
+        Some(&provider),
+    );
+
+    assert_eq!(result, "ok");
+}
+
+#[test]
 fn indirect_eval_uses_eval_functions_realm() {
     let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
     let result = compile_and_run_string(

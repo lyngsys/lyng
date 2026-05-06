@@ -126,6 +126,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         is_arrow: bool,
         dest: u16,
     ) -> LoweringResult<()> {
+        if self.in_class_field_initializer && is_arrow {
+            self.state
+                .class_field_arrow_context_functions
+                .insert(function);
+        }
+        if self.in_instance_class_field_initializer {
+            self.state
+                .class_instance_field_initializer_functions
+                .insert(function);
+        }
+        if self.in_class_field_initializer && !self.active_direct_eval_scopes.is_empty() {
+            self.state
+                .class_field_initializer_eval_scopes
+                .insert(function, self.active_direct_eval_scopes.clone());
+        }
         let child_index = self.ensure_child_index(function)?;
         let instruction_offset = self.builder.emit_abx(
             Opcode::CreateClosure,
@@ -279,6 +294,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         elements: lyng_js_ast::NodeList<Option<ExprId>>,
         dest: u16,
     ) -> LoweringResult<()> {
+        let saved_result_registers = std::mem::take(&mut self.array_literal_result_registers);
+        let saved_value_registers = std::mem::take(&mut self.array_literal_value_registers);
+        let result = self.lower_array_expression_at_depth(expr_id, elements, dest, 0);
+        self.array_literal_result_registers = saved_result_registers;
+        self.array_literal_value_registers = saved_value_registers;
+        result
+    }
+
+    fn lower_array_expression_at_depth(
+        &mut self,
+        expr_id: ExprId,
+        elements: lyng_js_ast::NodeList<Option<ExprId>>,
+        dest: u16,
+        depth: usize,
+    ) -> LoweringResult<()> {
         let elements = self.ast().get_opt_expr_list(elements).to_vec();
         let instruction_offset = self.builder.emit_abx(
             Opcode::CreateArray,
@@ -318,7 +348,23 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             let Some(element) = element else {
                 continue;
             };
-            let value_register = self.lower_expr_to_temp(*element)?;
+            let value_register = match self.ast().get_expr(*element).clone() {
+                Expr::ArrayExpression { elements, .. } => {
+                    let array_register = self.array_literal_result_register(depth + 1)?;
+                    self.lower_array_expression_at_depth(
+                        *element,
+                        elements,
+                        array_register,
+                        depth + 1,
+                    )?;
+                    array_register
+                }
+                _ => {
+                    let value_register = self.array_literal_value_register(depth)?;
+                    self.lower_expr_into(*element, value_register)?;
+                    value_register
+                }
+            };
             let index = u16::try_from(index).map_err(|_| LoweringError::ConstantIndexOverflow {
                 index: u32::try_from(index).unwrap_or(u32::MAX),
             })?;
@@ -330,7 +376,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             )?;
         }
         if elements.iter().any(Option::is_none) {
-            let length_register = self.alloc_temp()?;
+            let length_register = self.array_literal_value_register(depth)?;
             self.emit_load_smi(
                 length_register,
                 i16::try_from(elements.len()).unwrap_or(i16::MAX),
@@ -338,6 +384,22 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.emit_set_property_by_atom(dest, length_register, WellKnownAtom::length.id())?;
         }
         Ok(())
+    }
+
+    fn array_literal_result_register(&mut self, depth: usize) -> LoweringResult<u16> {
+        while self.array_literal_result_registers.len() <= depth {
+            let register = self.alloc_temp()?;
+            self.array_literal_result_registers.push(register);
+        }
+        Ok(self.array_literal_result_registers[depth])
+    }
+
+    fn array_literal_value_register(&mut self, depth: usize) -> LoweringResult<u16> {
+        while self.array_literal_value_registers.len() <= depth {
+            let register = self.alloc_temp()?;
+            self.array_literal_value_registers.push(register);
+        }
+        Ok(self.array_literal_value_registers[depth])
     }
 
     fn lower_array_spread_element(

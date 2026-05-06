@@ -50,7 +50,7 @@ pub enum ClassElement {
         r#static: bool,
     },
 
-    /// A class field: `x = 1;`, `static y;`.
+    /// A class field: `x = 1;`, `static y;`, or auto-accessor `accessor x = 1;`.
     Property {
         span: Span,
         key: ExprId,
@@ -58,6 +58,7 @@ pub enum ClassElement {
         computed: bool,
         private: bool,
         r#static: bool,
+        auto_accessor_private_name: Option<AtomId>,
     },
 
     /// A static initialization block: `static { ... }`.

@@ -30,16 +30,16 @@ impl Agent {
         lexical_env: EnvironmentRef,
         this_state: ThisState,
     ) -> bool {
-        let Some(context) = self
+        let mut updated = false;
+        for context in self
             .execution_contexts
             .iter_mut()
-            .rev()
-            .find(|context| context.lexical_env() == lexical_env)
-        else {
-            return false;
-        };
-        *context = context.with_this_state(this_state);
-        true
+            .filter(|context| context.lexical_env() == lexical_env)
+        {
+            *context = context.with_this_state(this_state);
+            updated = true;
+        }
+        updated
     }
 
     pub fn push_script_context(

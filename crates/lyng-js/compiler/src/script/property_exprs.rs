@@ -341,10 +341,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         let target = self.delete_target(argument);
         match self.ast().get_expr(target).clone() {
+            Expr::OptionalChainExpression { .. } => self.lower_optional_chain_delete(target, dest),
             Expr::Identifier { name, .. } => self.lower_delete_identifier(target, name, dest),
             Expr::StaticMemberExpression {
                 object, property, ..
             } => {
+                if self.expr_continues_optional_chain(object) {
+                    return self.lower_optional_chain_delete(target, dest);
+                }
                 if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
                     let _receiver = self.lower_super_receiver()?;
                     return self.emit_throw_reference_error(self.ast().get_expr(object).span());
@@ -363,6 +367,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Expr::ComputedMemberExpression {
                 object, property, ..
             } => {
+                if self.expr_continues_optional_chain(object) {
+                    return self.lower_optional_chain_delete(target, dest);
+                }
                 if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
                     let _receiver = self.lower_super_receiver()?;
                     let _key_value = self.lower_expr_to_temp(property)?;

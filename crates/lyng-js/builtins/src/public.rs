@@ -10,7 +10,7 @@ use crate::internal::{InternalBuiltinCache, InternalRealmBuiltins};
 use crate::BuiltinEntryMetadata;
 use lyng_js_common::WellKnownAtom;
 use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
+use lyng_js_gc::{AllocationLifetime, PrimitiveTracer, TraceHeapEdges};
 use lyng_js_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, ObjectAllocation,
     ObjectColdData, PrimitiveWrapperKind,
@@ -190,6 +190,8 @@ use lyng_js_types::{
     weak_map_has_builtin, weak_map_set_builtin, weak_ref_builtin, weak_ref_deref_builtin,
     weak_set_add_builtin, weak_set_builtin, weak_set_delete_builtin, weak_set_has_builtin,
     BuiltinFunctionId, EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, Value,
+    COMPLETION_BUILTIN_NAMESPACE_END, COMPLETION_BUILTIN_NAMESPACE_START,
+    CORE_BUILTIN_NAMESPACE_END, CORE_BUILTIN_NAMESPACE_START,
 };
 use std::collections::HashMap;
 
@@ -1001,6 +1003,34 @@ impl PublicRealmBuiltins {
 pub struct BuiltinCache {
     internal: InternalBuiltinCache,
     public: HashMap<RealmRef, PublicRealmBuiltins>,
+}
+
+impl TraceHeapEdges for BuiltinCache {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.internal.trace_heap_edges(tracer);
+        for (realm, builtins) in &self.public {
+            realm.trace_heap_edges(tracer);
+            trace_public_realm_builtins(*builtins, tracer);
+        }
+    }
+}
+
+fn trace_public_realm_builtins(builtins: PublicRealmBuiltins, tracer: &mut PrimitiveTracer<'_>) {
+    for raw in CORE_BUILTIN_NAMESPACE_START..=CORE_BUILTIN_NAMESPACE_END {
+        trace_public_builtin(raw, builtins, tracer);
+    }
+    for raw in COMPLETION_BUILTIN_NAMESPACE_START..=COMPLETION_BUILTIN_NAMESPACE_END {
+        trace_public_builtin(raw, builtins, tracer);
+    }
+}
+
+fn trace_public_builtin(raw: u32, builtins: PublicRealmBuiltins, tracer: &mut PrimitiveTracer<'_>) {
+    let Some(entry) = BuiltinFunctionId::from_raw(raw) else {
+        return;
+    };
+    if let Some(object) = builtins.builtin_object(entry) {
+        object.trace_heap_edges(tracer);
+    }
 }
 
 impl BuiltinCache {

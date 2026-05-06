@@ -65,6 +65,30 @@ fn phase5_objects_support_create_descriptors_and_prototype_mutation() {
 }
 
 #[test]
+fn phase5_property_is_enumerable_converts_key_before_this_object() {
+    let result = compile_and_run_string(
+        r#"
+        let keyConverted = false;
+        let key = {
+            toString() {
+                keyConverted = true;
+                throw new RangeError("key");
+            }
+        };
+
+        try {
+            Object.prototype.propertyIsEnumerable.call(null, key);
+            "no throw";
+        } catch (error) {
+            String(keyConverted) + ":" + String(error instanceof RangeError);
+        }
+        "#,
+    );
+
+    assert_eq!(result, "true:true");
+}
+
+#[test]
 fn phase5_objects_support_null_prototypes_and_integrity_helpers() {
     let result = compile_and_run(
         r#"
@@ -214,6 +238,47 @@ fn phase6_object_literal_function_expression_keys_use_trimmed_source_text() {
     );
 
     assert_eq!(result, Value::from_smi(14));
+}
+
+#[test]
+fn phase6_global_proxy_prototype_bare_bindings_use_global_receiver() {
+    let result = compile_and_run(
+        r#"
+        var global = this;
+        var proto = Object.getPrototypeOf(global);
+        var gets = 0;
+        var sets = 0;
+
+        Object.setPrototypeOf(global, new Proxy(proto, {
+            has(target, key) {
+                return key === "bareword" || Reflect.has(target, key);
+            },
+            get(target, key, receiver) {
+                gets++;
+                return receiver === global ? Reflect.get(target, key, receiver) : -1;
+            },
+            set(target, key, value, receiver) {
+                sets++;
+                if (receiver !== global) {
+                    return false;
+                }
+                return Reflect.set(target, key, value, receiver);
+            }
+        }));
+
+        var total = 0;
+        total += bareword === undefined ? 1 : 0;
+        total += gets === 1 ? 2 : 0;
+        bareword = 12;
+        total += sets === 1 ? 4 : 0;
+        total += global.bareword === 12 ? 8 : 0;
+        Object.setPrototypeOf(global, proto);
+        delete global.bareword;
+        total;
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(15));
 }
 
 #[test]

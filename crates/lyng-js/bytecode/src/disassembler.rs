@@ -163,6 +163,7 @@ fn format_abc_instruction(
         | crate::Opcode::GetKeyedProperty
         | crate::Opcode::SetKeyedProperty
         | crate::Opcode::AssignKeyedProperty
+        | crate::Opcode::StrictAssignKeyedProperty
         | crate::Opcode::DefineKeyedProperty
         | crate::Opcode::CopyDataProperties => {
             format!(
@@ -178,6 +179,7 @@ fn format_abc_instruction(
         crate::Opcode::GetNamedProperty
         | crate::Opcode::SetNamedProperty
         | crate::Opcode::AssignNamedProperty
+        | crate::Opcode::StrictAssignNamedProperty
         | crate::Opcode::DefineNamedProperty => {
             format_named_property_instruction(opcode, function, operands)
         }
@@ -252,6 +254,9 @@ fn format_abx_instruction(
             let depth = (operands.bx() >> 24) as u8;
             let slot = operands.bx() & 0x00ff_ffff;
             format!("{opcode}r{}, depth={depth}, slot={slot}", operands.a())
+        }
+        crate::Opcode::EnterEnvScope | crate::Opcode::LeaveEnvScope => {
+            format!("{opcode}base={}, count={}", operands.a(), operands.bx())
         }
         crate::Opcode::JumpIfTrue | crate::Opcode::JumpIfFalse => {
             let delta = i32::from_le_bytes(operands.bx().to_le_bytes());

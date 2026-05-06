@@ -222,6 +222,17 @@ pub(super) fn collect_arguments_owners(
         }
     }
 
+    for (index, record) in sema.function_table.as_slice().iter().enumerate() {
+        if !record.needs_arguments {
+            continue;
+        }
+        let function = FunctionSemaId::new(index as u32);
+        if let Some(owner) = nearest_non_arrow_owner_for(program, sema, parent_functions, function)
+        {
+            owners.insert(owner);
+        }
+    }
+
     owners
 }
 

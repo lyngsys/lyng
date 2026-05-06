@@ -795,6 +795,11 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
             let hex = self.text(hex_start, self.pos);
             self.advance(); // skip `}`
             let code = u32::from_str_radix(hex, 16).ok()?;
+            if let Ok(unit) = u16::try_from(code) {
+                if (0xD800..=0xDFFF).contains(&unit) {
+                    return Some(UnicodeStringEscape::CodeUnit(unit));
+                }
+            }
             return char::from_u32(code).map(UnicodeStringEscape::Scalar);
         }
 
@@ -1477,8 +1482,8 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
         }
     }
 
-    fn scan_template_chars(&mut self) -> (Option<String>, String, TemplateEnd) {
-        let mut cooked = Some(String::new());
+    fn scan_template_chars(&mut self) -> (Option<Vec<u16>>, String, TemplateEnd) {
+        let mut cooked = Some(Vec::new());
         let mut raw = String::new();
 
         loop {
@@ -1531,32 +1536,32 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                     match esc_ch {
                         b'n' => {
                             if let Some(ref mut c) = cooked {
-                                c.push('\n');
+                                c.push(u16::from(b'\n'));
                             }
                         }
                         b'r' => {
                             if let Some(ref mut c) = cooked {
-                                c.push('\r');
+                                c.push(u16::from(b'\r'));
                             }
                         }
                         b't' => {
                             if let Some(ref mut c) = cooked {
-                                c.push('\t');
+                                c.push(u16::from(b'\t'));
                             }
                         }
                         b'b' => {
                             if let Some(ref mut c) = cooked {
-                                c.push('\u{0008}');
+                                c.push(0x0008);
                             }
                         }
                         b'f' => {
                             if let Some(ref mut c) = cooked {
-                                c.push('\u{000C}');
+                                c.push(0x000C);
                             }
                         }
                         b'v' => {
                             if let Some(ref mut c) = cooked {
-                                c.push('\u{000B}');
+                                c.push(0x000B);
                             }
                         }
                         b'0' => {
@@ -1569,7 +1574,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                                     self.advance();
                                 }
                             } else if let Some(ref mut c) = cooked {
-                                c.push('\0');
+                                c.push(0);
                             }
                         }
                         b'x' => {
@@ -1580,7 +1585,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                                     raw.push_str(h);
                                     if let Ok(code) = u8::from_str_radix(h, 16) {
                                         if let Some(ref mut c) = cooked {
-                                            c.push(code as char);
+                                            c.push(u16::from(code));
                                         }
                                     } else {
                                         cooked = None;
@@ -1615,7 +1620,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                                     if let Ok(code) = u32::from_str_radix(hex, 16) {
                                         if let Some(ch) = char::from_u32(code) {
                                             if let Some(ref mut ck) = cooked {
-                                                ck.push(ch);
+                                                push_utf16_char(ck, ch);
                                             }
                                         } else {
                                             cooked = None;
@@ -1643,13 +1648,42 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                                 if hex.len() == 4
                                     && hex.as_bytes().iter().all(u8::is_ascii_hexdigit)
                                 {
-                                    if let Ok(code) = u32::from_str_radix(&hex, 16) {
-                                        if let Some(ch) = char::from_u32(code) {
+                                    if let Ok(code_unit) = u16::from_str_radix(&hex, 16) {
+                                        if (0xD800..=0xDBFF).contains(&code_unit)
+                                            && self.pos + 6 <= self.source.len()
+                                            && self.source[self.pos] == b'\\'
+                                            && self.source[self.pos + 1] == b'u'
+                                        {
+                                            let low_hex = self.text(self.pos + 2, self.pos + 6);
+                                            if let Ok(low) = u16::from_str_radix(low_hex, 16) {
+                                                if (0xDC00..=0xDFFF).contains(&low) {
+                                                    raw.push('\\');
+                                                    raw.push('u');
+                                                    raw.push_str(low_hex);
+                                                    self.advance_n(6);
+                                                    let combined = 0x10000
+                                                        + ((u32::from(code_unit) - 0xD800) << 10)
+                                                        + (u32::from(low) - 0xDC00);
+                                                    if let Some(ch) = char::from_u32(combined) {
+                                                        if let Some(ref mut ck) = cooked {
+                                                            push_utf16_char(ck, ch);
+                                                        }
+                                                    } else {
+                                                        cooked = None;
+                                                    }
+                                                    continue;
+                                                }
+                                            }
+                                        }
+
+                                        if let Some(ch) = char::from_u32(u32::from(code_unit)) {
                                             if let Some(ref mut ck) = cooked {
-                                                ck.push(ch);
+                                                push_utf16_char(ck, ch);
                                             }
                                         } else {
-                                            cooked = None;
+                                            if let Some(ref mut ck) = cooked {
+                                                ck.push(code_unit);
+                                            }
                                         }
                                     } else {
                                         cooked = None;
@@ -1679,7 +1713,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                             if matches!(esc_ch, b'1'..=b'9') {
                                 cooked = None;
                             } else if let Some(ref mut c) = cooked {
-                                c.push(esc_ch as char);
+                                c.push(u16::from(esc_ch));
                             }
                         }
                     }
@@ -1688,7 +1722,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                     self.advance();
                     raw.push('\n'); // normalize to LF in raw
                     if let Some(ref mut c) = cooked {
-                        c.push('\n');
+                        c.push(u16::from(b'\n'));
                     }
                     if !self.at_end() && self.current() == b'\n' {
                         self.advance();
@@ -1698,7 +1732,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                     self.advance();
                     raw.push('\n');
                     if let Some(ref mut c) = cooked {
-                        c.push('\n');
+                        c.push(u16::from(b'\n'));
                     }
                 }
                 _ => {
@@ -1710,7 +1744,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                         {
                             raw.push(c);
                             if let Some(ref mut ck) = cooked {
-                                ck.push(c);
+                                push_utf16_char(ck, c);
                             }
                             self.advance_n(c.len_utf8());
                         } else {
@@ -1719,7 +1753,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                     } else {
                         raw.push(ch as char);
                         if let Some(ref mut c) = cooked {
-                            c.push(ch as char);
+                            c.push(u16::from(ch));
                         }
                         self.advance();
                     }
@@ -2175,6 +2209,11 @@ enum TemplateEnd {
     Backtick,
     DollarBrace,
     Eof,
+}
+
+fn push_utf16_char(units: &mut Vec<u16>, ch: char) {
+    let mut buffer = [0u16; 2];
+    units.extend_from_slice(ch.encode_utf16(&mut buffer));
 }
 
 // =============================================================================

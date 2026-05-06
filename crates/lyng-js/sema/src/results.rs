@@ -10,6 +10,10 @@ use crate::{
 pub struct DirectEvalScriptAnalysisOptions {
     ambient_private_layouts: Vec<Vec<ClassPrivateElementRecord>>,
     forbid_arguments_in_class_initializer: bool,
+    forbid_direct_super_call: bool,
+    forbid_super_call_in_class_initializer: bool,
+    allow_new_target: bool,
+    allow_super: bool,
     annex_b_blocked_var_names: Vec<AtomId>,
     suppressed_function_name_bindings: Vec<FunctionId>,
 }
@@ -36,6 +40,30 @@ impl DirectEvalScriptAnalysisOptions {
     }
 
     #[inline]
+    pub const fn with_forbid_direct_super_call(mut self, enabled: bool) -> Self {
+        self.forbid_direct_super_call = enabled;
+        self
+    }
+
+    #[inline]
+    pub const fn with_forbid_super_call_in_class_initializer(mut self, enabled: bool) -> Self {
+        self.forbid_super_call_in_class_initializer = enabled;
+        self
+    }
+
+    #[inline]
+    pub const fn with_allow_new_target(mut self, enabled: bool) -> Self {
+        self.allow_new_target = enabled;
+        self
+    }
+
+    #[inline]
+    pub const fn with_allow_super(mut self, enabled: bool) -> Self {
+        self.allow_super = enabled;
+        self
+    }
+
+    #[inline]
     pub fn with_annex_b_blocked_var_names(mut self, names: Vec<AtomId>) -> Self {
         self.annex_b_blocked_var_names = names;
         self
@@ -55,6 +83,26 @@ impl DirectEvalScriptAnalysisOptions {
     #[inline]
     pub const fn forbid_arguments_in_class_initializer(&self) -> bool {
         self.forbid_arguments_in_class_initializer
+    }
+
+    #[inline]
+    pub const fn forbid_direct_super_call(&self) -> bool {
+        self.forbid_direct_super_call
+    }
+
+    #[inline]
+    pub const fn forbid_super_call_in_class_initializer(&self) -> bool {
+        self.forbid_super_call_in_class_initializer
+    }
+
+    #[inline]
+    pub const fn allow_new_target(&self) -> bool {
+        self.allow_new_target
+    }
+
+    #[inline]
+    pub const fn allow_super(&self) -> bool {
+        self.allow_super
     }
 
     #[inline]
@@ -79,6 +127,8 @@ pub struct ProgramSemaView<'a> {
     pub private_names: &'a PrivateNameTable,
     pub private_uses: &'a PrivateUseTable,
     pub class_private_layouts: &'a ClassPrivateLayoutTable,
+    pub direct_eval_allows_new_target: bool,
+    pub direct_eval_allows_super: bool,
 }
 
 impl<'a> ProgramSemaView<'a> {
@@ -101,6 +151,8 @@ pub struct ScriptSema {
     pub private_names: PrivateNameTable,
     pub private_uses: PrivateUseTable,
     pub class_private_layouts: ClassPrivateLayoutTable,
+    pub direct_eval_allows_new_target: bool,
+    pub direct_eval_allows_super: bool,
     pub diagnostics: DiagnosticList,
 }
 
@@ -137,6 +189,8 @@ impl ScriptSema {
             private_names: &self.private_names,
             private_uses: &self.private_uses,
             class_private_layouts: &self.class_private_layouts,
+            direct_eval_allows_new_target: self.direct_eval_allows_new_target,
+            direct_eval_allows_super: self.direct_eval_allows_super,
         }
     }
 }
@@ -161,6 +215,8 @@ impl ModuleSema {
             private_names: &self.private_names,
             private_uses: &self.private_uses,
             class_private_layouts: &self.class_private_layouts,
+            direct_eval_allows_new_target: false,
+            direct_eval_allows_super: false,
         }
     }
 }
@@ -176,6 +232,8 @@ pub fn analyze_direct_eval_script(
     atoms: &AtomTable,
     options: DirectEvalScriptAnalysisOptions,
 ) -> ScriptSema {
+    let direct_eval_allows_new_target = options.allow_new_target();
+    let direct_eval_allows_super = options.allow_super();
     let analyzer = analyzer::Analyzer::analyze_direct_eval_script(
         &parsed.ast,
         atoms,
@@ -192,6 +250,8 @@ pub fn analyze_direct_eval_script(
         private_names: analyzer.private_names,
         private_uses: analyzer.private_uses,
         class_private_layouts: analyzer.class_private_layouts,
+        direct_eval_allows_new_target,
+        direct_eval_allows_super,
         diagnostics: analyzer.diagnostics,
     }
 }

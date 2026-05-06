@@ -199,6 +199,22 @@ fn typed_array_to_locale_string_builtin_dispatch<Cx: PublicBuiltinDispatchContex
 ) -> Result<Value, Cx::Error> {
     let (record, length) = typed_array_validated_record_and_length(cx, invocation.this_value())?;
     let to_locale_string_key = property_key_from_text(cx, "toLocaleString");
+    let intl_key = property_key_from_text(cx, "Intl");
+    let realm = cx.builtin_realm();
+    let Some(global_object) = cx
+        .agent()
+        .realm(realm)
+        .map(lyng_js_env::RealmRecord::global_object)
+    else {
+        return Err(type_error(cx));
+    };
+    let intl_value = cx.get_property_value(Value::from_object_ref(global_object), intl_key)?;
+    let empty_arguments = [];
+    let element_arguments = if intl_value.as_object_ref().is_some() {
+        invocation.arguments()
+    } else {
+        &empty_arguments
+    };
     let mut parts = Vec::with_capacity(length);
     for index in 0..length {
         let value = typed_array_read_element_value(cx.agent(), record, index);
@@ -207,7 +223,7 @@ fn typed_array_to_locale_string_builtin_dispatch<Cx: PublicBuiltinDispatchContex
         } else {
             let method_value = cx.get_property_value(value, to_locale_string_key)?;
             let method = cx.require_callable_object(method_value)?;
-            let result = cx.call_to_completion(method, value, invocation.arguments())?;
+            let result = cx.call_to_completion(method, value, element_arguments)?;
             cx.value_to_string_text(result)?
         };
         parts.push(text);

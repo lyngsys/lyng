@@ -1075,6 +1075,50 @@ fn large_stable_shapes_switch_to_flattened_lookup_table() {
 }
 
 #[test]
+fn repeated_named_property_definitions_transition_large_objects_to_dictionary_mode() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let object = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+
+    for raw in 0..160 {
+        let mut descriptor = PropertyDescriptor::new();
+        descriptor.set_value(Value::from_smi(raw));
+        descriptor.set_writable(true);
+        descriptor.set_enumerable(true);
+        descriptor.set_configurable(raw % 2 == 0);
+        assert!(runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(
+                    u32::try_from(raw + 1).expect("test atom id fits u32"),
+                )),
+                descriptor,
+                AllocationLifetime::Default,
+            )
+            .unwrap());
+    }
+
+    assert_eq!(
+        runtime.named_property_storage_mode(object),
+        Some(NamedPropertyStorageMode::Dictionary)
+    );
+    assert_eq!(
+        runtime
+            .own_property_keys(mutator.view(), object)
+            .unwrap()
+            .len(),
+        160
+    );
+}
+
+#[test]
 fn object_runtime_allocates_hot_header_and_cold_payload_out_of_line() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();

@@ -281,20 +281,6 @@ pub(super) fn to_bigint_for_builtin<Cx: PublicBuiltinDispatchContext>(
     map_completion(cx, bigint)
 }
 
-pub(super) fn collect_array_like_values_for_from_builtin<Cx: PublicBuiltinDispatchContext>(
-    cx: &mut Cx,
-    source: Value,
-) -> Result<Vec<Value>, Cx::Error> {
-    let source_object = cx.to_object_for_builtin_value(cx.builtin_realm(), source)?;
-    let length = array_like_length_u64(cx, source_object)?;
-    let mut values = Vec::new();
-    for index in 0..length {
-        let key = array_like_index_property_key(cx, index);
-        values.push(get_property_from_object(cx, source_object, key)?);
-    }
-    Ok(values)
-}
-
 pub(super) fn define_data_property_with_attrs<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: lyng_js_types::ObjectRef,

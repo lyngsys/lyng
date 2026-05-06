@@ -59,6 +59,300 @@ fn regexp_duplicate_named_backrefs_and_escaped_astral_names_match_spec() {
 }
 
 #[test]
+fn regexp_duplicate_named_group_alternatives_expose_participating_capture() {
+    let result = compile_and_run_string(
+        r#"
+        function arrayResult(match) {
+            return Array.prototype.map.call(match, value => value === undefined ? "U" : value).join(",");
+        }
+
+        let simple = /(?:(?:(?<a>x)|(?<a>y))\k<a>){2}/.exec("xxyy");
+        let complex = /(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>){3}/.exec("xzzyyxxy");
+
+        [
+            arrayResult(simple),
+            simple.groups.a,
+            arrayResult(complex),
+            complex.groups.a,
+            "xxyy".replace(/(?:(?:(?<a>x)|(?<a>y))\k<a>)/, "2$<a>($1,$2)"),
+            "xzzyyxxy".replace(/(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>)/, "2$<a>($1,$2,$3,$4,$5)"),
+            "xxyy".replace(/(?:(?:(?<a>x)|(?<a>y))\k<a>)/g, "2$<a>"),
+            "xzzyyxxy".replace(/(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>)/g, "2$<a>")
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "xxyy,U,y|y|zzyyxx,x,U,U,U,U|x|2x(x,)yy|x2z(,,,,z)yyxxy|2x2y|x2z2y2xy"
+    );
+}
+
+#[test]
+fn regexp_replace_rejects_oversized_static_replacement_expansion() {
+    let result = compile_and_run_string(
+        r#"
+        function puff(value, length) {
+            while (value.length < length) {
+                value += value;
+            }
+            return value.substring(0, length);
+        }
+
+        let source = puff("1", 1 << 20);
+        let replacement = puff("$1", 1 << 16);
+        try {
+            source.replace(/(.+)/g, replacement);
+            "no throw";
+        } catch (error) {
+            String(error instanceof RangeError);
+        }
+        "#,
+    );
+
+    assert_eq!(result, "true");
+}
+
+#[test]
+fn regexp_unicode_backrefs_do_not_split_surrogate_pairs() {
+    let result = compile_and_run_string(
+        r#"
+        function unit(value) {
+            return String.fromCharCode(value);
+        }
+
+        let lead = unit(0xD834);
+        let trail = unit(0xDC00);
+        let re = /foo(.+)bar\1/u;
+
+        function hit(input, whole, capture) {
+            let match = re.exec(input);
+            return match !== null && match[0] === whole && match[1] === capture;
+        }
+
+        [
+            hit("fooAbarA" + trail, "fooAbarA", "A"),
+            hit("fooAbarA" + lead, "fooAbarA", "A"),
+            hit("fooAbarAA", "fooAbarA", "A"),
+            hit("fooAbarA", "fooAbarA", "A"),
+            re.exec("foo" + lead + "bar" + lead + trail) === null,
+            hit("foo" + lead + "bar" + lead + lead, "foo" + lead + "bar" + lead, lead),
+            hit("foo" + lead + "bar" + lead + "A", "foo" + lead + "bar" + lead, lead),
+            hit("foo" + lead + "bar" + lead, "foo" + lead + "bar" + lead, lead),
+            hit("foo" + trail + "bar" + trail + trail, "foo" + trail + "bar" + trail, trail),
+            hit("foo" + trail + "bar" + trail + lead, "foo" + trail + "bar" + trail, trail),
+            hit("foo" + trail + "bar" + trail + "A", "foo" + trail + "bar" + trail, trail),
+            hit("foo" + trail + "bar" + trail, "foo" + trail + "bar" + trail, trail),
+            /^(.+)\1$/u.exec(trail + "foobar" + lead + trail + "foobar" + lead) === null
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "true|true|true|true|true|true|true|true|true|true|true|true|true"
+    );
+}
+
+#[test]
+fn regexp_raw_surrogate_literals_match_staging_semantics() {
+    let result = compile_and_run_string(
+        r#"
+        function okArray(actual, expected) {
+            if (actual === null) return expected === null;
+            if (expected === null) return false;
+            if (actual.length !== expected.length) return false;
+            for (let i = 0; i < actual.length; i++) {
+                if (!Object.is(actual[i], expected[i])) return false;
+            }
+            return true;
+        }
+
+        let frog = "\u{1F438}";
+        [
+            okArray(eval(`/\uD83D\uDC38/u`).exec(frog), [frog]),
+            okArray(eval(`/\uD83D\uDC38/`).exec(frog), [frog]),
+            eval(`/\\uD83D\uDC38/u`).exec(frog) === null,
+            eval(`/\uD83D\\uDC38/u`).exec(frog) === null,
+            okArray(eval(`/\\uD83D\uDC38/`).exec(frog), [frog]),
+            okArray(eval(`/\uD83D\\uDC38/`).exec(frog), [frog]),
+            okArray(new RegExp("\uD83D\uDC38", "u").exec(frog), [frog]),
+            okArray(new RegExp("\uD83D\uDC38", "").exec(frog), [frog]),
+            new RegExp("\\uD83D\uDC38", "u").exec(frog) === null,
+            new RegExp("\uD83D\\uDC38", "u").exec(frog) === null,
+            okArray(new RegExp("\\uD83D\uDC38", "").exec(frog), [frog]),
+            okArray(new RegExp("\uD83D\\uDC38", "").exec(frog), [frog]),
+            okArray(eval(`/\uD83D\uDC38?/u`).exec(frog), [frog]),
+            okArray(eval(`/\uD83D\uDC38?/u`).exec(""), [""]),
+            okArray(eval(`/\uD83D\uDC38?/u`).exec("\uD83D"), [""]),
+            okArray(eval(`/\uD83D\uDC38?/`).exec(frog), [frog]),
+            eval(`/\uD83D\uDC38?/`).exec("") === null,
+            okArray(eval(`/\uD83D\uDC38?/`).exec("\uD83D"), ["\uD83D"]),
+            eval(`/\\uD83D\uDC38?/u`).exec(frog) === null,
+            eval(`/\\uD83D\uDC38?/u`).exec("") === null,
+            okArray(eval(`/\\uD83D\uDC38?/u`).exec("\uD83D"), ["\uD83D"]),
+            eval(`/\uD83D\\uDC38?/u`).exec(frog) === null,
+            eval(`/\uD83D\\uDC38?/u`).exec("") === null,
+            okArray(eval(`/\uD83D\\uDC38?/u`).exec("\uD83D"), ["\uD83D"]),
+            okArray(eval(`/\\uD83D\uDC38?/`).exec(frog), [frog]),
+            eval(`/\\uD83D\uDC38?/`).exec("") === null,
+            okArray(eval(`/\\uD83D\uDC38?/`).exec("\uD83D"), ["\uD83D"]),
+            okArray(eval(`/\uD83D\\uDC38?/`).exec(frog), [frog]),
+            eval(`/\uD83D\\uDC38?/`).exec("") === null,
+            okArray(eval(`/\uD83D\\uDC38?/`).exec("\uD83D"), ["\uD83D"]),
+            okArray(new RegExp("\uD83D\uDC38?", "u").exec(frog), [frog]),
+            okArray(new RegExp("\uD83D\uDC38?", "u").exec(""), [""]),
+            okArray(new RegExp("\uD83D\uDC38?", "u").exec("\uD83D"), [""]),
+            okArray(new RegExp("\uD83D\uDC38?", "").exec(frog), [frog]),
+            new RegExp("\uD83D\uDC38?", "").exec("") === null,
+            okArray(new RegExp("\uD83D\uDC38?", "").exec("\uD83D"), ["\uD83D"]),
+            okArray(eval(`/[\uD83D\uDC38]/u`).exec(frog), [frog]),
+            okArray(eval(`/[\uD83D\uDC38]/`).exec(frog), ["\uD83D"]),
+            eval(`/[\\uD83D\uDC38]/u`).exec(frog) === null,
+            eval(`/[\uD83D\\uDC38]/u`).exec(frog) === null,
+            okArray(new RegExp("[\uD83D\uDC38]", "u").exec(frog), [frog]),
+            okArray(new RegExp("[\uD83D\uDC38]", "").exec(frog), ["\uD83D"]),
+            new RegExp("[\\uD83D\uDC38]", "u").exec(frog) === null,
+            new RegExp("[\uD83D\\uDC38]", "u").exec(frog) === null
+        ].join("|");
+        "#,
+    );
+
+    assert!(result.split('|').all(|part| part == "true"), "{result}");
+}
+
+#[test]
+fn regexp_symbol_split_trace_matches_staging_observability() {
+    let result = compile_and_run_string(
+        r#"
+        var n;
+        var log;
+        var target;
+        var flags;
+        var expectedFlags;
+        var execResult;
+        var lastIndexResult;
+        var lastIndexExpected;
+
+        function P(A) {
+            return new Proxy(A, {
+                get(that, name) {
+                    log += "get:result[" + name + "],";
+                    return that[name];
+                }
+            });
+        }
+
+        var myRegExp = {
+            get constructor() {
+                log += "get:constructor,";
+                return {
+                    get [Symbol.species]() {
+                        log += "get:species,";
+                        return function(pattern, flagsArg) {
+                            if (pattern !== myRegExp) return { bad: "pattern" };
+                            if (flagsArg !== expectedFlags) return { bad: "flags:" + flagsArg };
+                            log += "call:constructor,";
+                            return {
+                                get lastIndex() {
+                                    log += "get:lastIndex,";
+                                    return lastIndexResult[n];
+                                },
+                                set lastIndex(v) {
+                                    log += "set:lastIndex,";
+                                    if (v !== lastIndexExpected[n]) log += "bad:lastIndex:" + v + ":" + lastIndexExpected[n] + ",";
+                                },
+                                get flags() {
+                                    log += "get:flags,";
+                                    return flags;
+                                },
+                                get exec() {
+                                    log += "get:exec,";
+                                    return function(S) {
+                                        log += "call:exec,";
+                                        if (S !== target) log += "bad:target,";
+                                        return execResult[n++];
+                                    };
+                                },
+                            };
+                        };
+                    }
+                };
+            },
+            get flags() {
+                log += "get:flags,";
+                return flags;
+            },
+        };
+
+        function reset() {
+            n = 0;
+            log = "";
+            target = "abcde";
+            flags = "";
+            expectedFlags = "y";
+        }
+
+        function record(label, expectedJson, expectedLog) {
+            var ret = RegExp.prototype[Symbol.split].call(myRegExp, target);
+            return label + ":" + (JSON.stringify(ret) === expectedJson) + ":" + (log === expectedLog) + ":" + JSON.stringify(ret) + ":" + log;
+        }
+
+        reset();
+        execResult        = [    null, P(["b"]), null, P(["d"]), null ];
+        lastIndexResult   = [ ,  ,     2,        ,     4,        ,    ];
+        lastIndexExpected = [ 0, 1,    2,        3,    4,             ];
+        var first = record("basic", `["a","c","e"]`,
+             "get:constructor," +
+             "get:species," +
+             "get:flags," +
+             "call:constructor," +
+             "set:lastIndex,get:exec,call:exec," +
+             "set:lastIndex,get:exec,call:exec,get:lastIndex," +
+             "get:result[length]," +
+             "set:lastIndex,get:exec,call:exec," +
+             "set:lastIndex,get:exec,call:exec,get:lastIndex," +
+             "get:result[length]," +
+             "set:lastIndex,get:exec,call:exec,");
+
+        reset();
+        target = "-\uD83D\uDC38\uDC38\uD83D";
+        flags = "u";
+        expectedFlags = "uy";
+        var E = P(["", "X"]);
+        execResult        = [    E, E, E, E, E, E, E ];
+        lastIndexResult   = [ ,  0, 1, 1, 3, 3, 4, 4 ];
+        lastIndexExpected = [ 0, 1, 1, 3, 3, 4, 4,   ];
+        var unicode = record("unicode", `["-","X","\uD83D\uDC38","X","\\udc38","X","\\ud83d"]`,
+             "get:constructor," +
+             "get:species," +
+             "get:flags," +
+             "call:constructor," +
+             "set:lastIndex,get:exec,call:exec,get:lastIndex," +
+             "set:lastIndex,get:exec,call:exec,get:lastIndex," +
+             "get:result[length]," +
+             "get:result[1]," +
+             "set:lastIndex,get:exec,call:exec,get:lastIndex," +
+             "set:lastIndex,get:exec,call:exec,get:lastIndex," +
+             "get:result[length]," +
+             "get:result[1]," +
+             "set:lastIndex,get:exec,call:exec,get:lastIndex," +
+             "set:lastIndex,get:exec,call:exec,get:lastIndex," +
+             "get:result[length]," +
+             "get:result[1]," +
+             "set:lastIndex,get:exec,call:exec,get:lastIndex,");
+
+        first + "\n" + unicode;
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "basic:true:true:[\"a\",\"c\",\"e\"]:get:constructor,get:species,get:flags,call:constructor,set:lastIndex,get:exec,call:exec,set:lastIndex,get:exec,call:exec,get:lastIndex,get:result[length],set:lastIndex,get:exec,call:exec,set:lastIndex,get:exec,call:exec,get:lastIndex,get:result[length],set:lastIndex,get:exec,call:exec,\nunicode:true:true:[\"-\",\"X\",\"\u{1F438}\",\"X\",\"\\udc38\",\"X\",\"\\ud83d\"]:get:constructor,get:species,get:flags,call:constructor,set:lastIndex,get:exec,call:exec,get:lastIndex,set:lastIndex,get:exec,call:exec,get:lastIndex,get:result[length],get:result[1],set:lastIndex,get:exec,call:exec,get:lastIndex,set:lastIndex,get:exec,call:exec,get:lastIndex,get:result[length],get:result[1],set:lastIndex,get:exec,call:exec,get:lastIndex,set:lastIndex,get:exec,call:exec,get:lastIndex,get:result[length],get:result[1],set:lastIndex,get:exec,call:exec,get:lastIndex,"
+    );
+}
+
+#[test]
 fn regexp_group_names_are_readable_through_escaped_identifier_properties() {
     let result = compile_and_run_string(
         r#"

@@ -67,10 +67,6 @@ impl<'a> Analyzer<'a> {
                 StorageClass::EnvironmentSlot
             } else if scope_rec.kind == ScopeKind::Module {
                 StorageClass::EnvironmentSlot
-            } else if scope_rec.kind == ScopeKind::ClassBody
-                && binding.kind == crate::binding::DeclarationKind::ClassName
-            {
-                StorageClass::EnvironmentSlot
             } else if scope_rec.kind == ScopeKind::Global && binding.kind.is_hoisted() {
                 StorageClass::GlobalName
             } else if scope_rec.kind == ScopeKind::Global && binding.kind.is_lexical() {

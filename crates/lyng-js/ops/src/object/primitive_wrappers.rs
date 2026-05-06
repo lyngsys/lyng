@@ -1,8 +1,8 @@
-use crate::errors::throw_type_error;
+use crate::errors::{self, throw_type_error};
 use lyng_js_env::Agent;
 use lyng_js_gc::{AllocationLifetime, StringEncoding};
 use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData, PrimitiveWrapperKind};
-use lyng_js_types::{Completion, ObjectRef, RealmRef, ShapeId, StringRef, Value};
+use lyng_js_types::{AbruptCompletion, Completion, ObjectRef, RealmRef, ShapeId, StringRef, Value};
 
 /// ECMAScript `ToObject` over the shared wrapper substrate.
 ///
@@ -14,10 +14,16 @@ pub fn to_object(agent: &mut Agent, realm: RealmRef, value: Value) -> Completion
         return Ok(object);
     }
     if value.is_null() || value.is_undefined() {
-        return Err(throw_type_error(agent));
+        return Err(throw_type_error_for_realm(agent, realm));
     }
 
     wrap_primitive_value(agent, realm, value, AllocationLifetime::Default)
+}
+
+fn throw_type_error_for_realm(agent: &mut Agent, realm: RealmRef) -> AbruptCompletion {
+    errors::create_intrinsic_error_object(agent, realm, errors::ErrorKind::Type, None)
+        .map(Value::from_object_ref)
+        .map_or_else(|completion| completion, AbruptCompletion::throw)
 }
 
 /// Allocates one primitive-wrapper object using the shared wrapper substrate.

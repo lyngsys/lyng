@@ -361,6 +361,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
     pub(super) fn lower_catch_clause(&mut self, handler: CatchClause) -> LoweringResult<()> {
         self.with_child_scope(ScopeKind::Catch, true, handler.body, |this| {
+            let env_scope = this.current_dynamic_env_scope_range()?;
+            if let Some((base, count)) = env_scope {
+                this.emit_enter_env_scope(base, count)?;
+            }
             if let Some(pattern) = handler.param {
                 let value = this.alloc_temp()?;
                 this.builder
@@ -372,7 +376,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 )?;
             }
             this.reset_statement_result()?;
-            this.lower_statement(handler.body)
+            let result = this.lower_statement(handler.body);
+            if let Some((base, count)) = env_scope {
+                this.emit_leave_env_scope(base, count)?;
+            }
+            result
         })
     }
 

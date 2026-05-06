@@ -47,12 +47,24 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         let is_await = self.at(TokenKind::Await) || self.at_contextual(WellKnownAtom::r#await);
         if is_await {
+            if !self.allow_await && !self.is_module() {
+                self.error_at(
+                    self.current_span(),
+                    "`for await` is only allowed in async functions and modules".to_string(),
+                );
+            }
             self.advance();
         }
 
         self.expect(TokenKind::LParen);
 
         if self.at(TokenKind::Semicolon) {
+            if is_await {
+                self.error_at(
+                    self.current_span(),
+                    "`for await` requires a for-of head".to_string(),
+                );
+            }
             self.advance();
             return self.parse_for_rest(start, None);
         }
@@ -82,6 +94,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         self.set_no_in(prev_no_in);
 
         if self.at(TokenKind::In) {
+            if is_await {
+                self.error_at(
+                    self.current_span(),
+                    "`for await` requires a for-of head".to_string(),
+                );
+            }
             if self.is_destructuring_pattern_expression(expr) {
                 self.validate_pattern_expression(expr, false, true);
             } else if !self.is_simple_assignment_target(expr) {
@@ -141,6 +159,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             });
         }
 
+        if is_await {
+            self.error_at(
+                self.current_span(),
+                "`for await` requires a for-of head".to_string(),
+            );
+        }
         self.expect(TokenKind::Semicolon);
         self.parse_for_rest(start, Some(ForInit::Expression(expr)))
     }
@@ -160,6 +184,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let decl = self.parse_for_declaration();
 
         if self.at(TokenKind::In) {
+            if is_await {
+                self.error_at(
+                    self.current_span(),
+                    "`for await` requires a for-of head".to_string(),
+                );
+            }
             self.validate_for_in_of_declaration(decl);
             self.advance();
             let right = self.parse_expression();
@@ -202,6 +232,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             });
         }
 
+        if is_await {
+            self.error_at(
+                self.current_span(),
+                "`for await` requires a for-of head".to_string(),
+            );
+        }
         self.validate_regular_for_declaration(decl);
         self.expect(TokenKind::Semicolon);
         self.parse_for_rest(start, Some(ForInit::Declaration(decl)))

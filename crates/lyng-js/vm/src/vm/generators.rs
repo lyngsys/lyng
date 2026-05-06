@@ -1530,6 +1530,7 @@ impl Vm {
                 self.frames.len(),
                 side_state.direct_eval_environment_states,
             );
+            self.restore_env_scope_state(self.frames.len(), side_state.active_env_scopes);
             if let Some(async_state) = side_state.async_frame_state {
                 self.async_frame_states
                     .insert(frame.registers().base(), async_state);
@@ -1615,6 +1616,7 @@ impl Vm {
             loop_iteration_envs: self.drain_loop_iteration_state(frame_depth),
             with_environment_states: self.drain_with_environment_state(frame_depth),
             direct_eval_environment_states: self.drain_direct_eval_environment_state(frame_depth),
+            active_env_scopes: self.drain_env_scope_state(frame_depth),
             async_frame_state: self.async_frame_states.remove(&frame.registers().base()),
             async_generator_frame_state: self
                 .async_generator_frame_states
@@ -1627,6 +1629,7 @@ impl Vm {
             || !side_state.loop_iteration_envs.is_empty()
             || !side_state.with_environment_states.is_empty()
             || !side_state.direct_eval_environment_states.is_empty()
+            || !side_state.active_env_scopes.is_empty()
             || side_state.async_frame_state.is_some()
             || side_state.async_generator_frame_state.is_some()
             || side_state.script_or_module_referrer.is_some()

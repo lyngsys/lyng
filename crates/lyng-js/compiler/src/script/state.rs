@@ -123,6 +123,9 @@ pub(crate) struct CompilationState<'a> {
     pub(super) class_function_metadata: HashMap<FunctionId, ClassFunctionMetadata>,
     pub(super) class_constructor_plans: HashMap<FunctionId, ClassConstructorPlan>,
     pub(super) class_field_initializer_functions: HashSet<FunctionId>,
+    pub(super) class_field_arrow_context_functions: HashSet<FunctionId>,
+    pub(super) class_instance_field_initializer_functions: HashSet<FunctionId>,
+    pub(super) class_field_initializer_eval_scopes: HashMap<FunctionId, Vec<ScopeId>>,
     pub(super) next_function_raw: u32,
 }
 
@@ -201,6 +204,9 @@ impl<'a> CompilationState<'a> {
             class_function_metadata,
             class_constructor_plans,
             class_field_initializer_functions: HashSet::new(),
+            class_field_arrow_context_functions: HashSet::new(),
+            class_instance_field_initializer_functions: HashSet::new(),
+            class_field_initializer_eval_scopes: HashMap::new(),
             next_function_raw: 1,
         })
     }
@@ -406,6 +412,50 @@ impl<'a> CompilationState<'a> {
         Ok(depth)
     }
 
+    pub(super) fn class_field_arrow_context_depth(
+        &self,
+        from: FunctionSemaId,
+        owner: Option<FunctionSemaId>,
+    ) -> LoweringResult<u8> {
+        let mut depth = 0u8;
+        let mut current = Some(from);
+
+        while current != owner {
+            let Some(function) = current else {
+                return Err(LoweringError::InvalidCapturedBindingDepth {
+                    binding: SemanticBindingId::new(0),
+                    function: Some(from),
+                });
+            };
+            let ast_function = self.sema.function_table.get(function).function_id;
+            if self
+                .class_field_arrow_context_functions
+                .contains(&ast_function)
+            {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or(LoweringError::InvalidCapturedBindingDepth {
+                        binding: SemanticBindingId::new(0),
+                        function: Some(from),
+                    })?;
+            }
+            if self
+                .class_instance_field_initializer_functions
+                .contains(&ast_function)
+            {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or(LoweringError::InvalidCapturedBindingDepth {
+                        binding: SemanticBindingId::new(0),
+                        function: Some(from),
+                    })?;
+            }
+            current = self.parent_function(function);
+        }
+
+        Ok(depth)
+    }
+
     pub(super) fn function_allocates_environment(&self, function: FunctionSemaId) -> bool {
         let ast_function = self.sema.function_table.get(function).function_id;
         let derived_class_constructor = self
@@ -455,6 +505,7 @@ impl<'a> CompilationState<'a> {
                 && self.scope_owner(binding.scope).is_none()
         }) || self.module_default_export_slot.is_some()
             || self.has_direct_root_arrow_child()
+            || self.sema.direct_eval_allows_super
     }
 
     pub(super) fn function_environment_bindings(
@@ -1276,6 +1327,7 @@ fn collect_class_lowering_from_class_body(
                 computed,
                 private,
                 r#static,
+                auto_accessor_private_name,
                 ..
             } => {
                 if *computed {
@@ -1295,7 +1347,13 @@ fn collect_class_lowering_from_class_body(
                     );
                 }
                 if !*r#static {
-                    if *private {
+                    if let Some(backing_name) = auto_accessor_private_name {
+                        instance_elements.push(ClassInstanceElementPlan::PrivateElement {
+                            name: *backing_name,
+                            kind: lyng_js_sema::ClassPrivateElementKind::Field,
+                            value: *value,
+                        });
+                    } else if *private {
                         if let lyng_js_ast::Expr::Identifier { name, .. } = ast.get_expr(*key) {
                             instance_elements.push(ClassInstanceElementPlan::PrivateElement {
                                 name: *name,
@@ -1370,6 +1428,8 @@ pub(super) struct FunctionCompiler<'a, 'b> {
     pub(super) float_constants: HashMap<u64, u32>,
     pub(super) builtin_constants: HashMap<BuiltinFunctionId, u32>,
     pub(super) child_indices: HashMap<FunctionId, u16>,
+    pub(super) array_literal_result_registers: Vec<u16>,
+    pub(super) array_literal_value_registers: Vec<u16>,
     pub(super) hoisted_function_decls: HashSet<DeclId>,
     pub(super) block_instantiated_function_decls: HashSet<DeclId>,
     pub(super) hoisted_default_export_functions: HashSet<FunctionId>,
@@ -1388,6 +1448,8 @@ pub(super) struct FunctionCompiler<'a, 'b> {
     pub(super) active_class_contexts: Vec<ActiveClassContext>,
     pub(super) active_direct_eval_scopes: Vec<ScopeId>,
     pub(super) in_class_field_initializer: bool,
+    pub(super) in_instance_class_field_initializer: bool,
+    pub(super) force_strict_assignment: bool,
     pub(super) active_disposal_scopes: Vec<ActiveDisposalScope>,
 }
 
@@ -1471,7 +1533,10 @@ fn scope_environment_bindings(
         let Some(slot_binding) = bindings.get_mut(slot) else {
             continue;
         };
-        *slot_binding = Some(bytecode_environment_binding(binding));
+        *slot_binding = Some(bytecode_environment_binding(
+            binding,
+            scope_environment_binding_is_scoped(scope),
+        ));
     }
 
     assert!(
@@ -1493,7 +1558,8 @@ fn synthetic_function_environment_bindings(
         let mut parameter_bindings = vec![None; activation.parameter_ordinals.len()];
         for (binding_id, ordinal) in &activation.parameter_ordinals {
             let binding = sema.binding_table.get(*binding_id);
-            parameter_bindings[usize::from(*ordinal)] = Some(bytecode_environment_binding(binding));
+            parameter_bindings[usize::from(*ordinal)] =
+                Some(bytecode_environment_binding(binding, false));
         }
         assert!(
             parameter_bindings.iter().all(|binding| binding.is_some()),
@@ -1514,6 +1580,7 @@ fn synthetic_function_environment_bindings(
     if let Some(rest_binding) = activation.rest_binding {
         bindings.push(bytecode_environment_binding(
             sema.binding_table.get(rest_binding),
+            false,
         ));
     } else if activation.has_rest_parameter {
         bindings.push(BytecodeEnvironmentBinding::new(
@@ -1534,6 +1601,7 @@ fn synthetic_function_environment_bindings(
 
 fn bytecode_environment_binding(
     binding: &lyng_js_sema::BindingRecord,
+    scoped: bool,
 ) -> BytecodeEnvironmentBinding {
     let flags = BytecodeEnvironmentSlotFlags::new(
         binding_is_mutable(binding.kind),
@@ -1544,8 +1612,16 @@ fn bytecode_environment_binding(
             StorageClass::DynamicLookup | StorageClass::DynamicVariableLookup
         ),
     )
+    .with_scoped(scoped)
     .with_sloppy_immutable_assign_silent(matches!(binding.kind, DeclarationKind::FunctionName));
     BytecodeEnvironmentBinding::new(Some(binding.name), flags)
+}
+
+fn scope_environment_binding_is_scoped(scope: &lyng_js_sema::ScopeRecord) -> bool {
+    !matches!(
+        scope.kind,
+        ScopeKind::Global | ScopeKind::Module | ScopeKind::Function | ScopeKind::Parameter
+    )
 }
 
 fn binding_is_mutable(kind: DeclarationKind) -> bool {

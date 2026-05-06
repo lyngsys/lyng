@@ -213,6 +213,7 @@ fn regexp_symbol_split_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
+    let constructor = regexp_species_constructor(cx, object_ref)?;
     let flags_key = {
         let agent = cx.agent();
         PropertyKey::from_atom(agent.bootstrap_atoms().flags())
@@ -225,7 +226,6 @@ fn regexp_symbol_split_builtin<Cx: PublicBuiltinDispatchContext>(
     } else {
         format!("{flags_text}y")
     };
-    let constructor = regexp_species_constructor(cx, object_ref)?;
     let flags_arg = string_value(cx, &new_flags);
     let splitter =
         cx.construct_to_completion(constructor, &[receiver, flags_arg], Some(constructor))?;

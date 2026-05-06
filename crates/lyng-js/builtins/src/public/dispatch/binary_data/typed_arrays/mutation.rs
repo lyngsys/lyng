@@ -131,6 +131,120 @@ fn compare_typed_array_sort_elements<Cx: PublicBuiltinDispatchContext>(
     ))
 }
 
+fn sort_typed_array_default_elements(kind: TypedArrayElementKind, elements: &mut [u64]) {
+    if counting_sort_typed_array_default_elements(kind, elements) {
+        return;
+    }
+    elements.sort_by(|left, right| compare_typed_array_default_elements(kind, *left, *right));
+}
+
+fn counting_sort_typed_array_default_elements(
+    kind: TypedArrayElementKind,
+    elements: &mut [u64],
+) -> bool {
+    let range = match kind {
+        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => 1_usize << 16,
+        _ => return false,
+    };
+    let mut counts = vec![0_usize; range];
+    for bits in elements.iter().copied() {
+        counts[usize::from(bits as u16)] += 1;
+    }
+    let mut index = 0;
+    match kind {
+        TypedArrayElementKind::Int16 => {
+            for key in (1_usize << 15)..range {
+                for _ in 0..counts[key] {
+                    elements[index] = key as u64;
+                    index += 1;
+                }
+            }
+            for (key, count) in counts.iter().copied().enumerate().take(1_usize << 15) {
+                for _ in 0..count {
+                    elements[index] = key as u64;
+                    index += 1;
+                }
+            }
+        }
+        TypedArrayElementKind::Uint16 => {
+            for (key, count) in counts.iter().copied().enumerate() {
+                for _ in 0..count {
+                    elements[index] = key as u64;
+                    index += 1;
+                }
+            }
+        }
+        _ => unreachable!("counting sort range should only be selected for 16-bit integer arrays"),
+    }
+    true
+}
+
+fn sort_typed_array_compare_elements<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    kind: TypedArrayElementKind,
+    compare_fn: ObjectRef,
+    elements: &mut [u64],
+) -> Result<(), Cx::Error> {
+    if elements.len() <= 1 {
+        return Ok(());
+    }
+    let mut scratch = elements.to_vec();
+    merge_sort_typed_array_compare_elements(
+        cx,
+        kind,
+        compare_fn,
+        elements,
+        &mut scratch,
+        0,
+        elements.len(),
+    )
+}
+
+fn merge_sort_typed_array_compare_elements<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    kind: TypedArrayElementKind,
+    compare_fn: ObjectRef,
+    elements: &mut [u64],
+    scratch: &mut [u64],
+    start: usize,
+    end: usize,
+) -> Result<(), Cx::Error> {
+    let len = end - start;
+    if len <= 1 {
+        return Ok(());
+    }
+    let mid = start + len / 2;
+    merge_sort_typed_array_compare_elements(cx, kind, compare_fn, elements, scratch, start, mid)?;
+    merge_sort_typed_array_compare_elements(cx, kind, compare_fn, elements, scratch, mid, end)?;
+
+    let mut left = start;
+    let mut right = mid;
+    for target in start..end {
+        if left == mid {
+            scratch[target] = elements[right];
+            right += 1;
+        } else if right == end {
+            scratch[target] = elements[left];
+            left += 1;
+        } else if compare_typed_array_sort_elements(
+            cx,
+            kind,
+            Some(compare_fn),
+            elements[left],
+            elements[right],
+        )? == std::cmp::Ordering::Greater
+        {
+            scratch[target] = elements[right];
+            right += 1;
+        } else {
+            scratch[target] = elements[left];
+            left += 1;
+        }
+    }
+    elements[start..end].copy_from_slice(&scratch[start..end]);
+    Ok(())
+}
+
 fn typed_array_reverse_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -165,20 +279,10 @@ fn typed_array_sort_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         value => Some(cx.require_callable_object(value)?),
     };
     let mut elements = typed_array_snapshot_storage_bits(cx.agent(), record);
-    for i in 1..elements.len() {
-        let mut j = i;
-        while j > 0
-            && compare_typed_array_sort_elements(
-                cx,
-                record.kind(),
-                compare_fn,
-                elements[j - 1],
-                elements[j],
-            )? == std::cmp::Ordering::Greater
-        {
-            elements.swap(j - 1, j);
-            j -= 1;
-        }
+    if let Some(compare_fn) = compare_fn {
+        sort_typed_array_compare_elements(cx, record.kind(), compare_fn, &mut elements)?;
+    } else {
+        sort_typed_array_default_elements(record.kind(), &mut elements);
     }
     let Some(current_length) = typed_array_current_length(cx.agent(), record) else {
         return Ok(invocation.this_value());
@@ -220,20 +324,10 @@ fn typed_array_to_sorted_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     let length = record.length();
     let (result_object, result_record) = typed_array_same_kind_create(cx, record.kind(), length)?;
     let mut elements = typed_array_snapshot_storage_bits(cx.agent(), record);
-    for i in 1..elements.len() {
-        let mut j = i;
-        while j > 0
-            && compare_typed_array_sort_elements(
-                cx,
-                record.kind(),
-                compare_fn,
-                elements[j - 1],
-                elements[j],
-            )? == std::cmp::Ordering::Greater
-        {
-            elements.swap(j - 1, j);
-            j -= 1;
-        }
+    if let Some(compare_fn) = compare_fn {
+        sort_typed_array_compare_elements(cx, record.kind(), compare_fn, &mut elements)?;
+    } else {
+        sort_typed_array_default_elements(record.kind(), &mut elements);
     }
     for (index, bits) in elements.into_iter().enumerate() {
         typed_array_write_storage_bits(cx, result_record, index, bits)?;
@@ -508,8 +602,13 @@ fn uint8_array_slice_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         let source_index = start_index
             .checked_add(offset)
             .ok_or_else(|| range_error(cx))?;
-        let value = typed_array_read_element_value(cx.agent(), record, source_index);
-        let bits = typed_array_storage_bits_from_builtin_value(cx, result_record.kind(), value)?;
+        let bits = if result_record.kind() == record.kind() {
+            typed_array_read_storage_bits(cx.agent(), record, source_index)
+                .ok_or_else(|| type_error(cx))?
+        } else {
+            let value = typed_array_read_element_value(cx.agent(), record, source_index);
+            typed_array_storage_bits_from_builtin_value(cx, result_record.kind(), value)?
+        };
         typed_array_write_storage_bits(cx, result_record, offset, bits)?;
     }
     Ok(Value::from_object_ref(result_object))

@@ -6,8 +6,8 @@ use super::super::super::{
 };
 use super::super::{
     array_like_index_property_key, array_like_length_u64, buffers::allocate_array_buffer_object,
-    collect_array_like_values_for_from_builtin, get_property_from_object, iterable_to_values_list,
-    length_value_u64, range_error, to_index_for_builtin, type_error, PublicBuiltinDispatchContext,
+    get_property_from_object, iterable_to_values_list, length_value_u64, range_error,
+    to_index_for_builtin, type_error, PublicBuiltinDispatchContext,
 };
 use super::{
     allocate_typed_array_object, typed_array_default_prototype,
@@ -78,18 +78,28 @@ fn typed_array_constructor_receiver<Cx: PublicBuiltinDispatchContext>(
     this_value.as_object_ref().ok_or_else(|| type_error(cx))
 }
 
-fn typed_array_collect_from_source<Cx: PublicBuiltinDispatchContext>(
+enum TypedArrayFromSource {
+    Iterable(Vec<Value>),
+    ArrayLike { object: ObjectRef, length: usize },
+}
+
+fn typed_array_from_source<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     source: Value,
-) -> Result<Vec<Value>, Cx::Error> {
+) -> Result<TypedArrayFromSource, Cx::Error> {
     if let Some(iterator_symbol) = cx.agent().well_known_symbol(WellKnownSymbolId::Iterator) {
         let iterator_method =
             cx.get_property_value(source, PropertyKey::from_symbol(iterator_symbol))?;
         if !(iterator_method.is_undefined() || iterator_method.is_null()) {
-            return iterable_to_values_list(cx, source);
+            return Ok(TypedArrayFromSource::Iterable(iterable_to_values_list(
+                cx, source,
+            )?));
         }
     }
-    collect_array_like_values_for_from_builtin(cx, source)
+    let object = cx.to_object_for_builtin_value(cx.builtin_realm(), source)?;
+    let length = array_like_length_u64(cx, object)?;
+    let length = usize::try_from(length).map_err(|_| range_error(cx))?;
+    Ok(TypedArrayFromSource::ArrayLike { object, length })
 }
 
 fn typed_array_construct_from_receiver<Cx: PublicBuiltinDispatchContext>(
@@ -170,9 +180,24 @@ fn typed_array_from_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         .get(2)
         .copied()
         .unwrap_or(Value::undefined());
-    let values = typed_array_collect_from_source(cx, source)?;
-    let (object, _record) = typed_array_construct_from_receiver(cx, constructor, values.len())?;
-    for (index, value) in values.iter().copied().enumerate() {
+    let source = typed_array_from_source(cx, source)?;
+    let length = match &source {
+        TypedArrayFromSource::Iterable(values) => values.len(),
+        TypedArrayFromSource::ArrayLike { length, .. } => *length,
+    };
+    let (object, _record) = typed_array_construct_from_receiver(cx, constructor, length)?;
+    for index in 0..length {
+        let value = match &source {
+            TypedArrayFromSource::Iterable(values) => values[index],
+            TypedArrayFromSource::ArrayLike {
+                object: source_object,
+                ..
+            } => {
+                let key =
+                    array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
+                get_property_from_object(cx, *source_object, key)?
+            }
+        };
         let mapped = if let Some(mapper) = mapper {
             cx.call_to_completion(
                 mapper,
@@ -225,14 +250,14 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
             .and_then(|record| record.intrinsics().array_buffer_prototype())
     }
     .ok_or_else(|| type_error(cx))?;
+    let default_prototype = typed_array_default_prototype(cx, realm, kind)?;
+    let prototype =
+        cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)?;
     let (buffer_object, store, byte_offset, length, length_tracking) = if let Some(buffer_object) =
         argument.as_object_ref()
     {
         if let Some(buffer) = cx.agent().objects().array_buffer(buffer_object) {
             let store = buffer.backing_store();
-            if typed_array_buffer_is_detached(cx, store)? {
-                return Err(type_error(cx));
-            }
             let byte_offset = to_index_for_builtin(
                 cx,
                 invocation
@@ -242,9 +267,6 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
                     .unwrap_or(Value::undefined()),
             )?;
             let byte_offset = usize::try_from(byte_offset).map_err(|_| range_error(cx))?;
-            if typed_array_buffer_is_detached(cx, store)? {
-                return Err(type_error(cx));
-            }
             if byte_offset % element_size != 0 {
                 return Err(range_error(cx));
             }
@@ -254,11 +276,21 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
                 .copied()
                 .filter(|value| !value.is_undefined());
             let length_tracking = buffer.is_resizable() && explicit_length.is_none();
-            let length = if let Some(value) = explicit_length {
-                let requested = to_index_for_builtin(cx, value)?;
-                usize::try_from(requested).map_err(|_| range_error(cx))?
+            let explicit_length = if let Some(value) = explicit_length {
+                Some(
+                    usize::try_from(to_index_for_builtin(cx, value)?)
+                        .map_err(|_| range_error(cx))?,
+                )
             } else {
-                let store_len = typed_array_buffer_byte_length(cx, store)?;
+                None
+            };
+            if typed_array_buffer_is_detached(cx, store)? {
+                return Err(type_error(cx));
+            }
+            let store_len = typed_array_buffer_byte_length(cx, store)?;
+            let length = if let Some(length) = explicit_length {
+                length
+            } else {
                 if byte_offset > store_len {
                     return Err(range_error(cx));
                 }
@@ -268,10 +300,6 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
                 }
                 remaining_bytes / element_size
             };
-            if typed_array_buffer_is_detached(cx, store)? {
-                return Err(type_error(cx));
-            }
-            let store_len = typed_array_buffer_byte_length(cx, store)?;
             if byte_offset > store_len {
                 return Err(range_error(cx));
             }
@@ -362,9 +390,6 @@ fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
         let buffer_object = allocate_array_buffer_object(cx, realm, array_buffer_prototype, store)?;
         (buffer_object, store, 0, length, false)
     };
-    let default_prototype = typed_array_default_prototype(cx, realm, kind)?;
-    let prototype =
-        cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)?;
     let record = if length_tracking {
         TypedArrayObjectData::new_length_tracking(buffer_object, store, byte_offset, length, kind)
     } else {

@@ -1988,6 +1988,7 @@ fn class_field_initializer_captures_outer_binding() {
             computed: false,
             private: false,
             r#static: false,
+            auto_accessor_private_name: None,
         });
         let class_body = ast.alloc_class_element_list(&[field, constructor]);
         let class_decl = ast.alloc_decl(Decl::Class {

@@ -1,5 +1,7 @@
 use super::*;
 
+const LARGE_SHAPE_DICTIONARY_PROPERTY_LIMIT: u32 = 128;
+
 impl ObjectRuntime {
     pub fn init_named_slot(
         &self,
@@ -77,6 +79,7 @@ impl ObjectRuntime {
             return true;
         }
 
+        let preserve_named_slots = self.has_reserved_named_slots(heap.view(), record);
         let dictionary = self.snapshot_named_property_dictionary(heap.view(), record);
         let Some(metadata) = self.object_metadata_mut(id) else {
             return false;
@@ -85,10 +88,13 @@ impl ObjectRuntime {
         metadata.flags = metadata
             .flags
             .union(ObjectFlags::NAMED_PROPERTIES_DICTIONARY);
-        if !heap
-            .mut_store_object_slots_handle(ObjectSlotsHandleStoreTarget::ObjectNamedSlots(id), None)
-        {
-            return false;
+        if !preserve_named_slots {
+            if !heap.mut_store_object_slots_handle(
+                ObjectSlotsHandleStoreTarget::ObjectNamedSlots(id),
+                None,
+            ) {
+                return false;
+            }
         }
         self.bump_invalidation(id, InvalidationCause::DictionaryTransition)
     }
@@ -230,9 +236,24 @@ impl ObjectRuntime {
             .view()
             .object(id)
             .ok_or(InternalMethodError::MissingObject)?;
+        if self.has_reserved_named_slots(heap.view(), record) {
+            if self.redefine_named_property(heap, id, key, payload, attrs) {
+                return Ok(true);
+            }
+            return Err(InternalMethodError::CorruptObjectState);
+        }
         let current_shape = record
             .shape()
             .ok_or(InternalMethodError::CorruptObjectState)?;
+        if self
+            .shape(heap.view(), current_shape)
+            .is_some_and(|shape| shape.property_count() >= LARGE_SHAPE_DICTIONARY_PROPERTY_LIMIT)
+        {
+            if self.redefine_named_property(heap, id, key, payload, attrs) {
+                return Ok(true);
+            }
+            return Err(InternalMethodError::CorruptObjectState);
+        }
         let transition = ShapeTransitionKey::new(key, payload.kind(), attrs);
         let Some(next_shape) = self.transition_shape(heap, current_shape, transition, lifetime)
         else {
@@ -390,5 +411,21 @@ impl ObjectRuntime {
             }
         };
         Ok(descriptor_from_payload(payload, property.attrs()))
+    }
+
+    fn has_reserved_named_slots(
+        &self,
+        heap: PrimitiveHeapView<'_>,
+        record: RuntimeObjectRecord,
+    ) -> bool {
+        let shape_slot_count = record
+            .shape()
+            .and_then(|shape| self.shape(heap, shape))
+            .map_or(0, ShapeRecord::slot_count) as usize;
+        let named_slot_count = record
+            .named_slots()
+            .and_then(|slots| heap.object_slots(slots))
+            .map_or(0, <[Value]>::len);
+        named_slot_count > shape_slot_count
     }
 }

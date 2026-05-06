@@ -2,7 +2,7 @@ use crate::public::{dispatch_internal_spec_like_builtin, PublicBuiltinDispatchCo
 use crate::{BuiltinEntryMetadata, BuiltinInvocation};
 use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, PrimitiveMutator};
+use lyng_js_gc::{AllocationLifetime, PrimitiveMutator, PrimitiveTracer, TraceHeapEdges};
 use lyng_js_objects::{
     FunctionObjectData, FunctionThisMode, ObjectAllocation, ObjectColdData, ObjectFlags,
     OrdinaryObjectData, PrimitiveWrapperKind,
@@ -25,9 +25,11 @@ use lyng_js_types::{
     internal_regexp_literal_builtin, internal_require_constructor_builtin,
     internal_set_function_home_object_builtin, internal_string_index_of_builtin,
     internal_string_replace_builtin, internal_super_base_builtin,
-    internal_super_property_get_builtin, internal_super_property_set_builtin,
-    internal_template_to_string_builtin, internal_throw_type_error_builtin, BuiltinFunctionId,
-    EnvironmentRef, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, ShapeId, Value,
+    internal_super_constructor_builtin, internal_super_property_get_builtin,
+    internal_super_property_set_builtin, internal_template_to_string_builtin,
+    internal_throw_type_error_builtin, BuiltinFunctionId, EnvironmentRef, ObjectRef,
+    PropertyDescriptor, PropertyKey, RealmRef, ShapeId, Value, INTERNAL_BUILTIN_NAMESPACE_END,
+    INTERNAL_BUILTIN_NAMESPACE_START,
 };
 use std::collections::HashMap;
 
@@ -35,6 +37,22 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct InternalBuiltinCache {
     realms: HashMap<RealmRef, InternalRealmBuiltins>,
+}
+
+impl TraceHeapEdges for InternalBuiltinCache {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        for (realm, builtins) in &self.realms {
+            realm.trace_heap_edges(tracer);
+            for raw in INTERNAL_BUILTIN_NAMESPACE_START..=INTERNAL_BUILTIN_NAMESPACE_END {
+                let Some(entry) = BuiltinFunctionId::from_raw(raw) else {
+                    continue;
+                };
+                if let Some(object) = builtins.builtin_object(entry) {
+                    object.trace_heap_edges(tracer);
+                }
+            }
+        }
+    }
 }
 
 /// Per-realm object set backing the reserved internal builtin namespace.
@@ -71,6 +89,7 @@ pub struct InternalRealmBuiltins {
     super_property_get: ObjectRef,
     super_property_set: ObjectRef,
     super_base: ObjectRef,
+    super_constructor: ObjectRef,
     construct_super: ObjectRef,
     construct_super_spread: ObjectRef,
     construct_super_array_like: ObjectRef,
@@ -194,6 +213,9 @@ impl InternalRealmBuiltins {
         }
         if entry == internal_super_base_builtin() {
             return Some(self.super_base);
+        }
+        if entry == internal_super_constructor_builtin() {
+            return Some(self.super_constructor);
         }
         if entry == internal_construct_super_builtin() {
             return Some(self.construct_super);
@@ -419,6 +441,10 @@ impl InternalBuiltinCache {
                     &mut mutator,
                 ),
                 super_base: alloc_builtin(internal_super_base_builtin(), &mut mutator),
+                super_constructor: alloc_builtin(
+                    internal_super_constructor_builtin(),
+                    &mut mutator,
+                ),
                 construct_super: alloc_builtin(internal_construct_super_builtin(), &mut mutator),
                 construct_super_spread: alloc_builtin(
                     internal_construct_super_spread_builtin(),
@@ -703,6 +729,14 @@ pub fn internal_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntr
             false,
         ));
     }
+    if entry == internal_super_constructor_builtin() {
+        return Some(BuiltinEntryMetadata::new(
+            "internal_superConstructor",
+            0,
+            false,
+            false,
+        ));
+    }
     if entry == internal_construct_super_builtin() {
         return Some(BuiltinEntryMetadata::new(
             "internal_constructSuper",
@@ -923,6 +957,11 @@ pub trait InternalBuiltinDispatchContext {
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error>;
 
+    fn super_constructor_builtin(
+        &mut self,
+        invocation: BuiltinInvocation<'_>,
+    ) -> Result<Value, Self::Error>;
+
     fn construct_super_builtin(
         &mut self,
         invocation: BuiltinInvocation<'_>,
@@ -1054,6 +1093,9 @@ pub fn dispatch_internal_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     if entry == internal_super_base_builtin() {
         return context.super_base_builtin(invocation).map(Some);
+    }
+    if entry == internal_super_constructor_builtin() {
+        return context.super_constructor_builtin(invocation).map(Some);
     }
     if entry == internal_construct_super_builtin() {
         return context.construct_super_builtin(invocation).map(Some);

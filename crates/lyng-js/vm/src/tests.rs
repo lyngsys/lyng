@@ -7648,6 +7648,115 @@ fn for_of_using_disposes_each_iteration_before_advancing() {
 }
 
 #[test]
+fn using_declarations_dispose_in_statement_contexts() {
+    let unit = compile_test_unit(
+        2315,
+        r#"
+            var results = [];
+
+            function check(name, run, expected) {
+                try {
+                    var value = run();
+                    results.push(name + ":" + (value === expected ? "ok" : value));
+                } catch (error) {
+                    results.push(name + ":" + error.name);
+                }
+            }
+
+            check("for", function() {
+                var values = [];
+                for (let i = 0; i < 3; i++) {
+                    using x = {
+                        value: i,
+                        [Symbol.dispose]() {
+                            values.push(this.value);
+                        }
+                    };
+                }
+                values.push(3);
+                return values.join(",");
+            }, "0,1,2,3");
+
+            check("for-in", function() {
+                var values = [];
+                for (let i in [0, 1]) {
+                    using x = {
+                        value: i,
+                        [Symbol.dispose]() {
+                            values.push(this.value);
+                        }
+                    };
+                }
+                values.push("2");
+                return values.join(",");
+            }, "0,1,2");
+
+            check("for-of", function() {
+                var values = [];
+                for (let i of [0, 1]) {
+                    using x = {
+                        value: i,
+                        [Symbol.dispose]() {
+                            values.push(this.value);
+                        }
+                    };
+                }
+                values.push(2);
+                return values.join(",");
+            }, "0,1,2");
+
+            check("function", function() {
+                var values = [];
+                (function() {
+                    using x = {
+                        [Symbol.dispose]() {
+                            values.push(1);
+                        }
+                    };
+                    using y = {
+                        [Symbol.dispose]() {
+                            values.push(2);
+                        }
+                    };
+                })();
+                return values.join(",");
+            }, "2,1");
+
+            check("missing", function() {
+                try {
+                    {
+                        using x = { value: 1 };
+                    }
+                    return "no-throw";
+                } catch (error) {
+                    return error instanceof TypeError ? "type-error" : "other-error";
+                }
+            }, "type-error");
+
+            results.join("|");
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let value = result
+        .as_string_ref()
+        .expect("statement disposal check should return a string");
+    let decoded = decode_string(
+        agent
+            .heap()
+            .view()
+            .string_view(value)
+            .expect("string should remain in the heap"),
+    );
+
+    assert_eq!(decoded, "for:ok|for-in:ok|for-of:ok|function:ok|missing:ok");
+}
+
+#[test]
 fn await_using_waits_for_async_disposal_before_resolving() {
     let unit = compile_test_unit(
         2308,

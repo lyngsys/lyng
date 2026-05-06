@@ -19,6 +19,13 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let start = self.current_span();
         self.advance();
 
+        if self.at(TokenKind::OptionalChain) {
+            self.error_at(
+                self.current_span(),
+                "optional chains are not valid in new constructor position".to_string(),
+            );
+        }
+
         if self.eat(TokenKind::Dot) {
             let property_token = self.current();
             let property = self.parse_identifier_name();
@@ -43,6 +50,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         };
 
         let mut callee = self.parse_member_chain(callee);
+        if self.at(TokenKind::OptionalChain) {
+            self.error_at(
+                self.current_span(),
+                "optional chains are not valid in new constructor position".to_string(),
+            );
+        }
         while matches!(
             self.current_kind(),
             TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead

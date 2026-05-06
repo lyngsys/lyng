@@ -731,11 +731,7 @@ impl Vm {
         let Some(function) = self.installed_function(code) else {
             return Ok(None);
         };
-        if function.kind() != lyng_js_bytecode::BytecodeFunctionKind::Function
-            || function.flags().strict()
-            || function.flags().generator()
-            || function.flags().async_function()
-        {
+        if !Self::legacy_function_allows_caller_arguments(function) {
             return Ok(None);
         }
 
@@ -757,14 +753,11 @@ impl Vm {
             }
             return Ok(Some(Value::from_object_ref(caller)));
         }
-        let Some(caller_frame) = active_index
-            .checked_sub(1)
-            .and_then(|index| self.frames.get(index))
-            .copied()
+        let Some(caller) = self.frames[..active_index]
+            .iter()
+            .rev()
+            .find_map(|frame| frame.callee())
         else {
-            return Ok(Some(Value::null()));
-        };
-        let Some(caller) = caller_frame.callee() else {
             return Ok(Some(Value::null()));
         };
         if self.legacy_function_caller_is_restricted(agent, caller) {
@@ -773,14 +766,68 @@ impl Vm {
         Ok(Some(Value::from_object_ref(caller)))
     }
 
+    fn legacy_function_allows_caller_arguments(
+        function: &lyng_js_bytecode::BytecodeFunction,
+    ) -> bool {
+        function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Function
+            && !function.flags().strict()
+            && !function.flags().generator()
+            && !function.flags().async_function()
+            && !function.flags().class_constructor()
+            && function.flags().has_prototype_property()
+            && function.flags().constructible()
+    }
+
     fn legacy_function_caller_is_restricted(&self, agent: &Agent, function: ObjectRef) -> bool {
         Self::bytecode_entry(agent, function).is_some_and(|code| {
-            self.installed_function(code).is_some_and(|function| {
-                function.flags().strict()
-                    || function.flags().generator()
-                    || function.flags().async_function()
-            })
+            self.installed_function(code)
+                .is_some_and(|function| !Self::legacy_function_allows_caller_arguments(function))
         })
+    }
+
+    fn legacy_function_arguments(
+        &self,
+        agent: &mut Agent,
+        object: ObjectRef,
+        key: PropertyKey,
+    ) -> VmResult<Option<Value>> {
+        let PropertyKey::Atom(atom) = key else {
+            return Ok(None);
+        };
+        if agent.atoms().resolve(atom) != "arguments" {
+            return Ok(None);
+        }
+        let Some(code) = Self::bytecode_entry(agent, object) else {
+            return Ok(None);
+        };
+        let Some(function) = self.installed_function(code) else {
+            return Ok(None);
+        };
+        if !Self::legacy_function_allows_caller_arguments(function) {
+            return Ok(None);
+        }
+
+        let Some(active_frame) = self
+            .frames
+            .iter()
+            .rposition(|frame| frame.callee() == Some(object))
+            .and_then(|index| self.frames.get(index))
+            .copied()
+        else {
+            return Ok(Some(Value::null()));
+        };
+        let Some(arguments_slot) = legacy_function_arguments_slot(
+            function.parameter_count(),
+            function.arguments_mode(),
+            function.has_rest_parameter(),
+        ) else {
+            return Ok(None);
+        };
+        Ok(Some(Self::read_environment_slot_raw(
+            agent,
+            active_frame.lexical_env(),
+            arguments_slot,
+        )?))
     }
 
     pub(super) fn copy_data_properties(
@@ -952,6 +999,9 @@ impl Vm {
             return Ok(Value::undefined());
         }
         if let Some(value) = self.legacy_function_caller(agent, object, key)? {
+            return Ok(value);
+        }
+        if let Some(value) = self.legacy_function_arguments(agent, object, key)? {
             return Ok(value);
         }
 
@@ -1555,6 +1605,18 @@ impl Vm {
             frame,
         };
         lyng_js_ops::object::to_primitive(&mut bridge, value, hint)
+    }
+}
+
+fn legacy_function_arguments_slot(
+    parameter_count: u16,
+    arguments_mode: ArgumentsMode,
+    has_rest_parameter: bool,
+) -> Option<u32> {
+    match arguments_mode {
+        ArgumentsMode::None => None,
+        ArgumentsMode::Mapped => Some(u32::from(parameter_count)),
+        ArgumentsMode::Unmapped => Some(u32::from(has_rest_parameter)),
     }
 }
 

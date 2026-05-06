@@ -6,10 +6,10 @@ use iteration::dispatch_array_iteration_builtin;
 use super::{
     array_like_index_property_key, array_like_join_value_for_length, array_like_length,
     array_like_length_u64, array_result_capacity_hint, array_species_create_for_length,
-    close_iterator_after_error, collect_array_like_values_for_from_builtin, create_array_result,
-    create_array_result_for_length, create_array_result_with_prototype,
-    create_data_property_or_throw, define_array_length, delete_property_from_object,
-    get_property_from_object, has_property_on_object, is_array_for_species, is_concat_spreadable,
+    close_iterator_after_error, create_array_result, create_array_result_for_length,
+    create_array_result_with_prototype, create_data_property_or_throw, define_array_length,
+    delete_property_from_object, get_property_from_object, has_property_on_object,
+    is_array_for_species, is_concat_spreadable,
     iterators::{array_iterator_factory_builtin, array_iterator_next_builtin, ArrayIterationKind},
     length_value_u64, normalize_relative_index_u64, objects, property_key_from_text, range_error,
     set_length_property, set_property_on_object, string_ref_code_units, string_value,
@@ -258,11 +258,7 @@ fn array_from_iterable_builtin<Cx: PublicBuiltinDispatchContext>(
         let next_value = {
             let mut bridge = BuiltinIteratorBridge { cx };
             iterator::iterator_value(&mut bridge, next)
-        };
-        let next_value = match next_value {
-            Ok(next_value) => next_value,
-            Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
-        };
+        }?;
         if index >= MAX_SAFE_INTEGER_U64 {
             let error = type_error(cx);
             return close_iterator_after_error(cx, &mut iterator_record, error);
@@ -286,7 +282,7 @@ fn array_from_iterable_builtin<Cx: PublicBuiltinDispatchContext>(
 fn array_from_result_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     constructor_receiver: Value,
-    source_len: usize,
+    source_len: u64,
     used_iterator: bool,
 ) -> Result<ObjectRef, Cx::Error> {
     let constructor = constructor_receiver
@@ -294,14 +290,10 @@ fn array_from_result_object<Cx: PublicBuiltinDispatchContext>(
         .filter(|object| cx.agent().objects().is_constructor(*object));
     match constructor {
         Some(constructor) if used_iterator => cx.construct_to_completion(constructor, &[], None),
-        Some(constructor) => cx.construct_to_completion(
-            constructor,
-            &[length_value_u64(
-                u64::try_from(source_len).unwrap_or(u64::MAX),
-            )],
-            None,
-        ),
-        None => create_array_result(cx, source_len),
+        Some(constructor) => {
+            cx.construct_to_completion(constructor, &[length_value_u64(source_len)], None)
+        }
+        None => create_array_result(cx, array_result_capacity_hint(source_len)),
     }
 }
 
@@ -338,25 +330,20 @@ fn array_from_builtin<Cx: PublicBuiltinDispatchContext>(
             );
         }
     }
-    let values = collect_array_like_values_for_from_builtin(cx, source)?;
-    let array = array_from_result_object(cx, invocation.this_value(), values.len(), false)?;
-    for (index, value) in values.iter().copied().enumerate() {
+    let source_object = cx.to_object_for_builtin_value(cx.builtin_realm(), source)?;
+    let length = array_like_length_u64(cx, source_object)?;
+    let array = array_from_result_object(cx, invocation.this_value(), length, false)?;
+    for index in 0..length {
+        let key = array_like_index_property_key(cx, index);
+        let value = get_property_from_object(cx, source_object, key)?;
         let mapped = if let Some(mapper) = mapper {
-            cx.call_to_completion(
-                mapper,
-                this_arg,
-                &[
-                    value,
-                    length_value_u64(u64::try_from(index).unwrap_or(u64::MAX)),
-                ],
-            )?
+            cx.call_to_completion(mapper, this_arg, &[value, length_value_u64(index)])?
         } else {
             value
         };
-        let key = array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
         create_data_property_or_throw(cx, array, key, mapped)?;
     }
-    set_length_property(cx, array, u64::try_from(values.len()).unwrap_or(u64::MAX))?;
+    set_length_property(cx, array, length)?;
     Ok(Value::from_object_ref(array))
 }
 
@@ -585,7 +572,12 @@ fn array_of_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let length = invocation.arguments().len();
-    let array = array_from_result_object(cx, invocation.this_value(), length, false)?;
+    let array = array_from_result_object(
+        cx,
+        invocation.this_value(),
+        u64::try_from(length).unwrap_or(u64::MAX),
+        false,
+    )?;
     for (index, value) in invocation.arguments().iter().copied().enumerate() {
         let key = array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
         create_data_property_or_throw(cx, array, key, value)?;
@@ -861,11 +853,7 @@ fn array_slice_builtin<Cx: PublicBuiltinDispatchContext>(
         let target_index = u32::try_from(offset).expect("slice result length already validated");
         create_data_property_or_throw(cx, result, PropertyKey::Index(target_index), value)?;
     }
-    define_array_length(
-        cx,
-        result,
-        u32::try_from(count).expect("slice result length already validated"),
-    )?;
+    set_length_property(cx, result, count)?;
     Ok(Value::from_object_ref(result))
 }
 

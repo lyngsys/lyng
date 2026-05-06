@@ -11,28 +11,119 @@ use lyng_js_objects::NativeFunctionRegistry;
 use lyng_js_ops::{errors, object, proxy, read};
 use lyng_js_types::PropertyKey;
 
-fn layout_binding_slot(
-    agent: &Agent,
-    environment: EnvironmentRef,
-    layout: lyng_js_env::EnvironmentLayoutId,
-    name: AtomId,
-) -> Option<u32> {
-    let layout = agent.environment_layout(layout)?;
-    for (index, binding) in layout.bindings().iter().enumerate() {
-        if binding.name() != Some(name) {
-            continue;
-        }
-        let index = u32::try_from(index).ok()?;
-        let value = agent.environment_slot(environment, index)?;
-        if binding.flags().is_dynamic() && value == Value::deleted_environment_binding() {
-            continue;
-        }
-        return Some(index);
-    }
-    None
-}
-
 impl Vm {
+    fn layout_binding_slot(
+        &self,
+        agent: &Agent,
+        environment: EnvironmentRef,
+        layout: lyng_js_env::EnvironmentLayoutId,
+        name: AtomId,
+    ) -> Option<u32> {
+        let layout = agent.environment_layout(layout)?;
+        for (index, binding) in layout.bindings().iter().enumerate() {
+            if binding.name() != Some(name) {
+                continue;
+            }
+            let index = u32::try_from(index).ok()?;
+            if binding.flags().is_scoped() && !self.active_env_scope_contains(environment, index) {
+                continue;
+            }
+            let value = agent.environment_slot(environment, index)?;
+            if binding.flags().is_dynamic() && value == Value::deleted_environment_binding() {
+                continue;
+            }
+            return Some(index);
+        }
+        None
+    }
+
+    fn active_env_scope_contains(&self, environment: EnvironmentRef, slot: u32) -> bool {
+        let frame_depth = self.frames.len();
+        if self
+            .active_env_scopes
+            .iter()
+            .rev()
+            .any(|range| range.frame_depth == frame_depth && range.contains(environment, slot))
+        {
+            return true;
+        }
+        self.loop_iteration_envs
+            .iter()
+            .rev()
+            .filter(|record| {
+                record.active
+                    && record.frame_depth == frame_depth
+                    && record.iteration_environment == environment
+            })
+            .any(|record| {
+                self.active_env_scopes.iter().rev().any(|range| {
+                    range.frame_depth == frame_depth
+                        && range.contains(record.source_environment, slot)
+                })
+            })
+    }
+
+    pub(super) fn enter_env_scope(
+        &mut self,
+        agent: &Agent,
+        frame: FrameRecord,
+        base: u16,
+        count: u32,
+    ) -> VmResult<()> {
+        let environment =
+            self.environment_for_slot_access(agent, frame.lexical_env(), 0, u32::from(base))?;
+        self.active_env_scopes.push(ActiveEnvScopeRange::new(
+            self.frames.len(),
+            environment,
+            u32::from(base),
+            count,
+        ));
+        Ok(())
+    }
+
+    pub(super) fn leave_env_scope(&mut self, frame: FrameRecord, base: u16, count: u32) {
+        let start = u32::from(base);
+        let end = start.saturating_add(count);
+        let frame_depth = self.frames.len();
+        if let Some(index) = self.active_env_scopes.iter().rposition(|range| {
+            range.frame_depth == frame_depth
+                && range.start == start
+                && range.end == end
+                && range.environment == frame.lexical_env()
+        }) {
+            let _ = self.active_env_scopes.remove(index);
+        }
+    }
+
+    pub(super) fn close_env_scope_frames(&mut self, frame_depth: usize) {
+        self.active_env_scopes
+            .retain(|range| range.frame_depth <= frame_depth);
+    }
+
+    pub(super) fn drain_env_scope_state(&mut self, frame_depth: usize) -> Vec<ActiveEnvScopeRange> {
+        let mut states = Vec::new();
+        let mut index = 0;
+        while index < self.active_env_scopes.len() {
+            if self.active_env_scopes[index].frame_depth == frame_depth {
+                states.push(self.active_env_scopes.remove(index));
+            } else {
+                index += 1;
+            }
+        }
+        states
+    }
+
+    pub(super) fn restore_env_scope_state(
+        &mut self,
+        frame_depth: usize,
+        mut states: Vec<ActiveEnvScopeRange>,
+    ) {
+        for state in &mut states {
+            state.frame_depth = frame_depth;
+        }
+        self.active_env_scopes.extend(states);
+    }
+
     fn object_environment_has_binding_with_context(
         &mut self,
         agent: &mut Agent,
@@ -222,7 +313,7 @@ impl Vm {
             match record {
                 EnvironmentRecord::Declarative(record) => {
                     if let Some(slot) =
-                        layout_binding_slot(agent, record.id(), record.layout(), name)
+                        self.layout_binding_slot(agent, record.id(), record.layout(), name)
                     {
                         let environment =
                             self.environment_for_slot_access(agent, record.id(), 0, slot)?;
@@ -235,9 +326,12 @@ impl Vm {
                 EnvironmentRecord::Private(record) => current = record.outer(),
                 EnvironmentRecord::Function(record) => {
                     let declarative = record.declarative();
-                    if let Some(slot) =
-                        layout_binding_slot(agent, declarative.id(), declarative.layout(), name)
-                    {
+                    if let Some(slot) = self.layout_binding_slot(
+                        agent,
+                        declarative.id(),
+                        declarative.layout(),
+                        name,
+                    ) {
                         let environment =
                             self.environment_for_slot_access(agent, declarative.id(), 0, slot)?;
                         return self
@@ -248,7 +342,7 @@ impl Vm {
                 }
                 EnvironmentRecord::Module(record) => {
                     if let Some(slot) =
-                        layout_binding_slot(agent, record.id(), record.layout(), name)
+                        self.layout_binding_slot(agent, record.id(), record.layout(), name)
                     {
                         let environment =
                             self.environment_for_slot_access(agent, record.id(), 0, slot)?;
@@ -272,7 +366,7 @@ impl Vm {
                             .map(Some);
                     }
                     if let Some(slot) =
-                        layout_binding_slot(agent, record.id(), record.layout(), name)
+                        self.layout_binding_slot(agent, record.id(), record.layout(), name)
                     {
                         let environment =
                             self.environment_for_slot_access(agent, record.id(), 0, slot)?;
@@ -280,17 +374,15 @@ impl Vm {
                             .read_environment_slot(agent, environment, slot)
                             .map(Some);
                     }
-                    if record.has_var_name(name) {
-                        return self
-                            .get_global_property_binding_with_context(
-                                agent,
-                                host,
-                                registry,
-                                frame,
-                                record.id(),
-                                name,
-                            )
-                            .map(|value| Some(value.unwrap_or_else(Value::undefined)));
+                    if let Some(value) = self.get_global_property_binding_with_context(
+                        agent,
+                        host,
+                        registry,
+                        frame,
+                        record.id(),
+                        name,
+                    )? {
+                        return Ok(Some(value));
                     }
                     current = record.outer();
                 }
@@ -336,7 +428,7 @@ impl Vm {
             match record {
                 EnvironmentRecord::Declarative(record) => {
                     if let Some(slot) =
-                        layout_binding_slot(agent, record.id(), record.layout(), name)
+                        self.layout_binding_slot(agent, record.id(), record.layout(), name)
                     {
                         let environment =
                             self.environment_for_slot_access(agent, record.id(), 0, slot)?;
@@ -347,9 +439,12 @@ impl Vm {
                 EnvironmentRecord::Private(record) => current = record.outer(),
                 EnvironmentRecord::Function(record) => {
                     let declarative = record.declarative();
-                    if let Some(slot) =
-                        layout_binding_slot(agent, declarative.id(), declarative.layout(), name)
-                    {
+                    if let Some(slot) = self.layout_binding_slot(
+                        agent,
+                        declarative.id(),
+                        declarative.layout(),
+                        name,
+                    ) {
                         let environment =
                             self.environment_for_slot_access(agent, declarative.id(), 0, slot)?;
                         return Ok(CapturedNameTarget::EnvironmentSlot { environment, slot });
@@ -358,7 +453,7 @@ impl Vm {
                 }
                 EnvironmentRecord::Module(record) => {
                     if let Some(slot) =
-                        layout_binding_slot(agent, record.id(), record.layout(), name)
+                        self.layout_binding_slot(agent, record.id(), record.layout(), name)
                     {
                         let environment =
                             self.environment_for_slot_access(agent, record.id(), 0, slot)?;
@@ -380,12 +475,14 @@ impl Vm {
                             slot: binding.slot(),
                         });
                     }
-                    let has_global_property = object::ordinary_has_property(
+                    let has_global_property = self.global_has_property_with_context(
                         agent,
+                        host,
+                        registry,
+                        frame,
                         record.global_object(),
-                        PropertyKey::from_atom(name),
-                    )
-                    .map_err(VmError::Abrupt)?;
+                        name,
+                    )?;
                     if record.has_var_name(name) || has_global_property {
                         return Ok(CapturedNameTarget::GlobalProperty {
                             environment: record.id(),
@@ -462,6 +559,8 @@ impl Vm {
     pub(super) fn store_global_with_feedback(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
         name: AtomId,
         value: Value,
@@ -488,14 +587,15 @@ impl Vm {
             self.record_feedback_site(code, instruction_offset);
             return Ok(());
         }
-        let _ = object::ordinary_set(
+        let _ = self.set_global_property_with_context(
             agent,
+            host,
+            registry,
+            frame,
             global_object,
-            PropertyKey::from_atom(name),
+            name,
             value,
-            AllocationLifetime::Default,
-        )
-        .map_err(VmError::Abrupt)?;
+        )?;
         self.observe_named_property_slow_path(
             agent,
             code,
@@ -510,6 +610,8 @@ impl Vm {
     pub(super) fn assign_global_with_feedback(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
         name: AtomId,
         value: Value,
@@ -546,19 +648,20 @@ impl Vm {
         }
 
         let has_property =
-            object::ordinary_has_property(agent, global_object, key).map_err(VmError::Abrupt)?;
+            self.global_has_property_with_key(agent, host, registry, frame, global_object, key)?;
         if !has_property && self.frame_is_strict(frame) {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
 
-        let stored = object::ordinary_set(
+        let stored = self.set_global_property_with_key(
             agent,
+            host,
+            registry,
+            frame,
             global_object,
             key,
             value,
-            AllocationLifetime::Default,
-        )
-        .map_err(VmError::Abrupt)?;
+        )?;
         if !stored && self.frame_is_strict(frame) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
@@ -620,6 +723,9 @@ impl Vm {
     fn assign_global_property_binding(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
         environment: EnvironmentRef,
         name: AtomId,
         value: Value,
@@ -627,19 +733,26 @@ impl Vm {
     ) -> VmResult<()> {
         let global = self.find_global_environment(agent, environment)?;
         let key = PropertyKey::from_atom(name);
-        let has_property = object::ordinary_has_property(agent, global.global_object(), key)
-            .map_err(VmError::Abrupt)?;
+        let has_property = self.global_has_property_with_key(
+            agent,
+            host,
+            registry,
+            frame,
+            global.global_object(),
+            key,
+        )?;
         if !has_property && strict {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
-        let stored = object::ordinary_set(
+        let stored = self.set_global_property_with_key(
             agent,
+            host,
+            registry,
+            frame,
             global.global_object(),
             key,
             value,
-            AllocationLifetime::Default,
-        )
-        .map_err(VmError::Abrupt)?;
+        )?;
         if !stored && strict {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
@@ -649,6 +762,9 @@ impl Vm {
     fn assign_unresolvable_name(
         &mut self,
         agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
         global_environment: EnvironmentRef,
         name: AtomId,
         value: Value,
@@ -658,14 +774,15 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
         let global = self.find_global_environment(agent, global_environment)?;
-        let _ = object::ordinary_set(
+        let _ = self.set_global_property_with_context(
             agent,
+            host,
+            registry,
+            frame,
             global.global_object(),
-            PropertyKey::from_atom(name),
+            name,
             value,
-            AllocationLifetime::Default,
-        )
-        .map_err(VmError::Abrupt)?;
+        )?;
         Ok(())
     }
 
@@ -776,6 +893,9 @@ impl Vm {
             CapturedNameTarget::GlobalProperty { environment } => self
                 .assign_global_property_binding(
                     agent,
+                    host,
+                    registry,
+                    frame,
                     environment,
                     reference.name(),
                     value,
@@ -784,6 +904,9 @@ impl Vm {
             CapturedNameTarget::Unresolvable { global_environment } => self
                 .assign_unresolvable_name(
                     agent,
+                    host,
+                    registry,
+                    frame,
                     global_environment,
                     reference.name(),
                     value,
@@ -864,8 +987,15 @@ impl Vm {
         )? {
             return Ok(value);
         }
-        self.lookup_global_property(agent, frame.variable_env(), name)?
-            .ok_or_else(|| VmError::Abrupt(errors::throw_reference_error(agent)))
+        self.get_global_property_binding_with_context(
+            agent,
+            host,
+            registry,
+            frame,
+            frame.variable_env(),
+            name,
+        )?
+        .ok_or_else(|| VmError::Abrupt(errors::throw_reference_error(agent)))
     }
 
     pub(super) fn capture_name_with_context(
@@ -921,6 +1051,9 @@ impl Vm {
             CapturedNameTarget::GlobalProperty { environment } => self
                 .assign_global_property_binding(
                     agent,
+                    host,
+                    registry,
+                    frame,
                     environment,
                     name,
                     value,
@@ -929,6 +1062,9 @@ impl Vm {
             CapturedNameTarget::Unresolvable { global_environment } => self
                 .assign_unresolvable_name(
                     agent,
+                    host,
+                    registry,
+                    frame,
                     global_environment,
                     name,
                     value,
@@ -977,6 +1113,9 @@ impl Vm {
             CapturedNameTarget::GlobalProperty { environment } => self
                 .assign_global_property_binding(
                     agent,
+                    host,
+                    registry,
+                    frame,
                     environment,
                     name,
                     value,
@@ -985,6 +1124,9 @@ impl Vm {
             CapturedNameTarget::Unresolvable { global_environment } => self
                 .assign_unresolvable_name(
                     agent,
+                    host,
+                    registry,
+                    frame,
                     global_environment,
                     name,
                     value,
@@ -1208,20 +1350,88 @@ impl Vm {
         Err(VmError::MissingEnvironment(start))
     }
 
-    fn lookup_global_property(
-        &self,
+    fn global_has_property_with_context(
+        &mut self,
         agent: &mut Agent,
-        start: EnvironmentRef,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        global_object: ObjectRef,
         name: AtomId,
-    ) -> VmResult<Option<Value>> {
-        let (_, global_object) = self.find_global_environment_object(agent, start)?;
-        let key = PropertyKey::from_atom(name);
-        if !object::ordinary_has_property(agent, global_object, key).map_err(VmError::Abrupt)? {
-            return Ok(None);
-        }
-        object::ordinary_get(agent, global_object, key)
-            .map(Some)
-            .map_err(VmError::Abrupt)
+    ) -> VmResult<bool> {
+        self.global_has_property_with_key(
+            agent,
+            host,
+            registry,
+            frame,
+            global_object,
+            PropertyKey::from_atom(name),
+        )
+    }
+
+    fn global_has_property_with_key(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        global_object: ObjectRef,
+        key: PropertyKey,
+    ) -> VmResult<bool> {
+        object::has_property_in_context(
+            &mut VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame,
+            },
+            global_object,
+            key,
+        )
+    }
+
+    fn set_global_property_with_context(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        global_object: ObjectRef,
+        name: AtomId,
+        value: Value,
+    ) -> VmResult<bool> {
+        self.set_global_property_with_key(
+            agent,
+            host,
+            registry,
+            frame,
+            global_object,
+            PropertyKey::from_atom(name),
+            value,
+        )
+    }
+
+    fn set_global_property_with_key(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        global_object: ObjectRef,
+        key: PropertyKey,
+        value: Value,
+    ) -> VmResult<bool> {
+        self.set_property_on_object(
+            agent,
+            host,
+            registry,
+            frame,
+            global_object,
+            Value::from_object_ref(global_object),
+            key,
+            value,
+        )
     }
 
     fn get_global_property_binding_with_context(
@@ -1235,14 +1445,15 @@ impl Vm {
     ) -> VmResult<Option<Value>> {
         let (_, global_object) = self.find_global_environment_object(agent, start)?;
         let key = PropertyKey::from_atom(name);
-        if !object::ordinary_has_property(agent, global_object, key).map_err(VmError::Abrupt)? {
+        if !self.global_has_property_with_key(agent, host, registry, frame, global_object, key)? {
             return Ok(None);
         }
-        self.get_property_from_value(
+        self.get_property_from_object(
             agent,
             host,
             registry,
             frame,
+            global_object,
             Value::from_object_ref(global_object),
             key,
         )

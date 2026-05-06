@@ -223,13 +223,17 @@ impl JsonParseNode {
         }
     }
 
-    fn source_units_for_value(&self, value: Value) -> Option<&[u16]> {
+    fn source_units_for_value<Cx: PublicBuiltinDispatchContext>(
+        &self,
+        cx: &mut Cx,
+        value: Value,
+    ) -> Result<Option<&[u16]>, Cx::Error> {
         match self {
             Self::Primitive {
                 value: original,
                 source_units,
-            } if *original == value => Some(source_units),
-            _ => None,
+            } if json_parse_source_value_matches(cx, *original, value)? => Ok(Some(source_units)),
+            _ => Ok(None),
         }
     }
 
@@ -565,12 +569,37 @@ fn json_reviver_context_object<Cx: PublicBuiltinDispatchContext>(
     let prototype = json_object_prototype(cx)?;
     let context =
         cx.allocate_ordinary_object_with_prototype(cx.builtin_realm(), Some(prototype))?;
-    if let Some(source_units) = metadata.and_then(|node| node.source_units_for_value(value)) {
+    let source_units = metadata
+        .map(|node| node.source_units_for_value(cx, value))
+        .transpose()?
+        .flatten();
+    if let Some(source_units) = source_units {
         let source_key = property_key_from_text(cx, "source");
         let source_value = string_from_code_units(cx, source_units);
         create_data_property_or_throw(cx, context, source_key, source_value)?;
     }
     Ok(Value::from_object_ref(context))
+}
+
+fn json_parse_source_value_matches<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    original: Value,
+    current: Value,
+) -> Result<bool, Cx::Error> {
+    if original == current {
+        return Ok(true);
+    }
+    if let (Some(left), Some(right)) = (json_number_value(original), json_number_value(current)) {
+        return Ok(left.to_bits() == right.to_bits());
+    }
+    let (Some(left), Some(right)) = (original.as_string_ref(), current.as_string_ref()) else {
+        return Ok(false);
+    };
+    Ok(string_ref_code_units(cx, left)? == string_ref_code_units(cx, right)?)
+}
+
+fn json_number_value(value: Value) -> Option<f64> {
+    value.as_smi().map(f64::from).or_else(|| value.as_f64())
 }
 
 fn json_internalize_property<Cx: PublicBuiltinDispatchContext>(

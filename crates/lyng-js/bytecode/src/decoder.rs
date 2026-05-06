@@ -163,6 +163,8 @@ fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::LoadThis
         | Opcode::LoadCallee
         | Opcode::LoadNewTarget
+        | Opcode::EnterEnvScope
+        | Opcode::LeaveEnvScope
         | Opcode::JumpIfTrue
         | Opcode::JumpIfFalse
         | Opcode::CreateObject
@@ -204,9 +206,11 @@ fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::GetNamedProperty
         | Opcode::SetNamedProperty
         | Opcode::AssignNamedProperty
+        | Opcode::StrictAssignNamedProperty
         | Opcode::GetKeyedProperty
         | Opcode::SetKeyedProperty
         | Opcode::AssignKeyedProperty
+        | Opcode::StrictAssignKeyedProperty
         | Opcode::DeleteProperty
         | Opcode::CopyDataProperties
         | Opcode::SetFunctionName

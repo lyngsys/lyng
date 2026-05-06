@@ -14,6 +14,20 @@ fn date_parse_two_digits(bytes: &[u8], index: usize) -> Option<u32> {
     Some(u32::from(tens - b'0') * 10 + u32::from(ones - b'0'))
 }
 
+fn date_parse_one_or_two_digits(bytes: &[u8], index: usize) -> Option<(u32, usize)> {
+    let first = *bytes.get(index)?;
+    if !first.is_ascii_digit() {
+        return None;
+    }
+    let mut value = u32::from(first - b'0');
+    let mut next = index + 1;
+    if let Some(second) = bytes.get(next).copied().filter(u8::is_ascii_digit) {
+        value = value * 10 + u32::from(second - b'0');
+        next += 1;
+    }
+    Some((value, next))
+}
+
 fn date_parse_fixed_digits(bytes: &[u8], index: usize, len: usize) -> Option<i32> {
     let mut value = 0_i32;
     for offset in 0..len {
@@ -238,6 +252,170 @@ fn date_parse_iso_text<Cx: PublicBuiltinDispatchContext>(
     Ok(Some(value))
 }
 
+fn date_parse_space_separated_text<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    text: &str,
+) -> Result<Option<Value>, Cx::Error> {
+    let bytes = text.as_bytes();
+    let mut index = 0;
+    let mut sign = 1_i32;
+    let year_digits = match bytes.first().copied() {
+        Some(b'+') => {
+            index = 1;
+            6
+        }
+        Some(b'-') => {
+            index = 1;
+            sign = -1;
+            6
+        }
+        _ => 4,
+    };
+    let Some(mut year) = date_parse_fixed_digits(bytes, index, year_digits) else {
+        return Ok(None);
+    };
+    if sign == -1 && year == 0 && year_digits == 6 {
+        return Ok(None);
+    }
+    year *= sign;
+    index += year_digits;
+
+    if bytes.get(index) != Some(&b'-') {
+        return Ok(None);
+    }
+    index += 1;
+    let Some((month, next)) = date_parse_one_or_two_digits(bytes, index) else {
+        return Ok(None);
+    };
+    index = next;
+    if bytes.get(index) != Some(&b'-') {
+        return Ok(None);
+    }
+    index += 1;
+    let Some((day, next)) = date_parse_one_or_two_digits(bytes, index) else {
+        return Ok(None);
+    };
+    index = next;
+    if !date_validate_iso_date(year, month, day) || bytes.get(index) != Some(&b' ') {
+        return Ok(None);
+    }
+    index += 1;
+
+    let Some((hour, next)) = date_parse_one_or_two_digits(bytes, index) else {
+        return Ok(None);
+    };
+    index = next;
+    if bytes.get(index) != Some(&b':') {
+        return Ok(None);
+    }
+    index += 1;
+    let Some((minute, next)) = date_parse_one_or_two_digits(bytes, index) else {
+        return Ok(None);
+    };
+    index = next;
+
+    let mut second = 0_u32;
+    let mut millisecond = 0_u32;
+    if bytes.get(index) == Some(&b':') {
+        index += 1;
+        let Some((parsed_second, next)) = date_parse_one_or_two_digits(bytes, index) else {
+            return Ok(None);
+        };
+        second = parsed_second;
+        index = next;
+        if bytes.get(index) == Some(&b'.') {
+            index += 1;
+            let mut scale = 100;
+            while let Some(byte) = bytes.get(index).copied() {
+                if !byte.is_ascii_digit() {
+                    break;
+                }
+                if scale > 0 {
+                    millisecond += u32::from(byte - b'0') * scale;
+                    scale /= 10;
+                }
+                index += 1;
+            }
+        }
+    }
+
+    if hour > 24
+        || minute > 59
+        || second > 59
+        || (hour == 24 && (minute != 0 || second != 0 || millisecond != 0))
+    {
+        return Ok(None);
+    }
+
+    let mut offset_minutes = None;
+    if matches!(bytes.get(index), Some(b'+' | b'-')) {
+        let offset_sign = if bytes[index] == b'+' { 1 } else { -1 };
+        index += 1;
+        let Some(offset_hour) = date_parse_two_digits(bytes, index) else {
+            return Ok(None);
+        };
+        index += 2;
+        let offset_minute = if bytes.get(index) == Some(&b':') {
+            index += 1;
+            let Some(minute) = date_parse_two_digits(bytes, index) else {
+                return Ok(None);
+            };
+            index += 2;
+            minute
+        } else if index + 2 <= bytes.len()
+            && bytes
+                .get(index..index + 2)
+                .is_some_and(|slice| slice.iter().all(u8::is_ascii_digit))
+        {
+            let minute = date_parse_two_digits(bytes, index).expect("digits were checked");
+            index += 2;
+            minute
+        } else {
+            0
+        };
+        if offset_hour > 23 || offset_minute > 59 {
+            return Ok(None);
+        }
+        offset_minutes = Some(
+            offset_sign
+                * (i32::try_from(offset_hour).unwrap_or(i32::MAX) * 60
+                    + i32::try_from(offset_minute).unwrap_or(i32::MAX)),
+        );
+    }
+
+    if index != text.len() {
+        return Ok(None);
+    }
+
+    let value = if let Some(offset) = offset_minutes {
+        let utc = date_make_utc_value(
+            f64::from(year),
+            f64::from(month - 1),
+            f64::from(day),
+            f64::from(hour),
+            f64::from(minute),
+            f64::from(second),
+            f64::from(millisecond),
+        );
+        let Some(millis) = utc.as_f64().filter(|millis| millis.is_finite()) else {
+            return Ok(Some(Value::from_f64(f64::NAN)));
+        };
+        date_time_clip_value(millis - f64::from(offset) * DATE_MS_PER_MINUTE as f64)
+    } else {
+        date_make_local_value(
+            cx,
+            f64::from(year),
+            f64::from(month - 1),
+            f64::from(day),
+            f64::from(hour),
+            f64::from(minute),
+            f64::from(second),
+            f64::from(millisecond),
+        )?
+    };
+    Ok(Some(value))
+}
+
 fn date_parse_utc_string(text: &str) -> Option<Value> {
     let parts: Vec<_> = text.split_whitespace().collect();
     if parts.len() != 6 || parts[5] != "GMT" {
@@ -288,6 +466,9 @@ pub(super) fn date_parse_text<Cx: PublicBuiltinDispatchContext>(
     text: &str,
 ) -> Result<Value, Cx::Error> {
     if let Some(value) = date_parse_iso_text(cx, text)? {
+        return Ok(value);
+    }
+    if let Some(value) = date_parse_space_separated_text(cx, text)? {
         return Ok(value);
     }
     if let Some(value) = date_parse_utc_string(text) {

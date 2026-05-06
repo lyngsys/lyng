@@ -28,6 +28,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             return Ok(false);
         }
 
+        let this_override = if let Some(this_override) = self.this_override_register {
+            let stable_this = self.alloc_temp()?;
+            self.emit_move(stable_this, this_override)?;
+            Some(stable_this)
+        } else {
+            None
+        };
         let argument_values = self.lower_call_arguments(arguments)?;
         let callee_register = self.lower_direct_eval_callee(callee)?;
         let mut direct_eval_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
@@ -38,7 +45,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             &direct_eval_arguments,
             self.ast().get_expr(expr_id).span(),
             dest,
-            self.this_override_register,
+            this_override,
         )?;
         let lexical_scopes = self.active_direct_eval_lexical_scopes();
         let flags = self.active_direct_eval_site_flags();
@@ -71,6 +78,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             return Ok(false);
         }
 
+        let this_override = if let Some(this_override) = self.this_override_register {
+            let stable_this = self.alloc_temp()?;
+            self.emit_move(stable_this, this_override)?;
+            Some(stable_this)
+        } else {
+            None
+        };
         let argument_values = self.lower_call_arguments(arguments)?;
         let callee_register = self.lower_direct_eval_callee(callee)?;
         let builtin_eval = self.alloc_temp()?;
@@ -96,7 +110,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             &direct_eval_arguments,
             self.ast().get_expr(expr_id).span(),
             direct_eval_result,
-            self.this_override_register,
+            this_override,
         )?;
         let lexical_scopes = self.active_direct_eval_lexical_scopes();
         let flags = self.active_direct_eval_site_flags();
@@ -594,6 +608,51 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         arguments: lyng_js_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
+        let current_direct_eval_arrow = self
+            .current_function_ast
+            .map(|function| {
+                matches!(
+                    self.ast().get_function(function).kind,
+                    FunctionKind::Arrow | FunctionKind::AsyncArrow
+                )
+            })
+            .unwrap_or(false);
+        if self.state.sema.direct_eval_allows_super
+            && (self.current_function.is_none() || current_direct_eval_arrow)
+        {
+            let span = self.ast().get_expr(expr_id).span();
+            let super_constructor = self.alloc_temp()?;
+            self.emit_internal_builtin_call_into(
+                internal_super_constructor_builtin(),
+                &[],
+                span,
+                super_constructor,
+            )?;
+            let argument_values = self.lower_call_arguments(arguments)?;
+            let mut super_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
+            super_arguments.push(super_constructor);
+            super_arguments.extend(argument_values.registers.iter().copied());
+            let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
+                internal_construct_super_builtin(),
+                &super_arguments,
+                span,
+                dest,
+            )?;
+            if argument_values.spread_mask != 0 {
+                if argument_values.spread_mask & (1_u64 << 63) != 0 {
+                    return Err(LoweringError::RegisterOverflow { register: u16::MAX });
+                }
+                let expected_arity = u16::try_from(super_arguments.len())
+                    .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+                self.builder.add_feedback_site(
+                    instruction_offset,
+                    FeedbackSiteKind::Call,
+                    self.call_feedback_metadata(expected_arity, argument_values.spread_mask << 1),
+                )?;
+            }
+            return Ok(());
+        }
+
         let Some(current_function) = self.current_function else {
             return Err(LoweringError::UnsupportedExpression { expr: expr_id });
         };
@@ -608,21 +667,34 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             return Err(LoweringError::UnsupportedExpression { expr: expr_id });
         }
 
-        let argument_values = self.lower_call_arguments(arguments)?;
         let span = self.ast().get_expr(expr_id).span();
+        let super_constructor = self.alloc_temp()?;
+        self.emit_internal_builtin_call_into(
+            internal_super_constructor_builtin(),
+            &[],
+            span,
+            super_constructor,
+        )?;
+        let argument_values = self.lower_call_arguments(arguments)?;
+        let mut super_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
+        super_arguments.push(super_constructor);
+        super_arguments.extend(argument_values.registers.iter().copied());
         let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
             internal_construct_super_builtin(),
-            &argument_values.registers,
+            &super_arguments,
             span,
             dest,
         )?;
         if argument_values.spread_mask != 0 {
-            let expected_arity = u16::try_from(argument_values.registers.len())
+            if argument_values.spread_mask & (1_u64 << 63) != 0 {
+                return Err(LoweringError::RegisterOverflow { register: u16::MAX });
+            }
+            let expected_arity = u16::try_from(super_arguments.len())
                 .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
             self.builder.add_feedback_site(
                 instruction_offset,
                 FeedbackSiteKind::Call,
-                self.call_feedback_metadata(expected_arity, argument_values.spread_mask),
+                self.call_feedback_metadata(expected_arity, argument_values.spread_mask << 1),
             )?;
         }
         self.emit_derived_class_super_call_epilogue(dest)

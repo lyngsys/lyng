@@ -21,7 +21,7 @@ use lyng_js_env::{
     ModuleRequestPhase, ModuleRequestRecord, ModuleResolvedExport, ModuleResolvedExportTarget,
     ModuleStarExportEntry, ModuleStatus, RealmRecord, ThisBindingStatus, ThisState,
 };
-use lyng_js_gc::AllocationLifetime;
+use lyng_js_gc::{AllocationLifetime, PrimitiveCollectionReport, PrimitiveTracer, TraceHeapEdges};
 use lyng_js_host::{
     DiagnosticReportRequest, HostHooks, ImportMetaRequest, ModuleKey, ModuleSourceRequest,
     NoopHostHooks,
@@ -204,7 +204,160 @@ struct EntryExecutionOverride {
     this_value: Value,
     new_target: Option<ObjectRef>,
     home_object: Option<ObjectRef>,
+    active_function: Option<ObjectRef>,
     private_env: Option<EnvironmentRef>,
+    lexical_this: bool,
+}
+
+struct ActiveVmRoots<'a> {
+    vm: &'a Vm,
+    caller_frame: FrameRecord,
+}
+
+impl TraceHeapEdges for TemplateCacheKey {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.realm.trace_heap_edges(tracer);
+        self.code.trace_heap_edges(tracer);
+    }
+}
+
+impl TraceHeapEdges for LoopIterationEnvironment {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.source_environment.trace_heap_edges(tracer);
+        self.iteration_environment.trace_heap_edges(tracer);
+    }
+}
+
+impl TraceHeapEdges for WithEnvironmentState {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.previous_lexical_env.trace_heap_edges(tracer);
+    }
+}
+
+impl TraceHeapEdges for DirectEvalEnvironmentState {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.environment.trace_heap_edges(tracer);
+    }
+}
+
+impl TraceHeapEdges for AsyncGeneratorRequest {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.value.trace_heap_edges(tracer);
+        self.realm.trace_heap_edges(tracer);
+    }
+}
+
+impl TraceHeapEdges for AsyncGeneratorFrameState {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.generator.trace_heap_edges(tracer);
+        self.realm.trace_heap_edges(tracer);
+    }
+}
+
+impl TraceHeapEdges for EntryExecutionOverride {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.this_value.trace_heap_edges(tracer);
+        self.new_target.trace_heap_edges(tracer);
+        self.home_object.trace_heap_edges(tracer);
+        self.active_function.trace_heap_edges(tracer);
+        self.private_env.trace_heap_edges(tracer);
+    }
+}
+
+impl TraceHeapEdges for ActiveVmRoots<'_> {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        trace_frame_record(self.caller_frame, tracer);
+
+        for value in &self.vm.register_stack {
+            value.trace_heap_edges(tracer);
+        }
+        for frame in &self.vm.frames {
+            trace_frame_record(*frame, tracer);
+        }
+        self.vm.current_exception.trace_heap_edges(tracer);
+
+        for installed in self.vm.installed.iter().flatten() {
+            for code in &installed.child_codes {
+                code.trace_heap_edges(tracer);
+            }
+        }
+        self.vm.builtin_cache.trace_heap_edges(tracer);
+        for (key, value) in &self.vm.template_cache {
+            key.trace_heap_edges(tracer);
+            value.trace_heap_edges(tracer);
+        }
+        for code in self.vm.dynamic_function_cache.values() {
+            code.code().trace_heap_edges(tracer);
+        }
+        for state in self.vm.suspended_side_states.values() {
+            for (_, iterator) in &state.iterator_states {
+                iterator.trace_heap_edges(tracer);
+            }
+            for (_, enumerator) in &state.for_in_states {
+                enumerator.trace_heap_edges(tracer);
+            }
+            for state in &state.loop_iteration_envs {
+                state.trace_heap_edges(tracer);
+            }
+            for state in &state.with_environment_states {
+                state.trace_heap_edges(tracer);
+            }
+            for state in &state.direct_eval_environment_states {
+                state.trace_heap_edges(tracer);
+            }
+            for state in &state.active_env_scopes {
+                state.environment.trace_heap_edges(tracer);
+            }
+            state.async_generator_frame_state.trace_heap_edges(tracer);
+        }
+        for state in self.vm.async_generator_frame_states.values() {
+            state.trace_heap_edges(tracer);
+        }
+        for object in &self.vm.async_generator_objects {
+            object.trace_heap_edges(tracer);
+        }
+        for (object, queue) in &self.vm.async_generator_queues {
+            object.trace_heap_edges(tracer);
+            for request in queue {
+                request.trace_heap_edges(tracer);
+            }
+        }
+        for object in self.vm.deferred_module_namespaces.keys() {
+            object.trace_heap_edges(tracer);
+        }
+        for state in &self.vm.loop_iteration_envs {
+            state.trace_heap_edges(tracer);
+        }
+        for state in &self.vm.with_environment_states {
+            state.trace_heap_edges(tracer);
+        }
+        for state in &self.vm.direct_eval_environment_states {
+            state.trace_heap_edges(tracer);
+        }
+        for state in &self.vm.active_env_scopes {
+            state.environment.trace_heap_edges(tracer);
+        }
+        for (overlay, source) in &self.vm.direct_eval_environment_overlays {
+            overlay.trace_heap_edges(tracer);
+            source.trace_heap_edges(tracer);
+        }
+        for value in &self.vm.argument_scratch {
+            value.trace_heap_edges(tracer);
+        }
+    }
+}
+
+fn trace_frame_record(frame: FrameRecord, tracer: &mut PrimitiveTracer<'_>) {
+    frame.code().trace_heap_edges(tracer);
+    frame.realm().trace_heap_edges(tracer);
+    frame.lexical_env().trace_heap_edges(tracer);
+    frame.variable_env().trace_heap_edges(tracer);
+    frame.this_value().trace_heap_edges(tracer);
+    frame.construct_this().trace_heap_edges(tracer);
+    frame.new_target().trace_heap_edges(tracer);
+    frame.callee().trace_heap_edges(tracer);
+    frame.tail_caller().trace_heap_edges(tracer);
+    frame.resume_value().trace_heap_edges(tracer);
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -245,9 +398,33 @@ struct SuspendedExecutionSideState {
     loop_iteration_envs: Vec<LoopIterationEnvironment>,
     with_environment_states: Vec<WithEnvironmentState>,
     direct_eval_environment_states: Vec<DirectEvalEnvironmentState>,
+    active_env_scopes: Vec<ActiveEnvScopeRange>,
     async_frame_state: Option<AsyncFrameState>,
     async_generator_frame_state: Option<AsyncGeneratorFrameState>,
     script_or_module_referrer: Option<AtomId>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ActiveEnvScopeRange {
+    frame_depth: usize,
+    environment: EnvironmentRef,
+    start: u32,
+    end: u32,
+}
+
+impl ActiveEnvScopeRange {
+    const fn new(frame_depth: usize, environment: EnvironmentRef, start: u32, count: u32) -> Self {
+        Self {
+            frame_depth,
+            environment,
+            start,
+            end: start.saturating_add(count),
+        }
+    }
+
+    fn contains(self, environment: EnvironmentRef, slot: u32) -> bool {
+        self.environment == environment && self.start <= slot && slot < self.end
+    }
 }
 
 #[derive(Default)]
@@ -287,6 +464,7 @@ pub struct Vm {
     loop_iteration_envs: Vec<LoopIterationEnvironment>,
     with_environment_states: Vec<WithEnvironmentState>,
     direct_eval_environment_states: Vec<DirectEvalEnvironmentState>,
+    active_env_scopes: Vec<ActiveEnvScopeRange>,
     direct_eval_environment_overlays: HashMap<EnvironmentRef, EnvironmentRef>,
     direct_eval_lexical_layouts: HashMap<Vec<BytecodeEnvironmentBinding>, EnvironmentLayoutId>,
     loop_iteration_layouts: HashMap<Option<EnvironmentLayoutId>, EnvironmentLayoutId>,
@@ -337,6 +515,7 @@ impl Vm {
             loop_iteration_envs: Vec::new(),
             with_environment_states: Vec::new(),
             direct_eval_environment_states: Vec::new(),
+            active_env_scopes: Vec::new(),
             direct_eval_environment_overlays: HashMap::new(),
             direct_eval_lexical_layouts: HashMap::new(),
             loop_iteration_layouts: HashMap::new(),
@@ -401,6 +580,17 @@ impl Vm {
     #[inline]
     pub fn current_exception(&self) -> Option<Value> {
         self.current_exception
+    }
+
+    pub(crate) fn force_collect_with_active_roots(
+        &self,
+        agent: &mut Agent,
+        caller_frame: FrameRecord,
+    ) -> PrimitiveCollectionReport {
+        agent.force_collect_with_additional_roots(&ActiveVmRoots {
+            vm: self,
+            caller_frame,
+        })
     }
 
     #[inline]
@@ -1060,7 +1250,9 @@ impl Vm {
         entry_this_value: Value,
         entry_new_target: Option<ObjectRef>,
         entry_home_object: Option<ObjectRef>,
+        entry_active_function: Option<ObjectRef>,
         entry_private_env: Option<EnvironmentRef>,
+        entry_lexical_this: bool,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
@@ -1077,7 +1269,9 @@ impl Vm {
                 this_value: entry_this_value,
                 new_target: entry_new_target,
                 home_object: entry_home_object,
+                active_function: entry_active_function,
                 private_env: entry_private_env,
+                lexical_this: entry_lexical_this,
             }),
         )
     }
@@ -1237,6 +1431,9 @@ impl Vm {
             .ok_or(VmError::MissingInstalledCode(code))?;
         let entry_private_env =
             entry_override.and_then(|override_state| override_state.private_env);
+        let entry_lexical_this = entry_override.is_some_and(|override_state| {
+            override_state.active_function.is_some() && override_state.lexical_this
+        });
         let (lexical_env, variable_env, this_value, new_target) = self.prepare_entry_execution(
             agent,
             code,
@@ -1257,7 +1454,12 @@ impl Vm {
 
         let context = ExecutionContext::bytecode(realm, code, lexical_env, variable_env)
             .with_private_env(entry_private_env)
-            .with_this_state(ThisState::Value(this_value))
+            .with_this_state(if entry_lexical_this {
+                ThisState::Lexical
+            } else {
+                ThisState::Value(this_value)
+            })
+            .with_new_target(new_target)
             .with_script_or_module_referrer(script_or_module_referrer);
         let context = if function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Module {
             let module_referrer = agent
@@ -1352,19 +1554,24 @@ impl Vm {
             return Ok((module_env, module_env, this_value, None));
         }
 
-        let (this_value, new_target, home_object) = if let Some(override_state) = entry_override {
-            (
-                override_state.this_value,
-                override_state.new_target,
-                override_state.home_object,
-            )
-        } else {
-            (
-                self.resolve_global_this(agent, realm, Value::undefined())?,
-                None,
-                None,
-            )
-        };
+        let (this_value, new_target, home_object, active_function, lexical_this) =
+            if let Some(override_state) = entry_override {
+                (
+                    override_state.this_value,
+                    override_state.new_target,
+                    override_state.home_object,
+                    override_state.active_function,
+                    override_state.lexical_this,
+                )
+            } else {
+                (
+                    self.resolve_global_this(agent, realm, Value::undefined())?,
+                    None,
+                    None,
+                    None,
+                    false,
+                )
+            };
         if !function.needs_environment() {
             return Ok((lexical_env, variable_env, this_value, new_target));
         }
@@ -1377,12 +1584,18 @@ impl Vm {
             .realm(realm)
             .ok_or(VmError::MissingRootShape(realm))?
             .global_object();
+        let function_object = active_function.unwrap_or(global_object);
+        let this_binding_status = if lexical_this && active_function.is_some() {
+            ThisBindingStatus::Lexical
+        } else {
+            ThisBindingStatus::Initialized
+        };
         let lexical_env = agent
             .alloc_function_environment(
                 Some(lexical_env),
                 layout,
-                global_object,
-                ThisBindingStatus::Initialized,
+                function_object,
+                this_binding_status,
                 this_value,
                 new_target,
                 home_object,

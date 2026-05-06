@@ -100,6 +100,20 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
             Expr::OptionalChainExpression { base, .. } => self
                 .lower_optional_chain_optional_call_target(base, callee_dest, this_dest, shorted),
+            Expr::CallExpression {
+                callee: inner_callee,
+                arguments,
+                ..
+            } if self.expr_continues_optional_chain(inner_callee) => {
+                self.lower_optional_chain_call_continuation_with_flag(
+                    callee,
+                    inner_callee,
+                    arguments,
+                    callee_dest,
+                    shorted,
+                )?;
+                self.emit_load_undefined(this_dest)
+            }
             Expr::StaticMemberExpression {
                 object, property, ..
             } if self.expr_continues_optional_chain(object) => self
@@ -137,6 +151,159 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.emit_move(this_dest, this_register)
             }
         }
+    }
+
+    pub(super) fn lower_optional_chain_delete(
+        &mut self,
+        expr_id: ExprId,
+        dest: u16,
+    ) -> LoweringResult<()> {
+        let shorted = self.alloc_temp()?;
+        self.emit_load_bool(shorted, false)?;
+        self.emit_load_bool(dest, true)?;
+        self.lower_optional_chain_delete_segment(expr_id, dest, shorted)
+    }
+
+    fn lower_optional_chain_delete_segment(
+        &mut self,
+        expr_id: ExprId,
+        dest: u16,
+        shorted: u16,
+    ) -> LoweringResult<()> {
+        match self.ast().get_expr(expr_id).clone() {
+            Expr::OptionalChainExpression { base, .. } => {
+                self.lower_optional_chain_delete_hop(base, dest, shorted)
+            }
+            Expr::StaticMemberExpression {
+                object, property, ..
+            } if self.expr_continues_optional_chain(object) => self
+                .lower_optional_chain_delete_static_continuation(object, property, dest, shorted),
+            Expr::ComputedMemberExpression {
+                object, property, ..
+            } if self.expr_continues_optional_chain(object) => self
+                .lower_optional_chain_delete_computed_continuation(object, property, dest, shorted),
+            _ => self.lower_delete_expression(expr_id, dest),
+        }
+    }
+
+    fn lower_optional_chain_delete_hop(
+        &mut self,
+        base: ExprId,
+        dest: u16,
+        shorted: u16,
+    ) -> LoweringResult<()> {
+        match self.ast().get_expr(base).clone() {
+            Expr::StaticMemberExpression {
+                object, property, ..
+            } => self.lower_optional_delete_static_hop(object, property, dest, shorted),
+            Expr::ComputedMemberExpression {
+                object, property, ..
+            } => self.lower_optional_delete_computed_hop(object, property, dest, shorted),
+            Expr::CallExpression {
+                callee, arguments, ..
+            } => {
+                let result = self.alloc_temp()?;
+                self.lower_optional_call_hop(base, callee, arguments, result, shorted)?;
+                self.emit_load_bool(dest, true)
+            }
+            _ => {
+                let result = self.alloc_temp()?;
+                self.lower_optional_chain_segment(base, result, shorted)?;
+                self.emit_load_bool(dest, true)
+            }
+        }
+    }
+
+    fn lower_optional_delete_static_hop(
+        &mut self,
+        object: ExprId,
+        property: AtomId,
+        dest: u16,
+        shorted: u16,
+    ) -> LoweringResult<()> {
+        let receiver = self.alloc_temp()?;
+        self.lower_optional_chain_operand_value(object, receiver, shorted)?;
+        let guard = self.emit_optional_nullish_delete_guard(receiver, dest, shorted)?;
+        let key = self.alloc_temp()?;
+        self.emit_load_atom_string(key, property)?;
+        self.builder.emit_abc(
+            Opcode::DeleteProperty,
+            self.encode_register(dest)?,
+            self.encode_register(receiver)?,
+            self.encode_register(key)?,
+        )?;
+        self.finish_optional_nullish_guard(guard)?;
+        Ok(())
+    }
+
+    fn lower_optional_delete_computed_hop(
+        &mut self,
+        object: ExprId,
+        property: ExprId,
+        dest: u16,
+        shorted: u16,
+    ) -> LoweringResult<()> {
+        let receiver = self.alloc_temp()?;
+        self.lower_optional_chain_operand_value(object, receiver, shorted)?;
+        let guard = self.emit_optional_nullish_delete_guard(receiver, dest, shorted)?;
+        let key = self.lower_expr_to_temp(property)?;
+        self.builder.emit_abc(
+            Opcode::DeleteProperty,
+            self.encode_register(dest)?,
+            self.encode_register(receiver)?,
+            self.encode_register(key)?,
+        )?;
+        self.finish_optional_nullish_guard(guard)?;
+        Ok(())
+    }
+
+    fn lower_optional_chain_delete_static_continuation(
+        &mut self,
+        object: ExprId,
+        property: AtomId,
+        dest: u16,
+        shorted: u16,
+    ) -> LoweringResult<()> {
+        let receiver = self.alloc_temp()?;
+        self.lower_optional_chain_segment(object, receiver, shorted)?;
+        let jump_end = self
+            .builder
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?)?;
+        let key = self.alloc_temp()?;
+        self.emit_load_atom_string(key, property)?;
+        self.builder.emit_abc(
+            Opcode::DeleteProperty,
+            self.encode_register(dest)?,
+            self.encode_register(receiver)?,
+            self.encode_register(key)?,
+        )?;
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
+        Ok(())
+    }
+
+    fn lower_optional_chain_delete_computed_continuation(
+        &mut self,
+        object: ExprId,
+        property: ExprId,
+        dest: u16,
+        shorted: u16,
+    ) -> LoweringResult<()> {
+        let receiver = self.alloc_temp()?;
+        self.lower_optional_chain_segment(object, receiver, shorted)?;
+        let jump_end = self
+            .builder
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(shorted)?)?;
+        let key = self.lower_expr_to_temp(property)?;
+        self.builder.emit_abc(
+            Opcode::DeleteProperty,
+            self.encode_register(dest)?,
+            self.encode_register(receiver)?,
+            self.encode_register(key)?,
+        )?;
+        let end = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_end, end)?;
+        Ok(())
     }
 
     fn lower_optional_chain_segment(
@@ -525,6 +692,40 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let end = self.builder.current_offset()?;
         self.builder.patch_jump_to(guard.jump_end, end)?;
         Ok(())
+    }
+
+    fn emit_optional_nullish_delete_guard(
+        &mut self,
+        value: u16,
+        dest: u16,
+        shorted: u16,
+    ) -> LoweringResult<OptionalNullishGuard> {
+        let null_value = self.alloc_temp()?;
+        self.emit_load_null(null_value)?;
+        let is_null = self.alloc_temp()?;
+        self.emit_profiled_binary(Opcode::StrictEqual, is_null, value, null_value)?;
+        let jump_short_from_null = self
+            .builder
+            .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(is_null)?)?;
+
+        let undefined_value = self.alloc_temp()?;
+        self.emit_load_undefined(undefined_value)?;
+        let is_undefined = self.alloc_temp()?;
+        self.emit_profiled_binary(Opcode::StrictEqual, is_undefined, value, undefined_value)?;
+        let jump_continue = self
+            .builder
+            .emit_cond_jump_placeholder(Opcode::JumpIfFalse, self.encode_register(is_undefined)?)?;
+
+        let short_offset = self.builder.current_offset()?;
+        self.builder
+            .patch_jump_to(jump_short_from_null, short_offset)?;
+        self.emit_load_bool(dest, true)?;
+        self.emit_load_bool(shorted, true)?;
+        let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+
+        let continue_offset = self.builder.current_offset()?;
+        self.builder.patch_jump_to(jump_continue, continue_offset)?;
+        Ok(OptionalNullishGuard { jump_end })
     }
 
     fn emit_optional_call(

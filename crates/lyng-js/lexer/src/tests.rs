@@ -484,6 +484,21 @@ fn string_unicode_braced_escape() {
 }
 
 #[test]
+fn string_unicode_braced_surrogate_escape_preserves_utf16() {
+    let mut atoms = AtomTable::new();
+    let source_id = SourceId::new(0);
+    let mut lexer = Lexer::new(r#""\u{D800}\u{DC00}""#, source_id, &mut atoms);
+    let tok = lexer.next_token();
+    assert_eq!(tok.kind, TokenKind::StringLiteral);
+    let id = literal_id(&tok);
+    assert_eq!(
+        lexer.literals.get_string(id).code_units(),
+        vec![0xD800, 0xDC00]
+    );
+    assert!(lexer.diagnostics.is_empty());
+}
+
+#[test]
 fn string_identity_escape_consumes_full_unicode_character() {
     let mut atoms = AtomTable::new();
     let source_id = SourceId::new(0);
@@ -564,7 +579,10 @@ fn no_substitution_template() {
     assert_eq!(tok.kind, TokenKind::NoSubstitutionTemplate);
     let id = literal_id(&tok);
     let chunk = lexer.literals.get_template(id);
-    assert_eq!(chunk.cooked.as_deref(), Some("hello"));
+    assert_eq!(
+        chunk.cooked.as_ref().and_then(|value| value.as_str()),
+        Some("hello")
+    );
     assert_eq!(chunk.raw, "hello");
 }
 
@@ -578,7 +596,12 @@ fn template_with_substitution() {
     assert_eq!(head.kind, TokenKind::TemplateHead);
     let id = literal_id(&head);
     assert_eq!(
-        lexer.literals.get_template(id).cooked.as_deref(),
+        lexer
+            .literals
+            .get_template(id)
+            .cooked
+            .as_ref()
+            .and_then(|value| value.as_str()),
         Some("hello ")
     );
 
@@ -602,8 +625,43 @@ fn template_with_escape() {
     assert_eq!(tok.kind, TokenKind::NoSubstitutionTemplate);
     let id = literal_id(&tok);
     let chunk = lexer.literals.get_template(id);
-    assert_eq!(chunk.cooked.as_deref(), Some("a\nb"));
+    assert_eq!(
+        chunk.cooked.as_ref().and_then(|value| value.as_str()),
+        Some("a\nb")
+    );
     assert_eq!(chunk.raw, "a\\nb");
+}
+
+#[test]
+fn template_with_surrogate_pair_escape() {
+    let mut atoms = AtomTable::new();
+    let source_id = SourceId::new(0);
+    let mut lexer = Lexer::new("`\\uD83D\\uDC38`", source_id, &mut atoms);
+    let tok = lexer.next_token();
+    assert_eq!(tok.kind, TokenKind::NoSubstitutionTemplate);
+    let id = literal_id(&tok);
+    let chunk = lexer.literals.get_template(id);
+    assert_eq!(
+        chunk.cooked.as_ref().and_then(|value| value.as_str()),
+        Some("\u{1F438}")
+    );
+    assert_eq!(chunk.raw, "\\uD83D\\uDC38");
+}
+
+#[test]
+fn template_with_lone_surrogate_escape_preserves_utf16() {
+    let mut atoms = AtomTable::new();
+    let source_id = SourceId::new(0);
+    let mut lexer = Lexer::new("`\\uDC38`", source_id, &mut atoms);
+    let tok = lexer.next_token();
+    assert_eq!(tok.kind, TokenKind::NoSubstitutionTemplate);
+    let id = literal_id(&tok);
+    let chunk = lexer.literals.get_template(id);
+    assert_eq!(
+        chunk.cooked.as_ref().map(|value| value.code_units()),
+        Some(vec![0xDC38])
+    );
+    assert_eq!(chunk.raw, "\\uDC38");
 }
 
 #[test]

@@ -95,6 +95,14 @@ impl<'a> Analyzer<'a> {
                                 self.diagnostics
                                     .error(prop.span, "getter methods must not declare parameters");
                             }
+                            if prop.kind == PropertyKind::Set
+                                && (param_len != 1 || func.params.rest.is_some())
+                            {
+                                self.diagnostics.error(
+                                    prop.span,
+                                    "setter methods must declare exactly one non-rest parameter",
+                                );
+                            }
                             if self.function_body_contains_query(
                                 *function,
                                 ContainmentQuery::DirectSuperCall,
@@ -246,7 +254,14 @@ impl<'a> Analyzer<'a> {
                 }
             }
 
-            Expr::StaticMemberExpression { object, .. } => {
+            Expr::StaticMemberExpression {
+                object, property, ..
+            } => {
+                if *property == WellKnownAtom::arguments.id() {
+                    if let Some(func_id) = self.ctx.current_function {
+                        self.functions.get_mut(func_id).needs_arguments = true;
+                    }
+                }
                 self.walk_expr(*object);
             }
 

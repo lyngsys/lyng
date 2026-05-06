@@ -313,6 +313,7 @@ impl Vm {
             .expect("tail-call recycling requires one active frame");
         debug_assert_eq!(active, frame);
         self.close_loop_iteration_frames(self.frames.len());
+        self.close_env_scope_frames(self.frames.len());
         self.for_in_states.clear_window(frame.registers());
         self.iterator_states.clear_window(frame.registers());
         self.captured_name_references

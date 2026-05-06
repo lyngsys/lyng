@@ -17,8 +17,7 @@ pub(super) use typed_arrays::{
 };
 
 use super::{
-    array_like_index_property_key, array_like_length_u64, arrays,
-    collect_array_like_values_for_from_builtin, create_data_property_or_throw,
+    array_like_index_property_key, array_like_length_u64, arrays, create_data_property_or_throw,
     get_property_from_object, iterable_to_values_list, iterators, length_value_u64, map_completion,
     normalize_relative_index_u64, promises, property_key_from_text, range_error,
     string_from_code_units, string_ref_code_units, string_value, syntax_error,

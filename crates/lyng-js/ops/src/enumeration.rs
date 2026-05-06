@@ -1,5 +1,6 @@
 use crate::errors::internal_method_error;
 use lyng_js_env::Agent;
+use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
 use lyng_js_types::{Completion, ObjectRef, PropertyKey};
 use std::collections::HashSet;
 
@@ -56,6 +57,15 @@ impl ForInEnumerator {
             }
         }
         Ok(None)
+    }
+}
+
+impl TraceHeapEdges for ForInEnumerator {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        for entry in &self.keys {
+            entry.owner.trace_heap_edges(tracer);
+            entry.key.trace_heap_edges(tracer);
+        }
     }
 }
 

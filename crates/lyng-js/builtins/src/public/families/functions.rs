@@ -18,8 +18,8 @@ use lyng_js_types::{
     function_bind_builtin, function_builtin, function_call_builtin, function_prototype_builtin,
     function_symbol_has_instance_builtin, function_to_string_builtin, generator_function_builtin,
     generator_next_builtin, generator_return_builtin, generator_throw_builtin,
-    internal_throw_type_error_builtin, iterator_prototype_iterator_builtin, BuiltinFunctionId,
-    ObjectRef, RealmRef, Value, WellKnownSymbolId,
+    internal_throw_type_error_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
+    WellKnownSymbolId,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -287,11 +287,6 @@ fn install_generator_prototype_descriptors(
         builtin_function_atom_property(atoms.next, generator_next_builtin()),
         builtin_function_atom_property(WellKnownAtom::r#return.id(), generator_return_builtin()),
         builtin_function_atom_property(atoms.throw, generator_throw_builtin()),
-        builtin_function_symbol_property(
-            WellKnownSymbolId::Iterator,
-            iterator_prototype_iterator_builtin(),
-            writable_builtin_attributes(),
-        ),
         data_symbol_property(
             WellKnownSymbolId::ToStringTag,
             tags.generator,

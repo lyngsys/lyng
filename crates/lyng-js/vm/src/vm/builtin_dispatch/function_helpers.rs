@@ -14,6 +14,16 @@ impl Vm {
         if !agent.objects().is_callable(target) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
+        let target_prototype = object::get_prototype_of_in_context(
+            &mut VmProxyBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame: caller,
+            },
+            target,
+        )?;
         let target_data = bound_target_function_data(agent, target)?;
         let realm = target_data
             .as_ref()
@@ -24,10 +34,6 @@ impl Vm {
             .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
         let root_shape = realm_record
             .root_shape()
-            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
-        let function_prototype = realm_record
-            .intrinsics()
-            .function_prototype()
             .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
         let environment = target_data
             .as_ref()
@@ -55,7 +61,7 @@ impl Vm {
             objects.alloc_object(
                 &mut mutator,
                 ObjectAllocation::function(root_shape)
-                    .with_prototype(Some(function_prototype))
+                    .with_prototype(target_prototype)
                     .with_cold_data(ObjectColdData::Function(function_data)),
                 AllocationLifetime::Default,
             )

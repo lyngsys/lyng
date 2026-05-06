@@ -6,7 +6,7 @@ mod symbols;
 use super::{
     allocate_array_like_result, append_string_ref_code_units, builtin_function_entry,
     callable_object_from_value, code_unit_range_value, define_data_property_with_attrs, iterators,
-    set_data_property_value, string_from_code_units, string_from_string_ref_range,
+    range_error, set_data_property_value, string_from_code_units, string_from_string_ref_range,
     string_ref_code_units, string_value, syntax_error, to_boolean_for_builtin,
     to_integer_or_infinity_for_builtin, to_length_for_builtin, to_string_string_ref, type_error,
     usize_index_value, with_string_ref_code_units, PublicBuiltinDispatchContext,
@@ -982,6 +982,89 @@ pub(super) fn code_unit_ascii(unit: u16) -> Option<u8> {
     u8::try_from(unit).ok().filter(u8::is_ascii)
 }
 
+fn regexp_replacement_template_length_without_named(
+    template_units: &[u16],
+    source_units: &[u16],
+    matched_units: &[u16],
+    position: usize,
+    captures: &[Option<Vec<u16>>],
+    named_captures: Value,
+) -> Option<usize> {
+    let mut length = 0_usize;
+    let mut index = 0;
+    while index < template_units.len() {
+        if template_units[index] != u16::from(b'$') {
+            length = length.checked_add(1)?;
+            index += 1;
+            continue;
+        }
+        let Some(next) = template_units.get(index + 1).copied() else {
+            length = length.checked_add(1)?;
+            index += 1;
+            continue;
+        };
+        match code_unit_ascii(next).map(char::from) {
+            Some('$') => {
+                length = length.checked_add(1)?;
+                index += 2;
+            }
+            Some('&') => {
+                length = length.checked_add(matched_units.len())?;
+                index += 2;
+            }
+            Some('`') => {
+                length = length.checked_add(position)?;
+                index += 2;
+            }
+            Some('\'') => {
+                let end = position
+                    .saturating_add(matched_units.len())
+                    .min(source_units.len());
+                length = length.checked_add(source_units.len().saturating_sub(end))?;
+                index += 2;
+            }
+            Some('<') => {
+                if !named_captures.is_undefined() {
+                    return None;
+                }
+                length = length.checked_add(2)?;
+                index += 2;
+            }
+            Some(digit @ '0'..='9') => {
+                let first = usize::from((digit as u8) - b'0');
+                let mut capture_index = first;
+                let mut digit_count = 1;
+                if let Some(second) = template_units
+                    .get(index + 2)
+                    .and_then(|unit| code_unit_ascii(*unit))
+                    .filter(u8::is_ascii_digit)
+                {
+                    let candidate = first * 10 + usize::from(second - b'0');
+                    digit_count = 2;
+                    capture_index = candidate;
+                    if capture_index > captures.len() && first != 0 {
+                        digit_count = 1;
+                        capture_index = first;
+                    }
+                }
+                if (1..=captures.len()).contains(&capture_index) {
+                    if let Some(capture) = &captures[capture_index - 1] {
+                        length = length.checked_add(capture.len())?;
+                    }
+                } else {
+                    length = length.checked_add(1 + digit_count)?;
+                }
+                index += 1 + digit_count;
+            }
+            _ => {
+                length = length.checked_add(1)?;
+                index += 1;
+            }
+        }
+    }
+    Some(length)
+}
+
 fn expand_regexp_replacement_template<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     template_units: &[u16],
@@ -1369,6 +1452,26 @@ pub(super) fn regexp_replace_with_string<Cx: PublicBuiltinDispatchContext>(
                         cx.to_object_for_builtin_value(cx.builtin_realm(), named_captures)?,
                     )
                 };
+                if let Some(replacement_len) = regexp_replacement_template_length_without_named(
+                    replacement_template_units
+                        .as_deref()
+                        .expect("template units should exist for non-callable replacements"),
+                    source_units,
+                    &matched_units,
+                    position,
+                    &capture_units,
+                    named_captures,
+                ) {
+                    let prefix_len = position.saturating_sub(next_source_position);
+                    let projected_len = result
+                        .len()
+                        .checked_add(prefix_len)
+                        .and_then(|length| length.checked_add(replacement_len))
+                        .ok_or_else(|| range_error(cx))?;
+                    if u32::try_from(projected_len).is_err() {
+                        return Err(range_error(cx));
+                    }
+                }
                 expand_regexp_replacement_template(
                     cx,
                     replacement_template_units

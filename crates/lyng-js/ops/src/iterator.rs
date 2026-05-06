@@ -1,7 +1,7 @@
 use crate::{errors::throw_type_error, object, read};
 use lyng_js_common::WellKnownAtom;
 use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
+use lyng_js_gc::{AllocationLifetime, PrimitiveTracer, TraceHeapEdges};
 use lyng_js_types::{
     AbruptCompletion, Completion, ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId,
 };
@@ -163,6 +163,13 @@ impl IteratorRecord {
     #[inline]
     pub fn set_delegate_started(&mut self, delegate_started: bool) {
         self.delegate_started = delegate_started;
+    }
+}
+
+impl TraceHeapEdges for IteratorRecord {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.iterator.trace_heap_edges(tracer);
+        self.next_method.trace_heap_edges(tracer);
     }
 }
 

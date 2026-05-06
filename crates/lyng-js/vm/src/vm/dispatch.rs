@@ -207,8 +207,15 @@ impl Vm {
                             self.write_register(frame, a, value)?;
                             self.advance_instruction()?;
                         }
-                        Opcode::SetNamedProperty | Opcode::AssignNamedProperty => {
-                            let assignment = matches!(opcode, Opcode::AssignNamedProperty);
+                        Opcode::SetNamedProperty
+                        | Opcode::AssignNamedProperty
+                        | Opcode::StrictAssignNamedProperty => {
+                            let assignment = matches!(
+                                opcode,
+                                Opcode::AssignNamedProperty | Opcode::StrictAssignNamedProperty
+                            );
+                            let strict_assignment =
+                                matches!(opcode, Opcode::StrictAssignNamedProperty);
                             let receiver = self.read_register(frame, a)?;
                             let value = self.read_register(frame, b)?;
                             let atom = self.read_atom_constant(frame.code(), u32::from(c))?;
@@ -223,7 +230,12 @@ impl Vm {
                                 ) {
                                     if assignment {
                                         let assignment_result = self
-                                            .check_property_assignment_result(agent, frame, stored);
+                                            .check_property_assignment_result(
+                                                agent,
+                                                frame,
+                                                stored,
+                                                strict_assignment,
+                                            );
                                         let Some(()) =
                                             self.handle_vm_result(agent, assignment_result)?
                                         else {
@@ -262,8 +274,12 @@ impl Vm {
                                     continue;
                                 };
                                 if assignment {
-                                    let assignment_result =
-                                        self.check_property_assignment_result(agent, frame, stored);
+                                    let assignment_result = self.check_property_assignment_result(
+                                        agent,
+                                        frame,
+                                        stored,
+                                        strict_assignment,
+                                    );
                                     let Some(()) =
                                         self.handle_vm_result(agent, assignment_result)?
                                     else {
@@ -287,8 +303,12 @@ impl Vm {
                                     continue;
                                 };
                                 if assignment {
-                                    let assignment_result =
-                                        self.check_property_assignment_result(agent, frame, stored);
+                                    let assignment_result = self.check_property_assignment_result(
+                                        agent,
+                                        frame,
+                                        stored,
+                                        strict_assignment,
+                                    );
                                     let Some(()) =
                                         self.handle_vm_result(agent, assignment_result)?
                                     else {
@@ -434,8 +454,15 @@ impl Vm {
                             self.write_register(frame, a, value)?;
                             self.advance_instruction()?;
                         }
-                        Opcode::SetKeyedProperty | Opcode::AssignKeyedProperty => {
-                            let assignment = matches!(opcode, Opcode::AssignKeyedProperty);
+                        Opcode::SetKeyedProperty
+                        | Opcode::AssignKeyedProperty
+                        | Opcode::StrictAssignKeyedProperty => {
+                            let assignment = matches!(
+                                opcode,
+                                Opcode::AssignKeyedProperty | Opcode::StrictAssignKeyedProperty
+                            );
+                            let strict_assignment =
+                                matches!(opcode, Opcode::StrictAssignKeyedProperty);
                             let receiver = self.read_register(frame, a)?;
                             let value = self.read_register(frame, b)?;
                             let key_value = self.read_register(frame, c)?;
@@ -485,7 +512,12 @@ impl Vm {
                                     };
                                     if assignment {
                                         let assignment_result = self
-                                            .check_property_assignment_result(agent, frame, stored);
+                                            .check_property_assignment_result(
+                                                agent,
+                                                frame,
+                                                stored,
+                                                strict_assignment,
+                                            );
                                         let Some(()) =
                                             self.handle_vm_result(agent, assignment_result)?
                                         else {
@@ -513,7 +545,10 @@ impl Vm {
                                         if assignment {
                                             let assignment_result = self
                                                 .check_property_assignment_result(
-                                                    agent, frame, stored,
+                                                    agent,
+                                                    frame,
+                                                    stored,
+                                                    strict_assignment,
                                                 );
                                             let Some(()) =
                                                 self.handle_vm_result(agent, assignment_result)?
@@ -537,7 +572,12 @@ impl Vm {
                                     };
                                     if assignment {
                                         let assignment_result = self
-                                            .check_property_assignment_result(agent, frame, stored);
+                                            .check_property_assignment_result(
+                                                agent,
+                                                frame,
+                                                stored,
+                                                strict_assignment,
+                                            );
                                         let Some(()) =
                                             self.handle_vm_result(agent, assignment_result)?
                                         else {
@@ -562,7 +602,12 @@ impl Vm {
                                     };
                                     if assignment {
                                         let assignment_result = self
-                                            .check_property_assignment_result(agent, frame, stored);
+                                            .check_property_assignment_result(
+                                                agent,
+                                                frame,
+                                                stored,
+                                                strict_assignment,
+                                            );
                                         let Some(()) =
                                             self.handle_vm_result(agent, assignment_result)?
                                         else {
@@ -583,8 +628,12 @@ impl Vm {
                                     continue;
                                 };
                                 if assignment {
-                                    let assignment_result =
-                                        self.check_property_assignment_result(agent, frame, stored);
+                                    let assignment_result = self.check_property_assignment_result(
+                                        agent,
+                                        frame,
+                                        stored,
+                                        strict_assignment,
+                                    );
                                     let Some(()) =
                                         self.handle_vm_result(agent, assignment_result)?
                                     else {
@@ -724,7 +773,6 @@ impl Vm {
                                         AllocationLifetime::Default,
                                     )
                                 });
-                                self.sync_engine_array_length(agent, object)?;
                             } else {
                                 let store_result = self.set_property_on_value(
                                     agent,
@@ -1040,6 +1088,14 @@ impl Vm {
                             };
                             self.advance_instruction()?;
                         }
+                        Opcode::EnterEnvScope => {
+                            self.enter_env_scope(agent, frame, a, bx)?;
+                            self.advance_instruction()?;
+                        }
+                        Opcode::LeaveEnvScope => {
+                            self.leave_env_scope(frame, a, bx);
+                            self.advance_instruction()?;
+                        }
                         Opcode::LoadGlobal => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
                             let load_result = self.load_global_with_feedback(
@@ -1186,6 +1242,8 @@ impl Vm {
                             let value = self.read_register(frame, a)?;
                             let store_result = self.store_global_with_feedback(
                                 agent,
+                                host,
+                                registry,
                                 frame,
                                 atom,
                                 value,
@@ -1202,6 +1260,8 @@ impl Vm {
                             let value = self.read_register(frame, a)?;
                             let assign_result = self.assign_global_with_feedback(
                                 agent,
+                                host,
+                                registry,
                                 frame,
                                 atom,
                                 value,
@@ -1291,11 +1351,12 @@ impl Vm {
                             self.advance_instruction()?;
                         }
                         Opcode::CreateArray => {
-                            let object = self.create_array(
-                                agent,
-                                frame.realm(),
-                                usize::try_from(bx).unwrap_or(usize::MAX),
-                            )?;
+                            let length = usize::try_from(bx).unwrap_or(usize::MAX);
+                            let object = self.create_array(agent, frame.realm(), length)?;
+                            let length = u32::try_from(length).unwrap_or(u32::MAX);
+                            if length != 0 {
+                                Self::define_length_property(agent, object, length, false)?;
+                            }
                             self.write_register(frame, a, Value::from_object_ref(object))?;
                             self.advance_instruction()?;
                         }
@@ -1678,8 +1739,9 @@ impl Vm {
         agent: &mut Agent,
         frame: FrameRecord,
         stored: bool,
+        strict_override: bool,
     ) -> VmResult<()> {
-        if !stored && self.frame_is_strict(frame) {
+        if !stored && (strict_override || self.frame_is_strict(frame)) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         Ok(())

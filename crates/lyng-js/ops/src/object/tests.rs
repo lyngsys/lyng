@@ -526,6 +526,8 @@ fn string_wrapper_install_preserves_length_and_elements() {
 
 struct WrapperToPrimitiveContext<'a> {
     agent: &'a mut Agent,
+    to_string: ObjectRef,
+    value_of: ObjectRef,
 }
 
 impl ToPrimitiveContext for WrapperToPrimitiveContext<'_> {
@@ -564,11 +566,22 @@ impl ToPrimitiveContext for WrapperToPrimitiveContext<'_> {
 
     fn call_to_completion(
         &mut self,
-        _callee_object: ObjectRef,
-        _this_value: Value,
+        callee_object: ObjectRef,
+        this_value: Value,
         _arguments: &[Value],
     ) -> Result<Value, Self::Error> {
-        panic!("wrapper fallback should avoid calling default Object.prototype methods")
+        if callee_object == self.value_of {
+            return Ok(this_value);
+        }
+        if callee_object == self.to_string {
+            let string = self.agent.alloc_runtime_string(
+                "object-fallback",
+                None,
+                AllocationLifetime::Default,
+            );
+            return Ok(Value::from_string_ref(string));
+        }
+        panic!("unexpected wrapper fallback method")
     }
 }
 
@@ -631,17 +644,12 @@ fn install_default_object_to_primitive_methods(
 }
 
 #[test]
-fn to_primitive_uses_default_object_prototype_fallbacks_for_6a1_wrappers() {
+fn to_primitive_calls_inherited_object_prototype_methods_for_wrappers() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let realm = install_test_wrapper_prototypes(agent);
-    let (_to_string, _value_of) = install_default_object_to_primitive_methods(agent, realm);
+    let (to_string, value_of) = install_default_object_to_primitive_methods(agent, realm);
     let string = agent.alloc_runtime_string("abc", None, AllocationLifetime::Default);
-    let bigint = agent.heap_mut().mutator().alloc_bigint(
-        BigIntSign::NonNegative,
-        &[19],
-        AllocationLifetime::Default,
-    );
     let number_wrapper = wrap_primitive_value(
         agent,
         realm,
@@ -656,43 +664,24 @@ fn to_primitive_uses_default_object_prototype_fallbacks_for_6a1_wrappers() {
         AllocationLifetime::Default,
     )
     .expect("String wrapper should allocate");
-    let bigint_wrapper = wrap_primitive_value(
+    let mut context = WrapperToPrimitiveContext {
         agent,
-        realm,
-        Value::from_bigint_ref(bigint),
-        AllocationLifetime::Default,
-    )
-    .expect("BigInt wrapper should allocate");
-    let mut context = WrapperToPrimitiveContext { agent };
+        to_string,
+        value_of,
+    };
 
-    assert_eq!(
-        to_primitive(
-            &mut context,
-            Value::from_object_ref(number_wrapper),
-            ToPrimitiveHint::Number,
-        ),
-        Ok(Value::from_smi(7))
-    );
-    assert_eq!(
-        to_primitive(
-            &mut context,
-            Value::from_object_ref(string_wrapper),
-            ToPrimitiveHint::Number,
-        ),
-        Ok(Value::from_string_ref(string))
-    );
     let number_text = to_primitive(
         &mut context,
         Value::from_object_ref(number_wrapper),
-        ToPrimitiveHint::String,
+        ToPrimitiveHint::Number,
     )
-    .expect("number wrapper should stringify");
-    let bigint_text = to_primitive(
+    .expect("number wrapper should use inherited Object.prototype methods");
+    let string_text = to_primitive(
         &mut context,
-        Value::from_object_ref(bigint_wrapper),
+        Value::from_object_ref(string_wrapper),
         ToPrimitiveHint::String,
     )
-    .expect("bigint wrapper should stringify");
+    .expect("string wrapper should use inherited Object.prototype methods");
     assert_eq!(
         context
             .agent
@@ -701,18 +690,20 @@ fn to_primitive_uses_default_object_prototype_fallbacks_for_6a1_wrappers() {
             .string_view(number_text.as_string_ref().unwrap())
             .unwrap()
             .latin1_bytes(),
-        Some(&b"7"[..])
+        Some(&b"object-fallback"[..])
     );
     assert_eq!(
         context
             .agent
             .heap()
             .view()
-            .string_view(bigint_text.as_string_ref().unwrap())
+            .string_view(string_text.as_string_ref().unwrap())
             .unwrap()
             .latin1_bytes(),
-        Some(&b"19"[..])
+        Some(&b"object-fallback"[..])
     );
+    assert_ne!(number_text, Value::from_smi(7));
+    assert_ne!(string_text, Value::from_string_ref(string));
 }
 
 #[test]

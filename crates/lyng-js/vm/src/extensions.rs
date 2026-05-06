@@ -2,7 +2,7 @@ use crate::error::VmResult;
 use crate::{FrameRecord, Vm, VmError};
 use lyng_js_builtins::BootstrapArtifacts;
 use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
+use lyng_js_gc::{AllocationLifetime, PrimitiveCollectionReport};
 use lyng_js_host::HostHooks;
 use lyng_js_objects::{NativeFunctionRegistry, ObjectAllocation, ObjectFlags};
 use lyng_js_ops::errors;
@@ -13,6 +13,8 @@ use lyng_js_types::{
 use std::sync::Arc;
 
 pub type SharedRealmExtensionProvider = Arc<dyn RealmExtensionProvider>;
+
+const EMBEDDING_FORCED_GC_POST_BUDGET_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EmbeddingFunctionMetadata {
@@ -311,6 +313,23 @@ impl<'a> EmbeddingFunctionContext<'a> {
 
     pub fn create_embedding_realm(&mut self) -> Result<BootstrapArtifacts, VmError> {
         self.vm.create_embedding_realm(self.agent, self.provider)
+    }
+
+    pub fn force_collect(&mut self) -> PrimitiveCollectionReport {
+        let mut report = self
+            .vm
+            .force_collect_with_active_roots(self.agent, self.caller_frame);
+        let next_budget = report.next_budget_bytes.max(
+            report
+                .after
+                .live_bytes
+                .saturating_add(EMBEDDING_FORCED_GC_POST_BUDGET_BYTES),
+        );
+        self.agent
+            .heap_mut()
+            .set_collection_budget_bytes(next_budget);
+        report.next_budget_bytes = next_budget;
+        report
     }
 }
 

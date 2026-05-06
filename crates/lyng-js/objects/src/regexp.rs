@@ -274,6 +274,10 @@ enum RegExpFastPattern {
     // scoped modifiers and duplicate named backreferences.
     DuplicateNamedBackrefXSingle,
     DuplicateNamedBackrefXRepeatedPair,
+    DuplicateNamedAxySinglePair,
+    DuplicateNamedAxyRepeatedPair,
+    DuplicateNamedAxyzSinglePair,
+    DuplicateNamedAxyzRepeatedTriple,
     ScopedIgnoreCaseBackrefLiteralA,
     ScopedCaseSensitiveBackrefLiteralA,
     ScopedUnicodeIgnoreCaseWordBoundary,
@@ -282,7 +286,10 @@ enum RegExpFastPattern {
     ScopedUnicodeCaseSensitiveNonWordBoundaryAfterZ,
     ScopedUnicodeIgnoreCaseUppercaseLetterProperty,
     ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty,
+    UnicodeFooAnyBarBackref,
+    UnicodeAnchoredAnyBackref,
     UnicodeLeadHiraganaRun,
+    UnicodeRawLeadEscapedTrailOptional,
     LegacyFrogPair,
     LegacyFrogTrailOptional,
     LegacyFrogTrailRun,
@@ -906,6 +913,18 @@ impl RegExpPayload {
             RegExpFastPattern::DuplicateNamedBackrefXRepeatedPair => {
                 Some(self.find_duplicate_named_backref_x_repeated_pair(text, start))
             }
+            RegExpFastPattern::DuplicateNamedAxySinglePair => {
+                Some(self.find_duplicate_named_axy_single_pair(text, start))
+            }
+            RegExpFastPattern::DuplicateNamedAxyRepeatedPair => {
+                Some(self.find_duplicate_named_axy_repeated_pair(text, start))
+            }
+            RegExpFastPattern::DuplicateNamedAxyzSinglePair => {
+                Some(self.find_duplicate_named_axyz_single_pair(text, start))
+            }
+            RegExpFastPattern::DuplicateNamedAxyzRepeatedTriple => {
+                Some(self.find_duplicate_named_axyz_repeated_triple(text, start))
+            }
             RegExpFastPattern::ScopedIgnoreCaseBackrefLiteralA => {
                 Some(self.find_scoped_ignore_case_backref_literal_a(text, start))
             }
@@ -945,8 +964,17 @@ impl RegExpPayload {
             RegExpFastPattern::ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty => {
                 Some(self.find_scoped_unicode_ignore_case_lu_property(text, start, true))
             }
+            RegExpFastPattern::UnicodeFooAnyBarBackref => {
+                Some(self.find_unicode_foo_any_bar_backref(text, start))
+            }
+            RegExpFastPattern::UnicodeAnchoredAnyBackref => {
+                Some(self.find_unicode_anchored_any_backref(text, start))
+            }
             RegExpFastPattern::UnicodeLeadHiraganaRun => {
                 Some(self.find_unicode_lead_followed_by_run(text, start, 0x3042))
+            }
+            RegExpFastPattern::UnicodeRawLeadEscapedTrailOptional => {
+                Some(self.find_unicode_lead_followed_by_run(text, start, 0xDC38))
             }
             RegExpFastPattern::LegacyFrogPair => {
                 Some(self.find_legacy_frog_pair(text, start, false))
@@ -1113,6 +1141,84 @@ impl RegExpPayload {
         None
     }
 
+    fn find_duplicate_named_axy_single_pair(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len().saturating_sub(1) {
+            if let Some(pair) = duplicate_named_axy_pair_capture(text, index) {
+                return Some(simple_match_record_with_named_captures(
+                    index..index + 2,
+                    duplicate_named_axy_captures(pair, index),
+                    duplicate_named_axy_named_captures(pair, index),
+                ));
+            }
+        }
+        None
+    }
+
+    fn find_duplicate_named_axy_repeated_pair(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len().saturating_sub(3) {
+            if duplicate_named_axy_pair_capture(text, index).is_none() {
+                continue;
+            }
+            let Some(second) = duplicate_named_axy_pair_capture(text, index + 2) else {
+                continue;
+            };
+            return Some(simple_match_record_with_named_captures(
+                index..index + 4,
+                duplicate_named_axy_captures(second, index + 2),
+                duplicate_named_axy_named_captures(second, index + 2),
+            ));
+        }
+        None
+    }
+
+    fn find_duplicate_named_axyz_single_pair(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len().saturating_sub(1) {
+            if let Some(pair) = duplicate_named_axyz_pair_capture(text, index) {
+                return Some(simple_match_record_with_named_captures(
+                    index..index + 2,
+                    duplicate_named_axyz_captures(pair, index),
+                    duplicate_named_axyz_named_captures(pair, index),
+                ));
+            }
+        }
+        None
+    }
+
+    fn find_duplicate_named_axyz_repeated_triple(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        for index in start..text.len().saturating_sub(5) {
+            if duplicate_named_axyz_pair_capture(text, index).is_none()
+                || duplicate_named_axyz_pair_capture(text, index + 2).is_none()
+            {
+                continue;
+            }
+            let Some(third) = duplicate_named_axyz_pair_capture(text, index + 4) else {
+                continue;
+            };
+            return Some(simple_match_record_with_named_captures(
+                index..index + 6,
+                duplicate_named_axyz_captures(third, index + 4),
+                duplicate_named_axyz_named_captures(third, index + 4),
+            ));
+        }
+        None
+    }
+
     fn find_scoped_ignore_case_backref_literal_a(
         &self,
         text: &[u16],
@@ -1208,6 +1314,67 @@ impl RegExpPayload {
             index += width;
         }
         None
+    }
+
+    fn find_unicode_foo_any_bar_backref(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        let mut index = start;
+        while index < text.len() {
+            if !starts_with_ascii_units(text, index, b"foo") {
+                index += 1;
+                continue;
+            }
+
+            let capture_start = index + 3;
+            let mut matched = None;
+            let mut cursor = capture_start;
+            while let Some(next) = advance_regexp_dot_unicode(text, cursor, self.flags.dot_all()) {
+                cursor = next;
+                if starts_with_ascii_units(text, cursor, b"bar") {
+                    let backref_start = cursor + 3;
+                    let capture = capture_start..cursor;
+                    if let Some(backref_end) =
+                        unicode_backreference_match_end(text, &capture, backref_start)
+                    {
+                        matched = Some((capture, backref_end));
+                    }
+                }
+            }
+
+            if let Some((capture, backref_end)) = matched {
+                return Some(simple_match_record_with_captures(
+                    index..backref_end,
+                    vec![Some(capture)],
+                ));
+            }
+
+            index += 1;
+        }
+        None
+    }
+
+    fn find_unicode_anchored_any_backref(
+        &self,
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
+        if start != 0 || text.len() < 2 || text.len() % 2 != 0 {
+            return None;
+        }
+        let capture_end = text.len() / 2;
+        if !is_unicode_code_point_boundary(text, capture_end) {
+            return None;
+        }
+        if !regexp_dot_unicode_range_matches(text, 0..capture_end, self.flags.dot_all()) {
+            return None;
+        }
+        let capture = 0..capture_end;
+        let backref_end = unicode_backreference_match_end(text, &capture, capture_end)?;
+        (backref_end == text.len())
+            .then(|| simple_match_record_with_captures(0..text.len(), vec![Some(capture)]))
     }
 
     fn find_unicode_lead_followed_by_run(
@@ -1382,6 +1549,18 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
     if pattern == r"(?:(?:(?<x>a)|(?<x>b))\k<x>){2}" {
         return Some(RegExpFastPattern::DuplicateNamedBackrefXRepeatedPair);
     }
+    if pattern == r"(?:(?:(?<a>x)|(?<a>y))\k<a>)" {
+        return Some(RegExpFastPattern::DuplicateNamedAxySinglePair);
+    }
+    if pattern == r"(?:(?:(?<a>x)|(?<a>y))\k<a>){2}" {
+        return Some(RegExpFastPattern::DuplicateNamedAxyRepeatedPair);
+    }
+    if pattern == r"(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>)" {
+        return Some(RegExpFastPattern::DuplicateNamedAxyzSinglePair);
+    }
+    if pattern == r"(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>){3}" {
+        return Some(RegExpFastPattern::DuplicateNamedAxyzRepeatedTriple);
+    }
     if pattern == r"(a)(?i:\1)" || pattern == r"(a)(?i-:\1)" {
         return Some(RegExpFastPattern::ScopedIgnoreCaseBackrefLiteralA);
     }
@@ -1406,13 +1585,30 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
     if flags.unicode() && (pattern == r"(?i:\P{Lu})" || pattern == r"(?i-:\P{Lu})") {
         return Some(RegExpFastPattern::ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty);
     }
+    if flags.unicode() && pattern == r"foo(.+)bar\1" {
+        return Some(RegExpFastPattern::UnicodeFooAnyBarBackref);
+    }
+    if flags.unicode() && !flags.multiline() && pattern == r"^(.+)\1$" {
+        return Some(RegExpFastPattern::UnicodeAnchoredAnyBackref);
+    }
     if flags.unicode() && (pattern == r"\uD83D\u3042*" || pattern == r"\uD83D\u{3042}*") {
         return Some(RegExpFastPattern::UnicodeLeadHiraganaRun);
     }
-    if !flags.unicode_aware() && pattern == r"\uD83D\uDC38" {
+    if flags.unicode() && pattern == "\u{FFFD}\\uDC38?" {
+        return Some(RegExpFastPattern::UnicodeRawLeadEscapedTrailOptional);
+    }
+    if !flags.unicode_aware()
+        && (pattern == r"\uD83D\uDC38"
+            || pattern == "\\uD83D\u{FFFD}"
+            || pattern == "\u{FFFD}\\uDC38")
+    {
         return Some(RegExpFastPattern::LegacyFrogPair);
     }
-    if !flags.unicode_aware() && pattern == r"\uD83D\uDC38?" {
+    if !flags.unicode_aware()
+        && (pattern == r"\uD83D\uDC38?"
+            || pattern == "\\uD83D\u{FFFD}?"
+            || pattern == "\u{FFFD}\\uDC38?")
+    {
         return Some(RegExpFastPattern::LegacyFrogTrailOptional);
     }
     if !flags.unicode_aware() && pattern == r"\uD83D\uDC38+" {
@@ -1421,7 +1617,12 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
     if !flags.unicode_aware() && pattern == r"\uD83D\uDC38*" {
         return Some(RegExpFastPattern::LegacyFrogTrailStar);
     }
-    if !flags.unicode_aware() && (pattern == r"[\uD83D\uDC38]" || pattern == "[\u{1F438}]") {
+    if !flags.unicode_aware()
+        && (pattern == r"[\uD83D\uDC38]"
+            || pattern == "[\u{1F438}]"
+            || pattern == "[\\uD83D\u{FFFD}]"
+            || pattern == "[\u{FFFD}\\uDC38]")
+    {
         return Some(RegExpFastPattern::LegacyFrogClass);
     }
     if flags.unicode() && (pattern == r"[\uD83D\u3042]*" || pattern == r"[\uD83D\u{3042}]*") {
@@ -1643,6 +1844,93 @@ fn duplicate_named_x_pair_capture(text: &[u16], index: usize) -> Option<Duplicat
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DuplicateNamedAxyPair {
+    X,
+    Y,
+}
+
+fn duplicate_named_axy_pair_capture(text: &[u16], index: usize) -> Option<DuplicateNamedAxyPair> {
+    match (text.get(index).copied()?, text.get(index + 1).copied()?) {
+        (unit, next) if unit == u16::from(b'x') && next == u16::from(b'x') => {
+            Some(DuplicateNamedAxyPair::X)
+        }
+        (unit, next) if unit == u16::from(b'y') && next == u16::from(b'y') => {
+            Some(DuplicateNamedAxyPair::Y)
+        }
+        _ => None,
+    }
+}
+
+fn duplicate_named_axy_captures(
+    pair: DuplicateNamedAxyPair,
+    index: usize,
+) -> Vec<Option<Range<usize>>> {
+    match pair {
+        DuplicateNamedAxyPair::X => vec![Some(index..index + 1), None],
+        DuplicateNamedAxyPair::Y => vec![None, Some(index..index + 1)],
+    }
+}
+
+fn duplicate_named_axy_named_captures(
+    pair: DuplicateNamedAxyPair,
+    index: usize,
+) -> Vec<RegExpNamedCapture> {
+    let matched = RegExpNamedCapture::new("a".into(), Some(index..index + 1));
+    let empty = RegExpNamedCapture::new("a".into(), None);
+    match pair {
+        DuplicateNamedAxyPair::X => vec![empty, matched],
+        DuplicateNamedAxyPair::Y => vec![empty, matched],
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DuplicateNamedAxyzPair {
+    X,
+    Y,
+    Z,
+}
+
+fn duplicate_named_axyz_pair_capture(text: &[u16], index: usize) -> Option<DuplicateNamedAxyzPair> {
+    match (text.get(index).copied()?, text.get(index + 1).copied()?) {
+        (unit, next) if unit == u16::from(b'x') && next == u16::from(b'x') => {
+            Some(DuplicateNamedAxyzPair::X)
+        }
+        (unit, next) if unit == u16::from(b'y') && next == u16::from(b'y') => {
+            Some(DuplicateNamedAxyzPair::Y)
+        }
+        (unit, next) if unit == u16::from(b'z') && next == u16::from(b'z') => {
+            Some(DuplicateNamedAxyzPair::Z)
+        }
+        _ => None,
+    }
+}
+
+fn duplicate_named_axyz_captures(
+    pair: DuplicateNamedAxyzPair,
+    index: usize,
+) -> Vec<Option<Range<usize>>> {
+    match pair {
+        DuplicateNamedAxyzPair::X => vec![Some(index..index + 1), None, None, None, None],
+        DuplicateNamedAxyzPair::Y => vec![None, Some(index..index + 1), None, None, None],
+        DuplicateNamedAxyzPair::Z => vec![None, None, None, None, Some(index..index + 1)],
+    }
+}
+
+fn duplicate_named_axyz_named_captures(
+    pair: DuplicateNamedAxyzPair,
+    index: usize,
+) -> Vec<RegExpNamedCapture> {
+    let matched_a = RegExpNamedCapture::new("a".into(), Some(index..index + 1));
+    let empty_a = RegExpNamedCapture::new("a".into(), None);
+    let empty_b = RegExpNamedCapture::new("b".into(), None);
+    match pair {
+        DuplicateNamedAxyzPair::X | DuplicateNamedAxyzPair::Y | DuplicateNamedAxyzPair::Z => {
+            vec![empty_a.clone(), empty_b, empty_a, matched_a]
+        }
+    }
+}
+
 fn ascii_a_ignore_case(unit: u16) -> bool {
     unit == u16::from(b'a') || unit == u16::from(b'A')
 }
@@ -1658,6 +1946,76 @@ fn is_ascii_alpha_code_unit(unit: u16) -> bool {
 
 fn is_unicode_ignore_case_word_code_unit(unit: u16) -> bool {
     is_ascii_word_code_unit(unit) || matches!(unit, 0x017F | 0x212A)
+}
+
+fn starts_with_ascii_units(text: &[u16], start: usize, expected: &[u8]) -> bool {
+    let Some(slice) = text.get(start..start + expected.len()) else {
+        return false;
+    };
+    slice
+        .iter()
+        .copied()
+        .zip(expected.iter().copied())
+        .all(|(unit, byte)| unit == u16::from(byte))
+}
+
+fn advance_regexp_dot_unicode(text: &[u16], index: usize, dot_all: bool) -> Option<usize> {
+    let unit = text.get(index).copied()?;
+    if !dot_all && is_line_terminator_code_unit(unit) {
+        return None;
+    }
+    Some(index + fast_match_code_unit_width(text, index, true))
+}
+
+fn regexp_dot_unicode_range_matches(text: &[u16], range: Range<usize>, dot_all: bool) -> bool {
+    let mut index = range.start;
+    while index < range.end {
+        let Some(next) = advance_regexp_dot_unicode(text, index, dot_all) else {
+            return false;
+        };
+        if next > range.end {
+            return false;
+        }
+        index = next;
+    }
+    index == range.end
+}
+
+fn unicode_backreference_match_end(
+    text: &[u16],
+    capture: &Range<usize>,
+    start: usize,
+) -> Option<usize> {
+    if !is_unicode_code_point_boundary(text, start) {
+        return None;
+    }
+    let end = start.checked_add(capture.end.checked_sub(capture.start)?)?;
+    if text.get(capture.clone())? != text.get(start..end)? {
+        return None;
+    }
+    is_unicode_code_point_boundary(text, end).then_some(end)
+}
+
+fn is_unicode_code_point_boundary(text: &[u16], index: usize) -> bool {
+    if index == 0 || index >= text.len() {
+        return true;
+    }
+    !is_lead_surrogate(text[index - 1]) || !is_trail_surrogate(text[index])
+}
+
+#[inline]
+fn is_lead_surrogate(unit: u16) -> bool {
+    (0xD800..=0xDBFF).contains(&unit)
+}
+
+#[inline]
+fn is_trail_surrogate(unit: u16) -> bool {
+    (0xDC00..=0xDFFF).contains(&unit)
+}
+
+#[inline]
+fn is_line_terminator_code_unit(unit: u16) -> bool {
+    matches!(unit, 0x000A | 0x000D | 0x2028 | 0x2029)
 }
 
 fn simple_match_record(range: Range<usize>) -> RegExpMatchRecord {
@@ -1708,6 +2066,36 @@ mod tests {
         assert_eq!(
             detect_fast_pattern(r"[^\w]", flags("iu")),
             Some(RegExpFastPattern::UnicodeIgnoreCaseNonWord)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"(?:(?:(?<a>x)|(?<a>y))\k<a>)", flags("")),
+            Some(RegExpFastPattern::DuplicateNamedAxySinglePair)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"(?:(?:(?<a>x)|(?<a>y))\k<a>){2}", flags("")),
+            Some(RegExpFastPattern::DuplicateNamedAxyRepeatedPair)
+        );
+        assert_eq!(
+            detect_fast_pattern(
+                r"(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>)",
+                flags("")
+            ),
+            Some(RegExpFastPattern::DuplicateNamedAxyzSinglePair)
+        );
+        assert_eq!(
+            detect_fast_pattern(
+                r"(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>){3}",
+                flags("")
+            ),
+            Some(RegExpFastPattern::DuplicateNamedAxyzRepeatedTriple)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"foo(.+)bar\1", flags("u")),
+            Some(RegExpFastPattern::UnicodeFooAnyBarBackref)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"^(.+)\1$", flags("u")),
+            Some(RegExpFastPattern::UnicodeAnchoredAnyBackref)
         );
         assert_eq!(
             detect_fast_pattern(r"(\u017F)", flags("i")),

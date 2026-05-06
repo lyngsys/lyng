@@ -633,3 +633,35 @@ fn phase6_strict_delete_through_arrow_callback_uses_outer_arguments_object() {
 
     assert_eq!(result, Value::from_smi(3));
 }
+
+#[test]
+fn phase6_delete_arguments_respects_with_object_and_bindings() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            (function() {
+                var o = { arguments: 42 };
+                var deleted;
+                with (o) {
+                    deleted = delete arguments;
+                }
+                return String(deleted) + ":" + String("arguments" in o);
+            })(),
+            (function() {
+                var o = { arguments: 42 };
+                delete o.arguments;
+                return String("arguments" in o);
+            })(),
+            (function() {
+                var arguments = 42;
+                return String(delete arguments);
+            })(),
+            (function() {
+                return String(delete arguments);
+            })()
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true:false|false|false|false");
+}

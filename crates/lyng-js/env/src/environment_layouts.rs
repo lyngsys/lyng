@@ -57,6 +57,7 @@ pub struct EnvironmentSlotFlags {
     lexical: bool,
     needs_tdz: bool,
     dynamic: bool,
+    scoped: bool,
     sloppy_immutable_assign_silent: bool,
 }
 
@@ -69,6 +70,7 @@ impl EnvironmentSlotFlags {
             lexical,
             needs_tdz,
             dynamic,
+            scoped: false,
             sloppy_immutable_assign_silent: false,
         }
     }
@@ -109,8 +111,19 @@ impl EnvironmentSlotFlags {
     }
 
     #[inline]
+    pub const fn is_scoped(self) -> bool {
+        self.scoped
+    }
+
+    #[inline]
     pub const fn with_dynamic(mut self, dynamic: bool) -> Self {
         self.dynamic = dynamic;
+        self
+    }
+
+    #[inline]
+    pub const fn with_scoped(mut self, scoped: bool) -> Self {
+        self.scoped = scoped;
         self
     }
 

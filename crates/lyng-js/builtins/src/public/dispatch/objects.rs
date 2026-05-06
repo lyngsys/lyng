@@ -916,7 +916,6 @@ fn object_property_is_enumerable_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
     let key = cx.to_property_key(
         invocation
             .arguments()
@@ -924,6 +923,7 @@ fn object_property_is_enumerable_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
+    let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
     Ok(Value::from_bool(
         proxy_get_own_property(cx, object_ref, key)?
             .is_some_and(|descriptor| descriptor.enumerable() == Some(true)),

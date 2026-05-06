@@ -7,7 +7,10 @@ use lyng_js_types::{
 #[derive(Clone, Copy)]
 enum StaticPublicFieldKey {
     Atom(AtomId),
-    Register(u16),
+    Register {
+        key: u16,
+        inferred_name: Option<AtomId>,
+    },
 }
 
 #[derive(Clone, Copy)]
@@ -68,6 +71,66 @@ impl PrivateElementInitializerScratch {
         let _ = compiler.encode_register(last_argument)?;
         Ok(Self { arguments })
     }
+}
+
+fn numeric_property_name_text(value: lyng_js_ast::NumericLiteral) -> String {
+    match value {
+        lyng_js_ast::NumericLiteral::Int32(number) => number.to_string(),
+        lyng_js_ast::NumericLiteral::Number(number) if number == 0.0 => "0".to_string(),
+        lyng_js_ast::NumericLiteral::Number(number) => number.to_string(),
+    }
+}
+
+fn bigint_property_name_text(raw: &str) -> String {
+    let digits = raw.replace('_', "");
+    let (radix, digits) = if let Some(rest) = digits
+        .strip_prefix("0x")
+        .or_else(|| digits.strip_prefix("0X"))
+    {
+        (16u32, rest)
+    } else if let Some(rest) = digits
+        .strip_prefix("0o")
+        .or_else(|| digits.strip_prefix("0O"))
+    {
+        (8u32, rest)
+    } else if let Some(rest) = digits
+        .strip_prefix("0b")
+        .or_else(|| digits.strip_prefix("0B"))
+    {
+        (2u32, rest)
+    } else {
+        return digits;
+    };
+
+    radix_digits_to_decimal(digits, radix)
+}
+
+fn radix_digits_to_decimal(digits: &str, radix: u32) -> String {
+    let mut decimal = vec![0u8];
+    for digit in digits.chars().filter_map(|ch| ch.to_digit(radix)) {
+        let mut carry = digit;
+        for value in decimal.iter_mut().rev() {
+            let next = u32::from(*value) * radix + carry;
+            *value = u8::try_from(next % 10).expect("decimal digit should fit");
+            carry = next / 10;
+        }
+        while carry > 0 {
+            decimal.insert(
+                0,
+                u8::try_from(carry % 10).expect("decimal digit should fit"),
+            );
+            carry /= 10;
+        }
+    }
+
+    let first_non_zero = decimal
+        .iter()
+        .position(|digit| *digit != 0)
+        .unwrap_or(decimal.len().saturating_sub(1));
+    decimal[first_non_zero..]
+        .iter()
+        .map(|digit| char::from(b'0' + *digit))
+        .collect()
 }
 
 impl PrivateElementDescriptorLookup {
@@ -142,8 +205,26 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let has_private_entries = self
             .class_layout_for_span(body, class_span)
             .is_some_and(|layout| !layout.entries().is_empty());
+        let class_self_binding = name
+            .map(|name| self.class_self_binding(body, class_span, name))
+            .transpose()?
+            .flatten();
+        let class_self_binding_needs_initialization = class_self_binding
+            .map(|binding_id| self.class_self_binding_needs_initialization(binding_id))
+            .transpose()?
+            .unwrap_or(false);
+        if class_self_binding_needs_initialization
+            && class_self_binding.is_some_and(|binding_id| {
+                self.binding(binding_id)
+                    .is_ok_and(|binding| binding.storage_class == StorageClass::FrameLocal)
+            })
+        {
+            let binding_id = class_self_binding.expect("class self binding should be present");
+            let register = self.ensure_local_register(binding_id)?;
+            self.emit_load_uninitialized_lexical(register)?;
+        }
         let evaluated_super = super_class
-            .map(|expr| self.lower_expr_to_temp(expr))
+            .map(|expr| self.lower_class_strict_expr_to_temp(expr))
             .transpose()?;
         let super_is_literal_null = super_class
             .map(|expr| matches!(self.ast().get_expr(expr), Expr::NullLiteral { .. }))
@@ -188,20 +269,31 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         computed,
                         r#static: false,
                         private: false,
+                        auto_accessor_private_name,
                         ..
-                    } => Some(ClassInstanceElementPlan::PublicField {
-                        key: *key,
-                        value: *value,
-                        computed: *computed,
-                        computed_key_index: if *computed {
-                            let index = next_computed_instance_field_key;
-                            next_computed_instance_field_key =
-                                next_computed_instance_field_key.saturating_add(1);
-                            Some(index)
+                    } => {
+                        if let Some(backing_name) = auto_accessor_private_name {
+                            Some(ClassInstanceElementPlan::PrivateElement {
+                                name: *backing_name,
+                                kind: lyng_js_sema::ClassPrivateElementKind::Field,
+                                value: *value,
+                            })
                         } else {
-                            None
-                        },
-                    }),
+                            Some(ClassInstanceElementPlan::PublicField {
+                                key: *key,
+                                value: *value,
+                                computed: *computed,
+                                computed_key_index: if *computed {
+                                    let index = next_computed_instance_field_key;
+                                    next_computed_instance_field_key =
+                                        next_computed_instance_field_key.saturating_add(1);
+                                    Some(index)
+                                } else {
+                                    None
+                                },
+                            })
+                        }
+                    }
                     lyng_js_ast::ClassElement::Property {
                         key,
                         value,
@@ -250,12 +342,6 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let name_value = self.alloc_temp()?;
         self.emit_load_atom_string(name_value, class_name)?;
         self.emit_set_function_name(dest, name_value)?;
-
-        if let Some(name) = name {
-            if let Some(binding_id) = self.class_self_binding(body, class_span, name)? {
-                self.store_binding_value(binding_id, name, dest)?;
-            }
-        }
 
         let previous_class_contexts = self.active_class_contexts.len();
         self.active_class_contexts.push(ActiveClassContext {
@@ -413,11 +499,52 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     value,
                     computed,
                     private: false,
+                    r#static,
+                    span,
+                    auto_accessor_private_name: Some(backing_name),
+                } => {
+                    self.emit_define_private_element_with_scratch(
+                        dest,
+                        prototype,
+                        backing_name,
+                        r#static,
+                        lyng_js_sema::ClassPrivateElementKind::Field,
+                        None,
+                        span,
+                        private_define_scratch
+                            .expect("private definition scratch should exist for auto-accessors"),
+                    )?;
+                    if r#static {
+                        pending_static_elements.push(PendingStaticClassElement::PrivateField {
+                            name: backing_name,
+                            value,
+                            span,
+                        });
+                    }
+                    if value.is_some() {
+                        self.skip_class_body_function_scope(body);
+                    }
+                    self.lower_public_auto_accessor_property(
+                        dest,
+                        prototype,
+                        body,
+                        key,
+                        computed,
+                        r#static,
+                        backing_name,
+                        span,
+                    )?;
+                }
+                lyng_js_ast::ClassElement::Property {
+                    key,
+                    value,
+                    computed,
+                    private: false,
                     r#static: false,
                     span,
                     ..
                 } if computed => {
-                    let key_register = self.lower_expr_to_temp(key)?;
+                    let key_register = self.lower_class_strict_expr_to_temp(key)?;
                     if value.is_some() {
                         self.skip_class_body_function_scope(body);
                     }
@@ -520,6 +647,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 | lyng_js_ast::ClassElement::InvalidElement { .. } => {}
             }
         }
+        if let (Some(name), Some(binding_id)) = (name, class_self_binding) {
+            if class_self_binding_needs_initialization {
+                self.store_binding_value(binding_id, name, dest)?;
+            }
+        }
         for element in pending_static_elements {
             self.lower_pending_static_class_element(
                 dest,
@@ -554,6 +686,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.active_class_span
             .and_then(|class_span| self.class_layout_for_span(body, class_span))
             .or_else(|| self.state.sema.class_private_layouts.get(body))
+    }
+
+    fn current_class_field_direct_eval_scope(&self) -> Option<ScopeId> {
+        let scope = self
+            .active_class_body
+            .and_then(|body| self.active_class_layout(body))
+            .map(lyng_js_sema::ClassPrivateLayoutRecord::scope)?;
+        self.active_direct_eval_scope(scope).then_some(scope)
     }
 
     fn class_constructor_method(
@@ -623,6 +763,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }))
     }
 
+    fn class_self_binding_needs_initialization(
+        &self,
+        binding_id: SemanticBindingId,
+    ) -> LoweringResult<bool> {
+        let binding = self.binding(binding_id)?;
+        let scope = self.state.sema.scope_table.get(binding.scope);
+        Ok(binding.is_captured
+            || scope.has_eval
+            || scope.has_with
+            || self
+                .state
+                .sema
+                .use_sites
+                .as_slice()
+                .iter()
+                .any(|record| record.resolved_binding == Some(binding_id)))
+    }
+
     fn lower_class_element_key(
         &mut self,
         key: ExprId,
@@ -635,8 +793,43 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 return Ok((key_value, Some(key_value)));
             }
         }
-        let key_value = self.lower_expr_to_temp(key)?;
+        let key_value = self.lower_class_strict_expr_to_temp(key)?;
         Ok((key_value, None))
+    }
+
+    fn lower_class_strict_expr_to_temp(&mut self, expr: ExprId) -> LoweringResult<u16> {
+        let previous = std::mem::replace(&mut self.force_strict_assignment, true);
+        let result = self.lower_expr_to_temp(expr);
+        self.force_strict_assignment = previous;
+        result
+    }
+
+    fn class_field_inferred_name_atom(&mut self, key: ExprId) -> LoweringResult<Option<AtomId>> {
+        let expr = self.ast().get_expr(key).clone();
+        let atom = match expr {
+            Expr::Identifier { name, .. } => Some(name),
+            Expr::StringLiteral { value, .. } => {
+                match self.ast().literals().get_string_value(value).clone() {
+                    lyng_js_ast::StringLiteralValue::Utf8(text) => {
+                        Some(self.state.atoms.intern(&text))
+                    }
+                    lyng_js_ast::StringLiteralValue::Utf16(units) => {
+                        Some(self.state.atoms.intern_utf16(&units))
+                    }
+                }
+            }
+            Expr::NumericLiteral { value, .. } => {
+                let text = numeric_property_name_text(value);
+                Some(self.state.atoms.intern(&text))
+            }
+            Expr::BigIntLiteral { value, .. } => {
+                let raw = self.ast().literals().get_bigint(value);
+                let text = bigint_property_name_text(raw);
+                Some(self.state.atoms.intern(&text))
+            }
+            _ => None,
+        };
+        Ok(atom)
     }
 
     fn lower_static_public_field_key(
@@ -649,10 +842,133 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 return Ok(StaticPublicFieldKey::Atom(atom));
             }
         }
-        let raw_key = self.lower_expr_to_temp(key)?;
+        let inferred_name = if computed {
+            None
+        } else {
+            self.class_field_inferred_name_atom(key)?
+        };
+        let raw_key = self.lower_class_strict_expr_to_temp(key)?;
         let property_key = self.alloc_temp()?;
         self.emit_to_property_key(property_key, raw_key)?;
-        Ok(StaticPublicFieldKey::Register(property_key))
+        Ok(StaticPublicFieldKey::Register {
+            key: property_key,
+            inferred_name,
+        })
+    }
+
+    fn lower_public_auto_accessor_property(
+        &mut self,
+        class_object: u16,
+        prototype: u16,
+        class_body: NodeList<lyng_js_ast::ClassElementId>,
+        key: ExprId,
+        computed: bool,
+        is_static: bool,
+        backing_name: AtomId,
+        span: Span,
+    ) -> LoweringResult<()> {
+        let descriptor_index = self.private_element_descriptor_index(
+            class_body,
+            backing_name,
+            lyng_js_sema::ClassPrivateElementKind::Field,
+        )?;
+        let target = if is_static { class_object } else { prototype };
+        let home_object = target;
+        let (key_register, _) = self.lower_class_element_key(key, computed)?;
+        let getter = self.emit_auto_accessor_closure(descriptor_index, false, span)?;
+        self.bind_function_home_object(getter, home_object, span)?;
+        self.bind_function_private_env(getter, span)?;
+        self.emit_internal_builtin_call(
+            internal_define_class_getter_property_builtin(),
+            &[target, key_register, getter],
+            span,
+        )?;
+
+        let setter = self.emit_auto_accessor_closure(descriptor_index, true, span)?;
+        self.bind_function_home_object(setter, home_object, span)?;
+        self.bind_function_private_env(setter, span)?;
+        self.emit_internal_builtin_call(
+            internal_define_class_setter_property_builtin(),
+            &[target, key_register, setter],
+            span,
+        )
+    }
+
+    fn emit_auto_accessor_closure(
+        &mut self,
+        descriptor_index: u32,
+        is_setter: bool,
+        span: Span,
+    ) -> LoweringResult<u16> {
+        let (id, function) =
+            self.build_auto_accessor_function(descriptor_index, is_setter, span)?;
+        self.state.functions.push(function);
+        let child_index = self.builder.add_child_function(id)?;
+        let closure = self.alloc_temp()?;
+        self.emit_create_closure(closure, child_index, span)?;
+        Ok(closure)
+    }
+
+    fn build_auto_accessor_function(
+        &mut self,
+        descriptor_index: u32,
+        is_setter: bool,
+        span: Span,
+    ) -> LoweringResult<(BytecodeFunctionId, BytecodeFunction)> {
+        let descriptor_smi =
+            i16::try_from(descriptor_index).map_err(|_| LoweringError::UnsupportedDeclaration {
+                decl: DeclId::new(0),
+            })?;
+        let id = self.state.alloc_function_id();
+        let mut builder = BytecodeBuilder::new(id, BytecodeFunctionKind::Function);
+        builder.set_flags(BytecodeFunctionFlags::new(true, false));
+        builder.set_this_mode(ThisMode::Strict);
+        let parameter_count = u16::from(is_setter);
+        builder.set_parameter_counts(parameter_count, parameter_count);
+        builder.set_source_span(Some(span));
+
+        let parameter = is_setter.then(|| builder.alloc_register()).transpose()?;
+        let receiver = builder.alloc_register()?;
+        let descriptor = builder.alloc_register()?;
+        let value = is_setter.then(|| builder.alloc_register()).transpose()?;
+        let depth = builder.alloc_register()?;
+        let callee = builder.alloc_register()?;
+        let this_value = builder.alloc_register()?;
+        let result = builder.alloc_register()?;
+
+        builder.emit_abx(Opcode::LoadThis, receiver, 0)?;
+        builder.emit_abx(
+            Opcode::LoadSmi,
+            descriptor,
+            u16::from_le_bytes(descriptor_smi.to_le_bytes()),
+        )?;
+        if let (Some(parameter), Some(value)) = (parameter, value) {
+            builder.emit_abc(Opcode::Move, value, parameter, 0)?;
+        }
+        builder.emit_abx(Opcode::LoadSmi, depth, 0)?;
+        let builtin = if is_setter {
+            internal_private_field_set_builtin()
+        } else {
+            internal_private_field_get_builtin()
+        };
+        let builtin_constant = builder.add_constant(ConstantValue::Builtin(builtin))?;
+        builder.emit_abx(Opcode::LoadConst, callee, builtin_constant)?;
+        builder.emit_abx(Opcode::LoadUndefined, this_value, 0)?;
+        let argument_count = if is_setter { 4 } else { 3 };
+        let call_offset = builder.emit_call(
+            result,
+            callee,
+            this_value,
+            CallRange::new(receiver, argument_count),
+        )?;
+        let register_window_len = if is_setter { 8 } else { 6 };
+        builder.add_safepoint_at(call_offset, SafepointKind::Allocation, register_window_len)?;
+        if is_setter {
+            builder.emit_ax(Opcode::ReturnUndefined, 0)?;
+        } else {
+            builder.emit_ax(Opcode::Return, i32::from(result))?;
+        }
+        Ok((id, builder.finish()?))
     }
 
     fn lower_pending_static_class_element(
@@ -666,7 +982,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             PendingStaticClassElement::PublicField { key, value } => {
                 let inferred_name = match key {
                     StaticPublicFieldKey::Atom(atom) => Some(atom),
-                    StaticPublicFieldKey::Register(_) => None,
+                    StaticPublicFieldKey::Register { inferred_name, .. } => inferred_name,
                 };
                 let value_register = self.lower_class_field_value(
                     value,
@@ -678,7 +994,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     StaticPublicFieldKey::Atom(atom) => {
                         self.emit_define_property_by_atom(class_object, value_register, atom)
                     }
-                    StaticPublicFieldKey::Register(key_register) => {
+                    StaticPublicFieldKey::Register {
+                        key: key_register, ..
+                    } => {
                         if value.is_some_and(|value| self.is_anonymous_function_definition(value)) {
                             self.emit_set_function_name(value_register, key_register)?;
                         }
@@ -774,15 +1092,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .and_then(|home_object| self.super_home_object_override.replace(home_object));
         let previous_in_class_field_initializer =
             std::mem::replace(&mut self.in_class_field_initializer, true);
-        let value_register: LoweringResult<u16> = if let Some(value) = value {
-            let value_register = self.alloc_temp()?;
-            self.lower_initializer_with_inferred_name(value, inferred_name, value_register)?;
-            Ok(value_register)
-        } else {
-            let undefined = self.alloc_temp()?;
-            self.emit_load_undefined(undefined)?;
-            Ok(undefined)
-        };
+        let tracked_scope = self.current_class_field_direct_eval_scope();
+        if let Some(scope) = tracked_scope {
+            self.active_direct_eval_scopes.push(scope);
+        }
+        let value_register: LoweringResult<u16> = (|| {
+            if let Some(value) = value {
+                let value_register = self.alloc_temp()?;
+                self.lower_initializer_with_inferred_name(value, inferred_name, value_register)?;
+                Ok(value_register)
+            } else {
+                let undefined = self.alloc_temp()?;
+                self.emit_load_undefined(undefined)?;
+                Ok(undefined)
+            }
+        })();
+        if tracked_scope.is_some() {
+            let _ = self.active_direct_eval_scopes.pop();
+        }
         self.in_class_field_initializer = previous_in_class_field_initializer;
         if this_override.is_some() {
             self.this_override_register = previous_override;
@@ -807,8 +1134,17 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         } else {
             self.named_property_atom(key)?
         };
-        let value_register =
-            self.lower_class_field_value(value, named_atom, this_override, home_object_override)?;
+        let inferred_name = if named_atom.is_some() || computed {
+            named_atom
+        } else {
+            self.class_field_inferred_name_atom(key)?
+        };
+        let value_register = self.lower_class_field_value(
+            value,
+            inferred_name,
+            this_override,
+            home_object_override,
+        )?;
 
         if let Some(atom) = named_atom {
             return self.emit_define_property_by_atom(target, value_register, atom);
@@ -876,14 +1212,23 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .and_then(|home_object| self.super_home_object_override.replace(home_object));
         let previous_in_class_field_initializer =
             std::mem::replace(&mut self.in_class_field_initializer, true);
-        let value_register: LoweringResult<u16> = if let Some(value) = value {
-            let value_register = self.alloc_temp()?;
-            self.lower_initializer_with_inferred_name(value, inferred_name, value_register)?;
-            Ok(value_register)
-        } else {
-            self.emit_load_undefined(arguments + 2)?;
-            Ok(arguments + 2)
-        };
+        let tracked_scope = self.current_class_field_direct_eval_scope();
+        if let Some(scope) = tracked_scope {
+            self.active_direct_eval_scopes.push(scope);
+        }
+        let value_register: LoweringResult<u16> = (|| {
+            if let Some(value) = value {
+                let value_register = self.alloc_temp()?;
+                self.lower_initializer_with_inferred_name(value, inferred_name, value_register)?;
+                Ok(value_register)
+            } else {
+                self.emit_load_undefined(arguments + 2)?;
+                Ok(arguments + 2)
+            }
+        })();
+        if tracked_scope.is_some() {
+            let _ = self.active_direct_eval_scopes.pop();
+        }
         self.in_class_field_initializer = previous_in_class_field_initializer;
         let value_register = value_register?;
         if this_override.is_some() || home_object_override.is_some() {
@@ -1034,6 +1379,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 float_constants: HashMap::new(),
                 builtin_constants: HashMap::new(),
                 child_indices: HashMap::new(),
+                array_literal_result_registers: Vec::new(),
+                array_literal_value_registers: Vec::new(),
                 hoisted_function_decls: HashSet::new(),
                 block_instantiated_function_decls: HashSet::new(),
                 hoisted_default_export_functions: HashSet::new(),
@@ -1052,6 +1399,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 active_class_contexts: Vec::new(),
                 active_direct_eval_scopes: self.active_direct_eval_scopes.clone(),
                 in_class_field_initializer: false,
+                in_instance_class_field_initializer: false,
+                force_strict_assignment: false,
                 active_disposal_scopes: Vec::new(),
             };
             synthetic.reserve_call_bridge_registers()?;
@@ -1115,6 +1464,25 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         instance_elements: &[ClassInstanceElementPlan],
         class_body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
     ) -> LoweringResult<()> {
+        let previous_instance_initializer =
+            std::mem::replace(&mut self.in_instance_class_field_initializer, true);
+        let previous_class_body = self.active_class_body.replace(class_body);
+        let result = self.emit_instance_element_initializers_inner(
+            this_register,
+            instance_elements,
+            class_body,
+        );
+        self.active_class_body = previous_class_body;
+        self.in_instance_class_field_initializer = previous_instance_initializer;
+        result
+    }
+
+    fn emit_instance_element_initializers_inner(
+        &mut self,
+        this_register: u16,
+        instance_elements: &[ClassInstanceElementPlan],
+        class_body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+    ) -> LoweringResult<()> {
         let private_descriptors = self
             .active_class_layout(class_body)
             .map(PrivateElementDescriptorLookup::from_layout);
@@ -1159,11 +1527,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 } => {
                     if let Some(computed_key_index) = computed_key_index {
                         let value_register = if let Some(value) = value {
-                            let previous_override =
-                                self.this_override_register.replace(this_register);
-                            let value_register = self.lower_expr_to_temp(value)?;
-                            self.this_override_register = previous_override;
-                            value_register
+                            self.lower_class_field_value(
+                                Some(value),
+                                None,
+                                Some(this_register),
+                                None,
+                            )?
                         } else {
                             let undefined = self.alloc_temp()?;
                             self.emit_load_undefined(undefined)?;
@@ -1475,6 +1844,23 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let super_span = super_span.unwrap_or(self.root_span());
 
         if !super_is_literal_null {
+            let null_value = self.alloc_temp()?;
+            self.emit_load_null(null_value)?;
+            let super_is_null = self.alloc_temp()?;
+            self.emit_profiled_binary(Opcode::StrictEqual, super_is_null, super_value, null_value)?;
+            let jump_non_null = self.builder.emit_cond_jump_placeholder(
+                Opcode::JumpIfFalse,
+                self.encode_register(super_is_null)?,
+            )?;
+            self.emit_internal_builtin_call(
+                object_set_prototype_of_builtin(),
+                &[prototype, null_value],
+                super_span,
+            )?;
+            let jump_end = self.builder.emit_jump_placeholder(Opcode::Jump)?;
+
+            let non_null = self.builder.current_offset()?;
+            self.builder.patch_jump_to(jump_non_null, non_null)?;
             self.emit_internal_builtin_call(
                 internal_require_constructor_builtin(),
                 &[super_value],
@@ -1496,6 +1882,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 &[prototype, super_prototype],
                 super_span,
             )?;
+            let end = self.builder.current_offset()?;
+            self.builder.patch_jump_to(jump_end, end)?;
             return Ok(());
         }
 

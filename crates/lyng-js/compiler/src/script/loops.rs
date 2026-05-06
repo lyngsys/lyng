@@ -139,6 +139,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         span: Span,
     ) -> LoweringResult<()> {
         self.reset_statement_result()?;
+        let env_scope = self.current_dynamic_env_scope_range()?;
+        if let Some((base, count)) = env_scope {
+            self.emit_enter_env_scope(base, count)?;
+        }
         if self.for_init_has_lexical_scope(init) {
             self.emit_frame_local_tdz_initializers_for_current_scope()?;
         }
@@ -177,6 +181,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if loop_iteration_plan.is_some() {
             self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
         }
+        if let Some((base, count)) = env_scope {
+            self.emit_leave_env_scope(base, count)?;
+        }
         if let Some(exit_jump) = exit_jump {
             self.builder.patch_jump_to(exit_jump, break_cleanup)?;
         }
@@ -210,6 +217,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         span: Span,
     ) -> LoweringResult<()> {
         self.reset_statement_result()?;
+        let env_scope = self.current_dynamic_env_scope_range()?;
+        if let Some((base, count)) = env_scope {
+            self.emit_enter_env_scope(base, count)?;
+        }
         if self.for_in_of_has_lexical_scope(left) {
             self.emit_frame_local_tdz_initializers_for_current_scope()?;
         }
@@ -286,6 +297,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if loop_iteration_plan.is_some() {
             self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
         }
+        if let Some((base, count)) = env_scope {
+            self.emit_leave_env_scope(base, count)?;
+        }
         let close_offset = self.builder.current_offset()?;
         self.builder.emit_abx(
             Opcode::CloseForIn,
@@ -358,6 +372,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         span: Span,
     ) -> LoweringResult<()> {
         self.reset_statement_result()?;
+        let env_scope = self.current_dynamic_env_scope_range()?;
+        if let Some((base, count)) = env_scope {
+            self.emit_enter_env_scope(base, count)?;
+        }
         if self.for_in_of_has_lexical_scope(left) {
             self.emit_frame_local_tdz_initializers_for_current_scope()?;
         }
@@ -456,6 +474,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if loop_iteration_plan.is_some() {
             self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
         }
+        if let Some((base, count)) = env_scope {
+            self.emit_leave_env_scope(base, count)?;
+        }
         self.builder.emit_abx(
             Opcode::CloseIterator,
             self.encode_register(iterator_register)?,
@@ -467,6 +488,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.builder.patch_jump_to(jump_escape, escape_offset)?;
         if loop_iteration_plan.is_some() {
             self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
+        }
+        if let Some((base, count)) = env_scope {
+            self.emit_leave_env_scope(base, count)?;
         }
         self.emit_close_iterator_for_completion(iterator_register)?;
         if let Some(outer) = self.outer_active_finally(finally_index) {
@@ -756,6 +780,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.collect_functions_in_statement(body, &mut nested_functions);
 
         let mut iteration_slots = Vec::new();
+        if let Some(body_scope) = self.loop_body_block_scope(body) {
+            self.collect_per_iteration_tdz_environment_slots(body_scope, &mut iteration_slots)?;
+        }
         let mut shared_slots = Vec::new();
         for function in nested_functions {
             let sema_id = self

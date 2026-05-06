@@ -282,6 +282,14 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .super_base_builtin(self.agent, self.caller_frame, invocation.arguments())
     }
 
+    fn super_constructor_builtin(
+        &mut self,
+        _invocation: BuiltinInvocation<'_>,
+    ) -> Result<Value, Self::Error> {
+        self.vm
+            .super_constructor_builtin(self.agent, self.caller_frame)
+    }
+
     fn construct_super_builtin(
         &mut self,
         invocation: BuiltinInvocation<'_>,

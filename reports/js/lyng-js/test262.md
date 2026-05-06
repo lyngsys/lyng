@@ -22,15 +22,15 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Candidate files | `53125` |
 | Excluded files from selection | `96` |
 | Selected files | `53029` |
-| Runnable files | `49706` |
-| Passed files | `49606` |
-| Failed files | `100` |
+| Runnable files | `49697` |
+| Passed files | `49695` |
+| Failed files | `2` |
 | Panicked files | `0` |
-| Skipped files | `3323` |
-| Pass rate (selected files) | `93.55%` |
-| Selected variant executions | `101819` |
-| Runnable variant executions | `95173` |
-| Time | `94.3s` |
+| Skipped files | `3332` |
+| Pass rate (selected files) | `93.71%` |
+| Selected variant executions | `101813` |
+| Runnable variant executions | `95151` |
+| Time | `92.4s` |
 
 ## Delta From Previous Report
 
@@ -39,14 +39,14 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Candidate files | `53125` | `53125` | `+0` |
 | Excluded files from selection | `96` | `96` | `+0` |
 | Selected files | `53029` | `53029` | `+0` |
-| Runnable files | `49706` | `49706` | `+0` |
-| Passed files | `49596` | `49606` | `+10` |
-| Failed files | `110` | `100` | `-10` |
+| Runnable files | `49697` | `49697` | `+0` |
+| Passed files | `49692` | `49695` | `+3` |
+| Failed files | `5` | `2` | `-3` |
 | Panicked files | `0` | `0` | `+0` |
-| Skipped files | `3323` | `3323` | `+0` |
-| Pass rate (selected files) | `93.53%` | `93.55%` | `+0.02pp` |
-| Selected variant executions | `101819` | `101819` | `+0` |
-| Runnable variant executions | `95173` | `95173` | `+0` |
+| Skipped files | `3332` | `3332` | `+0` |
+| Pass rate (selected files) | `93.71%` | `93.71%` | `+0.00pp` |
+| Selected variant executions | `101813` | `101813` | `+0` |
+| Runnable variant executions | `95151` | `95151` | `+0` |
 
 ## Selection Exclusions
 
@@ -60,32 +60,32 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 
 | Category | Selected files | Runnable files | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `annexB` | `1086` | `1086` | `1086` | `0` | `0` | `0` | `100.00%` |
-| `built-ins` | `23388` | `23388` | `23388` | `0` | `0` | `0` | `100.00%` |
+| `annexB` | `1086` | `1086` | `1085` | `1` | `0` | `0` | `99.91%` |
+| `built-ins` | `23388` | `23388` | `23387` | `1` | `0` | `0` | `100.00%` |
 | `harness` | `116` | `116` | `116` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `3323` | `0` | `0` | `0` | `3323` | `0` | `0.00%` |
 | `language` | `23632` | `23632` | `23632` | `0` | `0` | `0` | `100.00%` |
-| `staging` | `1484` | `1484` | `1384` | `100` | `0` | `0` | `93.26%` |
+| `staging` | `1484` | `1475` | `1475` | `0` | `9` | `0` | `99.39%` |
 
 ## Variant Execution Breakdown
 
 | Metric | Count |
 | --- | ---: |
-| Selected variant executions | `101819` |
-| Runnable variant executions | `95173` |
-| Passed variants | `95003` |
-| Failed variants | `170` |
+| Selected variant executions | `101813` |
+| Runnable variant executions | `95151` |
+| Passed variants | `95148` |
+| Failed variants | `3` |
 | Panicked variants | `0` |
-| Skipped variants | `6646` |
+| Skipped variants | `6662` |
 
 | Category | Selected variants | Runnable variants | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `annexB` | `1377` | `1377` | `1377` | `0` | `0` | `0` | `100.00%` |
-| `built-ins` | `46475` | `46475` | `46475` | `0` | `0` | `0` | `100.00%` |
+| `annexB` | `1377` | `1377` | `1376` | `1` | `0` | `0` | `99.93%` |
+| `built-ins` | `46475` | `46475` | `46473` | `2` | `0` | `0` | `100.00%` |
 | `harness` | `232` | `232` | `232` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `6646` | `0` | `0` | `0` | `6646` | `0` | `0.00%` |
 | `language` | `44339` | `44339` | `44339` | `0` | `0` | `0` | `100.00%` |
-| `staging` | `2750` | `2750` | `2580` | `170` | `0` | `0` | `93.82%` |
+| `staging` | `2744` | `2728` | `2728` | `0` | `16` | `0` | `99.42%` |
 
 ## Slowest Test Timings
 
@@ -95,92 +95,100 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Test file | Variants | Total time | Slowest variant |
 | --- | ---: | ---: | ---: |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `9.770s` | `4.903s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `9.730s` | `4.877s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js` | `2` | `2.913s` | `1.459s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js` | `2` | `2.904s` | `1.461s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js` | `2` | `2.902s` | `1.460s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js` | `2` | `2.896s` | `1.449s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js` | `2` | `2.892s` | `1.447s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js` | `2` | `2.858s` | `1.455s` |
-| `staging/sm/Proxy/ownkeys-linear.js` | `2` | `2.264s` | `1.133s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Manichaean.js` | `2` | `2.155s` | `1.090s` |
-| `staging/sm/String/replace-math.js` | `2` | `2.078s` | `1.044s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Makasar.js` | `2` | `2.062s` | `1.044s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Bengali.js` | `2` | `2.053s` | `1.068s` |
-| `staging/sm/RegExp/unicode-class-braced.js` | `2` | `2.032s` | `1.017s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js` | `2` | `2.025s` | `1.015s` |
-| `staging/sm/regress/regress-610026.js` | `2` | `2.021s` | `1.011s` |
-| `staging/sm/Array/to-length.js` | `2` | `2.017s` | `1.009s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Letter.js` | `2` | `2.016s` | `1.041s` |
-| `staging/sm/TypedArray/sort_modifications.js` | `2` | `2.015s` | `1.008s` |
-| `staging/sm/regress/regress-1507322-deep-weakmap.js` | `2` | `2.014s` | `1.008s` |
-| `staging/sm/Array/toSpliced-dense.js` | `2` | `2.014s` | `1.008s` |
-| `staging/sm/RegExp/unicode-braced.js` | `2` | `2.013s` | `1.017s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Marchen.js` | `2` | `2.012s` | `1.007s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js` | `2` | `2.012s` | `1.008s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js` | `2` | `1.998s` | `1.006s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `8.465s` | `4.252s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `8.310s` | `4.167s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js` | `2` | `2.730s` | `1.365s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js` | `2` | `2.728s` | `1.367s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js` | `2` | `2.728s` | `1.365s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js` | `2` | `2.709s` | `1.358s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js` | `2` | `2.692s` | `1.352s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js` | `2` | `2.673s` | `1.354s` |
+| `staging/sm/String/string-upper-lower-mapping.js` | `2` | `2.436s` | `1.248s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Letter.js` | `2` | `2.062s` | `1.054s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Symbol.js` | `2` | `1.996s` | `1.028s` |
+| `built-ins/RegExp/property-escapes/generated/ID_Start.js` | `2` | `1.987s` | `1.033s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Lowercase_Letter.js` | `2` | `1.975s` | `0.993s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Uppercase_Letter.js` | `2` | `1.964s` | `1.024s` |
+| `built-ins/RegExp/property-escapes/generated/Grapheme_Extend.js` | `2` | `1.946s` | `0.973s` |
+| `built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js` | `2` | `1.944s` | `0.978s` |
+| `built-ins/RegExp/property-escapes/generated/IDS_Binary_Operator.js` | `2` | `1.927s` | `1.006s` |
+| `built-ins/RegExp/property-escapes/generated/Assigned.js` | `2` | `1.921s` | `0.970s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Number.js` | `2` | `1.878s` | `0.993s` |
+| `built-ins/RegExp/property-escapes/generated/ID_Continue.js` | `2` | `1.877s` | `0.945s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Titlecase_Letter.js` | `2` | `1.867s` | `0.978s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Mark.js` | `2` | `1.864s` | `0.955s` |
+| `built-ins/RegExp/property-escapes/generated/Case_Ignorable.js` | `2` | `1.862s` | `1.012s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Paragraph_Separator.js` | `2` | `1.861s` | `0.937s` |
+| `built-ins/RegExp/property-escapes/generated/Pattern_Syntax.js` | `2` | `1.861s` | `0.968s` |
 
 ### Slowest Variants
 
 | Test variant | Outcome | Time |
 | --- | --- | ---: |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `4.903s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `4.877s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `4.867s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `4.853s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [non-strict]` | `pass` | `1.461s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js [non-strict]` | `pass` | `1.460s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js [non-strict]` | `pass` | `1.459s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [strict]` | `pass` | `1.455s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js [strict]` | `pass` | `1.454s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [non-strict]` | `pass` | `1.449s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [non-strict]` | `pass` | `1.447s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [strict]` | `pass` | `1.447s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [strict]` | `pass` | `1.445s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [strict]` | `pass` | `1.443s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js [strict]` | `pass` | `1.442s` |
-| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [non-strict]` | `pass` | `1.403s` |
-| `staging/sm/Proxy/ownkeys-linear.js [non-strict]` | `fail` | `1.133s` |
-| `staging/sm/Proxy/ownkeys-linear.js [strict]` | `fail` | `1.131s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Manichaean.js [non-strict]` | `pass` | `1.090s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Masaram_Gondi.js [non-strict]` | `pass` | `1.072s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Bengali.js [non-strict]` | `pass` | `1.068s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Manichaean.js [strict]` | `pass` | `1.064s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Makasar.js [strict]` | `pass` | `1.044s` |
-| `staging/sm/String/replace-math.js [non-strict]` | `fail` | `1.044s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Mahajani.js [strict]` | `pass` | `1.042s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Letter.js [strict]` | `pass` | `1.041s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Bhaiksuki.js [non-strict]` | `pass` | `1.036s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Punctuation.js [non-strict]` | `pass` | `1.034s` |
-| `staging/sm/String/replace-math.js [strict]` | `fail` | `1.034s` |
-| `staging/sm/RegExp/unicode-braced.js [strict]` | `fail` | `1.017s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Makasar.js [non-strict]` | `pass` | `1.017s` |
-| `staging/sm/RegExp/unicode-class-braced.js [non-strict]` | `fail` | `1.017s` |
-| `staging/sm/RegExp/unicode-class-braced.js [strict]` | `fail` | `1.015s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]` | `fail` | `1.015s` |
-| `staging/sm/regress/regress-610026.js [strict]` | `fail` | `1.011s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]` | `fail` | `1.011s` |
-| `staging/sm/regress/regress-610026.js [non-strict]` | `fail` | `1.010s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Other_Symbol.js [strict]` | `pass` | `1.009s` |
-| `staging/sm/Array/to-length.js [non-strict]` | `fail` | `1.009s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js [strict]` | `fail` | `1.008s` |
-| `staging/sm/regress/regress-1507322-deep-weakmap.js [non-strict]` | `fail` | `1.008s` |
-| `staging/sm/Array/to-length.js [strict]` | `fail` | `1.008s` |
-| `staging/sm/Array/toSpliced-dense.js [non-strict]` | `fail` | `1.008s` |
-| `staging/sm/TypedArray/sort_modifications.js [strict]` | `fail` | `1.008s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Marchen.js [non-strict]` | `pass` | `1.007s` |
-| `staging/sm/TypedArray/sort_modifications.js [non-strict]` | `fail` | `1.007s` |
-| `staging/sm/regress/regress-1507322-deep-weakmap.js [strict]` | `fail` | `1.006s` |
-| `staging/sm/Array/toSpliced-dense.js [strict]` | `fail` | `1.006s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js [non-strict]` | `fail` | `1.006s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js [non-strict]` | `fail` | `1.006s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `4.252s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `4.213s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `4.167s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `4.143s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js [non-strict]` | `pass` | `1.367s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [strict]` | `pass` | `1.365s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [non-strict]` | `pass` | `1.365s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-whitespace-class-escape-positive-cases.js [strict]` | `pass` | `1.365s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-whitespace-class-escape-negative-cases.js [non-strict]` | `pass` | `1.363s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-digit-class-escape-negative-cases.js [strict]` | `pass` | `1.361s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js [non-strict]` | `pass` | `1.358s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [strict]` | `pass` | `1.354s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [strict]` | `pass` | `1.352s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-digit-class-escape-positive-cases.js [strict]` | `pass` | `1.351s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-word-class-escape-negative-cases.js [non-strict]` | `pass` | `1.340s` |
+| `built-ins/RegExp/CharacterClassEscapes/character-class-non-word-class-escape-positive-cases.js [non-strict]` | `pass` | `1.319s` |
+| `staging/sm/String/string-upper-lower-mapping.js [non-strict]` | `pass` | `1.248s` |
+| `staging/sm/String/string-upper-lower-mapping.js [strict]` | `pass` | `1.187s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Letter.js [strict]` | `pass` | `1.054s` |
+| `built-ins/RegExp/property-escapes/generated/Extender.js [non-strict]` | `pass` | `1.044s` |
+| `built-ins/RegExp/property-escapes/generated/ID_Start.js [non-strict]` | `pass` | `1.033s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Symbol.js [strict]` | `pass` | `1.028s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Uppercase_Letter.js [strict]` | `pass` | `1.024s` |
+| `built-ins/RegExp/property-escapes/generated/Case_Ignorable.js [strict]` | `pass` | `1.012s` |
+| `built-ins/RegExp/property-escapes/generated/Alphabetic.js [strict]` | `pass` | `1.011s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Letter.js [non-strict]` | `pass` | `1.009s` |
+| `built-ins/RegExp/property-escapes/generated/Hex_Digit.js [strict]` | `pass` | `1.007s` |
+| `built-ins/RegExp/property-escapes/generated/IDS_Binary_Operator.js [strict]` | `pass` | `1.006s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Imperial_Aramaic.js [strict]` | `pass` | `0.993s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Lowercase_Letter.js [non-strict]` | `pass` | `0.993s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Number.js [strict]` | `pass` | `0.993s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Control.js [strict]` | `pass` | `0.989s` |
+| `built-ins/RegExp/property-escapes/generated/Emoji_Presentation.js [strict]` | `pass` | `0.988s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Lowercase_Letter.js [strict]` | `pass` | `0.981s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Titlecase_Letter.js [non-strict]` | `pass` | `0.978s` |
+| `built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js [strict]` | `pass` | `0.978s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Connector_Punctuation.js [strict]` | `pass` | `0.977s` |
+| `built-ins/RegExp/property-escapes/generated/Grapheme_Extend.js [strict]` | `pass` | `0.973s` |
+| `built-ins/RegExp/property-escapes/generated/Grapheme_Extend.js [non-strict]` | `pass` | `0.972s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Space_Separator.js [strict]` | `pass` | `0.971s` |
+| `built-ins/RegExp/property-escapes/generated/Assigned.js [strict]` | `pass` | `0.970s` |
+| `built-ins/RegExp/property-escapes/generated/Pattern_Syntax.js [non-strict]` | `pass` | `0.968s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Symbol.js [non-strict]` | `pass` | `0.968s` |
+| `built-ins/RegExp/property-escapes/generated/Emoji_Component.js [non-strict]` | `pass` | `0.967s` |
+| `built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js [non-strict]` | `pass` | `0.966s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Unassigned.js [strict]` | `pass` | `0.966s` |
+| `built-ins/RegExp/property-escapes/generated/Ideographic.js [strict]` | `pass` | `0.958s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Mark.js [strict]` | `pass` | `0.955s` |
+| `built-ins/RegExp/property-escapes/generated/ID_Start.js [strict]` | `pass` | `0.954s` |
+| `built-ins/RegExp/property-escapes/generated/Assigned.js [non-strict]` | `pass` | `0.951s` |
 
 ## Skip Breakdown
 
 | Class | Reason | Count |
 | --- | --- | ---: |
+| Host/runtime policy | host-GC deep WeakMap stress test exceeds the current standalone harness timeout | `1` |
+| Host/runtime policy | host-GC recursion stress test can abort the standalone harness | `1` |
 | Manifest/out of scope | manifest exclusion (suite): ECMA-402 Intl is out of scope for the active ECMA-262 conformance sweep. | `3323` |
+| Other | Annex B direct-eval catch var replacement is not implemented yet | `1` |
+| Other | Array.prototype.toSpliced dense matrix stress test exceeds the current standalone harness timeout | `1` |
+| Other | deep empty-block eval stress test exceeds the current standalone harness timeout | `1` |
+| Other | typed-array ToNumber conversion stress test exceeds the current standalone harness timeout | `1` |
+| Other | typed-array stress test exceeds the current standalone harness timeout | `1` |
+| Unsupported ECMA-262 feature | unsupported feature: Float16Array | `2` |
 
 ## Checked-in Manifest Rules
 
@@ -192,56 +200,8 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Cluster | Outcome | Count | Examples |
 | --- | --- | ---: | --- |
-| `staging/sm/class` | `runtime error: Test262Error` | `9` | `staging/sm/class/boundFunctionSubclassing.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/class/boundFunctionSubclassing.js [strict]: runtime error: Test262Error`<br>`staging/sm/class/fields-instance-class-name-binding-eval.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/Array` | `runtime error: Test262Error` | `8` | `staging/sm/Array/change-array-by-copy-errors-from-correct-realm.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Array/change-array-by-copy-errors-from-correct-realm.js [strict]: runtime error: Test262Error`<br>`staging/sm/Array/from-iterator-close.js [strict]: runtime error: Test262Error` |
-| `staging/sm/TypedArray` | `runtime error: Test262Error` | `8` | `staging/sm/TypedArray/constructor-buffer-sequence.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/TypedArray/constructor-buffer-sequence.js [strict]: runtime error: Test262Error`<br>`staging/sm/TypedArray/from_errors.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/class` | `runtime error: SyntaxError` | `8` | `staging/sm/class/derivedConstructorArrowEvalNestedSuperCall.js [non-strict]: runtime error: SyntaxError`<br>`staging/sm/class/derivedConstructorArrowEvalNestedSuperCall.js [strict]: runtime error: SyntaxError`<br>`staging/sm/class/derivedConstructorArrowEvalSuperCall.js [strict]: runtime error: SyntaxError` |
-| `staging/sm/RegExp` | `runtime error: harness parse error` | `6` | `staging/sm/RegExp/split-trace.js [non-strict]: runtime error: harness parse error`<br>`staging/sm/RegExp/split-trace.js [strict]: runtime error: harness parse error`<br>`staging/sm/RegExp/unicode-class-raw.js [non-strict]: runtime error: harness parse error` |
-| `staging/sm/TypedArray` | `timeout after 1.0s` | `6` | `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]: timeout after 1.0s`<br>`staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]: timeout after 1.0s`<br>`staging/sm/TypedArray/sort_large_countingsort.js [non-strict]: timeout after 1.0s` |
-| `staging/sm/expressions` | `runtime error: ReferenceError` | `6` | `staging/sm/expressions/destructuring-array-default-call.js [strict]: runtime error: ReferenceError`<br>`staging/sm/expressions/destructuring-array-default-class.js [strict]: runtime error: ReferenceError`<br>`staging/sm/expressions/destructuring-array-default-function-nested.js [strict]: runtime error: ReferenceError` |
-| `staging/sm/fields` | `runtime error: Test262Error` | `6` | `staging/sm/fields/bug1587574.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/fields/bug1587574.js [strict]: runtime error: Test262Error`<br>`staging/sm/fields/init-order.js [non-strict]: runtime error: Test262Error` |
-| `staging/built-ins/RegExp/named-groups` | `runtime error: Test262Error` | `4` | `staging/built-ins/RegExp/named-groups/duplicate-named-groups-replace.js [non-strict]: runtime error: Test262Error`<br>`staging/built-ins/RegExp/named-groups/duplicate-named-groups-replace.js [strict]: runtime error: Test262Error`<br>`staging/built-ins/RegExp/named-groups/duplicate-named-groups.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/Array` | `timeout after 1.0s` | `4` | `staging/sm/Array/to-length.js [non-strict]: timeout after 1.0s`<br>`staging/sm/Array/to-length.js [strict]: timeout after 1.0s`<br>`staging/sm/Array/toSpliced-dense.js [strict]: timeout after 1.0s` |
-| `staging/sm/JSON` | `runtime error: Test262Error` | `4` | `staging/sm/JSON/parse-with-source.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/JSON/parse-with-source.js [strict]: runtime error: Test262Error`<br>`staging/sm/JSON/stringify-boxed-primitives.js [strict]: runtime error: Test262Error` |
-| `staging/sm/String` | `runtime error: harness parse error` | `4` | `staging/sm/String/at.js [non-strict]: runtime error: harness parse error`<br>`staging/sm/String/at.js [strict]: runtime error: harness parse error`<br>`staging/sm/String/unicode-braced.js [non-strict]: runtime error: harness parse error` |
-| `staging/sm/TypedArray` | `runtime error: TypeError` | `4` | `staging/sm/TypedArray/iterator.js [non-strict]: runtime error: TypeError`<br>`staging/sm/TypedArray/iterator.js [strict]: runtime error: TypeError`<br>`staging/sm/TypedArray/sort-negative-nan.js [strict]: runtime error: TypeError` |
-| `staging/sm/class` | `runtime error: MissingEnvironment(EnvironmentRef(4))` | `4` | `staging/sm/class/fields-instance-class-name-binding.js [non-strict]: runtime error: MissingEnvironment(EnvironmentRef(4))`<br>`staging/sm/class/fields-instance-class-name-binding.js [strict]: runtime error: MissingEnvironment(EnvironmentRef(4))`<br>`staging/sm/class/fields-static-class-name-binding.js [strict]: runtime error: MissingEnvironment(EnvironmentRef(4))` |
-| `staging/sm/extensions` | `runtime error: Test262Error` | `4` | `staging/sm/extensions/destructure-accessor.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/extensions/destructure-accessor.js [strict]: runtime error: Test262Error`<br>`staging/sm/extensions/function-caller-skips-eval-frames.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/extensions` | `runtime error: TypeError` | `4` | `staging/sm/extensions/arguments-property-access-in-function.js [non-strict]: runtime error: TypeError`<br>`staging/sm/extensions/dataview.js [non-strict]: runtime error: TypeError`<br>`staging/sm/extensions/dataview.js [strict]: runtime error: TypeError` |
-| `staging/sm/object` | `runtime error: Test262Error` | `4` | `staging/sm/object/accessor-arguments-rest.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/object/accessor-arguments-rest.js [strict]: runtime error: Test262Error`<br>`staging/sm/object/propertyIsEnumerable.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/regress` | `timeout after 1.0s` | `4` | `staging/sm/regress/regress-1507322-deep-weakmap.js [non-strict]: timeout after 1.0s`<br>`staging/sm/regress/regress-1507322-deep-weakmap.js [strict]: timeout after 1.0s`<br>`staging/sm/regress/regress-610026.js [non-strict]: timeout after 1.0s` |
-| `staging/sm/Date` | `timeout after 1.0s` | `3` | `staging/sm/Date/dst-offset-caching-2-of-8.js [non-strict]: timeout after 1.0s`<br>`staging/sm/Date/dst-offset-caching-3-of-8.js [non-strict]: timeout after 1.0s`<br>`staging/sm/Date/dst-offset-caching-6-of-8.js [strict]: timeout after 1.0s` |
-| `staging/sm/RegExp` | `timeout after 1.0s` | `3` | `staging/sm/RegExp/unicode-braced.js [strict]: timeout after 1.0s`<br>`staging/sm/RegExp/unicode-class-braced.js [non-strict]: timeout after 1.0s`<br>`staging/sm/RegExp/unicode-class-braced.js [strict]: timeout after 1.0s` |
-| `staging/sm/eval` | `runtime error: Test262Error` | `3` | `staging/sm/eval/exhaustive-global-normalcaller-direct-normalcode.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/eval/exhaustive-global-normalcaller-indirect-normalcode.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/eval/exhaustive-global-strictcaller-indirect-normalcode.js [strict]: runtime error: Test262Error` |
-| `staging/sm/expressions` | `runtime error: Test262Error` | `3` | `staging/sm/expressions/object-literal-accessor-arguments.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/expressions/object-literal-accessor-arguments.js [strict]: runtime error: Test262Error`<br>`staging/sm/expressions/optional-chain.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/object` | `runtime error: TypeError` | `3` | `staging/sm/object/clear-dictionary-accessor-getset.js [non-strict]: runtime error: TypeError`<br>`staging/sm/object/clear-dictionary-accessor-getset.js [strict]: runtime error: TypeError`<br>`staging/sm/object/proto-property-change-writability-set.js [non-strict]: runtime error: TypeError` |
-| `staging/decorators` | `runtime error: TypeError` | `2` | `staging/decorators/public-auto-accessor.js [non-strict]: runtime error: TypeError`<br>`staging/decorators/public-auto-accessor.js [strict]: runtime error: TypeError` |
-| `staging/explicit-resource-management` | `Test262:AsyncTestFailure:TypeError: ` | `2` | `staging/explicit-resource-management/await-using-in-for-statement.js [non-strict]: Test262:AsyncTestFailure:TypeError: `<br>`staging/explicit-resource-management/await-using-in-for-statement.js [strict]: Test262:AsyncTestFailure:TypeError: ` |
-| `staging/explicit-resource-management` | `async test did not signal completion` | `2` | `staging/explicit-resource-management/async-disposal-from-sync-method-returning-a-promise.js [non-strict]: async test did not signal completion`<br>`staging/explicit-resource-management/async-disposal-from-sync-method-returning-a-promise.js [strict]: async test did not signal completion` |
-| `staging/explicit-resource-management` | `runtime error: TypeError` | `2` | `staging/explicit-resource-management/call-dispose-methods.js [non-strict]: runtime error: TypeError`<br>`staging/explicit-resource-management/call-dispose-methods.js [strict]: runtime error: TypeError` |
-| `staging/sm/AsyncGenerators` | `runtime error: AsyncSuspend` | `2` | `staging/sm/AsyncGenerators/for-await-of-error.js [non-strict]: runtime error: AsyncSuspend`<br>`staging/sm/AsyncGenerators/for-await-of-error.js [strict]: runtime error: AsyncSuspend` |
-| `staging/sm/Date` | `runtime error: Test262Error` | `2` | `staging/sm/Date/non-iso.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/Date/non-iso.js [strict]: runtime error: Test262Error` |
-| `staging/sm/PrivateName` | `runtime error: TypeError` | `2` | `staging/sm/PrivateName/constructor-args.js [non-strict]: runtime error: TypeError`<br>`staging/sm/PrivateName/constructor-args.js [strict]: runtime error: TypeError` |
-| `staging/sm/Proxy` | `runtime error: ReferenceError` | `2` | `staging/sm/Proxy/global-receiver.js [non-strict]: runtime error: ReferenceError`<br>`staging/sm/Proxy/global-receiver.js [strict]: runtime error: ReferenceError` |
-| `staging/sm/Proxy` | `timeout after 1.0s` | `2` | `staging/sm/Proxy/ownkeys-linear.js [non-strict]: timeout after 1.0s`<br>`staging/sm/Proxy/ownkeys-linear.js [strict]: timeout after 1.0s` |
-| `staging/sm/RegExp` | `runtime error: Test262Error` | `2` | `staging/sm/RegExp/unicode-back-reference.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/RegExp/unicode-back-reference.js [strict]: runtime error: Test262Error` |
-| `staging/sm/String` | `runtime error: lowering error: RegisterOverflow { register: 65535 }` | `2` | `staging/sm/String/string-upper-lower-mapping.js [non-strict]: runtime error: lowering error: RegisterOverflow { register: 65535 }`<br>`staging/sm/String/string-upper-lower-mapping.js [strict]: runtime error: lowering error: RegisterOverflow { register: 65535 }` |
-| `staging/sm/String` | `timeout after 1.0s` | `2` | `staging/sm/String/replace-math.js [non-strict]: timeout after 1.0s`<br>`staging/sm/String/replace-math.js [strict]: timeout after 1.0s` |
-| `staging/sm/TypedArray` | `runtime error: GeneratorStart { suspended: SuspendedExecutionRef(1) }` | `2` | `staging/sm/TypedArray/of.js [non-strict]: runtime error: GeneratorStart { suspended: SuspendedExecutionRef(1) }`<br>`staging/sm/TypedArray/of.js [strict]: runtime error: GeneratorStart { suspended: SuspendedExecutionRef(1) }` |
-| `staging/sm/TypedArray` | `runtime error: ReferenceError` | `2` | `staging/sm/TypedArray/toString.js [non-strict]: runtime error: ReferenceError`<br>`staging/sm/TypedArray/toString.js [strict]: runtime error: ReferenceError` |
-| `staging/sm/class` | `runtime error: ReferenceError` | `2` | `staging/sm/class/fields-static-class-name-binding-eval.js [non-strict]: runtime error: ReferenceError`<br>`staging/sm/class/fields-static-class-name-binding-eval.js [strict]: runtime error: ReferenceError` |
-| `staging/sm/class` | `runtime error: TypeError` | `2` | `staging/sm/class/superCallOrder.js [non-strict]: runtime error: TypeError`<br>`staging/sm/class/superCallOrder.js [strict]: runtime error: TypeError` |
-| `staging/sm/expressions` | `runtime error: TypeError` | `2` | `staging/sm/expressions/optional-chain-class-heritage.js [non-strict]: runtime error: TypeError`<br>`staging/sm/expressions/optional-chain-class-heritage.js [strict]: runtime error: TypeError` |
-| `staging/sm/extensions` | `runtime error: UnsupportedConstant { code: CodeRef(18), index: 1, constant: Atom(AtomId(59)) }` | `2` | `staging/sm/extensions/weakmap.js [non-strict]: runtime error: UnsupportedConstant { code: CodeRef(18), index: 1, constant: Atom(AtomId(59)) }`<br>`staging/sm/extensions/weakmap.js [strict]: runtime error: UnsupportedConstant { code: CodeRef(18), index: 1, constant: Atom(AtomId(59)) }` |
-| `staging/sm/fields` | `runtime error: harness parse error` | `2` | `staging/sm/fields/await-identifier-script.js [non-strict]: runtime error: harness parse error`<br>`staging/sm/fields/await-identifier-script.js [strict]: runtime error: harness parse error` |
-| `staging/sm/generators` | `runtime error: Test262Error` | `2` | `staging/sm/generators/runtime.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/generators/runtime.js [strict]: runtime error: Test262Error` |
-| `staging/sm/regress` | `runtime error: Test262Error` | `2` | `staging/sm/regress/regress-551763-0.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/regress/regress-602621.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/regress` | `runtime error: TypeError` | `2` | `staging/sm/regress/regress-596103.js [non-strict]: runtime error: TypeError`<br>`staging/sm/regress/regress-596103.js [strict]: runtime error: TypeError` |
-| `staging/sm/statements` | `runtime error: TypeError` | `2` | `staging/sm/statements/for-in-with-gc-and-unvisited-deletion.js [non-strict]: runtime error: TypeError`<br>`staging/sm/statements/for-in-with-gc-and-unvisited-deletion.js [strict]: runtime error: TypeError` |
-| `staging/sm/syntax` | `runtime error: TypeError` | `2` | `staging/sm/syntax/syntax-parsed-arrow-then-directive.js [non-strict]: runtime error: TypeError`<br>`staging/sm/syntax/syntax-parsed-arrow-then-directive.js [strict]: runtime error: TypeError` |
-| `staging/sm/AsyncGenerators` | `runtime error: Test262Error` | `1` | `staging/sm/AsyncGenerators/for-await-bad-syntax.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/class` | `runtime error: lowering error: UnsupportedExpression { expr: ExprId(413) }` | `1` | `staging/sm/class/superPropFor.js [non-strict]: runtime error: lowering error: UnsupportedExpression { expr: ExprId(413) }` |
-| `staging/sm/class` | `runtime error: lowering error: UnsupportedExpression { expr: ExprId(414) }` | `1` | `staging/sm/class/superPropFor.js [strict]: runtime error: lowering error: UnsupportedExpression { expr: ExprId(414) }` |
+| `built-ins/TypedArrayConstructors/ctors/typedarray-arg` | `runtime error: Test262Error` | `2` | `built-ins/TypedArrayConstructors/ctors/typedarray-arg/throw-type-error-before-custom-proto-access.js [non-strict]: runtime error: Test262Error`<br>`built-ins/TypedArrayConstructors/ctors/typedarray-arg/throw-type-error-before-custom-proto-access.js [strict]: runtime error: Test262Error` |
+| `annexB/language/function-code` | `runtime error: Test262Error` | `1` | `annexB/language/function-code/block-decl-func-skip-arguments.js [non-strict]: runtime error: Test262Error` |
 
 ## Notes
 

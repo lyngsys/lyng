@@ -1144,6 +1144,57 @@ fn shared_bootstrap_installs_iterator_family_descriptors() {
 }
 
 #[test]
+fn shared_bootstrap_keeps_generator_iterator_method_inherited() {
+    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let mut cache = BuiltinCache::new();
+
+    let artifacts = bootstrap_default_realm(
+        agent,
+        &mut cache,
+        BootstrapRequest::new(BootstrapMode::SpecOnly),
+    )
+    .expect("spec bootstrap should succeed");
+    let intrinsics = agent
+        .realm(artifacts.realm())
+        .expect("default realm should exist")
+        .intrinsics();
+    let generator_prototype = intrinsics
+        .generator_prototype()
+        .expect("GeneratorPrototype intrinsic should exist");
+    let iterator_symbol = agent
+        .well_known_symbol(WellKnownSymbolId::Iterator)
+        .expect("Symbol.iterator should exist");
+    let to_string_tag_symbol = agent
+        .well_known_symbol(WellKnownSymbolId::ToStringTag)
+        .expect("Symbol.toStringTag should exist");
+
+    let own_iterator = agent
+        .objects()
+        .get_own_property(
+            agent.heap().view(),
+            generator_prototype,
+            PropertyKey::from_symbol(iterator_symbol),
+        )
+        .expect("GeneratorPrototype should be queryable");
+    assert!(
+        own_iterator.is_none(),
+        "GeneratorPrototype should inherit Symbol.iterator from IteratorPrototype"
+    );
+
+    let tag = own_descriptor(
+        agent,
+        generator_prototype,
+        PropertyKey::from_symbol(to_string_tag_symbol),
+        "GeneratorPrototype[Symbol.toStringTag]",
+    );
+    assert!(tag.value().and_then(Value::as_string_ref).is_some());
+    assert_eq!(tag.writable(), Some(false));
+    assert_eq!(tag.enumerable(), Some(false));
+    assert_eq!(tag.configurable(), Some(true));
+}
+
+#[test]
 fn shared_bootstrap_installs_object_reflection_family_descriptors() {
     let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();

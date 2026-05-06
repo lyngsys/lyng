@@ -686,7 +686,9 @@ impl RealmExtensionProvider for Test262RealmExtension {
             return Ok(Value::undefined());
         }
         if entry == test262_gc_entry() {
-            let _ = context.agent().force_collect();
+            // The primitive collector is not yet safe to run from arbitrary
+            // VM frames. Keep the Test262 host hook observationally inert
+            // until allocation slow paths can trace active VM state.
             return Ok(Value::undefined());
         }
         if entry == test262_print_entry() {

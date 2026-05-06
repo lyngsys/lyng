@@ -577,6 +577,60 @@ fn direct_eval_in_global_code_creates_var_binding_before_initializer_reads() {
 }
 
 #[test]
+fn direct_eval_in_global_code_creates_deletable_new_var_binding() {
+    let result = compile_and_run_string(
+        r#"
+            var existing = 17;
+            let before = "missing";
+            let afterExisting = "missing";
+            let afterCreated = "missing";
+
+            let f = eval([
+                "var existing = 4;",
+                "var created = 5;",
+                "function probe(action) {",
+                "  switch (action) {",
+                "    case 'get-existing': return existing;",
+                "    case 'get-created': return created;",
+                "    case 'delete-existing': return eval('delete existing');",
+                "    case 'delete-created': return eval('delete created');",
+                "  }",
+                "}",
+                "probe;",
+            ].join("\n"));
+
+            before = f("get-existing") + ":" + f("get-created");
+            let delExisting = f("delete-existing");
+            let delCreated = f("delete-created");
+            try {
+                afterExisting = f("get-existing");
+            } catch (error) {
+                afterExisting = error.constructor.name;
+            }
+            try {
+                afterCreated = f("get-created");
+            } catch (error) {
+                afterCreated = error.constructor.name;
+            }
+
+            before
+                + "|"
+                + String(delExisting)
+                + ":"
+                + String(delCreated)
+                + "|"
+                + afterExisting
+                + ":"
+                + afterCreated
+                + "|"
+                + String(existing);
+        "#,
+    );
+
+    assert_eq!(result, "4:5|false:true|4:ReferenceError|4");
+}
+
+#[test]
 fn direct_eval_in_only_strict_script_can_still_call_global_helpers() {
     let result = compile_and_run_string(
         r#"
@@ -741,6 +795,46 @@ fn direct_eval_can_observe_new_target_from_non_arrow_function() {
 }
 
 #[test]
+fn direct_eval_propagates_new_target_context_to_nested_eval() {
+    let result = compile_and_run_string(
+        r#"
+            function syntaxStatus(callback) {
+                try {
+                    callback();
+                    return "ok";
+                } catch (error) {
+                    return error.constructor === SyntaxError ? "syntax" : "other";
+                }
+            }
+
+            let constructed = "missing";
+            function Probe(expected) {
+                try {
+                    let direct = eval("new.target") === expected;
+                    let arrow = (() => eval("new.target"))() === expected;
+                    let nested = eval('eval("new.target")') === expected;
+                    let result = [direct, arrow, nested].join(",");
+                    if (expected !== undefined) {
+                        constructed = result;
+                    }
+                    return result;
+                } catch (error) {
+                    return error.constructor.name;
+                }
+            }
+
+            let top = syntaxStatus(() => eval("new.target"));
+            let topArrow = syntaxStatus(() => (() => eval("new.target"))());
+            let plain = Probe(undefined);
+            new Probe(Probe);
+            top + "|" + topArrow + "|" + plain + "|" + constructed;
+        "#,
+    );
+
+    assert_eq!(result, "syntax|syntax|true,true,true|true,true,true");
+}
+
+#[test]
 fn direct_eval_can_read_super_property_from_method() {
     let result = compile_and_run_string(
         r#"
@@ -759,6 +853,77 @@ fn direct_eval_can_read_super_property_from_method() {
     );
 
     assert_eq!(result, "undefined:262");
+}
+
+#[test]
+fn direct_eval_rejects_super_call_from_non_constructor_method_before_side_effects() {
+    let result = compile_and_run_string(
+        r#"
+            let evaluated = false;
+            const object = {
+                method() {
+                    try {
+                        eval("super(evaluated = true);");
+                        return "ok";
+                    } catch (error) {
+                        return error.constructor.name + ":" + String(evaluated);
+                    }
+                },
+            };
+            object.method();
+        "#,
+    );
+
+    assert_eq!(result, "SyntaxError:false");
+}
+
+#[test]
+fn direct_eval_preserves_super_context_through_arrows_and_nested_eval() {
+    let result = compile_and_run_string(
+        r#"
+            let log = [];
+            class Base {
+                constructor() {
+                    this.base = true;
+                }
+
+                method() {
+                    return "base";
+                }
+            }
+
+            new class extends Base {
+                constructor() {
+                    eval("super()");
+                    log.push(String(this.base));
+                }
+            }();
+
+            new class extends Base {
+                constructor() {
+                    (() => eval("super()"))();
+                    log.push(String(this.base));
+                }
+            }();
+
+            new class extends Base {
+                constructor() {
+                    eval("(()=>super())()");
+                    log.push(String(this.base));
+                }
+            }();
+
+            class MethodCase extends Base {
+                method() {
+                    return (() => eval("super.method"))();
+                }
+            }
+            log.push(String(new MethodCase().method() === Base.prototype.method));
+            log.join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|true|true|true");
 }
 
 #[test]
@@ -865,6 +1030,60 @@ fn direct_eval_nested_in_class_field_initializer_rejects_arguments_before_side_e
     );
 
     assert_eq!(result, "SyntaxError:false");
+}
+
+#[test]
+fn direct_eval_in_class_field_initializer_rejects_super_call_before_side_effects() {
+    let result = compile_and_run_string(
+        r#"
+            let executed = false;
+            class Base {
+                constructor() {
+                    this.base = true;
+                }
+                get value() {
+                    return 262;
+                }
+            }
+            class C extends Base {
+                x = eval("executed = true; super();");
+                y = eval("super.value");
+            }
+
+            try {
+                new C();
+                "ok";
+            } catch (error) {
+                error.constructor.name + ":" + String(executed);
+            }
+        "#,
+    );
+
+    assert_eq!(result, "SyntaxError:false");
+}
+
+#[test]
+fn direct_eval_in_class_field_initializer_can_read_private_names() {
+    let result = compile_and_run_string(
+        r#"
+            class C {
+                #field = 44;
+                #method() { return 7; }
+                get #accessor() { return 3; }
+                set #setter(value) { this.observed = value; }
+
+                field = eval("this.#field");
+                method = eval("this.#method()");
+                accessor = eval("this.#accessor");
+                setter = eval("this.#setter = 9");
+            }
+
+            const c = new C();
+            [c.field, c.method, c.accessor, c.observed].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "44:7:3:9");
 }
 
 #[test]

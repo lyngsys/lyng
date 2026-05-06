@@ -178,6 +178,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     pub(super) fn active_direct_eval_site_flags(&self) -> DirectEvalSiteFlags {
         DirectEvalSiteFlags::empty()
             .with_forbid_arguments_in_class_initializer(self.in_class_field_initializer)
+            .with_forbid_super_call_in_class_initializer(self.in_class_field_initializer)
+            .with_allow_new_target(self.state.sema.direct_eval_allows_new_target)
+            .with_allow_super(self.state.sema.direct_eval_allows_super)
     }
 
     pub(super) fn active_direct_eval_annex_b_catch_names(&self) -> Vec<AtomId> {
@@ -332,20 +335,49 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         list: lyng_js_ast::NodeList<StmtId>,
         span: Span,
     ) -> LoweringResult<()> {
+        let env_scope = self.current_dynamic_env_scope_range()?;
+        if let Some((base, count)) = env_scope {
+            self.emit_enter_env_scope(base, count)?;
+        }
         self.emit_frame_local_tdz_initializers_for_current_scope()?;
         let stmts = self.ast().get_stmt_list(list).to_vec();
         if let Some(kind) = self.statement_list_disposal_scope_kind(list) {
-            return self.with_disposal_scope(kind, span, move |this| {
+            let result = self.with_disposal_scope(kind, span, move |this| {
                 for stmt in stmts {
                     this.lower_statement(stmt)?;
                 }
                 Ok(())
             });
+            if let Some((base, count)) = env_scope {
+                self.emit_leave_env_scope(base, count)?;
+            }
+            return result;
         }
         for stmt in stmts {
             self.lower_statement(stmt)?;
         }
+        if let Some((base, count)) = env_scope {
+            self.emit_leave_env_scope(base, count)?;
+        }
         Ok(())
+    }
+
+    pub(super) fn current_dynamic_env_scope_range(&self) -> LoweringResult<Option<(u16, u32)>> {
+        let Some(base) = self.state.scope_environment_base(self.current_scope) else {
+            return Ok(None);
+        };
+        let bindings = self
+            .state
+            .scope_environment_bindings_for(self.current_scope);
+        if bindings.is_empty() || !bindings.iter().any(|binding| binding.flags().is_scoped()) {
+            return Ok(None);
+        }
+        let base = u16::try_from(base)
+            .map_err(|_| LoweringError::ConstantIndexOverflow { index: base })?;
+        Ok(Some((
+            base,
+            u32::try_from(bindings.len()).unwrap_or(u32::MAX),
+        )))
     }
 
     pub(super) fn emit_frame_local_tdz_initializers_for_current_scope(
@@ -790,12 +822,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             Expr::StaticMemberExpression {
                 object, property, ..
             } => {
+                if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
+                    let target = self
+                        .prepare_reference_target(expr_id, ReferenceUsage::WriteOnly)?
+                        .ok_or(LoweringError::UnsupportedExpression { expr: expr_id })?;
+                    return self.assign_prepared_reference(target, value_register);
+                }
                 let object_register = self.lower_expr_to_temp(object)?;
                 self.emit_assign_property_by_atom(object_register, value_register, property)
             }
             Expr::ComputedMemberExpression {
                 object, property, ..
             } => {
+                if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
+                    let target = self
+                        .prepare_reference_target(expr_id, ReferenceUsage::WriteOnly)?
+                        .ok_or(LoweringError::UnsupportedExpression { expr: expr_id })?;
+                    return self.assign_prepared_reference(target, value_register);
+                }
                 let object_register = self.lower_expr_to_temp(object)?;
                 let key_register = self.lower_expr_to_temp(property)?;
                 self.emit_assign_keyed_property(object_register, value_register, key_register)?;

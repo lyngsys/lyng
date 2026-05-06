@@ -432,7 +432,16 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             if !peek.preceded_by_line_terminator() && is_accessor_field_name_start(peek.kind) {
                 self.advance(); // eat `accessor`
                 let (key, computed, private) = self.parse_class_element_name();
-                return self.finish_class_property(start, key, computed, private, is_static);
+                let auto_accessor_private_name =
+                    (!private).then(|| self.auto_accessor_private_name(start));
+                return self.finish_class_property(
+                    start,
+                    key,
+                    computed,
+                    private,
+                    is_static,
+                    auto_accessor_private_name,
+                );
             }
         }
 
@@ -519,17 +528,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             } else {
                 self.ast().get_expr(key).span()
             };
-            // Check if this is the constructor
-            let method_kind = if !computed && !private && !is_static {
-                if let lyng_js_ast::Expr::Identifier { name, .. } = self.ast().get_expr(key) {
-                    if *name == WellKnownAtom::constructor.id() {
-                        MethodKind::Constructor
-                    } else {
-                        MethodKind::Method
-                    }
-                } else {
-                    MethodKind::Method
-                }
+            let method_kind = if !computed
+                && !private
+                && !is_static
+                && self.class_element_key_is_constructor(key)
+            {
+                MethodKind::Constructor
             } else {
                 MethodKind::Method
             };
@@ -548,7 +552,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
 
         // Field: `name = value;` or `name;`
-        self.finish_class_property(start, key, computed, private, is_static)
+        self.finish_class_property(start, key, computed, private, is_static, None)
     }
 
     fn finish_class_property(
@@ -558,9 +562,17 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         computed: bool,
         private: bool,
         is_static: bool,
+        auto_accessor_private_name: Option<lyng_js_common::AtomId>,
     ) -> lyng_js_ast::ClassElementId {
         let value = if self.eat(TokenKind::Eq) {
-            Some(self.parse_assignment_expression())
+            let prev_await = self.allow_await;
+            let prev_yield = self.allow_yield;
+            self.allow_await = false;
+            self.allow_yield = false;
+            let value = self.parse_assignment_expression();
+            self.allow_await = prev_await;
+            self.allow_yield = prev_yield;
+            Some(value)
         } else {
             None
         };
@@ -578,7 +590,16 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             computed,
             private,
             r#static: is_static,
+            auto_accessor_private_name,
         })
+    }
+
+    fn auto_accessor_private_name(
+        &mut self,
+        start: lyng_js_common::Span,
+    ) -> lyng_js_common::AtomId {
+        self.lexer
+            .intern_atom(&format!("\0auto_accessor_{}", start.range.start.raw()))
     }
 
     fn parse_class_element_name(&mut self) -> (lyng_js_ast::ExprId, bool, bool) {
@@ -593,6 +614,16 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         } else {
             let (key, computed) = self.parse_property_name();
             (key, computed, false)
+        }
+    }
+
+    fn class_element_key_is_constructor(&self, key: lyng_js_ast::ExprId) -> bool {
+        match self.ast().get_expr(key) {
+            lyng_js_ast::Expr::Identifier { name, .. } => *name == WellKnownAtom::constructor.id(),
+            lyng_js_ast::Expr::StringLiteral { value, .. } => {
+                self.ast().literals().get_string(*value) == WellKnownAtom::constructor.as_str()
+            }
+            _ => false,
         }
     }
 

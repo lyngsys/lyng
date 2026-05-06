@@ -80,6 +80,15 @@ fn parse_import_side_effect() {
 }
 
 #[test]
+fn await_is_restricted_inside_nested_module_functions() {
+    let p = module("function f() { await; }");
+    assert!(
+        p.diagnostics.has_errors(),
+        "expected await identifier reference to be rejected in module code"
+    );
+}
+
+#[test]
 fn parse_import_attributes_retained() {
     let p = module_ok("import foo from 'bar' with { type: 'json', mode: 'strict' };");
     let stmts = mbody(&p);

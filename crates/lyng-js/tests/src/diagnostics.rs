@@ -486,6 +486,22 @@ fn optional_chain_tagged_template_errors() {
 }
 
 #[test]
+fn optional_chain_new_constructor_errors() {
+    for source in [
+        "const o = { C: class {} }; new o?.C();",
+        "const o = { C: class {} }; new o?.['C']();",
+        "class C {} new C?.();",
+        "function f() { new?.target; }",
+    ] {
+        let p = script(source);
+        assert!(
+            p.diagnostics.has_errors(),
+            "optional chains are not valid in new constructor position: {source}"
+        );
+    }
+}
+
+#[test]
 fn private_name_in_expression_parses() {
     let (parsed, sema) = script_sema("class C { #x; static has(v) { return #x in v; } }");
     assert!(

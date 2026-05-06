@@ -784,6 +784,26 @@ fn compile_script_reuses_private_field_registers_for_extremely_large_classes() {
 }
 
 #[test]
+fn compile_script_reuses_array_literal_registers_for_large_nested_arrays() {
+    let mut source = String::from("var mapping = [\n");
+    for index in 0..22_000 {
+        source.push_str(&format!("[{index}, {index}],\n"));
+    }
+    source.push_str("];\nmapping.length;\n");
+
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(&mut atoms, lyng_js_common::SourceId::new(3_002), &source);
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+
+    assert!(entry.register_count() < 1_024);
+}
+
+#[test]
 fn compile_script_allocates_script_environment_for_captured_top_level_bindings() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
@@ -1363,6 +1383,86 @@ fn compile_script_lowers_class_expressions_and_static_blocks() {
 }
 
 #[test]
+fn compile_script_counts_class_field_arrow_context_in_capture_depths() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(11_001),
+        r#"
+            class C {
+                static field = () => C;
+            }
+            C.field();
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).expect("class field arrow should lower");
+    let arrow = unit
+        .functions()
+        .iter()
+        .find(|function| {
+            function.captures().iter().any(|capture| {
+                capture.name() == Some(atoms.intern("C"))
+                    && matches!(
+                        capture.source(),
+                        CaptureSource::EnvironmentSlot { slot: 1, .. }
+                    )
+            })
+        })
+        .expect("arrow should capture the class name binding");
+
+    assert!(arrow.captures().iter().any(|capture| {
+        capture.name() == Some(atoms.intern("C"))
+            && matches!(
+                capture.source(),
+                CaptureSource::EnvironmentSlot { depth: 1, slot: 1 }
+            )
+    }));
+    assert!(lyng_js_bytecode::disassemble(arrow).contains("LoadEnvSlot     r3, depth=1, slot=1"));
+
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(11_002),
+        r#"
+            class D {
+                field = () => D;
+            }
+            new D().field();
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit =
+        compile_script(&parsed, &sema, &mut atoms).expect("instance field arrow should lower");
+    let arrow = unit
+        .functions()
+        .iter()
+        .find(|function| {
+            function.captures().iter().any(|capture| {
+                capture.name() == Some(atoms.intern("D"))
+                    && matches!(
+                        capture.source(),
+                        CaptureSource::EnvironmentSlot { slot: 1, .. }
+                    )
+            })
+        })
+        .expect("instance arrow should capture the class name binding");
+
+    assert!(arrow.captures().iter().any(|capture| {
+        capture.name() == Some(atoms.intern("D"))
+            && matches!(
+                capture.source(),
+                CaptureSource::EnvironmentSlot { depth: 2, slot: 1 }
+            )
+    }));
+}
+
+#[test]
 fn compile_script_forces_environments_for_explicit_derived_class_constructors() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
@@ -1907,9 +2007,10 @@ fn compile_script_records_direct_eval_site_for_class_initializer_without_lexical
         &mut atoms,
         lyng_js_common::SourceId::new(21),
         r#"
-            class C {
+            let C = class {
                 x = eval("arguments");
-            }
+            };
+            new C();
         "#,
     );
     assert!(!parsed.diagnostics.has_errors());
@@ -1928,4 +2029,42 @@ fn compile_script_records_direct_eval_site_for_class_initializer_without_lexical
         .find(|site| site.flags().forbid_arguments_in_class_initializer())
         .expect("class initializer direct eval should record site flags");
     assert!(site.scopes().is_empty());
+}
+
+#[test]
+fn compile_script_records_class_name_scope_for_field_initializer_eval() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(24),
+        r#"
+            class C {
+                static direct = eval("C");
+                static arrow = () => eval("C");
+            }
+        "#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let c_atom = atoms.intern("C");
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let sites_with_class_name_scope =
+        unit.functions()
+            .iter()
+            .flat_map(|function| function.direct_eval_lexical_sites().iter())
+            .filter(|site| {
+                site.scopes().iter().any(|scope| {
+                    scope.bindings().iter().any(|binding| {
+                        binding.name() == Some(c_atom) && binding.flags().is_lexical()
+                    })
+                })
+            })
+            .count();
+
+    assert!(
+        sites_with_class_name_scope >= 2,
+        "static direct eval and the arrow eval should both carry C's class-name scope"
+    );
 }

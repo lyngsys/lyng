@@ -284,6 +284,9 @@ pub struct DirectEvalSiteFlags(u8);
 
 impl DirectEvalSiteFlags {
     const FORBID_ARGUMENTS_IN_CLASS_INITIALIZER: u8 = 1 << 0;
+    const ALLOW_NEW_TARGET: u8 = 1 << 1;
+    const ALLOW_SUPER: u8 = 1 << 2;
+    const FORBID_SUPER_CALL_IN_CLASS_INITIALIZER: u8 = 1 << 3;
 
     #[inline]
     pub const fn empty() -> Self {
@@ -301,9 +304,48 @@ impl DirectEvalSiteFlags {
     }
 
     #[inline]
+    pub const fn allow_new_target(self) -> bool {
+        self.0 & Self::ALLOW_NEW_TARGET != 0
+    }
+
+    #[inline]
+    pub const fn allow_super(self) -> bool {
+        self.0 & Self::ALLOW_SUPER != 0
+    }
+
+    #[inline]
+    pub const fn forbid_super_call_in_class_initializer(self) -> bool {
+        self.0 & Self::FORBID_SUPER_CALL_IN_CLASS_INITIALIZER != 0
+    }
+
+    #[inline]
     pub const fn with_forbid_arguments_in_class_initializer(mut self, enabled: bool) -> Self {
         if enabled {
             self.0 |= Self::FORBID_ARGUMENTS_IN_CLASS_INITIALIZER;
+        }
+        self
+    }
+
+    #[inline]
+    pub const fn with_allow_new_target(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.0 |= Self::ALLOW_NEW_TARGET;
+        }
+        self
+    }
+
+    #[inline]
+    pub const fn with_allow_super(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.0 |= Self::ALLOW_SUPER;
+        }
+        self
+    }
+
+    #[inline]
+    pub const fn with_forbid_super_call_in_class_initializer(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.0 |= Self::FORBID_SUPER_CALL_IN_CLASS_INITIALIZER;
         }
         self
     }

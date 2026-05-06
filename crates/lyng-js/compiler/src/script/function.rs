@@ -115,6 +115,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             float_constants: HashMap::new(),
             builtin_constants: HashMap::new(),
             child_indices: HashMap::new(),
+            array_literal_result_registers: Vec::new(),
+            array_literal_value_registers: Vec::new(),
             hoisted_function_decls: HashSet::new(),
             block_instantiated_function_decls: HashSet::new(),
             hoisted_default_export_functions: HashSet::new(),
@@ -133,6 +135,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             active_class_contexts: Vec::new(),
             active_direct_eval_scopes: Vec::new(),
             in_class_field_initializer: false,
+            in_instance_class_field_initializer: false,
+            force_strict_assignment: false,
             active_disposal_scopes: Vec::new(),
         })
     }
@@ -224,6 +228,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let scope_count = state.sema.scope_table.len();
         let in_class_field_initializer =
             state.class_field_initializer_functions.contains(&function);
+        let active_direct_eval_scopes = state
+            .class_field_initializer_eval_scopes
+            .get(&function)
+            .cloned()
+            .unwrap_or_default();
 
         Ok(Self {
             state,
@@ -238,6 +247,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             float_constants: HashMap::new(),
             builtin_constants: HashMap::new(),
             child_indices: HashMap::new(),
+            array_literal_result_registers: Vec::new(),
+            array_literal_value_registers: Vec::new(),
             hoisted_function_decls: HashSet::new(),
             block_instantiated_function_decls: HashSet::new(),
             hoisted_default_export_functions: HashSet::new(),
@@ -254,8 +265,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             active_class_body: None,
             active_class_span: None,
             active_class_contexts: Vec::new(),
-            active_direct_eval_scopes: Vec::new(),
+            active_direct_eval_scopes,
             in_class_field_initializer,
+            in_instance_class_field_initializer: false,
+            force_strict_assignment: false,
             active_disposal_scopes: Vec::new(),
         })
     }
@@ -271,13 +284,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.emit_load_undefined(result_register)?;
         }
 
+        self.emit_class_constructor_field_prologue()?;
         self.emit_parameter_environment_prologue()?;
         self.current_scope = self.body_scope;
-        self.emit_parameter_expression_arguments_var_binding_initializer()?;
+        self.emit_arguments_var_binding_initializer()?;
         self.builder
             .set_parameter_initializer_end_offset(self.builder.current_offset()?);
         self.emit_hoisted_function_declarations()?;
-        self.emit_class_constructor_field_prologue()?;
         self.emit_generator_start_suspend_point()?;
 
         if let Some(function) = self.current_function_ast {
@@ -448,14 +461,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
-    fn emit_parameter_expression_arguments_var_binding_initializer(
-        &mut self,
-    ) -> LoweringResult<()> {
+    fn emit_arguments_var_binding_initializer(&mut self) -> LoweringResult<()> {
         let Some(function) = self.current_function else {
             return Ok(());
         };
         let activation = self.state.activation(function).clone();
-        if !activation.has_parameter_expressions || !activation.needs_arguments_object() {
+        if !activation.needs_arguments_object() {
             return Ok(());
         }
         let Some(binding) = self.find_named_binding_in_scope(

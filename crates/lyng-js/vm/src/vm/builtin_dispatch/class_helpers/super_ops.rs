@@ -1,6 +1,48 @@
 use super::*;
 
+#[derive(Clone, Copy, Debug)]
+struct SuperConstructContext {
+    function_env: Option<lyng_js_types::EnvironmentRef>,
+    active_function: ObjectRef,
+    binding_status: ThisBindingStatus,
+    new_target: ObjectRef,
+}
+
 impl Vm {
+    fn super_constructor_this_environment_record(
+        &self,
+        agent: &Agent,
+        start: lyng_js_types::EnvironmentRef,
+    ) -> VmResult<Option<lyng_js_env::FunctionEnvironmentRecord>> {
+        let mut current = Some(start);
+        while let Some(environment) = current {
+            match agent
+                .environment(environment)
+                .ok_or(VmError::MissingEnvironment(environment))?
+            {
+                lyng_js_env::EnvironmentRecord::Function(record) => {
+                    let function_is_lexical = agent
+                        .objects()
+                        .function_data(record.function_object())
+                        .is_some_and(|data| data.this_mode() == FunctionThisMode::Lexical);
+                    if record.this_binding_status() == ThisBindingStatus::Lexical
+                        || function_is_lexical
+                    {
+                        current = record.declarative().outer();
+                        continue;
+                    }
+                    return Ok(Some(record));
+                }
+                lyng_js_env::EnvironmentRecord::Declarative(record) => current = record.outer(),
+                lyng_js_env::EnvironmentRecord::Private(record) => current = record.outer(),
+                lyng_js_env::EnvironmentRecord::Module(record) => current = record.outer(),
+                lyng_js_env::EnvironmentRecord::Global(record) => current = record.outer(),
+                lyng_js_env::EnvironmentRecord::Object(record) => current = record.outer(),
+            }
+        }
+        Ok(None)
+    }
+
     pub(in crate::vm::builtin_dispatch) fn super_property_get_builtin(
         &mut self,
         agent: &mut Agent,
@@ -80,15 +122,24 @@ impl Vm {
         Ok(base)
     }
 
-    pub(in crate::vm::builtin_dispatch) fn construct_super_with_arguments(
+    pub(in crate::vm::builtin_dispatch) fn super_constructor_builtin(
         &mut self,
         agent: &mut Agent,
-        host: &dyn HostHooks,
-        registry: &mut dyn NativeFunctionRegistry,
         caller: FrameRecord,
-        arguments: &[Value],
     ) -> VmResult<Value> {
-        let record = Self::this_environment_record(agent, caller.lexical_env())?;
+        let context = self.super_construct_context(agent, caller)?;
+        let super_constructor = object::ordinary_get_prototype_of(agent, context.active_function)
+            .map_err(VmError::Abrupt)?
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        Ok(Value::from_object_ref(super_constructor))
+    }
+
+    fn super_construct_context(
+        &self,
+        agent: &mut Agent,
+        caller: FrameRecord,
+    ) -> VmResult<SuperConstructContext> {
+        let record = self.super_constructor_this_environment_record(agent, caller.lexical_env())?;
         let function_env = record.map(|record| record.declarative().id());
         let active_function = record
             .map(|record| record.function_object())
@@ -125,13 +176,28 @@ impl Vm {
             },
             |record| record.this_binding_status(),
         );
-        let super_constructor = object::ordinary_get_prototype_of(agent, active_function)
-            .map_err(VmError::Abrupt)?
-            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let new_target = record
             .and_then(|record| record.new_target())
             .or_else(|| caller.new_target())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        Ok(SuperConstructContext {
+            function_env,
+            active_function,
+            binding_status,
+            new_target,
+        })
+    }
+
+    fn construct_super_with_constructor(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        super_constructor: ObjectRef,
+        arguments: &[Value],
+    ) -> VmResult<Value> {
+        let context = self.super_construct_context(agent, caller)?;
         let this_object = self.construct_to_completion(
             agent,
             host,
@@ -139,13 +205,13 @@ impl Vm {
             caller,
             super_constructor,
             arguments,
-            Some(new_target),
+            Some(context.new_target),
         )?;
         let this_value = Value::from_object_ref(this_object);
-        if binding_status != lyng_js_env::ThisBindingStatus::Uninitialized {
+        if context.binding_status != lyng_js_env::ThisBindingStatus::Uninitialized {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
-        if let Some(function_env) = function_env {
+        if let Some(function_env) = context.function_env {
             let _ = agent.set_function_this_binding(
                 function_env,
                 lyng_js_env::ThisBindingStatus::Initialized,
@@ -164,9 +230,9 @@ impl Vm {
         let frame_index = self
             .frames
             .iter()
-            .rposition(|frame| frame.callee() == Some(active_function))
+            .rposition(|frame| frame.callee() == Some(context.active_function))
             .or_else(|| {
-                function_env.and_then(|function_env| {
+                context.function_env.and_then(|function_env| {
                     self.frames.iter().rposition(|frame| {
                         frame.lexical_env() == function_env || frame.variable_env() == function_env
                     })
@@ -191,6 +257,28 @@ impl Vm {
         Ok(this_value)
     }
 
+    pub(in crate::vm::builtin_dispatch) fn construct_super_with_arguments(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        arguments: &[Value],
+    ) -> VmResult<Value> {
+        let context = self.super_construct_context(agent, caller)?;
+        let super_constructor = object::ordinary_get_prototype_of(agent, context.active_function)
+            .map_err(VmError::Abrupt)?
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        self.construct_super_with_constructor(
+            agent,
+            host,
+            registry,
+            caller,
+            super_constructor,
+            arguments,
+        )
+    }
+
     pub(in crate::vm::builtin_dispatch) fn construct_super_builtin(
         &mut self,
         agent: &mut Agent,
@@ -199,7 +287,20 @@ impl Vm {
         caller: FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
-        self.construct_super_with_arguments(agent, host, registry, caller, arguments)
+        let Some(super_constructor_value) = arguments.first().copied() else {
+            return self.construct_super_with_arguments(agent, host, registry, caller, arguments);
+        };
+        let super_constructor = super_constructor_value
+            .as_object_ref()
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        self.construct_super_with_constructor(
+            agent,
+            host,
+            registry,
+            caller,
+            super_constructor,
+            &arguments[1..],
+        )
     }
 
     pub(in crate::vm::builtin_dispatch) fn construct_super_spread_builtin(

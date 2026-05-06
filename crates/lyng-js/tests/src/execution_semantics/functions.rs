@@ -309,6 +309,109 @@ fn phase6_function_caller_returns_null_for_restricted_actual_caller() {
 }
 
 #[test]
+fn phase6_legacy_function_arguments_returns_active_sloppy_arguments_object() {
+    let result = compile_and_run_string(
+        r#"
+        var obj = {
+            test: function() {
+                var args = obj.test.arguments;
+                return String(args !== null) + ":" + args[0] + ":" + String(args[1]) + ":" + args.length;
+            }
+        };
+
+        var strictThrows = 0;
+        var sobj = {
+            test: function() {
+                "use strict";
+                try {
+                    sobj.test.arguments;
+                } catch (error) {
+                    strictThrows = error.constructor === TypeError ? 1 : 2;
+                }
+            }
+        };
+
+        var active = obj.test(5, undefined);
+        var inactive = obj.test.arguments === null ? 1 : 0;
+        sobj.test(5, undefined);
+        active + ":" + inactive + ":" + strictThrows;
+        "#,
+    );
+
+    assert_eq!(result, "true:5:undefined:2:1:1");
+}
+
+#[test]
+fn phase6_legacy_function_caller_skips_eval_frames() {
+    let result = compile_and_run_string(
+        r#"
+        function innermost() {
+            return arguments.callee.caller;
+        }
+        function nest() {
+            return eval("innermost();");
+        }
+        function nest2() {
+            return nest();
+        }
+
+        var first = nest2() === nest ? 1 : 0;
+        var innermost = function innermost() {
+            return arguments.callee.caller.caller;
+        };
+        var second = nest2() === nest2 ? 1 : 0;
+        first + ":" + second;
+        "#,
+    );
+
+    assert_eq!(result, "1:1");
+}
+
+#[test]
+fn phase6_newer_function_forms_inherit_restricted_caller_arguments() {
+    let result = compile_and_run_string(
+        r#"
+        const container = {
+            method() {},
+            get getter() {},
+            set setter(value) {},
+        };
+        const functions = [
+            () => {},
+            async function() {},
+            function*() {},
+            class {},
+            container.method,
+            Object.getOwnPropertyDescriptor(container, "getter").get,
+            Object.getOwnPropertyDescriptor(container, "setter").set,
+            function() {}.bind(),
+        ];
+
+        var count = 0;
+        for (var f of functions) {
+            try {
+                f.arguments;
+            } catch (error) {
+                if (error.constructor === TypeError) {
+                    count += 1;
+                }
+            }
+            try {
+                f.caller;
+            } catch (error) {
+                if (error.constructor === TypeError) {
+                    count += 10;
+                }
+            }
+        }
+        String(count);
+        "#,
+    );
+
+    assert_eq!(result, "88");
+}
+
+#[test]
 fn phase5_functions_support_bound_function_calls() {
     let result = compile_and_run(
         r#"
@@ -338,6 +441,56 @@ fn phase5_functions_support_bound_function_construction() {
     );
 
     assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn phase6_bound_functions_preserve_target_object_prototype() {
+    let result = compile_and_run_string(
+        r#"
+        class Func extends Function {}
+        let inst = new Func("x", "return x");
+        let bound = inst.bind(null, 1);
+        let subclassInstanceof = bound instanceof Func;
+
+        Object.setPrototypeOf(inst, null);
+        let nullPrototypeBound = Function.prototype.bind.call(inst, null);
+        String(subclassInstanceof) + ":" + String(Object.getPrototypeOf(nullPrototypeBound) === null);
+        "#,
+    );
+
+    assert_eq!(result, "true:true");
+}
+
+#[test]
+fn phase6_bound_functions_can_be_subclassed_with_forwarded_new_target() {
+    let result = compile_and_run_string(
+        r#"
+        function Target() {}
+        let total = 0;
+
+        for (let i = 0; i < 5; i++) {
+            let boundArgs = [];
+            for (let k = 0; k <= i; k++) {
+                boundArgs.push(k);
+            }
+            let Bound = Target.bind(undefined, ...boundArgs);
+            Bound.prototype = {};
+
+            class Derived extends Bound {}
+            let passedArgs = [];
+            for (let j = 0; j < 15; j++) {
+                passedArgs.push(j);
+                if (Object.getPrototypeOf(new Derived(...passedArgs)) === Derived.prototype) {
+                    total++;
+                }
+            }
+        }
+
+        String(total);
+        "#,
+    );
+
+    assert_eq!(result, "75");
 }
 
 #[test]
@@ -1024,6 +1177,33 @@ fn phase4_functions_support_recursive_named_function_expressions() {
 }
 
 #[test]
+fn phase4_functions_ignore_sloppy_assignment_to_named_expression_binding() {
+    let result = compile_and_run(
+        r#"
+        let thrown = 0;
+        let observed = (function outer(named) {
+            let innerName = "";
+            try {
+                eval(`
+                    (function namedLambda() {
+                        namedLambda = class named {};
+                        innerName = namedLambda.name;
+                        innerName += ":" + String(named);
+                    })();
+                `);
+            } catch (error) {
+                thrown = 1;
+            }
+            return innerName + ":" + String(named);
+        })(true);
+        (thrown ? 0 : 1) + (observed === "namedLambda:true:true" ? 2 : 0);
+        "#,
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
 fn phase4_functions_support_object_literal_accessors_and_duplicates() {
     let result = compile_and_run(
         r#"
@@ -1041,6 +1221,34 @@ fn phase4_functions_support_object_literal_accessors_and_duplicates() {
     );
 
     assert_eq!(result, Value::from_smi(12));
+}
+
+#[test]
+fn phase4_functions_reject_invalid_object_literal_accessor_parameters_in_eval() {
+    let result = compile_and_run_string(
+        r#"
+        function classify(source) {
+            try {
+                eval(source);
+                return "ok";
+            } catch (error) {
+                return error.constructor === SyntaxError ? "syntax" : "other";
+            }
+        }
+
+        [
+            classify("({ get x(a) { } })"),
+            classify("({ set x() { } })"),
+            classify("({ set x(a, b) { } })"),
+            classify("({ get x(...a) { } })"),
+            classify("({ set x(...a) { } })"),
+            classify("({ get(...a) { } })"),
+            classify("({ set(a, ...b) { } })"),
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "syntax:syntax:syntax:syntax:syntax:ok:ok");
 }
 
 #[test]

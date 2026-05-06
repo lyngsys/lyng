@@ -457,6 +457,18 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
+    pub(super) fn emit_enter_env_scope(&mut self, base: u16, count: u32) -> LoweringResult<()> {
+        self.builder
+            .emit_abx(Opcode::EnterEnvScope, self.encode_register(base)?, count)?;
+        Ok(())
+    }
+
+    pub(super) fn emit_leave_env_scope(&mut self, base: u16, count: u32) -> LoweringResult<()> {
+        self.builder
+            .emit_abx(Opcode::LeaveEnvScope, self.encode_register(base)?, count)?;
+        Ok(())
+    }
+
     pub(super) fn emit_load_env_slot(
         &mut self,
         dest: u16,
@@ -588,8 +600,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     ) -> LoweringResult<()> {
         match self.named_atom_operand(atom) {
             Ok(index) => {
+                let opcode = if self.force_strict_assignment {
+                    Opcode::StrictAssignNamedProperty
+                } else {
+                    Opcode::AssignNamedProperty
+                };
                 let instruction_offset = self.builder.emit_abc(
-                    Opcode::AssignNamedProperty,
+                    opcode,
                     self.encode_register(object)?,
                     self.encode_register(value)?,
                     index,
@@ -681,8 +698,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         value: u16,
         key: u16,
     ) -> LoweringResult<()> {
+        let opcode = if self.force_strict_assignment {
+            Opcode::StrictAssignKeyedProperty
+        } else {
+            Opcode::AssignKeyedProperty
+        };
         let instruction_offset = self.builder.emit_abc(
-            Opcode::AssignKeyedProperty,
+            opcode,
             self.encode_register(object)?,
             self.encode_register(value)?,
             self.encode_register(key)?,

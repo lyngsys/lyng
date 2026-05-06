@@ -882,9 +882,7 @@ impl<'a> Analyzer<'a> {
         name: AtomId,
         span: lyng_js_common::Span,
     ) {
-        if name == lyng_js_common::WellKnownAtom::arguments.id()
-            || self.annex_b_parameter_names_contain(name)
-        {
+        if self.annex_b_parameter_names_contain(name) {
             return;
         }
 

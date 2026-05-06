@@ -408,6 +408,7 @@ fn continue_async_disposal<Cx: PublicBuiltinDispatchContext>(
             return Ok(());
         };
 
+        let method_kind = resource.method_kind();
         let result = match call_disposal_resource(cx, resource) {
             Ok(result) => result,
             Err(error) => {
@@ -424,6 +425,9 @@ fn continue_async_disposal<Cx: PublicBuiltinDispatchContext>(
                 continue;
             }
         };
+        if matches!(method_kind, lyng_js_env::DisposalMethodKind::AsyncFromSync) {
+            continue;
+        }
 
         let promise = match promise_for_async_disposal_result(cx, result) {
             Ok(promise) => promise,

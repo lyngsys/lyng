@@ -393,6 +393,7 @@ impl Vm {
                                     binding.flags().needs_tdz(),
                                     binding.flags().is_dynamic(),
                                 )
+                                .with_scoped(binding.flags().is_scoped())
                                 .with_sloppy_immutable_assign_silent(
                                     binding.flags().sloppy_immutable_assign_silent(),
                                 ),
