@@ -1,7 +1,7 @@
 use super::*;
 use crate::vm::values::alloc_code_unit_string;
 use crate::vm::values::encode_number;
-use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
+use lyng_js_objects::{f64_to_float16_bits, TypedArrayElementKind, TypedArrayObjectData};
 use lyng_js_ops::{
     errors, number_to_string,
     object::{self, ToPrimitiveContext},
@@ -41,6 +41,7 @@ fn vm_typed_array_storage_bits(kind: TypedArrayElementKind, number: f64) -> u64 
         TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => {
             u64::from(vm_to_uint16(number))
         }
+        TypedArrayElementKind::Float16 => u64::from(f64_to_float16_bits(number)),
         TypedArrayElementKind::Float32 => u64::from(f32::to_bits(number as f32)),
         TypedArrayElementKind::Float64 => number.to_bits(),
         TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => {

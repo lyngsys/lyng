@@ -87,6 +87,8 @@ fn resolve_intrinsic(
         BuiltinIntrinsic::Int16ArrayPrototype => intrinsics.int16_array_prototype(),
         BuiltinIntrinsic::Int32Array => intrinsics.int32_array(),
         BuiltinIntrinsic::Int32ArrayPrototype => intrinsics.int32_array_prototype(),
+        BuiltinIntrinsic::Float16Array => intrinsics.float16_array(),
+        BuiltinIntrinsic::Float16ArrayPrototype => intrinsics.float16_array_prototype(),
         BuiltinIntrinsic::Float32Array => intrinsics.float32_array(),
         BuiltinIntrinsic::Float32ArrayPrototype => intrinsics.float32_array_prototype(),
         BuiltinIntrinsic::Float64Array => intrinsics.float64_array(),

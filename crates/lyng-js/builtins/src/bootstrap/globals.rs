@@ -3,7 +3,7 @@ use super::*;
 pub(super) fn default_global_descriptors(
     agent: &mut Agent,
     artifacts: BootstrapArtifacts,
-) -> [BuiltinPropertyDescriptor; 64] {
+) -> [BuiltinPropertyDescriptor; 65] {
     let atoms = agent.bootstrap_atoms();
     let reflect_atom = agent.atoms_mut().intern("Reflect");
     let proxy_atom = agent.atoms_mut().intern("Proxy");
@@ -148,6 +148,11 @@ pub(super) fn default_global_descriptors(
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(atoms.int32_array()),
             BuiltinPropertyValueSpec::BuiltinFunction(int32_array_builtin()),
+            BuiltinAttributes::new(true, false, true),
+        ),
+        BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(atoms.float16_array()),
+            BuiltinPropertyValueSpec::BuiltinFunction(float16_array_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(

@@ -1,8 +1,9 @@
 use super::super::super::{
-    big_int64_array_builtin, big_uint64_array_builtin, float32_array_builtin,
-    float64_array_builtin, int16_array_builtin, int32_array_builtin, int8_array_builtin,
-    set_property_on_object, typed_array_builtin, typed_array_from_builtin, typed_array_of_builtin,
-    uint16_array_builtin, uint32_array_builtin, uint8_array_builtin, uint8_clamped_array_builtin,
+    big_int64_array_builtin, big_uint64_array_builtin, float16_array_builtin,
+    float32_array_builtin, float64_array_builtin, int16_array_builtin, int32_array_builtin,
+    int8_array_builtin, set_property_on_object, typed_array_builtin, typed_array_from_builtin,
+    typed_array_of_builtin, uint16_array_builtin, uint32_array_builtin, uint8_array_builtin,
+    uint8_clamped_array_builtin,
 };
 use super::super::{
     array_like_index_property_key, array_like_length_u64, buffers::allocate_array_buffer_object,
@@ -43,6 +44,9 @@ pub(in crate::public::dispatch::binary_data) fn dispatch_typed_array_constructor
     }
     if entry == int32_array_builtin() {
         return int32_array_builtin_dispatch(context, invocation).map(Some);
+    }
+    if entry == float16_array_builtin() {
+        return float16_array_builtin_dispatch(context, invocation).map(Some);
     }
     if entry == float32_array_builtin() {
         return float32_array_builtin_dispatch(context, invocation).map(Some);
@@ -418,6 +422,13 @@ fn int32_array_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     typed_array_constructor_builtin(cx, invocation, TypedArrayElementKind::Int32)
+}
+
+fn float16_array_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    typed_array_constructor_builtin(cx, invocation, TypedArrayElementKind::Float16)
 }
 
 fn float32_array_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(

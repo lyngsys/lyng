@@ -15,6 +15,7 @@ pub(in crate::public) fn link_installed_family_prototypes(
     reparent_builtin_object(agent, builtins.int8_array, Some(builtins.typed_array));
     reparent_builtin_object(agent, builtins.int16_array, Some(builtins.typed_array));
     reparent_builtin_object(agent, builtins.int32_array, Some(builtins.typed_array));
+    reparent_builtin_object(agent, builtins.float16_array, Some(builtins.typed_array));
     reparent_builtin_object(agent, builtins.float32_array, Some(builtins.typed_array));
     reparent_builtin_object(agent, builtins.float64_array, Some(builtins.typed_array));
     reparent_builtin_object(agent, builtins.big_int64_array, Some(builtins.typed_array));

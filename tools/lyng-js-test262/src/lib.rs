@@ -568,6 +568,7 @@ fn is_staging_slow_stress_test(path: &Path) -> bool {
         Some(
             "regress-1507322-deep-weakmap.js"
                 | "toSpliced-dense.js"
+                | "sort_large_countingsort.js"
                 | "element-setting-converts-using-ToNumber.js"
         )
     )

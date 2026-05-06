@@ -21,6 +21,7 @@ pub(in crate::public) struct PublicRealmPrototypeHandles {
     pub(in crate::public) int8_array_prototype: ObjectRef,
     pub(in crate::public) int16_array_prototype: ObjectRef,
     pub(in crate::public) int32_array_prototype: ObjectRef,
+    pub(in crate::public) float16_array_prototype: ObjectRef,
     pub(in crate::public) float32_array_prototype: ObjectRef,
     pub(in crate::public) float64_array_prototype: ObjectRef,
     pub(in crate::public) big_int64_array_prototype: ObjectRef,
@@ -125,6 +126,8 @@ fn with_binary_data_intrinsics(
         .with_int16_array_prototype(Some(prototypes.int16_array_prototype))
         .with_int32_array(Some(builtins.int32_array))
         .with_int32_array_prototype(Some(prototypes.int32_array_prototype))
+        .with_float16_array(Some(builtins.float16_array))
+        .with_float16_array_prototype(Some(prototypes.float16_array_prototype))
         .with_float32_array(Some(builtins.float32_array))
         .with_float32_array_prototype(Some(prototypes.float32_array_prototype))
         .with_float64_array(Some(builtins.float64_array))

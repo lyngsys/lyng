@@ -257,6 +257,7 @@ fn typed_array_to_string_tag_getter_builtin_dispatch<Cx: PublicBuiltinDispatchCo
         TypedArrayElementKind::Int8 => string_value(cx, "Int8Array"),
         TypedArrayElementKind::Int16 => string_value(cx, "Int16Array"),
         TypedArrayElementKind::Int32 => string_value(cx, "Int32Array"),
+        TypedArrayElementKind::Float16 => string_value(cx, "Float16Array"),
         TypedArrayElementKind::Float32 => string_value(cx, "Float32Array"),
         TypedArrayElementKind::Float64 => string_value(cx, "Float64Array"),
         TypedArrayElementKind::Uint32 => string_value(cx, "Uint32Array"),

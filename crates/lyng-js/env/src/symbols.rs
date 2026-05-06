@@ -57,6 +57,7 @@ pub struct BootstrapAtoms {
     int8_array: AtomId,
     int16_array: AtomId,
     int32_array: AtomId,
+    float16_array: AtomId,
     float32_array: AtomId,
     float64_array: AtomId,
     big_int64_array: AtomId,
@@ -172,6 +173,7 @@ impl BootstrapAtoms {
             int8_array: atoms.intern("Int8Array"),
             int16_array: atoms.intern("Int16Array"),
             int32_array: atoms.intern("Int32Array"),
+            float16_array: atoms.intern("Float16Array"),
             float32_array: atoms.intern("Float32Array"),
             float64_array: atoms.intern("Float64Array"),
             big_int64_array: atoms.intern("BigInt64Array"),
@@ -495,6 +497,11 @@ impl BootstrapAtoms {
     }
 
     #[inline]
+    pub const fn float16_array(self) -> AtomId {
+        self.float16_array
+    }
+
+    #[inline]
     pub const fn float32_array(self) -> AtomId {
         self.float32_array
     }
@@ -781,6 +788,7 @@ impl TraceAtomEdges for BootstrapAtoms {
         self.int8_array.trace_atom_edges(sweep);
         self.int16_array.trace_atom_edges(sweep);
         self.int32_array.trace_atom_edges(sweep);
+        self.float16_array.trace_atom_edges(sweep);
         self.float32_array.trace_atom_edges(sweep);
         self.float64_array.trace_atom_edges(sweep);
         self.big_int64_array.trace_atom_edges(sweep);

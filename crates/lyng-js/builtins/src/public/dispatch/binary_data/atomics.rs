@@ -187,6 +187,7 @@ fn atomics_store_value_argument<Cx: PublicBuiltinDispatchContext>(
             Ok((integer_storage_bits(integer, 32), integer_value(integer)))
         }
         TypedArrayElementKind::Float32
+        | TypedArrayElementKind::Float16
         | TypedArrayElementKind::Float64
         | TypedArrayElementKind::Uint8Clamped => Err(type_error(cx)),
     }

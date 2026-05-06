@@ -18,8 +18,8 @@ use lyng_js_types::{
     data_view_set_float16_builtin, data_view_set_float32_builtin, data_view_set_float64_builtin,
     data_view_set_int16_builtin, data_view_set_int32_builtin, data_view_set_int8_builtin,
     data_view_set_uint16_builtin, data_view_set_uint32_builtin, data_view_set_uint8_builtin,
-    float32_array_builtin, float64_array_builtin, int16_array_builtin, int32_array_builtin,
-    int8_array_builtin, shared_array_buffer_builtin,
+    float16_array_builtin, float32_array_builtin, float64_array_builtin, int16_array_builtin,
+    int32_array_builtin, int8_array_builtin, shared_array_buffer_builtin,
     shared_array_buffer_byte_length_getter_builtin, shared_array_buffer_grow_builtin,
     shared_array_buffer_growable_getter_builtin,
     shared_array_buffer_max_byte_length_getter_builtin, shared_array_buffer_slice_builtin,
@@ -77,6 +77,9 @@ pub(in crate::public) fn binary_data_builtin_object(
     }
     if entry == int32_array_builtin() {
         return Some(builtins.int32_array);
+    }
+    if entry == float16_array_builtin() {
+        return Some(builtins.float16_array);
     }
     if entry == float32_array_builtin() {
         return Some(builtins.float32_array);

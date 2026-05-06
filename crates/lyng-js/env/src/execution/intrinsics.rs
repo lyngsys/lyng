@@ -47,6 +47,8 @@ pub struct Intrinsics {
     int16_array_prototype: Option<ObjectRef>,
     int32_array: Option<ObjectRef>,
     int32_array_prototype: Option<ObjectRef>,
+    float16_array: Option<ObjectRef>,
+    float16_array_prototype: Option<ObjectRef>,
     float32_array: Option<ObjectRef>,
     float32_array_prototype: Option<ObjectRef>,
     float64_array: Option<ObjectRef>,
@@ -163,6 +165,8 @@ impl Intrinsics {
             int16_array_prototype: None,
             int32_array: None,
             int32_array_prototype: None,
+            float16_array: None,
+            float16_array_prototype: None,
             float32_array: None,
             float32_array_prototype: None,
             float64_array: None,
@@ -446,6 +450,16 @@ impl Intrinsics {
     #[inline]
     pub const fn int32_array_prototype(self) -> Option<ObjectRef> {
         self.int32_array_prototype
+    }
+
+    #[inline]
+    pub const fn float16_array(self) -> Option<ObjectRef> {
+        self.float16_array
+    }
+
+    #[inline]
+    pub const fn float16_array_prototype(self) -> Option<ObjectRef> {
+        self.float16_array_prototype
     }
 
     #[inline]
@@ -1045,6 +1059,18 @@ impl Intrinsics {
     }
 
     #[inline]
+    pub const fn with_float16_array(mut self, value: Option<ObjectRef>) -> Self {
+        self.float16_array = value;
+        self
+    }
+
+    #[inline]
+    pub const fn with_float16_array_prototype(mut self, value: Option<ObjectRef>) -> Self {
+        self.float16_array_prototype = value;
+        self
+    }
+
+    #[inline]
     pub const fn with_float32_array(mut self, value: Option<ObjectRef>) -> Self {
         self.float32_array = value;
         self
@@ -1496,6 +1522,8 @@ impl TraceHeapEdges for Intrinsics {
             self.int16_array_prototype,
             self.int32_array,
             self.int32_array_prototype,
+            self.float16_array,
+            self.float16_array_prototype,
             self.float32_array,
             self.float32_array_prototype,
             self.float64_array,

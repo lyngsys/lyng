@@ -65,28 +65,7 @@ const FEATURE_REASON_ALIASES: &[(&str, &str)] = &[];
 
 const EXPLICIT_SELECTION_EXCLUSIONS: &[(&str, &str)] = &[];
 
-const EXPLICIT_TEST_SKIPS: &[(&str, &str)] = &[
-    (
-        "staging/sm/TypedArray/sort-negative-nan.js",
-        "unsupported feature: Float16Array",
-    ),
-    (
-        "staging/sm/TypedArray/sort_large_countingsort.js",
-        "typed-array stress test exceeds the current standalone harness timeout",
-    ),
-    (
-        "staging/sm/TypedArray/toString.js",
-        "unsupported feature: Float16Array",
-    ),
-    (
-        "staging/sm/extensions/recursion.js",
-        "host-GC recursion stress test can abort the standalone harness",
-    ),
-    (
-        "staging/sm/regress/regress-610026.js",
-        "deep empty-block eval stress test exceeds the current standalone harness timeout",
-    ),
-];
+const EXPLICIT_TEST_SKIPS: &[(&str, &str)] = &[];
 
 const SUPPORTED_FEATURE_TESTS: &[(&str, &[&str])] = &[(
     "regexp-v-flag",
@@ -960,7 +939,7 @@ mod tests {
     }
 
     #[test]
-    fn skip_decision_classifies_float16_dependent_staging_typedarray_sort() {
+    fn skip_decision_keeps_staging_typedarray_sort_negative_nan_runnable() {
         let root = workspace_root();
         let test_dir = root.join("testdata/test262/test");
         let path = test_dir.join("staging/sm/TypedArray/sort-negative-nan.js");
@@ -978,16 +957,11 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "unsupported feature: Float16Array".to_string()
-            ))
-        );
+        assert_eq!(decision, None);
     }
 
     #[test]
-    fn skip_decision_classifies_staging_typedarray_counting_sort_stress_timeout() {
+    fn skip_decision_keeps_staging_typedarray_counting_sort_stress_runnable() {
         let root = workspace_root();
         let test_dir = root.join("testdata/test262/test");
         let path = test_dir.join("staging/sm/TypedArray/sort_large_countingsort.js");
@@ -1005,17 +979,11 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "typed-array stress test exceeds the current standalone harness timeout"
-                    .to_string()
-            ))
-        );
+        assert_eq!(decision, None);
     }
 
     #[test]
-    fn skip_decision_classifies_float16_dependent_staging_typedarray_to_string() {
+    fn skip_decision_keeps_staging_typedarray_to_string_runnable() {
         let root = workspace_root();
         let test_dir = root.join("testdata/test262/test");
         let path = test_dir.join("staging/sm/TypedArray/toString.js");
@@ -1033,16 +1001,11 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "unsupported feature: Float16Array".to_string()
-            ))
-        );
+        assert_eq!(decision, None);
     }
 
     #[test]
-    fn skip_decision_classifies_staging_extension_recursion_host_gc_stress() {
+    fn skip_decision_keeps_staging_extension_recursion_runnable() {
         let root = workspace_root();
         let test_dir = root.join("testdata/test262/test");
         let path = test_dir.join("staging/sm/extensions/recursion.js");
@@ -1060,16 +1023,11 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "host-GC recursion stress test can abort the standalone harness".to_string()
-            ))
-        );
+        assert_eq!(decision, None);
     }
 
     #[test]
-    fn skip_decision_classifies_staging_deep_empty_block_eval_stress() {
+    fn skip_decision_keeps_staging_deep_empty_block_eval_stress_runnable() {
         let root = workspace_root();
         let test_dir = root.join("testdata/test262/test");
         let path = test_dir.join("staging/sm/regress/regress-610026.js");
@@ -1087,13 +1045,7 @@ mod tests {
             ProposalStage::Stage3,
         );
 
-        assert_eq!(
-            decision,
-            Some(SkipDecision::Skip(
-                "deep empty-block eval stress test exceeds the current standalone harness timeout"
-                    .to_string()
-            ))
-        );
+        assert_eq!(decision, None);
     }
 
     #[test]

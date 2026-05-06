@@ -138,6 +138,10 @@ pub(super) const PUBLIC_BINARY_DATA_BUILTIN_METADATA: &[PublicBuiltinMetadataRow
         BuiltinEntryMetadata::new("Int32Array", 3, true, true),
     ),
     PublicBuiltinMetadataRow::new(
+        float16_array_builtin,
+        BuiltinEntryMetadata::new("Float16Array", 3, true, true),
+    ),
+    PublicBuiltinMetadataRow::new(
         float32_array_builtin,
         BuiltinEntryMetadata::new("Float32Array", 3, true, true),
     ),

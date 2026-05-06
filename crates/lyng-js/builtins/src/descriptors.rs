@@ -55,6 +55,8 @@ pub enum BuiltinIntrinsic {
     Int16ArrayPrototype,
     Int32Array,
     Int32ArrayPrototype,
+    Float16Array,
+    Float16ArrayPrototype,
     Float32Array,
     Float32ArrayPrototype,
     Float64Array,

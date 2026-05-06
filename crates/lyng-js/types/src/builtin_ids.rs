@@ -460,6 +460,7 @@ const FLOAT64_ARRAY_RAW: u32 = 3_169;
 const UINT8_CLAMPED_ARRAY_RAW: u32 = 3_170;
 const BIG_UINT64_ARRAY_RAW: u32 = 3_171;
 const BIG_INT64_ARRAY_RAW: u32 = 3_172;
+const FLOAT16_ARRAY_RAW: u32 = 3_590;
 const MAP_RAW: u32 = 3_173;
 const MAP_GET_RAW: u32 = 3_174;
 const MAP_SET_RAW: u32 = 3_175;
@@ -886,7 +887,7 @@ pub const CORE_BUILTIN_NAMESPACE_END: u32 = REGEXP_LEGACY_PAREN9_GETTER_RAW;
 pub const COMPLETION_BUILTIN_NAMESPACE_START: u32 = PROMISE_RAW;
 
 /// Last reserved builtin-entry payload for the public completion builtin namespace.
-pub const COMPLETION_BUILTIN_NAMESPACE_END: u32 = TEMPORAL_PLAIN_DATE_TIME_WITH_PLAIN_TIME_RAW;
+pub const COMPLETION_BUILTIN_NAMESPACE_END: u32 = FLOAT16_ARRAY_RAW;
 
 /// Returns whether a builtin ID falls inside the reserved internal helper namespace.
 #[inline]

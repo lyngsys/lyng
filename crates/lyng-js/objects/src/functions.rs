@@ -218,6 +218,7 @@ pub enum TypedArrayElementKind {
     Int8,
     Int16,
     Int32,
+    Float16,
     Float32,
     Float64,
     Uint32,
@@ -235,6 +236,7 @@ impl TypedArrayElementKind {
             Self::Int8 => 1,
             Self::Int16 => 2,
             Self::Int32 => 4,
+            Self::Float16 => 2,
             Self::Float32 => 4,
             Self::Float64 => 8,
             Self::Uint32 => 4,
@@ -243,6 +245,103 @@ impl TypedArrayElementKind {
             Self::Uint8 => 1,
         }
     }
+}
+
+/// Decode a 16-bit IEEE-754 half-precision float into a 64-bit double.
+#[inline]
+pub fn float16_bits_to_f64(bits: u16) -> f64 {
+    let sign = (bits >> 15) & 0x1;
+    let exp = ((bits >> 10) & 0x1f) as i32;
+    let mant = (bits & 0x03ff) as u32;
+    let sign_bit_f64 = u64::from(sign) << 63;
+
+    if exp == 0 {
+        if mant == 0 {
+            return f64::from_bits(sign_bit_f64);
+        }
+        let mut mantissa = mant;
+        let mut shift = 0_i32;
+        while (mantissa & 0x0400) == 0 {
+            mantissa <<= 1;
+            shift += 1;
+        }
+        mantissa &= 0x03ff;
+        let half_unbiased = 1 - 15 - shift;
+        let f64_biased = (half_unbiased + 1023) as u64;
+        let f64_mant = u64::from(mantissa) << (52 - 10);
+        return f64::from_bits(sign_bit_f64 | (f64_biased << 52) | f64_mant);
+    }
+
+    if exp == 0x1f {
+        if mant == 0 {
+            return f64::from_bits(sign_bit_f64 | 0x7ff0_0000_0000_0000);
+        }
+        return f64::from_bits(sign_bit_f64 | 0x7ff8_0000_0000_0000);
+    }
+
+    let f64_biased = (exp - 15 + 1023) as u64;
+    let f64_mant = u64::from(mant) << (52 - 10);
+    f64::from_bits(sign_bit_f64 | (f64_biased << 52) | f64_mant)
+}
+
+/// Round an `f64` to IEEE-754 binary16, ties-to-even.
+#[inline]
+pub fn f64_to_float16_bits(value: f64) -> u16 {
+    let bits = value.to_bits();
+    let sign16 = ((bits >> 63) as u16) & 0x1;
+    let exp64 = ((bits >> 52) & 0x07ff) as i32;
+    let mant64 = bits & 0x000f_ffff_ffff_ffff;
+
+    if exp64 == 0x07ff {
+        if mant64 == 0 {
+            return (sign16 << 15) | 0x7c00;
+        }
+        return (sign16 << 15) | 0x7e00;
+    }
+
+    if exp64 == 0 {
+        return sign16 << 15;
+    }
+
+    let unbiased = exp64 - 1023;
+    let f16_unbiased = unbiased + 15;
+    let signif = (1_u64 << 52) | mant64;
+
+    if f16_unbiased >= 0x1f {
+        return (sign16 << 15) | 0x7c00;
+    }
+
+    if f16_unbiased <= 0 {
+        if f16_unbiased < -10 {
+            return sign16 << 15;
+        }
+        let shift = (1 - f16_unbiased) as u32;
+        let mant_with_hidden = signif >> (52 - 10 + shift);
+        let round_mask = (1_u64 << (52 - 10 + shift)) - 1;
+        let round_bits = signif & round_mask;
+        let half = 1_u64 << (52 - 10 + shift - 1);
+        let increment = round_bits > half || (round_bits == half && (mant_with_hidden & 1) != 0);
+        let rounded = mant_with_hidden + u64::from(increment);
+        return (sign16 << 15) | (rounded as u16);
+    }
+
+    let exp16 = f16_unbiased as u16;
+    let mant = signif >> (52 - 10);
+    let round_mask = (1_u64 << (52 - 10)) - 1;
+    let round_bits = signif & round_mask;
+    let half = 1_u64 << (52 - 10 - 1);
+    let increment = round_bits > half || (round_bits == half && (mant & 1) != 0);
+    let mut rounded_mant = (mant as u16) + u16::from(increment);
+    let mut rounded_exp = exp16;
+    if (rounded_mant & 0x0800) != 0 {
+        rounded_mant = 0;
+        rounded_exp += 1;
+        if rounded_exp >= 0x1f {
+            return (sign16 << 15) | 0x7c00;
+        }
+    }
+
+    (sign16 << 15) | (rounded_exp << 10) | (rounded_mant & 0x03ff)
 }
 
 /// Cold payload carried by one `DataView` wrapper object.

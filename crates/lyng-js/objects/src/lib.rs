@@ -48,11 +48,12 @@ use self::descriptors::{
     update_integrity_flags, validate_descriptor_change, write_named_payload, DescriptorKind,
 };
 pub use self::functions::{
-    ArrayBufferObjectData, DataViewObjectData, FunctionConstructorFlags, FunctionEntryIdentity,
-    FunctionKindFlags, FunctionObjectData, FunctionThisMode, GeneratorState, MapEntry,
-    MapObjectData, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
-    ObjectColdData, OrdinaryObjectData, PrimitiveWrapperKind, ProxyObjectData, SetObjectData,
-    TypedArrayElementKind, TypedArrayObjectData,
+    f64_to_float16_bits, float16_bits_to_f64, ArrayBufferObjectData, DataViewObjectData,
+    FunctionConstructorFlags, FunctionEntryIdentity, FunctionKindFlags, FunctionObjectData,
+    FunctionThisMode, GeneratorState, MapEntry, MapObjectData, NativeCallRequest,
+    NativeConstructRequest, NativeFunctionRegistry, ObjectColdData, OrdinaryObjectData,
+    PrimitiveWrapperKind, ProxyObjectData, SetObjectData, TypedArrayElementKind,
+    TypedArrayObjectData,
 };
 pub use self::marker::ObjectSubstrateMarker;
 use self::module_namespace::ModuleNamespaceObject;

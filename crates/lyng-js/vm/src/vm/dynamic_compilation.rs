@@ -22,6 +22,27 @@ use lyng_js_sema::{
 use lyng_js_types::{AbruptCompletion, PropertyDescriptor, PropertyKey, RealmRef, StringRef};
 use std::collections::HashMap;
 
+fn source_is_empty_block_sequence(source: &str) -> bool {
+    let bytes = source.as_bytes();
+    let mut index = 0;
+    let mut saw_block = false;
+
+    while index < bytes.len() {
+        match bytes[index] {
+            b'{' if bytes.get(index + 1) == Some(&b'}') => {
+                saw_block = true;
+                index += 2;
+            }
+            b'\t' | b'\n' | b'\r' | b' ' => {
+                index += 1;
+            }
+            _ => return false,
+        }
+    }
+
+    saw_block
+}
+
 fn split_eval_regexp_literal_source(source: &str) -> Option<(&str, &str)> {
     let mut chars = source.char_indices();
     if chars.next()?.1 != '/' {
@@ -283,6 +304,10 @@ impl Vm {
         realm: RealmRef,
         source_text: &str,
     ) -> VmResult<Value> {
+        if source_is_empty_block_sequence(source_text) {
+            return Ok(Value::undefined());
+        }
+
         let source_id = self.allocate_dynamic_source_id();
         let compilation = dynamic::compile_dynamic_script_source(
             agent.atoms_mut(),
@@ -322,6 +347,10 @@ impl Vm {
         realm: RealmRef,
         source_text: &str,
     ) -> VmResult<Value> {
+        if source_is_empty_block_sequence(source_text) {
+            return Ok(Value::undefined());
+        }
+
         if let Some(value) =
             self.try_evaluate_regexp_literal_eval_source(agent, realm, source_text)?
         {
@@ -1377,6 +1406,10 @@ impl Vm {
         this_override: Option<Value>,
     ) -> VmResult<Value> {
         let realm = caller.realm();
+        if source_is_empty_block_sequence(source_text) {
+            return Ok(Value::undefined());
+        }
+
         if let Some(value) =
             self.try_evaluate_regexp_literal_eval_source(agent, realm, source_text)?
         {

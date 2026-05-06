@@ -296,6 +296,14 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
             &typed_array_descriptor_sets.int32_array_prototype_descriptors,
         ),
         BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Float16Array),
+            &typed_array_descriptor_sets.float16_array_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
+            BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Float16ArrayPrototype),
+            &typed_array_descriptor_sets.float16_array_prototype_descriptors,
+        ),
+        BuiltinDescriptorTable::new(
             BuiltinInstallTarget::Intrinsic(BuiltinIntrinsic::Float32Array),
             &typed_array_descriptor_sets.float32_array_descriptors,
         ),

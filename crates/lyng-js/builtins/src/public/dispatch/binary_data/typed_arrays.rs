@@ -21,8 +21,8 @@ use lyng_js_common::WellKnownAtom;
 use lyng_js_env::Agent;
 use lyng_js_gc::{AllocationLifetime, BigIntSign};
 use lyng_js_objects::{
-    ObjectAllocation, ObjectColdData, OrdinaryObjectData, TypedArrayElementKind,
-    TypedArrayObjectData,
+    f64_to_float16_bits, float16_bits_to_f64, ObjectAllocation, ObjectColdData, OrdinaryObjectData,
+    TypedArrayElementKind, TypedArrayObjectData,
 };
 use lyng_js_types::{ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId};
 
@@ -59,6 +59,7 @@ pub(super) fn typed_array_storage_bits_to_value(
         TypedArrayElementKind::Int8 => Value::from_smi(i32::from((bits as u8) as i8)),
         TypedArrayElementKind::Int16 => Value::from_smi(i32::from((bits as u16) as i16)),
         TypedArrayElementKind::Int32 => Value::from_smi(bits as u32 as i32),
+        TypedArrayElementKind::Float16 => Value::from_f64(float16_bits_to_f64(bits as u16)),
         TypedArrayElementKind::Float32 => Value::from_f64(f64::from(f32::from_bits(bits as u32))),
         TypedArrayElementKind::Float64 => Value::from_f64(f64::from_bits(bits)),
         TypedArrayElementKind::Uint32 => {
@@ -107,6 +108,9 @@ pub(in crate::public::dispatch) fn typed_array_storage_bits_from_builtin_value<
         TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => {
             Ok(u64::from(to_uint32_for_builtin(cx, value)? as u16))
         }
+        TypedArrayElementKind::Float16 => Ok(u64::from(f64_to_float16_bits(
+            to_number_for_builtin(cx, value)?,
+        ))),
         TypedArrayElementKind::Float32 => Ok(u64::from(f32::to_bits(to_number_for_builtin(
             cx, value,
         )? as f32))),
@@ -320,6 +324,7 @@ pub(super) fn typed_array_default_prototype<Cx: PublicBuiltinDispatchContext>(
         TypedArrayElementKind::Int8 => lyng_js_env::Intrinsics::int8_array_prototype,
         TypedArrayElementKind::Int16 => lyng_js_env::Intrinsics::int16_array_prototype,
         TypedArrayElementKind::Int32 => lyng_js_env::Intrinsics::int32_array_prototype,
+        TypedArrayElementKind::Float16 => lyng_js_env::Intrinsics::float16_array_prototype,
         TypedArrayElementKind::Float32 => lyng_js_env::Intrinsics::float32_array_prototype,
         TypedArrayElementKind::Float64 => lyng_js_env::Intrinsics::float64_array_prototype,
         TypedArrayElementKind::BigInt64 => lyng_js_env::Intrinsics::big_int64_array_prototype,
@@ -350,6 +355,7 @@ fn typed_array_default_constructor<Cx: PublicBuiltinDispatchContext>(
         TypedArrayElementKind::Int8 => lyng_js_env::Intrinsics::int8_array,
         TypedArrayElementKind::Int16 => lyng_js_env::Intrinsics::int16_array,
         TypedArrayElementKind::Int32 => lyng_js_env::Intrinsics::int32_array,
+        TypedArrayElementKind::Float16 => lyng_js_env::Intrinsics::float16_array,
         TypedArrayElementKind::Float32 => lyng_js_env::Intrinsics::float32_array,
         TypedArrayElementKind::Float64 => lyng_js_env::Intrinsics::float64_array,
         TypedArrayElementKind::BigInt64 => lyng_js_env::Intrinsics::big_int64_array,

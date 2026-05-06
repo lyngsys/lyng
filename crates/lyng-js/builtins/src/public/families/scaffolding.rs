@@ -305,6 +305,12 @@ fn allocate_binary_data_prototypes(
             request.intrinsics.int32_array_prototype(),
             typed_array_prototype,
         ),
+        float16_array_prototype: ordinary_intrinsic(
+            agent,
+            request,
+            request.intrinsics.float16_array_prototype(),
+            typed_array_prototype,
+        ),
         float32_array_prototype: ordinary_intrinsic(
             agent,
             request,
@@ -632,6 +638,7 @@ fn public_intrinsic_handles(
         int8_array_prototype: binary_data.int8_array_prototype,
         int16_array_prototype: binary_data.int16_array_prototype,
         int32_array_prototype: binary_data.int32_array_prototype,
+        float16_array_prototype: binary_data.float16_array_prototype,
         float32_array_prototype: binary_data.float32_array_prototype,
         float64_array_prototype: binary_data.float64_array_prototype,
         big_int64_array_prototype: binary_data.big_int64_array_prototype,

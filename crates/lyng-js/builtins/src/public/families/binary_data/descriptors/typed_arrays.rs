@@ -78,6 +78,8 @@ pub(super) struct TypedArrayDescriptorSets {
     pub(super) int16_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) int32_array_descriptors: [BuiltinPropertyDescriptor; 1],
     pub(super) int32_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
+    pub(super) float16_array_descriptors: [BuiltinPropertyDescriptor; 1],
+    pub(super) float16_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) float32_array_descriptors: [BuiltinPropertyDescriptor; 1],
     pub(super) float32_array_prototype_descriptors: [BuiltinPropertyDescriptor; 2],
     pub(super) float64_array_descriptors: [BuiltinPropertyDescriptor; 1],
@@ -463,6 +465,16 @@ pub(super) fn descriptor_sets(
             builtins.int32_array,
             bytes_per_element_atom,
             4,
+        ),
+        float16_array_descriptors: [BuiltinPropertyDescriptor::new(
+            BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),
+            BuiltinPropertyValueSpec::Data(Value::from_smi(2)),
+            BuiltinAttributes::new(false, false, false),
+        )],
+        float16_array_prototype_descriptors: concrete_typed_array_prototype_descriptors(
+            builtins.float16_array,
+            bytes_per_element_atom,
+            2,
         ),
         float32_array_descriptors: [BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(bytes_per_element_atom),

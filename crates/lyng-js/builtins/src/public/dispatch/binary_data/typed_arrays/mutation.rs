@@ -18,7 +18,7 @@ use super::{
     typed_array_validated_record_and_length, typed_array_write_storage_bits,
 };
 use crate::BuiltinInvocation;
-use lyng_js_objects::TypedArrayElementKind;
+use lyng_js_objects::{float16_bits_to_f64, TypedArrayElementKind};
 use lyng_js_types::{BuiltinFunctionId, ObjectRef, Value};
 
 pub(in crate::public::dispatch::binary_data) fn dispatch_typed_array_mutation_builtin<
@@ -104,6 +104,10 @@ fn compare_typed_array_default_elements(
         }
         TypedArrayElementKind::Uint16 => (left_bits as u16).cmp(&(right_bits as u16)),
         TypedArrayElementKind::Uint32 => (left_bits as u32).cmp(&(right_bits as u32)),
+        TypedArrayElementKind::Float16 => compare_typed_array_float_values(
+            float16_bits_to_f64(left_bits as u16),
+            float16_bits_to_f64(right_bits as u16),
+        ),
         TypedArrayElementKind::Float32 => compare_typed_array_float_values(
             f64::from(f32::from_bits(left_bits as u32)),
             f64::from(f32::from_bits(right_bits as u32)),

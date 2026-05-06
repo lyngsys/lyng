@@ -41,6 +41,14 @@ pub fn float32_array_builtin() -> BuiltinFunctionId {
 }
 
 #[inline]
+pub fn float16_array_builtin() -> BuiltinFunctionId {
+    match BuiltinFunctionId::from_raw(FLOAT16_ARRAY_RAW) {
+        Some(id) => id,
+        None => unreachable!("builtin id should stay non-zero"),
+    }
+}
+
+#[inline]
 pub fn float64_array_builtin() -> BuiltinFunctionId {
     match BuiltinFunctionId::from_raw(FLOAT64_ARRAY_RAW) {
         Some(id) => id,

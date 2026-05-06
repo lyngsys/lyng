@@ -12,6 +12,7 @@ use lyng_js_types::{PropertyKey, SuspendedExecutionRef, Value};
 const THIS_STATE_LEXICAL_RAW: u8 = 0;
 const THIS_STATE_UNINITIALIZED_RAW: u8 = 1;
 const THIS_STATE_VALUE_RAW: u8 = 2;
+const MAX_GENERATOR_RESUME_DEPTH: usize = if cfg!(debug_assertions) { 8 } else { 128 };
 
 enum GeneratorExecutionOutcome {
     Complete(Value),
@@ -119,7 +120,11 @@ impl Vm {
             GeneratorState::SuspendedStart | GeneratorState::SuspendedYield => {
                 let suspended =
                     suspended.ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+                if self.generator_resume_depth >= MAX_GENERATOR_RESUME_DEPTH {
+                    return Err(VmError::Abrupt(errors::throw_range_error(agent)));
+                }
                 self.set_generator_state(agent, generator, GeneratorState::Executing, None)?;
+                self.generator_resume_depth += 1;
                 let effective_value = if state == GeneratorState::SuspendedStart
                     && resume_kind == GeneratorResumeKind::Next
                 {
@@ -130,6 +135,7 @@ impl Vm {
                 if let Err(error) =
                     self.restore_suspended_execution(agent, suspended, resume_kind, effective_value)
                 {
+                    self.generator_resume_depth -= 1;
                     let _ = self.complete_generator_object(agent, generator);
                     return Err(error);
                 }
@@ -138,7 +144,9 @@ impl Vm {
                 {
                     self.clear_active_resume();
                 }
-                match self.run_generator_frame(agent, host, registry, generator, None)? {
+                let outcome = self.run_generator_frame(agent, host, registry, generator, None);
+                self.generator_resume_depth -= 1;
+                match outcome? {
                     GeneratorExecutionOutcome::Complete(value) => {
                         self.generator_result_object(agent, caller_frame.realm(), value, true)
                     }

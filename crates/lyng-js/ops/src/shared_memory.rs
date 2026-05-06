@@ -1,7 +1,7 @@
 use lyng_js_env::Agent;
 use lyng_js_gc::{AllocationLifetime, BigIntSign};
 use lyng_js_host::WaitLocation;
-use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
+use lyng_js_objects::{float16_bits_to_f64, TypedArrayElementKind, TypedArrayObjectData};
 use lyng_js_types::{ObjectRef, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,6 +49,7 @@ pub const fn is_atomics_friendly_kind(kind: TypedArrayElementKind) -> bool {
     !matches!(
         kind,
         TypedArrayElementKind::Float32
+            | TypedArrayElementKind::Float16
             | TypedArrayElementKind::Float64
             | TypedArrayElementKind::Uint8Clamped
     )
@@ -243,6 +244,7 @@ pub fn atomic_value_from_bits(agent: &mut Agent, kind: TypedArrayElementKind, bi
         TypedArrayElementKind::Uint8 | TypedArrayElementKind::Uint8Clamped => {
             Value::from_smi(i32::from(bits as u8))
         }
+        TypedArrayElementKind::Float16 => Value::from_f64(float16_bits_to_f64(bits as u16)),
         TypedArrayElementKind::Float32 => Value::from_f64(f64::from(f32::from_bits(bits as u32))),
         TypedArrayElementKind::Float64 => Value::from_f64(f64::from_bits(bits)),
     }
@@ -291,6 +293,8 @@ fn normalize_integer_bits(kind: TypedArrayElementKind, bits: u64) -> u64 {
         | TypedArrayElementKind::Uint8Clamped => u64::from(bits as u8),
         TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => u64::from(bits as u16),
         TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => u64::from(bits as u32),
-        TypedArrayElementKind::Float32 | TypedArrayElementKind::Float64 => bits,
+        TypedArrayElementKind::Float16
+        | TypedArrayElementKind::Float32
+        | TypedArrayElementKind::Float64 => bits,
     }
 }

@@ -195,6 +195,26 @@ fn script_core_if_statement_completion_uses_a_fresh_undefined_seed() {
 }
 
 #[test]
+fn script_core_eval_fast_paths_repeated_empty_blocks() {
+    let result = compile_and_run_string(
+        r#"
+        var source = "{}";
+        for (var i = 0; i < 16; i = i + 1) {
+            source += source;
+        }
+
+        var indirectEval = eval;
+        [
+            String(eval(source)),
+            String(indirectEval(source))
+        ].join(":");
+        "#,
+    );
+
+    assert_eq!(result, "undefined:undefined");
+}
+
+#[test]
 fn script_core_loop_statement_completion_updates_empty_abrupt_exits() {
     let result = compile_and_run_string(
         r#"
@@ -4263,6 +4283,35 @@ fn script_core_typed_array_slice_preserves_same_kind_float_nan_payload_bits() {
 }
 
 #[test]
+fn script_core_float16_array_uses_half_precision_storage() {
+    let result = compile_and_run_string(
+        r#"
+        let sample = new Float16Array([-0, 0, 0.5, -0.5, NaN, Infinity, -Infinity]);
+        let raw = new Int16Array(new Float16Array([1]).buffer)[0];
+        let sorted = new Float16Array([NaN, 123, -456, 0]);
+        sorted.sort();
+
+        [
+            typeof Float16Array,
+            Float16Array.BYTES_PER_ELEMENT,
+            Float16Array.prototype.BYTES_PER_ELEMENT,
+            sample.toString(),
+            raw,
+            sorted[0],
+            sorted[1],
+            sorted[2],
+            sorted[3]
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(
+        result,
+        "function|2|2|0,0,0.5,-0.5,NaN,Infinity,-Infinity|15360|-456|0|123|NaN"
+    );
+}
+
+#[test]
 fn script_core_typed_array_to_locale_string_omits_element_arguments_without_intl() {
     let result = compile_and_run_string(
         r#"
@@ -7964,6 +8013,59 @@ fn script_core_recursive_calls_throw_before_native_stack_overflow() {
         } catch (error) {
             error.constructor === RangeError ? "true" : "false";
         }
+        "#,
+    );
+
+    assert_eq!(result, "true");
+}
+
+#[test]
+fn script_core_named_eval_recursion_uses_bytecode_call_guard() {
+    let result = compile_and_run_string(
+        r#"
+        function eval() {
+            eval();
+        }
+        function callEval() {
+            eval();
+        }
+
+        try {
+            callEval();
+            "missing";
+        } catch (error) {
+            error.constructor === RangeError ? "true" : "false";
+        }
+        "#,
+    );
+
+    assert_eq!(result, "true");
+}
+
+#[test]
+fn script_core_recursive_generator_resume_uses_vm_depth_guard() {
+    let result = compile_and_run_string(
+        r#"
+        var sawRangeError = false;
+
+        function* f() {
+            test();
+            yield 170;
+        }
+
+        function test() {
+            function foopy() {
+                try {
+                    for (var i of f());
+                } catch (error) {
+                    sawRangeError = error.constructor === RangeError;
+                }
+            }
+            foopy();
+        }
+
+        test();
+        sawRangeError ? "true" : "false";
         "#,
     );
 
