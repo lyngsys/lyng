@@ -22,6 +22,10 @@ enum PromiseReactionOutcome {
 }
 
 impl Vm {
+    /// # Errors
+    ///
+    /// Returns a VM error if a promise or harness job throws, host observation fails, or a queued
+    /// runtime job cannot be executed.
     pub fn checkpoint_promise_jobs(
         &mut self,
         agent: &mut Agent,
@@ -41,6 +45,10 @@ impl Vm {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if a queued job throws, host observation fails, or runtime job execution
+    /// fails.
     pub fn drain_job_queue_with_registry(
         &mut self,
         agent: &mut Agent,

@@ -701,6 +701,9 @@ impl Vm {
             .cloned()
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if builtin bootstrap fails for the requested realm.
     pub fn bootstrap_realm(
         &mut self,
         agent: &mut Agent,
@@ -749,6 +752,9 @@ impl Vm {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if bootstrap or provider extension installation fails.
     pub fn install_realm_extensions(
         &mut self,
         agent: &mut Agent,
@@ -770,6 +776,9 @@ impl Vm {
         Ok(artifacts)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if realm creation or extension installation fails.
     pub fn create_embedding_realm(
         &mut self,
         agent: &mut Agent,
@@ -779,6 +788,9 @@ impl Vm {
         self.install_realm_extensions(agent, realm, provider)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if function installation fails for the compiled script unit.
     pub fn install_script(
         &mut self,
         agent: &mut Agent,
@@ -789,6 +801,9 @@ impl Vm {
         self.install_functions(agent, realm, unit.entry(), unit.functions(), unit.atoms())
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if function installation fails for the compiled function unit.
     pub fn install_function(
         &mut self,
         agent: &mut Agent,
@@ -799,6 +814,9 @@ impl Vm {
         self.install_functions(agent, realm, unit.entry(), unit.functions(), unit.atoms())
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if module function installation or module-record creation fails.
     pub fn install_module(
         &mut self,
         agent: &mut Agent,
@@ -817,6 +835,9 @@ impl Vm {
         Ok(installed)
     }
 
+    /// # Errors
+    ///
+    /// Returns a module-load error if host loading, diagnostics, bootstrap, or VM installation fails.
     pub fn load_module_graph_from_host(
         &mut self,
         agent: &mut Agent,
@@ -835,6 +856,10 @@ impl Vm {
         self.ensure_module_loaded_from_host(agent, realm, host, loaded)
     }
 
+    /// # Errors
+    ///
+    /// Returns a module-load error if host loading, diagnostics, bootstrap, extension installation,
+    /// or VM installation fails.
     pub fn load_module_graph_from_host_and_extensions(
         &mut self,
         agent: &mut Agent,
@@ -851,6 +876,10 @@ impl Vm {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if script installation, instantiation, extension setup, evaluation, or job
+    /// checkpointing fails.
     pub fn evaluate_script_with_registry_and_host_referrer_and_extensions(
         &mut self,
         agent: &mut Agent,
@@ -883,6 +912,10 @@ impl Vm {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if script installation, instantiation, extension setup, evaluation, or job
+    /// checkpointing fails.
     pub fn evaluate_script_with_host_referrer_and_extensions(
         &mut self,
         agent: &mut Agent,
@@ -904,6 +937,10 @@ impl Vm {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if script installation, instantiation, extension setup, evaluation, or job
+    /// checkpointing fails.
     pub fn evaluate_script_with_host_referrer_and_extensions_retaining_installed(
         &mut self,
         agent: &mut Agent,
@@ -933,6 +970,10 @@ impl Vm {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if module bootstrap, extension setup, installation, linking, evaluation, or
+    /// job checkpointing fails.
     pub fn evaluate_module_with_registry_and_host_and_extensions(
         &mut self,
         agent: &mut Agent,
@@ -968,6 +1009,9 @@ impl Vm {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if extension setup, module linking, evaluation, or job checkpointing fails.
     pub fn evaluate_linked_module_with_registry_and_host_and_extensions(
         &mut self,
         agent: &mut Agent,
@@ -986,6 +1030,9 @@ impl Vm {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if extension setup, module linking, evaluation, or job checkpointing fails.
     pub fn evaluate_linked_module_with_host_and_extensions(
         &mut self,
         agent: &mut Agent,
@@ -1005,6 +1052,9 @@ impl Vm {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
     pub fn evaluate_installed(
         &mut self,
         agent: &mut Agent,
@@ -1024,6 +1074,10 @@ impl Vm {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
+    /// checkpointing fails.
     pub fn evaluate_script(
         &mut self,
         agent: &mut Agent,
@@ -1048,6 +1102,10 @@ impl Vm {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
+    /// checkpointing fails.
     pub fn evaluate_script_with_host(
         &mut self,
         agent: &mut Agent,
@@ -1059,6 +1117,10 @@ impl Vm {
         self.evaluate_script_with_registry_and_host(agent, realm, unit, host, &mut registry)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
+    /// checkpointing fails.
     pub fn evaluate_script_with_host_referrer(
         &mut self,
         agent: &mut Agent,
@@ -1078,6 +1140,10 @@ impl Vm {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
+    /// checkpointing fails.
     pub fn evaluate_script_with_registry(
         &mut self,
         agent: &mut Agent,
@@ -1088,6 +1154,10 @@ impl Vm {
         self.evaluate_script_with_registry_and_host(agent, realm, unit, &NoopHostHooks, registry)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
+    /// checkpointing fails.
     pub fn evaluate_script_with_registry_and_host(
         &mut self,
         agent: &mut Agent,
@@ -1101,6 +1171,10 @@ impl Vm {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
+    /// checkpointing fails.
     pub fn evaluate_script_with_registry_and_host_referrer(
         &mut self,
         agent: &mut Agent,
@@ -1158,6 +1232,10 @@ impl Vm {
         Ok((value, installed))
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if module bootstrap, installation, linking, evaluation, or job
+    /// checkpointing fails.
     pub fn evaluate_module(
         &mut self,
         agent: &mut Agent,
@@ -1170,6 +1248,10 @@ impl Vm {
         self.evaluate_module_with_registry(agent, realm, key, display_name, unit, &mut registry)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if module bootstrap, installation, linking, evaluation, or job
+    /// checkpointing fails.
     pub fn evaluate_module_with_registry(
         &mut self,
         agent: &mut Agent,
@@ -1190,6 +1272,10 @@ impl Vm {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if module bootstrap, installation, linking, evaluation, or job
+    /// checkpointing fails.
     pub fn evaluate_module_with_registry_and_host(
         &mut self,
         agent: &mut Agent,
@@ -1206,6 +1292,9 @@ impl Vm {
         self.evaluate_linked_module_with_registry_and_host(agent, realm, key, host, registry)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if bootstrap, extension setup, or module graph linking fails.
     pub fn link_module(
         &mut self,
         agent: &mut Agent,
@@ -1217,6 +1306,9 @@ impl Vm {
         self.link_module_graph(agent, realm, key)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if module linking, evaluation, or job checkpointing fails.
     pub fn evaluate_linked_module(
         &mut self,
         agent: &mut Agent,
@@ -1227,6 +1319,9 @@ impl Vm {
         self.evaluate_linked_module_with_registry(agent, realm, key, &mut registry)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if module linking, evaluation, or job checkpointing fails.
     pub fn evaluate_linked_module_with_host(
         &mut self,
         agent: &mut Agent,
@@ -1238,6 +1333,9 @@ impl Vm {
         self.evaluate_linked_module_with_registry_and_host(agent, realm, key, host, &mut registry)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if module linking, evaluation, or job checkpointing fails.
     pub fn evaluate_linked_module_with_registry(
         &mut self,
         agent: &mut Agent,
@@ -1254,6 +1352,9 @@ impl Vm {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if module linking, evaluation, or job checkpointing fails.
     pub fn evaluate_linked_module_with_registry_and_host(
         &mut self,
         agent: &mut Agent,
@@ -1278,6 +1379,9 @@ impl Vm {
         result
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
     pub fn evaluate_installed_with_registry(
         &mut self,
         agent: &mut Agent,
@@ -1297,6 +1401,9 @@ impl Vm {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
     pub fn evaluate_installed_with_registry_and_host(
         &mut self,
         agent: &mut Agent,

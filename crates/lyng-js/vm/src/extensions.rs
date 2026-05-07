@@ -141,6 +141,9 @@ impl<'a> RealmExtensionInstallation<'a> {
         self.agent
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if the current realm is missing its root object shape.
     pub fn allocate_ordinary_object(
         &mut self,
         prototype: Option<ObjectRef>,
@@ -149,7 +152,7 @@ impl<'a> RealmExtensionInstallation<'a> {
             .agent
             .realm(self.realm())
             .and_then(lyng_js_env::RealmRecord::root_shape)
-            .ok_or(VmError::MissingRootShape(self.realm()))?;
+            .ok_or_else(|| VmError::MissingRootShape(self.realm()))?;
         Ok(self.agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
             objects.alloc_object(
@@ -160,17 +163,26 @@ impl<'a> RealmExtensionInstallation<'a> {
         }))
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if the embedding function object cannot be allocated for this realm.
     pub fn allocate_function(&mut self, entry: EmbeddingFunctionId) -> Result<ObjectRef, VmError> {
         self.vm
             .allocate_embedding_function_object(self.agent, self.realm(), entry, self.provider)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if the requested builtin value is not installed for this realm.
     pub fn builtin_constant(&mut self, entry: BuiltinFunctionId) -> Result<Value, VmError> {
         self.vm
             .builtin_constant(self.agent, self.realm(), entry)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(self.agent)))
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if defining the property is rejected by the object model.
     pub fn define_property(
         &mut self,
         target: ObjectRef,
@@ -193,6 +205,9 @@ impl<'a> RealmExtensionInstallation<'a> {
         Err(VmError::Abrupt(errors::throw_type_error(self.agent)))
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if defining the data property is rejected by the object model.
     pub fn define_data_property(
         &mut self,
         target: ObjectRef,
@@ -210,6 +225,9 @@ impl<'a> RealmExtensionInstallation<'a> {
         self.define_property(target, key, descriptor)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if allocation fails or the function property cannot be defined.
     pub fn define_function_property(
         &mut self,
         target: ObjectRef,
@@ -231,6 +249,9 @@ impl<'a> RealmExtensionInstallation<'a> {
         Ok(function)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if the target object is no longer present in the object store.
     pub fn mark_is_html_dda_object(&mut self, object: ObjectRef) -> Result<(), VmError> {
         if self
             .agent
@@ -295,9 +316,12 @@ impl<'a> EmbeddingFunctionContext<'a> {
             .objects()
             .function_data(self.callee_object)
             .and_then(lyng_js_objects::FunctionObjectData::realm)
-            .unwrap_or(self.caller_frame.realm())
+            .unwrap_or_else(|| self.caller_frame.realm())
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if parsing, compiling, installing, or evaluating the script fails.
     pub fn evaluate_script_in_realm(
         &mut self,
         realm: RealmRef,
@@ -307,6 +331,9 @@ impl<'a> EmbeddingFunctionContext<'a> {
             .evaluate_script_source(self.agent, self.host, self.registry, realm, source_text)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if JavaScript `ToString` produces an abrupt completion.
     pub fn value_to_string_text(&mut self, value: Value) -> Result<String, VmError> {
         self.vm.value_to_string_text(self.agent, value)
     }
@@ -315,6 +342,9 @@ impl<'a> EmbeddingFunctionContext<'a> {
         self.vm.alloc_code_unit_string_value(self.agent, units)
     }
 
+    /// # Errors
+    ///
+    /// Returns a VM error if realm creation or extension installation fails.
     pub fn create_embedding_realm(&mut self) -> Result<BootstrapArtifacts, VmError> {
         self.vm.create_embedding_realm(self.agent, self.provider)
     }
@@ -343,11 +373,17 @@ pub trait RealmExtensionProvider: Send + Sync {
         entry: EmbeddingFunctionId,
     ) -> Option<EmbeddingFunctionMetadata>;
 
+    /// # Errors
+    ///
+    /// Returns a VM error if the provider cannot install its realm-specific objects.
     fn install_realm_extensions(
         &self,
         installation: &mut RealmExtensionInstallation<'_>,
     ) -> VmResult<()>;
 
+    /// # Errors
+    ///
+    /// Returns a VM error if the embedding function throws or cannot complete normally.
     fn call_embedding_function(
         &self,
         context: &mut EmbeddingFunctionContext<'_>,
@@ -355,6 +391,9 @@ pub trait RealmExtensionProvider: Send + Sync {
         invocation: EmbeddingInvocation<'_>,
     ) -> VmResult<Value>;
 
+    /// # Errors
+    ///
+    /// Returns a VM error if construction is unsupported or the embedding constructor throws.
     fn construct_embedding_function(
         &self,
         context: &mut EmbeddingFunctionContext<'_>,
