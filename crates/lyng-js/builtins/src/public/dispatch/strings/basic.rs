@@ -1,11 +1,12 @@
 use super::super::{
     append_string_ref_code_units, array_like_index_property_key,
     iterators::{string_iterator_builtin, string_iterator_next_builtin},
-    map_completion, primitive_wrapper_constructor, property_key_from_text, range_error,
+    map_completion, number_to_u32_after_range_check, number_to_usize_after_range_check,
+    numbers_are_equal, primitive_wrapper_constructor, property_key_from_text, range_error,
     string_from_code_units, string_ref_code_unit_len, string_ref_code_units, string_this_ref,
     string_value, symbol_descriptive_string, to_integer_or_infinity_for_builtin,
     to_length_for_builtin, to_number_for_builtin, to_string_string_ref, to_uint32_for_builtin,
-    type_error, BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
+    type_error, usize_index_as_number, BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use lyng_js_common::WellKnownAtom;
@@ -206,7 +207,7 @@ fn string_position_index(position: f64, length: usize) -> Option<usize> {
     if !position.is_finite() || position < 0.0 {
         return None;
     }
-    let index = position as usize;
+    let index = number_to_usize_after_range_check(position);
     (index < length).then_some(index)
 }
 
@@ -257,9 +258,11 @@ fn string_from_char_code_builtin<Cx: PublicBuiltinDispatchContext>(
     let mut units = Vec::with_capacity(invocation.arguments().len());
     for value in invocation.arguments().iter().copied() {
         let unit = if let Some(value) = value.as_smi() {
-            (value as u32 & 0xffff) as u16
+            u16::try_from(value.cast_unsigned() & 0xffff)
+                .expect("masked UTF-16 code unit should fit into u16")
         } else {
-            (to_uint32_for_builtin(cx, value)? & 0xffff) as u16
+            u16::try_from(to_uint32_for_builtin(cx, value)? & 0xffff)
+                .expect("masked UTF-16 code unit should fit into u16")
         };
         units.push(unit);
     }
@@ -268,13 +271,15 @@ fn string_from_char_code_builtin<Cx: PublicBuiltinDispatchContext>(
 
 fn append_code_point_units(units: &mut Vec<u16>, code_point: u32) {
     if code_point <= 0xFFFF {
-        units.push(code_point as u16);
+        units.push(u16::try_from(code_point).expect("BMP code point should fit into u16"));
         return;
     }
 
     let adjusted = code_point - 0x1_0000;
-    units.push(0xD800 | ((adjusted >> 10) as u16));
-    units.push(0xDC00 | ((adjusted as u16) & 0x03FF));
+    let high = u16::try_from(adjusted >> 10).expect("high surrogate payload should fit into u16");
+    let low = u16::try_from(adjusted & 0x03FF).expect("low surrogate payload should fit into u16");
+    units.push(0xD800 | high);
+    units.push(0xDC00 | low);
 }
 
 fn string_from_code_point_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -294,12 +299,12 @@ fn string_from_code_point_builtin<Cx: PublicBuiltinDispatchContext>(
         } else {
             let number = to_number_for_builtin(cx, value)?;
             if !number.is_finite()
-                || number.trunc() != number
+                || !numbers_are_equal(number, number.trunc())
                 || !(0.0..=1_114_111.0).contains(&number)
             {
                 return Err(range_error(cx));
             }
-            append_code_point_units(&mut units, number as u32);
+            append_code_point_units(&mut units, number_to_u32_after_range_check(number));
         }
     }
     Ok(string_from_code_units(cx, &units))
@@ -364,14 +369,14 @@ fn string_at_builtin<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let index = if relative_index < 0.0 {
-        units.len() as f64 + relative_index
+        usize_index_as_number(units.len()) + relative_index
     } else {
         relative_index
     };
-    if !index.is_finite() || index < 0.0 || index >= units.len() as f64 {
+    if !index.is_finite() || index < 0.0 || index >= usize_index_as_number(units.len()) {
         return Ok(Value::undefined());
     }
-    let index = index as usize;
+    let index = number_to_usize_after_range_check(index);
     Ok(string_from_code_units(cx, &units[index..=index]))
 }
 
@@ -394,15 +399,16 @@ fn string_code_point_at_builtin<Cx: PublicBuiltinDispatchContext>(
     };
     let first = units[index];
     let code_point = if (0xD800..=0xDBFF).contains(&first) {
-        if let Some(second) = units.get(index + 1).copied() {
-            if (0xDC00..=0xDFFF).contains(&second) {
-                0x1_0000 + ((u32::from(first - 0xD800)) << 10) + u32::from(second - 0xDC00)
-            } else {
-                u32::from(first)
-            }
-        } else {
-            u32::from(first)
-        }
+        units.get(index + 1).copied().map_or_else(
+            || u32::from(first),
+            |second| {
+                if (0xDC00..=0xDFFF).contains(&second) {
+                    0x1_0000 + ((u32::from(first - 0xD800)) << 10) + u32::from(second - 0xDC00)
+                } else {
+                    u32::from(first)
+                }
+            },
+        )
     } else {
         u32::from(first)
     };

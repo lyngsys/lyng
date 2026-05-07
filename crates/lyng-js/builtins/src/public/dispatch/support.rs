@@ -514,7 +514,7 @@ const fn length_u64_as_number(length: u64) -> f64 {
     number
 }
 
-const fn usize_index_as_number(index: usize) -> f64 {
+pub(super) const fn usize_index_as_number(index: usize) -> f64 {
     #[allow(
         clippy::cast_precision_loss,
         reason = "ECMAScript length/index values are exposed through the Number type"
@@ -523,7 +523,7 @@ const fn usize_index_as_number(index: usize) -> f64 {
     number
 }
 
-const fn number_to_u64_after_range_check(number: f64) -> u64 {
+pub(super) const fn number_to_u64_after_range_check(number: f64) -> u64 {
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
@@ -533,7 +533,7 @@ const fn number_to_u64_after_range_check(number: f64) -> u64 {
     integer
 }
 
-const fn number_to_u32_after_range_check(number: f64) -> u32 {
+pub(super) const fn number_to_u32_after_range_check(number: f64) -> u32 {
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
@@ -553,7 +553,7 @@ const fn number_to_u8_after_range_check(number: f64) -> u8 {
     integer
 }
 
-const fn number_to_usize_after_range_check(number: f64) -> usize {
+pub(super) const fn number_to_usize_after_range_check(number: f64) -> usize {
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
@@ -571,7 +571,7 @@ fn max_supported_length_usize() -> usize {
     }
 }
 
-fn numbers_are_equal(left: f64, right: f64) -> bool {
+pub(super) fn numbers_are_equal(left: f64, right: f64) -> bool {
     #[allow(
         clippy::float_cmp,
         reason = "ECMAScript Number algorithms require exact IEEE-754 comparison"

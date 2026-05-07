@@ -3,10 +3,10 @@ mod normalization;
 
 use super::{
     allocate_array_like_result, callable_object_from_value, define_data_property_with_attrs,
-    range_error, regexp, string_from_code_units, string_ref_code_units, string_this_ref,
-    to_integer_or_infinity_for_builtin, to_length_for_builtin, to_number_for_builtin,
-    to_string_string_ref, to_uint32_for_builtin, type_error, usize_index_value,
-    PublicBuiltinDispatchContext,
+    number_to_usize_after_range_check, range_error, regexp, string_from_code_units,
+    string_ref_code_units, string_this_ref, to_integer_or_infinity_for_builtin,
+    to_length_for_builtin, to_number_for_builtin, to_string_string_ref, to_uint32_for_builtin,
+    type_error, usize_index_as_number, usize_index_value, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use basic::{
@@ -313,13 +313,7 @@ pub(super) fn string_index_of_builtin<Cx: PublicBuiltinDispatchContext>(
     } else {
         0.0
     };
-    let start = if position.is_nan() || position <= 0.0 {
-        0
-    } else if !position.is_finite() {
-        source_units.len()
-    } else {
-        (position as usize).min(source_units.len())
-    };
+    let start = string_position_start(position, source_units.len());
     Ok(Value::from_smi(string_index_of_units(
         &source_units,
         &search_units,
@@ -348,13 +342,7 @@ fn string_includes_builtin<Cx: PublicBuiltinDispatchContext>(
     } else {
         0.0
     };
-    let start = if position.is_nan() || position <= 0.0 {
-        0
-    } else if !position.is_finite() {
-        source_units.len()
-    } else {
-        (position as usize).min(source_units.len())
-    };
+    let start = string_position_start(position, source_units.len());
     Ok(Value::from_bool(
         find_subsequence(&source_units, &search_units, start).is_some(),
     ))
@@ -379,15 +367,9 @@ fn string_ends_with_builtin<Cx: PublicBuiltinDispatchContext>(
     let end_position = if let Some(value) = invocation.arguments().get(1).copied() {
         to_integer_or_infinity_for_builtin(cx, value)?
     } else {
-        source_units.len() as f64
+        usize_index_as_number(source_units.len())
     };
-    let end = if end_position.is_nan() || end_position <= 0.0 {
-        0
-    } else if !end_position.is_finite() {
-        source_units.len()
-    } else {
-        (end_position as usize).min(source_units.len())
-    };
+    let end = string_position_start(end_position, source_units.len());
     let Some(start) = end.checked_sub(search_units.len()) else {
         return Ok(Value::from_bool(false));
     };
@@ -490,9 +472,20 @@ fn string_trim_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(string_from_code_units(cx, &units[start..end]))
 }
 
+#[derive(Clone, Copy)]
 enum StringCaseMapping {
     Lower,
     Upper,
+}
+
+fn string_position_start(position: f64, length: usize) -> usize {
+    if position.is_nan() || position <= 0.0 {
+        0
+    } else if !position.is_finite() {
+        length
+    } else {
+        number_to_usize_after_range_check(position).min(length)
+    }
 }
 
 fn push_char_units(output: &mut Vec<u16>, ch: char) {
@@ -949,7 +942,7 @@ fn string_last_index_of_builtin<Cx: PublicBuiltinDispatchContext>(
     } else if position <= 0.0 {
         0
     } else {
-        (position as usize).min(source_len)
+        number_to_usize_after_range_check(position).min(source_len)
     };
 
     if search_units.is_empty() {
@@ -1055,7 +1048,7 @@ fn string_repeat_builtin<Cx: PublicBuiltinDispatchContext>(
         return Err(range_error(cx));
     }
 
-    let repeat_count = count as usize;
+    let repeat_count = number_to_usize_after_range_check(count);
     if repeat_count == 0 || units.is_empty() {
         return Ok(string_from_code_units(cx, &[]));
     }
@@ -1240,13 +1233,13 @@ fn string_slice_index(value: f64, length: usize) -> usize {
         return 0;
     }
     if value < 0.0 {
-        let offset = (-value).min(length as f64) as usize;
+        let offset = number_to_usize_after_range_check((-value).min(usize_index_as_number(length)));
         return length.saturating_sub(offset);
     }
     if !value.is_finite() {
         return length;
     }
-    (value as usize).min(length)
+    number_to_usize_after_range_check(value).min(length)
 }
 
 fn string_slice_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1266,12 +1259,12 @@ fn string_slice_builtin<Cx: PublicBuiltinDispatchContext>(
     )?;
     let end = if let Some(value) = invocation.arguments().get(1).copied() {
         if value.is_undefined() {
-            length as f64
+            usize_index_as_number(length)
         } else {
             to_integer_or_infinity_for_builtin(cx, value)?
         }
     } else {
-        length as f64
+        usize_index_as_number(length)
     };
     let from = string_slice_index(start, length);
     let to = string_slice_index(end, length);
@@ -1298,23 +1291,15 @@ fn string_substring_builtin<Cx: PublicBuiltinDispatchContext>(
     )?;
     let end = if let Some(value) = invocation.arguments().get(1).copied() {
         if value.is_undefined() {
-            length as f64
+            usize_index_as_number(length)
         } else {
             to_integer_or_infinity_for_builtin(cx, value)?
         }
     } else {
-        length as f64
+        usize_index_as_number(length)
     };
 
-    let clamp = |value: f64| -> usize {
-        if value.is_nan() || value <= 0.0 {
-            0
-        } else if !value.is_finite() {
-            length
-        } else {
-            (value as usize).min(length)
-        }
-    };
+    let clamp = |value: f64| -> usize { string_position_start(value, length) };
 
     let start_index = clamp(start);
     let end_index = clamp(end);
@@ -1344,21 +1329,23 @@ fn string_substr_builtin<Cx: PublicBuiltinDispatchContext>(
     let start_index = if start == f64::NEG_INFINITY {
         0
     } else if start < 0.0 {
-        size.saturating_sub((-start).min(size as f64) as usize)
+        size.saturating_sub(number_to_usize_after_range_check(
+            (-start).min(usize_index_as_number(size)),
+        ))
     } else if !start.is_finite() {
         size
     } else {
-        (start as usize).min(size)
+        number_to_usize_after_range_check(start).min(size)
     };
 
     let substring_length = if let Some(value) = invocation.arguments().get(1).copied() {
         if value.is_undefined() {
-            size as f64
+            usize_index_as_number(size)
         } else {
             to_integer_or_infinity_for_builtin(cx, value)?
         }
     } else {
-        size as f64
+        usize_index_as_number(size)
     };
     let remaining = size.saturating_sub(start_index);
     let count = if substring_length <= 0.0 {
@@ -1366,7 +1353,7 @@ fn string_substr_builtin<Cx: PublicBuiltinDispatchContext>(
     } else if !substring_length.is_finite() {
         remaining
     } else {
-        (substring_length as usize).min(remaining)
+        number_to_usize_after_range_check(substring_length).min(remaining)
     };
     let end = start_index + count;
     Ok(string_from_code_units(cx, &units[start_index..end]))
@@ -1393,13 +1380,7 @@ fn string_starts_with_builtin<Cx: PublicBuiltinDispatchContext>(
     } else {
         0.0
     };
-    let start = if position.is_nan() || position <= 0.0 {
-        0
-    } else if !position.is_finite() {
-        source_units.len()
-    } else {
-        (position as usize).min(source_units.len())
-    };
+    let start = string_position_start(position, source_units.len());
     let end = start.saturating_add(search_units.len());
     let matches = end <= source_units.len() && source_units[start..end] == search_units[..];
     Ok(Value::from_bool(matches))
