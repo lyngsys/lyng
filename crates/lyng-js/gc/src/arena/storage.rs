@@ -237,10 +237,9 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
         let Some((page_index, slot_index)) = locate::<Handle>(handle) else {
             return false;
         };
-        match self.pages.get_mut(page_index) {
-            Some(page) => page.mark(slot_index),
-            None => false,
-        }
+        self.pages
+            .get_mut(page_index)
+            .is_some_and(|page| page.mark(slot_index))
     }
 
     pub(super) fn is_marked(&self, handle: Handle) -> bool {
@@ -298,10 +297,9 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
             return false;
         };
 
-        match self.pages.get_mut(page_index) {
-            Some(page) => page.update(slot_index, &mut update),
-            None => false,
-        }
+        self.pages
+            .get_mut(page_index)
+            .is_some_and(|page| page.update(slot_index, &mut update))
     }
 
     fn find_available_page_after(&self, start: usize) -> Option<usize> {
@@ -562,6 +560,10 @@ impl SideAllocator {
         Some(id)
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the storage layer validates both string operands explicitly before allocating the concatenated side payload"
+    )]
     pub(super) fn allocate_utf16_concat(
         &mut self,
         left: SideAllocationRef,

@@ -340,7 +340,7 @@ pub fn analyze_dynamic_script_with_diagnostics(
 
     let sema = match mode {
         DynamicScriptAnalysisMode::DirectEval { options, .. } => {
-            analyze_direct_eval_script(&parsed, atoms, options)
+            analyze_direct_eval_script(&parsed, atoms, &options)
         }
         DynamicScriptAnalysisMode::DynamicFunction => {
             let options = dynamic_function_wrapper_function(&parsed).map_or_else(
@@ -350,7 +350,7 @@ pub fn analyze_dynamic_script_with_diagnostics(
                         .with_suppressed_function_name_bindings(vec![function])
                 },
             );
-            analyze_direct_eval_script(&parsed, atoms, options)
+            analyze_direct_eval_script(&parsed, atoms, &options)
         }
         DynamicScriptAnalysisMode::Script | DynamicScriptAnalysisMode::InitialStrict(_) => {
             analyze_script(&parsed, atoms)

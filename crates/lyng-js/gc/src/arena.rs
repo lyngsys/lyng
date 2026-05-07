@@ -66,12 +66,10 @@ impl PrimitiveHeap {
         );
 
         let record = if payload_bytes.is_empty() {
-            match cached_atom {
-                Some(atom) => {
-                    PrimitiveStringRecord::with_cached_atom(encoding, code_unit_len, atom)
-                }
-                None => PrimitiveStringRecord::new(encoding, code_unit_len),
-            }
+            cached_atom.map_or_else(
+                || PrimitiveStringRecord::new(encoding, code_unit_len),
+                |atom| PrimitiveStringRecord::with_cached_atom(encoding, code_unit_len, atom),
+            )
         } else {
             let payload = self.string_payloads.allocate(payload_bytes, lifetime);
             PrimitiveStringRecord::with_payload(encoding, code_unit_len, cached_atom, payload)

@@ -223,14 +223,15 @@ impl ModuleSema {
 
 /// Analyzes a parsed script and produces semantic metadata.
 pub fn analyze_script(parsed: &ParsedScript, atoms: &AtomTable) -> ScriptSema {
-    analyze_direct_eval_script(parsed, atoms, DirectEvalScriptAnalysisOptions::default())
+    let options = DirectEvalScriptAnalysisOptions::default();
+    analyze_direct_eval_script(parsed, atoms, &options)
 }
 
 /// Analyzes a parsed direct-eval script with caller-sensitive analysis options.
 pub fn analyze_direct_eval_script(
     parsed: &ParsedScript,
     atoms: &AtomTable,
-    options: DirectEvalScriptAnalysisOptions,
+    options: &DirectEvalScriptAnalysisOptions,
 ) -> ScriptSema {
     let direct_eval_allows_new_target = options.allow_new_target();
     let direct_eval_allows_super = options.allow_super();

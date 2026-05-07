@@ -212,14 +212,18 @@ impl PrimitiveRoots {
     }
 
     fn register(&self, registration: RootRegistration) -> usize {
-        if let Some(slot) = self.free.borrow_mut().pop() {
-            self.slots.borrow_mut()[slot] = Some(registration);
-            slot
-        } else {
-            let mut slots = self.slots.borrow_mut();
-            slots.push(Some(registration));
-            slots.len() - 1
-        }
+        let free_slot = self.free.borrow_mut().pop();
+        free_slot.map_or_else(
+            || {
+                let mut slots = self.slots.borrow_mut();
+                slots.push(Some(registration));
+                slots.len() - 1
+            },
+            |slot| {
+                self.slots.borrow_mut()[slot] = Some(registration);
+                slot
+            },
+        )
     }
 
     fn unregister(&self, slot: usize) {

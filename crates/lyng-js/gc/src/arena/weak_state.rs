@@ -11,6 +11,10 @@ impl PrimitiveHeap {
     }
 
     #[inline]
+    #[allow(
+        clippy::option_option,
+        reason = "outer None means the WeakMap object is missing; inner None means the key is absent"
+    )]
     pub(crate) fn weak_map_get(&self, owner: ObjectRef, key: WeakHeapRef) -> Option<Option<Value>> {
         Some(self.weak_maps.get(&owner)?.get(key))
     }
@@ -80,6 +84,10 @@ impl PrimitiveHeap {
     }
 
     #[inline]
+    #[allow(
+        clippy::option_option,
+        reason = "outer None means the WeakRef object is missing; inner None means its target was cleared"
+    )]
     pub(crate) fn weak_ref_target(&self, owner: ObjectRef) -> Option<Option<WeakHeapRef>> {
         Some(self.weak_refs.get(&owner)?.target())
     }

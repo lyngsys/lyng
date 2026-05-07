@@ -51,6 +51,15 @@ impl Analyzer<'_> {
             let scope_rec = self.scopes.get(scope);
 
             let parameter_scope = scope_rec.kind == ScopeKind::Parameter;
+            let using_binding = matches!(
+                binding_kind,
+                crate::binding::DeclarationKind::Using
+                    | crate::binding::DeclarationKind::AwaitUsing
+            );
+            let lexical_or_captured_environment = (scope_rec.kind == ScopeKind::Global
+                && binding.kind.is_lexical())
+                || (scope_rec.kind == ScopeKind::ForLoop && binding.kind.is_lexical())
+                || binding.is_captured;
             let new_storage = if parameter_scope {
                 StorageClass::EnvironmentSlot
             } else if scope_rec.has_eval || scope_rec.has_with {
@@ -59,21 +68,11 @@ impl Analyzer<'_> {
                 } else {
                     StorageClass::EnvironmentSlot
                 }
-            } else if matches!(
-                binding_kind,
-                crate::binding::DeclarationKind::Using
-                    | crate::binding::DeclarationKind::AwaitUsing
-            ) {
-                StorageClass::EnvironmentSlot
-            } else if scope_rec.kind == ScopeKind::Module {
+            } else if using_binding || scope_rec.kind == ScopeKind::Module {
                 StorageClass::EnvironmentSlot
             } else if scope_rec.kind == ScopeKind::Global && binding.kind.is_hoisted() {
                 StorageClass::GlobalName
-            } else if scope_rec.kind == ScopeKind::Global && binding.kind.is_lexical() {
-                StorageClass::EnvironmentSlot
-            } else if scope_rec.kind == ScopeKind::ForLoop && binding.kind.is_lexical() {
-                StorageClass::EnvironmentSlot
-            } else if binding.is_captured {
+            } else if lexical_or_captured_environment {
                 StorageClass::EnvironmentSlot
             } else {
                 StorageClass::FrameLocal

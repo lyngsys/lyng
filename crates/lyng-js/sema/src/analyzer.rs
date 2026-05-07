@@ -219,7 +219,7 @@ impl<'a> Analyzer<'a> {
         atoms: &'a AtomTable,
         root: lyng_js_ast::ScriptId,
         strict: bool,
-        options: DirectEvalScriptAnalysisOptions,
+        options: &DirectEvalScriptAnalysisOptions,
     ) -> Self {
         let mut this = Self::new_for_script(ast, atoms, strict);
         let script = ast.get_script(root);
@@ -228,7 +228,7 @@ impl<'a> Analyzer<'a> {
             .iter()
             .copied()
             .collect();
-        this.seed_direct_eval_private_layouts(script.span.source, &options);
+        this.seed_direct_eval_private_layouts(script.span.source, options);
         this.ctx.annex_b_blocked_var_names = options
             .annex_b_blocked_var_names()
             .iter()
@@ -325,7 +325,7 @@ impl<'a> Analyzer<'a> {
             self.ctx.class_scopes.push(scope);
             let span = entries
                 .first()
-                .map_or(Span::from_offsets(source, 0, 0), |entry| entry.span());
+                .map_or_else(|| Span::from_offsets(source, 0, 0), |entry| entry.span());
             let mut seen_names = HashSet::new();
             for entry in entries {
                 if seen_names.insert(entry.name()) {

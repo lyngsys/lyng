@@ -179,7 +179,7 @@ mod tests {
 
         let mut state = WeakMapState::new();
         for raw in 1..=ENTRY_COUNT {
-            state.set(object_key(raw), Value::from_smi(raw as i32));
+            state.set(object_key(raw), Value::from_smi(raw.cast_signed()));
         }
 
         let started = Instant::now();
