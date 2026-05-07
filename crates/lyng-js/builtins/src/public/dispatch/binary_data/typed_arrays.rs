@@ -48,6 +48,22 @@ fn typed_array_bigint64_value(agent: &mut Agent, bits: u64) -> Value {
     Value::from_bigint_ref(bigint)
 }
 
+pub(super) fn typed_array_storage_u8_bits(bits: u64) -> u8 {
+    u8::try_from(bits & u64::from(u8::MAX)).expect("typed-array u8 storage bits should fit u8")
+}
+
+pub(super) fn typed_array_storage_u16_bits(bits: u64) -> u16 {
+    u16::try_from(bits & u64::from(u16::MAX)).expect("typed-array u16 storage bits should fit u16")
+}
+
+pub(super) fn typed_array_storage_u32_bits(bits: u64) -> u32 {
+    u32::try_from(bits & u64::from(u32::MAX)).expect("typed-array u32 storage bits should fit u32")
+}
+
+fn typed_array_storage_u16_bits_from_u32(bits: u32) -> u16 {
+    u16::try_from(bits & u32::from(u16::MAX)).expect("typed-array u16 source bits should fit u16")
+}
+
 pub(super) fn typed_array_storage_bits_to_value(
     agent: &mut Agent,
     kind: TypedArrayElementKind,
@@ -56,19 +72,31 @@ pub(super) fn typed_array_storage_bits_to_value(
     match kind {
         TypedArrayElementKind::BigInt64 => typed_array_bigint64_value(agent, bits),
         TypedArrayElementKind::BigUint64 => typed_array_biguint64_value(agent, bits),
-        TypedArrayElementKind::Int8 => Value::from_smi(i32::from((bits as u8) as i8)),
-        TypedArrayElementKind::Int16 => Value::from_smi(i32::from((bits as u16) as i16)),
-        TypedArrayElementKind::Int32 => Value::from_smi(bits as u32 as i32),
-        TypedArrayElementKind::Float16 => Value::from_f64(float16_bits_to_f64(bits as u16)),
-        TypedArrayElementKind::Float32 => Value::from_f64(f64::from(f32::from_bits(bits as u32))),
+        TypedArrayElementKind::Int8 => {
+            Value::from_smi(i32::from(typed_array_storage_u8_bits(bits).cast_signed()))
+        }
+        TypedArrayElementKind::Int16 => {
+            Value::from_smi(i32::from(typed_array_storage_u16_bits(bits).cast_signed()))
+        }
+        TypedArrayElementKind::Int32 => {
+            Value::from_smi(typed_array_storage_u32_bits(bits).cast_signed())
+        }
+        TypedArrayElementKind::Float16 => {
+            Value::from_f64(float16_bits_to_f64(typed_array_storage_u16_bits(bits)))
+        }
+        TypedArrayElementKind::Float32 => Value::from_f64(f64::from(f32::from_bits(
+            typed_array_storage_u32_bits(bits),
+        ))),
         TypedArrayElementKind::Float64 => Value::from_f64(f64::from_bits(bits)),
         TypedArrayElementKind::Uint32 => {
-            let value = bits as u32;
+            let value = typed_array_storage_u32_bits(bits);
             i32::try_from(value).map_or_else(|_| Value::from_f64(f64::from(value)), Value::from_smi)
         }
-        TypedArrayElementKind::Uint16 => Value::from_smi(i32::from(bits as u16)),
+        TypedArrayElementKind::Uint16 => {
+            Value::from_smi(i32::from(typed_array_storage_u16_bits(bits)))
+        }
         TypedArrayElementKind::Uint8Clamped | TypedArrayElementKind::Uint8 => {
-            Value::from_smi(i32::from(bits as u8))
+            Value::from_smi(i32::from(typed_array_storage_u8_bits(bits)))
         }
     }
 }
@@ -105,15 +133,20 @@ pub(in crate::public::dispatch) fn typed_array_storage_bits_from_builtin_value<
         TypedArrayElementKind::Uint8Clamped => {
             Ok(u64::from(to_uint8_clamp_for_builtin(cx, value)?))
         }
-        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => {
-            Ok(u64::from(to_uint32_for_builtin(cx, value)? as u16))
-        }
+        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => Ok(u64::from(
+            typed_array_storage_u16_bits_from_u32(to_uint32_for_builtin(cx, value)?),
+        )),
         TypedArrayElementKind::Float16 => Ok(u64::from(f64_to_float16_bits(
             to_number_for_builtin(cx, value)?,
         ))),
-        TypedArrayElementKind::Float32 => Ok(u64::from(f32::to_bits(to_number_for_builtin(
-            cx, value,
-        )? as f32))),
+        TypedArrayElementKind::Float32 => {
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "Float32 typed arrays intentionally round Number values to binary32"
+            )]
+            let rounded = to_number_for_builtin(cx, value)? as f32;
+            Ok(u64::from(f32::to_bits(rounded)))
+        }
         TypedArrayElementKind::Float64 => Ok(to_number_for_builtin(cx, value)?.to_bits()),
         TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => {
             Ok(u64::from(to_uint32_for_builtin(cx, value)?))

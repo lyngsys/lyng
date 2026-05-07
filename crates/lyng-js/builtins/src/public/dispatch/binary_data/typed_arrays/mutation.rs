@@ -13,7 +13,8 @@ use super::{
     typed_array_current_length, typed_array_read_element_value, typed_array_read_storage_bits,
     typed_array_same_kind_create, typed_array_snapshot_storage_bits, typed_array_species_create,
     typed_array_species_create_with_arguments, typed_array_storage_bits_from_builtin_value,
-    typed_array_storage_bits_to_value, typed_array_this_object, typed_array_this_record,
+    typed_array_storage_bits_to_value, typed_array_storage_u16_bits, typed_array_storage_u32_bits,
+    typed_array_storage_u8_bits, typed_array_this_object, typed_array_this_record,
     typed_array_validated_object_record_and_length, typed_array_validated_record,
     typed_array_validated_record_and_length, typed_array_write_storage_bits,
 };
@@ -94,23 +95,33 @@ fn compare_typed_array_default_elements(
     right_bits: u64,
 ) -> std::cmp::Ordering {
     match kind {
-        TypedArrayElementKind::BigInt64 => (left_bits as i64).cmp(&(right_bits as i64)),
+        TypedArrayElementKind::BigInt64 => left_bits.cast_signed().cmp(&right_bits.cast_signed()),
         TypedArrayElementKind::BigUint64 => left_bits.cmp(&right_bits),
-        TypedArrayElementKind::Int8 => (left_bits as u8 as i8).cmp(&(right_bits as u8 as i8)),
-        TypedArrayElementKind::Int16 => (left_bits as u16 as i16).cmp(&(right_bits as u16 as i16)),
-        TypedArrayElementKind::Int32 => (left_bits as u32 as i32).cmp(&(right_bits as u32 as i32)),
+        TypedArrayElementKind::Int8 => typed_array_storage_u8_bits(left_bits)
+            .cast_signed()
+            .cmp(&typed_array_storage_u8_bits(right_bits).cast_signed()),
+        TypedArrayElementKind::Int16 => typed_array_storage_u16_bits(left_bits)
+            .cast_signed()
+            .cmp(&typed_array_storage_u16_bits(right_bits).cast_signed()),
+        TypedArrayElementKind::Int32 => typed_array_storage_u32_bits(left_bits)
+            .cast_signed()
+            .cmp(&typed_array_storage_u32_bits(right_bits).cast_signed()),
         TypedArrayElementKind::Uint8 | TypedArrayElementKind::Uint8Clamped => {
-            (left_bits as u8).cmp(&(right_bits as u8))
+            typed_array_storage_u8_bits(left_bits).cmp(&typed_array_storage_u8_bits(right_bits))
         }
-        TypedArrayElementKind::Uint16 => (left_bits as u16).cmp(&(right_bits as u16)),
-        TypedArrayElementKind::Uint32 => (left_bits as u32).cmp(&(right_bits as u32)),
+        TypedArrayElementKind::Uint16 => {
+            typed_array_storage_u16_bits(left_bits).cmp(&typed_array_storage_u16_bits(right_bits))
+        }
+        TypedArrayElementKind::Uint32 => {
+            typed_array_storage_u32_bits(left_bits).cmp(&typed_array_storage_u32_bits(right_bits))
+        }
         TypedArrayElementKind::Float16 => compare_typed_array_float_values(
-            float16_bits_to_f64(left_bits as u16),
-            float16_bits_to_f64(right_bits as u16),
+            float16_bits_to_f64(typed_array_storage_u16_bits(left_bits)),
+            float16_bits_to_f64(typed_array_storage_u16_bits(right_bits)),
         ),
         TypedArrayElementKind::Float32 => compare_typed_array_float_values(
-            f64::from(f32::from_bits(left_bits as u32)),
-            f64::from(f32::from_bits(right_bits as u32)),
+            f64::from(f32::from_bits(typed_array_storage_u32_bits(left_bits))),
+            f64::from(f32::from_bits(typed_array_storage_u32_bits(right_bits))),
         ),
         TypedArrayElementKind::Float64 => {
             compare_typed_array_float_values(f64::from_bits(left_bits), f64::from_bits(right_bits))
@@ -152,20 +163,22 @@ fn counting_sort_typed_array_default_elements(
     };
     let mut counts = vec![0_usize; range];
     for bits in elements.iter().copied() {
-        counts[usize::from(bits as u16)] += 1;
+        counts[usize::from(typed_array_storage_u16_bits(bits))] += 1;
     }
     let mut index = 0;
     match kind {
         TypedArrayElementKind::Int16 => {
-            for key in (1_usize << 15)..range {
-                for _ in 0..counts[key] {
-                    elements[index] = key as u64;
+            for (key, count) in counts.iter().copied().enumerate().skip(1_usize << 15) {
+                for _ in 0..count {
+                    elements[index] =
+                        u64::try_from(key).expect("16-bit counting-sort key should fit u64");
                     index += 1;
                 }
             }
             for (key, count) in counts.iter().copied().enumerate().take(1_usize << 15) {
                 for _ in 0..count {
-                    elements[index] = key as u64;
+                    elements[index] =
+                        u64::try_from(key).expect("16-bit counting-sort key should fit u64");
                     index += 1;
                 }
             }
@@ -173,7 +186,8 @@ fn counting_sort_typed_array_default_elements(
         TypedArrayElementKind::Uint16 => {
             for (key, count) in counts.iter().copied().enumerate() {
                 for _ in 0..count {
-                    elements[index] = key as u64;
+                    elements[index] =
+                        u64::try_from(key).expect("16-bit counting-sort key should fit u64");
                     index += 1;
                 }
             }
@@ -223,12 +237,12 @@ fn merge_sort_typed_array_compare_elements<Cx: PublicBuiltinDispatchContext>(
 
     let mut left = start;
     let mut right = mid;
-    for target in start..end {
+    for slot in scratch.iter_mut().take(end).skip(start) {
         if left == mid {
-            scratch[target] = elements[right];
+            *slot = elements[right];
             right += 1;
         } else if right == end {
-            scratch[target] = elements[left];
+            *slot = elements[left];
             left += 1;
         } else if compare_typed_array_sort_elements(
             cx,
@@ -238,10 +252,10 @@ fn merge_sort_typed_array_compare_elements<Cx: PublicBuiltinDispatchContext>(
             elements[right],
         )? == std::cmp::Ordering::Greater
         {
-            scratch[target] = elements[right];
+            *slot = elements[right];
             right += 1;
         } else {
-            scratch[target] = elements[left];
+            *slot = elements[left];
             left += 1;
         }
     }
@@ -362,14 +376,24 @@ fn typed_array_with_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let actual_index = if relative_index < 0.0 {
-        length as f64 + relative_index
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "ECMAScript relative typed-array indices are represented as Number values"
+        )]
+        let length_number = length as f64;
+        length_number + relative_index
     } else {
         relative_index
     };
     if !actual_index.is_finite() || actual_index < 0.0 {
         return Err(range_error(cx));
     }
-    let actual_index = usize::try_from(actual_index as u64).map_err(|_| range_error(cx))?;
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "TypedArray.prototype.with converts a checked finite non-negative integer index"
+    )]
+    let actual_index = actual_index as usize;
     if typed_array_current_length(cx.agent(), record).is_none_or(|length| actual_index >= length) {
         return Err(range_error(cx));
     }

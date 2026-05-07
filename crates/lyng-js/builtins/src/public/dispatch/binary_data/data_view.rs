@@ -1357,9 +1357,9 @@ mod float16_tests {
     #[test]
     fn handles_subnormal_round_to_even() {
         // 5.960464477539063e-8 is the smallest f16 subnormal.
-        assert_eq!(
+        assert_same_float_bits(
             round_trip_via_f16(5.960_464_477_539_063e-8),
-            5.960_464_477_539_063e-8
+            5.960_464_477_539_063e-8,
         );
         // 2.9802322387695312e-8 is exactly half the smallest subnormal -> 0.
         assert_same_float_bits(round_trip_via_f16(2.980_232_238_769_531_2e-8), 0.0);
