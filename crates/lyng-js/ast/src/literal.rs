@@ -59,10 +59,10 @@ impl StringLiteralValue {
     }
 
     pub fn from_code_units(units: &[u16]) -> Self {
-        match String::from_utf16(units) {
-            Ok(text) => Self::Utf8(text.into_boxed_str()),
-            Err(_) => Self::Utf16(units.into()),
-        }
+        String::from_utf16(units).map_or_else(
+            |_| Self::Utf16(units.into()),
+            |text| Self::Utf8(text.into_boxed_str()),
+        )
     }
 
     #[inline]

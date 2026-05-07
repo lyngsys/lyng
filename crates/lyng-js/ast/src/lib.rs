@@ -108,7 +108,7 @@ impl Default for Ast {
 
 impl Ast {
     /// Creates a new, empty AST container.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             scripts: NodeArena::new(),
             modules: NodeArena::new(),

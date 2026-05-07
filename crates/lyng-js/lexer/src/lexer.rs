@@ -318,32 +318,32 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
     }
 
     #[inline]
-    fn utf8_text(&self, bytes: &'src [u8]) -> &'src str {
+    fn utf8_text(bytes: &'src [u8]) -> &'src str {
         std::str::from_utf8(bytes)
             .expect("lexer should only decode bytes that originate from valid UTF-8 source text")
     }
 
     #[inline]
-    fn valid_utf8_prefix(&self, bytes: &'src [u8]) -> Option<&'src str> {
+    fn valid_utf8_prefix(bytes: &'src [u8]) -> Option<&'src str> {
         match std::str::from_utf8(bytes) {
             Ok(text) => Some(text),
             Err(error) => {
                 let valid_len = error.valid_up_to();
-                (valid_len > 0).then(|| self.utf8_text(&bytes[..valid_len]))
+                (valid_len > 0).then(|| Self::utf8_text(&bytes[..valid_len]))
             }
         }
     }
 
     #[inline]
     fn next_code_point_from(&self, start: usize) -> Option<char> {
-        self.valid_utf8_prefix(&self.source[start..])?
+        Self::valid_utf8_prefix(&self.source[start..])?
             .chars()
             .next()
     }
 
     /// Source text slice for the given byte range.
     fn text(&self, start: usize, end: usize) -> &'src str {
-        self.utf8_text(&self.source[start..end])
+        Self::utf8_text(&self.source[start..end])
     }
 
     // =========================================================================
@@ -595,10 +595,8 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
 
     fn scan_identifier(&mut self, start: usize, flags: TokenFlags) -> Token {
         let mut has_escape = false;
-        let mut buf: Option<String> = None;
-
         // Handle first character
-        if self.current() == b'\\' {
+        let mut buf = if self.current() == b'\\' {
             has_escape = true;
             let mut b = String::new();
             if let Some(ch) = self.scan_unicode_escape_sequence() {
@@ -613,11 +611,12 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
             } else {
                 self.error(start, self.pos, "invalid Unicode escape sequence");
             }
-            buf = Some(b);
+            Some(b)
         } else {
             // Plain ASCII or Unicode start
             self.advance_identifier_start();
-        }
+            None
+        };
 
         // Continue characters
         loop {

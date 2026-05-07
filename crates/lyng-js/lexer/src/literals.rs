@@ -21,10 +21,8 @@ impl StringLiteral {
     }
 
     pub fn from_utf16(units: Vec<u16>) -> Self {
-        match String::from_utf16(&units) {
-            Ok(text) => Self::Utf8(text),
-            Err(_) => Self::Utf16(units.into_boxed_slice()),
-        }
+        String::from_utf16(&units)
+            .map_or_else(|_| Self::Utf16(units.into_boxed_slice()), Self::Utf8)
     }
 
     #[inline]
