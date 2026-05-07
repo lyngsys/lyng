@@ -618,6 +618,7 @@ impl Vm {
     }
 
     #[inline]
+    #[allow(clippy::needless_pass_by_ref_mut)]
     fn note_frame_depth(&mut self) {
         #[cfg(test)]
         {
@@ -1713,7 +1714,7 @@ impl Vm {
     }
 
     fn prepare_entry_execution(
-        &mut self,
+        &self,
         agent: &mut Agent,
         code: CodeRef,
         realm: RealmRef,
@@ -1803,7 +1804,7 @@ impl Vm {
     }
 
     fn allocate_module_entry_environment(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRecord,
         installed: InstalledCode,
@@ -1896,7 +1897,7 @@ impl Vm {
     }
 
     fn initialize_module_hoisted_functions(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRecord,
         code: CodeRef,

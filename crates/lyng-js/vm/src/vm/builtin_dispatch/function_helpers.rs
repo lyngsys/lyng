@@ -380,7 +380,7 @@ impl Vm {
     }
 
     pub(super) fn native_function_source_text(
-        &mut self,
+        &self,
         agent: &mut Agent,
         function: ObjectRef,
     ) -> VmResult<String> {
@@ -393,7 +393,7 @@ impl Vm {
     }
 
     pub(super) fn source_function_source_text(
-        &mut self,
+        &self,
         agent: &mut Agent,
         code: lyng_js_types::CodeRef,
         function: ObjectRef,
@@ -422,7 +422,7 @@ impl Vm {
         })
     }
 
-    fn function_name_text(&mut self, agent: &mut Agent, function: ObjectRef) -> VmResult<String> {
+    fn function_name_text(&self, agent: &mut Agent, function: ObjectRef) -> VmResult<String> {
         let name = object::ordinary_get(
             agent,
             function,

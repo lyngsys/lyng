@@ -285,7 +285,7 @@ impl Vm {
     }
 
     pub(super) fn create_intrinsic_promise_capability(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
     ) -> VmResult<PromiseCapabilityId> {
@@ -352,7 +352,7 @@ impl Vm {
     }
 
     fn enqueue_await_resume(
-        &mut self,
+        &self,
         agent: &mut Agent,
         promise: ObjectRef,
         suspended: SuspendedExecutionRef,

@@ -105,7 +105,7 @@ impl Vm {
     }
 
     pub(super) fn prepare_bytecode_call(
-        &mut self,
+        &self,
         agent: &mut Agent,
         caller_frame: FrameRecord,
         callee_object: ObjectRef,
@@ -475,7 +475,7 @@ impl Vm {
     }
 
     pub(super) fn resolve_global_this(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         this_value: Value,

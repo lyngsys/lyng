@@ -1831,7 +1831,7 @@ impl Vm {
         self.to_numeric_primitive(agent, primitive)
     }
 
-    fn to_numeric_primitive(&mut self, agent: &mut Agent, value: Value) -> VmResult<Value> {
+    fn to_numeric_primitive(&self, agent: &mut Agent, value: Value) -> VmResult<Value> {
         read::to_numeric(agent.heap().view(), value)
             .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
     }

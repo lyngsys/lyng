@@ -655,7 +655,7 @@ impl Vm {
     }
 
     pub(super) fn try_fast_set_engine_array_index(
-        &mut self,
+        &self,
         agent: &mut Agent,
         object: ObjectRef,
         index: u32,
@@ -717,7 +717,7 @@ impl Vm {
 
     fn legacy_function_caller(
         &self,
-        agent: &mut Agent,
+        agent: &Agent,
         object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<Option<Value>> {
@@ -789,7 +789,7 @@ impl Vm {
 
     fn legacy_function_arguments(
         &self,
-        agent: &mut Agent,
+        agent: &Agent,
         object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<Option<Value>> {

@@ -87,7 +87,7 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn get_instance_field_key_builtin(
-        &mut self,
+        &self,
         agent: &mut Agent,
         arguments: &[Value],
     ) -> VmResult<Value> {
@@ -192,7 +192,7 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn define_private_field_builtin(
-        &mut self,
+        &self,
         agent: &mut Agent,
         _caller: FrameRecord,
         arguments: &[Value],
@@ -237,7 +237,7 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn private_field_init_builtin(
-        &mut self,
+        &self,
         agent: &mut Agent,
         caller: FrameRecord,
         arguments: &[Value],
@@ -398,7 +398,7 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn private_has_builtin(
-        &mut self,
+        &self,
         agent: &mut Agent,
         caller: FrameRecord,
         arguments: &[Value],

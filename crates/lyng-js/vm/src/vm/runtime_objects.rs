@@ -109,7 +109,7 @@ impl Vm {
     }
 
     pub(super) fn create_array(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         element_capacity: usize,
@@ -137,7 +137,7 @@ impl Vm {
     }
 
     pub(super) fn create_closure(
-        &mut self,
+        &self,
         agent: &mut Agent,
         frame: FrameRecord,
         child_index: u32,
@@ -405,7 +405,7 @@ impl Vm {
     }
 
     pub(super) fn to_object_for_value(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         value: Value,
@@ -413,11 +413,7 @@ impl Vm {
         object::to_object(agent, realm, value).map_err(VmError::Abrupt)
     }
 
-    pub(super) fn check_object_coercible(
-        &mut self,
-        agent: &mut Agent,
-        value: Value,
-    ) -> VmResult<()> {
+    pub(super) fn check_object_coercible(&self, agent: &mut Agent, value: Value) -> VmResult<()> {
         if value.is_null() || value.is_undefined() {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }

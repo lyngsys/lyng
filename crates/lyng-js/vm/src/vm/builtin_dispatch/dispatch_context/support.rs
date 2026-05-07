@@ -187,7 +187,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
     }
 
     fn remap_constructor_default_prototype(
-        &mut self,
+        &self,
         source_realm: RealmRef,
         target_realm: RealmRef,
         default_prototype: ObjectRef,

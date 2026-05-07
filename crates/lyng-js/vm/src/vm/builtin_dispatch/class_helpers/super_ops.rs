@@ -107,7 +107,7 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn super_base_builtin(
-        &mut self,
+        &self,
         agent: &mut Agent,
         caller: FrameRecord,
         arguments: &[Value],
@@ -126,7 +126,7 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn super_constructor_builtin(
-        &mut self,
+        &self,
         agent: &mut Agent,
         caller: FrameRecord,
     ) -> VmResult<Value> {

@@ -837,7 +837,7 @@ impl Vm {
     }
 
     pub(super) fn load_captured_name_this_with_context(
-        &mut self,
+        &self,
         frame: FrameRecord,
         reference_register: u16,
     ) -> VmResult<Value> {

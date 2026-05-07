@@ -222,7 +222,7 @@ impl Vm {
     }
 
     fn try_evaluate_regexp_literal_eval_source(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         source_text: &str,
@@ -238,7 +238,7 @@ impl Vm {
     }
 
     pub(super) fn try_evaluate_regexp_literal_eval_string_ref(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         source: StringRef,
@@ -262,7 +262,7 @@ impl Vm {
     }
 
     fn allocate_eval_regexp_literal(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         pattern: &str,
@@ -274,7 +274,7 @@ impl Vm {
     }
 
     fn allocate_eval_regexp_literal_with_source_units(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         pattern: &str,
@@ -287,7 +287,7 @@ impl Vm {
     }
 
     fn allocate_eval_regexp_literal_with_payload(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         payload: RegExpPayload,
@@ -1104,7 +1104,7 @@ impl Vm {
 
     fn rewrite_direct_eval_root_bindings(
         &self,
-        agent: &mut Agent,
+        agent: &Agent,
         variable_env: lyng_js_types::EnvironmentRef,
         always_host: bool,
         sema: &mut ScriptSema,
@@ -1171,7 +1171,7 @@ impl Vm {
     }
 
     fn create_direct_eval_var_environment(
-        &mut self,
+        &self,
         agent: &mut Agent,
         outer: lyng_js_types::EnvironmentRef,
         hosted_names: &[AtomId],

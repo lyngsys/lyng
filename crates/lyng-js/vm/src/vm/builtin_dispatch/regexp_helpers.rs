@@ -4,7 +4,7 @@ use lyng_js_parser::validate_regexp_literal;
 
 impl Vm {
     pub(super) fn regexp_literal_builtin(
-        &mut self,
+        &self,
         agent: &mut Agent,
         caller: FrameRecord,
         arguments: &[Value],

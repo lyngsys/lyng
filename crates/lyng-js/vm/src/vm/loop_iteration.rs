@@ -324,7 +324,7 @@ impl Vm {
     }
 
     fn sync_active_loop_iteration_slot_without_scratch(
-        &mut self,
+        &self,
         agent: &mut Agent,
         environment: EnvironmentRef,
         slot: u32,

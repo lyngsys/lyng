@@ -23,7 +23,7 @@ enum DynamicImportEvaluationOutcome {
 
 impl Vm {
     pub(super) fn import_meta_builtin(
-        &mut self,
+        &self,
         agent: &mut Agent,
         caller_frame: FrameRecord,
     ) -> VmResult<Value> {
@@ -297,7 +297,7 @@ impl Vm {
     }
 
     fn enqueue_dynamic_import_settle_job(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         capability: lyng_js_env::PromiseCapabilityId,

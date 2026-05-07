@@ -6,7 +6,7 @@ use super::{
 
 impl Vm {
     pub(in crate::vm) fn allocate_ordinary_object_with_prototype(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         prototype: Option<ObjectRef>,
@@ -26,7 +26,7 @@ impl Vm {
     }
 
     pub(in crate::vm) fn descriptor_object_from_descriptor(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         descriptor: PropertyDescriptor,

@@ -195,7 +195,7 @@ impl Vm {
     }
 
     fn execute_atomics_wait_async_timeout_job(
-        &mut self,
+        &self,
         agent: &mut Agent,
         location: WaitLocation,
         token: WaiterToken,
@@ -520,7 +520,7 @@ impl Vm {
     }
 
     pub(in crate::vm) fn enqueue_promise_then(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRecord,
         promise: ObjectRef,
@@ -568,7 +568,7 @@ impl Vm {
     }
 
     pub(super) fn enqueue_promise_reaction_job(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRecord,
         reaction: lyng_js_env::PromiseReactionId,
@@ -659,7 +659,7 @@ impl Vm {
     }
 
     fn create_promise_job_resolving_functions(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRecord,
         promise: ObjectRef,

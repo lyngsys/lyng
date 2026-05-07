@@ -113,11 +113,7 @@ impl Vm {
     }
 
     #[inline]
-    pub(crate) fn alloc_code_unit_string_value(
-        &mut self,
-        agent: &mut Agent,
-        units: &[u16],
-    ) -> Value {
+    pub(crate) fn alloc_code_unit_string_value(&self, agent: &mut Agent, units: &[u16]) -> Value {
         Value::from_string_ref(alloc_code_unit_string(agent, units, None))
     }
 
@@ -558,7 +554,7 @@ impl Vm {
     }
 
     pub(super) fn initialize_environment_slot(
-        &mut self,
+        &self,
         agent: &mut Agent,
         environment: EnvironmentRef,
         slot: u32,
@@ -568,7 +564,7 @@ impl Vm {
     }
 
     pub(super) fn copy_environment_slot(
-        &mut self,
+        &self,
         agent: &mut Agent,
         source_environment: EnvironmentRef,
         target_environment: EnvironmentRef,
@@ -579,7 +575,7 @@ impl Vm {
     }
 
     pub(super) fn mirror_environment_slot(
-        &mut self,
+        &self,
         agent: &mut Agent,
         environment: EnvironmentRef,
         slot: u32,

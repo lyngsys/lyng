@@ -1709,7 +1709,7 @@ impl Vm {
     }
 
     fn set_generator_state(
-        &mut self,
+        &self,
         agent: &mut Agent,
         generator: ObjectRef,
         state: GeneratorState,
@@ -1729,11 +1729,7 @@ impl Vm {
         }
     }
 
-    fn complete_generator_object(
-        &mut self,
-        agent: &mut Agent,
-        generator: ObjectRef,
-    ) -> VmResult<()> {
+    fn complete_generator_object(&self, agent: &mut Agent, generator: ObjectRef) -> VmResult<()> {
         agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
             if let Some(suspended) = objects.generator_suspended(mutator.view(), generator) {
@@ -1746,7 +1742,7 @@ impl Vm {
     }
 
     fn generator_result_object(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         value: Value,
@@ -1758,7 +1754,7 @@ impl Vm {
     }
 
     fn generator_completion_result(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: RealmRef,
         resume_kind: GeneratorResumeKind,

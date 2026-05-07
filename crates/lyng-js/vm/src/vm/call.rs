@@ -397,7 +397,7 @@ impl Vm {
     }
 
     pub(super) fn resolve_bound_call_chain(
-        &mut self,
+        &self,
         agent: &mut Agent,
         callee: &mut ObjectRef,
         this_value: &mut Value,
@@ -412,7 +412,7 @@ impl Vm {
     }
 
     pub(super) fn resolve_bound_construct_chain(
-        &mut self,
+        &self,
         agent: &mut Agent,
         callee: &mut ObjectRef,
         new_target: &mut ObjectRef,
