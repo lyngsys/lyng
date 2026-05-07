@@ -597,7 +597,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let args = self.ast().get_expr_list(arguments).to_vec();
         let mut rest = None;
         let mut rest_end = None;
-        let params_end = if let Some(last) = args.last().copied() {
+        let params_end = args.last().copied().map_or(0, |last| {
             if let Expr::SpreadElement { argument, .. } = self.ast().get_expr(last).clone() {
                 rest_end = Some(self.ast().get_expr(last).span().range.end.raw());
                 rest = Some(self.convert_expr_to_pattern(argument));
@@ -605,9 +605,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             } else {
                 args.len()
             }
-        } else {
-            0
-        };
+        });
         let params = self.convert_exprs_to_patterns(&args[..params_end]);
         if let Some(rest_end) = rest_end
             && self.has_trailing_comma_before_closing_paren(rest_end, span.range.end.raw())

@@ -944,7 +944,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     #[inline]
-    fn allows_annex_b_call_assignment_target(&self) -> bool {
+    const fn allows_annex_b_call_assignment_target(&self) -> bool {
         self.allows_annex_b_sloppy_function_declarations()
     }
 

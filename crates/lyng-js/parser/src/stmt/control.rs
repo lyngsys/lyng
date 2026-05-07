@@ -62,11 +62,9 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
         self.exit_switch_clause_statement_list();
 
-        let end = if let Some(last) = stmts.last() {
-            self.ast().get_stmt(*last).span()
-        } else {
-            start
-        };
+        let end = stmts
+            .last()
+            .map_or(start, |last| self.ast().get_stmt(*last).span());
         let span = start.cover(end);
         let consequent = self.ast_mut().alloc_stmt_list(&stmts);
         SwitchCase {

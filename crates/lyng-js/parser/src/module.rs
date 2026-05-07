@@ -575,11 +575,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                         value,
                     });
                 }
-                self.advance();
             } else {
                 self.error("expected string literal for attribute value".to_string());
-                self.advance();
             }
+            self.advance();
             if !self.eat(TokenKind::Comma) {
                 break;
             }

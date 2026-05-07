@@ -285,11 +285,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             self.validate_using_declarators(&declarators, true);
         }
 
-        let last_span = if let Some(last) = declarators.last() {
-            last.span
-        } else {
-            start
-        };
+        let last_span = declarators.last().map_or(start, |last| last.span);
         let span = start.cover(last_span);
         let list = self.ast_mut().alloc_var_declarator_list(&declarators);
         self.ast_mut().alloc_decl(Decl::Variable {

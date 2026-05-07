@@ -359,11 +359,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         } else {
             None
         };
-        let end = if let Some(alt) = alternate {
-            self.ast().get_stmt(alt).span()
-        } else {
-            self.ast().get_stmt(consequent).span()
-        };
+        let end = alternate.map_or_else(
+            || self.ast().get_stmt(consequent).span(),
+            |alt| self.ast().get_stmt(alt).span(),
+        );
         let span = start.cover(end);
         self.ast_mut().alloc_stmt(Stmt::If {
             span,

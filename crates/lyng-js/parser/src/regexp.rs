@@ -41,6 +41,21 @@ struct RegExpFlags {
     unicode_sets: bool,
 }
 
+#[derive(Clone, Copy)]
+struct EscapeContext<'a> {
+    flags: RegExpFlags,
+    in_class: bool,
+    class_complemented: bool,
+    total_captures: usize,
+    all_named_groups: &'a HashSet<String>,
+}
+
+/// Validates a regular expression literal pattern and flags.
+///
+/// # Errors
+///
+/// Returns an error string when the flags or pattern are not valid for a
+/// regular expression literal.
 pub fn validate_regexp_literal(pattern: &str, flags: &str) -> Result<(), &'static str> {
     let flags = validate_flags(flags)?;
     let chars: Vec<char> = pattern.chars().collect();
@@ -48,6 +63,11 @@ pub fn validate_regexp_literal(pattern: &str, flags: &str) -> Result<(), &'stati
     validate_pattern(&chars, flags, total_captures, true)
 }
 
+/// Validates a pattern passed through the `RegExp` constructor.
+///
+/// # Errors
+///
+/// Returns an error string when the flags or constructor pattern are invalid.
 pub fn validate_regexp_constructor_pattern(pattern: &str, flags: &str) -> Result<(), &'static str> {
     let flags = validate_flags(flags)?;
     let chars: Vec<char> = pattern.chars().collect();
@@ -181,11 +201,13 @@ fn validate_pattern(
                 let (next, kind) = parse_escape(
                     chars,
                     i,
-                    flags,
-                    false,
-                    false,
-                    total_captures,
-                    &all_named_groups,
+                    EscapeContext {
+                        flags,
+                        in_class: false,
+                        class_complemented: false,
+                        total_captures,
+                        all_named_groups: &all_named_groups,
+                    },
                     &mut named_references,
                 )?;
                 i = next;
@@ -217,8 +239,8 @@ fn validate_pattern(
                 i += 1;
             }
             '*' | '+' | '?' => {
-                if last_atom != AtomKind::Atom
-                    && !(last_atom == AtomKind::LookaheadAssertion && !flags.unicode)
+                if (flags.unicode || last_atom != AtomKind::LookaheadAssertion)
+                    && last_atom != AtomKind::Atom
                 {
                     return Err("invalid regular expression pattern");
                 }
@@ -239,8 +261,8 @@ fn validate_pattern(
                         i += 1;
                         continue;
                     }
-                    if last_atom != AtomKind::Atom
-                        && !(last_atom == AtomKind::LookaheadAssertion && !flags.unicode)
+                    if (flags.unicode || last_atom != AtomKind::LookaheadAssertion)
+                        && last_atom != AtomKind::Atom
                     {
                         return Err("invalid regular expression pattern");
                     }
@@ -451,11 +473,13 @@ fn parse_character_class(
             parse_escape(
                 chars,
                 i,
-                flags,
-                true,
-                class_complemented,
-                total_captures,
-                all_named_groups,
+                EscapeContext {
+                    flags,
+                    in_class: true,
+                    class_complemented,
+                    total_captures,
+                    all_named_groups,
+                },
                 &mut named_references,
             )?
         } else {
@@ -543,13 +567,14 @@ const fn is_class_set_reserved_double_punctuator(ch: char) -> bool {
 fn parse_escape(
     chars: &[char],
     start: usize,
-    flags: RegExpFlags,
-    in_class: bool,
-    class_complemented: bool,
-    total_captures: usize,
-    all_named_groups: &HashSet<String>,
+    context: EscapeContext<'_>,
     named_references: &mut Vec<String>,
 ) -> Result<(usize, ClassAtomKind), &'static str> {
+    let flags = context.flags;
+    let in_class = context.in_class;
+    let class_complemented = context.class_complemented;
+    let total_captures = context.total_captures;
+    let all_named_groups = context.all_named_groups;
     let Some(&ch) = chars.get(start + 1) else {
         return Err("invalid regular expression pattern");
     };
