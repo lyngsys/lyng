@@ -23,9 +23,9 @@ const ENTRY_SOURCE_ID: SourceId = SourceId::new(1);
 pub fn run_script(invocation: &CliInvocation, stderr: &mut dyn Write) -> Result<i32, CliError> {
     let host = CliHost::new();
     let outcome = if invocation.is_module_entry() {
-        execute_module(invocation, host)?
+        execute_module(invocation, &host)?
     } else {
-        execute_script(invocation, host)?
+        execute_script(invocation, &host)?
     };
     write_reports(stderr, &outcome.display_name, &outcome.snapshot)?;
     Ok(outcome.exit_code)
@@ -37,7 +37,7 @@ struct ScriptOutcome {
     snapshot: CliHostSnapshot,
 }
 
-fn execute_script(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOutcome, CliError> {
+fn execute_script(invocation: &CliInvocation, host: &CliHost) -> Result<ScriptOutcome, CliError> {
     let loaded = host
         .load_script_source(&ScriptSourceRequest {
             path: invocation.script_path().display().to_string(),
@@ -53,7 +53,7 @@ fn execute_script(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
         .ok_or_else(|| CliError::internal("default realm is missing from the runtime shell"))?;
 
     let parsed = parse_script(agent.atoms_mut(), ENTRY_SOURCE_ID, &loaded.source_text);
-    report_diagnostics(&host, parsed.diagnostics.as_slice()).map_err(CliError::host)?;
+    report_diagnostics(host, parsed.diagnostics.as_slice()).map_err(CliError::host)?;
     if parsed.diagnostics.has_errors() {
         return Ok(ScriptOutcome {
             exit_code: 1,
@@ -63,7 +63,7 @@ fn execute_script(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
     }
 
     let sema = analyze_script(&parsed, agent.atoms());
-    report_diagnostics(&host, sema.diagnostics.as_slice()).map_err(CliError::host)?;
+    report_diagnostics(host, sema.diagnostics.as_slice()).map_err(CliError::host)?;
     if sema.diagnostics.has_errors() {
         return Ok(ScriptOutcome {
             exit_code: 1,
@@ -92,11 +92,11 @@ fn execute_script(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
             realm,
             &unit,
             Some(&script_referrer),
-            &host,
+            host,
             Some(provider),
         )
     } else {
-        vm.evaluate_script_with_host_referrer(agent, realm, &unit, Some(&script_referrer), &host)
+        vm.evaluate_script_with_host_referrer(agent, realm, &unit, Some(&script_referrer), host)
     };
     let exit_code = match execution_result {
         Ok(_) => 0,
@@ -124,7 +124,7 @@ fn execute_script(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
     })
 }
 
-fn execute_module(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOutcome, CliError> {
+fn execute_module(invocation: &CliInvocation, host: &CliHost) -> Result<ScriptOutcome, CliError> {
     let mut runtime = Runtime::new(host.clone());
     let agent = runtime.root_agent_mut();
     let realm = agent
@@ -145,12 +145,12 @@ fn execute_module(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
         vm.load_module_graph_from_host_and_extensions(
             agent,
             realm,
-            &host,
+            host,
             &module_request,
             Some(provider),
         )
     } else {
-        vm.load_module_graph_from_host(agent, realm, &host, &module_request)
+        vm.load_module_graph_from_host(agent, realm, host, &module_request)
     };
     let loaded = match load_result {
         Ok(loaded) => loaded,
@@ -173,11 +173,11 @@ fn execute_module(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
             agent,
             realm,
             loaded.key(),
-            &host,
+            host,
             Some(provider),
         )
     } else {
-        vm.evaluate_linked_module_with_host(agent, realm, loaded.key(), &host)
+        vm.evaluate_linked_module_with_host(agent, realm, loaded.key(), host)
     };
     let exit_code = match execution_result {
         Ok(_) => 0,
@@ -344,10 +344,10 @@ fn primitive_value_text(agent: &Agent, value: Value) -> Option<String> {
                 description.code_unit_len(),
             )
         });
-        return Some(match description {
-            Some(description) => format!("Symbol({description})"),
-            None => "Symbol()".to_owned(),
-        });
+        return Some(description.map_or_else(
+            || "Symbol()".to_owned(),
+            |description| format!("Symbol({description})"),
+        ));
     }
     None
 }
