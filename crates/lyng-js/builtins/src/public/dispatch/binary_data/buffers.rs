@@ -21,7 +21,7 @@ pub(super) fn dispatch_buffer_builtin<Cx: PublicBuiltinDispatchContext>(
         return array_buffer_builtin(context, invocation).map(Some);
     }
     if entry == super::super::array_buffer_is_view_builtin() {
-        return array_buffer_is_view_builtin(context, invocation).map(Some);
+        return Ok(Some(array_buffer_is_view_builtin(context, invocation)));
     }
     if entry == super::super::array_buffer_byte_length_getter_builtin() {
         return array_buffer_byte_length_getter_builtin(context, invocation).map(Some);
@@ -373,7 +373,7 @@ fn shared_array_buffer_builtin<Cx: PublicBuiltinDispatchContext>(
 fn array_buffer_is_view_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
+) -> Value {
     let value = invocation
         .arguments()
         .first()
@@ -383,7 +383,7 @@ fn array_buffer_is_view_builtin<Cx: PublicBuiltinDispatchContext>(
         let objects = cx.agent().objects();
         objects.is_data_view_object(object) || objects.is_typed_array_object(object)
     });
-    Ok(Value::from_bool(is_view))
+    Value::from_bool(is_view)
 }
 
 fn array_buffer_byte_length_getter_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -647,10 +647,10 @@ fn array_buffer_transfer_family_builtin<Cx: PublicBuiltinDispatchContext>(
         .realm(realm)
         .and_then(|record| record.intrinsics().array_buffer_prototype())
         .ok_or_else(|| type_error(cx))?;
-    let data = match new_max_byte_length {
-        Some(max_byte_length) => ArrayBufferObjectData::new_resizable(new_store, max_byte_length),
-        None => ArrayBufferObjectData::new(new_store),
-    };
+    let data = new_max_byte_length.map_or_else(
+        || ArrayBufferObjectData::new(new_store),
+        |max_byte_length| ArrayBufferObjectData::new_resizable(new_store, max_byte_length),
+    );
     let object = allocate_array_buffer_object_with_data(cx, realm, prototype, data)?;
     Ok(Value::from_object_ref(object))
 }

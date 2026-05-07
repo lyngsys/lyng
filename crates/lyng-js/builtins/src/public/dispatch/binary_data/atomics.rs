@@ -148,11 +148,21 @@ fn integer_storage_bits(integer: f64, width: u32) -> u64 {
     if wrapped < 0.0 {
         wrapped += modulus;
     }
-    wrapped as u64
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Atomics integer storage applies ECMAScript modulo wrapping before narrowing"
+    )]
+    let bits = wrapped as u64;
+    bits
 }
 
 fn integer_value(integer: f64) -> Value {
     if integer.is_finite() && integer >= f64::from(i32::MIN) && integer <= f64::from(i32::MAX) {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "finite integer has been range-checked for SMI conversion"
+        )]
         Value::from_smi(integer as i32)
     } else {
         Value::from_f64(integer)
@@ -339,7 +349,13 @@ fn atomics_notify_count<Cx: PublicBuiltinDispatchContext>(
     if integer <= 0.0 {
         return Ok(0);
     }
-    Ok(integer.min(f64::from(u32::MAX)) as u32)
+    let capped = integer.min(f64::from(u32::MAX));
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Atomics.notify count is finite, positive, and capped at u32::MAX"
+    )]
+    Ok(capped as u32)
 }
 
 fn atomics_notify_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -411,8 +427,18 @@ fn atomics_wait_timeout_ns<Cx: PublicBuiltinDispatchContext>(
     if timeout_ms <= 0.0 || timeout_ms.is_sign_negative() {
         return Ok(Some(0));
     }
-    let timeout_ns = (timeout_ms * 1_000_000.0).min(u64::MAX as f64);
-    Ok(Some(timeout_ns as u64))
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Atomics.wait timeout clamps an ECMAScript Number duration to u64 nanoseconds"
+    )]
+    let max_timeout_ns = u64::MAX as f64;
+    let timeout_nanoseconds = (timeout_ms * 1_000_000.0).min(max_timeout_ns);
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Atomics.wait timeout is finite, positive, and clamped to u64::MAX"
+    )]
+    Ok(Some(timeout_nanoseconds as u64))
 }
 
 fn wait_async_result_object<Cx: PublicBuiltinDispatchContext>(
@@ -559,7 +585,13 @@ fn atomics_is_lock_free_builtin<Cx: PublicBuiltinDispatchContext>(
     if !integer.is_finite() || integer <= 0.0 {
         return Ok(Value::from_bool(false));
     }
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Atomics.isLockFree size is finite and positive before integer-width probing"
+    )]
+    let size = integer as u64;
     Ok(Value::from_bool(shared_memory_ops::atomics_is_lock_free(
-        integer as u64,
+        size,
     )))
 }
