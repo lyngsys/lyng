@@ -543,6 +543,15 @@ pub(super) const fn number_to_u32_after_range_check(number: f64) -> u32 {
     integer
 }
 
+pub(super) const fn number_to_i32_after_range_check(number: f64) -> i32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "caller validates the ECMAScript Number range before narrowing to i32"
+    )]
+    let integer = number as i32;
+    integer
+}
+
 const fn number_to_u8_after_range_check(number: f64) -> u8 {
     #[allow(
         clippy::cast_possible_truncation,

@@ -1,5 +1,6 @@
 use super::super::{
-    argument_to_number, close_iterator_after_error, number_value, to_uint32_for_builtin,
+    argument_to_number, close_iterator_after_error, number_to_i32_after_range_check,
+    number_to_u64_after_range_check, number_value, numbers_are_equal, to_uint32_for_builtin,
     type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
@@ -232,7 +233,7 @@ fn acosh_number(value: f64) -> f64 {
     if value.is_nan() || value < 1.0 {
         return f64::NAN;
     }
-    if value == 1.0 {
+    if numbers_are_equal(value, 1.0) {
         return 0.0;
     }
     if value.is_infinite() {
@@ -256,7 +257,7 @@ fn atanh_number(value: f64) -> f64 {
     if value.is_nan() || abs > 1.0 {
         return f64::NAN;
     }
-    if abs == 1.0 {
+    if numbers_are_equal(abs, 1.0) {
         return value / 0.0;
     }
     if abs < ATANH_TINY_THRESHOLD {
@@ -348,7 +349,16 @@ fn math_fround_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let number = argument_to_number(cx, math_argument(&invocation, 0))?;
-    Ok(number_value(f64::from(number as f32)))
+    Ok(number_value(f64::from(math_fround_number(number))))
+}
+
+const fn math_fround_number(number: f64) -> f32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Math.fround intentionally rounds an ECMAScript Number to IEEE-754 binary32"
+    )]
+    let rounded = number as f32;
+    rounded
 }
 
 fn math_hypot_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -394,7 +404,7 @@ fn math_imul_builtin<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let left = to_uint32_for_builtin(cx, math_argument(&invocation, 0))?;
     let right = to_uint32_for_builtin(cx, math_argument(&invocation, 1))?;
-    Ok(Value::from_smi(left.wrapping_mul(right) as i32))
+    Ok(Value::from_smi(left.wrapping_mul(right).cast_signed()))
 }
 
 fn math_log_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -504,7 +514,7 @@ fn math_pow_builtin<Cx: PublicBuiltinDispatchContext>(
 fn math_random_builtin() -> Value {
     let seed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos() as u64)
+        .map(|duration| u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX))
         .unwrap_or(0);
     let mut mixed = seed ^ seed.rotate_left(25) ^ 0x9e37_79b9_7f4a_7c15;
     mixed ^= mixed >> 30;
@@ -513,7 +523,17 @@ fn math_random_builtin() -> Value {
     mixed = mixed.wrapping_mul(0x94d0_49bb_1331_11eb);
     mixed ^= mixed >> 31;
     let mantissa = mixed >> 11;
-    Value::from_f64(mantissa as f64 / ((1_u64 << 53) as f64))
+    Value::from_f64(math_random_mantissa_unit(mantissa))
+}
+
+fn math_random_mantissa_unit(mantissa: u64) -> f64 {
+    const RANDOM_DENOMINATOR: f64 = 9_007_199_254_740_992.0;
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Math.random constructs a double from a 53-bit mantissa"
+    )]
+    let numerator = mantissa as f64;
+    numerator / RANDOM_DENOMINATOR
 }
 
 #[allow(
@@ -654,7 +674,7 @@ fn round_to_float16(number: f64) -> f64 {
     } else if magnitude < MIN_NORMAL {
         round_ties_to_even(magnitude / MIN_SUBNORMAL) * MIN_SUBNORMAL
     } else {
-        let exponent = magnitude.log2().floor() as i32;
+        let exponent = number_to_i32_after_range_check(magnitude.log2().floor());
         let step = 2.0_f64.powi(exponent - 10);
         let candidate = round_ties_to_even(magnitude / step) * step;
         candidate.min(MAX_FINITE)
@@ -672,7 +692,7 @@ fn round_ties_to_even(value: f64) -> f64 {
     let fraction = value - floor;
     if fraction < 0.5 {
         floor
-    } else if fraction > 0.5 || (floor as u64) % 2 == 1 {
+    } else if fraction > 0.5 || number_to_u64_after_range_check(floor) % 2 == 1 {
         floor + 1.0
     } else {
         floor
@@ -767,7 +787,8 @@ impl MathFiniteTerm {
     fn from_f64(number: f64) -> Option<Self> {
         let bits = number.to_bits();
         let negative = (bits >> 63) != 0;
-        let exponent_bits = ((bits >> 52) & 0x7ff) as u16;
+        let exponent_bits =
+            u16::try_from((bits >> 52) & 0x7ff).expect("f64 exponent bits should fit into u16");
         let fraction = bits & ((1_u64 << 52) - 1);
         if exponent_bits == 0 {
             if fraction == 0 {
@@ -893,11 +914,12 @@ fn add_magnitude(target: &mut Vec<u64>, addend: &[u64]) {
     for (index, target_limb) in target.iter_mut().enumerate() {
         let addend_limb = addend.get(index).copied().unwrap_or(0);
         let sum = u128::from(*target_limb) + u128::from(addend_limb) + carry;
-        *target_limb = sum as u64;
+        *target_limb =
+            u64::try_from(sum & u128::from(u64::MAX)).expect("masked limb should fit into u64");
         carry = sum >> 64;
     }
     if carry != 0 {
-        target.push(carry as u64);
+        target.push(u64::try_from(carry).expect("carry should fit into one limb"));
     }
 }
 
@@ -907,10 +929,11 @@ fn subtract_magnitude(target: &mut Vec<u64>, subtrahend: &[u64]) {
         let left = i128::from(*target_limb) - borrow;
         let right = i128::from(subtrahend.get(index).copied().unwrap_or(0));
         if left >= right {
-            *target_limb = (left - right) as u64;
+            *target_limb = u64::try_from(left - right).expect("limb difference should fit");
             borrow = 0;
         } else {
-            *target_limb = ((1_i128 << 64) + left - right) as u64;
+            *target_limb = u64::try_from((1_i128 << 64) + left - right)
+                .expect("borrowed limb difference should fit");
             borrow = 1;
         }
     }

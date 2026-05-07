@@ -3,8 +3,8 @@ mod math;
 
 use super::{
     format_to_exponential, format_to_precision, is_integral_number, map_completion,
-    primitive_wrapper_constructor, radix_argument, range_error, string_value,
-    symbol_descriptive_string, to_integer_or_infinity_for_builtin, type_error,
+    number_to_i32_after_range_check, primitive_wrapper_constructor, radix_argument, range_error,
+    string_value, symbol_descriptive_string, to_integer_or_infinity_for_builtin, type_error,
     BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
@@ -236,7 +236,7 @@ fn number_format_digits<Cx: PublicBuiltinDispatchContext>(
     if !digits.is_finite() || digits < f64::from(min) || digits > f64::from(max) {
         return Err(range_error(cx));
     }
-    usize::try_from(digits as i32).map_err(|_| range_error(cx))
+    usize::try_from(number_to_i32_after_range_check(digits)).map_err(|_| range_error(cx))
 }
 
 fn number_to_exponential_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -255,9 +255,10 @@ fn number_to_exponential_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     let fraction_digits = match fraction_digits {
         None => None,
-        Some(digits) if digits.is_finite() && (0.0..=100.0).contains(&digits) => {
-            Some(usize::try_from(digits as i32).map_err(|_| range_error(cx))?)
-        }
+        Some(digits) if digits.is_finite() && (0.0..=100.0).contains(&digits) => Some(
+            usize::try_from(number_to_i32_after_range_check(digits))
+                .map_err(|_| range_error(cx))?,
+        ),
         Some(_) => return Err(range_error(cx)),
     };
     let normalized = if number == 0.0 { 0.0 } else { number };
@@ -319,7 +320,8 @@ fn number_to_precision_builtin<Cx: PublicBuiltinDispatchContext>(
     if !precision_integer.is_finite() || !(1.0..=100.0).contains(&precision_integer) {
         return Err(range_error(cx));
     }
-    let precision = usize::try_from(precision_integer as i32).map_err(|_| range_error(cx))?;
+    let precision = usize::try_from(number_to_i32_after_range_check(precision_integer))
+        .map_err(|_| range_error(cx))?;
     let text = format_to_precision(number, precision).ok_or_else(|| type_error(cx))?;
     Ok(string_value(cx, &text))
 }
