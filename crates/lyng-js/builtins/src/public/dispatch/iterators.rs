@@ -2,7 +2,8 @@ use super::{
     array_like_length,
     binary_data::{typed_array_is_out_of_bounds, typed_array_validated_object_and_record},
     close_iterator_after_error, create_array_result, create_data_property_or_throw,
-    get_property_from_object, length_value, map_completion, number_value,
+    get_property_from_object, length_value, length_value_u64, map_completion,
+    number_to_u32_after_range_check, number_value, numbers_are_equal,
     promises::{
         new_promise_capability, perform_promise_then_with_capability, promise_capability_promise,
         promise_capability_reject, promise_capability_resolve, promise_default_constructor,
@@ -29,7 +30,7 @@ pub(super) fn dispatch_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
     if entry == super::iterator_prototype_iterator_builtin() {
-        return iterator_prototype_iterator_builtin(context, invocation).map(Some);
+        return Ok(Some(iterator_prototype_iterator_value(invocation)));
     }
     if entry == super::iterator_builtin() {
         return iterator_builtin(context, invocation).map(Some);
@@ -92,7 +93,7 @@ pub(super) fn dispatch_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
         return iterator_helper_return_builtin(context, invocation).map(Some);
     }
     if entry == super::iterator_to_string_tag_getter_builtin() {
-        return iterator_to_string_tag_getter_builtin(context, invocation).map(Some);
+        return Ok(Some(iterator_to_string_tag_value(context)));
     }
     if entry == super::iterator_to_string_tag_setter_builtin() {
         return iterator_to_string_tag_setter_builtin(context, invocation).map(Some);
@@ -412,11 +413,8 @@ pub(super) fn typed_array_iterator_factory_builtin<Cx: PublicBuiltinDispatchCont
     Ok(Value::from_object_ref(iterator_object))
 }
 
-const fn iterator_prototype_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
-    _cx: &mut Cx,
-    invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
-    Ok(invocation.this_value())
+const fn iterator_prototype_iterator_value(invocation: BuiltinInvocation<'_>) -> Value {
+    invocation.this_value()
 }
 
 fn array_iterator_target_length<Cx: PublicBuiltinDispatchContext>(
@@ -620,10 +618,7 @@ fn iterator_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_object_ref(object))
 }
 
-fn iterator_to_string_tag_getter_builtin<Cx: PublicBuiltinDispatchContext>(
-    cx: &mut Cx,
-    _invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
+fn iterator_to_string_tag_value<Cx: PublicBuiltinDispatchContext>(cx: &mut Cx) -> Value {
     // The default getter returns the literal string "Iterator". Per the
     // spec, custom subclass setters can override this on a per-instance
     // basis via the brand-checked accessor pair below; the getter only
@@ -635,7 +630,7 @@ fn iterator_to_string_tag_getter_builtin<Cx: PublicBuiltinDispatchContext>(
         .map(lyng_js_env::RealmRecord::intrinsics)
         .unwrap_or_default();
     let _ = intrinsics; // suppress unused warning; reserved for future custom-tag logic
-    Ok(super::string_value(cx, "Iterator"))
+    super::string_value(cx, "Iterator")
 }
 
 fn iterator_to_string_tag_setter_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -741,9 +736,9 @@ fn iterator_close_for_validation_failure<Cx: PublicBuiltinDispatchContext>(
     object_ref: lyng_js_types::ObjectRef,
 ) {
     let return_key = property_key_from_text(cx, "return");
-    let return_value = match cx.get_property_value(Value::from_object_ref(object_ref), return_key) {
-        Ok(value) => value,
-        Err(_) => return,
+    let Ok(return_value) = cx.get_property_value(Value::from_object_ref(object_ref), return_key)
+    else {
+        return;
     };
     if return_value.is_undefined() || return_value.is_null() {
         return;
@@ -1961,9 +1956,9 @@ fn iterator_helper_map_next<Cx: PublicBuiltinDispatchContext>(
     .as_object_ref()
     .ok_or_else(|| type_error(cx))?;
     let counter = iterator_helper_counter(cx, helper)?;
-    let mapped =
+    let mapped_value =
         match cx.call_to_completion(mapper, Value::undefined(), &[value, u64_to_value(counter)]) {
-            Ok(mapped) => mapped,
+            Ok(value) => value,
             Err(error) => {
                 set_iterator_helper_done(cx, helper)?;
                 return close_iterator_after_error(cx, &mut iterator_record, error);
@@ -1976,7 +1971,7 @@ fn iterator_helper_map_next<Cx: PublicBuiltinDispatchContext>(
         ITERATOR_HELPER_COUNTER_SLOT,
         u64_to_value(counter.saturating_add(1)),
     )?;
-    create_iterator_result_value(cx, mapped, false)
+    create_iterator_result_value(cx, mapped_value, false)
 }
 
 fn iterator_helper_take_next<Cx: PublicBuiltinDispatchContext>(
@@ -2034,6 +2029,10 @@ fn iterator_helper_drop_next<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let mut iterator_record = iterator_helper_record(cx, helper)?;
     let mut remaining = iterator_helper_limit(cx, helper)?;
+    #[allow(
+        clippy::while_float,
+        reason = "Iterator helper drop counts are represented as ECMAScript Number limits"
+    )]
     while remaining > 0.0 {
         let next = {
             let mut bridge = BuiltinIteratorBridge { cx };
@@ -2081,6 +2080,10 @@ fn iterator_helper_drop_next<Cx: PublicBuiltinDispatchContext>(
     create_iterator_result_value(cx, value, false)
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "flatMap keeps the outer and inner iterator close paths visible in one state machine"
+)]
 fn iterator_helper_flat_map_next<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     helper: ObjectRef,
@@ -2160,12 +2163,12 @@ fn iterator_helper_flat_map_next<Cx: PublicBuiltinDispatchContext>(
         .as_object_ref()
         .ok_or_else(|| type_error(cx))?;
         let counter = iterator_helper_counter(cx, helper)?;
-        let mapped = match cx.call_to_completion(
+        let mapped_value = match cx.call_to_completion(
             mapper,
             Value::undefined(),
             &[value, u64_to_value(counter)],
         ) {
-            Ok(mapped) => mapped,
+            Ok(value) => value,
             Err(error) => {
                 set_iterator_helper_done(cx, helper)?;
                 return close_iterator_after_error(cx, &mut outer_record, error);
@@ -2178,7 +2181,7 @@ fn iterator_helper_flat_map_next<Cx: PublicBuiltinDispatchContext>(
             ITERATOR_HELPER_COUNTER_SLOT,
             u64_to_value(counter.saturating_add(1)),
         )?;
-        let (inner, inner_next) = match get_iterator_flattenable(cx, mapped) {
+        let (inner, inner_next) = match get_iterator_flattenable(cx, mapped_value) {
             Ok(record) => record,
             Err(error) => {
                 set_iterator_helper_done(cx, helper)?;
@@ -2690,10 +2693,7 @@ fn iterator_zip_close_iterator_record<Cx: PublicBuiltinDispatchContext>(
     record: &mut iterator::IteratorRecord,
     thrown: Option<Value>,
 ) -> Result<Option<Value>, Cx::Error> {
-    let completion = match thrown {
-        Some(thrown) => Err(AbruptCompletion::throw(thrown)),
-        None => Ok(()),
-    };
+    let completion = thrown.map_or(Ok(()), |thrown| Err(AbruptCompletion::throw(thrown)));
     let close = {
         let mut bridge = BuiltinIteratorBridge { cx };
         iterator::iterator_close(&mut bridge, record, completion)
@@ -2931,12 +2931,12 @@ fn iterator_zip_u32_payload<Cx: PublicBuiltinDispatchContext>(
     let number = value.as_f64().ok_or_else(|| type_error(cx))?;
     if !number.is_finite()
         || number < 0.0
-        || number.trunc() != number
+        || !numbers_are_equal(number, number.trunc())
         || number > f64::from(u32::MAX)
     {
         return Err(type_error(cx));
     }
-    Ok(number as u32)
+    Ok(number_to_u32_after_range_check(number))
 }
 
 fn iterator_helper_concat_open_current<Cx: PublicBuiltinDispatchContext>(
@@ -3089,9 +3089,5 @@ fn iterator_prototype_in_chain<Cx: PublicBuiltinDispatchContext>(
 
 #[inline]
 fn u64_to_value(value: u64) -> Value {
-    if let Ok(small) = i32::try_from(value) {
-        Value::from_smi(small)
-    } else {
-        Value::from_f64(value as f64)
-    }
+    length_value_u64(value)
 }
