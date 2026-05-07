@@ -315,28 +315,28 @@ fn typed_array_reduce_common<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let this_value = invocation.this_value();
-    let mut accumulator;
-    let mut next_index;
-    if let Some(initial_value) = invocation.arguments().get(1).copied() {
-        accumulator = initial_value;
-        next_index = match direction {
-            TypedArrayReduceDirection::Forward => Some(0),
-            TypedArrayReduceDirection::Reverse => len.checked_sub(1),
+    let (mut accumulator, mut next_index) =
+        if let Some(initial_value) = invocation.arguments().get(1).copied() {
+            let next_index = match direction {
+                TypedArrayReduceDirection::Forward => Some(0),
+                TypedArrayReduceDirection::Reverse => len.checked_sub(1),
+            };
+            (initial_value, next_index)
+        } else {
+            if len == 0 {
+                return Err(type_error(cx));
+            }
+            let initial_index = match direction {
+                TypedArrayReduceDirection::Forward => 0,
+                TypedArrayReduceDirection::Reverse => len - 1,
+            };
+            let accumulator = typed_array_read_element_value(cx.agent(), record, initial_index);
+            let next_index = match direction {
+                TypedArrayReduceDirection::Forward => initial_index.checked_add(1),
+                TypedArrayReduceDirection::Reverse => initial_index.checked_sub(1),
+            };
+            (accumulator, next_index)
         };
-    } else {
-        if len == 0 {
-            return Err(type_error(cx));
-        }
-        let initial_index = match direction {
-            TypedArrayReduceDirection::Forward => 0,
-            TypedArrayReduceDirection::Reverse => len - 1,
-        };
-        accumulator = typed_array_read_element_value(cx.agent(), record, initial_index);
-        next_index = match direction {
-            TypedArrayReduceDirection::Forward => initial_index.checked_add(1),
-            TypedArrayReduceDirection::Reverse => initial_index.checked_sub(1),
-        };
-    }
 
     match direction {
         TypedArrayReduceDirection::Forward => {

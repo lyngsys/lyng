@@ -90,6 +90,36 @@ fn typed_array_search_matches<Cx: PublicBuiltinDispatchContext>(
     map_completion(cx, same)
 }
 
+fn typed_array_last_index_of_start<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    arguments: &[Value],
+    length: u64,
+) -> Result<Option<u64>, Cx::Error> {
+    let Some(value) = arguments.get(1).copied() else {
+        return Ok(Some(length.saturating_sub(1)));
+    };
+    let relative_index = to_integer_or_infinity_for_builtin(cx, value)?;
+    if relative_index == f64::NEG_INFINITY {
+        return Ok(None);
+    }
+    if relative_index == f64::INFINITY {
+        return Ok(Some(length.saturating_sub(1)));
+    }
+    if relative_index < 0.0 {
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "TypedArray.prototype.lastIndexOf compares Number indices with array length"
+        )]
+        let length_number = length as f64;
+        if relative_index.abs() > length_number {
+            return Ok(None);
+        }
+    }
+    Ok(Some(
+        normalize_relative_index_u64(length, relative_index).min(length.saturating_sub(1)),
+    ))
+}
+
 fn typed_array_search_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -168,23 +198,9 @@ fn typed_array_search_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
             })
         }
         TypedArraySearchKind::LastIndexOf => {
-            let relative_index = match invocation.arguments().get(1).copied() {
-                Some(value) => to_integer_or_infinity_for_builtin(cx, value)?,
-                None => (length.saturating_sub(1)) as f64,
-            };
-            if relative_index == f64::NEG_INFINITY {
+            let Some(start) = typed_array_last_index_of_start(cx, invocation.arguments(), length)?
+            else {
                 return Ok(Value::from_smi(-1));
-            }
-            let start = if relative_index == f64::INFINITY {
-                length.saturating_sub(1)
-            } else if relative_index >= 0.0 {
-                (relative_index.min((length.saturating_sub(1)) as f64)) as u64
-            } else {
-                let computed = (length as f64) + relative_index;
-                if computed < 0.0 {
-                    return Ok(Value::from_smi(-1));
-                }
-                computed as u64
             };
             let mut index = usize::try_from(start).map_err(|_| range_error(cx))?;
             loop {

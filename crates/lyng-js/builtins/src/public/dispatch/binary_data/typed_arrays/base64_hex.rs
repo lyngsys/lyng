@@ -251,7 +251,7 @@ fn decode_base64(
                         result.error = true;
                         return result;
                     }
-                    if let Some(bytes) = decode_partial_chunk(&chunk, chunk_len, false) {
+                    if let Some(bytes) = decode_partial_chunk(chunk, chunk_len, false) {
                         // If the partial chunk would not fit, silently stop
                         // (no error, no write, do not update read).
                         if let Some(max) = max_length
@@ -292,7 +292,7 @@ fn decode_base64(
             handle_base64_padding(
                 &units,
                 &mut i,
-                &chunk,
+                chunk,
                 chunk_len,
                 last_chunk_handling,
                 max_length,
@@ -319,7 +319,7 @@ fn decode_base64(
             {
                 return result;
             }
-            let bytes = decode_complete_chunk(&chunk);
+            let bytes = decode_complete_chunk(chunk);
             result.bytes.extend_from_slice(&bytes);
             result.read = i;
             chunk_len = 0;
@@ -333,22 +333,30 @@ fn decode_base64(
     }
 }
 
-fn decode_complete_chunk(chunk: &[u8; 4]) -> [u8; 3] {
+fn byte_from_low_u32(value: u32) -> u8 {
+    u8::try_from(value & 0xff).expect("masked byte should fit u8")
+}
+
+fn base64_table_char(table: &[u8; 64], index: u32) -> char {
+    char::from(table[usize::try_from(index & 0x3F).expect("base64 sextet index should fit usize")])
+}
+
+fn decode_complete_chunk(chunk: [u8; 4]) -> [u8; 3] {
     let combined: u32 = (u32::from(chunk[0]) << 18)
         | (u32::from(chunk[1]) << 12)
         | (u32::from(chunk[2]) << 6)
         | u32::from(chunk[3]);
     [
-        ((combined >> 16) & 0xff) as u8,
-        ((combined >> 8) & 0xff) as u8,
-        (combined & 0xff) as u8,
+        byte_from_low_u32(combined >> 16),
+        byte_from_low_u32(combined >> 8),
+        byte_from_low_u32(combined),
     ]
 }
 
 /// Decode a partial chunk of `chunk_len` chars (2 or 3) treating it as if
 /// padded. Returns `None` if the trailing pad bits are non-zero and `strict_pad`
 /// is true.
-fn decode_partial_chunk(chunk: &[u8; 4], chunk_len: usize, strict_pad: bool) -> Option<Vec<u8>> {
+fn decode_partial_chunk(chunk: [u8; 4], chunk_len: usize, strict_pad: bool) -> Option<Vec<u8>> {
     debug_assert!(chunk_len == 2 || chunk_len == 3);
     if chunk_len == 2 {
         // 12 bits -> 1 byte (4 trailing bits dropped). Strict requires those to be zero.
@@ -358,7 +366,7 @@ fn decode_partial_chunk(chunk: &[u8; 4], chunk_len: usize, strict_pad: bool) -> 
         if strict_pad && trailing != 0 {
             return None;
         }
-        Some(vec![byte as u8])
+        Some(vec![byte_from_low_u32(byte)])
     } else {
         // 18 bits -> 2 bytes (2 trailing bits dropped).
         let combined: u32 =
@@ -368,8 +376,8 @@ fn decode_partial_chunk(chunk: &[u8; 4], chunk_len: usize, strict_pad: bool) -> 
             return None;
         }
         Some(vec![
-            ((combined >> 10) & 0xff) as u8,
-            ((combined >> 2) & 0xff) as u8,
+            byte_from_low_u32(combined >> 10),
+            byte_from_low_u32(combined >> 2),
         ])
     }
 }
@@ -378,7 +386,7 @@ fn decode_partial_chunk(chunk: &[u8; 4], chunk_len: usize, strict_pad: bool) -> 
 fn handle_base64_padding(
     units: &[u16],
     i: &mut usize,
-    chunk: &[u8; 4],
+    chunk: [u8; 4],
     chunk_len: usize,
     last_chunk_handling: LastChunkHandling,
     max_length: Option<usize>,
@@ -526,17 +534,17 @@ fn encode_base64(bytes: &[u8], alphabet: Base64Alphabet, omit_padding: bool) -> 
     for chunk in chunks {
         let combined =
             (u32::from(chunk[0]) << 16) | (u32::from(chunk[1]) << 8) | u32::from(chunk[2]);
-        out.push(table[((combined >> 18) & 0x3F) as usize] as char);
-        out.push(table[((combined >> 12) & 0x3F) as usize] as char);
-        out.push(table[((combined >> 6) & 0x3F) as usize] as char);
-        out.push(table[(combined & 0x3F) as usize] as char);
+        out.push(base64_table_char(table, combined >> 18));
+        out.push(base64_table_char(table, combined >> 12));
+        out.push(base64_table_char(table, combined >> 6));
+        out.push(base64_table_char(table, combined));
     }
     match remainder.len() {
         0 => {}
         1 => {
             let combined = u32::from(remainder[0]) << 16;
-            out.push(table[((combined >> 18) & 0x3F) as usize] as char);
-            out.push(table[((combined >> 12) & 0x3F) as usize] as char);
+            out.push(base64_table_char(table, combined >> 18));
+            out.push(base64_table_char(table, combined >> 12));
             if !omit_padding {
                 out.push('=');
                 out.push('=');
@@ -544,9 +552,9 @@ fn encode_base64(bytes: &[u8], alphabet: Base64Alphabet, omit_padding: bool) -> 
         }
         2 => {
             let combined = (u32::from(remainder[0]) << 16) | (u32::from(remainder[1]) << 8);
-            out.push(table[((combined >> 18) & 0x3F) as usize] as char);
-            out.push(table[((combined >> 12) & 0x3F) as usize] as char);
-            out.push(table[((combined >> 6) & 0x3F) as usize] as char);
+            out.push(base64_table_char(table, combined >> 18));
+            out.push(base64_table_char(table, combined >> 12));
+            out.push(base64_table_char(table, combined >> 6));
             if !omit_padding {
                 out.push('=');
             }
@@ -557,11 +565,11 @@ fn encode_base64(bytes: &[u8], alphabet: Base64Alphabet, omit_padding: bool) -> 
 }
 
 fn encode_hex(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(bytes.len() * 2);
     const TABLE: &[u8; 16] = b"0123456789abcdef";
-    for byte in bytes {
-        out.push(TABLE[((byte >> 4) & 0x0F) as usize] as char);
-        out.push(TABLE[(byte & 0x0F) as usize] as char);
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes.iter().copied() {
+        out.push(char::from(TABLE[usize::from((byte >> 4) & 0x0F)]));
+        out.push(char::from(TABLE[usize::from(byte & 0x0F)]));
     }
     out
 }
@@ -602,7 +610,7 @@ fn write_typed_array_bytes<Cx: PublicBuiltinDispatchContext>(
 fn allocate_uint8_array_from_bytes<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    bytes: Vec<u8>,
+    bytes: &[u8],
 ) -> Result<ObjectRef, Cx::Error> {
     let array_buffer_prototype = {
         let agent = cx.agent();
@@ -662,11 +670,17 @@ fn make_set_result<Cx: PublicBuiltinDispatchContext>(
 
 fn u64_to_value(n: usize) -> Value {
     let as_u64 = u64::try_from(n).unwrap_or(u64::MAX);
-    if let Ok(small) = i32::try_from(as_u64) {
-        Value::from_smi(small)
-    } else {
-        Value::from_f64(as_u64 as f64)
-    }
+    i32::try_from(as_u64).map_or_else(
+        |_| {
+            #[allow(
+                clippy::cast_precision_loss,
+                reason = "Uint8Array base64/hex result counts are exposed as ECMAScript Number values"
+            )]
+            let number = as_u64 as f64;
+            Value::from_f64(number)
+        },
+        Value::from_smi,
+    )
 }
 
 // ---------- Static methods ----------
@@ -690,7 +704,7 @@ fn uint8_array_from_base64_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         return Err(syntax_error(cx));
     }
     let realm = cx.builtin_realm();
-    let object = allocate_uint8_array_from_bytes(cx, realm, result.bytes)?;
+    let object = allocate_uint8_array_from_bytes(cx, realm, &result.bytes)?;
     Ok(Value::from_object_ref(object))
 }
 
@@ -710,7 +724,7 @@ fn uint8_array_from_hex_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         return Err(syntax_error(cx));
     }
     let realm = cx.builtin_realm();
-    let object = allocate_uint8_array_from_bytes(cx, realm, result.bytes)?;
+    let object = allocate_uint8_array_from_bytes(cx, realm, &result.bytes)?;
     Ok(Value::from_object_ref(object))
 }
 

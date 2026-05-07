@@ -56,7 +56,9 @@ pub(in crate::public::dispatch::binary_data) fn dispatch_typed_array_access_buil
         return typed_array_to_string_builtin_dispatch(context, invocation).map(Some);
     }
     if entry == typed_array_to_string_tag_getter_builtin() {
-        return typed_array_to_string_tag_getter_builtin_dispatch(context, invocation).map(Some);
+        return Ok(Some(typed_array_to_string_tag_getter_value(
+            context, invocation,
+        )));
     }
     Ok(None)
 }
@@ -181,7 +183,14 @@ fn typed_array_at_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         if index >= length {
             return Ok(Value::undefined());
         }
-    } else if relative_index.is_infinite() || relative_index.abs() > (length as f64) {
+    } else if relative_index.is_infinite() || {
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "TypedArray.prototype.at compares ECMAScript Number indices with array length"
+        )]
+        let length_number = length as f64;
+        relative_index.abs() > length_number
+    } {
         return Ok(Value::undefined());
     }
     let element_index = usize::try_from(index).map_err(|_| range_error(cx))?;
@@ -241,17 +250,17 @@ fn typed_array_to_string_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     cx.call_to_completion(join, invocation.this_value(), &[])
 }
 
-fn typed_array_to_string_tag_getter_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
+fn typed_array_to_string_tag_getter_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
+) -> Value {
     let Some(object) = invocation.this_value().as_object_ref() else {
-        return Ok(Value::undefined());
+        return Value::undefined();
     };
     let Some(record) = cx.agent().objects().typed_array(object) else {
-        return Ok(Value::undefined());
+        return Value::undefined();
     };
-    Ok(match record.kind() {
+    match record.kind() {
         TypedArrayElementKind::BigInt64 => string_value(cx, "BigInt64Array"),
         TypedArrayElementKind::BigUint64 => string_value(cx, "BigUint64Array"),
         TypedArrayElementKind::Int8 => string_value(cx, "Int8Array"),
@@ -264,5 +273,5 @@ fn typed_array_to_string_tag_getter_builtin_dispatch<Cx: PublicBuiltinDispatchCo
         TypedArrayElementKind::Uint16 => string_value(cx, "Uint16Array"),
         TypedArrayElementKind::Uint8Clamped => string_value(cx, "Uint8ClampedArray"),
         TypedArrayElementKind::Uint8 => string_value(cx, "Uint8Array"),
-    })
+    }
 }
