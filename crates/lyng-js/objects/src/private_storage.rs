@@ -6,6 +6,11 @@ use super::{
 use lyng_js_common::AtomId;
 
 impl ObjectRuntime {
+    /// Records the runtime key value for one instance public field emitted by a class.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the class object is missing or its private storage is
+    /// corrupt.
     pub fn install_instance_public_field_key(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
@@ -22,7 +27,7 @@ impl ObjectRuntime {
             .cloned()
             .unwrap_or_else(|| ClassRecord::new(None, None));
         let field_index =
-            usize::try_from(field_index).expect("instance public field index should fit usize");
+            usize::try_from(field_index).map_err(|_| InternalMethodError::CorruptObjectState)?;
         while record.instance_public_field_key_slots.len() <= field_index {
             let slot_index = record.static_shared_slot_count;
             record.static_shared_slot_count = record.static_shared_slot_count.saturating_add(1);
@@ -43,6 +48,10 @@ impl ObjectRuntime {
         Ok(())
     }
 
+    /// Reads the runtime key value for one instance public field emitted by a class.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the class record or backing private slot is missing.
     pub fn instance_public_field_key(
         &self,
         heap: PrimitiveHeapView<'_>,
@@ -55,7 +64,8 @@ impl ObjectRuntime {
         let slot_index = record
             .instance_public_field_key_slots
             .get(
-                usize::try_from(field_index).expect("instance public field index should fit usize"),
+                usize::try_from(field_index)
+                    .map_err(|_| InternalMethodError::CorruptObjectState)?,
             )
             .copied()
             .ok_or(InternalMethodError::MissingClassRecord)?;
@@ -78,6 +88,10 @@ impl ObjectRuntime {
         Some(descriptor.is_static())
     }
 
+    /// Returns the private element kind for a class descriptor.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the class record or descriptor is missing.
     pub fn private_element_kind(
         &self,
         class_key: ObjectRef,
@@ -87,6 +101,10 @@ impl ObjectRuntime {
         Ok(descriptor.kind())
     }
 
+    /// Returns summarized private descriptor metadata for a class.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the class record is missing.
     pub fn private_descriptor_summaries(
         &self,
         class_key: ObjectRef,
@@ -108,6 +126,10 @@ impl ObjectRuntime {
             .collect())
     }
 
+    /// Reads a static/shared private method or accessor value.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the descriptor is invalid or storage is corrupt.
     pub fn private_shared_element_value(
         &self,
         heap: PrimitiveHeapView<'_>,
@@ -127,6 +149,10 @@ impl ObjectRuntime {
             .ok_or(InternalMethodError::CorruptObjectState)
     }
 
+    /// Installs a static/shared private method or accessor value.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the descriptor is invalid or storage cannot be updated.
     pub fn install_private_element_value(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
@@ -187,8 +213,7 @@ impl ObjectRuntime {
             .cloned()
             .or_else(|| self.class_record_slot(prototype).cloned())
             .unwrap_or_else(|| ClassRecord::new(None, None));
-        let descriptor_index =
-            u32::try_from(record.descriptors.len()).expect("private descriptor index must fit u32");
+        let descriptor_index = u32::try_from(record.descriptors.len()).ok()?;
         let slot_index = match kind {
             ClassPrivateElementKind::Field => {
                 if is_static {
@@ -240,6 +265,11 @@ impl ObjectRuntime {
         Some(descriptor_index)
     }
 
+    /// Initializes one private field on a receiver.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the private brand is invalid, already initialized, or
+    /// receiver storage is corrupt.
     pub fn private_field_init(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
@@ -268,8 +298,10 @@ impl ObjectRuntime {
         let slots = record
             .private_slots()
             .ok_or(InternalMethodError::CorruptObjectState)?;
-        let slot_index =
-            slot_base.saturating_add(self.private_brand_storage_slot(descriptor, field_slot_count));
+        let slot_index = slot_base.saturating_add(Self::private_brand_storage_slot(
+            descriptor,
+            field_slot_count,
+        ));
         let existing = heap
             .view()
             .object_slots(slots)
@@ -289,6 +321,11 @@ impl ObjectRuntime {
         Ok(())
     }
 
+    /// Reads one private field from a receiver.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the private brand is invalid or receiver storage is
+    /// corrupt.
     pub fn private_field_get(
         &self,
         heap: PrimitiveHeapView<'_>,
@@ -319,6 +356,11 @@ impl ObjectRuntime {
             .ok_or(InternalMethodError::CorruptObjectState)
     }
 
+    /// Stores one private field on a receiver.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the private brand is invalid or receiver storage cannot
+    /// be updated.
     pub fn private_field_set(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
@@ -354,6 +396,10 @@ impl ObjectRuntime {
         Ok(())
     }
 
+    /// Tests whether a receiver carries the private brand for a descriptor.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the class record or descriptor is missing.
     pub fn private_has(
         &self,
         receiver: ObjectRef,
@@ -454,7 +500,6 @@ impl ObjectRuntime {
     }
 
     const fn private_brand_storage_slot(
-        &self,
         descriptor: super::object_metadata::ClassPrivateElementDescriptor,
         field_slot_count: u32,
     ) -> u32 {
@@ -640,7 +685,7 @@ impl ObjectRuntime {
     }
 
     fn ensure_private_slot_capacity(
-        &mut self,
+        &self,
         heap: &mut PrimitiveMutator<'_>,
         object: ObjectRef,
         requested_len: usize,

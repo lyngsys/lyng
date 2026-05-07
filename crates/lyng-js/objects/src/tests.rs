@@ -41,11 +41,9 @@ fn engine_array(
         AllocationLifetime::Default,
     );
     let mut descriptor = PropertyDescriptor::new();
-    descriptor.set_value(if let Ok(length) = i32::try_from(length) {
-        Value::from_smi(length)
-    } else {
-        Value::from_f64(f64::from(length))
-    });
+    descriptor.set_value(
+        i32::try_from(length).map_or_else(|_| Value::from_f64(f64::from(length)), Value::from_smi),
+    );
     descriptor.set_writable(writable);
     descriptor.set_enumerable(false);
     descriptor.set_configurable(false);

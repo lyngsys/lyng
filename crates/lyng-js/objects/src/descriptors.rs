@@ -256,10 +256,7 @@ pub fn descriptor_same_value(
             if left.is_nan() && right.is_nan() {
                 return Ok(true);
             }
-            if left == right {
-                return Ok(left != 0.0 || left.is_sign_negative() == right.is_sign_negative());
-            }
-            return Ok(false);
+            return Ok(left.to_bits() == right.to_bits());
         }
         (Some(_), None) | (None, Some(_)) => return Ok(false),
         (None, None) => {}

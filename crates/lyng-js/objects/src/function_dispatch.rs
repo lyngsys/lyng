@@ -25,10 +25,8 @@ impl ObjectRuntime {
             return false;
         };
         *data = data.clone().with_home_object(home_object);
-        match data.gc_payload() {
-            Some(payload) => heap.set_function_payload_home_object(payload, home_object),
-            None => true,
-        }
+        data.gc_payload()
+            .is_none_or(|payload| heap.set_function_payload_home_object(payload, home_object))
     }
 
     pub fn set_function_environment(
@@ -44,10 +42,8 @@ impl ObjectRuntime {
             return false;
         };
         *data = data.clone().with_environment(environment);
-        match data.gc_payload() {
-            Some(payload) => heap.set_function_payload_environment(payload, environment),
-            None => true,
-        }
+        data.gc_payload()
+            .is_none_or(|payload| heap.set_function_payload_environment(payload, environment))
     }
 
     pub fn set_function_private_env(
@@ -63,10 +59,8 @@ impl ObjectRuntime {
             return false;
         };
         *data = data.clone().with_private_env(private_env);
-        match data.gc_payload() {
-            Some(payload) => heap.set_function_payload_private_env(payload, private_env),
-            None => true,
-        }
+        data.gc_payload()
+            .is_none_or(|payload| heap.set_function_payload_private_env(payload, private_env))
     }
 
     /// Invokes one callable function object through the substrate-native registry.
@@ -231,8 +225,7 @@ impl ObjectRuntime {
 
     fn require_function_data(&self, id: ObjectRef) -> InternalMethodResult<&FunctionObjectData> {
         match self.require_object_kind(id)? {
-            ObjectKind::Ordinary => Err(InternalMethodError::NotCallable),
-            ObjectKind::Proxy => Err(InternalMethodError::NotCallable),
+            ObjectKind::Ordinary | ObjectKind::Proxy => Err(InternalMethodError::NotCallable),
             ObjectKind::Function => self
                 .function_data(id)
                 .ok_or(InternalMethodError::MissingFunctionPayload),

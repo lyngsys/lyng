@@ -317,17 +317,20 @@ impl ShapeMetadata {
     }
 
     pub(crate) fn property(&self, key: PropertyKey) -> Option<ShapeProperty> {
-        if let Some(lookup) = &self.property_lookup {
-            lookup
-                .get(&key)
-                .copied()
-                .and_then(|index| self.properties.get(index).copied())
-        } else {
-            self.properties
-                .iter()
-                .find(|property| property.key() == key)
-                .copied()
-        }
+        self.property_lookup.as_ref().map_or_else(
+            || {
+                self.properties
+                    .iter()
+                    .find(|property| property.key() == key)
+                    .copied()
+            },
+            |lookup| {
+                lookup
+                    .get(&key)
+                    .copied()
+                    .and_then(|index| self.properties.get(index).copied())
+            },
+        )
     }
 }
 

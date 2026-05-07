@@ -78,7 +78,7 @@ impl ObjectRuntime {
     }
 
     pub(super) fn typed_array_delete(
-        &mut self,
+        &self,
         id: ObjectRef,
         key: PropertyKey,
     ) -> InternalMethodResult<bool> {

@@ -162,6 +162,10 @@ impl ObjectRuntime {
         Ok(Some(true))
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "cache entries are assembled from the exact guard tuple stored in the entry"
+    )]
     fn build_named_property_cache_entry(
         purpose: NamedPropertyCachePurpose,
         receiver_shape: ShapeId,

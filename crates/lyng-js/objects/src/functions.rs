@@ -109,6 +109,11 @@ impl MapObjectData {
     }
 
     #[inline]
+    pub const fn is_empty(&self) -> bool {
+        self.live_len == 0
+    }
+
+    #[inline]
     pub const fn tombstone_len(&self) -> usize {
         self.tombstone_len
     }
@@ -174,6 +179,11 @@ impl SetObjectData {
     }
 
     #[inline]
+    pub const fn is_empty(&self) -> bool {
+        self.live_len == 0
+    }
+
+    #[inline]
     pub const fn tombstone_len(&self) -> usize {
         self.tombstone_len
     }
@@ -231,23 +241,18 @@ impl TypedArrayElementKind {
     #[inline]
     pub const fn bytes_per_element(self) -> usize {
         match self {
-            Self::BigInt64 => 8,
-            Self::BigUint64 => 8,
-            Self::Int8 => 1,
-            Self::Int16 => 2,
-            Self::Int32 => 4,
-            Self::Float16 => 2,
-            Self::Float32 => 4,
-            Self::Float64 => 8,
-            Self::Uint32 => 4,
-            Self::Uint16 => 2,
-            Self::Uint8Clamped => 1,
-            Self::Uint8 => 1,
+            Self::BigInt64 | Self::BigUint64 | Self::Float64 => 8,
+            Self::Int16 | Self::Float16 | Self::Uint16 => 2,
+            Self::Int32 | Self::Float32 | Self::Uint32 => 4,
+            Self::Int8 | Self::Uint8Clamped | Self::Uint8 => 1,
         }
     }
 }
 
 /// Decode a 16-bit IEEE-754 half-precision float into a 64-bit double.
+///
+/// # Panics
+/// Panics if the internal binary16 exponent normalization invariants are violated.
 #[inline]
 pub fn float16_bits_to_f64(bits: u16) -> f64 {
     let sign = (bits >> 15) & 0x1;
@@ -267,7 +272,8 @@ pub fn float16_bits_to_f64(bits: u16) -> f64 {
         }
         mantissa &= 0x03ff;
         let half_unbiased = 1 - 15 - shift;
-        let f64_biased = (half_unbiased + 1023) as u64;
+        let f64_biased =
+            u64::try_from(half_unbiased + 1023).expect("binary16 exponent should fit u64");
         let f64_mant = u64::from(mantissa) << (52 - 10);
         return f64::from_bits(sign_bit_f64 | (f64_biased << 52) | f64_mant);
     }
@@ -279,17 +285,20 @@ pub fn float16_bits_to_f64(bits: u16) -> f64 {
         return f64::from_bits(sign_bit_f64 | 0x7ff8_0000_0000_0000);
     }
 
-    let f64_biased = (exp - 15 + 1023) as u64;
+    let f64_biased = u64::try_from(exp - 15 + 1023).expect("binary16 exponent should fit u64");
     let f64_mant = u64::from(mant) << (52 - 10);
     f64::from_bits(sign_bit_f64 | (f64_biased << 52) | f64_mant)
 }
 
 /// Round an `f64` to IEEE-754 binary16, ties-to-even.
+///
+/// # Panics
+/// Panics if the internal binary64-to-binary16 rounding invariants are violated.
 #[inline]
 pub fn f64_to_float16_bits(value: f64) -> u16 {
     let bits = value.to_bits();
-    let sign16 = ((bits >> 63) as u16) & 0x1;
-    let exp64 = ((bits >> 52) & 0x07ff) as i32;
+    let sign16 = u16::from((bits >> 63) != 0);
+    let exp64 = i32::try_from((bits >> 52) & 0x07ff).expect("binary64 exponent should fit i32");
     let mant64 = bits & 0x000f_ffff_ffff_ffff;
 
     if exp64 == 0x07ff {
@@ -315,23 +324,25 @@ pub fn f64_to_float16_bits(value: f64) -> u16 {
         if f16_unbiased < -10 {
             return sign16 << 15;
         }
-        let shift = (1 - f16_unbiased) as u32;
+        let shift = (1 - f16_unbiased).cast_unsigned();
         let mant_with_hidden = signif >> (52 - 10 + shift);
         let round_mask = (1_u64 << (52 - 10 + shift)) - 1;
         let round_bits = signif & round_mask;
         let half = 1_u64 << (52 - 10 + shift - 1);
         let increment = round_bits > half || (round_bits == half && (mant_with_hidden & 1) != 0);
         let rounded = mant_with_hidden + u64::from(increment);
-        return (sign16 << 15) | (rounded as u16);
+        return (sign16 << 15)
+            | u16::try_from(rounded).expect("rounded subnormal binary16 mantissa should fit u16");
     }
 
-    let exp16 = f16_unbiased as u16;
+    let exp16 = u16::try_from(f16_unbiased).expect("binary16 exponent should fit u16");
     let mant = signif >> (52 - 10);
     let round_mask = (1_u64 << (52 - 10)) - 1;
     let round_bits = signif & round_mask;
     let half = 1_u64 << (52 - 10 - 1);
     let increment = round_bits > half || (round_bits == half && (mant & 1) != 0);
-    let mut rounded_mant = (mant as u16) + u16::from(increment);
+    let mut rounded_mant =
+        u16::try_from(mant).expect("binary16 mantissa should fit u16") + u16::from(increment);
     let mut rounded_exp = exp16;
     if (rounded_mant & 0x0800) != 0 {
         rounded_mant = 0;
@@ -600,29 +611,8 @@ impl OrdinaryObjectData {
     #[inline]
     pub const fn wrapper_kind(self) -> Option<PrimitiveWrapperKind> {
         match self {
-            Self::Plain => None,
             Self::PrimitiveWrapper(kind) => Some(kind),
-            Self::Map => None,
-            Self::Set => None,
-            Self::WeakMap => None,
-            Self::WeakSet => None,
-            Self::WeakRef => None,
-            Self::FinalizationRegistry => None,
-            Self::ArrayBuffer => None,
-            Self::SharedArrayBuffer => None,
-            Self::DataView => None,
-            Self::TypedArray(_) => None,
-            Self::Date(_) => None,
-            Self::Temporal(_) => None,
-            Self::JsonRaw => None,
-            Self::RegExp => None,
-            Self::Generator => None,
-            Self::IteratorHelper => None,
-            Self::ArrayIterator => None,
-            Self::MapIterator => None,
-            Self::SetIterator => None,
-            Self::StringIterator => None,
-            Self::RegExpStringIterator => None,
+            _ => None,
         }
     }
 
@@ -1146,6 +1136,10 @@ pub struct NativeCallRequest<'a> {
 
 impl<'a> NativeCallRequest<'a> {
     #[inline]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "native call requests are field-for-field dispatch records assembled at one call site"
+    )]
     pub(crate) const fn new(
         callee: ObjectRef,
         this_value: Value,
@@ -1248,6 +1242,10 @@ pub struct NativeConstructRequest<'a> {
 
 impl<'a> NativeConstructRequest<'a> {
     #[inline]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "native construct requests are field-for-field dispatch records assembled at one call site"
+    )]
     pub(crate) const fn new(
         callee: ObjectRef,
         new_target: ObjectRef,

@@ -206,6 +206,10 @@ impl ObjectRuntime {
         }
     }
 
+    /// Return a fast-path own data value for an ordinary indexed property when possible.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when object metadata or dense element storage is corrupt.
     pub fn fast_own_index_data_value(
         &self,
         heap: PrimitiveHeapView<'_>,
@@ -244,6 +248,10 @@ impl ObjectRuntime {
         }
     }
 
+    /// Return whether an ordinary object has an own indexed property when the fast path applies.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when object metadata or dense element storage is corrupt.
     pub fn fast_has_own_index_property(
         &self,
         heap: PrimitiveHeapView<'_>,

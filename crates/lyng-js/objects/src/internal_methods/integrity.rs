@@ -18,33 +18,25 @@ impl ObjectRuntime {
                 .without(ObjectFlags::NAMED_PROPERTIES_DICTIONARY);
             return true;
         }
-        let computed = {
-            let Some(record) = heap.object(id) else {
-                return false;
-            };
-            let Some(metadata) = self.object_metadata(id) else {
-                return false;
-            };
-            let mut flags = metadata
-                .flags
-                .without(ObjectFlags::SEALED)
-                .without(ObjectFlags::FROZEN);
-            if flags.is_extensible() {
-                Some(flags)
-            } else {
-                let (sealed, frozen) = self.compute_integrity_summaries(record, metadata);
-                if sealed {
-                    flags = flags.union(ObjectFlags::SEALED);
-                }
-                if frozen {
-                    flags = flags.union(ObjectFlags::FROZEN);
-                }
-                Some(flags)
-            }
-        };
-        let Some(computed) = computed else {
+        let Some(record) = heap.object(id) else {
             return false;
         };
+        let Some(metadata) = self.object_metadata(id) else {
+            return false;
+        };
+        let mut computed = metadata
+            .flags
+            .without(ObjectFlags::SEALED)
+            .without(ObjectFlags::FROZEN);
+        if !computed.is_extensible() {
+            let (sealed, frozen) = self.compute_integrity_summaries(record, metadata);
+            if sealed {
+                computed = computed.union(ObjectFlags::SEALED);
+            }
+            if frozen {
+                computed = computed.union(ObjectFlags::FROZEN);
+            }
+        }
         let Some(metadata) = self.object_metadata_mut(id) else {
             return false;
         };

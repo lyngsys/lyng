@@ -128,11 +128,10 @@ impl ObjectRuntime {
     ) -> InternalMethodResult<PropertyDescriptor> {
         let length = self.string_exotic_code_unit_len(heap, id)?;
         let mut descriptor = PropertyDescriptor::new();
-        descriptor.set_value(if let Ok(length) = i32::try_from(length) {
-            Value::from_smi(length)
-        } else {
-            Value::from_f64(f64::from(length))
-        });
+        descriptor.set_value(
+            i32::try_from(length)
+                .map_or_else(|_| Value::from_f64(f64::from(length)), Value::from_smi),
+        );
         descriptor.set_writable(false);
         descriptor.set_enumerable(false);
         descriptor.set_configurable(false);

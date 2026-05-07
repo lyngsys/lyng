@@ -1,6 +1,11 @@
 use super::*;
 
 impl ObjectRuntime {
+    /// Fast-path indexed assignment for engine-owned array objects.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the receiver metadata, dense element storage, or length
+    /// descriptor state is corrupt.
     pub fn fast_set_engine_array_index(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
@@ -398,13 +403,14 @@ impl ObjectRuntime {
 }
 
 fn length_value(length: u32) -> Value {
-    if let Ok(length) = i32::try_from(length) {
-        Value::from_smi(length)
-    } else {
-        Value::from_f64(f64::from(length))
-    }
+    i32::try_from(length).map_or_else(|_| Value::from_f64(f64::from(length)), Value::from_smi)
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "array length conversion is finite, integral, non-negative, and u32 range checked"
+)]
 fn array_length_from_value(value: Value) -> InternalMethodResult<u32> {
     if let Some(length) = value.as_smi().and_then(|value| u32::try_from(value).ok()) {
         return Ok(length);
@@ -412,7 +418,7 @@ fn array_length_from_value(value: Value) -> InternalMethodResult<u32> {
     let Some(number) = value.as_f64() else {
         return Err(InternalMethodError::RangeError);
     };
-    if !number.is_finite() || number < 0.0 || number.trunc() != number {
+    if !number.is_finite() || number < 0.0 || number.trunc().to_bits() != number.to_bits() {
         return Err(InternalMethodError::RangeError);
     }
     if number > f64::from(u32::MAX) {

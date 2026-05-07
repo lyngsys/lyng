@@ -14,7 +14,7 @@ impl ObjectRuntime {
             return self.ordinary_get_own_property(heap, id, key);
         };
         let mut descriptor = PropertyDescriptor::new();
-        descriptor.set_value(self.module_namespace_export_value(heap, export)?);
+        descriptor.set_value(Self::module_namespace_export_value(heap, export)?);
         descriptor.set_writable(true);
         descriptor.set_enumerable(true);
         descriptor.set_configurable(false);
@@ -51,7 +51,7 @@ impl ObjectRuntime {
             && !descriptor_same_value(
                 heap.view(),
                 value,
-                self.module_namespace_export_value(heap.view(), export)?,
+                Self::module_namespace_export_value(heap.view(), export)?,
             )?
         {
             return Ok(false);
@@ -109,7 +109,6 @@ impl ObjectRuntime {
     }
 
     fn module_namespace_export_value(
-        &self,
         heap: PrimitiveHeapView<'_>,
         export: crate::ModuleNamespaceExport,
     ) -> InternalMethodResult<Value> {

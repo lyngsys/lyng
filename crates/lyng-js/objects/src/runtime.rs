@@ -210,6 +210,10 @@ impl ObjectRuntime {
     /// # Panics
     /// Panics if a requested slot or element capacity does not fit into the runtime's compact
     /// integer fields.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "object allocation wires all requested object-side storage in one auditable path"
+    )]
     pub fn alloc_object(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
@@ -434,9 +438,8 @@ impl ObjectRuntime {
             return true;
         }
         *data = data.with_handler(None).with_revoked(true);
-        let record = match heap.view().object(id) {
-            Some(record) => record,
-            None => return false,
+        let Some(record) = heap.view().object(id) else {
+            return false;
         };
         let Some(named_slots) = record.named_slots() else {
             return false;
@@ -915,13 +918,12 @@ impl ObjectRuntime {
         if !self.is_generator_object(id) {
             return false;
         }
-        let payload = match heap
+        let Some(payload) = heap
             .view()
             .object(id)
             .and_then(lyng_js_gc::RuntimeObjectRecord::ordinary_payload)
-        {
-            Some(payload) => payload,
-            None => return false,
+        else {
+            return false;
         };
         heap.mut_store_value(
             lyng_js_gc::ValueStoreTarget::ValueCell(payload),
@@ -959,7 +961,9 @@ impl ObjectRuntime {
             let Some(payload) = payload else {
                 continue;
             };
-            let raw = u32::try_from(index + 1).expect("object side-table index should fit u32");
+            let Ok(raw) = u32::try_from(index + 1) else {
+                continue;
+            };
             let Some(id) = ObjectRef::from_raw(raw) else {
                 continue;
             };

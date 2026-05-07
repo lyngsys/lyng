@@ -113,6 +113,10 @@ pub struct NamedPropertyCacheEntry {
 
 impl NamedPropertyCacheEntry {
     #[inline]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "cache entry construction mirrors the fixed cache-entry fields"
+    )]
     pub(crate) const fn new(
         receiver_shape: ShapeId,
         holder: ObjectRef,
@@ -468,6 +472,10 @@ pub struct ShapeRecord {
 
 impl ShapeRecord {
     #[inline]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "shape records are immutable field aggregates allocated by the shape table"
+    )]
     pub(crate) const fn new(
         id: ShapeId,
         parent: Option<ShapeId>,
