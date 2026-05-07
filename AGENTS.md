@@ -25,6 +25,11 @@ Start here before making non-trivial changes:
 
 If you are changing a specific subsystem, read the crate-local sources and tests for that subsystem before editing.
 
+For any Lyng JS work, also read `crates/lyng-js/AGENTS.md`. This applies even when the
+files being edited live outside `crates/lyng-js`, such as `docs/lyng-js`,
+`tools/lyng-js-test262`, `tools/lyng-js-bench`, `reports/js/lyng-js`, or
+`testdata/test262`.
+
 ## Workspace Map
 
 ### HTML stack
@@ -70,6 +75,8 @@ Follow these project-specific constraints when making changes:
 
 ## Lyng JS Priorities
 
+See `crates/lyng-js/AGENTS.md` for the detailed Lyng JS operating guide.
+
 - Lyng JS remains focused on ECMA-262 semantics and conformance.
 - Aim for a gold-standard implementation bar. Do not treat code quality or readability as secondary to feature completion.
 - Prioritize code quality, readability, performance, memory behavior, cleanup, auditability, and verification clarity.
@@ -89,6 +96,9 @@ Follow these project-specific constraints when making changes:
 ## Rust Module Guidelines
 
 - One major type per file when it has significant `impl` blocks.
+- Split code into focused modules with clear ownership. If a source file keeps growing
+  because it is collecting multiple responsibilities, treat that as a design problem and
+  split it by domain before it becomes hard to review.
 - Keep `lib.rs` and `main.rs` thin: use them for `mod` declarations, re-exports, and top-level wiring.
 - If a package has both a binary and a library, put the logic in `lib.rs`; keep `main.rs` as a thin wrapper.
 - For new module trees, use the Rust 2018 style with a named parent file plus directory children instead of `mod.rs`.
@@ -114,7 +124,11 @@ Run focused commands first, then widen scope only if needed.
 
 - `cargo test`
 - `cargo fmt --all`
-- `cargo clippy --all-targets --all-features -- -W clippy::pedantic`
+- `cargo clippy --all-targets --all-features -- -W clippy::pedantic -W clippy::nursery`
+
+All code should pass pedantic Clippy and the experimental nursery lint group. Treat
+Clippy findings as design feedback, not cosmetic noise; fix the code unless there is a
+clear, documented reason to allow a specific lint locally.
 
 ### HTML parser
 
