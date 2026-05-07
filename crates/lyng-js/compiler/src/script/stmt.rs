@@ -1,5 +1,5 @@
 use super::{
-    add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin,
+    add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin, checked_u32_index,
     create_async_disposal_scope_builtin, create_sync_disposal_scope_builtin,
     dispose_scope_async_builtin, dispose_scope_builtin, internal_private_field_set_builtin,
     AssignOp, AtomId, CompletionKind, ControlTargetKind, Decl, DeclId, DeclarationKind,
@@ -267,12 +267,10 @@ impl FunctionCompiler<'_, '_> {
                 kind: VariableKind::AwaitUsing,
                 ..
             } => Some(lyng_js_env::DisposalCapabilityKind::Async),
-            Decl::Export { kind, .. } => match kind {
-                lyng_js_ast::ExportKind::Declaration { decl } => {
-                    self.decl_disposal_scope_kind(*decl)
-                }
-                _ => None,
-            },
+            Decl::Export {
+                kind: lyng_js_ast::ExportKind::Declaration { decl },
+                ..
+            } => self.decl_disposal_scope_kind(*decl),
             _ => None,
         }
     }
@@ -546,6 +544,10 @@ impl FunctionCompiler<'_, '_> {
         self.lower_statement_with_label(stmt_id, None)
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "statement lowering is the central AST-to-bytecode dispatcher by statement kind"
+    )]
     pub(super) fn lower_statement_with_label(
         &mut self,
         stmt_id: StmtId,
@@ -668,7 +670,9 @@ impl FunctionCompiler<'_, '_> {
                 self.lower_return_statement(argument)
             }
             Stmt::Declaration { decl, .. } => self.lower_declaration(decl),
-            _ => Err(LoweringError::UnsupportedStatement { stmt: stmt_id }),
+            Stmt::InvalidStatement { .. } => {
+                Err(LoweringError::UnsupportedStatement { stmt: stmt_id })
+            }
         }
     }
 
@@ -865,6 +869,10 @@ impl FunctionCompiler<'_, '_> {
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "destructuring assignment lowering keeps object and array spec cases in one dispatcher"
+    )]
     pub(super) fn lower_destructuring_assignment_from_register(
         &mut self,
         expr_id: ExprId,
@@ -939,7 +947,7 @@ impl FunctionCompiler<'_, '_> {
                     let value = self.alloc_temp()?;
                     let source_key = if property.computed {
                         self.lower_object_destructuring_property_key(property.key)?
-                    } else if let Some(atom) = self.named_property_atom(property.key)? {
+                    } else if let Some(atom) = self.named_property_atom(property.key) {
                         ObjectRestExcludedKey::Atom(atom)
                     } else {
                         self.lower_object_destructuring_property_key(property.key)?
@@ -1255,7 +1263,7 @@ impl FunctionCompiler<'_, '_> {
         let default_value = self.alloc_temp()?;
         self.lower_initializer_with_inferred_name(
             default_initializer,
-            self.reference_target_inferred_name(target),
+            Self::reference_target_inferred_name(target),
             default_value,
         )?;
         self.assign_prepared_reference(target, default_value)?;
@@ -1399,39 +1407,41 @@ impl FunctionCompiler<'_, '_> {
             self.builder
                 .emit_abx(Opcode::CreateObject, self.encode_register(rest_value)?, 0)?;
         self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
-        let excluded_keys_register = if excluded_keys.is_empty() {
+        let excluded_keys_register = {
             let excluded = self.alloc_temp()?;
-            self.emit_load_undefined(excluded)?;
-            excluded
-        } else {
-            let excluded = self.alloc_temp()?;
-            let instruction_offset =
-                self.builder
-                    .emit_abx(Opcode::CreateArray, self.encode_register(excluded)?, 0)?;
-            self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
-            for (index, excluded_key) in excluded_keys.iter().enumerate() {
-                let excluded_value = match excluded_key {
-                    ObjectRestExcludedKey::Atom(atom) => {
-                        let value = self.alloc_temp()?;
-                        self.emit_load_atom_string(value, *atom)?;
-                        value
+            if excluded_keys.is_empty() {
+                self.emit_load_undefined(excluded)?;
+            } else {
+                let instruction_offset = self.builder.emit_abx(
+                    Opcode::CreateArray,
+                    self.encode_register(excluded)?,
+                    0,
+                )?;
+                self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
+                for (index, excluded_key) in excluded_keys.iter().enumerate() {
+                    let excluded_value = match excluded_key {
+                        ObjectRestExcludedKey::Atom(atom) => {
+                            let value = self.alloc_temp()?;
+                            self.emit_load_atom_string(value, *atom)?;
+                            value
+                        }
+                        ObjectRestExcludedKey::Register(register) => *register,
+                    };
+                    let index_register = self.alloc_temp()?;
+                    let index_value = i32::try_from(index)
+                        .map_err(|_| LoweringError::ConstantIndexOverflow { index: u32::MAX })?;
+                    if let Ok(index_smi) = i16::try_from(index_value) {
+                        self.emit_load_smi(index_register, index_smi)?;
+                    } else {
+                        let constant = self.constant_smi(index_value)?;
+                        self.builder.emit_abx(
+                            Opcode::LoadConst,
+                            self.encode_register(index_register)?,
+                            constant,
+                        )?;
                     }
-                    ObjectRestExcludedKey::Register(register) => *register,
-                };
-                let index_register = self.alloc_temp()?;
-                let index_value = i32::try_from(index)
-                    .map_err(|_| LoweringError::ConstantIndexOverflow { index: u32::MAX })?;
-                if let Ok(index_smi) = i16::try_from(index_value) {
-                    self.emit_load_smi(index_register, index_smi)?;
-                } else {
-                    let constant = self.constant_smi(index_value)?;
-                    self.builder.emit_abx(
-                        Opcode::LoadConst,
-                        self.encode_register(index_register)?,
-                        constant,
-                    )?;
+                    self.emit_define_keyed_property(excluded, excluded_value, index_register)?;
                 }
-                self.emit_define_keyed_property(excluded, excluded_value, index_register)?;
             }
             excluded
         };
@@ -1577,23 +1587,23 @@ impl FunctionCompiler<'_, '_> {
                 ..
             } => self.lower_class_declaration(decl_id, name, super_class, body),
             Decl::Import { .. } => Ok(()),
-            Decl::Export { kind, .. } => self.lower_export_declaration(kind),
+            Decl::Export { kind, .. } => self.lower_export_declaration(&kind),
             Decl::InvalidDeclaration { .. } => {
                 Err(LoweringError::UnsupportedDeclaration { decl: decl_id })
             }
         }
     }
 
-    fn lower_export_declaration(&mut self, kind: lyng_js_ast::ExportKind) -> LoweringResult<()> {
+    fn lower_export_declaration(&mut self, kind: &lyng_js_ast::ExportKind) -> LoweringResult<()> {
         match kind {
-            lyng_js_ast::ExportKind::Declaration { decl } => self.lower_declaration(decl),
+            lyng_js_ast::ExportKind::Declaration { decl } => self.lower_declaration(*decl),
             lyng_js_ast::ExportKind::Default { declaration } => match declaration {
                 lyng_js_ast::ExportDefaultDecl::Function(function)
-                    if self.hoisted_default_export_functions.contains(&function) =>
+                    if self.hoisted_default_export_functions.contains(function) =>
                 {
                     Ok(())
                 }
-                _ => self.lower_default_export_declaration(declaration),
+                _ => self.lower_default_export_declaration(*declaration),
             },
             lyng_js_ast::ExportKind::Named { .. } | lyng_js_ast::ExportKind::All { .. } => Ok(()),
         }
@@ -1791,11 +1801,10 @@ impl FunctionCompiler<'_, '_> {
         if !matches!(scope_kind, ScopeKind::Block | ScopeKind::Switch) {
             return false;
         }
-        if let Some(function) = self.current_function {
-            !self.state.sema.function_table.get(function).strict
-        } else {
-            !self.state.program.strict
-        }
+        self.current_function
+            .map_or(!self.state.program.strict, |function| {
+                !self.state.sema.function_table.get(function).strict
+            })
     }
 
     fn annex_b_var_binding_for_block_function(
@@ -1871,7 +1880,7 @@ impl FunctionCompiler<'_, '_> {
             .rev()
             .find_map(|(index, binding)| {
                 (binding.name == name && binding.scope == scope)
-                    .then_some(SemanticBindingId::new(index as u32))
+                    .then_some(SemanticBindingId::new(checked_u32_index(index)))
             })
     }
 
@@ -1893,6 +1902,10 @@ impl FunctionCompiler<'_, '_> {
                 ))
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "variable declarator lowering coordinates patterns, initializers, TDZ, and disposal registration"
+    )]
     pub(super) fn lower_variable_declarator(
         &mut self,
         kind: VariableKind,

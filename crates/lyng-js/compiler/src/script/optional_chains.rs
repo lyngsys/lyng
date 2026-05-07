@@ -234,7 +234,7 @@ impl FunctionCompiler<'_, '_> {
             self.encode_register(receiver)?,
             self.encode_register(key)?,
         )?;
-        self.finish_optional_nullish_guard(guard)?;
+        self.finish_optional_nullish_guard(&guard)?;
         Ok(())
     }
 
@@ -255,7 +255,7 @@ impl FunctionCompiler<'_, '_> {
             self.encode_register(receiver)?,
             self.encode_register(key)?,
         )?;
-        self.finish_optional_nullish_guard(guard)?;
+        self.finish_optional_nullish_guard(&guard)?;
         Ok(())
     }
 
@@ -380,7 +380,7 @@ impl FunctionCompiler<'_, '_> {
         self.lower_optional_chain_operand_value(object, receiver, shorted)?;
         let guard = self.emit_optional_nullish_guard(receiver, dest, shorted)?;
         self.emit_get_property_by_atom(dest, receiver, property)?;
-        self.finish_optional_nullish_guard(guard)?;
+        self.finish_optional_nullish_guard(&guard)?;
         Ok(())
     }
 
@@ -396,7 +396,7 @@ impl FunctionCompiler<'_, '_> {
         let guard = self.emit_optional_nullish_guard(receiver, dest, shorted)?;
         let key = self.lower_expr_to_temp(property)?;
         self.emit_get_keyed_property(dest, receiver, key)?;
-        self.finish_optional_nullish_guard(guard)?;
+        self.finish_optional_nullish_guard(&guard)?;
         Ok(())
     }
 
@@ -413,7 +413,7 @@ impl FunctionCompiler<'_, '_> {
         let guard = self.emit_optional_nullish_guard(receiver, dest, shorted)?;
         let span = self.ast().get_expr(object).span();
         self.emit_private_field_get_from_receiver(expr_id, receiver, property, span, dest)?;
-        self.finish_optional_nullish_guard(guard)?;
+        self.finish_optional_nullish_guard(&guard)?;
         Ok(())
     }
 
@@ -430,7 +430,7 @@ impl FunctionCompiler<'_, '_> {
         self.lower_optional_chain_call_target(callee, callee_register, this_register, shorted)?;
         let guard = self.emit_optional_nullish_guard(callee_register, dest, shorted)?;
         self.emit_optional_call(expr_id, callee_register, this_register, arguments, dest)?;
-        self.finish_optional_nullish_guard(guard)?;
+        self.finish_optional_nullish_guard(&guard)?;
         Ok(())
     }
 
@@ -531,7 +531,7 @@ impl FunctionCompiler<'_, '_> {
                 let guard = self.emit_optional_nullish_guard(receiver, callee_dest, shorted)?;
                 self.emit_get_property_by_atom(callee_dest, receiver, property)?;
                 self.emit_move(this_dest, receiver)?;
-                self.finish_optional_nullish_guard(guard)?;
+                self.finish_optional_nullish_guard(&guard)?;
                 Ok(())
             }
             Expr::ComputedMemberExpression {
@@ -543,7 +543,7 @@ impl FunctionCompiler<'_, '_> {
                 let key = self.lower_expr_to_temp(property)?;
                 self.emit_get_keyed_property(callee_dest, receiver, key)?;
                 self.emit_move(this_dest, receiver)?;
-                self.finish_optional_nullish_guard(guard)?;
+                self.finish_optional_nullish_guard(&guard)?;
                 Ok(())
             }
             Expr::PrivateMemberExpression {
@@ -561,7 +561,7 @@ impl FunctionCompiler<'_, '_> {
                     callee_dest,
                 )?;
                 self.emit_move(this_dest, receiver)?;
-                self.finish_optional_nullish_guard(guard)?;
+                self.finish_optional_nullish_guard(&guard)?;
                 Ok(())
             }
             Expr::CallExpression {
@@ -690,7 +690,10 @@ impl FunctionCompiler<'_, '_> {
         Ok(OptionalNullishGuard { jump_end })
     }
 
-    fn finish_optional_nullish_guard(&mut self, guard: OptionalNullishGuard) -> LoweringResult<()> {
+    fn finish_optional_nullish_guard(
+        &mut self,
+        guard: &OptionalNullishGuard,
+    ) -> LoweringResult<()> {
         let end = self.builder.current_offset()?;
         self.builder.patch_jump_to(guard.jump_end, end)?;
         Ok(())

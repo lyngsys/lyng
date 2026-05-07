@@ -1,17 +1,18 @@
 use super::state::ClassInstanceElementPlan;
 use super::{
-    internal_bind_function_private_env_builtin, internal_define_class_getter_property_builtin,
-    internal_define_class_setter_property_builtin, internal_define_method_property_builtin,
-    internal_define_private_field_builtin, internal_get_instance_field_key_builtin,
-    internal_install_instance_field_key_builtin, internal_private_field_get_builtin,
-    internal_private_field_init_builtin, internal_private_field_set_builtin,
-    internal_private_has_builtin, internal_set_function_home_object_builtin,
-    object_set_prototype_of_builtin, ActiveClassContext, AtomId, BuiltinFunctionId,
-    BytecodeBuilder, BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags, BytecodeFunction,
-    BytecodeFunctionFlags, BytecodeFunctionId, BytecodeFunctionKind, CallRange, ConstantValue,
-    DeclId, DeclarationKind, Expr, ExprId, FunctionCompiler, FunctionId, HashMap, HashSet,
-    LoweringError, LoweringResult, NodeList, Opcode, SafepointKind, ScopeId, ScopeKind,
-    SemanticBindingId, Span, StmtId, StorageClass, ThisMode, WellKnownAtom,
+    checked_u32_index, internal_bind_function_private_env_builtin,
+    internal_define_class_getter_property_builtin, internal_define_class_setter_property_builtin,
+    internal_define_method_property_builtin, internal_define_private_field_builtin,
+    internal_get_instance_field_key_builtin, internal_install_instance_field_key_builtin,
+    internal_private_field_get_builtin, internal_private_field_init_builtin,
+    internal_private_field_set_builtin, internal_private_has_builtin,
+    internal_set_function_home_object_builtin, object_set_prototype_of_builtin, ActiveClassContext,
+    AtomId, BuiltinFunctionId, BytecodeBuilder, BytecodeEnvironmentBinding,
+    BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionFlags, BytecodeFunctionId,
+    BytecodeFunctionKind, CallRange, ConstantValue, DeclId, DeclarationKind, Expr, ExprId,
+    FunctionCompiler, FunctionId, HashMap, HashSet, LoweringError, LoweringResult, NodeList,
+    Opcode, SafepointKind, ScopeId, ScopeKind, SemanticBindingId, Span, StmtId, StorageClass,
+    ThisMode, WellKnownAtom,
 };
 use lyng_js_types::{
     internal_construct_super_array_like_builtin, internal_require_constructor_builtin,
@@ -89,7 +90,7 @@ impl PrivateElementInitializerScratch {
 fn numeric_property_name_text(value: lyng_js_ast::NumericLiteral) -> String {
     match value {
         lyng_js_ast::NumericLiteral::Int32(number) => number.to_string(),
-        lyng_js_ast::NumericLiteral::Number(number) if number == 0.0 => "0".to_string(),
+        lyng_js_ast::NumericLiteral::Number(0.0) => "0".to_string(),
         lyng_js_ast::NumericLiteral::Number(number) => number.to_string(),
     }
 }
@@ -139,7 +140,7 @@ fn radix_digits_to_decimal(digits: &str, radix: u32) -> String {
     let first_non_zero = decimal
         .iter()
         .position(|digit| *digit != 0)
-        .unwrap_or(decimal.len().saturating_sub(1));
+        .unwrap_or_else(|| decimal.len().saturating_sub(1));
     decimal[first_non_zero..]
         .iter()
         .map(|digit| char::from(b'0' + *digit))
@@ -205,6 +206,10 @@ impl FunctionCompiler<'_, '_> {
         self.store_binding_value(binding_id, name, value_register)
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "class definition lowering preserves the ECMA-262 class evaluation order in one routine"
+    )]
     pub(super) fn lower_class_definition(
         &mut self,
         name: Option<AtomId>,
@@ -214,14 +219,12 @@ impl FunctionCompiler<'_, '_> {
         dest: u16,
     ) -> LoweringResult<()> {
         let elements = self.ast().get_class_element_list(body).to_vec();
-        let constructor = self.class_constructor_method(body)?;
+        let constructor = self.class_constructor_method(body);
         let has_private_entries = self
             .class_layout_for_span(body, class_span)
             .is_some_and(|layout| !layout.entries().is_empty());
-        let class_self_binding = name
-            .map(|name| self.class_self_binding(body, class_span, name))
-            .transpose()?
-            .flatten();
+        let class_self_binding =
+            name.and_then(|name| self.class_self_binding(body, class_span, name));
         let class_self_binding_needs_initialization = class_self_binding
             .map(|binding_id| self.class_self_binding_needs_initialization(binding_id))
             .transpose()?
@@ -283,14 +286,8 @@ impl FunctionCompiler<'_, '_> {
                         private: false,
                         auto_accessor_private_name,
                         ..
-                    } => {
-                        if let Some(backing_name) = auto_accessor_private_name {
-                            Some(ClassInstanceElementPlan::PrivateElement {
-                                name: *backing_name,
-                                kind: lyng_js_sema::ClassPrivateElementKind::Field,
-                                value: *value,
-                            })
-                        } else {
+                    } => (*auto_accessor_private_name).map_or_else(
+                        || {
                             Some(ClassInstanceElementPlan::PublicField {
                                 key: *key,
                                 value: *value,
@@ -304,8 +301,15 @@ impl FunctionCompiler<'_, '_> {
                                     None
                                 },
                             })
-                        }
-                    }
+                        },
+                        |backing_name| {
+                            Some(ClassInstanceElementPlan::PrivateElement {
+                                name: backing_name,
+                                kind: lyng_js_sema::ClassPrivateElementKind::Field,
+                                value: *value,
+                            })
+                        },
+                    ),
                     lyng_js_ast::ClassElement::Property {
                         key,
                         value,
@@ -711,7 +715,7 @@ impl FunctionCompiler<'_, '_> {
     fn class_constructor_method(
         &self,
         body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
-    ) -> LoweringResult<Option<FunctionId>> {
+    ) -> Option<FunctionId> {
         for &element in self.ast().get_class_element_list(body) {
             if let lyng_js_ast::ClassElement::Method {
                 kind: lyng_js_ast::MethodKind::Constructor,
@@ -719,10 +723,10 @@ impl FunctionCompiler<'_, '_> {
                 ..
             } = self.ast().get_class_element(element)
             {
-                return Ok(Some(*value));
+                return Some(*value);
             }
         }
-        Ok(None)
+        None
     }
 
     fn emit_load_private_function_name(
@@ -753,15 +757,11 @@ impl FunctionCompiler<'_, '_> {
         body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
         class_span: Span,
         name: AtomId,
-    ) -> LoweringResult<Option<SemanticBindingId>> {
-        let Some(scope) = self
+    ) -> Option<SemanticBindingId> {
+        let scope = self
             .class_layout_for_span(body, class_span)
-            .map(lyng_js_sema::ClassPrivateLayoutRecord::scope)
-        else {
-            return Ok(None);
-        };
-        Ok(self
-            .state
+            .map(lyng_js_sema::ClassPrivateLayoutRecord::scope)?;
+        self.state
             .sema
             .binding_table
             .as_slice()
@@ -771,8 +771,8 @@ impl FunctionCompiler<'_, '_> {
                 (binding.kind == DeclarationKind::ClassName
                     && binding.name == name
                     && binding.scope == scope)
-                    .then_some(SemanticBindingId::new(index as u32))
-            }))
+                    .then_some(SemanticBindingId::new(checked_u32_index(index)))
+            })
     }
 
     fn class_self_binding_needs_initialization(
@@ -798,7 +798,7 @@ impl FunctionCompiler<'_, '_> {
         key: ExprId,
         computed: bool,
     ) -> LoweringResult<(u16, Option<u16>)> {
-        if !computed && let Some(atom) = self.named_property_atom(key)? {
+        if !computed && let Some(atom) = self.named_property_atom(key) {
             let key_value = self.alloc_temp()?;
             self.emit_load_atom_string(key_value, atom)?;
             return Ok((key_value, Some(key_value)));
@@ -814,9 +814,9 @@ impl FunctionCompiler<'_, '_> {
         result
     }
 
-    fn class_field_inferred_name_atom(&mut self, key: ExprId) -> LoweringResult<Option<AtomId>> {
+    fn class_field_inferred_name_atom(&mut self, key: ExprId) -> Option<AtomId> {
         let expr = self.ast().get_expr(key).clone();
-        let atom = match expr {
+        match expr {
             Expr::Identifier { name, .. } => Some(name),
             Expr::StringLiteral { value, .. } => {
                 match self.ast().literals().get_string_value(value).clone() {
@@ -838,8 +838,7 @@ impl FunctionCompiler<'_, '_> {
                 Some(self.state.atoms.intern(&text))
             }
             _ => None,
-        };
-        Ok(atom)
+        }
     }
 
     fn lower_static_public_field_key(
@@ -847,13 +846,13 @@ impl FunctionCompiler<'_, '_> {
         key: ExprId,
         computed: bool,
     ) -> LoweringResult<StaticPublicFieldKey> {
-        if !computed && let Some(atom) = self.named_property_atom(key)? {
+        if !computed && let Some(atom) = self.named_property_atom(key) {
             return Ok(StaticPublicFieldKey::Atom(atom));
         }
         let inferred_name = if computed {
             None
         } else {
-            self.class_field_inferred_name_atom(key)?
+            self.class_field_inferred_name_atom(key)
         };
         let raw_key = self.lower_class_strict_expr_to_temp(key)?;
         let property_key = self.alloc_temp()?;
@@ -864,6 +863,10 @@ impl FunctionCompiler<'_, '_> {
         })
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "auto-accessor lowering must carry the spec operands and scratch registers explicitly"
+    )]
     fn lower_public_auto_accessor_property(
         &mut self,
         class_object: u16,
@@ -1140,12 +1143,12 @@ impl FunctionCompiler<'_, '_> {
         let named_atom = if computed {
             None
         } else {
-            self.named_property_atom(key)?
+            self.named_property_atom(key)
         };
         let inferred_name = if named_atom.is_some() || computed {
             named_atom
         } else {
-            self.class_field_inferred_name_atom(key)?
+            self.class_field_inferred_name_atom(key)
         };
         let value_register = self.lower_class_field_value(
             value,
@@ -1162,6 +1165,10 @@ impl FunctionCompiler<'_, '_> {
         self.emit_define_keyed_property(target, value_register, key_register)
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "private-element definition threads descriptor, receiver, initializer, and scratch registers"
+    )]
     fn emit_define_private_element_with_scratch(
         &mut self,
         class_object: u16,
@@ -1196,6 +1203,10 @@ impl FunctionCompiler<'_, '_> {
         }
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "private-element initializer lowering keeps explicit operands for bytecode register discipline"
+    )]
     fn lower_private_element_initializer_with_scratch(
         &mut self,
         target: u16,
@@ -1425,25 +1436,19 @@ impl FunctionCompiler<'_, '_> {
             } else {
                 synthetic.emit_load_this(this_register)?;
             }
+            synthetic.emit_instance_element_initializers(
+                this_register,
+                instance_elements,
+                class_body,
+            )?;
             if derived {
-                synthetic.emit_instance_element_initializers(
-                    this_register,
-                    instance_elements,
-                    class_body,
-                )?;
                 synthetic
                     .builder
                     .emit_ax(Opcode::Return, i32::from(this_register))?;
-                synthetic.builder.finish()
             } else {
-                synthetic.emit_instance_element_initializers(
-                    this_register,
-                    instance_elements,
-                    class_body,
-                )?;
                 synthetic.builder.emit_ax(Opcode::ReturnUndefined, 0)?;
-                synthetic.builder.finish()
             }
+            synthetic.builder.finish()
         };
 
         Ok((id, function?))
@@ -1485,6 +1490,10 @@ impl FunctionCompiler<'_, '_> {
         result
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "instance element initialization is ordered by class element kind and descriptor setup"
+    )]
     fn emit_instance_element_initializers_inner(
         &mut self,
         this_register: u16,
@@ -1510,8 +1519,11 @@ impl FunctionCompiler<'_, '_> {
             if kind == lyng_js_sema::ClassPrivateElementKind::Field {
                 continue;
             }
-            let (descriptor_index, span) =
-                Self::private_element_descriptor_from_lookup(&private_descriptors, name, kind)?;
+            let (descriptor_index, span) = Self::private_element_descriptor_from_lookup(
+                private_descriptors.as_ref(),
+                name,
+                kind,
+            )?;
             self.lower_private_element_initializer_with_scratch(
                 this_register,
                 descriptor_index,
@@ -1587,7 +1599,7 @@ impl FunctionCompiler<'_, '_> {
                     }
                     let inferred_name = Some(self.private_name_with_hash_atom(name));
                     let (descriptor_index, span) = Self::private_element_descriptor_from_lookup(
-                        &private_descriptors,
+                        private_descriptors.as_ref(),
                         name,
                         kind,
                     )?;
@@ -1610,12 +1622,11 @@ impl FunctionCompiler<'_, '_> {
     }
 
     fn private_element_descriptor_from_lookup(
-        private_descriptors: &Option<PrivateElementDescriptorLookup>,
+        private_descriptors: Option<&PrivateElementDescriptorLookup>,
         name: AtomId,
         kind: lyng_js_sema::ClassPrivateElementKind,
     ) -> LoweringResult<(u32, Span)> {
         private_descriptors
-            .as_ref()
             .and_then(|descriptors| descriptors.get(name, kind))
             .ok_or(LoweringError::UnsupportedDeclaration {
                 decl: DeclId::new(0),
@@ -1647,7 +1658,6 @@ impl FunctionCompiler<'_, '_> {
     }
 
     pub(super) fn private_access_descriptor_index_for_layout(
-        &self,
         layout: &lyng_js_sema::ClassPrivateLayoutRecord,
         name: AtomId,
         set_context: bool,
@@ -1700,7 +1710,7 @@ impl FunctionCompiler<'_, '_> {
             .get_by_scope(private_use.defining_scope())
             .ok_or(LoweringError::UnsupportedExpression { expr: expr_id })?;
         let descriptor_index =
-            self.private_access_descriptor_index_for_layout(layout, property, set_context)?;
+            Self::private_access_descriptor_index_for_layout(layout, property, set_context)?;
         Ok((descriptor_index, private_use.class_depth()))
     }
 
@@ -1849,7 +1859,7 @@ impl FunctionCompiler<'_, '_> {
         let Some(super_value) = super_value else {
             return Ok(());
         };
-        let super_span = super_span.unwrap_or(self.root_span());
+        let super_span = super_span.unwrap_or_else(|| self.root_span());
 
         if !super_is_literal_null {
             let null_value = self.alloc_temp()?;

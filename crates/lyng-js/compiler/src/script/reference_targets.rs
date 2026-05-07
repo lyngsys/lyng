@@ -107,7 +107,6 @@ impl FunctionCompiler<'_, '_> {
     }
 
     pub(super) const fn reference_target_inferred_name(
-        &self,
         target: PreparedReferenceTarget,
     ) -> Option<AtomId> {
         match target {

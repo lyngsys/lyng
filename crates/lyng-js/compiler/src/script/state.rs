@@ -1,11 +1,11 @@
 use super::{
-    build_function_activation_plan, collect_arguments_owners, parent_function_for, ArgumentsMode,
-    AtomId, AtomTable, BuiltinFunctionId, BytecodeBuilder, BytecodeEnvironmentBinding,
-    BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionId, CompiledAtom, Decl, DeclId,
-    DeclarationKind, Expr, ExprId, ForInOfLeft, ForInit, FunctionActivationPlan, FunctionId,
-    FunctionKind, FunctionSemaId, HashMap, HashSet, LoweringError, LoweringResult, NonZeroU32,
-    Pattern, ProgramRootKind, ProgramSemaView, ProgramSource, ScopeId, ScopeKind,
-    SemanticBindingId, Span, Stmt, StorageClass, WellKnownAtom,
+    build_function_activation_plan, checked_u32_index, collect_arguments_owners,
+    parent_function_for, ArgumentsMode, AtomId, AtomTable, BuiltinFunctionId, BytecodeBuilder,
+    BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionId,
+    CompiledAtom, Decl, DeclId, DeclarationKind, Expr, ExprId, ForInOfLeft, ForInit,
+    FunctionActivationPlan, FunctionId, FunctionKind, FunctionSemaId, HashMap, HashSet,
+    LoweringError, LoweringResult, NonZeroU32, Pattern, ProgramRootKind, ProgramSemaView,
+    ProgramSource, ScopeId, ScopeKind, SemanticBindingId, Span, Stmt, StorageClass, WellKnownAtom,
 };
 
 struct ComputedEnvironmentLayouts {
@@ -44,6 +44,10 @@ pub(super) struct CompletionRegisters {
     pub(super) target: u16,
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "class function metadata records independent class-construction flags from sema"
+)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct ClassFunctionMetadata {
     pub(super) constructible: bool,
@@ -149,7 +153,12 @@ impl<'a> CompilationState<'a> {
             .as_slice()
             .iter()
             .enumerate()
-            .map(|(index, record)| (record.function_id, FunctionSemaId::new(index as u32)))
+            .map(|(index, record)| {
+                (
+                    record.function_id,
+                    FunctionSemaId::new(checked_u32_index(index)),
+                )
+            })
             .collect::<HashMap<_, _>>();
         let parent_functions = sema
             .function_table
@@ -157,7 +166,7 @@ impl<'a> CompilationState<'a> {
             .iter()
             .enumerate()
             .map(|(index, record)| {
-                let current = FunctionSemaId::new(index as u32);
+                let current = FunctionSemaId::new(checked_u32_index(index));
                 Ok(parent_function_for(
                     sema.scope_table,
                     record.scope_root,
@@ -175,20 +184,27 @@ impl<'a> CompilationState<'a> {
                 build_function_activation_plan(
                     program,
                     sema,
-                    FunctionSemaId::new(index as u32),
+                    FunctionSemaId::new(checked_u32_index(index)),
                     record,
                     &arguments_owners,
                     &parent_functions,
                 )
             })
-            .collect::<LoweringResult<Vec<_>>>()?;
+            .collect::<Vec<_>>();
         let computed_environment_layouts = Self::compute_environment_layouts(
             sema,
             &activation_plans,
             module_default_export_binding,
         );
-        let module_default_export_slot = module_default_export_binding
-            .map(|_| computed_environment_layouts.root_environment_bindings.len() as u32 - 1);
+        let module_default_export_slot = module_default_export_binding.map(|_| {
+            checked_u32_index(
+                computed_environment_layouts
+                    .root_environment_bindings
+                    .len()
+                    .checked_sub(1)
+                    .expect("default export binding should allocate a root slot"),
+            )
+        });
         let (class_function_metadata, class_constructor_plans) =
             collect_class_lowering_metadata(program);
 
@@ -267,7 +283,7 @@ impl<'a> CompilationState<'a> {
 
     pub(crate) fn compile_root_entry(&mut self) -> LoweringResult<BytecodeFunctionId> {
         let entry = self.alloc_function_id();
-        let compiler = FunctionCompiler::for_root(self, entry)?;
+        let compiler = FunctionCompiler::for_root(self, entry);
         let function = compiler.lower()?;
         self.functions.push(function);
         Ok(entry)
@@ -656,6 +672,10 @@ fn collect_class_lowering_from_stmt_list(
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "class metadata collection is an exhaustive statement visitor"
+)]
 fn collect_class_lowering_from_stmt(
     ast: &lyng_js_ast::Ast,
     stmt_id: lyng_js_ast::StmtId,
@@ -1017,6 +1037,10 @@ const fn generator_function_has_prototype(kind: FunctionKind) -> bool {
     matches!(kind, FunctionKind::Generator | FunctionKind::AsyncGenerator)
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "class metadata collection is an exhaustive expression visitor"
+)]
 fn collect_class_lowering_from_expr(
     ast: &lyng_js_ast::Ast,
     expr_id: ExprId,
@@ -1195,7 +1219,8 @@ fn collect_class_lowering_from_expr(
             }
         }
         Expr::StaticMemberExpression { object, .. }
-        | Expr::PrivateMemberExpression { object, .. } => {
+        | Expr::PrivateMemberExpression { object, .. }
+        | Expr::PrivateInExpression { object, .. } => {
             collect_class_lowering_from_expr(ast, *object, function_metadata, constructor_plans);
         }
         Expr::ComputedMemberExpression {
@@ -1203,9 +1228,6 @@ fn collect_class_lowering_from_expr(
         } => {
             collect_class_lowering_from_expr(ast, *object, function_metadata, constructor_plans);
             collect_class_lowering_from_expr(ast, *property, function_metadata, constructor_plans);
-        }
-        Expr::PrivateInExpression { object, .. } => {
-            collect_class_lowering_from_expr(ast, *object, function_metadata, constructor_plans);
         }
         Expr::YieldExpression { argument, .. } => {
             if let Some(argument) = argument {
@@ -1252,6 +1274,10 @@ fn collect_class_lowering_from_function(
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "class body metadata collection preserves constructor and instance element ordering"
+)]
 fn collect_class_lowering_from_class_body(
     ast: &lyng_js_ast::Ast,
     body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,

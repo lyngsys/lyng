@@ -597,10 +597,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn resolve_continue_target(&self, label: Option<AtomId>) -> Option<usize> {
         self.control_targets.iter().rposition(|target| {
             target.kind == ControlTargetKind::Loop
-                && match label {
-                    Some(label) => target.label == Some(label),
-                    None => true,
-                }
+                && label.is_none_or(|label| target.label == Some(label))
         })
     }
 

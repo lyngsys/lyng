@@ -132,7 +132,7 @@ impl FunctionCompiler<'_, '_> {
                 let named_atom = if property.computed {
                     None
                 } else {
-                    self.named_property_atom(property.key)?
+                    self.named_property_atom(property.key)
                 };
                 let key_register = if named_atom.is_none() {
                     let raw_key = self.lower_expr_to_temp(property.key)?;
@@ -194,7 +194,7 @@ impl FunctionCompiler<'_, '_> {
 
     fn lower_object_property_key_value(&mut self, property: Property) -> LoweringResult<u16> {
         if !property.computed
-            && let Some(atom) = self.named_property_atom(property.key)?
+            && let Some(atom) = self.named_property_atom(property.key)
         {
             let key = self.alloc_temp()?;
             self.emit_load_atom_string(key, atom)?;
@@ -282,11 +282,10 @@ impl FunctionCompiler<'_, '_> {
         span: Span,
         dest: u16,
     ) -> LoweringResult<()> {
-        let arguments = if let Some(home_object) = self.super_home_object_override {
-            vec![receiver, key, home_object]
-        } else {
-            vec![receiver, key]
-        };
+        let arguments = self.super_home_object_override.map_or_else(
+            || vec![receiver, key],
+            |home_object| vec![receiver, key, home_object],
+        );
         self.emit_internal_builtin_call_into(
             internal_super_property_get_builtin(),
             &arguments,
@@ -296,11 +295,9 @@ impl FunctionCompiler<'_, '_> {
     }
 
     pub(super) fn emit_super_base(&mut self, dest: u16, span: Span) -> LoweringResult<()> {
-        let arguments = if let Some(home_object) = self.super_home_object_override {
-            vec![home_object]
-        } else {
-            Vec::new()
-        };
+        let arguments = self
+            .super_home_object_override
+            .map_or_else(Vec::new, |home_object| vec![home_object]);
         self.emit_internal_builtin_call_into(internal_super_base_builtin(), &arguments, span, dest)
     }
 

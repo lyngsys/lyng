@@ -11,6 +11,8 @@ use super::{
 use lyng_js_bytecode::{GlobalLexicalBindingPlan, GlobalScriptInstantiationPlan};
 use lyng_js_sema::{DeclarationKind, ScopeId, ScopeKind};
 
+/// # Errors
+/// Returns `LoweringError` when script metadata or bytecode lowering cannot be encoded.
 pub fn compile_script(
     parsed: &lyng_js_ast::ParsedScript,
     sema: &lyng_js_sema::ScriptSema,
@@ -88,10 +90,7 @@ fn push_unique_name(names: &mut Vec<Box<str>>, name: &str) {
 }
 
 impl<'a, 'b> FunctionCompiler<'a, 'b> {
-    pub(super) fn for_root(
-        state: &'b mut CompilationState<'a>,
-        entry: BytecodeFunctionId,
-    ) -> LoweringResult<Self> {
+    pub(super) fn for_root(state: &'b mut CompilationState<'a>, entry: BytecodeFunctionId) -> Self {
         let binding_count = state.sema.binding_table.len();
         let root_needs_environment = state.root_needs_environment();
         let root_kind = match state.program.kind {
@@ -109,7 +108,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let root_scope = ScopeId::new(0);
         let scope_count = state.sema.scope_table.len();
 
-        Ok(Self {
+        Self {
             state,
             builder,
             current_function: None,
@@ -145,9 +144,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             in_instance_class_field_initializer: false,
             force_strict_assignment: false,
             active_disposal_scopes: Vec::new(),
-        })
+        }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "function compiler construction assembles activation, metadata, and register state"
+    )]
     pub(super) fn for_function(
         state: &'b mut CompilationState<'a>,
         function: FunctionId,
@@ -162,7 +165,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .get(sema_id.raw() as usize)
             .ok_or(LoweringError::MissingFunctionRecord { function })?;
         let ast_function = state.program.ast.get_function(function).clone();
-        let function_kind = bytecode_function_kind(function, ast_function.kind)?;
+        let function_kind = bytecode_function_kind(ast_function.kind);
         let this_mode = function_this_mode(function_kind, function_record.strict);
         let parameter_count = u16::try_from(
             state
@@ -497,6 +500,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         )
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "binding pattern lowering mirrors the spec cases for object and array patterns"
+    )]
     pub(super) fn lower_binding_pattern_initialization(
         &mut self,
         pattern: lyng_js_ast::PatternId,
@@ -540,7 +547,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             )?;
                             continue;
                         }
-                    } else if let Some(atom) = self.named_property_atom(property.key)? {
+                    } else if let Some(atom) = self.named_property_atom(property.key) {
                         let prepared_target =
                             self.prepare_with_var_single_name_binding_target(kind, property.value)?;
                         self.emit_get_property_by_atom(value, source_register, atom)?;
@@ -951,17 +958,13 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     }
 }
 
-const fn bytecode_function_kind(
-    function: FunctionId,
-    kind: FunctionKind,
-) -> LoweringResult<BytecodeFunctionKind> {
-    let _ = function;
+const fn bytecode_function_kind(kind: FunctionKind) -> BytecodeFunctionKind {
     match kind {
         FunctionKind::Normal
         | FunctionKind::Generator
         | FunctionKind::Async
-        | FunctionKind::AsyncGenerator => Ok(BytecodeFunctionKind::Function),
-        FunctionKind::Arrow | FunctionKind::AsyncArrow => Ok(BytecodeFunctionKind::Arrow),
+        | FunctionKind::AsyncGenerator => BytecodeFunctionKind::Function,
+        FunctionKind::Arrow | FunctionKind::AsyncArrow => BytecodeFunctionKind::Arrow,
     }
 }
 

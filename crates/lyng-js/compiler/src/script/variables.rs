@@ -1,7 +1,7 @@
 use super::{
-    AssignOp, AtomId, DeclarationKind, Expr, ExprId, FunctionCompiler, FunctionId, LoweringError,
-    LoweringResult, PreparedReferenceTarget, ReferenceUsage, ResolutionKind, SemanticBindingId,
-    StorageClass,
+    checked_u32_index, AssignOp, AtomId, DeclarationKind, Expr, ExprId, FunctionCompiler,
+    FunctionId, LoweringError, LoweringResult, PreparedReferenceTarget, ReferenceUsage,
+    ResolutionKind, SemanticBindingId, StorageClass,
 };
 
 impl FunctionCompiler<'_, '_> {
@@ -50,7 +50,7 @@ impl FunctionCompiler<'_, '_> {
                 (binding.kind == DeclarationKind::FunctionName
                     && binding.name == name
                     && self.binding_belongs_to_owner(binding.scope, Some(sema_id)))
-                .then_some(SemanticBindingId::new(index as u32))
+                .then_some(SemanticBindingId::new(checked_u32_index(index)))
             }))
     }
 
@@ -182,7 +182,7 @@ impl FunctionCompiler<'_, '_> {
                         let rhs = self.lower_expr_to_temp(right)?;
                         let result = self.alloc_temp()?;
                         self.builder.emit_abc(
-                            self.assignment_opcode(operator)?,
+                            Self::assignment_opcode(operator)?,
                             self.encode_register(result)?,
                             self.encode_register(current)?,
                             self.encode_register(rhs)?,
@@ -201,7 +201,7 @@ impl FunctionCompiler<'_, '_> {
         target: PreparedReferenceTarget,
     ) -> Option<AtomId> {
         if matches!(self.ast().get_expr(original_left), Expr::Identifier { .. }) {
-            self.reference_target_inferred_name(target)
+            Self::reference_target_inferred_name(target)
         } else {
             None
         }

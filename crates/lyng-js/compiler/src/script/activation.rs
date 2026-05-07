@@ -1,6 +1,6 @@
 use super::{
-    ArgumentsMode, AtomId, DeclarationKind, FunctionKind, FunctionSemaId, HashMap, HashSet,
-    LoweringResult, Pattern, ProgramSemaView, ProgramSource, ScopeId, SemanticBindingId,
+    checked_u32_index, ArgumentsMode, AtomId, DeclarationKind, FunctionKind, FunctionSemaId,
+    HashMap, HashSet, Pattern, ProgramSemaView, ProgramSource, ScopeId, SemanticBindingId,
     WellKnownAtom,
 };
 
@@ -219,7 +219,7 @@ pub(super) fn collect_arguments_owners(
         if !record.has_eval {
             continue;
         }
-        let function = FunctionSemaId::new(index as u32);
+        let function = FunctionSemaId::new(checked_u32_index(index));
         if let Some(owner) = nearest_non_arrow_owner_for(program, sema, parent_functions, function)
         {
             owners.insert(owner);
@@ -230,7 +230,7 @@ pub(super) fn collect_arguments_owners(
         if !record.needs_arguments {
             continue;
         }
-        let function = FunctionSemaId::new(index as u32);
+        let function = FunctionSemaId::new(checked_u32_index(index));
         if let Some(owner) = nearest_non_arrow_owner_for(program, sema, parent_functions, function)
         {
             owners.insert(owner);
@@ -251,7 +251,7 @@ fn find_parameter_binding_for_plan(
         .iter()
         .enumerate()
         .find_map(|(index, binding)| {
-            let id = SemanticBindingId::new(index as u32);
+            let id = SemanticBindingId::new(checked_u32_index(index));
             (binding.kind == DeclarationKind::Parameter
                 && binding.name == name
                 && sema.scope_table.get(binding.scope).owning_function == Some(owner)
@@ -267,7 +267,7 @@ pub(super) fn build_function_activation_plan(
     record: &lyng_js_sema::FunctionSemaRecord,
     arguments_owners: &HashSet<FunctionSemaId>,
     parent_functions: &[Option<FunctionSemaId>],
-) -> LoweringResult<FunctionActivationPlan> {
+) -> FunctionActivationPlan {
     let ast_function = program.ast.get_function(record.function_id).clone();
     let has_parameter_expressions = function_has_parameter_expressions(program.ast, &ast_function);
     let arguments_mode = if matches!(
@@ -308,7 +308,7 @@ pub(super) fn build_function_activation_plan(
         find_parameter_binding_for_plan(sema, sema_id, name, &used_bindings)
     });
 
-    Ok(FunctionActivationPlan {
+    FunctionActivationPlan {
         arguments_mode,
         has_rest_parameter: ast_function.params.rest.is_some(),
         has_parameter_expressions,
@@ -320,5 +320,5 @@ pub(super) fn build_function_activation_plan(
             || arguments_mode != ArgumentsMode::None
             || ast_function.params.rest.is_some()
             || has_direct_arrow_child_for(program, sema, parent_functions, sema_id),
-    })
+    }
 }

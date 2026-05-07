@@ -38,6 +38,7 @@ use lyng_js_types::{
     object_set_prototype_of_builtin, reference_error_builtin, BuiltinFunctionId,
 };
 
+use crate::checked_u32_index;
 use crate::error::{LoweringError, LoweringResult};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -2,6 +2,7 @@ use super::*;
 use lyng_js_parser::parse_script;
 use lyng_js_sema::analyze_script;
 use std::collections::HashSet;
+use std::fmt::Write as _;
 
 #[test]
 fn compile_script_allocates_persistent_slots_for_global_lexicals_and_explicit_global_access() {
@@ -165,7 +166,7 @@ fn attach_safepoint_reports_register_window_limit_as_lowering_error() {
     };
     let mut state = CompilationState::new(program, sema.view(), &mut atoms).unwrap();
     let entry = state.alloc_function_id();
-    let mut compiler = FunctionCompiler::for_root(&mut state, entry).unwrap();
+    let mut compiler = FunctionCompiler::for_root(&mut state, entry);
     compiler.builder.alloc_registers(u16::MAX).unwrap();
     compiler.builder.set_hidden_register_count(1);
 
@@ -407,8 +408,9 @@ fn compile_script_lowers_dynamic_lookup_delete_through_delete_name() {
         .iter()
         .enumerate()
         .find_map(|(index, binding)| {
-            (binding.name == x && binding.kind == lyng_js_sema::DeclarationKind::Var)
-                .then_some(lyng_js_sema::SemanticBindingId::new(index as u32))
+            (binding.name == x && binding.kind == lyng_js_sema::DeclarationKind::Var).then_some(
+                lyng_js_sema::SemanticBindingId::new(checked_u32_index(index)),
+            )
         })
         .expect("function-local x binding should exist");
     let binding = sema.binding_table.get_mut(binding_id);
@@ -738,7 +740,7 @@ fn compile_script_lowers_eval_poisoned_identifier_rmw_through_captured_name_ops(
 fn compile_script_supports_large_register_functions_and_high_register_calls() {
     let mut source = String::new();
     for index in 0..280 {
-        source.push_str(&format!("let value{index} = {index};\n"));
+        writeln!(source, "let value{index} = {index}").expect("writing to String should not fail");
     }
     source.push_str("let fnRef = function(value) { return value; };\n");
     source.push_str("fnRef(value279);\n");
@@ -767,7 +769,7 @@ fn compile_script_supports_large_register_functions_and_high_register_calls() {
 fn compile_script_reuses_private_field_registers_for_extremely_large_classes() {
     let mut source = String::from("class Overflow {\n");
     for index in 0..10_000 {
-        source.push_str(&format!("#field{index};\n"));
+        writeln!(source, "#field{index};").expect("writing to String should not fail");
     }
     source.push_str("}\nOverflow;\n");
 
@@ -787,7 +789,7 @@ fn compile_script_reuses_private_field_registers_for_extremely_large_classes() {
 fn compile_script_reuses_array_literal_registers_for_large_nested_arrays() {
     let mut source = String::from("var mapping = [\n");
     for index in 0..22_000 {
-        source.push_str(&format!("[{index}, {index}],\n"));
+        writeln!(source, "[{index}, {index}],").expect("writing to String should not fail");
     }
     source.push_str("];\nmapping.length;\n");
 
@@ -1865,7 +1867,7 @@ fn compile_script_covers_direct_eval_internal_call_inside_try_with_catch_handler
                     ..
                 }
             )
-            .then_some(index as u32)
+            .then_some(checked_u32_index(index))
         })
         .expect("direct eval should lower through an internal builtin call");
 

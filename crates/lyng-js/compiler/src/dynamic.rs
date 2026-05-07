@@ -304,6 +304,8 @@ fn dynamic_function_parameter_validation_source(
     }
 }
 
+/// # Errors
+/// Returns `DynamicCompilationError` when parsing or semantic analysis reports errors.
 pub fn analyze_dynamic_script(
     atoms: &mut AtomTable,
     source_id: SourceId,
@@ -319,6 +321,8 @@ pub fn analyze_dynamic_script(
     Ok(analysis)
 }
 
+/// # Errors
+/// Returns `DynamicCompilationError` when parsing fails before diagnostics can be returned.
 pub fn analyze_dynamic_script_with_diagnostics(
     atoms: &mut AtomTable,
     source_id: SourceId,
@@ -382,6 +386,8 @@ fn dynamic_function_wrapper_function(parsed: &ParsedScript) -> Option<FunctionId
     Some(*function)
 }
 
+/// # Errors
+/// Returns `DynamicCompilationError` when lowering the analyzed script fails.
 pub fn compile_analyzed_dynamic_script(
     analysis: &DynamicScriptAnalysis,
     atoms: &mut AtomTable,
@@ -390,6 +396,8 @@ pub fn compile_analyzed_dynamic_script(
         .map_err(|_| DynamicCompilationError::new(DynamicCompilationStage::Compile))
 }
 
+/// # Errors
+/// Returns `DynamicCompilationError` when analysis or lowering fails.
 pub fn compile_dynamic_script_source(
     atoms: &mut AtomTable,
     source_id: SourceId,
@@ -401,6 +409,9 @@ pub fn compile_dynamic_script_source(
     Ok(DynamicScriptCompilation { analysis, unit })
 }
 
+/// # Errors
+/// Returns `DynamicCompilationError` when parameter validation, parsing, semantic analysis,
+/// or lowering fails.
 pub fn compile_dynamic_function(
     atoms: &mut AtomTable,
     source_id: SourceId,

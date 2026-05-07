@@ -1,7 +1,7 @@
 use super::{
-    ArgumentsMode, AtomId, DeclarationKind, ExprId, FunctionActivationPlan, FunctionCompiler,
-    FunctionId, FunctionKind, FunctionSemaId, LoweringError, LoweringResult, Pattern,
-    ResolutionKind, ScopeId, ScopeKind, SemanticBindingId, StorageClass, UseSiteRecord,
+    checked_u32_index, ArgumentsMode, AtomId, DeclarationKind, ExprId, FunctionActivationPlan,
+    FunctionCompiler, FunctionId, FunctionKind, FunctionSemaId, LoweringError, LoweringResult,
+    Pattern, ResolutionKind, ScopeId, ScopeKind, SemanticBindingId, StorageClass, UseSiteRecord,
     WellKnownAtom,
 };
 
@@ -62,7 +62,7 @@ impl FunctionCompiler<'_, '_> {
                 (binding.name == name
                     && Self::declaration_kind_matches(binding.kind, expected_kind)
                     && self.binding_belongs_to_current_function(binding.scope))
-                .then_some(SemanticBindingId::new(index as u32))
+                .then_some(SemanticBindingId::new(checked_u32_index(index)))
             });
 
         let Some(first) = matches.next() else {
@@ -91,7 +91,7 @@ impl FunctionCompiler<'_, '_> {
                 (binding.name == name
                     && Self::declaration_kind_matches(binding.kind, expected_kind)
                     && binding.scope == scope)
-                    .then_some(SemanticBindingId::new(index as u32))
+                    .then_some(SemanticBindingId::new(checked_u32_index(index)))
             })
     }
 
@@ -152,7 +152,10 @@ impl FunctionCompiler<'_, '_> {
                 (Self::declaration_kind_matches(binding.kind, expected_kind)
                     && binding.name == name
                     && self.binding_belongs_to_owner(binding.scope, self.current_function))
-                .then_some((SemanticBindingId::new(index as u32), binding.scope.raw()))
+                .then_some((
+                    SemanticBindingId::new(checked_u32_index(index)),
+                    binding.scope.raw(),
+                ))
             })
             .max_by_key(|(_, scope)| *scope)
             .map(|(binding, _)| binding)
@@ -177,7 +180,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn current_activation(&self) -> LoweringResult<&FunctionActivationPlan> {
         self.current_function
             .map(|function| self.state.activation(function))
-            .ok_or(LoweringError::UnsupportedFunction {
+            .ok_or_else(|| LoweringError::UnsupportedFunction {
                 function: self
                     .current_function_ast
                     .unwrap_or_else(|| FunctionId::new(0)),

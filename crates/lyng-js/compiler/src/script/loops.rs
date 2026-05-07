@@ -7,9 +7,9 @@ use super::{
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LoopIterationEnvironmentPlan {
-    iteration_slots: Vec<u16>,
-    shared_slots: Vec<u16>,
-    copy_slots: Vec<u16>,
+    iteration: Vec<u16>,
+    shared: Vec<u16>,
+    copies: Vec<u16>,
 }
 
 impl FunctionCompiler<'_, '_> {
@@ -236,9 +236,9 @@ impl FunctionCompiler<'_, '_> {
             let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
             self.builder.add_loop_iteration_environment_site(
                 push,
-                plan.iteration_slots.clone(),
-                plan.shared_slots.clone(),
-                plan.copy_slots.clone(),
+                plan.iteration.clone(),
+                plan.shared.clone(),
+                plan.copies.clone(),
             );
             let object_register = self.lower_expr_to_temp(right)?;
             self.builder.emit_ax(Opcode::PopClosureEnv, 0)?;
@@ -274,8 +274,8 @@ impl FunctionCompiler<'_, '_> {
             let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
             self.builder.add_loop_iteration_environment_site(
                 push,
-                plan.iteration_slots.clone(),
-                plan.shared_slots.clone(),
+                plan.iteration.clone(),
+                plan.shared.clone(),
                 Vec::new(),
             );
         }
@@ -367,6 +367,10 @@ impl FunctionCompiler<'_, '_> {
         self.lower_for_of_statement_core(label, left, right, body, r#await, span)
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "for-of lowering keeps iterator setup, completion handling, and environment refresh ordered"
+    )]
     fn lower_for_of_statement_core(
         &mut self,
         label: Option<AtomId>,
@@ -390,8 +394,8 @@ impl FunctionCompiler<'_, '_> {
             let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
             self.builder.add_loop_iteration_environment_site(
                 push,
-                plan.iteration_slots.clone(),
-                plan.shared_slots.clone(),
+                plan.iteration.clone(),
+                plan.shared.clone(),
                 Vec::new(),
             );
             let iterable_register = self.lower_expr_to_temp(right)?;
@@ -426,8 +430,8 @@ impl FunctionCompiler<'_, '_> {
             let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
             self.builder.add_loop_iteration_environment_site(
                 push,
-                plan.iteration_slots.clone(),
-                plan.shared_slots.clone(),
+                plan.iteration.clone(),
+                plan.shared.clone(),
                 Vec::new(),
             );
         }
@@ -648,7 +652,7 @@ impl FunctionCompiler<'_, '_> {
         }
         let per_iteration_roots = if let Some(binding_id) = self.for_in_of_capture_binding(left)? {
             let loop_scope = self.binding(binding_id)?.scope;
-            self.for_in_of_capture_roots(loop_scope)
+            Self::for_in_of_capture_roots(loop_scope)
         } else {
             Vec::new()
         };
@@ -697,9 +701,9 @@ impl FunctionCompiler<'_, '_> {
         Ok(
             (!iteration_slots.is_empty() || !shared_slots.is_empty()).then_some(
                 LoopIterationEnvironmentPlan {
-                    iteration_slots,
-                    shared_slots,
-                    copy_slots: Vec::new(),
+                    iteration: iteration_slots,
+                    shared: shared_slots,
+                    copies: Vec::new(),
                 },
             ),
         )
@@ -749,9 +753,9 @@ impl FunctionCompiler<'_, '_> {
         let iteration_slots = self.for_in_of_binding_slots(left)?;
         Ok(
             (!iteration_slots.is_empty()).then_some(LoopIterationEnvironmentPlan {
-                iteration_slots,
-                shared_slots: Vec::new(),
-                copy_slots: Vec::new(),
+                iteration: iteration_slots,
+                shared: Vec::new(),
+                copies: Vec::new(),
             }),
         )
     }
@@ -833,9 +837,9 @@ impl FunctionCompiler<'_, '_> {
 
         Ok(
             (!iteration_slots.is_empty()).then_some(LoopIterationEnvironmentPlan {
-                iteration_slots,
-                shared_slots,
-                copy_slots,
+                iteration: iteration_slots,
+                shared: shared_slots,
+                copies: copy_slots,
             }),
         )
     }
@@ -861,8 +865,8 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         plan: &LoopIterationEnvironmentPlan,
     ) -> LoweringResult<Vec<(u16, u16)>> {
-        let mut copied_values = Vec::with_capacity(plan.copy_slots.len());
-        for &slot in &plan.copy_slots {
+        let mut copied_values = Vec::with_capacity(plan.copies.len());
+        for &slot in &plan.copies {
             let value = self.alloc_temp()?;
             self.emit_load_env_slot(value, 0, u32::from(slot))?;
             copied_values.push((slot, value));
@@ -878,9 +882,9 @@ impl FunctionCompiler<'_, '_> {
         let push = self.builder.emit_ax(Opcode::PushClosureEnv, 0)?;
         self.builder.add_loop_iteration_environment_site(
             push,
-            plan.iteration_slots.clone(),
-            plan.shared_slots.clone(),
-            plan.copy_slots.clone(),
+            plan.iteration.clone(),
+            plan.shared.clone(),
+            plan.copies.clone(),
         );
         for (slot, value) in copied_values {
             self.emit_store_env_slot(value, 0, u32::from(slot))?;
@@ -888,7 +892,7 @@ impl FunctionCompiler<'_, '_> {
         Ok(())
     }
 
-    fn for_in_of_capture_roots(&self, loop_scope: ScopeId) -> Vec<ScopeId> {
+    fn for_in_of_capture_roots(loop_scope: ScopeId) -> Vec<ScopeId> {
         // Ancestor loop bindings stay owned by their active outer iteration environments.
         vec![loop_scope]
     }
@@ -1079,6 +1083,10 @@ impl FunctionCompiler<'_, '_> {
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "function collection is an exhaustive statement visitor used by loop environment planning"
+    )]
     fn collect_functions_in_statement(&self, stmt_id: StmtId, functions: &mut Vec<FunctionId>) {
         match self.ast().get_stmt(stmt_id) {
             Stmt::Block { body, .. } => {
@@ -1290,6 +1298,10 @@ impl FunctionCompiler<'_, '_> {
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "function collection is an exhaustive expression visitor used by loop environment planning"
+    )]
     fn collect_functions_in_expression(&self, expr_id: ExprId, functions: &mut Vec<FunctionId>) {
         match self.ast().get_expr(expr_id) {
             Expr::This { .. }
@@ -1381,7 +1393,8 @@ impl FunctionCompiler<'_, '_> {
                 }
             }
             Expr::StaticMemberExpression { object, .. }
-            | Expr::PrivateMemberExpression { object, .. } => {
+            | Expr::PrivateMemberExpression { object, .. }
+            | Expr::PrivateInExpression { object, .. } => {
                 self.collect_functions_in_expression(*object, functions);
             }
             Expr::ComputedMemberExpression {
@@ -1389,9 +1402,6 @@ impl FunctionCompiler<'_, '_> {
             } => {
                 self.collect_functions_in_expression(*object, functions);
                 self.collect_functions_in_expression(*property, functions);
-            }
-            Expr::PrivateInExpression { object, .. } => {
-                self.collect_functions_in_expression(*object, functions);
             }
             Expr::YieldExpression { argument, .. } => {
                 if let Some(argument) = argument {

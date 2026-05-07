@@ -419,6 +419,10 @@ impl FunctionCompiler<'_, '_> {
         Ok(())
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "call target lowering keeps direct eval, super, private, and optional call setup together"
+    )]
     pub(super) fn lower_call_target(&mut self, callee: ExprId) -> LoweringResult<(u16, u16)> {
         let expr = self.ast().get_expr(callee).clone();
         match expr {
@@ -501,7 +505,7 @@ impl FunctionCompiler<'_, '_> {
                         .class_private_layouts
                         .get_by_scope(private_use.defining_scope())
                         .ok_or(LoweringError::UnsupportedExpression { expr: callee })?;
-                    self.private_access_descriptor_index_for_layout(layout, property, false)?
+                    Self::private_access_descriptor_index_for_layout(layout, property, false)?
                 };
                 let descriptor = self.alloc_temp()?;
                 let descriptor_smi = i16::try_from(descriptor_index)
@@ -579,6 +583,10 @@ impl FunctionCompiler<'_, '_> {
         Ok(CallRange::new(base, count))
     }
 
+    #[allow(
+        clippy::unused_self,
+        reason = "feedback metadata is kept as an emitter helper beside call lowering"
+    )]
     pub(super) const fn call_feedback_metadata(
         &self,
         expected_arity: u16,

@@ -117,7 +117,7 @@ impl FunctionCompiler<'_, '_> {
                 let left_register = self.lower_expr_to_temp(left)?;
                 let right_register = self.lower_expr_to_temp(right)?;
                 self.emit_profiled_binary(
-                    self.binary_opcode(operator)?,
+                    Self::binary_opcode(operator)?,
                     dest,
                     left_register,
                     right_register,

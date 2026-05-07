@@ -1,5 +1,5 @@
 use crate::script::{CompilationState, ProgramRootKind, ProgramSource};
-use crate::LoweringResult;
+use crate::{checked_u32_index, LoweringResult};
 use lyng_js_ast::{
     Decl, ExportDefaultDecl, ExportKind, ImportAttribute, ImportSpecifier, ParsedModule, Pattern,
     Stmt,
@@ -228,6 +228,10 @@ pub struct CompiledModuleUnit {
 
 impl CompiledModuleUnit {
     #[inline]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "module unit construction mirrors the separate ECMA-262 module metadata tables"
+    )]
     pub const fn new(
         source: SourceId,
         entry: BytecodeFunctionId,
@@ -361,6 +365,8 @@ impl CompiledModuleUnit {
     }
 }
 
+/// # Errors
+/// Returns `LoweringError` when module metadata or bytecode lowering cannot be encoded.
 pub fn compile_module(
     parsed: &ParsedModule,
     sema: &ModuleSema,
@@ -412,14 +418,15 @@ fn append_module_metadata_atoms(
         if !seen.insert(atom) {
             return;
         }
-        let text = if let Some(text) = atoms.get(atom) {
-            CompiledAtom::from(text)
-        } else {
-            let units = atoms
-                .get_utf16(atom)
-                .expect("module metadata atom should resolve to UTF-8 or UTF-16 storage");
-            CompiledAtom::from(units.to_vec())
-        };
+        let text = atoms.get(atom).map_or_else(
+            || {
+                let units = atoms
+                    .get_utf16(atom)
+                    .expect("module metadata atom should resolve to UTF-8 or UTF-16 storage");
+                CompiledAtom::from(units.to_vec())
+            },
+            CompiledAtom::from,
+        );
         unit_atoms.push((atom, text));
     };
 
@@ -465,7 +472,10 @@ fn derive_module_metadata(
         if binding.scope != module_scope {
             continue;
         }
-        bindings_by_name.insert(binding.name, SemanticBindingId::new(index as u32));
+        bindings_by_name.insert(
+            binding.name,
+            SemanticBindingId::new(checked_u32_index(index)),
+        );
     }
 
     let mut metadata = ModuleMetadata::default();
@@ -560,6 +570,10 @@ fn derive_decl_metadata(
     Ok(())
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "module export derivation follows the ECMA-262 export-entry cases in one pass"
+)]
 fn derive_export_metadata(
     ast: &lyng_js_ast::Ast,
     kind: &ExportKind,
@@ -1005,6 +1019,10 @@ fn collect_expression_sites_from_class_body(
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "expression-site traversal is an exhaustive AST visitor with one arm per expression form"
+)]
 fn collect_expression_sites_from_expr(
     ast: &lyng_js_ast::Ast,
     expr_id: lyng_js_ast::ExprId,
@@ -1108,7 +1126,8 @@ fn collect_expression_sites_from_expr(
             }
         }
         lyng_js_ast::Expr::StaticMemberExpression { object, .. }
-        | lyng_js_ast::Expr::PrivateMemberExpression { object, .. } => {
+        | lyng_js_ast::Expr::PrivateMemberExpression { object, .. }
+        | lyng_js_ast::Expr::PrivateInExpression { object, .. } => {
             collect_expression_sites_from_expr(ast, *object, metadata);
         }
         lyng_js_ast::Expr::ComputedMemberExpression {
@@ -1116,9 +1135,6 @@ fn collect_expression_sites_from_expr(
         } => {
             collect_expression_sites_from_expr(ast, *object, metadata);
             collect_expression_sites_from_expr(ast, *property, metadata);
-        }
-        lyng_js_ast::Expr::PrivateInExpression { object, .. } => {
-            collect_expression_sites_from_expr(ast, *object, metadata);
         }
         lyng_js_ast::Expr::YieldExpression { argument, .. } => {
             if let Some(argument) = argument {

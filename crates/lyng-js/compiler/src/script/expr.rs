@@ -4,6 +4,10 @@ use super::{
 };
 
 impl FunctionCompiler<'_, '_> {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "expression dispatch is the central AST-to-bytecode dispatcher by expression kind"
+    )]
     pub(super) fn lower_expr_into(&mut self, expr_id: ExprId, dest: u16) -> LoweringResult<()> {
         let expr = self.ast().get_expr(expr_id).clone();
         match expr {

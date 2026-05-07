@@ -510,31 +510,31 @@ impl FunctionCompiler<'_, '_> {
         Ok(())
     }
 
-    pub(super) fn named_property_atom(&mut self, expr: ExprId) -> LoweringResult<Option<AtomId>> {
+    pub(super) fn named_property_atom(&mut self, expr: ExprId) -> Option<AtomId> {
         let expr = self.ast().get_expr(expr).clone();
         match expr {
-            Expr::Identifier { name, .. } => Ok(Some(name)),
+            Expr::Identifier { name, .. } => Some(name),
             Expr::StringLiteral { value, .. } => {
                 let literal = self.ast().literals().get_string_value(value).clone();
                 match literal {
                     lyng_js_ast::StringLiteralValue::Utf8(text) => {
                         if is_canonical_array_index_string(&text) {
-                            return Ok(None);
+                            return None;
                         }
-                        Ok(Some(self.state.atoms.intern(&text)))
+                        Some(self.state.atoms.intern(&text))
                     }
                     lyng_js_ast::StringLiteralValue::Utf16(units) => {
-                        Ok(Some(self.state.atoms.intern_utf16(&units)))
+                        Some(self.state.atoms.intern_utf16(&units))
                     }
                 }
             }
-            _ => Ok(None),
+            _ => None,
         }
     }
 
     pub(super) fn named_atom_operand(&mut self, atom: AtomId) -> LoweringResult<u16> {
         let index = self.constant_atom(atom)?;
-        self.encode_small_index(index)
+        Self::encode_small_index(index)
     }
 
     pub(super) fn emit_get_property_by_atom(
@@ -816,7 +816,7 @@ impl FunctionCompiler<'_, '_> {
         Ok(())
     }
 
-    pub(super) const fn binary_opcode(&self, operator: BinaryOp) -> LoweringResult<Opcode> {
+    pub(super) const fn binary_opcode(operator: BinaryOp) -> LoweringResult<Opcode> {
         match operator {
             BinaryOp::Add => Ok(Opcode::Add),
             BinaryOp::Sub => Ok(Opcode::Sub),
@@ -842,7 +842,7 @@ impl FunctionCompiler<'_, '_> {
         }
     }
 
-    pub(super) const fn assignment_opcode(&self, operator: AssignOp) -> LoweringResult<Opcode> {
+    pub(super) const fn assignment_opcode(operator: AssignOp) -> LoweringResult<Opcode> {
         match operator {
             AssignOp::AddAssign => Ok(Opcode::Add),
             AssignOp::SubAssign => Ok(Opcode::Sub),
@@ -942,11 +942,16 @@ impl FunctionCompiler<'_, '_> {
         Ok(index)
     }
 
+    #[allow(
+        clippy::unnecessary_wraps,
+        clippy::unused_self,
+        reason = "register encoding shares the fallible emission interface used by wide operands"
+    )]
     pub(super) const fn encode_register(&self, register: u16) -> LoweringResult<u16> {
         Ok(register)
     }
 
-    pub(super) fn encode_small_index(&self, index: u32) -> LoweringResult<u16> {
+    pub(super) fn encode_small_index(index: u32) -> LoweringResult<u16> {
         u16::try_from(index).map_err(|_| LoweringError::ConstantIndexOverflow { index })
     }
 

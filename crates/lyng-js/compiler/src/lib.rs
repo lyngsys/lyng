@@ -37,6 +37,11 @@ pub use module::{
 };
 pub use script::compile_script;
 
+#[inline]
+pub(crate) fn checked_u32_index(index: usize) -> u32 {
+    u32::try_from(index).expect("compiler table index should fit in u32")
+}
+
 /// Minimal lowering context scaffold for Phase 4 compiler work.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct LoweringContext {
@@ -70,6 +75,8 @@ impl LoweringContext {
         self.next_hidden_register
     }
 
+    /// # Panics
+    /// Panics if the temporary register scaffold exceeds `u16::MAX` registers.
     #[inline]
     pub const fn allocate_register(&mut self) -> u16 {
         let register = self.next_register;
@@ -80,6 +87,8 @@ impl LoweringContext {
         register
     }
 
+    /// # Panics
+    /// Panics if the hidden-register scaffold exceeds `u16::MAX` registers.
     #[inline]
     pub const fn allocate_hidden_register(&mut self) -> u16 {
         let register = self.next_hidden_register;

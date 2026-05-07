@@ -136,6 +136,13 @@ impl InstalledEnvironmentLayouts {
 }
 
 /// Derives a stable environment-layout plan from sema tables while preserving sema slot order.
+///
+/// # Errors
+/// Returns `EnvironmentLayoutPlanError` when sema scope or binding references are inconsistent.
+///
+/// # Panics
+/// Panics only if an in-memory sema table grows beyond `u32::MAX` entries, which the compiler
+/// cannot encode.
 pub fn derive_environment_layout_plan(
     scope_table: &ScopeTable,
     binding_table: &BindingTable,
