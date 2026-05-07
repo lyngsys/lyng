@@ -115,6 +115,10 @@ pub fn decode_instruction_stream(bytes: &[u8]) -> DecodedInstructionStream {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "the decoder keeps one exhaustive opcode-to-encoding table for auditability"
+)]
 const fn instruction_form(opcode: Opcode) -> InstructionForm {
     match opcode {
         Opcode::Nop

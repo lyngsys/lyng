@@ -31,125 +31,121 @@ pub enum BytecodeFunctionKind {
 /// Boolean flags that affect bytecode activation or call behavior.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub struct BytecodeFunctionFlags {
-    strict: bool,
-    tail_call_capable: bool,
-    non_constructible: bool,
-    has_prototype_property: bool,
-    class_constructor: bool,
-    derived_class_constructor: bool,
-    generator: bool,
-    async_function: bool,
+    bits: u16,
 }
+
+const STRICT_FLAG: u16 = 1 << 0;
+const TAIL_CALL_CAPABLE_FLAG: u16 = 1 << 1;
+const NON_CONSTRUCTIBLE_FLAG: u16 = 1 << 2;
+const HAS_PROTOTYPE_PROPERTY_FLAG: u16 = 1 << 3;
+const CLASS_CONSTRUCTOR_FLAG: u16 = 1 << 4;
+const DERIVED_CLASS_CONSTRUCTOR_FLAG: u16 = 1 << 5;
+const GENERATOR_FLAG: u16 = 1 << 6;
+const ASYNC_FUNCTION_FLAG: u16 = 1 << 7;
 
 impl BytecodeFunctionFlags {
     #[inline]
     pub const fn empty() -> Self {
         Self {
-            strict: false,
-            tail_call_capable: false,
-            non_constructible: false,
-            has_prototype_property: true,
-            class_constructor: false,
-            derived_class_constructor: false,
-            generator: false,
-            async_function: false,
+            bits: HAS_PROTOTYPE_PROPERTY_FLAG,
         }
     }
 
     #[inline]
     pub const fn new(strict: bool, tail_call_capable: bool) -> Self {
-        Self {
-            strict,
-            tail_call_capable,
-            non_constructible: false,
-            has_prototype_property: true,
-            class_constructor: false,
-            derived_class_constructor: false,
-            generator: false,
-            async_function: false,
-        }
+        Self::empty()
+            .with_flag(STRICT_FLAG, strict)
+            .with_flag(TAIL_CALL_CAPABLE_FLAG, tail_call_capable)
+    }
+
+    #[inline]
+    const fn contains(self, flag: u16) -> bool {
+        self.bits & flag != 0
+    }
+
+    #[inline]
+    const fn with_flag(mut self, flag: u16, enabled: bool) -> Self {
+        self.bits = if enabled {
+            self.bits | flag
+        } else {
+            self.bits & !flag
+        };
+        self
     }
 
     #[inline]
     pub const fn strict(self) -> bool {
-        self.strict
+        self.contains(STRICT_FLAG)
     }
 
     #[inline]
     pub const fn tail_call_capable(self) -> bool {
-        self.tail_call_capable
+        self.contains(TAIL_CALL_CAPABLE_FLAG)
     }
 
     #[inline]
     pub const fn constructible(self) -> bool {
-        !self.non_constructible
+        !self.contains(NON_CONSTRUCTIBLE_FLAG)
     }
 
     #[inline]
     pub const fn class_constructor(self) -> bool {
-        self.class_constructor
+        self.contains(CLASS_CONSTRUCTOR_FLAG)
     }
 
     #[inline]
     pub const fn derived_class_constructor(self) -> bool {
-        self.derived_class_constructor
+        self.contains(DERIVED_CLASS_CONSTRUCTOR_FLAG)
     }
 
     #[inline]
     pub const fn has_prototype_property(self) -> bool {
-        self.has_prototype_property
+        self.contains(HAS_PROTOTYPE_PROPERTY_FLAG)
     }
 
     #[inline]
     pub const fn generator(self) -> bool {
-        self.generator
+        self.contains(GENERATOR_FLAG)
     }
 
     #[inline]
     pub const fn async_function(self) -> bool {
-        self.async_function
+        self.contains(ASYNC_FUNCTION_FLAG)
     }
 
     #[inline]
-    pub const fn with_tail_call_capable(mut self, tail_call_capable: bool) -> Self {
-        self.tail_call_capable = tail_call_capable;
-        self
+    pub const fn with_tail_call_capable(self, tail_call_capable: bool) -> Self {
+        self.with_flag(TAIL_CALL_CAPABLE_FLAG, tail_call_capable)
     }
 
     #[inline]
-    pub const fn with_constructible(mut self, constructible: bool) -> Self {
-        self.non_constructible = !constructible;
-        self
+    pub const fn with_constructible(self, constructible: bool) -> Self {
+        self.with_flag(NON_CONSTRUCTIBLE_FLAG, !constructible)
     }
 
     #[inline]
-    pub const fn with_has_prototype_property(mut self, has_prototype_property: bool) -> Self {
-        self.has_prototype_property = has_prototype_property;
-        self
+    pub const fn with_has_prototype_property(self, has_prototype_property: bool) -> Self {
+        self.with_flag(HAS_PROTOTYPE_PROPERTY_FLAG, has_prototype_property)
     }
 
     #[inline]
-    pub const fn with_class_constructor(mut self, class_constructor: bool) -> Self {
-        self.class_constructor = class_constructor;
-        self
+    pub const fn with_class_constructor(self, class_constructor: bool) -> Self {
+        self.with_flag(CLASS_CONSTRUCTOR_FLAG, class_constructor)
     }
 
     #[inline]
-    pub const fn with_derived_class_constructor(mut self, derived_class_constructor: bool) -> Self {
-        self.derived_class_constructor = derived_class_constructor;
-        self
+    pub const fn with_derived_class_constructor(self, derived_class_constructor: bool) -> Self {
+        self.with_flag(DERIVED_CLASS_CONSTRUCTOR_FLAG, derived_class_constructor)
     }
 
     #[inline]
-    pub const fn with_generator(mut self, generator: bool) -> Self {
-        self.generator = generator;
-        self
+    pub const fn with_generator(self, generator: bool) -> Self {
+        self.with_flag(GENERATOR_FLAG, generator)
     }
 
     #[inline]
-    pub const fn with_async_function(mut self, async_function: bool) -> Self {
-        self.async_function = async_function;
-        self
+    pub const fn with_async_function(self, async_function: bool) -> Self {
+        self.with_flag(ASYNC_FUNCTION_FLAG, async_function)
     }
 }
 

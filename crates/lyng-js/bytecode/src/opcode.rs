@@ -230,6 +230,10 @@ impl Opcode {
     }
 
     #[inline]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "the opcode display name table mirrors the full opcode enum in one place"
+    )]
     pub const fn name(self) -> &'static str {
         match self {
             Self::Nop => "Nop",

@@ -298,6 +298,10 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Allocate one visible VM register.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the register window is full.
     pub fn alloc_register(&mut self) -> BytecodeBuildResult<u16> {
         self.try_alloc_register()
             .ok_or(BytecodeBuildError::LimitExceeded {
@@ -316,6 +320,11 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Allocate a contiguous visible register range.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the range would overflow the register
+    /// window.
     pub fn alloc_registers(&mut self, count: u16) -> BytecodeBuildResult<u16> {
         self.try_alloc_registers(count)
             .ok_or(BytecodeBuildError::LimitExceeded {
@@ -348,6 +357,11 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Return the instruction offset that the next emit will use.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the instruction stream length no longer
+    /// fits in the serialized offset width.
     pub fn current_offset(&self) -> BytecodeBuildResult<u32> {
         u32::try_from(self.instructions.len()).map_err(|_| BytecodeBuildError::LimitExceeded {
             kind: BytecodeLimitKind::InstructionStream,
@@ -390,6 +404,11 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append one fully encoded instruction to the function body.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the current instruction offset cannot be
+    /// represented.
     pub fn emit(&mut self, instruction: Instruction) -> BytecodeBuildResult<u32> {
         let offset = self.current_offset()?;
         self.instructions.push(instruction);
@@ -397,6 +416,12 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append an ABC-form instruction, recording a wide payload when any operand is out of range.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::OperandOverflow`] when an operand cannot be represented in the
+    /// wide operand format, or [`BytecodeBuildError::LimitExceeded`] when the instruction offset is
+    /// too large.
     pub fn emit_abc<A, B, C>(
         &mut self,
         opcode: Opcode,
@@ -427,6 +452,12 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append an ABx-form instruction, recording a wide payload when either operand is out of range.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::OperandOverflow`] when an operand cannot be represented in the
+    /// wide operand format, or [`BytecodeBuildError::LimitExceeded`] when the instruction offset is
+    /// too large.
     pub fn emit_abx<A, B>(&mut self, opcode: Opcode, a: A, bx: B) -> BytecodeBuildResult<u32>
     where
         A: TryInto<u16>,
@@ -448,11 +479,20 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append an AX-form instruction.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the instruction offset is too large.
     pub fn emit_ax(&mut self, opcode: Opcode, ax: i32) -> BytecodeBuildResult<u32> {
         self.emit(Instruction::ax(opcode, ax))
     }
 
     #[inline]
+    /// Append a jump instruction whose target will be patched later.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::InvalidJumpOpcode`] when `opcode` is not a jump opcode, or
+    /// [`BytecodeBuildError::LimitExceeded`] when the instruction offset is too large.
     pub fn emit_jump_placeholder(&mut self, opcode: Opcode) -> BytecodeBuildResult<u32> {
         if !opcode.is_jump() {
             return Err(BytecodeBuildError::InvalidJumpOpcode { opcode });
@@ -461,6 +501,12 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append a conditional jump instruction whose target will be patched later.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::InvalidJumpOpcode`] when `opcode` is not a supported
+    /// conditional jump, [`BytecodeBuildError::OperandOverflow`] when the condition register is too
+    /// wide, or [`BytecodeBuildError::LimitExceeded`] when the instruction offset is too large.
     pub fn emit_cond_jump_placeholder<A>(
         &mut self,
         opcode: Opcode,
@@ -480,6 +526,12 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append a call instruction and its argument range side payload.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::OperandOverflow`] when one of the fixed call registers cannot
+    /// fit in the narrow call fields, or [`BytecodeBuildError::LimitExceeded`] when the instruction
+    /// offset is too large.
     pub fn emit_call(
         &mut self,
         result: u16,
@@ -497,6 +549,12 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append a tail-call instruction and mark the function as tail-call capable.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::OperandOverflow`] when one of the fixed call registers cannot
+    /// fit in the narrow call fields, or [`BytecodeBuildError::LimitExceeded`] when the instruction
+    /// offset is too large.
     pub fn emit_tail_call(
         &mut self,
         callee: u16,
@@ -515,6 +573,12 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append a construct instruction and its argument range side payload.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::OperandOverflow`] when one of the fixed construct registers
+    /// cannot fit in the narrow fields, or [`BytecodeBuildError::LimitExceeded`] when the
+    /// instruction offset is too large.
     pub fn emit_construct(
         &mut self,
         result: u16,
@@ -530,6 +594,12 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Patch a placeholder jump to branch to `target_offset`.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::InvalidJumpPatch`] when `instruction_offset` does not point to
+    /// a jump instruction, or [`BytecodeBuildError::JumpDeltaOverflow`] when the relative branch
+    /// delta cannot be encoded.
     pub fn patch_jump_to(
         &mut self,
         instruction_offset: u32,
@@ -591,6 +661,10 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append a constant-pool entry and return its index.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the constant-pool index cannot be encoded.
     pub fn add_constant(&mut self, constant: ConstantValue) -> BytecodeBuildResult<u32> {
         let index =
             u32::try_from(self.constants.len()).map_err(|_| BytecodeBuildError::LimitExceeded {
@@ -601,6 +675,11 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append a child function reference and return its table index.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the child-function table index cannot be
+    /// encoded.
     pub fn add_child_function(&mut self, child: BytecodeFunctionId) -> BytecodeBuildResult<u16> {
         let index = u16::try_from(self.child_functions.len()).map_err(|_| {
             BytecodeBuildError::LimitExceeded {
@@ -612,6 +691,10 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append one capture descriptor and return its table index.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the capture table index cannot be encoded.
     pub fn add_capture(&mut self, capture: CaptureDescriptor) -> BytecodeBuildResult<u16> {
         let index =
             u16::try_from(self.captures.len()).map_err(|_| BytecodeBuildError::LimitExceeded {
@@ -622,6 +705,11 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append one exception-handler descriptor and return its table index.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the exception-handler table index cannot
+    /// be encoded.
     pub fn add_exception_handler(&mut self, handler: ExceptionHandler) -> BytecodeBuildResult<u16> {
         let index = u16::try_from(self.exception_handlers.len()).map_err(|_| {
             BytecodeBuildError::LimitExceeded {
@@ -669,6 +757,10 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append one feedback-site descriptor and allocate its feedback slot.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the feedback slot id overflows.
     pub fn add_feedback_site(
         &mut self,
         instruction_offset: u32,
@@ -717,6 +809,10 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Append a safepoint descriptor at an instruction offset and allocate its id.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the safepoint id overflows.
     pub fn add_safepoint_at(
         &mut self,
         instruction_offset: u32,
@@ -734,6 +830,10 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Allocate the next safepoint id without appending a descriptor.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the safepoint id overflows.
     pub fn alloc_safepoint_id(&mut self) -> BytecodeBuildResult<u32> {
         let id = self.next_safepoint_id;
         self.next_safepoint_id =
@@ -751,6 +851,11 @@ impl BytecodeBuilder {
     }
 
     #[inline]
+    /// Finalize the immutable bytecode function.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::LimitExceeded`] when the visible and hidden register counts do
+    /// not fit in the final register window.
     pub fn finish(self) -> BytecodeBuildResult<BytecodeFunction> {
         let final_register_window = self
             .header
