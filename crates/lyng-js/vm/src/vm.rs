@@ -904,6 +904,35 @@ impl Vm {
         )
     }
 
+    pub fn evaluate_script_with_host_referrer_and_extensions_retaining_installed(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRecord,
+        unit: &CompiledScriptUnit,
+        script_referrer: Option<&ModuleKey>,
+        host: &dyn HostHooks,
+        provider: Option<&SharedRealmExtensionProvider>,
+    ) -> VmResult<(Value, InstalledCode)> {
+        match provider {
+            Some(provider) => self.with_extension_provider(provider, |vm| {
+                vm.evaluate_script_with_host_referrer_retaining_installed(
+                    agent,
+                    realm,
+                    unit,
+                    script_referrer,
+                    host,
+                )
+            }),
+            None => self.evaluate_script_with_host_referrer_retaining_installed(
+                agent,
+                realm,
+                unit,
+                script_referrer,
+                host,
+            ),
+        }
+    }
+
     pub fn evaluate_module_with_registry_and_host_and_extensions(
         &mut self,
         agent: &mut Agent,
@@ -1098,6 +1127,35 @@ impl Vm {
             Some(unit.instantiation_plan()),
             None,
         )
+    }
+
+    fn evaluate_script_with_host_referrer_retaining_installed(
+        &mut self,
+        agent: &mut Agent,
+        realm: RealmRecord,
+        unit: &CompiledScriptUnit,
+        script_referrer: Option<&ModuleKey>,
+        host: &dyn HostHooks,
+    ) -> VmResult<(Value, InstalledCode)> {
+        let installed = self.install_script(agent, realm.id(), unit)?;
+        let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
+        self.install_active_realm_extensions(agent, realm.id())?;
+        self.instantiate_global_script(agent, realm, unit.instantiation_plan())?;
+        let script_referrer =
+            script_referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
+        let mut registry = RejectingNativeRegistry;
+        let value = self.evaluate_entry_with_registry_and_checkpoint(
+            agent,
+            installed,
+            realm.global_env(),
+            realm.global_env(),
+            script_referrer,
+            host,
+            &mut registry,
+            Some(unit.instantiation_plan()),
+            None,
+        )?;
+        Ok((value, installed))
     }
 
     pub fn evaluate_module(

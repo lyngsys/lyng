@@ -8,8 +8,9 @@ use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use lyng_js_bytecode::CompiledScriptUnit;
 use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_compiler::compile_script;
 use lyng_js_env::{Agent, Runtime};
@@ -17,9 +18,13 @@ use lyng_js_host::{ModuleKey, ModuleSourceRequest};
 use lyng_js_ops::object::ordinary_get;
 use lyng_js_parser::{parse_module, parse_script};
 use lyng_js_sema::{analyze_module, analyze_script};
-use lyng_js_types::{AbruptCompletion, ObjectRef, PropertyKey, Value};
-use lyng_js_vm::{ModuleLoadError, SharedRealmExtensionProvider, Vm, VmError};
+use lyng_js_types::{AbruptCompletion, CodeRef, ObjectRef, PropertyKey, Value};
+use lyng_js_vm::{
+    FeedbackInlineCacheState, FeedbackSiteDetail, ModuleLoadError, SharedRealmExtensionProvider,
+    Vm, VmError,
+};
 
+use crate::diagnostics::{Test262DiagnosticTimings, Test262RuntimeDiagnostics};
 use crate::extensions::{Test262Host, Test262PrintObserver, Test262RealmExtension};
 use crate::helpers::HelperCatalog;
 use crate::metadata::{
@@ -51,6 +56,12 @@ enum WorkerMessage {
 pub(crate) struct WorkerExecution {
     pub(crate) outcome: RunOutcome,
     pub(crate) reusable: bool,
+}
+
+pub(crate) struct DiagnosticExecution {
+    pub(crate) outcome_label: String,
+    pub(crate) timings: Test262DiagnosticTimings,
+    pub(crate) diagnostics: Option<Test262RuntimeDiagnostics>,
 }
 
 pub(crate) struct WorkerHandle {
@@ -334,6 +345,458 @@ pub(crate) fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> Run
     }
 
     outcome
+}
+
+#[allow(clippy::too_many_lines)]
+pub(crate) fn run_test_with_diagnostics(
+    test: &PreparedTest,
+    helpers: &Arc<HelperCatalog>,
+) -> DiagnosticExecution {
+    let total_start = Instant::now();
+    let mut timings = Test262DiagnosticTimings::default();
+
+    let read_start = Instant::now();
+    let source = match fs::read_to_string(&test.path) {
+        Ok(source) => {
+            timings.read_source = read_start.elapsed();
+            source
+        }
+        Err(error) => {
+            timings.read_source = read_start.elapsed();
+            timings.total = total_start.elapsed();
+            return DiagnosticExecution {
+                outcome_label: diagnostic_outcome_label(&RunOutcome::Fail(format!(
+                    "read error: {error}"
+                ))),
+                timings,
+                diagnostics: None,
+            };
+        }
+    };
+
+    let expectation = TestExpectation::from_metadata(&test.metadata);
+    if let Some(outcome) = expectation.fail_for_unknown_phase() {
+        timings.total = total_start.elapsed();
+        return DiagnosticExecution {
+            outcome_label: diagnostic_outcome_label(&outcome),
+            timings,
+            diagnostics: None,
+        };
+    }
+
+    if expectation.requires_standalone_frontend_check() {
+        let frontend_start = Instant::now();
+        let outcome = standalone_frontend_outcome(&source, test.variant, expectation.clone());
+        timings.frontend_check = frontend_start.elapsed();
+        if let Some(outcome) = outcome {
+            timings.total = total_start.elapsed();
+            return DiagnosticExecution {
+                outcome_label: diagnostic_outcome_label(&outcome),
+                timings,
+                diagnostics: None,
+            };
+        }
+    }
+
+    let runtime_entry_source = if test.variant.is_raw() {
+        Cow::Borrowed(source.as_str())
+    } else {
+        hot_test_runtime_source(&test.path, &source)
+    };
+    let assembly_start = Instant::now();
+    let runtime_source = match helpers.build_runtime_source_for_variant(
+        &test.metadata,
+        test.variant,
+        &runtime_entry_source,
+    ) {
+        Ok(source) => {
+            timings.runtime_assembly = assembly_start.elapsed();
+            source
+        }
+        Err(error) => {
+            timings.runtime_assembly = assembly_start.elapsed();
+            timings.total = total_start.elapsed();
+            return DiagnosticExecution {
+                outcome_label: diagnostic_outcome_label(&RunOutcome::Fail(error)),
+                timings,
+                diagnostics: None,
+            };
+        }
+    };
+
+    let print_observer = Test262PrintObserver::default();
+    let provider: SharedRealmExtensionProvider =
+        Arc::new(Test262RealmExtension::new(print_observer.clone()));
+
+    let (outcome, script_timings, diagnostics) = if expectation.module_goal {
+        let eval_start = Instant::now();
+        let outcome = match run_module(&test.path, &runtime_source, helpers, &provider) {
+            Ok(()) => match expectation
+                .negative
+                .as_ref()
+                .map(|negative| &negative.phase)
+            {
+                Some(ExpectedFailurePhase::Runtime) => {
+                    RunOutcome::Fail("expected runtime error but evaluation succeeded".to_string())
+                }
+                Some(ExpectedFailurePhase::Resolution) => RunOutcome::Fail(
+                    "expected resolution error but module loading succeeded".to_string(),
+                ),
+                _ => RunOutcome::Pass,
+            },
+            Err(ModuleExecutionError::Abrupt { actual_type }) => {
+                negative_runtime_outcome(expectation.negative.as_ref(), "runtime", actual_type)
+            }
+            Err(ModuleExecutionError::FrontendSyntax { stage }) => {
+                negative_resolution_frontend_outcome(expectation.negative.as_ref(), stage)
+            }
+            Err(ModuleExecutionError::Other(error)) => RunOutcome::Fail(error),
+        };
+        let module_timings = Test262DiagnosticTimings {
+            evaluation: eval_start.elapsed(),
+            ..Test262DiagnosticTimings::default()
+        };
+        (outcome, module_timings, None)
+    } else {
+        run_script_with_diagnostics(
+            &test.path,
+            &runtime_source,
+            helpers,
+            &provider,
+            &expectation,
+        )
+    };
+    timings.parse += script_timings.parse;
+    timings.sema += script_timings.sema;
+    timings.lowering += script_timings.lowering;
+    timings.install_or_load += script_timings.install_or_load;
+    timings.evaluation += script_timings.evaluation;
+
+    let outcome = if expectation.async_test && matches!(outcome, RunOutcome::Pass) {
+        async_completion_outcome(&print_observer.messages())
+    } else {
+        outcome
+    };
+    timings.total = total_start.elapsed();
+    DiagnosticExecution {
+        outcome_label: diagnostic_outcome_label(&outcome),
+        timings,
+        diagnostics,
+    }
+}
+
+fn standalone_frontend_outcome(
+    source: &str,
+    variant: TestVariant,
+    expectation: TestExpectation,
+) -> Option<RunOutcome> {
+    let parse_source = effective_parse_source(source, variant);
+    let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut atoms = AtomTable::new();
+        if expectation.module_goal {
+            let parsed = parse_module(&mut atoms, SourceId::new(0), &parse_source);
+            (atoms, parsed.diagnostics, true)
+        } else {
+            let parsed = parse_script(&mut atoms, SourceId::new(0), &parse_source);
+            (atoms, parsed.diagnostics, false)
+        }
+    }));
+
+    let (atoms, parse_diagnostics, parsed_as_module) = match parse_result {
+        Ok(result) => result,
+        Err(panic) => {
+            return Some(RunOutcome::Fail(format!(
+                "PANIC parse: {}",
+                panic_message(&panic)
+            )));
+        }
+    };
+
+    if parse_diagnostics.has_errors() {
+        return Some(
+            match expectation
+                .negative
+                .as_ref()
+                .map(|negative| &negative.phase)
+            {
+                Some(ExpectedFailurePhase::Parse) => {
+                    frontend_negative_outcome("parse", expectation)
+                }
+                _ => RunOutcome::Fail("unexpected parse error".to_string()),
+            },
+        );
+    }
+
+    let sema_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut atoms = atoms;
+        if parsed_as_module {
+            let parsed = parse_module(&mut atoms, SourceId::new(0), &parse_source);
+            analyze_module(&parsed, &atoms).diagnostics
+        } else {
+            let parsed = parse_script(&mut atoms, SourceId::new(0), &parse_source);
+            analyze_script(&parsed, &atoms).diagnostics
+        }
+    }));
+    let sema_diagnostics = match sema_result {
+        Ok(sema) => sema,
+        Err(panic) => {
+            return Some(RunOutcome::Fail(format!(
+                "PANIC sema: {}",
+                panic_message(&panic)
+            )));
+        }
+    };
+
+    if sema_diagnostics.has_errors() {
+        return Some(
+            match expectation
+                .negative
+                .as_ref()
+                .map(|negative| &negative.phase)
+            {
+                Some(ExpectedFailurePhase::Parse) => {
+                    frontend_negative_outcome("parse", expectation)
+                }
+                Some(ExpectedFailurePhase::Early) => {
+                    frontend_negative_outcome("early", expectation)
+                }
+                _ => RunOutcome::Fail("unexpected sema error".to_string()),
+            },
+        );
+    }
+
+    if let Some(negative) = expectation.negative.as_ref() {
+        match negative.phase {
+            ExpectedFailurePhase::Parse => {
+                return Some(RunOutcome::Fail(
+                    "expected parse error but frontend succeeded".to_string(),
+                ));
+            }
+            ExpectedFailurePhase::Early => {
+                return Some(RunOutcome::Fail(
+                    "expected early error but sema passed".to_string(),
+                ));
+            }
+            ExpectedFailurePhase::Other(_) => unreachable!("unknown phase handled earlier"),
+            ExpectedFailurePhase::Runtime | ExpectedFailurePhase::Resolution => {}
+        }
+    }
+
+    None
+}
+
+fn run_script_with_diagnostics(
+    path: &Path,
+    runtime_source: &str,
+    helpers: &Arc<HelperCatalog>,
+    provider: &SharedRealmExtensionProvider,
+    expectation: &TestExpectation,
+) -> (
+    RunOutcome,
+    Test262DiagnosticTimings,
+    Option<Test262RuntimeDiagnostics>,
+) {
+    let mut timings = Test262DiagnosticTimings::default();
+    let compile_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut atoms = AtomTable::new();
+        let parse_start = Instant::now();
+        let parsed = parse_script(&mut atoms, SourceId::new(0), runtime_source);
+        timings.parse = parse_start.elapsed();
+        if parsed.diagnostics.has_errors() {
+            return Err(ScriptExecutionError::Vm("harness parse error".to_string()));
+        }
+
+        let sema_start = Instant::now();
+        let sema = analyze_script(&parsed, &atoms);
+        timings.sema = sema_start.elapsed();
+        if sema.diagnostics.has_errors() {
+            return Err(ScriptExecutionError::Vm("harness sema error".to_string()));
+        }
+
+        let lowering_start = Instant::now();
+        let unit = compile_script(&parsed, &sema, &mut atoms)
+            .map_err(|error| ScriptExecutionError::Vm(format!("lowering error: {error:?}")))?;
+        timings.lowering = lowering_start.elapsed();
+        Ok(unit)
+    }));
+
+    let unit = match compile_result {
+        Ok(Ok(unit)) => unit,
+        Ok(Err(error)) => return (script_error_outcome(error, expectation), timings, None),
+        Err(panic) => {
+            return (
+                RunOutcome::Fail(format!("PANIC compile: {}", panic_message(&panic))),
+                timings,
+                None,
+            );
+        }
+    };
+
+    let mut diagnostics = compiled_script_diagnostics(&unit);
+    let eval_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let host = Test262Host::from_system_clock(path, runtime_source, Arc::clone(helpers));
+        let script_referrer = ModuleKey::new(
+            path.canonicalize()
+                .unwrap_or_else(|_| path.to_path_buf())
+                .display()
+                .to_string()
+                .into_boxed_str(),
+        );
+        let mut runtime = Runtime::new(host.clone());
+        diagnostics.runtime_live_bytes_before = runtime.phase6_accounting().live_bytes;
+        let result = {
+            let agent = runtime.root_agent_mut();
+            let realm = agent.default_realm().expect("default realm should exist");
+            let global_object = realm.global_object();
+            let mut vm = Vm::new();
+            let install_start = Instant::now();
+            let result = vm.evaluate_script_with_host_referrer_and_extensions_retaining_installed(
+                agent,
+                realm,
+                &unit,
+                Some(&script_referrer),
+                &host,
+                Some(provider),
+            );
+            timings.install_or_load = install_start.elapsed();
+            match result {
+                Ok((_, installed)) => {
+                    collect_vm_diagnostics(&vm, installed.code(), &mut diagnostics);
+                    Ok(())
+                }
+                Err(VmError::Abrupt(completion)) => Err(ScriptExecutionError::Abrupt {
+                    actual_type: thrown_error_type(agent, global_object, completion),
+                }),
+                Err(error) => Err(ScriptExecutionError::Vm(format!("{error:?}"))),
+            }
+        };
+        diagnostics.runtime_live_bytes_after = runtime.phase6_accounting().live_bytes;
+        diagnostics.runtime_live_bytes_delta = diagnostics
+            .runtime_live_bytes_after
+            .saturating_sub(diagnostics.runtime_live_bytes_before)
+            .try_into()
+            .unwrap_or(isize::MAX);
+        result
+    }));
+
+    let outcome = match eval_result {
+        Ok(Ok(())) => match expectation
+            .negative
+            .as_ref()
+            .map(|negative| &negative.phase)
+        {
+            Some(ExpectedFailurePhase::Runtime) => {
+                RunOutcome::Fail("expected runtime error but evaluation succeeded".to_string())
+            }
+            Some(ExpectedFailurePhase::Resolution) => RunOutcome::Fail(
+                "expected resolution error but script evaluation succeeded".to_string(),
+            ),
+            _ => RunOutcome::Pass,
+        },
+        Ok(Err(error)) => script_error_outcome(error, expectation),
+        Err(panic) => RunOutcome::Fail(format!("PANIC runtime: {}", panic_message(&panic))),
+    };
+    timings.evaluation = timings.install_or_load;
+    (outcome, timings, Some(diagnostics))
+}
+
+fn script_error_outcome(error: ScriptExecutionError, expectation: &TestExpectation) -> RunOutcome {
+    match error {
+        ScriptExecutionError::Abrupt { actual_type } => {
+            negative_runtime_outcome(expectation.negative.as_ref(), "runtime", actual_type)
+        }
+        ScriptExecutionError::Vm(error) => match expectation
+            .negative
+            .as_ref()
+            .map(|negative| &negative.phase)
+        {
+            Some(ExpectedFailurePhase::Runtime) => {
+                RunOutcome::Fail(format!("expected runtime error but got {error}"))
+            }
+            _ => RunOutcome::Fail(format!("runtime error: {error}")),
+        },
+    }
+}
+
+fn compiled_script_diagnostics(unit: &CompiledScriptUnit) -> Test262RuntimeDiagnostics {
+    let mut diagnostics = Test262RuntimeDiagnostics {
+        function_count: unit.functions().len(),
+        ..Test262RuntimeDiagnostics::default()
+    };
+    for function in unit.functions() {
+        diagnostics.instruction_words +=
+            function.instructions().len() + function.wide_operands().len();
+        diagnostics.wide_operands += function.wide_operands().len();
+        diagnostics.constants += function.constants().len();
+        diagnostics.metadata_records += function.constants().len()
+            + function.child_functions().len()
+            + function.captures().len()
+            + function.exception_handlers().len()
+            + function.feedback_sites().len()
+            + function.source_map().len()
+            + function.safepoints().len()
+            + function.deopt_snapshots().len();
+        diagnostics.source_map_entries += function.source_map().len();
+        diagnostics.safepoints += function.safepoints().len();
+        diagnostics.deopt_snapshots += function.deopt_snapshots().len();
+        diagnostics.feedback_slots += function.feedback_sites().len();
+        diagnostics.live_feedback_sites += function.feedback_sites().len();
+    }
+    diagnostics
+}
+
+fn collect_vm_diagnostics(vm: &Vm, root: CodeRef, diagnostics: &mut Test262RuntimeDiagnostics) {
+    let mut stack = vec![root];
+    while let Some(code) = stack.pop() {
+        let Some(function) = vm.installed_function(code) else {
+            continue;
+        };
+        if let Some(footprint) = vm.feedback_vector_footprint(code) {
+            diagnostics.feedback_slots = diagnostics.feedback_slots.max(footprint.slot_count());
+            diagnostics.live_feedback_sites = diagnostics
+                .live_feedback_sites
+                .max(footprint.live_site_count());
+        }
+        if let Some(snapshot) = vm.feedback_vector_snapshot(code) {
+            diagnostics.megamorphic_sites += snapshot
+                .sites()
+                .iter()
+                .filter(|site| match site.detail() {
+                    FeedbackSiteDetail::NamedProperty(named) => {
+                        named.state() == FeedbackInlineCacheState::Megamorphic
+                    }
+                    FeedbackSiteDetail::KeyedProperty(keyed) => {
+                        keyed.state() == FeedbackInlineCacheState::Megamorphic
+                    }
+                    _ => false,
+                })
+                .count();
+        }
+        if let Some(tiering) = vm.tiering_snapshot(code) {
+            diagnostics.tier_hotness = diagnostics.tier_hotness.saturating_add(tiering.hotness());
+            diagnostics.tier_feedback_events = diagnostics
+                .tier_feedback_events
+                .saturating_add(tiering.feedback_events());
+            diagnostics.tier_backedge_events = diagnostics
+                .tier_backedge_events
+                .saturating_add(tiering.backedge_events());
+        }
+        for child_index in 0..function.child_functions().len() {
+            let child_index =
+                u32::try_from(child_index).expect("child function count should fit u32");
+            if let Some(child_code) = vm.installed_child_code(code, child_index) {
+                stack.push(child_code);
+            }
+        }
+    }
+}
+
+fn diagnostic_outcome_label(outcome: &RunOutcome) -> String {
+    match outcome {
+        RunOutcome::Pass => "pass".to_string(),
+        RunOutcome::Fail(message) if message.starts_with("PANIC") => "panic".to_string(),
+        RunOutcome::Fail(_) => "fail".to_string(),
+    }
 }
 
 fn hot_test_runtime_source<'a>(path: &Path, source: &'a str) -> Cow<'a, str> {

@@ -9,6 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 lyng-js-builtins = { workspace = true }
+lyng-js-bytecode = { workspace = true }
 lyng-js-common = { workspace = true }
 lyng-js-compiler = { workspace = true }
 lyng-js-env = { workspace = true }

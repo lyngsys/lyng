@@ -14,5 +14,7 @@ lyng-js-env.workspace = true
 lyng-js-host.workspace = true
 lyng-js-parser.workspace = true
 lyng-js-sema.workspace = true
+lyng-js-test262 = { path = "../lyng-js-test262" }
 lyng-js-types.workspace = true
 lyng-js-vm.workspace = true
+serde_json = "1"

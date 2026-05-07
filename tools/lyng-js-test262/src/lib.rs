@@ -1,10 +1,17 @@
 mod cli;
+mod diagnostics;
 mod execution;
 mod extensions;
 mod helpers;
 mod metadata;
 mod report;
 mod selection;
+
+pub use diagnostics::{
+    prepare_diagnostic_suite, Test262DiagnosticConfig, Test262DiagnosticOutcome,
+    Test262DiagnosticProposalStage, Test262DiagnosticSuite, Test262DiagnosticTest,
+    Test262DiagnosticTimings, Test262RuntimeDiagnostics,
+};
 
 use std::collections::HashMap;
 use std::fs;
