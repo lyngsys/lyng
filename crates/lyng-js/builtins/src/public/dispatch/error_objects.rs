@@ -44,29 +44,29 @@ pub(super) fn dispatch_error_builtin<Cx: PublicBuiltinDispatchContext>(
         return suppressed_error_builtin(context, invocation).map(Some);
     }
     if entry == super::error_is_error_builtin() {
-        return error_is_error_builtin(context, invocation).map(Some);
+        return Ok(Some(error_is_error_value(context, invocation)));
     }
     Ok(None)
 }
 
-fn error_is_error_builtin<Cx: PublicBuiltinDispatchContext>(
+fn error_is_error_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
+) -> Value {
     let argument = invocation
         .arguments()
         .first()
         .copied()
         .unwrap_or(Value::undefined());
     let Some(object_ref) = argument.as_object_ref() else {
-        return Ok(Value::from_bool(false));
+        return Value::from_bool(false);
     };
     let agent = cx.agent();
     let is_error = agent
         .objects()
         .object_header(agent.heap().view(), object_ref)
         .is_some_and(|header| header.flags().is_error_object());
-    Ok(Value::from_bool(is_error))
+    Value::from_bool(is_error)
 }
 
 fn error_constructor_builtin<Cx: PublicBuiltinDispatchContext>(

@@ -26,6 +26,10 @@ use lyng_js_types::{
     Value, WellKnownSymbolId,
 };
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "iterator family installation is a fixed ordered builtin graph"
+)]
 pub(in crate::public) fn install_iterator_family(
     agent: &mut Agent,
     cx: FamilyInstallContext,
@@ -226,6 +230,10 @@ pub(in crate::public) fn iterator_builtin_object(
     .find_map(|(id, object)| (entry == id).then_some(object))
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "iterator descriptor installation is kept as one ordered bootstrap table"
+)]
 pub(in crate::public) fn install_iterator_family_descriptors(
     agent: &mut Agent,
     cache: &mut BuiltinCache,

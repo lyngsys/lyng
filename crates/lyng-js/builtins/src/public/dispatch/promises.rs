@@ -64,7 +64,7 @@ fn dispatch_promise_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
         return promise_with_resolvers_builtin(context, invocation).map(Some);
     }
     if entry == super::promise_species_getter_builtin() {
-        return promise_species_getter_builtin(context, invocation).map(Some);
+        return Ok(Some(promise_species_getter_value(invocation)));
     }
     Ok(None)
 }
@@ -422,11 +422,8 @@ fn promise_any_builtin<Cx: PublicBuiltinDispatchContext>(
     promise_collecting_combinator_builtin(cx, invocation, PromiseCombinatorKind::Any)
 }
 
-const fn promise_species_getter_builtin<Cx: PublicBuiltinDispatchContext>(
-    _cx: &mut Cx,
-    invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
-    Ok(invocation.this_value())
+const fn promise_species_getter_value(invocation: BuiltinInvocation<'_>) -> Value {
+    invocation.this_value()
 }
 
 fn promise_capability_executor_builtin<Cx: PublicBuiltinDispatchContext>(

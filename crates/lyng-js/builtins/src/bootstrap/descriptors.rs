@@ -35,6 +35,10 @@ fn resolve_install_target(
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "intrinsic install-target resolution is an explicit bootstrap mapping table"
+)]
 fn resolve_intrinsic(
     agent: &Agent,
     realm: RealmRef,

@@ -212,7 +212,7 @@ fn typed_array_from_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
                 get_property_from_object(cx, *source_object, key)?
             }
         };
-        let mapped = if let Some(mapper) = mapper {
+        let mapped_value = if let Some(mapper) = mapper {
             cx.call_to_completion(
                 mapper,
                 this_arg,
@@ -225,7 +225,7 @@ fn typed_array_from_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
             value
         };
         let key = array_like_index_property_key(cx, u64::try_from(index).unwrap_or(u64::MAX));
-        set_property_on_object(cx, object, key, mapped)?;
+        set_property_on_object(cx, object, key, mapped_value)?;
     }
     Ok(Value::from_object_ref(object))
 }
@@ -244,6 +244,10 @@ fn typed_array_of_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_object_ref(object))
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "typed array construction keeps the ECMA constructor argument cases in one ordered branch"
+)]
 fn typed_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,

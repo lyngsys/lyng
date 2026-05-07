@@ -155,12 +155,12 @@ fn dispatch_object_prototype_builtin<Cx: PublicBuiltinDispatchContext>(
 fn is_error_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: lyng_js_types::ObjectRef,
-) -> Result<bool, Cx::Error> {
+) -> bool {
     let agent = cx.agent();
-    Ok(agent
+    agent
         .objects()
         .object_header(agent.heap().view(), object_ref)
-        .is_some_and(|header| header.flags().is_error_object()))
+        .is_some_and(|header| header.flags().is_error_object())
 }
 
 fn object_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1259,7 +1259,7 @@ pub(super) fn object_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
                 }
             } else if is_arguments {
                 "Arguments"
-            } else if is_error_object(cx, object_ref)? {
+            } else if is_error_object(cx, object_ref) {
                 "Error"
             } else {
                 "Object"

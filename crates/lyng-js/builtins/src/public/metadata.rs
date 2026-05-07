@@ -345,6 +345,11 @@ pub fn builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::too_many_lines,
+        reason = "metadata tests keep expected builtin rows inline with the lookup table they verify"
+    )]
+
     use super::*;
 
     #[test]

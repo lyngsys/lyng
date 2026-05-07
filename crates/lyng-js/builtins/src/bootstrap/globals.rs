@@ -15,6 +15,10 @@ use super::{
     BuiltinPropertyKeySpec, BuiltinPropertyValueSpec, RealmRecord, Value, WellKnownAtom,
 };
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "global descriptor installation is a single ordered ECMA bootstrap table"
+)]
 pub(super) fn default_global_descriptors(
     agent: &mut Agent,
     artifacts: BootstrapArtifacts,

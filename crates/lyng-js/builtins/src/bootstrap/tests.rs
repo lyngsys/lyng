@@ -1,3 +1,8 @@
+#![allow(
+    clippy::too_many_lines,
+    reason = "bootstrap descriptor tests keep expected installed properties inline for auditability"
+)]
+
 use super::*;
 use lyng_js_common::{AtomId, AtomLifetime};
 use lyng_js_env::RealmBootstrapState;

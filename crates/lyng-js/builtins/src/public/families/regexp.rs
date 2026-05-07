@@ -106,6 +106,10 @@ pub(in crate::public) fn install_regexp_family(
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "RegExp builtin-object lookup is an explicit builtin ID table"
+)]
 pub(in crate::public) fn regexp_builtin_object(
     builtins: &PublicRealmBuiltins,
     entry: BuiltinFunctionId,
@@ -461,6 +465,10 @@ pub(in crate::public) fn install_regexp_family_descriptors(
     )
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "RegExp constructor descriptor installation is an ordered bootstrap table"
+)]
 fn install_regexp_constructor_descriptors(
     agent: &mut Agent,
     cache: &mut BuiltinCache,

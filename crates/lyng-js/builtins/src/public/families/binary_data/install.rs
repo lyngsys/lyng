@@ -219,6 +219,10 @@ struct BinaryDataConstructorBuiltins {
     uint8_array: ObjectRef,
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "binary-data constructor installation mirrors the typed-array intrinsic family order"
+)]
 fn install_binary_data_constructors(
     agent: &mut Agent,
     cx: FamilyInstallContext,

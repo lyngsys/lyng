@@ -669,6 +669,10 @@ fn array_buffer_transfer_to_fixed_length_builtin<Cx: PublicBuiltinDispatchContex
     array_buffer_transfer_family_builtin(cx, invocation, true)
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "ArrayBuffer and SharedArrayBuffer slice share the same spec-shaped copy path"
+)]
 fn array_buffer_family_slice_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,

@@ -144,6 +144,10 @@ impl InternalRealmBuiltins {
     }
 
     #[inline]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "internal builtin object lookup is an explicit reserved-namespace table"
+    )]
     pub fn builtin_object(self, entry: BuiltinFunctionId) -> Option<ObjectRef> {
         if entry == internal_function_call_builtin() {
             return Some(self.function_call);
@@ -275,6 +279,10 @@ impl InternalBuiltinCache {
         Self::default()
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "internal realm bootstrap allocates the reserved builtin graph in dependency order"
+    )]
     pub fn ensure_realm_builtins(
         &mut self,
         agent: &mut Agent,
@@ -579,6 +587,10 @@ impl InternalBuiltinCache {
 
 /// Compatibility metadata for the reserved internal builtin namespace.
 #[inline]
+#[allow(
+    clippy::too_many_lines,
+    reason = "internal builtin metadata mirrors the reserved builtin ID table"
+)]
 pub fn internal_builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata> {
     if entry == internal_function_call_builtin() {
         return Some(BuiltinEntryMetadata::new("call", 1, false, false));
@@ -1031,6 +1043,10 @@ pub trait InternalBuiltinDispatchContext {
 /// # Errors
 ///
 /// Propagates errors from the selected [`InternalBuiltinDispatchContext`] hook.
+#[allow(
+    clippy::too_many_lines,
+    reason = "internal builtin dispatch is the reserved bridge table for builtin-owned hooks"
+)]
 pub fn dispatch_internal_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
     entry: BuiltinFunctionId,
