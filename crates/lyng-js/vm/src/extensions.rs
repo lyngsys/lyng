@@ -311,6 +311,10 @@ impl<'a> EmbeddingFunctionContext<'a> {
         self.vm.value_to_string_text(self.agent, value)
     }
 
+    pub fn alloc_code_unit_string(&mut self, units: &[u16]) -> Value {
+        self.vm.alloc_code_unit_string_value(self.agent, units)
+    }
+
     pub fn create_embedding_realm(&mut self) -> Result<BootstrapArtifacts, VmError> {
         self.vm.create_embedding_realm(self.agent, self.provider)
     }

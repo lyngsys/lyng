@@ -328,6 +328,12 @@ impl TraceHeapEdges for ActiveVmRoots<'_> {
         for state in &self.vm.loop_iteration_envs {
             state.trace_heap_edges(tracer);
         }
+        for environment in &self.vm.loop_iteration_source_scratch {
+            environment.trace_heap_edges(tracer);
+        }
+        for environment in &self.vm.loop_iteration_target_scratch {
+            environment.trace_heap_edges(tracer);
+        }
         for state in &self.vm.with_environment_states {
             state.trace_heap_edges(tracer);
         }
@@ -468,6 +474,8 @@ pub struct Vm {
     direct_eval_environment_overlays: HashMap<EnvironmentRef, EnvironmentRef>,
     direct_eval_lexical_layouts: HashMap<Vec<BytecodeEnvironmentBinding>, EnvironmentLayoutId>,
     loop_iteration_layouts: HashMap<Option<EnvironmentLayoutId>, EnvironmentLayoutId>,
+    loop_iteration_source_scratch: Vec<EnvironmentRef>,
+    loop_iteration_target_scratch: Vec<EnvironmentRef>,
     class_private_env_layout: Option<EnvironmentLayoutId>,
     internal_completion_targets: Vec<usize>,
     generator_resume_depth: usize,
@@ -520,6 +528,8 @@ impl Vm {
             direct_eval_environment_overlays: HashMap::new(),
             direct_eval_lexical_layouts: HashMap::new(),
             loop_iteration_layouts: HashMap::new(),
+            loop_iteration_source_scratch: Vec::new(),
+            loop_iteration_target_scratch: Vec::new(),
             class_private_env_layout: None,
             internal_completion_targets: Vec::new(),
             generator_resume_depth: 0,
@@ -549,6 +559,16 @@ impl Vm {
     #[cfg(test)]
     pub(crate) fn string_code_units_scratch_capacity(&self) -> usize {
         self.string_code_units_scratch.capacity()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn loop_iteration_scratch_state_for_tests(&self) -> (usize, usize, usize, usize) {
+        (
+            self.loop_iteration_source_scratch.len(),
+            self.loop_iteration_target_scratch.len(),
+            self.loop_iteration_source_scratch.capacity(),
+            self.loop_iteration_target_scratch.capacity(),
+        )
     }
 
     pub(super) fn class_private_environment_layout(

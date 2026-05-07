@@ -584,6 +584,11 @@ const DATE_DST_CLEAR_CACHE_NOOP_SOURCE: &str = r#"  function clearDSTOffsetCache
     // Lyng computes Date offsets directly through host hooks; there is no
     // SpiderMonkey DST offset cache to purge between deterministic lookups.
   }"#;
+const REGEXP_BUILD_STRING_WRAPPER_SOURCE: &str = r#"
+function buildString(args) {
+  var fast = $262.buildString(args);
+  return fast === null ? buildStringFallback(args) : fast;
+}"#;
 pub(crate) const SUPPORTED_INCLUDES: &[&str] = &[
     "compareArray.js",
     "deepEqual.js",
@@ -768,6 +773,7 @@ fn adapt_helper_source(name: &str, source: String) -> String {
             adapted
         }
         "decimalToHexString.js" => DECIMAL_TO_HEX_STRING_ADAPTER_SOURCE.to_string(),
+        "regExpUtils.js" => adapt_regexp_helper_source(source),
         "sm/non262-Date-shell.js" => source
             .replace(
                 DATE_DST_OFFSET_FRESH_OBJECT_SOURCE,
@@ -780,6 +786,24 @@ fn adapt_helper_source(name: &str, source: String) -> String {
             .replace("assert.sameValue(", "$262.sameValue("),
         _ => source,
     }
+}
+
+fn adapt_regexp_helper_source(source: String) -> String {
+    let adapted = source.replacen(
+        "function buildString(args) {",
+        "function buildStringFallback(args) {",
+        1,
+    );
+    if adapted == source {
+        return adapted;
+    }
+
+    let mut wrapped =
+        String::with_capacity(adapted.len() + REGEXP_BUILD_STRING_WRAPPER_SOURCE.len() + 1);
+    wrapped.push_str(&adapted);
+    wrapped.push('\n');
+    wrapped.push_str(REGEXP_BUILD_STRING_WRAPPER_SOURCE);
+    wrapped
 }
 
 #[cfg(test)]
@@ -925,6 +949,28 @@ mod tests {
         assert!(source.contains("var integer = number - (number % 1);"));
         assert!(source.contains("return \"%\" + hex.charAt((n - low) / 16) + hex.charAt(low);"));
         assert!(!source.contains("Math.floor"));
+    }
+
+    #[test]
+    fn build_runtime_source_wraps_regexp_build_string_with_native_fast_path() {
+        let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
+        let metadata = parse_metadata(
+            r"
+            /*---
+            includes: [regExpUtils.js]
+            ---*/
+            ",
+        );
+        let source = catalog
+            .build_runtime_source(
+                &metadata,
+                "buildString({ loneCodePoints: [], ranges: [] });",
+            )
+            .expect("regexp helper harness source");
+
+        assert!(source.contains("function buildStringFallback(args)"));
+        assert!(source.contains("var fast = $262.buildString(args);"));
+        assert!(source.contains("return fast === null ? buildStringFallback(args) : fast;"));
     }
 
     #[test]

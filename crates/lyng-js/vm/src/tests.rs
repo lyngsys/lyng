@@ -7757,6 +7757,68 @@ fn using_declarations_dispose_in_statement_contexts() {
 }
 
 #[test]
+fn loop_iteration_slot_sync_active_stack_avoids_scratch_vectors() {
+    let unit = compile_test_unit(
+        2316,
+        r#"
+            var total = 0;
+            for (let outer = 0; outer < 6; outer = outer + 1) {
+                let saved;
+                for (let i = 0; i < 6; i = i + 1) {
+                    saved = function() { return i; };
+                    i = i + 0;
+                }
+                total = total + saved();
+            }
+            total;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_smi(30));
+    let (source_len, target_len, source_capacity, target_capacity) =
+        vm.loop_iteration_scratch_state_for_tests();
+    assert_eq!(source_len, 0);
+    assert_eq!(target_len, 0);
+    assert_eq!(source_capacity, 0);
+    assert_eq!(target_capacity, 0);
+}
+
+#[test]
+fn loop_iteration_slot_sync_single_active_environment_avoids_scratch_vectors() {
+    let unit = compile_test_unit(
+        14_230,
+        r#"
+            var saved;
+            for (let i = 0; i < 16; i = i + 1) {
+                saved = function() { return i; };
+                i = i + 0;
+            }
+            saved();
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_smi(15));
+    let (source_len, target_len, source_capacity, target_capacity) =
+        vm.loop_iteration_scratch_state_for_tests();
+    assert_eq!(source_len, 0);
+    assert_eq!(target_len, 0);
+    assert_eq!(source_capacity, 0);
+    assert_eq!(target_capacity, 0);
+}
+
+#[test]
 fn await_using_waits_for_async_disposal_before_resolving() {
     let unit = compile_test_unit(
         2308,

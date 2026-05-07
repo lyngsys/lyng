@@ -114,6 +114,36 @@ fn regexp_replace_rejects_oversized_static_replacement_expansion() {
 }
 
 #[test]
+fn regexp_replace_custom_receiver_does_not_probe_exec_before_builtin_path() {
+    let result = compile_and_run_string(
+        r#"
+        var log = "";
+        var receiver = {
+            get flags() {
+                log += "get:flags,";
+                return "g";
+            },
+            set lastIndex(value) {
+                log += "set:lastIndex,";
+            },
+            get exec() {
+                log += "get:exec,";
+                return function(source) {
+                    log += "call:exec,";
+                    return null;
+                };
+            }
+        };
+
+        RegExp.prototype[Symbol.replace].call(receiver, "abc", "x");
+        log;
+        "#,
+    );
+
+    assert_eq!(result, "get:flags,set:lastIndex,get:exec,call:exec,");
+}
+
+#[test]
 fn regexp_unicode_backrefs_do_not_split_surrogate_pairs() {
     let result = compile_and_run_string(
         r#"

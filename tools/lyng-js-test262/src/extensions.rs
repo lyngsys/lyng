@@ -37,6 +37,7 @@ const TEST262_AGENT_SLEEP_RAW: u32 = 8;
 const TEST262_AGENT_MONOTONIC_NOW_RAW: u32 = 9;
 const TEST262_SET_TIMEOUT_RAW: u32 = 10;
 const TEST262_IS_HTMLDDA_RAW: u32 = 11;
+const TEST262_BUILD_STRING_RAW: u32 = 12;
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone)]
@@ -379,6 +380,11 @@ fn test262_is_html_dda_entry() -> EmbeddingFunctionId {
         .expect("test262 embedding function ids should stay non-zero")
 }
 
+fn test262_build_string_entry() -> EmbeddingFunctionId {
+    EmbeddingFunctionId::from_raw(TEST262_BUILD_STRING_RAW)
+        .expect("test262 embedding function ids should stay non-zero")
+}
+
 fn test262_property_key(agent: &mut Agent, text: &str) -> PropertyKey {
     PropertyKey::from_atom(agent.atoms_mut().intern_collectible(text))
 }
@@ -489,6 +495,14 @@ impl RealmExtensionProvider for Test262RealmExtension {
         if entry == test262_is_html_dda_entry() {
             return Some(EmbeddingFunctionMetadata::new("IsHTMLDDA", 0, false, false));
         }
+        if entry == test262_build_string_entry() {
+            return Some(EmbeddingFunctionMetadata::new(
+                "buildString",
+                1,
+                false,
+                false,
+            ));
+        }
         None
     }
 
@@ -515,6 +529,7 @@ impl RealmExtensionProvider for Test262RealmExtension {
         let set_timeout_key = test262_property_key(installation.agent(), "setTimeout");
         let same_value_key = test262_property_key(installation.agent(), "sameValue");
         let is_html_dda_key = test262_property_key(installation.agent(), "IsHTMLDDA");
+        let build_string_key = test262_property_key(installation.agent(), "buildString");
         let get_report_key = test262_property_key(installation.agent(), "getReport");
         let sleep_key = test262_property_key(installation.agent(), "sleep");
         let monotonic_now_key = test262_property_key(installation.agent(), "monotonicNow");
@@ -611,6 +626,14 @@ impl RealmExtensionProvider for Test262RealmExtension {
             true,
         )?;
         installation.mark_is_html_dda_object(is_html_dda)?;
+        let _ = installation.define_function_property(
+            harness,
+            build_string_key,
+            test262_build_string_entry(),
+            true,
+            false,
+            true,
+        )?;
         let _ = installation.define_function_property(
             agent,
             get_report_key,
@@ -767,8 +790,118 @@ impl RealmExtensionProvider for Test262RealmExtension {
         if entry == test262_is_html_dda_entry() {
             return Ok(Value::null());
         }
+        if entry == test262_build_string_entry() {
+            return test262_build_string(context, invocation);
+        }
         Err(VmError::MissingEmbeddingFunction(entry))
     }
+}
+
+fn test262_build_string(
+    context: &mut EmbeddingFunctionContext<'_>,
+    invocation: EmbeddingInvocation<'_>,
+) -> Result<Value, VmError> {
+    let args = invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined());
+    let Some(args) = args.as_object_ref() else {
+        return Ok(Value::null());
+    };
+
+    let lone_code_points = get_test262_property(context.agent(), args, "loneCodePoints")?;
+    let ranges = get_test262_property(context.agent(), args, "ranges")?;
+    let mut units = Vec::new();
+    if !append_code_point_array(context.agent(), lone_code_points, &mut units) {
+        return Ok(Value::null());
+    }
+    if !append_code_point_ranges(context.agent(), ranges, &mut units) {
+        return Ok(Value::null());
+    }
+
+    Ok(context.alloc_code_unit_string(&units))
+}
+
+fn get_test262_property(
+    agent: &mut Agent,
+    object: ObjectRef,
+    name: &str,
+) -> Result<Value, VmError> {
+    let key = PropertyKey::from_atom(agent.atoms_mut().intern_collectible(name));
+    lyng_js_ops::object::ordinary_get(agent, object, key).map_err(VmError::Abrupt)
+}
+
+fn append_code_point_array(agent: &Agent, value: Value, units: &mut Vec<u16>) -> bool {
+    let Some(array) = value.as_object_ref() else {
+        return false;
+    };
+    let Some(length) = agent.objects().element_logical_len(array) else {
+        return false;
+    };
+    let Some(elements) = agent.objects().elements(agent.heap().view(), array) else {
+        return false;
+    };
+
+    for index in 0..length {
+        let Some(value) = elements.get(index as usize).copied() else {
+            return false;
+        };
+        let Some(code_point) = code_point_from_value(value) else {
+            return false;
+        };
+        append_code_point_units(units, code_point);
+    }
+    true
+}
+
+fn append_code_point_ranges(agent: &Agent, value: Value, units: &mut Vec<u16>) -> bool {
+    let Some(ranges) = value.as_object_ref() else {
+        return false;
+    };
+    let Some(length) = agent.objects().element_logical_len(ranges) else {
+        return false;
+    };
+    let Some(elements) = agent.objects().elements(agent.heap().view(), ranges) else {
+        return false;
+    };
+
+    for index in 0..length {
+        let Some(range) = elements.get(index as usize).copied() else {
+            return false;
+        };
+        let Some((start, end)) = code_point_range_from_value(agent, range) else {
+            return false;
+        };
+        for code_point in start..=end {
+            append_code_point_units(units, code_point);
+        }
+    }
+    true
+}
+
+fn code_point_range_from_value(agent: &Agent, value: Value) -> Option<(u32, u32)> {
+    let range = value.as_object_ref()?;
+    let elements = agent.objects().elements(agent.heap().view(), range)?;
+    let start = code_point_from_value(*elements.first()?)?;
+    let end = code_point_from_value(*elements.get(1)?)?;
+    (start <= end).then_some((start, end))
+}
+
+fn code_point_from_value(value: Value) -> Option<u32> {
+    let code_point = value.as_smi().and_then(|value| u32::try_from(value).ok())?;
+    (code_point <= 0x0010_FFFF).then_some(code_point)
+}
+
+fn append_code_point_units(units: &mut Vec<u16>, code_point: u32) {
+    if code_point <= 0xFFFF {
+        units.push(code_point as u16);
+        return;
+    }
+
+    let adjusted = code_point - 0x1_0000;
+    units.push(0xD800 | ((adjusted >> 10) as u16));
+    units.push(0xDC00 | ((adjusted as u16) & 0x03FF));
 }
 
 #[cfg(test)]

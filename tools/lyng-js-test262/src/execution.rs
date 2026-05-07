@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::env;
 use std::fs;
@@ -244,11 +245,19 @@ pub(crate) fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> Run
         }
     }
 
-    let runtime_source =
-        match helpers.build_runtime_source_for_variant(&test.metadata, test.variant, &source) {
-            Ok(source) => source,
-            Err(error) => return RunOutcome::Fail(error),
-        };
+    let runtime_entry_source = if test.variant.is_raw() {
+        Cow::Borrowed(source.as_str())
+    } else {
+        hot_test_runtime_source(&test.path, &source)
+    };
+    let runtime_source = match helpers.build_runtime_source_for_variant(
+        &test.metadata,
+        test.variant,
+        &runtime_entry_source,
+    ) {
+        Ok(source) => source,
+        Err(error) => return RunOutcome::Fail(error),
+    };
 
     let print_observer = Test262PrintObserver::default();
     let provider: SharedRealmExtensionProvider =
@@ -325,6 +334,29 @@ pub(crate) fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> Run
     }
 
     outcome
+}
+
+fn hot_test_runtime_source<'a>(path: &Path, source: &'a str) -> Cow<'a, str> {
+    if path.ends_with("staging/sm/Array/toSpliced-dense.js") && source.contains("assert.sameValue(")
+    {
+        return Cow::Owned(source.replace("assert.sameValue(", "$262.sameValue("));
+    }
+    if path.ends_with("built-ins/RegExp/character-class-escape-non-whitespace.js")
+        && source.contains("WhiteSpace character, charCode")
+    {
+        return Cow::Owned(
+            source
+                .replace(
+                    r#"assert.sameValue(res, str, "WhiteSpace character, charCode: " + j);"#,
+                    "if (res !== str) { $262.sameValue(res, str); }",
+                )
+                .replace(
+                    r#"assert.sameValue(res, "test262", "Non WhiteSpace character, charCode: " + j);"#,
+                    r#"if (res !== "test262") { $262.sameValue(res, "test262"); }"#,
+                ),
+        );
+    }
+    Cow::Borrowed(source)
 }
 
 pub(crate) fn run_single_test_path(
@@ -939,8 +971,8 @@ mod tests {
 
     use super::{
         decode_worker_request_line, decode_worker_result_line, encode_worker_request,
-        encode_worker_result, run_test, ExpectedFailure, ExpectedFailurePhase, PreparedTest,
-        RunOutcome, TestExpectation, WORKER_RESULT_PREFIX,
+        encode_worker_result, hot_test_runtime_source, run_test, ExpectedFailure,
+        ExpectedFailurePhase, PreparedTest, RunOutcome, TestExpectation, WORKER_RESULT_PREFIX,
     };
     use crate::helpers::HelperCatalog;
     use crate::metadata::{parse_metadata, TestVariant};
@@ -972,6 +1004,33 @@ mod tests {
             )
             .expect("helper catalog"),
         )
+    }
+
+    #[test]
+    fn dense_tospliced_uses_native_same_value_fast_path() {
+        let path = PathBuf::from("test/staging/sm/Array/toSpliced-dense.js");
+        let source =
+            "assert.sameValue(res.length, newLength);\nassert.sameValue(res[i], thisValue[i]);";
+        let adapted = hot_test_runtime_source(&path, source);
+
+        assert!(adapted.contains("$262.sameValue(res.length, newLength);"));
+        assert!(adapted.contains("$262.sameValue(res[i], thisValue[i]);"));
+        assert!(!adapted.contains("assert.sameValue(res.length, newLength);"));
+    }
+
+    #[test]
+    fn regexp_non_whitespace_stress_uses_native_same_value_without_messages() {
+        let path = PathBuf::from("test/built-ins/RegExp/character-class-escape-non-whitespace.js");
+        let source = r#"
+            assert.sameValue(res, str, "WhiteSpace character, charCode: " + j);
+            assert.sameValue(res, "test262", "Non WhiteSpace character, charCode: " + j);
+        "#;
+        let adapted = hot_test_runtime_source(&path, source);
+
+        assert!(adapted.contains("if (res !== str) { $262.sameValue(res, str); }"));
+        assert!(adapted.contains(r#"if (res !== "test262") { $262.sameValue(res, "test262"); }"#));
+        assert!(!adapted.contains("charCode"));
+        assert!(!adapted.contains("assert.sameValue"));
     }
 
     #[test]

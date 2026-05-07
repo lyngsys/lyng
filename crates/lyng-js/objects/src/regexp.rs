@@ -307,6 +307,7 @@ enum RegExpFastPattern {
     AsciiNonDigit,
     Whitespace,
     NonWhitespace,
+    NonWhitespaceRun,
     AsciiWord,
     AsciiNonWord,
     UnicodeIgnoreCaseWord,
@@ -878,6 +879,11 @@ impl RegExpPayload {
             + size_of::<Regex>()
     }
 
+    #[inline]
+    pub fn supports_literal_global_replace_fast_path(&self) -> bool {
+        matches!(self.fast_pattern, Some(RegExpFastPattern::NonWhitespaceRun))
+    }
+
     pub fn find_from_code_units(&self, text: &[u16], start: usize) -> Option<RegExpMatchRecord> {
         if let Some(matched) = self.find_fast_from_code_units(text, start) {
             return matched;
@@ -1029,6 +1035,11 @@ impl RegExpPayload {
             RegExpFastPattern::NonWhitespace => Some(self.find_fast_class(text, start, |unit| {
                 !is_js_whitespace_or_line_terminator(unit)
             })),
+            RegExpFastPattern::NonWhitespaceRun => {
+                Some(self.find_fast_class_run(text, start, |unit| {
+                    !is_js_whitespace_or_line_terminator(unit)
+                }))
+            }
             RegExpFastPattern::AsciiWord => {
                 Some(self.find_fast_class(text, start, is_ascii_word_code_unit))
             }
@@ -1528,6 +1539,24 @@ impl RegExpPayload {
         ))
     }
 
+    fn find_fast_class_run(
+        &self,
+        text: &[u16],
+        start: usize,
+        predicate: impl Fn(u16) -> bool,
+    ) -> Option<RegExpMatchRecord> {
+        let index = text.get(start..).and_then(|tail| {
+            tail.iter()
+                .position(|unit| predicate(*unit))
+                .map(|offset| start + offset)
+        })?;
+        let mut end = index + 1;
+        while end < text.len() && predicate(text[end]) {
+            end += 1;
+        }
+        Some(simple_match_record(index..end))
+    }
+
     fn match_fast_anchored_run(
         &self,
         text: &[u16],
@@ -1651,6 +1680,7 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
         r"\D" => Some(RegExpFastPattern::AsciiNonDigit),
         r"\s" => Some(RegExpFastPattern::Whitespace),
         r"\S" => Some(RegExpFastPattern::NonWhitespace),
+        r"\S+" => Some(RegExpFastPattern::NonWhitespaceRun),
         r"\w" if word_classes_are_ascii => Some(RegExpFastPattern::AsciiWord),
         r"\W" if word_classes_are_ascii => Some(RegExpFastPattern::AsciiNonWord),
         r"^\d+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAsciiDigitRun),
@@ -2114,6 +2144,10 @@ mod tests {
         assert_eq!(
             detect_fast_pattern(r"^\S+$", flags("v")),
             Some(RegExpFastPattern::AnchoredNonWhitespaceRun)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"\S+", flags("")),
+            Some(RegExpFastPattern::NonWhitespaceRun)
         );
         assert_eq!(
             detect_fast_pattern(r"^\W+$", flags("")),

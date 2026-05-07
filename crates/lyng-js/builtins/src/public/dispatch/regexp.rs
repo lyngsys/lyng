@@ -1372,6 +1372,27 @@ pub(super) fn regexp_replace_with_string<Cx: PublicBuiltinDispatchContext>(
             set_property_on_object_or_throw(cx, regexp_object, last_index_key, Value::from_smi(0))?;
         }
 
+        if global
+            && callable_replacement.is_none()
+            && replacement_template_units
+                .as_deref()
+                .is_some_and(regexp_replacement_template_is_literal)
+            && regexp_object_supports_literal_global_replace_fast_path(cx, regexp_object)
+            && regexp_uses_builtin_exec(cx, regexp_value)?
+        {
+            if let Some(value) = regexp_literal_global_replace_fast_path(
+                cx,
+                regexp_object,
+                source_ref,
+                source_units,
+                replacement_template_units
+                    .as_deref()
+                    .expect("template units should exist for non-callable replacements"),
+            )? {
+                return Ok(value);
+            }
+        }
+
         let mut results = Vec::new();
         loop {
             let result = regexp_exec(cx, regexp_object, source_ref, source_units)?;
@@ -1495,6 +1516,62 @@ pub(super) fn regexp_replace_with_string<Cx: PublicBuiltinDispatchContext>(
         result.extend_from_slice(&source_units[next_source_position..]);
         Ok(string_from_code_units(cx, &result))
     })
+}
+
+fn regexp_uses_builtin_exec<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    regexp_value: Value,
+) -> Result<bool, Cx::Error> {
+    let exec_key = {
+        let agent = cx.agent();
+        PropertyKey::from_atom(agent.atoms_mut().intern_collectible("exec"))
+    };
+    let exec = cx.get_property_value(regexp_value, exec_key)?;
+    Ok(callable_object_from_value(cx, exec)
+        .is_none_or(|exec_object| is_current_realm_regexp_exec_builtin(cx, exec_object)))
+}
+
+fn regexp_replacement_template_is_literal(units: &[u16]) -> bool {
+    !units.contains(&u16::from(b'$'))
+}
+
+fn regexp_object_supports_literal_global_replace_fast_path<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    regexp_object: ObjectRef,
+) -> bool {
+    let agent = cx.agent();
+    agent
+        .objects()
+        .regexp_payload(regexp_object)
+        .is_some_and(lyng_js_objects::RegExpPayload::supports_literal_global_replace_fast_path)
+}
+
+fn regexp_literal_global_replace_fast_path<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    regexp_object: ObjectRef,
+    source_ref: StringRef,
+    source_units: &[u16],
+    replacement_units: &[u16],
+) -> Result<Option<Value>, Cx::Error> {
+    let mut result = Vec::with_capacity(source_units.len().saturating_add(replacement_units.len()));
+    let mut next_source_position = 0;
+    let mut matched_any = false;
+    while let Some(state) = regexp_exec_state(cx, regexp_object, source_ref, source_units, false)? {
+        matched_any = true;
+        let range = state.matched.range();
+        if range.start >= next_source_position {
+            result.extend_from_slice(&source_units[next_source_position..range.start]);
+            result.extend_from_slice(replacement_units);
+            next_source_position = range.end.min(source_units.len());
+        }
+    }
+
+    if !matched_any {
+        return Ok(Some(Value::from_string_ref(source_ref)));
+    }
+
+    result.extend_from_slice(&source_units[next_source_position..]);
+    Ok(Some(string_from_code_units(cx, &result)))
 }
 
 fn regexp_to_string_builtin<Cx: PublicBuiltinDispatchContext>(

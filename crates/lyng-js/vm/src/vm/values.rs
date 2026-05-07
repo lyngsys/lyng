@@ -108,6 +108,15 @@ impl Vm {
         Ok(encode_number(left + right))
     }
 
+    #[inline]
+    pub(crate) fn alloc_code_unit_string_value(
+        &mut self,
+        agent: &mut Agent,
+        units: &[u16],
+    ) -> Value {
+        Value::from_string_ref(alloc_code_unit_string(agent, units, None))
+    }
+
     pub(super) fn sub_values(
         &mut self,
         agent: &mut Agent,

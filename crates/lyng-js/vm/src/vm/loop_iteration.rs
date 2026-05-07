@@ -178,14 +178,14 @@ impl Vm {
         layout
     }
 
-    fn loop_iteration_sources(
-        &self,
+    fn extend_loop_iteration_sources(
+        loop_iteration_envs: &[LoopIterationEnvironment],
+        sources: &mut Vec<EnvironmentRef>,
         environment: EnvironmentRef,
         slot: u32,
         active_only: bool,
-    ) -> Vec<EnvironmentRef> {
-        let mut sources = Vec::new();
-        for environment_record in &self.loop_iteration_envs {
+    ) {
+        for environment_record in loop_iteration_envs {
             if active_only && !environment_record.active {
                 continue;
             }
@@ -209,11 +209,10 @@ impl Vm {
                 sources.push(environment_record.source_environment);
             }
         }
-        sources
     }
 
     fn extend_loop_iteration_targets(
-        &self,
+        loop_iteration_envs: &[LoopIterationEnvironment],
         targets: &mut Vec<EnvironmentRef>,
         source_environment: EnvironmentRef,
         slot: u32,
@@ -222,7 +221,7 @@ impl Vm {
         if !targets.contains(&source_environment) {
             targets.push(source_environment);
         }
-        for environment_record in &self.loop_iteration_envs {
+        for environment_record in loop_iteration_envs {
             if environment_record.source_environment != source_environment {
                 continue;
             }
@@ -249,20 +248,167 @@ impl Vm {
         slot: u32,
         value: Value,
     ) -> VmResult<()> {
-        let mut targets = Vec::new();
-        for source in self.loop_iteration_sources(environment, slot, true) {
-            self.extend_loop_iteration_targets(&mut targets, source, slot, true);
+        if self
+            .loop_iteration_envs
+            .iter()
+            .all(|record| record.shared_slots.is_empty())
+        {
+            return self.sync_active_loop_iteration_slot_without_scratch(
+                agent,
+                environment,
+                slot,
+                value,
+            );
         }
-        for source in self.loop_iteration_sources(environment, slot, false) {
-            self.extend_loop_iteration_targets(&mut targets, source, slot, false);
+
+        self.loop_iteration_source_scratch.clear();
+        self.loop_iteration_target_scratch.clear();
+
+        Self::extend_loop_iteration_sources(
+            &self.loop_iteration_envs,
+            &mut self.loop_iteration_source_scratch,
+            environment,
+            slot,
+            true,
+        );
+        for index in 0..self.loop_iteration_source_scratch.len() {
+            let source = self.loop_iteration_source_scratch[index];
+            Self::extend_loop_iteration_targets(
+                &self.loop_iteration_envs,
+                &mut self.loop_iteration_target_scratch,
+                source,
+                slot,
+                true,
+            );
         }
-        for target in targets {
+        self.loop_iteration_source_scratch.clear();
+
+        Self::extend_loop_iteration_sources(
+            &self.loop_iteration_envs,
+            &mut self.loop_iteration_source_scratch,
+            environment,
+            slot,
+            false,
+        );
+        for index in 0..self.loop_iteration_source_scratch.len() {
+            let source = self.loop_iteration_source_scratch[index];
+            Self::extend_loop_iteration_targets(
+                &self.loop_iteration_envs,
+                &mut self.loop_iteration_target_scratch,
+                source,
+                slot,
+                false,
+            );
+        }
+
+        let target_count = self.loop_iteration_target_scratch.len();
+        let mut result = Ok(());
+        for index in 0..target_count {
+            let target = self.loop_iteration_target_scratch[index];
             if target == environment {
                 continue;
             }
-            self.mirror_environment_slot(agent, target, slot, value)?;
+            if let Err(error) = self.mirror_environment_slot(agent, target, slot, value) {
+                result = Err(error);
+                break;
+            }
+        }
+
+        self.loop_iteration_source_scratch.clear();
+        self.loop_iteration_target_scratch.clear();
+        result
+    }
+
+    fn sync_active_loop_iteration_slot_without_scratch(
+        &mut self,
+        agent: &mut Agent,
+        environment: EnvironmentRef,
+        slot: u32,
+        value: Value,
+    ) -> VmResult<()> {
+        for source_index in 0..self.loop_iteration_envs.len() {
+            let Some(source) =
+                self.active_loop_iteration_slot_source(source_index, environment, slot)
+            else {
+                continue;
+            };
+            if self.active_loop_iteration_source_seen_before(
+                source_index,
+                environment,
+                slot,
+                source,
+            ) {
+                continue;
+            }
+
+            if source != environment {
+                self.mirror_environment_slot(agent, source, slot, value)?;
+            }
+
+            for target_index in 0..self.loop_iteration_envs.len() {
+                let Some(target) =
+                    self.active_loop_iteration_slot_target(target_index, source, slot)
+                else {
+                    continue;
+                };
+                if target == environment {
+                    continue;
+                }
+                self.mirror_environment_slot(agent, target, slot, value)?;
+            }
         }
         Ok(())
+    }
+
+    fn active_loop_iteration_slot_source(
+        &self,
+        index: usize,
+        environment: EnvironmentRef,
+        slot: u32,
+    ) -> Option<EnvironmentRef> {
+        let record = self.loop_iteration_envs.get(index)?;
+        if !record.active
+            || !record.iteration_slots.contains(&slot)
+            || record.detached_slots.contains(&slot)
+        {
+            return None;
+        }
+        (record.source_environment == environment || record.iteration_environment == environment)
+            .then_some(record.source_environment)
+    }
+
+    fn active_loop_iteration_source_seen_before(
+        &self,
+        index: usize,
+        environment: EnvironmentRef,
+        slot: u32,
+        source: EnvironmentRef,
+    ) -> bool {
+        self.loop_iteration_envs[..index].iter().any(|record| {
+            record.active
+                && record.source_environment == source
+                && (record.source_environment == environment
+                    || record.iteration_environment == environment)
+                && record.iteration_slots.contains(&slot)
+                && !record.detached_slots.contains(&slot)
+        })
+    }
+
+    fn active_loop_iteration_slot_target(
+        &self,
+        index: usize,
+        source: EnvironmentRef,
+        slot: u32,
+    ) -> Option<EnvironmentRef> {
+        let record = self.loop_iteration_envs.get(index)?;
+        if !record.active
+            || record.source_environment != source
+            || !record.iteration_slots.contains(&slot)
+            || record.detached_slots.contains(&slot)
+        {
+            return None;
+        }
+        Some(record.iteration_environment)
     }
 
     pub(super) fn active_loop_iteration_environment(
