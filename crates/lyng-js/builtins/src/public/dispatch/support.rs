@@ -324,7 +324,10 @@ pub(super) fn length_value(length: u32) -> Value {
 }
 
 pub(super) fn length_value_u64(length: u64) -> Value {
-    u32::try_from(length).map_or_else(|_| Value::from_f64(length as f64), length_value)
+    u32::try_from(length).map_or_else(
+        |_| Value::from_f64(length_u64_as_number(length)),
+        length_value,
+    )
 }
 
 pub(super) fn is_engine_array<Cx: PublicBuiltinDispatchContext>(
@@ -439,10 +442,7 @@ pub(super) fn to_number_value_for_builtin<Cx: PublicBuiltinDispatchContext>(
         let agent = cx.agent();
         read::to_number(agent.heap().view(), primitive)
     };
-    match number {
-        Ok(number) => Ok(number),
-        Err(_) => Err(type_error(cx)),
-    }
+    number.map_or_else(|_| Err(type_error(cx)), Ok)
 }
 
 pub(super) fn to_number_for_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -460,21 +460,20 @@ pub(super) fn to_number_for_builtin<Cx: PublicBuiltinDispatchContext>(
 }
 
 pub(super) fn valid_array_length(number: f64) -> Option<u32> {
-    if !number.is_finite() || number < 0.0 || number.trunc() != number {
+    if !is_integral_number(number) || number < 0.0 {
         return None;
     }
     if number > f64::from(u32::MAX) {
         return None;
     }
-    Some(number as u32)
+    Some(number_to_u32_after_range_check(number))
 }
 
 pub(super) fn to_uint32_length(number: f64) -> u32 {
     if !number.is_finite() || number == 0.0 {
         return 0;
     }
-    const TWO_32: f64 = 4_294_967_296.0;
-    number.trunc().rem_euclid(TWO_32) as u32
+    number_to_u32_after_range_check(number.trunc().rem_euclid(TWO_32))
 }
 
 pub(super) fn normalize_engine_array_length_descriptor<Cx: PublicBuiltinDispatchContext>(
@@ -485,10 +484,9 @@ pub(super) fn normalize_engine_array_length_descriptor<Cx: PublicBuiltinDispatch
         return Ok(descriptor);
     }
     let value = descriptor.value().unwrap_or(Value::undefined());
-    let _ = to_number_for_builtin(cx, value)?;
     let number_len = to_number_for_builtin(cx, value)?;
     let new_len = to_uint32_length(number_len);
-    if number_len != f64::from(new_len) {
+    if !numbers_are_equal(number_len, f64::from(new_len)) {
         return Err(range_error(cx));
     }
     let mut normalized = descriptor;
@@ -498,6 +496,89 @@ pub(super) fn normalize_engine_array_length_descriptor<Cx: PublicBuiltinDispatch
 
 pub(super) const MAX_SAFE_INTEGER_U64: u64 = (1_u64 << 53) - 1;
 const ARRAY_RESULT_CAPACITY_HINT_LIMIT: usize = 4096;
+const TWO_32: f64 = 4_294_967_296.0;
+const TWO_8: f64 = 256.0;
+const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
+
+enum StringRangePayload {
+    Latin1(Vec<u8>),
+    Utf16(Vec<u8>),
+}
+
+const fn length_u64_as_number(length: u64) -> f64 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "ECMAScript length/index values are exposed through the Number type"
+    )]
+    let number = length as f64;
+    number
+}
+
+const fn usize_index_as_number(index: usize) -> f64 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "ECMAScript length/index values are exposed through the Number type"
+    )]
+    let number = index as f64;
+    number
+}
+
+const fn number_to_u64_after_range_check(number: f64) -> u64 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller validates the ECMAScript Number range before narrowing to an index"
+    )]
+    let integer = number as u64;
+    integer
+}
+
+const fn number_to_u32_after_range_check(number: f64) -> u32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller validates the ECMAScript Number range before narrowing to u32"
+    )]
+    let integer = number as u32;
+    integer
+}
+
+const fn number_to_u8_after_range_check(number: f64) -> u8 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller validates the ECMAScript Number range before narrowing to u8"
+    )]
+    let integer = number as u8;
+    integer
+}
+
+const fn number_to_usize_after_range_check(number: f64) -> usize {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller clamps the ECMAScript length to the platform-supported usize range"
+    )]
+    let integer = number as usize;
+    integer
+}
+
+fn max_supported_length_usize() -> usize {
+    if usize::BITS >= 64 {
+        usize::try_from(MAX_SAFE_INTEGER_U64).expect("MAX_SAFE_INTEGER should fit on 64-bit usize")
+    } else {
+        usize::try_from(u32::MAX).expect("u32::MAX should fit on 32-bit usize")
+    }
+}
+
+fn numbers_are_equal(left: f64, right: f64) -> bool {
+    #[allow(
+        clippy::float_cmp,
+        reason = "ECMAScript Number algorithms require exact IEEE-754 comparison"
+    )]
+    let equal = left == right;
+    equal
+}
 
 pub(super) struct BuiltinProxyBridge<'a, Cx> {
     pub(super) cx: &'a mut Cx,
@@ -915,7 +996,9 @@ pub(super) fn to_length_u32<Cx: PublicBuiltinDispatchContext>(
     if !integer.is_finite() {
         return Ok(u32::MAX);
     }
-    Ok(integer.min(f64::from(u32::MAX)) as u32)
+    Ok(number_to_u32_after_range_check(
+        integer.min(f64::from(u32::MAX)),
+    ))
 }
 
 pub(super) fn to_length_u64<Cx: PublicBuiltinDispatchContext>(
@@ -929,7 +1012,9 @@ pub(super) fn to_length_u64<Cx: PublicBuiltinDispatchContext>(
     if !integer.is_finite() {
         return Ok(MAX_SAFE_INTEGER_U64);
     }
-    Ok(integer.min(MAX_SAFE_INTEGER_U64 as f64) as u64)
+    Ok(number_to_u64_after_range_check(
+        integer.min(MAX_SAFE_INTEGER),
+    ))
 }
 
 pub(super) fn to_boolean_for_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -975,16 +1060,16 @@ pub(super) fn normalize_relative_index_u64(length: u64, relative: f64) -> u64 {
         if !relative.is_finite() {
             return 0;
         }
-        let computed = (length as f64) + relative;
+        let computed = length_u64_as_number(length) + relative;
         if computed <= 0.0 {
             0
         } else {
-            computed as u64
+            number_to_u64_after_range_check(computed)
         }
     } else if !relative.is_finite() {
         length
     } else {
-        (relative.min(length as f64)) as u64
+        number_to_u64_after_range_check(relative.min(length_u64_as_number(length)))
     }
 }
 
@@ -1276,7 +1361,7 @@ pub(super) fn create_data_property_or_throw<Cx: PublicBuiltinDispatchContext>(
 }
 
 pub(super) fn is_integral_number(number: f64) -> bool {
-    number.is_finite() && number == number.trunc()
+    number.is_finite() && numbers_are_equal(number, number.trunc())
 }
 
 pub(super) fn scientific_digits(number: f64) -> Option<(Vec<u8>, i32)> {
@@ -1422,10 +1507,10 @@ pub(super) fn radix_argument<Cx: PublicBuiltinDispatchContext>(
         return Ok(10);
     }
     let radix = argument_to_number(cx, value)?;
-    if !radix.is_finite() || radix != radix.trunc() || !(2.0..=36.0).contains(&radix) {
+    if !is_integral_number(radix) || !(2.0..=36.0).contains(&radix) {
         return Err(range_error(cx));
     }
-    Ok(radix as u32)
+    Ok(number_to_u32_after_range_check(radix))
 }
 
 pub(super) fn symbol_descriptive_string<Cx: PublicBuiltinDispatchContext>(
@@ -1530,11 +1615,6 @@ pub(super) fn string_from_string_ref_range<Cx: PublicBuiltinDispatchContext>(
         return Err(type_error(cx));
     }
 
-    enum StringRangePayload {
-        Latin1(Vec<u8>),
-        Utf16(Vec<u8>),
-    }
-
     let start = range.start;
     let end = range.end;
     let code_unit_len = end - start;
@@ -1549,15 +1629,19 @@ pub(super) fn string_from_string_ref_range<Cx: PublicBuiltinDispatchContext>(
             return Err(type_error(cx));
         }
 
-        if let Some(bytes) = view.latin1_bytes() {
-            StringRangePayload::Latin1(bytes[start..end].to_vec())
-        } else if let Some(bytes) = view.utf16_bytes() {
-            let byte_start = start * 2;
-            let byte_end = end * 2;
-            StringRangePayload::Utf16(bytes[byte_start..byte_end].to_vec())
-        } else {
-            StringRangePayload::Latin1(Vec::new())
-        }
+        view.latin1_bytes().map_or_else(
+            || {
+                view.utf16_bytes().map_or_else(
+                    || StringRangePayload::Latin1(Vec::new()),
+                    |bytes| {
+                        let byte_start = start * 2;
+                        let byte_end = end * 2;
+                        StringRangePayload::Utf16(bytes[byte_start..byte_end].to_vec())
+                    },
+                )
+            },
+            |bytes| StringRangePayload::Latin1(bytes[start..end].to_vec()),
+        )
     };
 
     let string = {
@@ -1672,8 +1756,10 @@ pub(super) fn string_from_code_units<Cx: PublicBuiltinDispatchContext>(
 ) -> Value {
     let string = {
         let agent = cx.agent();
-        if units.len() == 1 && u8::try_from(units[0]).is_ok() {
-            agent.latin1_single_code_unit_string(units[0] as u8)
+        if units.len() == 1
+            && let Ok(unit) = u8::try_from(units[0])
+        {
+            agent.latin1_single_code_unit_string(unit)
         } else if units.len() <= 4 {
             let mut latin1 = [0_u8; 4];
             let mut is_latin1 = true;
@@ -1759,11 +1845,11 @@ pub(super) fn to_uint32_for_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(0);
     }
     let integer = number.trunc();
-    let mut modulo = integer % 4_294_967_296.0;
+    let mut modulo = integer % TWO_32;
     if modulo < 0.0 {
-        modulo += 4_294_967_296.0;
+        modulo += TWO_32;
     }
-    Ok(modulo as u32)
+    Ok(number_to_u32_after_range_check(modulo))
 }
 
 pub(super) fn to_uint8_for_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1775,11 +1861,11 @@ pub(super) fn to_uint8_for_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(0);
     }
     let integer = number.trunc();
-    let mut modulo = integer % 256.0;
+    let mut modulo = integer % TWO_8;
     if modulo < 0.0 {
-        modulo += 256.0;
+        modulo += TWO_8;
     }
-    Ok(modulo as u8)
+    Ok(number_to_u8_after_range_check(modulo))
 }
 
 pub(super) fn to_uint8_clamp_for_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1795,12 +1881,12 @@ pub(super) fn to_uint8_clamp_for_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     let floor = number.floor();
     if floor + 0.5 < number {
-        return Ok((floor as u8).saturating_add(1));
+        return Ok(number_to_u8_after_range_check(floor).saturating_add(1));
     }
     if number < floor + 0.5 {
-        return Ok(floor as u8);
+        return Ok(number_to_u8_after_range_check(floor));
     }
-    let floor_u8 = floor as u8;
+    let floor_u8 = number_to_u8_after_range_check(floor);
     if floor_u8 % 2 == 1 {
         Ok(floor_u8.saturating_add(1))
     } else {
@@ -1812,23 +1898,25 @@ pub(super) fn to_length_for_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
 ) -> Result<usize, Cx::Error> {
-    const MAX_LENGTH: f64 = 9_007_199_254_740_991.0;
     let integer = to_integer_or_infinity_for_builtin(cx, value)?;
     if integer <= 0.0 {
         return Ok(0);
     }
     if !integer.is_finite() {
-        return Ok(MAX_LENGTH as usize);
+        return Ok(max_supported_length_usize());
     }
-    Ok(integer.min(MAX_LENGTH).min(usize::MAX as f64) as usize)
+    let max_length = if usize::BITS >= 64 {
+        MAX_SAFE_INTEGER
+    } else {
+        f64::from(u32::MAX)
+    };
+    Ok(number_to_usize_after_range_check(integer.min(max_length)))
 }
 
 pub(super) fn to_index_for_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
 ) -> Result<u64, Cx::Error> {
-    const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
-
     if value.is_undefined() {
         return Ok(0);
     }
@@ -1836,7 +1924,7 @@ pub(super) fn to_index_for_builtin<Cx: PublicBuiltinDispatchContext>(
     if !integer.is_finite() || !(0.0..=MAX_SAFE_INTEGER).contains(&integer) {
         return Err(range_error(cx));
     }
-    Ok(integer as u64)
+    Ok(number_to_u64_after_range_check(integer))
 }
 
 pub(super) fn allocate_array_like_result<Cx: PublicBuiltinDispatchContext>(
@@ -1863,7 +1951,10 @@ pub(super) fn callable_object_from_value<Cx: PublicBuiltinDispatchContext>(
 }
 
 pub(super) fn usize_index_value(index: usize) -> Value {
-    i32::try_from(index).map_or_else(|_| Value::from_f64(index as f64), Value::from_smi)
+    i32::try_from(index).map_or_else(
+        |_| Value::from_f64(usize_index_as_number(index)),
+        Value::from_smi,
+    )
 }
 
 pub(super) fn code_unit_range_value<Cx: PublicBuiltinDispatchContext>(
