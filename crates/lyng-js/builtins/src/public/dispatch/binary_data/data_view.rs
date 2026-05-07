@@ -420,7 +420,7 @@ fn data_view_get_int8_builtin<Cx: PublicBuiltinDispatchContext>(
         .agent()
         .backing_store_get_byte(record.backing_store(), absolute_index)
         .ok_or_else(|| range_error(cx))?;
-    Ok(Value::from_smi(i32::from(value as i8)))
+    Ok(Value::from_smi(i32::from(value.cast_signed())))
 }
 
 fn data_view_get_uint16_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -471,8 +471,15 @@ fn data_view_get_int16_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let value = data_view_read_unsigned(cx, record, absolute_index, 2, little_endian)? as u16;
-    Ok(Value::from_smi(i32::from(value as i16)))
+    let value = u16::try_from(data_view_read_unsigned(
+        cx,
+        record,
+        absolute_index,
+        2,
+        little_endian,
+    )?)
+    .expect("DataView 2-byte read should fit u16");
+    Ok(Value::from_smi(i32::from(value.cast_signed())))
 }
 
 fn data_view_get_int32_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -497,8 +504,15 @@ fn data_view_get_int32_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let value = data_view_read_unsigned(cx, record, absolute_index, 4, little_endian)?;
-    Ok(Value::from_smi(value as i32))
+    let value = u32::try_from(data_view_read_unsigned(
+        cx,
+        record,
+        absolute_index,
+        4,
+        little_endian,
+    )?)
+    .expect("DataView 4-byte read should fit u32");
+    Ok(Value::from_smi(value.cast_signed()))
 }
 
 fn data_view_get_float32_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -523,7 +537,14 @@ fn data_view_get_float32_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let bits = data_view_read_unsigned(cx, record, absolute_index, 4, little_endian)? as u32;
+    let bits = u32::try_from(data_view_read_unsigned(
+        cx,
+        record,
+        absolute_index,
+        4,
+        little_endian,
+    )?)
+    .expect("DataView 4-byte read should fit u32");
     Ok(Value::from_f64(f64::from(f32::from_bits(bits))))
 }
 
@@ -784,6 +805,10 @@ fn data_view_set_float32_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "DataView#setFloat32 intentionally rounds Number to IEEE-754 binary32"
+    )]
     let bits = f32::to_bits(value as f32);
     data_view_write_unsigned(
         cx,
@@ -1068,7 +1093,8 @@ fn float16_bits_to_f64(bits: u16) -> f64 {
         // Half unbiased exponent for renormalized number:
         // original is 1 - 15 (denormal exponent), then -shift to undo the shifts.
         let half_unbiased = 1 - 15 - shift;
-        let f64_biased = (half_unbiased + 1023) as u64;
+        let f64_biased =
+            u64::try_from(half_unbiased + 1023).expect("rebased binary16 exponent fits u64");
         let f64_mant = u64::from(mantissa) << (52 - 10);
         return f64::from_bits(sign_bit_f64 | (f64_biased << 52) | f64_mant);
     }
@@ -1083,7 +1109,7 @@ fn float16_bits_to_f64(bits: u16) -> f64 {
     }
 
     // Normal half: rebias exponent and zero-extend mantissa.
-    let f64_biased = (exp - 15 + 1023) as u64;
+    let f64_biased = u64::try_from(exp - 15 + 1023).expect("rebased binary16 exponent fits u64");
     let f64_mant = u64::from(mant) << (52 - 10);
     f64::from_bits(sign_bit_f64 | (f64_biased << 52) | f64_mant)
 }
@@ -1093,6 +1119,11 @@ fn float16_bits_to_f64(bits: u16) -> f64 {
 /// Overflow rounds to sign-preserved Infinity (`exp = 0x1F`, `mant = 0`).
 /// Underflow rounds to sign-preserved zero. NaN inputs yield a canonical
 /// quiet NaN.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "binary16 conversion narrows bounded IEEE-754 bit fields after explicit range checks"
+)]
 const fn f64_to_float16_bits(value: f64) -> u16 {
     let bits = value.to_bits();
     let sign16: u16 = ((bits >> 63) as u16) & 0x1;
@@ -1225,7 +1256,14 @@ fn data_view_get_float16_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let bits = data_view_read_unsigned(cx, record, absolute_index, 2, little_endian)? as u16;
+    let bits = u16::try_from(data_view_read_unsigned(
+        cx,
+        record,
+        absolute_index,
+        2,
+        little_endian,
+    )?)
+    .expect("DataView 2-byte read should fit u16");
     Ok(Value::from_f64(float16_bits_to_f64(bits)))
 }
 
@@ -1280,6 +1318,10 @@ mod float16_tests {
         float16_bits_to_f64(bits)
     }
 
+    fn assert_same_float_bits(actual: f64, expected: f64) {
+        assert_eq!(actual.to_bits(), expected.to_bits());
+    }
+
     #[test]
     fn round_trips_zeros_and_specials() {
         assert_eq!(f64_to_float16_bits(0.0), 0x0000);
@@ -1294,44 +1336,44 @@ mod float16_tests {
     #[test]
     fn handles_normal_round_trip() {
         // The Test262 vectors from byteConversionValues.js / setFloat16.
-        assert_eq!(round_trip_via_f16(127.0), 127.0);
-        assert_eq!(round_trip_via_f16(255.0), 255.0);
-        assert_eq!(round_trip_via_f16(0.5), 0.5);
-        assert_eq!(round_trip_via_f16(-1.0), -1.0);
-        assert_eq!(round_trip_via_f16(65504.0), 65504.0);
+        assert_same_float_bits(round_trip_via_f16(127.0), 127.0);
+        assert_same_float_bits(round_trip_via_f16(255.0), 255.0);
+        assert_same_float_bits(round_trip_via_f16(0.5), 0.5);
+        assert_same_float_bits(round_trip_via_f16(-1.0), -1.0);
+        assert_same_float_bits(round_trip_via_f16(65504.0), 65504.0);
         // Overflow.
         assert_eq!(f64_to_float16_bits(65520.0), 0x7C00);
-        assert_eq!(f64_to_float16_bits(65519.99999999999), 0x7BFF);
-        assert_eq!(round_trip_via_f16(65519.99999999999), 65504.0);
+        assert_eq!(f64_to_float16_bits(65_519.999_999_999_99), 0x7BFF);
+        assert_same_float_bits(round_trip_via_f16(65_519.999_999_999_99), 65504.0);
     }
 
     #[test]
     fn round_to_even_at_normal_boundary() {
         // 2049 -> 2048, 2051 -> 2052 (ties round to even at f16 mantissa LSB).
-        assert_eq!(round_trip_via_f16(2049.0), 2048.0);
-        assert_eq!(round_trip_via_f16(2051.0), 2052.0);
+        assert_same_float_bits(round_trip_via_f16(2049.0), 2048.0);
+        assert_same_float_bits(round_trip_via_f16(2051.0), 2052.0);
     }
 
     #[test]
     fn handles_subnormal_round_to_even() {
         // 5.960464477539063e-8 is the smallest f16 subnormal.
         assert_eq!(
-            round_trip_via_f16(5.960464477539063e-8),
-            5.960464477539063e-8
+            round_trip_via_f16(5.960_464_477_539_063e-8),
+            5.960_464_477_539_063e-8
         );
         // 2.9802322387695312e-8 is exactly half the smallest subnormal -> 0.
-        assert_eq!(round_trip_via_f16(2.9802322387695312e-8), 0.0);
+        assert_same_float_bits(round_trip_via_f16(2.980_232_238_769_531_2e-8), 0.0);
         // 2.980232238769532e-8 is just above half -> rounds up.
-        assert_eq!(
-            round_trip_via_f16(2.980232238769532e-8),
-            5.960464477539063e-8
+        assert_same_float_bits(
+            round_trip_via_f16(2.980_232_238_769_532e-8),
+            5.960_464_477_539_063e-8,
         );
     }
 
     #[test]
     fn renormalizes_known_subnormals() {
         // 0.00006097555160522461 is a representable f16 subnormal.
-        let v = 0.00006097555160522461_f64;
-        assert_eq!(round_trip_via_f16(v), v);
+        let v = 0.000_060_975_551_605_224_61_f64;
+        assert_same_float_bits(round_trip_via_f16(v), v);
     }
 }
