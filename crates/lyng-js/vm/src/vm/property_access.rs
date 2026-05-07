@@ -1165,6 +1165,18 @@ impl Vm {
         Ok(descriptor)
     }
 
+    pub(super) fn try_fast_own_index_value(
+        &self,
+        agent: &mut Agent,
+        object: ObjectRef,
+        index: u32,
+    ) -> VmResult<Option<Value>> {
+        agent
+            .objects()
+            .fast_own_index_data_value(agent.heap().view(), object, index)
+            .map_err(|_| VmError::Abrupt(errors::throw_type_error(agent)))
+    }
+
     pub(super) fn define_property_on_object(
         &mut self,
         agent: &mut Agent,
@@ -1576,15 +1588,13 @@ impl Vm {
             .byte_offset()
             .checked_add(index.checked_mul(element_size).unwrap_or(usize::MAX))
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        for offset in 0..element_size {
-            let byte_index = absolute_index
-                .checked_add(offset)
-                .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-            let shift = offset * 8;
-            let byte = u8::try_from((bits >> shift) & 0xff).expect("element byte should fit");
-            if !agent.backing_store_set_byte(typed_array.backing_store(), byte_index, byte) {
-                return Ok(false);
-            }
+        if !agent.backing_store_store_bits(
+            typed_array.backing_store(),
+            absolute_index,
+            element_size,
+            bits,
+        ) {
+            return Ok(false);
         }
         Ok(true)
     }

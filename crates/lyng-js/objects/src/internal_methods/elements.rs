@@ -206,6 +206,90 @@ impl ObjectRuntime {
         }
     }
 
+    pub fn fast_own_index_data_value(
+        &self,
+        heap: PrimitiveHeapView<'_>,
+        id: ObjectRef,
+        index: u32,
+    ) -> InternalMethodResult<Option<Value>> {
+        if !self.can_fast_query_ordinary_index(id)? {
+            return Ok(None);
+        }
+        let record = heap.object(id).ok_or(InternalMethodError::MissingObject)?;
+        let metadata = self
+            .object_metadata(id)
+            .ok_or(InternalMethodError::MissingObject)?;
+        match &metadata.element_storage {
+            ElementStorageMetadata::Empty => Ok(None),
+            ElementStorageMetadata::Dense { logical_len } => {
+                if index >= *logical_len {
+                    return Ok(None);
+                }
+                let Some(elements) = record.elements() else {
+                    return Err(InternalMethodError::CorruptObjectState);
+                };
+                let Some(buffer) = heap.object_slots(elements) else {
+                    return Err(InternalMethodError::CorruptObjectState);
+                };
+                let value = buffer
+                    .get(index as usize)
+                    .copied()
+                    .unwrap_or(Value::array_hole());
+                Ok((value != Value::array_hole()).then_some(value))
+            }
+            ElementStorageMetadata::Sparse { entries, .. } => Ok(entries
+                .get(&index)
+                .copied()
+                .and_then(SparseElementEntry::data_value)),
+        }
+    }
+
+    pub fn fast_has_own_index_property(
+        &self,
+        heap: PrimitiveHeapView<'_>,
+        id: ObjectRef,
+        index: u32,
+    ) -> InternalMethodResult<Option<bool>> {
+        if !self.can_fast_query_ordinary_index(id)? {
+            return Ok(None);
+        }
+        let record = heap.object(id).ok_or(InternalMethodError::MissingObject)?;
+        let metadata = self
+            .object_metadata(id)
+            .ok_or(InternalMethodError::MissingObject)?;
+        match &metadata.element_storage {
+            ElementStorageMetadata::Empty => Ok(Some(false)),
+            ElementStorageMetadata::Dense { logical_len } => {
+                if index >= *logical_len {
+                    return Ok(Some(false));
+                }
+                let Some(elements) = record.elements() else {
+                    return Err(InternalMethodError::CorruptObjectState);
+                };
+                let Some(buffer) = heap.object_slots(elements) else {
+                    return Err(InternalMethodError::CorruptObjectState);
+                };
+                let value = buffer
+                    .get(index as usize)
+                    .copied()
+                    .unwrap_or(Value::array_hole());
+                Ok(Some(value != Value::array_hole()))
+            }
+            ElementStorageMetadata::Sparse { entries, .. } => {
+                Ok(Some(entries.contains_key(&index)))
+            }
+        }
+    }
+
+    fn can_fast_query_ordinary_index(&self, id: ObjectRef) -> InternalMethodResult<bool> {
+        match self.require_object_kind(id)? {
+            ObjectKind::Proxy => Ok(false),
+            ObjectKind::Ordinary | ObjectKind::Function => Ok(!self.is_module_namespace_object(id)
+                && !self.is_string_exotic_object(id)
+                && !self.is_typed_array_object(id)),
+        }
+    }
+
     pub(super) fn ordinary_define_own_index_property(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,

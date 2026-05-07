@@ -145,6 +145,40 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .define_property_on_object(self.agent, object, key, descriptor, lifetime)
     }
 
+    fn try_fast_create_data_property(
+        &mut self,
+        object: ObjectRef,
+        index: u32,
+        value: Value,
+    ) -> Result<bool, Self::Error> {
+        let result = self.agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.fast_set_engine_array_index(
+                &mut mutator,
+                object,
+                index,
+                value,
+                AllocationLifetime::Default,
+            )
+        });
+        match result {
+            Ok(Some(true)) => Ok(true),
+            Ok(Some(false) | None) => Ok(false),
+            Err(_) => Err(VmError::Abrupt(errors::throw_type_error(self.agent))),
+        }
+    }
+
+    fn try_fast_has_own_index_property(
+        &mut self,
+        object: ObjectRef,
+        index: u32,
+    ) -> Result<Option<bool>, Self::Error> {
+        self.agent
+            .objects()
+            .fast_has_own_index_property(self.agent.heap().view(), object, index)
+            .map_err(|_| VmError::Abrupt(errors::throw_type_error(self.agent)))
+    }
+
     fn delete_property_from_object(
         &mut self,
         object: ObjectRef,
@@ -356,6 +390,16 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             this_value,
             arguments,
         )
+    }
+
+    fn try_fast_apply_builtin(
+        &mut self,
+        target: ObjectRef,
+        this_value: Value,
+        arguments: Value,
+    ) -> Result<Option<Value>, Self::Error> {
+        self.vm
+            .try_fast_apply_builtin(self.agent, target, this_value, arguments)
     }
 
     fn construct_to_completion(

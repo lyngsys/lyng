@@ -62,6 +62,24 @@ impl ClusterBackingStoreHandle {
     }
 
     #[inline]
+    fn load_bits(&self, store: BackingStoreRef, index: usize, byte_width: usize) -> Option<u64> {
+        self.0.borrow().load_bits(store, index, byte_width)
+    }
+
+    #[inline]
+    fn store_bits(
+        &self,
+        store: BackingStoreRef,
+        index: usize,
+        byte_width: usize,
+        bits: u64,
+    ) -> bool {
+        self.0
+            .borrow_mut()
+            .store_bits(store, index, byte_width, bits)
+    }
+
+    #[inline]
     fn resize(&self, store: BackingStoreRef, byte_length: usize) -> bool {
         self.0.borrow_mut().resize(store, byte_length)
     }
@@ -264,6 +282,28 @@ impl Agent {
         value: u8,
     ) -> bool {
         self.backing_stores.set_byte(store, index, value)
+    }
+
+    #[inline]
+    pub fn backing_store_load_bits(
+        &self,
+        store: BackingStoreRef,
+        index: usize,
+        byte_width: usize,
+    ) -> Option<u64> {
+        self.backing_stores.load_bits(store, index, byte_width)
+    }
+
+    #[inline]
+    pub fn backing_store_store_bits(
+        &mut self,
+        store: BackingStoreRef,
+        index: usize,
+        byte_width: usize,
+        bits: u64,
+    ) -> bool {
+        self.backing_stores
+            .store_bits(store, index, byte_width, bits)
     }
 
     #[inline]

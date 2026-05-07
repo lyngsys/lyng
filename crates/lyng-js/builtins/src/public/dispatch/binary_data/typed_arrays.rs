@@ -133,13 +133,7 @@ pub(super) fn typed_array_read_storage_bits(
     let start = typed_array
         .byte_offset()
         .checked_add(element_index.checked_mul(element_size)?)?;
-    let mut bits = 0_u64;
-    for offset in 0..element_size {
-        let byte_index = start.checked_add(offset)?;
-        let byte = agent.backing_store_get_byte(typed_array.backing_store(), byte_index)?;
-        bits |= u64::from(byte) << (offset * 8);
-    }
-    Some(bits)
+    agent.backing_store_load_bits(typed_array.backing_store(), start, element_size)
 }
 
 pub(in crate::public::dispatch) fn typed_array_write_storage_bits<
@@ -159,16 +153,11 @@ pub(in crate::public::dispatch) fn typed_array_write_storage_bits<
                 .ok_or_else(|| range_error(cx))?,
         )
         .ok_or_else(|| range_error(cx))?;
-    for offset in 0..element_size {
-        let byte_index = start.checked_add(offset).ok_or_else(|| range_error(cx))?;
-        let shift = offset * 8;
-        let byte = u8::try_from((bits >> shift) & 0xff).expect("element byte should fit");
-        if !cx
-            .agent()
-            .backing_store_set_byte(record.backing_store(), byte_index, byte)
-        {
-            return Err(range_error(cx));
-        }
+    if !cx
+        .agent()
+        .backing_store_store_bits(record.backing_store(), start, element_size, bits)
+    {
+        return Err(range_error(cx));
     }
     Ok(())
 }

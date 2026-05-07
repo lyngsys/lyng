@@ -1,5 +1,7 @@
 use super::*;
 
+const MAX_FAST_APPLY_STRING_CODE_UNITS: usize = 1 << 20;
+
 impl Vm {
     pub(super) fn create_bound_function(
         &mut self,
@@ -253,6 +255,87 @@ impl Vm {
         Ok(Some(arguments))
     }
 
+    pub(super) fn try_fast_apply_builtin(
+        &mut self,
+        agent: &mut Agent,
+        target: ObjectRef,
+        _this_value: Value,
+        arguments: Value,
+    ) -> VmResult<Option<Value>> {
+        if Self::builtin_entry(agent, target) != Some(string_from_code_point_builtin()) {
+            return Ok(None);
+        }
+        let Some(object) = arguments.as_object_ref() else {
+            return Ok(None);
+        };
+        if !agent
+            .objects()
+            .object_header(agent.heap().view(), object)
+            .is_some_and(|header| header.flags().is_engine_array())
+            || !Self::engine_array_index_prototype_chain_is_clear(agent, object)?
+            || agent.objects().element_mode(object) == Some(lyng_js_objects::ElementMode::Sparse)
+        {
+            return Ok(None);
+        }
+
+        let length_descriptor = agent
+            .objects()
+            .get_own_property(
+                agent.heap().view(),
+                object,
+                PropertyKey::from_atom(WellKnownAtom::length.id()),
+            )
+            .map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let Some(length_value) = length_descriptor.value() else {
+            return Ok(None);
+        };
+        let Some(length) = length_value
+            .as_smi()
+            .and_then(|value| u32::try_from(value).ok())
+            .or_else(|| length_value.as_f64().and_then(number_to_u32_length))
+        else {
+            return Ok(None);
+        };
+
+        let mut units = std::mem::take(&mut self.string_code_units_scratch);
+        units.clear();
+        units.reserve(usize::try_from(length).unwrap_or(usize::MAX));
+        for index in 0..length {
+            let value = agent
+                .objects()
+                .element(agent.heap().view(), object, index)
+                .unwrap_or(Value::array_hole());
+            let Some(value) = value.as_smi() else {
+                self.recycle_fast_apply_string_code_units(units);
+                return Ok(None);
+            };
+            let Ok(code_point) = u32::try_from(value) else {
+                self.recycle_fast_apply_string_code_units(units);
+                return Err(VmError::Abrupt(errors::throw_range_error(agent)));
+            };
+            if code_point > 0x0010_FFFF {
+                self.recycle_fast_apply_string_code_units(units);
+                return Err(VmError::Abrupt(errors::throw_range_error(agent)));
+            }
+            append_code_point_units(&mut units, code_point);
+        }
+
+        let string = alloc_code_unit_string(agent, &units, None);
+        self.recycle_fast_apply_string_code_units(units);
+        Ok(Some(Value::from_string_ref(string)))
+    }
+
+    fn recycle_fast_apply_string_code_units(&mut self, mut units: Vec<u16>) {
+        if units.capacity() > MAX_FAST_APPLY_STRING_CODE_UNITS {
+            return;
+        }
+        units.clear();
+        if units.capacity() > self.string_code_units_scratch.capacity() {
+            self.string_code_units_scratch = units;
+        }
+    }
+
     pub(super) fn instantiate_dynamic_function(
         &mut self,
         agent: &mut Agent,
@@ -395,6 +478,17 @@ impl Vm {
             .diagnostics
             .has_errors()
     }
+}
+
+fn append_code_point_units(units: &mut Vec<u16>, code_point: u32) {
+    if code_point <= 0xFFFF {
+        units.push(code_point as u16);
+        return;
+    }
+
+    let adjusted = code_point - 0x1_0000;
+    units.push(0xD800 | ((adjusted >> 10) as u16));
+    units.push(0xDC00 | ((adjusted as u16) & 0x03FF));
 }
 
 fn bound_target_function_data(

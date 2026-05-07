@@ -41,8 +41,8 @@ use lyng_js_parser::parse_script;
 use lyng_js_types::{
     eval_builtin, internal_dynamic_import_builtin, internal_import_meta_builtin,
     internal_regexp_literal_builtin, object_to_string_builtin, promise_capability_executor_builtin,
-    AbruptCompletion, BuiltinFunctionId, EmbeddingFunctionId, PropertyDescriptor, PropertyKey,
-    RealmRef,
+    string_from_code_point_builtin, AbruptCompletion, BuiltinFunctionId, EmbeddingFunctionId,
+    PropertyDescriptor, PropertyKey, RealmRef,
 };
 
 impl Vm {

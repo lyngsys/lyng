@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use lyng_js_types::{ObjectRef, SymbolRef, Value};
 
 /// Heap handle classes that ECMAScript permits to be held weakly.
@@ -57,53 +59,42 @@ impl WeakMapEntry {
     pub(crate) const fn value(self) -> Value {
         self.value
     }
-
-    #[inline]
-    pub(crate) fn set_value(&mut self, value: Value) {
-        self.value = value;
-    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct WeakMapState {
-    entries: Vec<WeakMapEntry>,
+    entries: HashMap<WeakHeapRef, Value>,
 }
 
 impl WeakMapState {
     #[inline]
-    pub(crate) const fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            entries: Vec::new(),
+            entries: HashMap::new(),
         }
     }
 
     #[inline]
-    pub(crate) fn entries(&self) -> &[WeakMapEntry] {
-        &self.entries
+    pub(crate) fn entries(&self) -> impl Iterator<Item = WeakMapEntry> + '_ {
+        self.entries
+            .iter()
+            .map(|(key, value)| WeakMapEntry::new(*key, *value))
     }
 
     pub(crate) fn get(&self, key: WeakHeapRef) -> Option<Value> {
-        self.entries
-            .iter()
-            .find_map(|entry| (entry.key() == key).then_some(entry.value()))
+        self.entries.get(&key).copied()
     }
 
     pub(crate) fn set(&mut self, key: WeakHeapRef, value: Value) {
-        if let Some(entry) = self.entries.iter_mut().find(|entry| entry.key() == key) {
-            entry.set_value(value);
-            return;
-        }
-        self.entries.push(WeakMapEntry::new(key, value));
+        self.entries.insert(key, value);
     }
 
     pub(crate) fn delete(&mut self, key: WeakHeapRef) -> bool {
-        let original_len = self.entries.len();
-        self.entries.retain(|entry| entry.key() != key);
-        original_len != self.entries.len()
+        self.entries.remove(&key).is_some()
     }
 
     pub(crate) fn retain_live_keys(&mut self, mut is_live: impl FnMut(WeakHeapRef) -> bool) {
-        self.entries.retain(|entry| is_live(entry.key()));
+        self.entries.retain(|key, _| is_live(*key));
     }
 }
 
@@ -170,6 +161,43 @@ impl WeakRefState {
         }
         self.target = None;
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    fn object_key(raw: u32) -> WeakHeapRef {
+        WeakHeapRef::Object(ObjectRef::from_raw(raw).expect("test object handle"))
+    }
+
+    #[test]
+    fn weak_map_lookup_scales_for_deep_chains() {
+        const ENTRY_COUNT: u32 = 12_000;
+
+        let mut state = WeakMapState::new();
+        for raw in 1..=ENTRY_COUNT {
+            state.set(object_key(raw), Value::from_smi(raw as i32));
+        }
+
+        let started = Instant::now();
+        let mut observed = 0_i64;
+        for raw in 1..=ENTRY_COUNT {
+            let value = state
+                .get(object_key(raw))
+                .and_then(Value::as_smi)
+                .expect("weak map entry");
+            observed += i64::from(value);
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(observed, i64::from(ENTRY_COUNT * (ENTRY_COUNT + 1) / 2));
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "weak map lookup over {ENTRY_COUNT} entries took {elapsed:?}"
+        );
     }
 }
 

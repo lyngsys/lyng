@@ -37,7 +37,6 @@ impl PrimitiveHeap {
                     *owner,
                     state
                         .entries()
-                        .iter()
                         .map(|entry| (entry.key(), entry.value()))
                         .collect(),
                 )

@@ -521,34 +521,82 @@ impl SideAllocator {
         lifetime: AllocationLifetime,
     ) -> SideAllocationRef {
         let class = SideAllocationClass::for_payload_len(payload.len());
+        let (slot_index, id) = self.reserve_slot(class, payload.len(), lifetime);
+        self.slots[slot_index].bytes[..payload.len()].copy_from_slice(payload);
+        id
+    }
 
-        if let Some(id) = self
-            .free_by_class
-            .get_mut(&class)
-            .and_then(std::vec::Vec::pop)
+    pub(super) fn allocate_concat(
+        &mut self,
+        left: SideAllocationRef,
+        left_len: usize,
+        right: SideAllocationRef,
+        right_len: usize,
+        lifetime: AllocationLifetime,
+    ) -> Option<SideAllocationRef> {
+        let left_index = side_allocation_index(left)?;
+        let right_index = side_allocation_index(right)?;
+        if self.source_payload_len(left_index)? != left_len
+            || self.source_payload_len(right_index)? != right_len
         {
-            let slot = &mut self.slots[(id - 1) as usize];
-            slot.lifetime = lifetime;
-            slot.payload_len = payload.len();
-            slot.occupied = true;
-            slot.bytes[..payload.len()].copy_from_slice(payload);
-            return SideAllocationRef::from_raw(id).unwrap();
+            return None;
         }
 
-        let mut bytes = vec![0_u8; class.slot_bytes()].into_boxed_slice();
-        bytes[..payload.len()].copy_from_slice(payload);
-        self.slots.push(SideAllocationSlot {
-            class,
-            lifetime,
-            payload_len: payload.len(),
-            occupied: true,
-            bytes,
-        });
-        SideAllocationRef::from_raw(
-            u32::try_from(self.slots.len())
-                .expect("side allocation handle count must fit into u32"),
-        )
-        .unwrap()
+        let payload_len = left_len.checked_add(right_len)?;
+        let class = SideAllocationClass::for_payload_len(payload_len);
+        let (slot_index, id) = self.reserve_slot(class, payload_len, lifetime);
+        copy_between_side_slots(&mut self.slots, left_index, left_len, slot_index, 0);
+        copy_between_side_slots(
+            &mut self.slots,
+            right_index,
+            right_len,
+            slot_index,
+            left_len,
+        );
+        Some(id)
+    }
+
+    pub(super) fn allocate_utf16_concat(
+        &mut self,
+        left: SideAllocationRef,
+        left_encoding: StringEncoding,
+        left_code_unit_len: u32,
+        right: SideAllocationRef,
+        right_encoding: StringEncoding,
+        right_code_unit_len: u32,
+        lifetime: AllocationLifetime,
+    ) -> Option<SideAllocationRef> {
+        let left_index = side_allocation_index(left)?;
+        let right_index = side_allocation_index(right)?;
+        if self.source_payload_len(left_index)?
+            != string_payload_len_for_encoding(left_encoding, left_code_unit_len)?
+            || self.source_payload_len(right_index)?
+                != string_payload_len_for_encoding(right_encoding, right_code_unit_len)?
+        {
+            return None;
+        }
+
+        let payload_len =
+            utf16_payload_len_for_code_units(left_code_unit_len.checked_add(right_code_unit_len)?)?;
+        let class = SideAllocationClass::for_payload_len(payload_len);
+        let (slot_index, id) = self.reserve_slot(class, payload_len, lifetime);
+        copy_string_payload_to_utf16_slot(
+            &mut self.slots,
+            left_index,
+            left_encoding,
+            left_code_unit_len,
+            slot_index,
+            0,
+        );
+        copy_string_payload_to_utf16_slot(
+            &mut self.slots,
+            right_index,
+            right_encoding,
+            right_code_unit_len,
+            slot_index,
+            usize::try_from(left_code_unit_len).ok()?.checked_mul(2)?,
+        );
+        Some(id)
     }
 
     pub(super) fn get(&self, id: SideAllocationRef) -> Option<&[u8]> {
@@ -597,6 +645,159 @@ impl SideAllocator {
 
         stats
     }
+
+    fn reserve_slot(
+        &mut self,
+        class: SideAllocationClass,
+        payload_len: usize,
+        lifetime: AllocationLifetime,
+    ) -> (usize, SideAllocationRef) {
+        if let Some(id) = self
+            .free_by_class
+            .get_mut(&class)
+            .and_then(std::vec::Vec::pop)
+        {
+            let slot_index = (id - 1) as usize;
+            let slot = &mut self.slots[slot_index];
+            slot.lifetime = lifetime;
+            slot.payload_len = payload_len;
+            slot.occupied = true;
+            return (slot_index, SideAllocationRef::from_raw(id).unwrap());
+        }
+
+        let bytes = vec![0_u8; class.slot_bytes()].into_boxed_slice();
+        self.slots.push(SideAllocationSlot {
+            class,
+            lifetime,
+            payload_len,
+            occupied: true,
+            bytes,
+        });
+        let id = SideAllocationRef::from_raw(
+            u32::try_from(self.slots.len())
+                .expect("side allocation handle count must fit into u32"),
+        )
+        .unwrap();
+        (self.slots.len() - 1, id)
+    }
+
+    fn source_payload_len(&self, slot_index: usize) -> Option<usize> {
+        let slot = self.slots.get(slot_index)?;
+        slot.occupied.then_some(slot.payload_len)
+    }
+}
+
+fn string_payload_len_for_encoding(encoding: StringEncoding, code_unit_len: u32) -> Option<usize> {
+    match encoding {
+        StringEncoding::Latin1 => usize::try_from(code_unit_len).ok(),
+        StringEncoding::Utf16 => utf16_payload_len_for_code_units(code_unit_len),
+    }
+}
+
+fn utf16_payload_len_for_code_units(code_unit_len: u32) -> Option<usize> {
+    usize::try_from(code_unit_len).ok()?.checked_mul(2)
+}
+
+fn copy_between_side_slots(
+    slots: &mut [SideAllocationSlot],
+    source_index: usize,
+    source_len: usize,
+    destination_index: usize,
+    destination_offset: usize,
+) {
+    if source_len == 0 {
+        return;
+    }
+    debug_assert_ne!(
+        source_index, destination_index,
+        "side-allocation concat destination must not alias an occupied source"
+    );
+
+    if source_index < destination_index {
+        let (before_destination, destination_and_after) = slots.split_at_mut(destination_index);
+        let source = &before_destination[source_index];
+        let destination = &mut destination_and_after[0];
+        destination.bytes[destination_offset..destination_offset + source_len]
+            .copy_from_slice(&source.bytes[..source_len]);
+    } else {
+        let (before_source, source_and_after) = slots.split_at_mut(source_index);
+        let destination = &mut before_source[destination_index];
+        let source = &source_and_after[0];
+        destination.bytes[destination_offset..destination_offset + source_len]
+            .copy_from_slice(&source.bytes[..source_len]);
+    }
+}
+
+fn copy_string_payload_to_utf16_slot(
+    slots: &mut [SideAllocationSlot],
+    source_index: usize,
+    source_encoding: StringEncoding,
+    source_code_unit_len: u32,
+    destination_index: usize,
+    destination_offset: usize,
+) {
+    if source_code_unit_len == 0 {
+        return;
+    }
+    debug_assert_ne!(
+        source_index, destination_index,
+        "side-allocation concat destination must not alias an occupied source"
+    );
+
+    if source_index < destination_index {
+        let (before_destination, destination_and_after) = slots.split_at_mut(destination_index);
+        let source = &before_destination[source_index];
+        let destination = &mut destination_and_after[0];
+        copy_string_payload_to_utf16_bytes(
+            source,
+            source_encoding,
+            source_code_unit_len,
+            destination,
+            destination_offset,
+        );
+    } else {
+        let (before_source, source_and_after) = slots.split_at_mut(source_index);
+        let destination = &mut before_source[destination_index];
+        let source = &source_and_after[0];
+        copy_string_payload_to_utf16_bytes(
+            source,
+            source_encoding,
+            source_code_unit_len,
+            destination,
+            destination_offset,
+        );
+    }
+}
+
+fn copy_string_payload_to_utf16_bytes(
+    source: &SideAllocationSlot,
+    source_encoding: StringEncoding,
+    source_code_unit_len: u32,
+    destination: &mut SideAllocationSlot,
+    destination_offset: usize,
+) {
+    let source_len = usize::try_from(source_code_unit_len)
+        .expect("string code unit length must fit addressable storage");
+    match source_encoding {
+        StringEncoding::Latin1 => {
+            for (index, byte) in source.bytes[..source_len].iter().copied().enumerate() {
+                let offset = destination_offset + index * 2;
+                destination.bytes[offset] = byte;
+                destination.bytes[offset + 1] = 0;
+            }
+        }
+        StringEncoding::Utf16 => {
+            let byte_len = source_len
+                .checked_mul(2)
+                .expect("UTF-16 payload length must fit addressable storage");
+            destination.bytes[destination_offset..destination_offset + byte_len]
+                .copy_from_slice(&source.bytes[..byte_len]);
+        }
+    }
+}
+
+fn side_allocation_index(id: SideAllocationRef) -> Option<usize> {
+    usize::try_from(id.get()).ok()?.checked_sub(1)
 }
 
 pub(super) struct ValueSlotAllocator<Handle> {

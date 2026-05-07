@@ -844,6 +844,41 @@ struct ConcatStringPayload {
 }
 
 fn concat_string_refs(agent: &mut Agent, left: StringRef, right: StringRef) -> VmResult<StringRef> {
+    let can_use_latin1_concat = {
+        let heap_view = agent.heap().view();
+        let Some(left_view) = heap_view.string_view(left) else {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        };
+        let Some(right_view) = heap_view.string_view(right) else {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        };
+        if left_view.code_unit_len() == 0 {
+            return Ok(right);
+        }
+        if right_view.code_unit_len() == 0 {
+            return Ok(left);
+        }
+        left_view.encoding() == StringEncoding::Latin1
+            && right_view.encoding() == StringEncoding::Latin1
+    };
+
+    if can_use_latin1_concat {
+        if let Some(string) = agent.heap_mut().mutator().alloc_latin1_concat_string(
+            left,
+            right,
+            AllocationLifetime::Default,
+        ) {
+            return Ok(string);
+        }
+    }
+    if let Some(string) = agent.heap_mut().mutator().alloc_utf16_concat_string(
+        left,
+        right,
+        AllocationLifetime::Default,
+    ) {
+        return Ok(string);
+    }
+
     let payload = {
         let heap_view = agent.heap().view();
         let Some(left_view) = heap_view.string_view(left) else {

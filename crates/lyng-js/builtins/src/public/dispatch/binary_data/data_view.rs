@@ -337,22 +337,15 @@ fn data_view_read_unsigned<Cx: PublicBuiltinDispatchContext>(
     byte_length: usize,
     little_endian: bool,
 ) -> Result<u64, Cx::Error> {
-    let mut value = 0_u64;
-    for offset in 0..byte_length {
-        let byte_index = absolute_index
-            .checked_add(offset)
-            .ok_or_else(|| range_error(cx))?;
-        let byte = cx
-            .agent()
-            .backing_store_get_byte(record.backing_store(), byte_index)
-            .ok_or_else(|| range_error(cx))?;
-        if little_endian {
-            value |= u64::from(byte) << (offset * 8);
-        } else {
-            value = (value << 8) | u64::from(byte);
-        }
-    }
-    Ok(value)
+    let bits = cx
+        .agent()
+        .backing_store_load_bits(record.backing_store(), absolute_index, byte_length)
+        .ok_or_else(|| range_error(cx))?;
+    Ok(if little_endian {
+        bits
+    } else {
+        reverse_data_view_byte_order(bits, byte_length)
+    })
 }
 
 fn data_view_write_unsigned<Cx: PublicBuiltinDispatchContext>(
@@ -363,24 +356,29 @@ fn data_view_write_unsigned<Cx: PublicBuiltinDispatchContext>(
     value: u64,
     little_endian: bool,
 ) -> Result<(), Cx::Error> {
-    for offset in 0..byte_length {
-        let byte_index = absolute_index
-            .checked_add(offset)
-            .ok_or_else(|| range_error(cx))?;
-        let shift = if little_endian {
-            offset * 8
-        } else {
-            (byte_length - 1 - offset) * 8
-        };
-        let byte = u8::try_from((value >> shift) & 0xff).expect("byte extraction should fit");
-        if !cx
-            .agent()
-            .backing_store_set_byte(record.backing_store(), byte_index, byte)
-        {
-            return Err(range_error(cx));
-        }
+    let bits = if little_endian {
+        value
+    } else {
+        reverse_data_view_byte_order(value, byte_length)
+    };
+    if !cx.agent().backing_store_store_bits(
+        record.backing_store(),
+        absolute_index,
+        byte_length,
+        bits,
+    ) {
+        return Err(range_error(cx));
     }
     Ok(())
+}
+
+fn reverse_data_view_byte_order(bits: u64, byte_length: usize) -> u64 {
+    let mut reversed = 0_u64;
+    for offset in 0..byte_length {
+        reversed <<= 8;
+        reversed |= (bits >> (offset * 8)) & 0xff;
+    }
+    reversed
 }
 
 fn data_view_get_uint8_builtin<Cx: PublicBuiltinDispatchContext>(

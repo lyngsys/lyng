@@ -1174,6 +1174,11 @@ fn object_has_own_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
+    if let Some(index) = key.as_index() {
+        if let Some(has_own) = cx.try_fast_has_own_index_property(object_ref, index)? {
+            return Ok(Value::from_bool(has_own));
+        }
+    }
     Ok(Value::from_bool(
         proxy_get_own_property(cx, object_ref, key)?.is_some(),
     ))
@@ -1191,6 +1196,11 @@ pub(super) fn object_has_own_property_builtin<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
+    if let Some(index) = key.as_index() {
+        if let Some(has_own) = cx.try_fast_has_own_index_property(object_ref, index)? {
+            return Ok(Value::from_bool(has_own));
+        }
+    }
     Ok(Value::from_bool(
         proxy_get_own_property(cx, object_ref, key)?.is_some(),
     ))

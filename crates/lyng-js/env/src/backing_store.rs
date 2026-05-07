@@ -55,6 +55,20 @@ impl BackingStoreRecord {
         }
     }
 
+    fn load_bits(&self, index: usize, byte_width: usize) -> Option<u64> {
+        match self {
+            Self::Local(record) => record.load_bits(index, byte_width),
+            Self::Shared(record) => record.load_bits(index, byte_width),
+        }
+    }
+
+    fn store_bits(&mut self, index: usize, byte_width: usize, bits: u64) -> bool {
+        match self {
+            Self::Local(record) => record.store_bits(index, byte_width, bits),
+            Self::Shared(record) => record.store_bits(index, byte_width, bits),
+        }
+    }
+
     fn resize(&mut self, byte_length: usize) -> bool {
         match self {
             Self::Local(record) => record.resize(byte_length),
@@ -138,6 +152,14 @@ impl LocalBackingStoreRecord {
         true
     }
 
+    fn load_bits(&self, index: usize, byte_width: usize) -> Option<u64> {
+        read_bits_from_bytes(&self.bytes, self.detached, index, byte_width)
+    }
+
+    fn store_bits(&mut self, index: usize, byte_width: usize, bits: u64) -> bool {
+        write_bits_to_bytes(&mut self.bytes, self.detached, index, byte_width, bits)
+    }
+
     fn resize(&mut self, byte_length: usize) -> bool {
         if self.detached {
             return false;
@@ -217,6 +239,14 @@ impl SharedBackingStoreRecord {
             *slot = value;
             true
         })
+    }
+
+    fn load_bits(&self, index: usize, byte_width: usize) -> Option<u64> {
+        self.with_bytes(|bytes| read_bits_from_bytes(bytes, false, index, byte_width))
+    }
+
+    fn store_bits(&self, index: usize, byte_width: usize, bits: u64) -> bool {
+        self.with_bytes_mut(|bytes| write_bits_to_bytes(bytes, false, index, byte_width, bits))
     }
 
     fn grow(&mut self, byte_length: usize) -> bool {
@@ -338,6 +368,28 @@ impl BackingStoreRuntime {
             return false;
         };
         record.set_byte(index, value)
+    }
+
+    pub(crate) fn load_bits(
+        &self,
+        id: BackingStoreRef,
+        index: usize,
+        byte_width: usize,
+    ) -> Option<u64> {
+        self.record(id)?.load_bits(index, byte_width)
+    }
+
+    pub(crate) fn store_bits(
+        &mut self,
+        id: BackingStoreRef,
+        index: usize,
+        byte_width: usize,
+        bits: u64,
+    ) -> bool {
+        let Some(record) = self.record_mut(id) else {
+            return false;
+        };
+        record.store_bits(index, byte_width, bits)
     }
 
     pub(crate) fn resize(&mut self, id: BackingStoreRef, byte_length: usize) -> bool {

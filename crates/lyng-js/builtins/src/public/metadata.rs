@@ -771,6 +771,10 @@ mod tests {
                 BuiltinEntryMetadata::new("Map", 0, true, true),
             ),
             (
+                map_group_by_builtin(),
+                BuiltinEntryMetadata::new("groupBy", 2, false, false),
+            ),
+            (
                 set_builtin(),
                 BuiltinEntryMetadata::new("Set", 0, true, true),
             ),

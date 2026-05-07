@@ -80,6 +80,118 @@ impl PrimitiveHeap {
         self.strings.allocate(record, lifetime)
     }
 
+    pub(crate) fn latin1_concat_string_payload_len(
+        &self,
+        left: StringRef,
+        right: StringRef,
+    ) -> Option<usize> {
+        let left = self.string(left)?;
+        let right = self.string(right)?;
+        if left.encoding() != StringEncoding::Latin1 || right.encoding() != StringEncoding::Latin1 {
+            return None;
+        }
+        usize::try_from(left.code_unit_len())
+            .ok()?
+            .checked_add(usize::try_from(right.code_unit_len()).ok()?)
+    }
+
+    pub(crate) fn utf16_concat_string_payload_len(
+        &self,
+        left: StringRef,
+        right: StringRef,
+    ) -> Option<usize> {
+        let left = self.string(left)?;
+        let right = self.string(right)?;
+        if left.encoding() == StringEncoding::Latin1 && right.encoding() == StringEncoding::Latin1 {
+            return None;
+        }
+        usize::try_from(left.code_unit_len().checked_add(right.code_unit_len())?)
+            .ok()?
+            .checked_mul(2)
+    }
+
+    pub(crate) fn alloc_latin1_concat_string(
+        &mut self,
+        left: StringRef,
+        right: StringRef,
+        lifetime: AllocationLifetime,
+    ) -> Option<StringRef> {
+        let left_record = self.string(left)?;
+        let right_record = self.string(right)?;
+        if left_record.encoding() != StringEncoding::Latin1
+            || right_record.encoding() != StringEncoding::Latin1
+        {
+            return None;
+        }
+
+        let code_unit_len = left_record
+            .code_unit_len()
+            .checked_add(right_record.code_unit_len())?;
+        if left_record.code_unit_len() == 0 {
+            return Some(right);
+        }
+        if right_record.code_unit_len() == 0 {
+            return Some(left);
+        }
+
+        let payload = self.string_payloads.allocate_concat(
+            left_record.payload()?,
+            usize::try_from(left_record.code_unit_len()).ok()?,
+            right_record.payload()?,
+            usize::try_from(right_record.code_unit_len()).ok()?,
+            lifetime,
+        )?;
+        let record = PrimitiveStringRecord::with_payload(
+            StringEncoding::Latin1,
+            code_unit_len,
+            None,
+            payload,
+        );
+        Some(self.strings.allocate(record, lifetime))
+    }
+
+    pub(crate) fn alloc_utf16_concat_string(
+        &mut self,
+        left: StringRef,
+        right: StringRef,
+        lifetime: AllocationLifetime,
+    ) -> Option<StringRef> {
+        let left_record = self.string(left)?;
+        let right_record = self.string(right)?;
+        if left_record.encoding() == StringEncoding::Latin1
+            && right_record.encoding() == StringEncoding::Latin1
+        {
+            return None;
+        }
+
+        let code_unit_len = left_record
+            .code_unit_len()
+            .checked_add(right_record.code_unit_len())?;
+        if left_record.code_unit_len() == 0 {
+            return Some(right);
+        }
+        if right_record.code_unit_len() == 0 {
+            return Some(left);
+        }
+
+        let payload = self.string_payloads.allocate_utf16_concat(
+            left_record.payload()?,
+            left_record.encoding(),
+            left_record.code_unit_len(),
+            right_record.payload()?,
+            right_record.encoding(),
+            right_record.code_unit_len(),
+            lifetime,
+        )?;
+        let record = PrimitiveStringRecord::with_payload(
+            StringEncoding::Utf16,
+            code_unit_len,
+            None,
+            payload,
+        );
+        Some(self.strings.allocate(record, lifetime))
+    }
+
     #[inline]
     pub(crate) fn string_allocation_requires_growth(&self, payload_len: usize) -> bool {
         self.strings.allocation_requires_growth()

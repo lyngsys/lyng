@@ -455,6 +455,36 @@ impl PrimitiveMutator<'_> {
     }
 
     #[inline]
+    pub fn alloc_latin1_concat_string(
+        &mut self,
+        left: StringRef,
+        right: StringRef,
+        lifetime: AllocationLifetime,
+    ) -> Option<StringRef> {
+        let payload_len = self.heap.latin1_concat_string_payload_len(left, right)?;
+        self.maybe_collect_for_growth(
+            PrimitiveCollectionTrigger::StringAllocationSlowPath,
+            self.heap.string_allocation_requires_growth(payload_len),
+        );
+        self.heap.alloc_latin1_concat_string(left, right, lifetime)
+    }
+
+    #[inline]
+    pub fn alloc_utf16_concat_string(
+        &mut self,
+        left: StringRef,
+        right: StringRef,
+        lifetime: AllocationLifetime,
+    ) -> Option<StringRef> {
+        let payload_len = self.heap.utf16_concat_string_payload_len(left, right)?;
+        self.maybe_collect_for_growth(
+            PrimitiveCollectionTrigger::StringAllocationSlowPath,
+            self.heap.string_allocation_requires_growth(payload_len),
+        );
+        self.heap.alloc_utf16_concat_string(left, right, lifetime)
+    }
+
+    #[inline]
     pub fn alloc_symbol(
         &mut self,
         description: Option<StringRef>,
@@ -1092,6 +1122,91 @@ mod tests {
             Some(description)
         );
         assert_eq!(view.string_payload(description), Some(&b"desc"[..]));
+    }
+
+    #[test]
+    fn latin1_concat_allocates_from_existing_string_payloads() {
+        let mut heap = PrimitiveHeap::new();
+        let mut mutator = heap.mutator();
+        let left = mutator.alloc_string(
+            StringEncoding::Latin1,
+            16,
+            b"left-hand-string",
+            None,
+            AllocationLifetime::Default,
+        );
+        let right = mutator.alloc_string(
+            StringEncoding::Latin1,
+            17,
+            b"right-hand-string",
+            None,
+            AllocationLifetime::Default,
+        );
+        let wide = mutator.alloc_string(
+            StringEncoding::Utf16,
+            1,
+            &[0x00, 0x01],
+            None,
+            AllocationLifetime::Default,
+        );
+
+        let combined = mutator
+            .alloc_latin1_concat_string(left, right, AllocationLifetime::Default)
+            .expect("latin1 payloads should concatenate directly");
+        assert!(
+            mutator
+                .alloc_latin1_concat_string(left, wide, AllocationLifetime::Default)
+                .is_none(),
+            "non-latin1 strings should fall back to the generic concat path"
+        );
+
+        let view = mutator.view();
+        assert_eq!(view.string(combined).unwrap().code_unit_len(), 33);
+        assert_eq!(
+            view.string_payload(combined),
+            Some(&b"left-hand-stringright-hand-string"[..])
+        );
+    }
+
+    #[test]
+    fn utf16_concat_allocates_from_existing_string_payloads() {
+        let mut heap = PrimitiveHeap::new();
+        let mut mutator = heap.mutator();
+        let latin1 = mutator.alloc_string(
+            StringEncoding::Latin1,
+            2,
+            b"Az",
+            None,
+            AllocationLifetime::Default,
+        );
+        let wide = mutator.alloc_string(
+            StringEncoding::Utf16,
+            2,
+            &[0x00, 0x01, 0x34, 0x12],
+            None,
+            AllocationLifetime::Default,
+        );
+
+        let combined = mutator
+            .alloc_utf16_concat_string(latin1, wide, AllocationLifetime::Default)
+            .expect("mixed payloads should concatenate directly into UTF-16 storage");
+        assert!(
+            mutator
+                .alloc_utf16_concat_string(latin1, latin1, AllocationLifetime::Default)
+                .is_none(),
+            "latin1-only strings should keep using the narrower concat path"
+        );
+
+        let view = mutator.view();
+        assert_eq!(
+            view.string(combined).unwrap().encoding(),
+            StringEncoding::Utf16
+        );
+        assert_eq!(view.string(combined).unwrap().code_unit_len(), 4);
+        assert_eq!(
+            view.string_payload(combined),
+            Some(&[b'A', 0x00, b'z', 0x00, 0x00, 0x01, 0x34, 0x12][..])
+        );
     }
 
     #[test]

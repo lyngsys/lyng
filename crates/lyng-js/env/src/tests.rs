@@ -1239,6 +1239,34 @@ fn wait_location_uses_backing_store_identity_not_host_shared_buffer_id() {
 }
 
 #[test]
+fn backing_store_bit_helpers_round_trip_local_and_shared_records() {
+    let mut cluster = AgentCluster::new();
+    let local = cluster
+        .root_agent_mut()
+        .allocate_backing_store(12)
+        .expect("local backing store should allocate");
+    let shared = cluster
+        .register_shared_backing_store(cluster.root_agent_id(), 12)
+        .expect("shared backing store should allocate");
+    let agent = cluster.root_agent_mut();
+
+    assert!(agent.backing_store_store_bits(local, 2, 4, 0x0403_0201));
+    assert_eq!(
+        agent.backing_store_load_bits(local, 2, 4),
+        Some(0x0403_0201)
+    );
+    assert_eq!(agent.backing_store_get_byte(local, 3), Some(0x02));
+
+    assert!(agent.backing_store_store_bits(shared, 4, 8, 0x0807_0605_0403_0201));
+    assert_eq!(
+        agent.backing_store_load_bits(shared, 4, 8),
+        Some(0x0807_0605_0403_0201)
+    );
+    assert!(!agent.backing_store_store_bits(shared, 10, 4, 0));
+    assert_eq!(agent.backing_store_load_bits(shared, 10, 4), None);
+}
+
+#[test]
 fn shared_backing_store_atomic_helpers_round_trip_integer_bits() {
     let mut cluster = AgentCluster::new();
     let store = cluster

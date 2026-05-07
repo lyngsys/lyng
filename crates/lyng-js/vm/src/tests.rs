@@ -4870,6 +4870,29 @@ fn evaluate_script_function_apply_observes_array_prototype_getter() {
 }
 
 #[test]
+fn evaluate_script_string_from_code_point_apply_uses_dense_array_fast_path() {
+    let unit = compile_test_unit(
+        14_229,
+        r#"
+            let args = [];
+            for (let i = 0; i < 64; i = i + 1) {
+                args[i] = 65;
+            }
+            String.fromCodePoint.apply(null, args).length;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_smi(64));
+    assert!(vm.string_code_units_scratch_capacity() >= 64);
+}
+
+#[test]
 fn evaluate_script_resolves_promise_any_with_first_fulfillment() {
     let unit = compile_test_unit(
         229,

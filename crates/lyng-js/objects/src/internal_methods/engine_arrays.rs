@@ -9,6 +9,129 @@ impl ObjectRuntime {
         value: Value,
         lifetime: AllocationLifetime,
     ) -> InternalMethodResult<Option<bool>> {
+        if let Some(result) =
+            self.try_fast_set_shape_stable_engine_array_index(heap, id, index, value, lifetime)?
+        {
+            return Ok(Some(result));
+        }
+        self.fast_set_engine_array_index_fallback(heap, id, index, value, lifetime)
+    }
+
+    fn try_fast_set_shape_stable_engine_array_index(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        index: u32,
+        value: Value,
+        lifetime: AllocationLifetime,
+    ) -> InternalMethodResult<Option<bool>> {
+        if value == Value::array_hole() {
+            return Ok(None);
+        }
+
+        let record = heap
+            .view()
+            .object(id)
+            .ok_or(InternalMethodError::MissingObject)?;
+        let Some(metadata) = self.object_metadata(id) else {
+            return Err(InternalMethodError::MissingObject);
+        };
+        if !metadata.flags.is_engine_array() || !metadata.flags.is_extensible() {
+            return Ok(None);
+        }
+        if !matches!(metadata.named_properties, NamedPropertyStorage::ShapeStable) {
+            return Ok(None);
+        }
+
+        let shape = record
+            .shape()
+            .ok_or(InternalMethodError::CorruptObjectState)?;
+        let key = PropertyKey::from_atom(WellKnownAtom::length.id());
+        let property = self
+            .shape_property(shape, key)
+            .ok_or(InternalMethodError::CorruptObjectState)?;
+        if property.kind() != ShapePropertyKind::Data {
+            return Err(InternalMethodError::CorruptObjectState);
+        }
+        if !property.attrs().writable() {
+            return Ok(None);
+        }
+        let named_slots = record
+            .named_slots()
+            .ok_or(InternalMethodError::CorruptObjectState)?;
+        let old_len = {
+            let slots = heap
+                .view()
+                .object_slots(named_slots)
+                .ok_or(InternalMethodError::CorruptObjectState)?;
+            let value = slots
+                .get(property.slot_offset() as usize)
+                .copied()
+                .ok_or(InternalMethodError::CorruptObjectState)?;
+            array_length_from_value(value)?
+        };
+
+        match &metadata.element_storage {
+            ElementStorageMetadata::Empty => {
+                if index > DENSE_ELEMENT_SPARSE_GAP_THRESHOLD {
+                    return Ok(None);
+                }
+            }
+            ElementStorageMetadata::Dense { logical_len } => {
+                if index > logical_len.saturating_add(DENSE_ELEMENT_SPARSE_GAP_THRESHOLD) {
+                    return Ok(None);
+                }
+            }
+            ElementStorageMetadata::Sparse { .. } => return Ok(None),
+        }
+
+        let stored = match self
+            .element_mode(id)
+            .ok_or(InternalMethodError::MissingObject)?
+        {
+            ElementMode::Empty => self.install_empty_element(
+                heap,
+                id,
+                index,
+                value,
+                ordinary_property_attrs(),
+                lifetime,
+            ),
+            ElementMode::Dense => self.store_dense_element(
+                heap,
+                id,
+                record,
+                index,
+                value,
+                ordinary_property_attrs(),
+                lifetime,
+            ),
+            ElementMode::Sparse => return Ok(None),
+        };
+        if !stored {
+            return Err(InternalMethodError::CorruptObjectState);
+        }
+
+        if index >= old_len
+            && !heap.mut_store_value(
+                ValueStoreTarget::ObjectSlot(named_slots, property.slot_offset()),
+                length_value(index.saturating_add(1)),
+            )
+        {
+            return Err(InternalMethodError::CorruptObjectState);
+        }
+
+        Ok(Some(true))
+    }
+
+    fn fast_set_engine_array_index_fallback(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        index: u32,
+        value: Value,
+        lifetime: AllocationLifetime,
+    ) -> InternalMethodResult<Option<bool>> {
         if !self
             .object_header(heap.view(), id)
             .is_some_and(|header| header.flags().is_engine_array())

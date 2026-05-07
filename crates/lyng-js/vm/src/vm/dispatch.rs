@@ -377,6 +377,10 @@ impl Vm {
                                             continue;
                                         };
                                         value
+                                    } else if let Some(value) =
+                                        self.try_fast_own_index_value(agent, object, index)?
+                                    {
+                                        value
                                     } else {
                                         let property_result = self.get_property_from_value(
                                             agent, host, registry, frame, receiver, key,
@@ -798,6 +802,10 @@ impl Vm {
                                     let Some(value) = self.handle_vm_result(agent, result)? else {
                                         continue;
                                     };
+                                    value
+                                } else if let Some(value) =
+                                    self.try_fast_own_index_value(agent, object, u32::from(c))?
+                                {
                                     value
                                 } else if Self::prototype_chain_has_proxy(agent, object) {
                                     let property_result = self.get_property_from_value(
@@ -1587,7 +1595,7 @@ impl Vm {
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
-        if let Some(value) = self.try_smi_binary_opcode(frame, opcode, left, right)? {
+        if let Some(value) = self.try_primitive_number_binary_opcode(frame, opcode, left, right)? {
             return Ok(value);
         }
         match opcode {
@@ -1644,7 +1652,7 @@ impl Vm {
         }
     }
 
-    fn try_smi_binary_opcode(
+    fn try_primitive_number_binary_opcode(
         &self,
         frame: FrameRecord,
         opcode: Opcode,
@@ -1653,30 +1661,90 @@ impl Vm {
     ) -> VmResult<Option<Value>> {
         let left = self.read_register(frame, left)?;
         let right = self.read_register(frame, right)?;
-        let (Some(left), Some(right)) = (left.as_smi(), right.as_smi()) else {
+        if let (Some(left), Some(right)) = (left.as_smi(), right.as_smi()) {
+            let value = match opcode {
+                Opcode::Add => encode_number(f64::from(left) + f64::from(right)),
+                Opcode::Sub => encode_number(f64::from(left) - f64::from(right)),
+                Opcode::Mul => encode_number(f64::from(left) * f64::from(right)),
+                Opcode::Div => encode_number(f64::from(left) / f64::from(right)),
+                Opcode::Mod => encode_number(f64::from(left) % f64::from(right)),
+                Opcode::Exp => encode_number(f64::from(left).powf(f64::from(right))),
+                Opcode::BitOr => Value::from_smi(left | right),
+                Opcode::BitAnd => Value::from_smi(left & right),
+                Opcode::BitXor => Value::from_smi(left ^ right),
+                Opcode::ShiftLeft => Value::from_smi(left.wrapping_shl((right & 0x1f) as u32)),
+                Opcode::ShiftRight => Value::from_smi(left.wrapping_shr((right & 0x1f) as u32)),
+                Opcode::UnsignedShiftRight => {
+                    let shifted = (left as u32).wrapping_shr((right & 0x1f) as u32);
+                    encode_number(f64::from(shifted))
+                }
+                Opcode::Equal | Opcode::StrictEqual => Value::from_bool(left == right),
+                Opcode::LessThan => Value::from_bool(left < right),
+                Opcode::LessEqual => Value::from_bool(left <= right),
+                Opcode::GreaterThan => Value::from_bool(left > right),
+                Opcode::GreaterEqual => Value::from_bool(left >= right),
+                _ => return Ok(None),
+            };
+            return Ok(Some(value));
+        }
+        if !left.is_number() || !right.is_number() {
             return Ok(None);
         };
+        let left = left
+            .as_f64()
+            .expect("Number value should expose an f64 payload");
+        let right = right
+            .as_f64()
+            .expect("Number value should expose an f64 payload");
         let value = match opcode {
-            Opcode::Add => encode_number(f64::from(left) + f64::from(right)),
-            Opcode::Sub => encode_number(f64::from(left) - f64::from(right)),
-            Opcode::Mul => encode_number(f64::from(left) * f64::from(right)),
-            Opcode::Div => encode_number(f64::from(left) / f64::from(right)),
-            Opcode::Mod => encode_number(f64::from(left) % f64::from(right)),
-            Opcode::Exp => encode_number(f64::from(left).powf(f64::from(right))),
-            Opcode::BitOr => Value::from_smi(left | right),
-            Opcode::BitAnd => Value::from_smi(left & right),
-            Opcode::BitXor => Value::from_smi(left ^ right),
-            Opcode::ShiftLeft => Value::from_smi(left.wrapping_shl((right & 0x1f) as u32)),
-            Opcode::ShiftRight => Value::from_smi(left.wrapping_shr((right & 0x1f) as u32)),
+            Opcode::Add => encode_number(left + right),
+            Opcode::Sub => encode_number(left - right),
+            Opcode::Mul => encode_number(left * right),
+            Opcode::Div => encode_number(left / right),
+            Opcode::Mod => encode_number(left % right),
+            Opcode::Exp => {
+                if left.abs() == 1.0 && right.is_infinite() {
+                    Value::from_f64(f64::NAN)
+                } else {
+                    encode_number(left.powf(right))
+                }
+            }
+            Opcode::BitOr => Value::from_smi(number_to_int32(left) | number_to_int32(right)),
+            Opcode::BitAnd => Value::from_smi(number_to_int32(left) & number_to_int32(right)),
+            Opcode::BitXor => Value::from_smi(number_to_int32(left) ^ number_to_int32(right)),
+            Opcode::ShiftLeft => {
+                let left = number_to_int32(left);
+                let right = number_to_uint32(right) & 0x1f;
+                Value::from_smi(left.wrapping_shl(right))
+            }
+            Opcode::ShiftRight => {
+                let left = number_to_int32(left);
+                let right = number_to_uint32(right) & 0x1f;
+                Value::from_smi(left >> right)
+            }
             Opcode::UnsignedShiftRight => {
-                let shifted = (left as u32).wrapping_shr((right & 0x1f) as u32);
-                encode_number(f64::from(shifted))
+                let left = number_to_uint32(left);
+                let right = number_to_uint32(right) & 0x1f;
+                let result = left >> right;
+                if let Ok(result) = i32::try_from(result) {
+                    Value::from_smi(result)
+                } else {
+                    Value::from_f64(f64::from(result))
+                }
             }
             Opcode::Equal | Opcode::StrictEqual => Value::from_bool(left == right),
-            Opcode::LessThan => Value::from_bool(left < right),
-            Opcode::LessEqual => Value::from_bool(left <= right),
-            Opcode::GreaterThan => Value::from_bool(left > right),
-            Opcode::GreaterEqual => Value::from_bool(left >= right),
+            Opcode::LessThan => {
+                Value::from_bool(left.partial_cmp(&right).is_some_and(|o| o.is_lt()))
+            }
+            Opcode::LessEqual => {
+                Value::from_bool(left.partial_cmp(&right).is_some_and(|o| !o.is_gt()))
+            }
+            Opcode::GreaterThan => {
+                Value::from_bool(left.partial_cmp(&right).is_some_and(|o| o.is_gt()))
+            }
+            Opcode::GreaterEqual => {
+                Value::from_bool(left.partial_cmp(&right).is_some_and(|o| !o.is_lt()))
+            }
             _ => return Ok(None),
         };
         Ok(Some(value))
@@ -2013,4 +2081,41 @@ fn number_to_uint32(number: f64) -> u32 {
     }
     let truncated = number.trunc();
     truncated.rem_euclid(4_294_967_296.0) as u32
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{FrameRecord, RegisterWindow};
+    use lyng_js_env::ExecutionContextKind;
+    use lyng_js_types::{CodeRef, EnvironmentRef, RealmRef};
+
+    fn test_frame() -> FrameRecord {
+        FrameRecord::new(
+            CodeRef::from_raw(1).expect("test code ref should be non-zero"),
+            0,
+            RegisterWindow::new(0, 2),
+            None,
+            RealmRef::from_raw(1).expect("test realm ref should be non-zero"),
+            EnvironmentRef::from_raw(1).expect("test lexical env should be non-zero"),
+            EnvironmentRef::from_raw(1).expect("test variable env should be non-zero"),
+            ExecutionContextKind::Script,
+        )
+    }
+
+    #[test]
+    fn number_binary_opcode_fast_path_handles_double_operands() {
+        let mut vm = Vm::new();
+        vm.register_stack = vec![Value::from_f64(1.5), Value::from_f64(2.25)];
+
+        let value = vm
+            .try_primitive_number_binary_opcode(test_frame(), Opcode::Add, 0, 1)
+            .expect("register reads should succeed");
+
+        assert_eq!(
+            value.and_then(Value::as_f64),
+            Some(3.75),
+            "primitive number addition should avoid the generic conversion path"
+        );
+    }
 }

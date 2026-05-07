@@ -305,6 +305,23 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         lifetime: AllocationLifetime,
     ) -> Result<bool, Self::Error>;
 
+    fn try_fast_create_data_property(
+        &mut self,
+        _object: lyng_js_types::ObjectRef,
+        _index: u32,
+        _value: Value,
+    ) -> Result<bool, Self::Error> {
+        Ok(false)
+    }
+
+    fn try_fast_has_own_index_property(
+        &mut self,
+        _object: lyng_js_types::ObjectRef,
+        _index: u32,
+    ) -> Result<Option<bool>, Self::Error> {
+        Ok(None)
+    }
+
     fn delete_property_from_object(
         &mut self,
         object: lyng_js_types::ObjectRef,
@@ -425,6 +442,15 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         this_value: Value,
         arguments: &[Value],
     ) -> Result<Value, Self::Error>;
+
+    fn try_fast_apply_builtin(
+        &mut self,
+        _target: lyng_js_types::ObjectRef,
+        _this_value: Value,
+        _arguments: Value,
+    ) -> Result<Option<Value>, Self::Error> {
+        Ok(None)
+    }
 
     fn construct_to_completion(
         &mut self,

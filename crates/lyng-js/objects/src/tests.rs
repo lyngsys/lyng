@@ -1539,6 +1539,113 @@ fn dense_elements_grow_preserve_holes_and_sparse_fallback_carries_attrs() {
 }
 
 #[test]
+fn fast_own_index_queries_cover_dense_sparse_holes_and_accessors() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let object = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root).with_element_capacity(2),
+        AllocationLifetime::Default,
+    );
+
+    assert!(runtime.set_element(
+        &mut mutator,
+        object,
+        0,
+        Value::from_smi(10),
+        AllocationLifetime::Default,
+    ));
+    assert!(runtime.set_element(
+        &mut mutator,
+        object,
+        3,
+        Value::from_smi(30),
+        AllocationLifetime::Default,
+    ));
+
+    assert_eq!(
+        runtime
+            .fast_own_index_data_value(mutator.view(), object, 0)
+            .unwrap(),
+        Some(Value::from_smi(10))
+    );
+    assert_eq!(
+        runtime
+            .fast_own_index_data_value(mutator.view(), object, 1)
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        runtime
+            .fast_has_own_index_property(mutator.view(), object, 0)
+            .unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        runtime
+            .fast_has_own_index_property(mutator.view(), object, 1)
+            .unwrap(),
+        Some(false)
+    );
+
+    let sparse_attrs = attrs(false, false, true);
+    assert!(runtime.define_element(
+        &mut mutator,
+        object,
+        32,
+        Value::from_smi(32),
+        sparse_attrs,
+        AllocationLifetime::Default,
+    ));
+    assert_eq!(
+        runtime
+            .fast_own_index_data_value(mutator.view(), object, 32)
+            .unwrap(),
+        Some(Value::from_smi(32))
+    );
+    assert_eq!(
+        runtime
+            .fast_has_own_index_property(mutator.view(), object, 32)
+            .unwrap(),
+        Some(true)
+    );
+
+    let callable_placeholder = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+    let mut accessor = PropertyDescriptor::new();
+    accessor.set_getter(Value::from_object_ref(callable_placeholder));
+    accessor.set_enumerable(true);
+    accessor.set_configurable(true);
+    assert!(runtime
+        .define_own_property(
+            &mut mutator,
+            object,
+            PropertyKey::Index(64),
+            accessor,
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+
+    assert_eq!(
+        runtime
+            .fast_own_index_data_value(mutator.view(), object, 64)
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        runtime
+            .fast_has_own_index_property(mutator.view(), object, 64)
+            .unwrap(),
+        Some(true)
+    );
+}
+
+#[test]
 fn sparse_index_accessors_preserve_getter_and_setter_payloads() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
@@ -1776,6 +1883,58 @@ fn engine_array_fast_index_store_extends_dense_array_and_length() {
     );
     assert_eq!(
         runtime.element(mutator.view(), array, 1),
+        Some(Value::from_smi(8))
+    );
+}
+
+#[test]
+fn engine_array_fast_index_store_fills_dense_holes() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let shape = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let array = engine_array(&mut runtime, &mut mutator, shape, 2, true);
+
+    assert!(runtime.set_element(
+        &mut mutator,
+        array,
+        0,
+        Value::from_smi(7),
+        AllocationLifetime::Default,
+    ));
+    assert!(runtime.set_element(
+        &mut mutator,
+        array,
+        1,
+        Value::from_smi(9),
+        AllocationLifetime::Default,
+    ));
+    assert!(runtime.delete_element(&mut mutator, array, 0));
+    assert_eq!(
+        runtime.element(mutator.view(), array, 0),
+        Some(Value::array_hole())
+    );
+    assert_eq!(runtime.element_logical_len(array), Some(2));
+
+    assert_eq!(
+        runtime
+            .fast_set_engine_array_index(
+                &mut mutator,
+                array,
+                0,
+                Value::from_smi(8),
+                AllocationLifetime::Default,
+            )
+            .unwrap(),
+        Some(true)
+    );
+
+    assert_eq!(
+        array_length_descriptor(&runtime, mutator.view(), array).value(),
+        Some(Value::from_smi(2))
+    );
+    assert_eq!(
+        runtime.element(mutator.view(), array, 0),
         Some(Value::from_smi(8))
     );
 }
