@@ -7,8 +7,9 @@ use super::{
     temporal_duration_exact_unit_allows_largest_smallest,
     temporal_duration_from_date_time_nanoseconds, temporal_duration_from_date_units,
     temporal_duration_from_nanoseconds_with_largest_unit, temporal_duration_sign,
-    temporal_duration_time_nanoseconds, temporal_integer_part_from_value,
-    temporal_month_from_month_code_value, temporal_ops, temporal_parse_offset_string,
+    temporal_duration_time_nanoseconds, temporal_i128_as_number, temporal_integer_part_from_value,
+    temporal_month_from_month_code_value, temporal_number_to_i128_after_range_check,
+    temporal_number_to_u8_after_range_check, temporal_ops, temporal_parse_offset_string,
     temporal_plain_date_add_duration, temporal_plain_date_difference_trunc,
     temporal_plain_date_from_parts, temporal_plain_date_from_value,
     temporal_plain_date_ordinal_day, temporal_plain_date_time_add_duration,
@@ -389,6 +390,10 @@ fn temporal_duration_with_builtin<Cx: PublicBuiltinDispatchContext>(
     allocate_temporal_duration_object(cx, prototype, data)
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Temporal.Duration round follows the option parsing and balancing steps in spec order"
+)]
 fn temporal_duration_round_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -844,7 +849,7 @@ fn temporal_duration_total_calendar_relative<Cx: PublicBuiltinDispatchContext>(
         .checked_sub(boundary)
         .ok_or_else(|| range_error(cx))?;
     if remainder == 0 {
-        return Ok(whole_units as f64);
+        return Ok(temporal_i128_as_number(whole_units));
     }
     let adjacent_units = if remainder < 0 {
         whole_units.checked_sub(1)
@@ -1040,7 +1045,10 @@ fn temporal_duration_compare_builtin<Cx: PublicBuiltinDispatchContext>(
 }
 
 pub(super) fn temporal_i128_to_number_value(value: i128) -> Value {
-    i32::try_from(value).map_or_else(|_| Value::from_f64(value as f64), Value::from_smi)
+    i32::try_from(value).map_or_else(
+        |_| Value::from_f64(temporal_i128_as_number(value)),
+        Value::from_smi,
+    )
 }
 
 #[allow(
@@ -1058,10 +1066,11 @@ pub(super) fn temporal_duration_part_from_value<Cx: PublicBuiltinDispatchContext
     if !number.is_finite() || number.trunc() != number {
         return Err(range_error(cx));
     }
-    if !(-(TEMPORAL_SAFE_INTEGER_MAX as f64)..=TEMPORAL_SAFE_INTEGER_MAX as f64).contains(&number) {
+    let max = temporal_i128_as_number(TEMPORAL_SAFE_INTEGER_MAX);
+    if !(-max..=max).contains(&number) {
         return Err(range_error(cx));
     }
-    Ok(number as i128)
+    Ok(temporal_number_to_i128_after_range_check(number))
 }
 
 #[allow(
@@ -1079,10 +1088,10 @@ pub(super) fn temporal_duration_part_i128_from_value<Cx: PublicBuiltinDispatchCo
     if !number.is_finite() || number.trunc() != number {
         return Err(range_error(cx));
     }
-    if number < i128::MIN as f64 || number > i128::MAX as f64 {
+    if number < temporal_i128_as_number(i128::MIN) || number > temporal_i128_as_number(i128::MAX) {
         return Err(range_error(cx));
     }
-    Ok(number as i128)
+    Ok(temporal_number_to_i128_after_range_check(number))
 }
 
 pub(super) fn temporal_duration_part_from_argument<Cx: PublicBuiltinDispatchContext>(
@@ -1376,7 +1385,7 @@ pub(super) fn temporal_duration_fractional_second_digits_option<
         if !(0.0..=9.0).contains(&digits) {
             return Err(range_error(cx));
         }
-        return Ok(Some(digits as u8));
+        return Ok(Some(temporal_number_to_u8_after_range_check(digits)));
     }
     let string_ref = to_string_string_ref(cx, value)?;
     let text = string_ref_text(cx, string_ref)?;
@@ -1627,6 +1636,10 @@ fn temporal_duration_validate_relative_zoned_string_limits<Cx: PublicBuiltinDisp
     Ok(())
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "relativeTo property-bag parsing keeps calendar, time-zone, and date-time branches together"
+)]
 fn temporal_duration_relative_to_from_property_bag<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: ObjectRef,
@@ -1975,6 +1988,10 @@ const fn temporal_duration_calendar_unit_to_date_difference_unit(
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "calendar-relative duration rounding keeps the balancing and remainder steps in one algorithm"
+)]
 pub(super) fn temporal_duration_round_calendar_relative<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     duration: TemporalDurationObjectData,
@@ -2700,7 +2717,7 @@ pub(super) fn temporal_duration_rounding_increment_option<Cx: PublicBuiltinDispa
     if !(1.0..=1_000_000_000.0).contains(&increment) {
         return Err(range_error(cx));
     }
-    Ok(increment as i128)
+    Ok(temporal_number_to_i128_after_range_check(increment))
 }
 
 pub(super) fn temporal_duration_rounding_increment_is_valid(

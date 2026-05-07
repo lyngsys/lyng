@@ -525,7 +525,7 @@ fn temporal_plain_year_month_with_builtin<Cx: PublicBuiltinDispatchContext>(
         )?;
         let _ = temporal_plain_year_month_from_parts(
             cx,
-            year.unwrap_or(i64::from(year_month.year())),
+            year.unwrap_or_else(|| i64::from(year_month.year())),
             month,
             i64::from(year_month.reference_day()),
         )?;
@@ -537,15 +537,15 @@ fn temporal_plain_year_month_with_builtin<Cx: PublicBuiltinDispatchContext>(
         month_code_text.as_deref(),
         Some(i64::from(year_month.month())),
     )?;
-    let data = temporal_plain_year_month_from_parts_with_overflow(
+    let result = temporal_plain_year_month_from_parts_with_overflow(
         cx,
-        year.unwrap_or(i64::from(year_month.year())),
+        year.unwrap_or_else(|| i64::from(year_month.year())),
         month,
         i64::from(year_month.reference_day()),
         overflow,
     )?;
     let prototype = current_temporal_plain_year_month_prototype(cx)?;
-    allocate_temporal_plain_year_month_object(cx, prototype, data)
+    allocate_temporal_plain_year_month_object(cx, prototype, result)
 }
 
 fn temporal_plain_year_month_add_duration<Cx: PublicBuiltinDispatchContext>(
@@ -843,7 +843,7 @@ fn temporal_plain_year_month_to_plain_date_builtin<Cx: PublicBuiltinDispatchCont
         .and_then(|value| value.as_object_ref())
         .ok_or_else(|| type_error(cx))?;
     let day = temporal_required_integer_part_from_property(cx, item, "day")?;
-    let date = temporal_plain_date_from_parts_with_overflow(
+    let plain_date = temporal_plain_date_from_parts_with_overflow(
         cx,
         i64::from(data.year()),
         data.month().into(),
@@ -851,7 +851,7 @@ fn temporal_plain_year_month_to_plain_date_builtin<Cx: PublicBuiltinDispatchCont
         TemporalOverflow::Constrain,
     )?;
     let prototype = current_temporal_plain_date_prototype(cx)?;
-    allocate_temporal_plain_date_object(cx, prototype, date)
+    allocate_temporal_plain_date_object(cx, prototype, plain_date)
 }
 
 fn temporal_plain_year_month_from_builtin<Cx: PublicBuiltinDispatchContext>(

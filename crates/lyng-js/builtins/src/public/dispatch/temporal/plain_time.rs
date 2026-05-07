@@ -328,12 +328,12 @@ fn temporal_plain_time_with_builtin<Cx: PublicBuiltinDispatchContext>(
     )?;
     let data = temporal_plain_time_from_parts_with_overflow(
         cx,
-        hour.unwrap_or(i64::from(time.hour())),
-        minute.unwrap_or(i64::from(time.minute())),
-        second.unwrap_or(i64::from(time.second())),
-        millisecond.unwrap_or(i64::from(time.millisecond())),
-        microsecond.unwrap_or(i64::from(time.microsecond())),
-        nanosecond.unwrap_or(i64::from(time.nanosecond())),
+        hour.unwrap_or_else(|| i64::from(time.hour())),
+        minute.unwrap_or_else(|| i64::from(time.minute())),
+        second.unwrap_or_else(|| i64::from(time.second())),
+        millisecond.unwrap_or_else(|| i64::from(time.millisecond())),
+        microsecond.unwrap_or_else(|| i64::from(time.microsecond())),
+        nanosecond.unwrap_or_else(|| i64::from(time.nanosecond())),
         overflow,
     )?;
     let prototype = current_temporal_plain_time_prototype(cx)?;
@@ -544,7 +544,7 @@ fn temporal_plain_time_to_plain_date_time_builtin<Cx: PublicBuiltinDispatchConte
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let data = TemporalPlainDateTimeObjectData::new(
+    let date_time_data = TemporalPlainDateTimeObjectData::new(
         date.year(),
         date.month(),
         date.day(),
@@ -557,7 +557,7 @@ fn temporal_plain_time_to_plain_date_time_builtin<Cx: PublicBuiltinDispatchConte
         date.calendar(),
     );
     let prototype = current_temporal_plain_date_time_prototype(cx)?;
-    allocate_temporal_plain_date_time_object(cx, prototype, data)
+    allocate_temporal_plain_date_time_object(cx, prototype, date_time_data)
 }
 
 fn temporal_plain_time_from_builtin<Cx: PublicBuiltinDispatchContext>(

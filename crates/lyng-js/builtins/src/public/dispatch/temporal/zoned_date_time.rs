@@ -1,5 +1,9 @@
 use super::*;
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Temporal ZonedDateTime dispatch is the builtin ID switchboard for this spec domain"
+)]
 pub(super) fn dispatch_temporal_zoned_date_time_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
     entry: BuiltinFunctionId,
@@ -608,6 +612,10 @@ fn temporal_zoned_date_time_civil_within_wall_clock_limits(
         ) <= (275_760, 9, 13, 23, 59, 59, 999, 999, 999)
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "ZonedDateTime.from keeps item parsing, offset behavior, and disambiguation in one algorithm"
+)]
 pub(super) fn temporal_zoned_date_time_from_value_with_options<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
@@ -1400,7 +1408,9 @@ pub(super) fn temporal_zoned_date_time_offset_nanoseconds_getter_builtin<
 ) -> Result<Value, Cx::Error> {
     let data = temporal_zoned_date_time_data(cx, invocation.this_value())?;
     let civil = temporal_zoned_date_time_civil(cx, data)?;
-    Ok(Value::from_f64(civil.offset_nanoseconds as f64))
+    Ok(Value::from_f64(temporal_i64_as_number(
+        civil.offset_nanoseconds,
+    )))
 }
 
 pub(super) fn temporal_zoned_date_time_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1687,6 +1697,10 @@ pub(super) fn temporal_zoned_date_time_round_builtin<Cx: PublicBuiltinDispatchCo
     allocate_temporal_zoned_date_time_object(cx, prototype, data)
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "ZonedDateTime.with keeps calendar, time-zone, and offset option handling in spec order"
+)]
 pub(super) fn temporal_zoned_date_time_with_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
@@ -1757,20 +1771,20 @@ pub(super) fn temporal_zoned_date_time_with_builtin<Cx: PublicBuiltinDispatchCon
     } else {
         None
     };
-    let year = year.unwrap_or(i64::from(civil.year));
+    let year = year.unwrap_or_else(|| i64::from(civil.year));
     let month = temporal_resolve_month_from_fields(
         cx,
         month_value,
         month_code_text.as_deref(),
         Some(i64::from(civil.month)),
     )?;
-    let day = day.unwrap_or(i64::from(civil.day));
-    let hour = hour.unwrap_or(i64::from(civil.hour));
-    let minute = minute.unwrap_or(i64::from(civil.minute));
-    let second = second.unwrap_or(i64::from(civil.second));
-    let millisecond = millisecond.unwrap_or(i64::from(civil.millisecond));
-    let microsecond = microsecond.unwrap_or(i64::from(civil.microsecond));
-    let nanosecond = nanosecond.unwrap_or(i64::from(civil.nanosecond));
+    let day = day.unwrap_or_else(|| i64::from(civil.day));
+    let hour = hour.unwrap_or_else(|| i64::from(civil.hour));
+    let minute = minute.unwrap_or_else(|| i64::from(civil.minute));
+    let second = second.unwrap_or_else(|| i64::from(civil.second));
+    let millisecond = millisecond.unwrap_or_else(|| i64::from(civil.millisecond));
+    let microsecond = microsecond.unwrap_or_else(|| i64::from(civil.microsecond));
+    let nanosecond = nanosecond.unwrap_or_else(|| i64::from(civil.nanosecond));
     let date_time = temporal_plain_date_time_from_parts_with_overflow(
         cx,
         year,
@@ -2027,10 +2041,14 @@ pub(super) fn temporal_zoned_date_time_hours_in_day_getter_builtin<
         next_date.day(),
     )?;
     Ok(Value::from_f64(
-        (next - start) as f64 / TEMPORAL_NANOS_PER_HOUR as f64,
+        temporal_i128_as_number(next - start) / temporal_i128_as_number(TEMPORAL_NANOS_PER_HOUR),
     ))
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "ZonedDateTime difference keeps instant, calendar, and rounding paths together"
+)]
 pub(super) fn temporal_zoned_date_time_difference_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,

@@ -44,7 +44,7 @@ fn dispatch_date_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
         return date_builtin(context, invocation).map(Some);
     }
     if entry == super::date_now_builtin() {
-        return date_now_builtin(context, invocation).map(Some);
+        return Ok(Some(date_now_value()));
     }
     if entry == super::date_parse_builtin() {
         return date_parse_builtin(context, invocation).map(Some);
@@ -309,7 +309,9 @@ fn current_time_value() -> Value {
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
-        .map_or(f64::NAN, |duration| duration.as_millis() as f64);
+        .map_or(f64::NAN, |duration| {
+            date_u128_as_number(duration.as_millis())
+        });
     Value::from_f64(millis)
 }
 
@@ -331,6 +333,51 @@ const DATE_WEEKDAY_NAMES: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri",
 const DATE_MONTH_NAMES: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
+
+const fn date_i64_as_number(value: i64) -> f64 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "ECMAScript Date stores time values in the Number type"
+    )]
+    let number = value as f64;
+    number
+}
+
+const fn date_i128_as_number(value: i128) -> f64 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "ECMAScript Date exposes host nanosecond calculations as Number milliseconds"
+    )]
+    let number = value as f64;
+    number
+}
+
+const fn date_u128_as_number(value: u128) -> f64 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "SystemTime milliseconds are exposed through ECMAScript Date Number values"
+    )]
+    let number = value as f64;
+    number
+}
+
+const fn date_number_to_i64_after_range_check(value: f64) -> i64 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "caller validates the finite Date Number range before narrowing"
+    )]
+    let integer = value as i64;
+    integer
+}
+
+const fn date_number_to_i128_after_range_check(value: f64) -> i128 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "caller validates the finite Date Number range before converting to nanoseconds"
+    )]
+    let integer = value as i128;
+    integer
+}
 
 #[derive(Clone, Copy, Debug)]
 struct DateParts {
@@ -384,10 +431,13 @@ fn date_number_argument<Cx: PublicBuiltinDispatchContext>(
 }
 
 fn date_finite_integer(value: f64) -> Option<i64> {
-    if !value.is_finite() || value < i64::MIN as f64 || value > i64::MAX as f64 {
+    if !value.is_finite()
+        || value < date_i64_as_number(i64::MIN)
+        || value > date_i64_as_number(i64::MAX)
+    {
         return None;
     }
-    Some(value.trunc() as i64)
+    Some(date_number_to_i64_after_range_check(value.trunc()))
 }
 
 fn date_time_clip_value(time: f64) -> Value {
@@ -482,7 +532,7 @@ fn date_value_epoch_nanoseconds(value: Value) -> Option<i128> {
     if !millis.is_finite() {
         return None;
     }
-    Some((millis.trunc() as i128) * DATE_NANOS_PER_MILLISECOND)
+    Some(date_number_to_i128_after_range_check(millis.trunc()) * DATE_NANOS_PER_MILLISECOND)
 }
 
 fn date_make_day(year: f64, month: f64, date: f64) -> Option<i64> {
@@ -499,10 +549,10 @@ fn date_make_time(hour: f64, minute: f64, second: f64, millisecond: f64) -> Opti
     }
     Some(
         second.trunc().mul_add(
-            DATE_MS_PER_SECOND as f64,
+            date_i64_as_number(DATE_MS_PER_SECOND),
             hour.trunc().mul_add(
-                DATE_MS_PER_HOUR as f64,
-                minute.trunc() * DATE_MS_PER_MINUTE as f64,
+                date_i64_as_number(DATE_MS_PER_HOUR),
+                minute.trunc() * date_i64_as_number(DATE_MS_PER_MINUTE),
             ),
         ) + millisecond.trunc(),
     )
@@ -523,9 +573,13 @@ fn date_make_utc_value(
     let Some(time) = date_make_time(hour, minute, second, millisecond) else {
         return Value::from_f64(f64::NAN);
     };
-    date_time_clip_value((day as f64).mul_add(DATE_MS_PER_DAY as f64, time))
+    date_time_clip_value(date_i64_as_number(day).mul_add(date_i64_as_number(DATE_MS_PER_DAY), time))
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Date construction receives the explicit ECMA MakeDate/MakeTime fields"
+)]
 fn date_make_local_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     year: f64,
@@ -569,9 +623,9 @@ fn date_make_local_value<Cx: PublicBuiltinDispatchContext>(
         ),
         disambiguation: TemporalDisambiguation::Compatible,
     })?;
-    Ok(date_time_clip_value(
-        (instant.epoch_nanoseconds / DATE_NANOS_PER_MILLISECOND) as f64,
-    ))
+    Ok(date_time_clip_value(date_i128_as_number(
+        instant.epoch_nanoseconds / DATE_NANOS_PER_MILLISECOND,
+    )))
 }
 
 fn date_local_time_value_from_arguments<Cx: PublicBuiltinDispatchContext>(
@@ -871,11 +925,8 @@ fn date_builtin<Cx: PublicBuiltinDispatchContext>(
     )?))
 }
 
-fn date_now_builtin<Cx: PublicBuiltinDispatchContext>(
-    _cx: &mut Cx,
-    _invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
-    Ok(current_time_value())
+fn date_now_value() -> Value {
+    current_time_value()
 }
 
 fn date_parse_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -987,7 +1038,7 @@ fn date_get_timezone_offset_builtin<Cx: PublicBuiltinDispatchContext>(
         time_zone_id: time_zone.time_zone_id,
         epoch_nanoseconds,
     })?;
-    let offset_minutes = -((civil_time.offset_nanoseconds / DATE_NANOS_PER_MINUTE) as f64);
+    let offset_minutes = -date_i64_as_number(civil_time.offset_nanoseconds / DATE_NANOS_PER_MINUTE);
     Ok(Value::from_f64(offset_minutes + 0.0))
 }
 

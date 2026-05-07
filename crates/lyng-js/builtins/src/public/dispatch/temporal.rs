@@ -48,21 +48,23 @@ use support::{
     temporal_compare_ordering, temporal_constructor_prototype,
     temporal_duration_from_nanoseconds_with_largest_unit, temporal_exact_time_round_options,
     temporal_exact_time_rounding_increment_is_valid, temporal_exact_time_unit_from_text,
-    temporal_exact_time_unit_nanoseconds, temporal_exact_time_unit_order,
-    temporal_instant_fractional_second_digits_option, temporal_instant_largest_unit_default,
-    temporal_instant_round_options, temporal_instant_smallest_unit_precision,
-    temporal_instant_smallest_unit_precision_from_text, temporal_instant_to_string_options,
-    temporal_integer_part_from_argument, temporal_integer_part_from_value,
-    temporal_month_from_month_code_text, temporal_month_from_month_code_value,
-    temporal_month_from_property_bag, temporal_optional_integer_part_from_property,
-    temporal_optional_month_code_text_from_property, temporal_optional_string_text_from_property,
-    temporal_optional_time_part_from_property, temporal_overflow_from_options,
-    temporal_parse_month_code_syntax, temporal_plain_time_for_string_precision,
-    temporal_plain_time_from_nanoseconds, temporal_plain_time_from_parts,
-    temporal_plain_time_from_parts_with_overflow, temporal_plain_time_from_value,
-    temporal_plain_time_from_value_with_overflow, temporal_plain_time_parts_from_property_bag,
-    temporal_property_value, temporal_required_integer_part_from_property,
-    temporal_resolve_month_from_fields, temporal_safe_integer_number, temporal_string_option,
+    temporal_exact_time_unit_nanoseconds, temporal_exact_time_unit_order, temporal_i128_as_number,
+    temporal_i64_as_number, temporal_instant_fractional_second_digits_option,
+    temporal_instant_largest_unit_default, temporal_instant_round_options,
+    temporal_instant_smallest_unit_precision, temporal_instant_smallest_unit_precision_from_text,
+    temporal_instant_to_string_options, temporal_integer_part_from_argument,
+    temporal_integer_part_from_value, temporal_month_from_month_code_text,
+    temporal_month_from_month_code_value, temporal_month_from_property_bag,
+    temporal_number_to_i128_after_range_check, temporal_number_to_u8_after_range_check,
+    temporal_optional_integer_part_from_property, temporal_optional_month_code_text_from_property,
+    temporal_optional_string_text_from_property, temporal_optional_time_part_from_property,
+    temporal_overflow_from_options, temporal_parse_month_code_syntax,
+    temporal_plain_time_for_string_precision, temporal_plain_time_from_nanoseconds,
+    temporal_plain_time_from_parts, temporal_plain_time_from_parts_with_overflow,
+    temporal_plain_time_from_value, temporal_plain_time_from_value_with_overflow,
+    temporal_plain_time_parts_from_property_bag, temporal_property_value,
+    temporal_required_integer_part_from_property, temporal_resolve_month_from_fields,
+    temporal_safe_integer_number, temporal_string_option,
     temporal_subsecond_parts_from_nanoseconds, temporal_time_part_from_argument,
     temporal_time_part_from_property, temporal_time_part_from_value,
     temporal_validate_iso_calendar_value,
@@ -224,7 +226,15 @@ fn temporal_bigint_to_i128(agent: &Agent, value: Value) -> Option<i128> {
 
 fn temporal_i128_to_bigint_value(agent: &mut Agent, value: i128) -> Value {
     let magnitude = value.unsigned_abs();
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "BigInt storage splits the low 64-bit limb from a u128 magnitude"
+    )]
     let low = magnitude as u64;
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the shifted high BigInt limb is at most 64 bits"
+    )]
     let high = (magnitude >> 64) as u64;
     let limbs = if high == 0 {
         vec![low]

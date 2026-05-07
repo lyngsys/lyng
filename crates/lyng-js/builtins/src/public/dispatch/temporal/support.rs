@@ -1,6 +1,52 @@
 use super::*;
 use std::fmt::Write as _;
 
+pub(super) const fn temporal_i64_as_number(value: i64) -> f64 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Temporal host offsets are exposed through ECMAScript Number values"
+    )]
+    let number = value as f64;
+    number
+}
+
+pub(super) const fn temporal_i128_as_number(value: i128) -> f64 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Temporal exact nanosecond values are exposed through ECMAScript Number operations"
+    )]
+    let number = value as f64;
+    number
+}
+
+pub(super) const fn temporal_number_to_i64_after_range_check(number: f64) -> i64 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "caller validates Temporal safe-integer range before narrowing to i64"
+    )]
+    let integer = number as i64;
+    integer
+}
+
+pub(super) const fn temporal_number_to_i128_after_range_check(number: f64) -> i128 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "caller validates Temporal integer range before narrowing to i128"
+    )]
+    let integer = number as i128;
+    integer
+}
+
+pub(super) const fn temporal_number_to_u8_after_range_check(number: f64) -> u8 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller validates Temporal fractional-second digit range before narrowing"
+    )]
+    let integer = number as u8;
+    integer
+}
+
 pub(super) fn temporal_constructor_prototype<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     constructor: ObjectRef,
@@ -102,10 +148,11 @@ pub(super) fn temporal_integer_part_from_value<Cx: PublicBuiltinDispatchContext>
         return Err(range_error(cx));
     }
     let number = number.trunc();
-    if !(-(TEMPORAL_SAFE_INTEGER_MAX as f64)..=TEMPORAL_SAFE_INTEGER_MAX as f64).contains(&number) {
+    let max = temporal_i128_as_number(TEMPORAL_SAFE_INTEGER_MAX);
+    if !(-max..=max).contains(&number) {
         return Err(range_error(cx));
     }
-    Ok(number as i64)
+    Ok(temporal_number_to_i64_after_range_check(number))
 }
 
 pub(super) fn temporal_integer_part_from_argument<Cx: PublicBuiltinDispatchContext>(
@@ -473,6 +520,10 @@ pub(super) fn temporal_plain_time_from_parts<Cx: PublicBuiltinDispatchContext>(
     )
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "PlainTime construction takes the explicit ECMA time fields plus overflow"
+)]
 pub(super) fn temporal_plain_time_from_parts_with_overflow<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     hour: i64,
@@ -724,7 +775,7 @@ pub(super) fn temporal_safe_integer_number<Cx: PublicBuiltinDispatchContext>(
     if !(-TEMPORAL_SAFE_INTEGER_MAX..=TEMPORAL_SAFE_INTEGER_MAX).contains(&value) {
         return Err(range_error(cx));
     }
-    Ok(Value::from_f64(value as f64))
+    Ok(Value::from_f64(temporal_i128_as_number(value)))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -805,7 +856,7 @@ pub(super) fn temporal_instant_fractional_second_digits_option<Cx: PublicBuiltin
             return Err(range_error(cx));
         }
         return Ok(TemporalInstantStringPrecision::FractionalSecond(
-            digits as u8,
+            temporal_number_to_u8_after_range_check(digits),
         ));
     }
     let string_ref = to_string_string_ref(cx, value)?;

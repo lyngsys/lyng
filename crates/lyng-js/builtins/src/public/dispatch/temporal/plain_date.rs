@@ -32,6 +32,10 @@ use super::{
     TEMPORAL_NANOS_PER_DAY,
 };
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Temporal PlainDate dispatch is the builtin ID switchboard for this spec domain"
+)]
 pub(super) fn dispatch_temporal_plain_date_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
     entry: BuiltinFunctionId,
@@ -326,7 +330,7 @@ pub(super) fn temporal_plain_date_from_property_bag<Cx: PublicBuiltinDispatchCon
         month_code_text: temporal_optional_month_code_text_from_property(cx, object_ref)?,
         year: temporal_optional_integer_part_from_property(cx, object_ref, "year")?,
     };
-    temporal_plain_date_from_bag_fields(cx, fields, TemporalOverflow::Reject)
+    temporal_plain_date_from_bag_fields(cx, &fields, TemporalOverflow::Reject)
 }
 
 pub(super) struct TemporalPlainDateBagFields {
@@ -383,7 +387,7 @@ pub(super) fn temporal_plain_date_time_bag_fields<Cx: PublicBuiltinDispatchConte
 
 pub(super) fn temporal_plain_date_from_bag_fields<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    fields: TemporalPlainDateBagFields,
+    fields: &TemporalPlainDateBagFields,
     overflow: TemporalOverflow,
 ) -> Result<TemporalPlainDateObjectData, Cx::Error> {
     let year = fields.year.ok_or_else(|| type_error(cx))?;
@@ -721,18 +725,18 @@ pub(super) fn temporal_plain_date_with_builtin<Cx: PublicBuiltinDispatchContext>
     } else {
         i64::from(date.month())
     };
-    let data = temporal_plain_date_from_parts_with_overflow(
+    let result = temporal_plain_date_from_parts_with_overflow(
         cx,
-        year.unwrap_or(i64::from(date.year())),
+        year.unwrap_or_else(|| i64::from(date.year())),
         month,
-        day.unwrap_or(i64::from(date.day())),
+        day.unwrap_or_else(|| i64::from(date.day())),
         overflow,
     )?;
     if !options.is_undefined() && options.as_object_ref().is_none() {
         return Err(type_error(cx));
     }
     let prototype = current_temporal_plain_date_prototype(cx)?;
-    allocate_temporal_plain_date_object(cx, prototype, data)
+    allocate_temporal_plain_date_object(cx, prototype, result)
 }
 
 pub(super) fn temporal_plain_date_with_calendar_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -748,10 +752,10 @@ pub(super) fn temporal_plain_date_with_calendar_builtin<Cx: PublicBuiltinDispatc
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let data =
+    let result =
         TemporalPlainDateObjectData::new(date.year(), date.month(), date.day(), date.calendar());
     let prototype = current_temporal_plain_date_prototype(cx)?;
-    allocate_temporal_plain_date_object(cx, prototype, data)
+    allocate_temporal_plain_date_object(cx, prototype, result)
 }
 
 pub(super) fn temporal_plain_date_add_duration<Cx: PublicBuiltinDispatchContext>(
@@ -814,9 +818,9 @@ pub(super) fn temporal_plain_date_add_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let data = temporal_plain_date_add_duration(cx, date, duration, overflow)?;
+    let result = temporal_plain_date_add_duration(cx, date, duration, overflow)?;
     let prototype = current_temporal_plain_date_prototype(cx)?;
-    allocate_temporal_plain_date_object(cx, prototype, data)
+    allocate_temporal_plain_date_object(cx, prototype, result)
 }
 
 pub(super) fn temporal_plain_date_subtract_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -840,10 +844,10 @@ pub(super) fn temporal_plain_date_subtract_builtin<Cx: PublicBuiltinDispatchCont
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let data =
+    let result =
         temporal_plain_date_add_duration(cx, date, negate_temporal_duration(duration), overflow)?;
     let prototype = current_temporal_plain_date_prototype(cx)?;
-    allocate_temporal_plain_date_object(cx, prototype, data)
+    allocate_temporal_plain_date_object(cx, prototype, result)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1265,7 +1269,7 @@ pub(super) fn temporal_plain_date_to_plain_date_time_builtin<Cx: PublicBuiltinDi
         Some(value) if !value.is_undefined() => temporal_plain_time_from_value(cx, value)?,
         _ => TemporalPlainTimeObjectData::new(0, 0, 0, 0, 0, 0),
     };
-    let data = TemporalPlainDateTimeObjectData::new(
+    let date_time_data = TemporalPlainDateTimeObjectData::new(
         date.year(),
         date.month(),
         date.day(),
@@ -1277,13 +1281,13 @@ pub(super) fn temporal_plain_date_to_plain_date_time_builtin<Cx: PublicBuiltinDi
         time.nanosecond(),
         date.calendar(),
     );
-    let total_nanoseconds =
-        temporal_plain_date_time_total_nanoseconds(data).ok_or_else(|| range_error(cx))?;
+    let total_nanoseconds = temporal_plain_date_time_total_nanoseconds(date_time_data)
+        .ok_or_else(|| range_error(cx))?;
     if !temporal_plain_date_time_is_within_limits(date.calendar(), total_nanoseconds) {
         return Err(range_error(cx));
     }
     let prototype = current_temporal_plain_date_time_prototype(cx)?;
-    allocate_temporal_plain_date_time_object(cx, prototype, data)
+    allocate_temporal_plain_date_time_object(cx, prototype, date_time_data)
 }
 
 pub(super) fn temporal_reject_calendar_or_time_zone_properties<Cx: PublicBuiltinDispatchContext>(
@@ -1357,9 +1361,10 @@ pub(super) fn temporal_plain_date_to_zoned_date_time_builtin<Cx: PublicBuiltinDi
         date_time,
         disambiguation: TemporalDisambiguation::Compatible,
     })?;
-    let data = temporal_zoned_date_time_from_parts(cx, instant.epoch_nanoseconds, &time_zone_id)?;
+    let zoned_date_time_data =
+        temporal_zoned_date_time_from_parts(cx, instant.epoch_nanoseconds, &time_zone_id)?;
     let prototype = current_temporal_zoned_date_time_prototype(cx)?;
-    allocate_temporal_zoned_date_time_object(cx, prototype, data)
+    allocate_temporal_zoned_date_time_object(cx, prototype, zoned_date_time_data)
 }
 
 pub(super) fn temporal_plain_date_to_plain_year_month_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1367,14 +1372,14 @@ pub(super) fn temporal_plain_date_to_plain_year_month_builtin<Cx: PublicBuiltinD
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let date = temporal_plain_date_data(cx, invocation.this_value())?;
-    let data = TemporalPlainYearMonthObjectData::new(
+    let year_month_data = TemporalPlainYearMonthObjectData::new(
         date.year(),
         date.month(),
         date.day(),
         date.calendar(),
     );
     let prototype = current_temporal_plain_year_month_prototype(cx)?;
-    plain_year_month::allocate_temporal_plain_year_month_object(cx, prototype, data)
+    plain_year_month::allocate_temporal_plain_year_month_object(cx, prototype, year_month_data)
 }
 
 pub(super) fn temporal_plain_date_to_plain_month_day_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1382,14 +1387,14 @@ pub(super) fn temporal_plain_date_to_plain_month_day_builtin<Cx: PublicBuiltinDi
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let date = temporal_plain_date_data(cx, invocation.this_value())?;
-    let data = TemporalPlainMonthDayObjectData::new(
+    let month_day_data = TemporalPlainMonthDayObjectData::new(
         date.month(),
         date.day(),
         date.year(),
         date.calendar(),
     );
     let prototype = current_temporal_plain_month_day_prototype(cx)?;
-    plain_month_day::allocate_temporal_plain_month_day_object(cx, prototype, data)
+    plain_month_day::allocate_temporal_plain_month_day_object(cx, prototype, month_day_data)
 }
 
 pub(super) fn temporal_plain_date_from_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -1449,7 +1454,7 @@ pub(super) fn temporal_plain_date_from_builtin<Cx: PublicBuiltinDispatchContext>
                     return Err(type_error(cx));
                 }
                 let overflow = temporal_overflow_from_options(cx, options)?;
-                temporal_plain_date_from_bag_fields(cx, fields, overflow)?
+                temporal_plain_date_from_bag_fields(cx, &fields, overflow)?
             }
         }
     };

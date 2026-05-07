@@ -9,11 +9,12 @@ use super::{
     temporal_duration_rounding_increment_option, temporal_duration_rounding_mode_option,
     temporal_duration_time_nanoseconds, temporal_exact_time_rounding_increment_is_valid,
     temporal_exact_time_unit_from_text, temporal_exact_time_unit_nanoseconds,
-    temporal_exact_time_unit_order, temporal_i128_to_bigint_value,
+    temporal_exact_time_unit_order, temporal_i128_as_number, temporal_i128_to_bigint_value,
     temporal_instant_epoch_nanoseconds_is_valid, temporal_instant_fractional_second_digits_option,
     temporal_instant_largest_unit_default, temporal_instant_round_options,
-    temporal_instant_smallest_unit_precision_from_text, temporal_ops, temporal_option_string_text,
-    temporal_property_value, temporal_round_duration_nanoseconds_to_increment,
+    temporal_instant_smallest_unit_precision_from_text, temporal_number_to_i128_after_range_check,
+    temporal_ops, temporal_option_string_text, temporal_property_value,
+    temporal_round_duration_nanoseconds_to_increment,
     temporal_round_epoch_nanoseconds_to_fractional_digits,
     temporal_round_epoch_nanoseconds_to_increment, temporal_safe_integer_number,
     temporal_time_zone_id_from_value, temporal_zoned_date_time_from_parts, to_bigint_for_builtin,
@@ -322,11 +323,11 @@ fn temporal_epoch_milliseconds_from_value<Cx: PublicBuiltinDispatchContext>(
     if !number.is_finite() || number.trunc() != number {
         return Err(range_error(cx));
     }
-    let max = TEMPORAL_INSTANT_EPOCH_MILLISECONDS_MAX as f64;
+    let max = temporal_i128_as_number(TEMPORAL_INSTANT_EPOCH_MILLISECONDS_MAX);
     if !(-max..=max).contains(&number) {
         return Err(range_error(cx));
     }
-    Ok(number as i128)
+    Ok(temporal_number_to_i128_after_range_check(number))
 }
 
 fn temporal_instant_compare_builtin<Cx: PublicBuiltinDispatchContext>(

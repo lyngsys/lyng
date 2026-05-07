@@ -1,7 +1,7 @@
 use super::super::PublicBuiltinDispatchContext;
 use super::{
-    date_days_in_month, date_make_local_value, date_make_utc_value, date_time_clip_value,
-    DATE_MONTH_NAMES, DATE_MS_PER_MINUTE,
+    date_days_in_month, date_i64_as_number, date_make_local_value, date_make_utc_value,
+    date_time_clip_value, DATE_MONTH_NAMES, DATE_MS_PER_MINUTE,
 };
 use lyng_js_types::Value;
 
@@ -105,6 +105,10 @@ fn date_validate_iso_date(year: i32, month: u32, day: u32) -> bool {
     (1..=u32::from(date_days_in_month(year, month_u8))).contains(&day)
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Date.parse ISO parser keeps the legacy-compatible grammar branches in order"
+)]
 fn date_parse_iso_text<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     text: &str,
@@ -226,7 +230,9 @@ fn date_parse_iso_text<Cx: PublicBuiltinDispatchContext>(
         let Some(millis) = utc.as_f64().filter(|millis| millis.is_finite()) else {
             return Ok(Some(Value::from_f64(f64::NAN)));
         };
-        date_time_clip_value(f64::from(offset).mul_add(-(DATE_MS_PER_MINUTE as f64), millis))
+        date_time_clip_value(
+            f64::from(offset).mul_add(-date_i64_as_number(DATE_MS_PER_MINUTE), millis),
+        )
     } else if date_only {
         date_make_utc_value(
             f64::from(year),
@@ -252,6 +258,10 @@ fn date_parse_iso_text<Cx: PublicBuiltinDispatchContext>(
     Ok(Some(value))
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Date.parse fallback parser keeps token interpretation and timezone handling together"
+)]
 fn date_parse_space_separated_text<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     text: &str,
@@ -347,8 +357,7 @@ fn date_parse_space_separated_text<Cx: PublicBuiltinDispatchContext>(
         return Ok(None);
     }
 
-    let mut offset_minutes = None;
-    if matches!(bytes.get(index), Some(b'+' | b'-')) {
+    let offset_minutes = if matches!(bytes.get(index), Some(b'+' | b'-')) {
         let offset_sign = if bytes[index] == b'+' { 1 } else { -1 };
         index += 1;
         let Some(offset_hour) = date_parse_two_digits(bytes, index) else {
@@ -376,12 +385,14 @@ fn date_parse_space_separated_text<Cx: PublicBuiltinDispatchContext>(
         if offset_hour > 23 || offset_minute > 59 {
             return Ok(None);
         }
-        offset_minutes = Some(
+        Some(
             offset_sign
                 * (i32::try_from(offset_hour).unwrap_or(i32::MAX) * 60
                     + i32::try_from(offset_minute).unwrap_or(i32::MAX)),
-        );
-    }
+        )
+    } else {
+        None
+    };
 
     if index != text.len() {
         return Ok(None);
@@ -400,7 +411,9 @@ fn date_parse_space_separated_text<Cx: PublicBuiltinDispatchContext>(
         let Some(millis) = utc.as_f64().filter(|millis| millis.is_finite()) else {
             return Ok(Some(Value::from_f64(f64::NAN)));
         };
-        date_time_clip_value(f64::from(offset).mul_add(-(DATE_MS_PER_MINUTE as f64), millis))
+        date_time_clip_value(
+            f64::from(offset).mul_add(-date_i64_as_number(DATE_MS_PER_MINUTE), millis),
+        )
     } else {
         date_make_local_value(
             cx,
@@ -457,7 +470,7 @@ fn date_parse_local_string(text: &str) -> Option<Value> {
     );
     let millis = utc.as_f64().filter(|millis| millis.is_finite())?;
     Some(date_time_clip_value(
-        f64::from(offset).mul_add(-(DATE_MS_PER_MINUTE as f64), millis),
+        f64::from(offset).mul_add(-date_i64_as_number(DATE_MS_PER_MINUTE), millis),
     ))
 }
 

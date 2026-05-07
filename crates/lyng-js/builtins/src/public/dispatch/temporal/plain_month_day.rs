@@ -159,7 +159,7 @@ fn temporal_plain_month_day_from_parts_with_overflow<Cx: PublicBuiltinDispatchCo
 
 fn temporal_plain_month_day_from_bag_fields<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    fields: TemporalPlainMonthDayBagFields,
+    fields: &TemporalPlainMonthDayBagFields,
     overflow: TemporalOverflow,
     reference_year: i64,
 ) -> Result<TemporalPlainMonthDayObjectData, Cx::Error> {
@@ -262,7 +262,7 @@ fn temporal_plain_month_day_from_value<Cx: PublicBuiltinDispatchContext>(
     let fields = temporal_plain_month_day_bag_fields(cx, object_ref)?;
     temporal_plain_month_day_from_bag_fields(
         cx,
-        fields,
+        &fields,
         TemporalOverflow::Constrain,
         TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR,
     )
@@ -450,11 +450,13 @@ fn temporal_plain_month_day_with_builtin<Cx: PublicBuiltinDispatchContext>(
         fields.month_code_text.as_deref(),
         Some(i64::from(month_day.month())),
     )?;
-    let data = temporal_plain_month_day_from_parts_with_overflow(
+    let result = temporal_plain_month_day_from_parts_with_overflow(
         cx,
-        fields.year.unwrap_or(i64::from(month_day.reference_year())),
+        fields
+            .year
+            .unwrap_or_else(|| i64::from(month_day.reference_year())),
         month,
-        fields.day.unwrap_or(i64::from(month_day.day())),
+        fields.day.unwrap_or_else(|| i64::from(month_day.day())),
         i64::from(month_day.reference_year()),
         overflow,
     )?;
@@ -462,7 +464,7 @@ fn temporal_plain_month_day_with_builtin<Cx: PublicBuiltinDispatchContext>(
         return Err(type_error(cx));
     }
     let prototype = current_temporal_plain_month_day_prototype(cx)?;
-    allocate_temporal_plain_month_day_object(cx, prototype, data)
+    allocate_temporal_plain_month_day_object(cx, prototype, result)
 }
 
 fn temporal_plain_month_day_to_plain_date_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -476,7 +478,7 @@ fn temporal_plain_month_day_to_plain_date_builtin<Cx: PublicBuiltinDispatchConte
         .and_then(|value| value.as_object_ref())
         .ok_or_else(|| type_error(cx))?;
     let year = temporal_required_integer_part_from_property(cx, item, "year")?;
-    let date = temporal_plain_date_from_parts_with_overflow(
+    let plain_date = temporal_plain_date_from_parts_with_overflow(
         cx,
         year,
         data.month().into(),
@@ -484,7 +486,7 @@ fn temporal_plain_month_day_to_plain_date_builtin<Cx: PublicBuiltinDispatchConte
         TemporalOverflow::Constrain,
     )?;
     let prototype = current_temporal_plain_date_prototype(cx)?;
-    allocate_temporal_plain_date_object(cx, prototype, date)
+    allocate_temporal_plain_date_object(cx, prototype, plain_date)
 }
 
 fn temporal_plain_month_day_from_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -540,7 +542,7 @@ fn temporal_plain_month_day_from_builtin<Cx: PublicBuiltinDispatchContext>(
                 let overflow = temporal_overflow_from_options(cx, options)?;
                 temporal_plain_month_day_from_bag_fields(
                     cx,
-                    fields,
+                    &fields,
                     overflow,
                     TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR,
                 )?
