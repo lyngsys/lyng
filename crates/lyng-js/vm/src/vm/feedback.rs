@@ -797,7 +797,7 @@ impl FeedbackSiteState {
 
     #[cfg(test)]
     #[inline]
-    fn execution_count(self) -> u32 {
+    const fn execution_count(self) -> u32 {
         match self {
             Self::Arithmetic(feedback) => feedback.execution_count,
             Self::Comparison(feedback) => feedback.execution_count,

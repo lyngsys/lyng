@@ -2382,7 +2382,7 @@ fn dynamic_import_fulfills_with_the_loaded_module_namespace() {
         LoadedModuleSource::new(module_key.clone(), "/tmp/dep.mjs", "export default 7;"),
     );
     host.define_import_meta(
-        module_key.clone(),
+        module_key,
         ImportMetaProperties::new(vec![ImportMetaProperty {
             key: "url".into(),
             value: ImportMetaValue::String("file:///tmp/dep.mjs".into()),
@@ -2435,14 +2435,14 @@ fn dynamic_import_fulfills_with_the_loaded_module_namespace() {
 fn dynamic_import_evaluates_options_after_the_specifier_expression() {
     let unit = compile_test_unit(
         204,
-        r#"
+        r"
             (function() {
                 var log = [];
                 import(log.push('first'), (log.push('second'), undefined))
                     .then(null, function() {});
                 return log[0] + ',' + log[1];
             })();
-        "#,
+        ",
     );
     let host = TestHost::new();
     let script_referrer = ModuleKey::new("/tmp/main.js");
@@ -2483,7 +2483,7 @@ fn dynamic_import_accepts_unary_assignment_expressions() {
         LoadedModuleSource::new(module_key.clone(), "/tmp/bitnot.mjs", "export default 9;"),
     );
     host.define_import_meta(
-        module_key.clone(),
+        module_key,
         ImportMetaProperties::new(vec![ImportMetaProperty {
             key: "url".into(),
             value: ImportMetaValue::String("file:///tmp/bitnot.mjs".into()),
@@ -2528,12 +2528,12 @@ fn dynamic_import_accepts_unary_assignment_expressions() {
 fn dynamic_import_preserves_script_referrer_after_async_resume() {
     let unit = compile_test_unit(
         220,
-        r#"
+        r"
             (async function() {
                 await 0;
                 return import('./dep.mjs');
             })();
-        "#,
+        ",
     );
     let host = TestHost::new();
     let script_referrer = ModuleKey::new("/tmp/main.js");
@@ -2543,7 +2543,7 @@ fn dynamic_import_preserves_script_referrer_after_async_resume() {
         LoadedModuleSource::new(module_key.clone(), "/tmp/dep.mjs", "export default 13;"),
     );
     host.define_import_meta(
-        module_key.clone(),
+        module_key,
         ImportMetaProperties::new(vec![ImportMetaProperty {
             key: "url".into(),
             value: ImportMetaValue::String("file:///tmp/dep.mjs".into()),
@@ -2579,11 +2579,11 @@ fn dynamic_import_preserves_script_referrer_after_async_resume() {
 fn dynamic_import_preserves_script_referrer_in_promise_reactions() {
     let unit = compile_test_unit(
         226,
-        r#"
+        r"
             Promise.resolve().then(function() {
                 return import('./dep.mjs');
             });
-        "#,
+        ",
     );
     let host = TestHost::new();
     let script_referrer = ModuleKey::new("/tmp/main.js");
@@ -2593,7 +2593,7 @@ fn dynamic_import_preserves_script_referrer_in_promise_reactions() {
         LoadedModuleSource::new(module_key.clone(), "/tmp/dep.mjs", "export default 17;"),
     );
     host.define_import_meta(
-        module_key.clone(),
+        module_key,
         ImportMetaProperties::new(vec![ImportMetaProperty {
             key: "url".into(),
             value: ImportMetaValue::String("file:///tmp/dep.mjs".into()),
@@ -2629,7 +2629,7 @@ fn dynamic_import_preserves_script_referrer_in_promise_reactions() {
 fn dynamic_import_preserves_referrer_through_import_promise_reactions() {
     let unit = compile_test_unit(
         259,
-        r#"
+        r"
             Promise.all([
                 import('./dep.mjs'),
                 import('./dep.mjs')
@@ -2637,7 +2637,7 @@ fn dynamic_import_preserves_referrer_through_import_promise_reactions() {
                 await import('./dep.mjs');
                 await import('./dep.mjs');
             });
-        "#,
+        ",
     );
     let host = TestHost::new();
     let script_referrer = ModuleKey::new("/tmp/main.js");
@@ -2645,16 +2645,16 @@ fn dynamic_import_preserves_referrer_through_import_promise_reactions() {
     host.define_module_source(
         "./dep.mjs",
         LoadedModuleSource::new(
-            module_key.clone(),
+            module_key,
             "/tmp/dep.mjs",
-            r#"
+            r"
                 var global = Function('return this;')();
                 if (global.dynamicImportMarker) {
                     throw new Error('Module was evaluated more than once.');
                 }
                 global.dynamicImportMarker = 19;
                 export default null;
-            "#,
+            ",
         ),
     );
     let mut runtime = Runtime::new(host.clone());
@@ -2698,12 +2698,12 @@ fn dynamic_import_preserves_referrer_through_import_promise_reactions() {
 #[test]
 fn dynamic_import_does_not_preempt_static_module_dfs_evaluation() {
     let main_source = "import './state.mjs'; import './a.mjs'; import './b.mjs';";
-    let state_source = r#"
+    let state_source = r"
         export let score = 0;
         export function step(value) {
             score = score * 10 + value;
         }
-    "#;
+    ";
     let state_unit = compile_test_module(258, state_source);
     let state_key = ModuleKey::new("/tmp/state.mjs");
     let host = TestHost::new();
@@ -2720,11 +2720,11 @@ fn dynamic_import_does_not_preempt_static_module_dfs_evaluation() {
         LoadedModuleSource::new(
             ModuleKey::new("/tmp/a.mjs"),
             "a.mjs",
-            r#"
+            r"
                 import { step } from './state.mjs';
                 import('./b.mjs');
                 step(1);
-            "#,
+            ",
         ),
     );
     host.define_module_source(
@@ -2786,7 +2786,7 @@ fn dynamic_import_does_not_preempt_static_module_dfs_evaluation() {
 fn dynamic_import_waits_for_current_top_level_await_evaluation() {
     let unit = compile_test_unit(
         260,
-        r#"
+        r"
             let continueExecution;
             globalThis.promise = new Promise(function(resolve) {
                 continueExecution = resolve;
@@ -2816,7 +2816,7 @@ fn dynamic_import_waits_for_current_top_level_await_evaluation() {
             }
 
             run();
-        "#,
+        ",
     );
     let host = TestHost::new();
     host.define_module_source(
@@ -2824,11 +2824,11 @@ fn dynamic_import_waits_for_current_top_level_await_evaluation() {
         LoadedModuleSource::new(
             ModuleKey::new("/tmp/tla.mjs"),
             "/tmp/tla.mjs",
-            r#"
+            r"
                 globalThis.executionStarted();
                 export let x = 1;
                 await globalThis.promise;
-            "#,
+            ",
         ),
     );
     host.define_module_source(
@@ -2920,7 +2920,7 @@ fn top_level_await_does_not_resume_before_sibling_module_evaluation() {
 fn top_level_await_dynamic_imports_settle_leaf_before_parent() {
     let unit = compile_test_unit(
         261,
-        r#"
+        r"
             globalThis.logs = [];
             globalThis.p1 = Promise.withResolvers();
             globalThis.pAStart = Promise.withResolvers();
@@ -2944,7 +2944,7 @@ fn top_level_await_dynamic_imports_settle_leaf_before_parent() {
             imports.then(function() {
                 return globalThis.logs.join(',');
             });
-        "#,
+        ",
     );
     let host = TestHost::new();
     host.define_module_source(
@@ -3009,7 +3009,7 @@ fn top_level_await_dynamic_imports_settle_leaf_before_parent() {
 fn top_level_await_dynamic_import_rejections_settle_leaf_before_parent() {
     let unit = compile_test_unit(
         262,
-        r#"
+        r"
             globalThis.logs = [];
             globalThis.p1 = Promise.withResolvers();
             globalThis.pAStart = Promise.withResolvers();
@@ -3033,7 +3033,7 @@ fn top_level_await_dynamic_import_rejections_settle_leaf_before_parent() {
             imports.then(function() {
                 return globalThis.logs.join(',');
             });
-        "#,
+        ",
     );
     let host = TestHost::new();
     host.define_module_source(
@@ -3194,14 +3194,14 @@ fn dynamic_import_source_phase_rejects_source_text_modules_with_syntax_error() {
 fn dynamic_import_defer_sync_module_evaluates_on_namespace_access() {
     let unit = compile_test_unit(
         266,
-        r#"
+        r"
             globalThis.evaluations = [];
             import.defer('./sync.mjs').then(ns => {
                 globalThis.beforeDeferredAccess = globalThis.evaluations.join(',');
                 ns.x;
                 globalThis.afterDeferredAccess = globalThis.evaluations.join(',');
             });
-        "#,
+        ",
     );
     let host = TestHost::new();
     let script_referrer = ModuleKey::new("/tmp/main.js");
@@ -3284,13 +3284,13 @@ fn static_import_defer_sync_module_evaluates_on_namespace_access() {
         LoadedModuleSource::new(
             ModuleKey::new("/tmp/main.mjs"),
             "/tmp/main.mjs",
-            r#"
+            r"
             import './setup.mjs';
             import defer * as ns from './sync.mjs';
             globalThis.beforeDeferredAccess = globalThis.evaluations.join(',');
             ns.x;
             globalThis.afterDeferredAccess = globalThis.evaluations.join(',');
-        "#,
+        ",
         ),
     );
     let mut runtime = Runtime::new(host.clone());
@@ -3342,7 +3342,7 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
         LoadedModuleSource::new(
             ModuleKey::new("/tmp/main.mjs"),
             "/tmp/main.mjs",
-            r#"
+            r"
                 import { done } from './promises.mjs';
                 import './dep.mjs';
                 (async function() {
@@ -3354,7 +3354,7 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
                     globalThis.doneAfterDeferredAsyncReady =
                         globalThis.afterDeferredAsyncReady;
                 })();
-            "#,
+            ",
         ),
     );
     host.define_module_source(
@@ -3362,7 +3362,7 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
         LoadedModuleSource::new(
             ModuleKey::new("/tmp/promises.mjs"),
             "/tmp/promises.mjs",
-            r#"
+            r"
                 export let resolveDone, rejectDone;
                 export const done = new Promise((resolve, reject) => {
                     resolveDone = resolve;
@@ -3372,7 +3372,7 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
                 export const first = new Promise((resolve) => { resolveFirst = resolve; });
                 export const second = new Promise((resolve) => { resolveSecond = resolve; });
                 export const third = new Promise((resolve) => { resolveThird = resolve; });
-            "#,
+            ",
         ),
     );
     host.define_module_source(
@@ -3380,7 +3380,7 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
         LoadedModuleSource::new(
             ModuleKey::new("/tmp/observer.mjs"),
             "/tmp/observer.mjs",
-            r#"
+            r"
                 import { first, third, resolveDone, rejectDone, resolveSecond } from './promises.mjs';
                 import defer * as ns from './dep.mjs';
 
@@ -3406,7 +3406,7 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
                         }
                     });
                 }).then(resolveDone, rejectDone);
-            "#,
+            ",
         ),
     );
     host.define_module_source(
@@ -3414,7 +3414,7 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
         LoadedModuleSource::new(
             ModuleKey::new("/tmp/dep.mjs"),
             "/tmp/dep.mjs",
-            r#"
+            r"
                 import { resolveFirst, resolveThird, second } from './promises.mjs';
                 import './observer.mjs';
 
@@ -3424,7 +3424,7 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
                 resolveThird();
 
                 export let foo = 1;
-            "#,
+            ",
         ),
     );
     let mut runtime = Runtime::new(host.clone());
@@ -3486,7 +3486,7 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
 fn static_import_defer_preserves_prior_evaluation_error_identity() {
     let unit = compile_test_unit(
         267,
-        r#"
+        r"
             import('./throws.mjs').catch(function(first) {
                 globalThis.firstDeferredError = first;
                 return import('./deferred.mjs').then(function(module) {
@@ -3498,7 +3498,7 @@ fn static_import_defer_preserves_prior_evaluation_error_identity() {
                     }
                 });
             });
-        "#,
+        ",
     );
     let host = TestHost::new();
     let script_referrer = ModuleKey::new("/tmp/main.js");
@@ -3750,7 +3750,7 @@ fn nested_eval_script_preserves_host_access_for_dynamic_import() {
         LoadedModuleSource::new(module_key.clone(), "/tmp/dep.mjs", "export default 11;"),
     );
     host.define_import_meta(
-        module_key.clone(),
+        module_key,
         ImportMetaProperties::new(vec![ImportMetaProperty {
             key: "url".into(),
             value: ImportMetaValue::String("file:///tmp/dep.mjs".into()),
@@ -3805,7 +3805,7 @@ fn nested_eval_script_preserves_host_access_for_dynamic_import() {
 fn promise_checkpoint_drains_reaction_jobs_and_reports_host_phases() {
     let unit = compile_test_unit(
         217,
-        r#"
+        r"
             (function() {
                 let resolve;
                 let reject;
@@ -3815,7 +3815,7 @@ fn promise_checkpoint_drains_reaction_jobs_and_reports_host_phases() {
                 });
                 return [promise, resolve, reject];
             })();
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -3891,9 +3891,9 @@ fn promise_checkpoint_drains_reaction_jobs_and_reports_host_phases() {
 fn evaluate_script_drains_nested_promise_jobs_to_quiescence() {
     let unit = compile_test_unit(
         218,
-        r#"
+        r"
             Promise.resolve(1).then().then();
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -3921,13 +3921,13 @@ fn evaluate_script_drains_nested_promise_jobs_to_quiescence() {
 fn evaluate_script_runs_callable_promise_reactions() {
     let unit = compile_test_unit(
         219,
-        r#"
+        r"
             Promise.resolve(1)
                 .then(function(value) {
                     return value + 1;
                 })
                 .then();
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -3954,9 +3954,9 @@ fn evaluate_script_runs_callable_promise_reactions() {
 fn evaluate_script_resolves_promise_all_values_in_order() {
     let unit = compile_test_unit(
         220,
-        r#"
+        r"
             Promise.all([Promise.resolve(1), 2, Promise.resolve(3)]);
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -3998,11 +3998,11 @@ fn evaluate_script_resolves_promise_all_values_in_order() {
 fn evaluate_script_promise_reaction_can_update_global_lexical_binding() {
     let unit = compile_test_unit(
         221,
-        r#"
+        r"
             let outcomes = [];
             Promise.all([Promise.resolve(1), 2, Promise.resolve(3)])
                 .then(results => (outcomes = results), function() {});
-        "#,
+        ",
     );
     let readback = compile_test_unit(222, "outcomes[2];");
     let host = TestHost::new();
@@ -4266,11 +4266,11 @@ fn evaluate_script_named_function_expression_closure_observes_rebound_lexical_bi
 fn evaluate_script_array_from_async_resolves_sync_iterable_values() {
     let unit = compile_test_unit(
         220,
-        r#"
+        r"
             Array.fromAsync([Promise.resolve(1), 2], function(value, index) {
                 return Promise.resolve(value + index + 1);
             });
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -4451,9 +4451,9 @@ fn evaluate_script_array_from_async_awaits_async_iterator_values_before_mapping(
 fn evaluate_script_array_from_async_rejects_bigint_array_like_length() {
     let unit = compile_test_unit(
         220,
-        r#"
+        r"
             Array.fromAsync({ length: 1n, 0: 0 });
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -4580,9 +4580,9 @@ fn evaluate_script_array_from_async_custom_constructor_uses_custom_sync_iterator
 fn evaluate_script_resolves_promise_all_settled_records() {
     let unit = compile_test_unit(
         221,
-        r#"
+        r"
             Promise.allSettled([Promise.resolve(1), Promise.reject(2)]);
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -4653,9 +4653,9 @@ fn evaluate_script_resolves_promise_all_settled_records() {
 fn evaluate_script_resolves_promise_race_with_first_settlement() {
     let unit = compile_test_unit(
         222,
-        r#"
+        r"
             Promise.race([Promise.resolve(4), new Promise(function() {})]);
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -4682,13 +4682,13 @@ fn evaluate_script_resolves_promise_race_with_first_settlement() {
 fn evaluate_script_promise_all_rejects_non_iterables_through_the_returned_promise() {
     let unit = compile_test_unit(
         223,
-        r#"
+        r"
             Promise.all(false)
                 .then(function() { return false; }, function(error) {
                     return error instanceof TypeError;
                 })
                 .then();
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -4715,7 +4715,7 @@ fn evaluate_script_promise_all_rejects_non_iterables_through_the_returned_promis
 fn evaluate_script_invokes_promise_all_resolve_for_each_iterated_value() {
     let unit = compile_test_unit(
         224,
-        r#"
+        r"
             var callCount = 0;
             var boundResolve = Promise.resolve.bind(Promise);
             Promise.resolve = function(value) {
@@ -4723,7 +4723,7 @@ fn evaluate_script_invokes_promise_all_resolve_for_each_iterated_value() {
                 return boundResolve(value);
             };
             Promise.all([1, 2, 3]).then(function() { return callCount; }).then();
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -4873,13 +4873,13 @@ fn evaluate_script_function_apply_observes_array_prototype_getter() {
 fn evaluate_script_string_from_code_point_apply_uses_dense_array_fast_path() {
     let unit = compile_test_unit(
         14_229,
-        r#"
+        r"
             let args = [];
             for (let i = 0; i < 64; i = i + 1) {
                 args[i] = 65;
             }
             String.fromCodePoint.apply(null, args).length;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -4896,9 +4896,9 @@ fn evaluate_script_string_from_code_point_apply_uses_dense_array_fast_path() {
 fn evaluate_script_resolves_promise_any_with_first_fulfillment() {
     let unit = compile_test_unit(
         229,
-        r#"
+        r"
             Promise.any([Promise.reject(1), Promise.resolve(7), Promise.reject(3)]).then();
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -4963,14 +4963,14 @@ fn evaluate_script_rejects_promise_any_with_aggregate_error() {
 fn evaluate_script_rejects_promise_any_empty_iterable_with_aggregate_error() {
     let unit = compile_test_unit(
         231,
-        r#"
+        r"
             Promise.any([])
                 .then(function() { return false; }, function(error) {
                     return error instanceof AggregateError
                         && error.errors.length === 0;
                 })
                 .then();
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -4997,7 +4997,7 @@ fn evaluate_script_rejects_promise_any_empty_iterable_with_aggregate_error() {
 fn evaluate_script_promise_any_preserves_fulfillment_job_order() {
     let unit = compile_test_unit(
         232,
-        r#"
+        r"
             var sequence = [];
             var p1 = Promise.resolve(1);
             var p2 = Promise.resolve(2);
@@ -5018,7 +5018,7 @@ fn evaluate_script_promise_any_preserves_fulfillment_job_order() {
             });
             sequence.push(2);
             outcome;
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -5045,7 +5045,7 @@ fn evaluate_script_promise_any_preserves_fulfillment_job_order() {
 fn evaluate_script_promise_any_rejects_non_callable_capability_resolve() {
     let unit = compile_test_unit(
         233,
-        r#"
+        r"
             function Custom(executor) {
                 executor({}, function() {});
                 return Promise.resolve(0);
@@ -5056,7 +5056,7 @@ fn evaluate_script_promise_any_rejects_non_callable_capability_resolve() {
             } catch (error) {
                 error instanceof TypeError;
             }
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -5548,14 +5548,14 @@ fn evaluate_script_direct_eval_string_comparison_result_shape() {
 fn evaluate_script_with_statement_assigns_existing_object_binding() {
     let unit = compile_test_unit(
         2393,
-        r#"
+        r"
             var x = 1;
             var object = { x: 2 };
             with (object) {
                 x = 3;
             }
             object.x * 10 + x;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -5945,14 +5945,14 @@ fn evaluate_script_eval_with_statement_preserves_normal_completion_value() {
 fn evaluate_script_eval_with_statement_updates_empty_abrupt_completion() {
     let unit = compile_test_unit(
         2408,
-        r#"
+        r"
             [
                 String(eval('1; do { 2; with({}) { 3; break; } 4; } while (false);')),
                 String(eval('5; do { 6; with({}) { break; } 7; } while (false);')),
                 String(eval('8; do { 9; with({}) { 10; continue; } 11; } while (false)')),
                 String(eval('12; do { 13; with({}) { continue; } 14; } while (false)'))
             ].join(':');
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -5995,14 +5995,14 @@ fn evaluate_script_direct_eval_with_statement_reads_object_binding() {
 fn evaluate_script_with_statement_respects_symbol_unscopables() {
     let unit = compile_test_unit(
         2395,
-        r#"
+        r"
             var x = 1;
             var object = { x: 2 };
             object[Symbol.unscopables] = { x: true };
             with (object) {
                 x;
             }
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -6018,7 +6018,7 @@ fn evaluate_script_with_statement_respects_symbol_unscopables() {
 fn evaluate_script_with_statement_unscopables_keeps_global_hoisted_functions_callable() {
     let unit = compile_test_unit(
         2396,
-        r#"
+        r"
             function check(value) {
                 return value + 1;
             }
@@ -6034,7 +6034,7 @@ fn evaluate_script_with_statement_unscopables_keeps_global_hoisted_functions_cal
             }
 
             wrap()(4);
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -6372,11 +6372,11 @@ fn evaluate_script_with_statement_sloppy_assignment_keeps_deleted_binding_refere
 fn evaluate_script_logical_and_assignment_infers_identifier_function_name() {
     let unit = compile_test_unit(
         2413,
-        r#"
+        r"
             var value = 1;
             value &&= function() {};
             value.name;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -6591,7 +6591,7 @@ fn evaluate_script_compound_assignment_keeps_initial_identifier_reference_across
 fn evaluate_script_with_statement_closure_keeps_object_environment_live() {
     let unit = compile_test_unit(
         2398,
-        r#"
+        r"
             var reader;
             with ({ x: 7 }) {
                 reader = function() {
@@ -6599,7 +6599,7 @@ fn evaluate_script_with_statement_closure_keeps_object_environment_live() {
                 };
             }
             reader() === 7;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -6633,7 +6633,7 @@ fn evaluate_installed_function_expression_closure_can_resolve_global_eval() {
     let Some(FunctionEntryIdentity::Bytecode(code)) = agent
         .objects()
         .function_data(function_object)
-        .and_then(|data| data.entry())
+        .and_then(lyng_js_objects::FunctionObjectData::entry)
     else {
         panic!("function expression should remain backed by installed bytecode");
     };
@@ -6643,7 +6643,7 @@ fn evaluate_installed_function_expression_closure_can_resolve_global_eval() {
     let environment = agent
         .objects()
         .function_data(function_object)
-        .and_then(|data| data.environment())
+        .and_then(lyng_js_objects::FunctionObjectData::environment)
         .expect("function expression closure should preserve its outer environment");
 
     let closure_result = vm
@@ -6662,7 +6662,7 @@ fn evaluate_installed_function_expression_closure_can_resolve_global_eval() {
 fn evaluate_script_with_statement_closure_reads_var_declared_inside_with() {
     let unit = compile_test_unit(
         2398,
-        r#"
+        r"
             var reader;
             with ({}) {
                 var x = 7;
@@ -6671,7 +6671,7 @@ fn evaluate_script_with_statement_closure_reads_var_declared_inside_with() {
                 };
             }
             reader() === 7;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -6687,13 +6687,13 @@ fn evaluate_script_with_statement_closure_reads_var_declared_inside_with() {
 fn evaluate_script_with_statement_single_statement_body_closure_keeps_var_binding() {
     let unit = compile_test_unit(
         2399,
-        r#"
+        r"
             var probeBody;
             with ({ x: 0 })
                 var x = 1, _ = probeBody = function() { return x; };
             var x = 2;
             probeBody() * 10 + x;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -6709,7 +6709,7 @@ fn evaluate_script_with_statement_single_statement_body_closure_keeps_var_bindin
 fn evaluate_script_with_statement_expression_and_body_keep_distinct_var_views() {
     let unit = compile_test_unit(
         2400,
-        r#"
+        r"
             var x = 0;
             var objectRecord = { x: 2 };
             var probeBefore = function() { return x; };
@@ -6719,7 +6719,7 @@ fn evaluate_script_with_statement_expression_and_body_keep_distinct_var_views() 
                 var x = 3, _ = probeBody = function() { return x; };
 
             objectRecord.x * 10000 + x * 1000 + probeBody() * 100 + probeExpr() * 10 + probeBefore();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -6883,14 +6883,14 @@ fn evaluate_script_array_join_preserves_utf16_code_units() {
 fn evaluate_script_typed_array_join_preserves_utf16_separator() {
     let unit = compile_test_unit(
         2396,
-        r#"
+        r"
             let separator = String.fromCharCode(0xD800);
             let text = new Uint8Array([1, 2]).join(separator);
             text.length === 3 &&
                 text.charCodeAt(0) === 0x0031 &&
                 text.charCodeAt(1) === 0xD800 &&
                 text.charCodeAt(2) === 0x0032;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -6932,10 +6932,10 @@ fn evaluate_script_string_html_methods_preserve_utf16_code_units() {
 fn evaluate_script_regexp_legacy_input_preserves_utf16_code_units() {
     let unit = compile_test_unit(
         2398,
-        r#"
+        r"
             RegExp.input = String.fromCharCode(0xD800);
             RegExp.input.length === 1 && RegExp.input.charCodeAt(0) === 0xD800;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -7034,7 +7034,7 @@ fn evaluate_script_string_search_uses_regexp_payloads() {
 fn evaluate_script_promise_finally_invokes_then_on_thenables() {
     let unit = compile_test_unit(
         239,
-        r#"
+        r"
             var thenResult = {};
             var seenThis = null;
             var seenArgs = null;
@@ -7050,7 +7050,7 @@ fn evaluate_script_promise_finally_invokes_then_on_thenables() {
                 && seenArgs.length === 2
                 && seenArgs[0] === undefined
                 && seenArgs[1] === undefined;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -7146,7 +7146,7 @@ fn evaluate_script_promise_finally_invokes_result_then_observably() {
 fn evaluate_script_promise_then_throws_when_constructor_is_null() {
     let unit = compile_test_unit(
         241,
-        r#"
+        r"
             var p = new Promise(function() {});
             p.constructor = null;
             try {
@@ -7155,7 +7155,7 @@ fn evaluate_script_promise_then_throws_when_constructor_is_null() {
             } catch (error) {
                 error instanceof TypeError;
             }
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -7252,13 +7252,13 @@ fn evaluate_script_object_define_properties_applies_multiple_descriptors() {
 fn evaluate_script_object_define_properties_normalizes_array_length() {
     let unit = compile_test_unit(
         236,
-        r#"
+        r"
             var target = [1, 2, 3];
             Object.defineProperties(target, {
                 length: { value: 1 }
             });
             target.length === 1 && target[1] === undefined;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -7783,7 +7783,7 @@ fn using_declarations_dispose_in_statement_contexts() {
 fn loop_iteration_slot_sync_active_stack_avoids_scratch_vectors() {
     let unit = compile_test_unit(
         2316,
-        r#"
+        r"
             var total = 0;
             for (let outer = 0; outer < 6; outer = outer + 1) {
                 let saved;
@@ -7794,7 +7794,7 @@ fn loop_iteration_slot_sync_active_stack_avoids_scratch_vectors() {
                 total = total + saved();
             }
             total;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -7816,14 +7816,14 @@ fn loop_iteration_slot_sync_active_stack_avoids_scratch_vectors() {
 fn loop_iteration_slot_sync_single_active_environment_avoids_scratch_vectors() {
     let unit = compile_test_unit(
         14_230,
-        r#"
+        r"
             var saved;
             for (let i = 0; i < 16; i = i + 1) {
                 saved = function() { return i; };
                 i = i + 0;
             }
             saved();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -7890,7 +7890,7 @@ fn await_using_waits_for_async_disposal_before_resolving() {
 fn skipped_await_using_declaration_does_not_suspend_async_function() {
     let unit = compile_test_unit(
         2309,
-        r#"
+        r"
             var sameTurn = true;
 
             async function run() {
@@ -7909,7 +7909,7 @@ fn skipped_await_using_declaration_does_not_suspend_async_function() {
             var result = run();
             sameTurn = false;
             result;
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -7936,14 +7936,14 @@ fn skipped_await_using_declaration_does_not_suspend_async_function() {
 fn evaluate_module_supports_top_level_await_using() {
     let unit = compile_test_module(
         2314,
-        r#"
+        r"
             export let disposed = false;
             await using resource = {
                 [Symbol.dispose]() {
                     disposed = true;
                 }
             };
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -7980,7 +7980,7 @@ fn evaluate_module_supports_top_level_await_using() {
 fn using_block_local_initializer_reads_trigger_reference_error() {
     let unit = compile_test_unit(
         2309,
-        r#"
+        r"
             try {
                 {
                     using x = x + 1;
@@ -7989,7 +7989,7 @@ fn using_block_local_initializer_reads_trigger_reference_error() {
             } catch (error) {
                 error instanceof ReferenceError;
             }
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8005,7 +8005,7 @@ fn using_block_local_initializer_reads_trigger_reference_error() {
 fn using_function_local_initializer_reads_trigger_reference_error() {
     let unit = compile_test_unit(
         2310,
-        r#"
+        r"
             function f() {
                 using x = x + 1;
             }
@@ -8016,7 +8016,7 @@ fn using_function_local_initializer_reads_trigger_reference_error() {
             } catch (error) {
                 error instanceof ReferenceError;
             }
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8032,7 +8032,7 @@ fn using_function_local_initializer_reads_trigger_reference_error() {
 fn assigning_to_using_bindings_in_for_of_bodies_throws_type_error() {
     let unit = compile_test_unit(
         2311,
-        r#"
+        r"
             try {
                 for (using x of [null]) {
                     x = { [Symbol.dispose]() {} };
@@ -8041,7 +8041,7 @@ fn assigning_to_using_bindings_in_for_of_bodies_throws_type_error() {
             } catch (error) {
                 error instanceof TypeError;
             }
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8057,14 +8057,14 @@ fn assigning_to_using_bindings_in_for_of_bodies_throws_type_error() {
 fn assigning_to_using_bindings_in_for_update_throws_type_error() {
     let unit = compile_test_unit(
         2312,
-        r#"
+        r"
             try {
                 for (using i = null; i === null; i = { [Symbol.dispose]() {} }) {}
                 false;
             } catch (error) {
                 error instanceof TypeError;
             }
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8080,7 +8080,7 @@ fn assigning_to_using_bindings_in_for_update_throws_type_error() {
 fn using_cleanup_nests_multiple_disposal_errors_as_suppressed_error() {
     let unit = compile_test_unit(
         2313,
-        r#"
+        r"
             class MyError extends Error {}
             const error1 = new MyError();
             const error2 = new MyError();
@@ -8097,7 +8097,7 @@ fn using_cleanup_nests_multiple_disposal_errors_as_suppressed_error() {
                     && error.suppressed.error === error2
                     && error.suppressed.suppressed === error3;
             }
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8113,7 +8113,7 @@ fn using_cleanup_nests_multiple_disposal_errors_as_suppressed_error() {
 fn generator_call_returns_a_generator_without_running_the_body() {
     let unit = compile_test_unit(
         204,
-        r#"
+        r"
             var ran = 0;
             function* g() {
                 ran = 1;
@@ -8121,7 +8121,7 @@ fn generator_call_returns_a_generator_without_running_the_body() {
             }
             var iter = g();
             ran;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8141,12 +8141,12 @@ fn generator_call_returns_a_generator_without_running_the_body() {
 fn async_function_call_returns_a_promise_and_fulfills_after_await() {
     let unit = compile_test_unit(
         221,
-        r#"
+        r"
             async function f() {
                 return await Promise.resolve(41);
             }
             f();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8169,12 +8169,12 @@ fn async_function_call_returns_a_promise_and_fulfills_after_await() {
 fn async_function_call_rejects_the_returned_promise_on_await_rejection() {
     let unit = compile_test_unit(
         222,
-        r#"
+        r"
             async function f() {
                 await Promise.reject(99);
             }
             f();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8247,7 +8247,7 @@ fn async_function_constructor_compiles_dynamic_async_bodies() {
 fn for_await_of_consumes_async_iterators() {
     let unit = compile_test_unit(
         225,
-        r#"
+        r"
             var iterable = {
                 [Symbol.asyncIterator]() {
                     var index = 0;
@@ -8270,7 +8270,7 @@ fn for_await_of_consumes_async_iterators() {
                 return sum;
             }
             main();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8293,7 +8293,7 @@ fn for_await_of_consumes_async_iterators() {
 fn for_await_of_wraps_sync_iterators_and_awaits_each_value() {
     let unit = compile_test_unit(
         226,
-        r#"
+        r"
             async function main() {
                 var sum = 0;
                 for await (const value of [Promise.resolve(1), 2]) {
@@ -8302,7 +8302,7 @@ fn for_await_of_wraps_sync_iterators_and_awaits_each_value() {
                 return sum;
             }
             main();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8444,7 +8444,7 @@ fn for_await_of_break_rejects_when_async_close_rejects() {
 fn for_await_of_return_closes_wrapped_sync_iterators_and_awaits_return_value() {
     let unit = compile_test_unit(
         228,
-        r#"
+        r"
             var state = { closed: 0 };
             var iterable = {
                 [Symbol.iterator]() {
@@ -8473,7 +8473,7 @@ fn for_await_of_return_closes_wrapped_sync_iterators_and_awaits_return_value() {
             main().then(function(value) {
                 return value + state.closed * 10;
             });
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8496,7 +8496,7 @@ fn for_await_of_return_closes_wrapped_sync_iterators_and_awaits_return_value() {
 fn for_await_of_return_preserves_value_with_async_iterator_close() {
     let unit = compile_test_unit(
         229,
-        r#"
+        r"
             async function main() {
                 var iterable = {
                     [Symbol.asyncIterator]() {
@@ -8516,7 +8516,7 @@ fn for_await_of_return_preserves_value_with_async_iterator_close() {
                 return 99;
             }
             main();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8539,7 +8539,7 @@ fn for_await_of_return_preserves_value_with_async_iterator_close() {
 fn for_await_of_return_preserves_value_with_sync_wrapper_close_without_await() {
     let unit = compile_test_unit(
         230,
-        r#"
+        r"
             async function main() {
                 var iterable = {
                     [Symbol.iterator]() {
@@ -8564,7 +8564,7 @@ fn for_await_of_return_preserves_value_with_sync_wrapper_close_without_await() {
                 return 99;
             }
             main();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8587,7 +8587,7 @@ fn for_await_of_return_preserves_value_with_sync_wrapper_close_without_await() {
 fn async_generator_next_returns_a_promise_for_iterator_results() {
     let unit = compile_test_unit(
         231,
-        r#"
+        r"
             async function main() {
                 var iter = (async function* () {
                     yield 1;
@@ -8603,7 +8603,7 @@ fn async_generator_next_returns_a_promise_for_iterator_results() {
                 return first.value + second.value;
             }
             main();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8626,7 +8626,7 @@ fn async_generator_next_returns_a_promise_for_iterator_results() {
 fn async_generator_yield_unwraps_promises_before_resolving_next() {
     let unit = compile_test_unit(
         232,
-        r#"
+        r"
             async function main() {
                 var iter = (async function* () {
                     yield Promise.resolve(7);
@@ -8635,7 +8635,7 @@ fn async_generator_yield_unwraps_promises_before_resolving_next() {
                 return result.value instanceof Promise ? -1 : result.value;
             }
             main();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8658,7 +8658,7 @@ fn async_generator_yield_unwraps_promises_before_resolving_next() {
 fn async_generator_awaits_within_the_body_before_settling_next_requests() {
     let unit = compile_test_unit(
         232,
-        r#"
+        r"
             async function main() {
                 var iter = (async function* () {
                     yield await Promise.resolve(1);
@@ -8671,7 +8671,7 @@ fn async_generator_awaits_within_the_body_before_settling_next_requests() {
                 return first.value + second.value;
             }
             main();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -8808,7 +8808,7 @@ fn async_generator_private_yield_star_awaits_async_iterator_next_results() {
 fn async_generator_yield_star_missing_return_method_awaits_return_value() {
     let unit = compile_test_unit(
         335,
-        r#"
+        r"
             async function main() {
                 var iterable = {
                     [Symbol.asyncIterator]() {
@@ -8830,7 +8830,7 @@ fn async_generator_yield_star_missing_return_method_awaits_return_value() {
                 return result.value === returnValue ? -1 : result.value;
             }
             main();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9177,7 +9177,7 @@ fn async_iterator_prototype_async_dispose_method_has_spec_descriptor() {
 fn async_iterator_prototype_async_dispose_rejects_when_return_throws() {
     let unit = compile_test_unit(
         237,
-        r#"
+        r"
             var AsyncIteratorPrototype = Object.getPrototypeOf(
                 Object.getPrototypeOf((async function* () {}).prototype)
             );
@@ -9198,7 +9198,7 @@ fn async_iterator_prototype_async_dispose_rejects_when_return_throws() {
                     return error instanceof Marker && calls === 1;
                 }
             );
-        "#,
+        ",
     );
     let host = TestHost::new();
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -9266,7 +9266,7 @@ fn async_generator_function_constructor_compiles_dynamic_async_generator_bodies(
 fn generator_call_runs_parameter_instantiation_before_suspending_start() {
     let unit = compile_test_unit(
         214,
-        r#"
+        r"
             var calls = 0;
             function* g(x = (calls += 1, 41)) {
                 calls += 100;
@@ -9274,7 +9274,7 @@ fn generator_call_runs_parameter_instantiation_before_suspending_start() {
             }
             var iter = g();
             calls;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9294,7 +9294,7 @@ fn generator_call_runs_parameter_instantiation_before_suspending_start() {
 fn generator_call_throws_parameter_instantiation_errors_before_returning() {
     let unit = compile_test_unit(
         215,
-        r#"
+        r"
             var ran = 0;
             function* g(x = x) {
                 ran = 1;
@@ -9307,7 +9307,7 @@ fn generator_call_throws_parameter_instantiation_errors_before_returning() {
                 status = error.constructor === ReferenceError ? 2 : 3;
             }
             status * 10 + (ran === 0 ? 1 : 0);
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9323,12 +9323,12 @@ fn generator_call_throws_parameter_instantiation_errors_before_returning() {
 fn generator_call_creates_instances_after_parameter_side_effects() {
     let unit = compile_test_unit(
         216,
-        r#"
+        r"
             var g = function*(a = (g.prototype = null)) {};
             var oldPrototype = g.prototype;
             var iter = g();
             Object.getPrototypeOf(iter) === oldPrototype;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9344,14 +9344,14 @@ fn generator_call_creates_instances_after_parameter_side_effects() {
 fn generator_instances_use_the_function_prototype_chain() {
     let unit = compile_test_unit(
         210,
-        r#"
+        r"
             function* g() {}
             var iter = g();
             var directProtoMatches = Object.getPrototypeOf(iter) === g.prototype;
             var sharedProto = Object.getPrototypeOf(g.prototype);
             var sharedNext = typeof sharedProto.next;
             var sharedTag = sharedProto[Symbol.toStringTag];
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9446,7 +9446,7 @@ fn subclassed_generator_function_constructors_preserve_generator_descriptors() {
 fn explicit_derived_constructors_can_fall_through_after_super_call() {
     let unit = compile_test_unit(
         221,
-        r#"
+        r"
             class Base {
                 constructor(x) {
                     this.foobar = x;
@@ -9459,7 +9459,7 @@ fn explicit_derived_constructors_can_fall_through_after_super_call() {
             }
             var instance = new Subclass(1);
             instance.foobar === 1 && Object.getPrototypeOf(instance) === Subclass.prototype;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9475,7 +9475,7 @@ fn explicit_derived_constructors_can_fall_through_after_super_call() {
 fn explicit_derived_constructors_can_return_this_immediately_after_super_call() {
     let unit = compile_test_unit(
         222,
-        r#"
+        r"
             class Base {
                 constructor(x) {
                     this.foobar = x;
@@ -9488,7 +9488,7 @@ fn explicit_derived_constructors_can_return_this_immediately_after_super_call() 
                 }
             }
             new Subclass(1).foobar === 1;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9504,7 +9504,7 @@ fn explicit_derived_constructors_can_return_this_immediately_after_super_call() 
 fn explicit_derived_constructors_throw_for_non_undefined_primitive_returns() {
     let unit = compile_test_unit(
         223,
-        r#"
+        r"
             class Base {
                 constructor() {}
             }
@@ -9522,7 +9522,7 @@ fn explicit_derived_constructors_throw_for_non_undefined_primitive_returns() {
                 status = error.constructor === TypeError ? 2 : 3;
             }
             status;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9538,7 +9538,7 @@ fn explicit_derived_constructors_throw_for_non_undefined_primitive_returns() {
 fn explicit_derived_constructors_preserve_object_return_overrides() {
     let unit = compile_test_unit(
         224,
-        r#"
+        r"
             class Base {
                 constructor() {
                     this.base = true;
@@ -9554,7 +9554,7 @@ fn explicit_derived_constructors_preserve_object_return_overrides() {
             result.overridden === true
                 && result.base === undefined
                 && !(result instanceof Derived);
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9570,11 +9570,11 @@ fn explicit_derived_constructors_preserve_object_return_overrides() {
 fn instanceof_accepts_class_constructors_as_rhs() {
     let unit = compile_test_unit(
         225,
-        r#"
+        r"
             class Base {}
             let value = new Base();
             value instanceof Base;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9590,7 +9590,7 @@ fn instanceof_accepts_class_constructors_as_rhs() {
 fn class_heritage_functions_use_strict_arguments_objects() {
     let unit = compile_test_unit(
         237,
-        r#"
+        r"
             var status = 0;
             var D = class extends function() {
                 arguments.callee;
@@ -9610,7 +9610,7 @@ fn class_heritage_functions_use_strict_arguments_objects() {
                 }
             }
             status;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9654,7 +9654,7 @@ fn arrow_super_calls_in_finally_initialize_the_enclosing_derived_constructor() {
 fn class_declaration_heritage_self_reference_throws_reference_error() {
     let unit = compile_test_unit(
         226,
-        r#"
+        r"
             var status = 0;
             try {
                 class x extends x {}
@@ -9663,7 +9663,7 @@ fn class_declaration_heritage_self_reference_throws_reference_error() {
                 status = error.constructor === ReferenceError ? 2 : 3;
             }
             status;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9679,7 +9679,7 @@ fn class_declaration_heritage_self_reference_throws_reference_error() {
 fn class_expression_heritage_self_reference_throws_reference_error() {
     let unit = compile_test_unit(
         227,
-        r#"
+        r"
             var status = 0;
             try {
                 (class x extends x {});
@@ -9688,7 +9688,7 @@ fn class_expression_heritage_self_reference_throws_reference_error() {
                 status = error.constructor === ReferenceError ? 2 : 3;
             }
             status;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9887,7 +9887,7 @@ fn derived_constructors_reject_this_before_super_even_when_super_returns_an_obje
 fn derived_constructors_throw_reference_error_on_second_super_after_evaluating_arguments() {
     let unit = compile_test_unit(
         232,
-        r#"
+        r"
             class Base {
                 constructor(a, b) {
                     this.prp = a + b;
@@ -9916,7 +9916,7 @@ fn derived_constructors_throw_reference_error_on_second_super_after_evaluating_a
 
             var result = new Subclass();
             ok && result.prp === 3;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -9932,7 +9932,7 @@ fn derived_constructors_throw_reference_error_on_second_super_after_evaluating_a
 fn derived_constructors_without_super_throw_reference_error_on_fallthrough() {
     let unit = compile_test_unit(
         233,
-        r#"
+        r"
             class Base {
                 constructor() {}
             }
@@ -9949,7 +9949,7 @@ fn derived_constructors_without_super_throw_reference_error_on_fallthrough() {
                 status = error.constructor === ReferenceError ? 2 : 3;
             }
             status;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10072,7 +10072,7 @@ fn derived_constructor_this_access_restriction_matches_test262_behavior() {
 fn class_constructor_function_call_builtin_throws_type_error_catchably() {
     let unit = compile_test_unit(
         235,
-        r#"
+        r"
             class Base {
                 constructor() {}
             }
@@ -10085,7 +10085,7 @@ fn class_constructor_function_call_builtin_throws_type_error_catchably() {
                 status = error instanceof TypeError ? 2 : 3;
             }
             status;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10101,7 +10101,7 @@ fn class_constructor_function_call_builtin_throws_type_error_catchably() {
 fn derived_class_constructor_function_call_builtin_throws_type_error_catchably() {
     let unit = compile_test_unit(
         236,
-        r#"
+        r"
             class Base {
                 constructor() {}
             }
@@ -10121,7 +10121,7 @@ fn derived_class_constructor_function_call_builtin_throws_type_error_catchably()
                 status = error instanceof TypeError ? 2 : 3;
             }
             status;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10137,14 +10137,14 @@ fn derived_class_constructor_function_call_builtin_throws_type_error_catchably()
 fn generator_length_uses_expected_argument_count() {
     let unit = compile_test_unit(
         217,
-        r#"
+        r"
             var lengths = [
                 (function* (x = 42) {}).length,
                 (function* (x, y = 42) {}).length,
                 (function* (x, y = 42, z) {}).length
             ];
             lengths[0] * 100 + lengths[1] * 10 + lengths[2];
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10160,9 +10160,9 @@ fn generator_length_uses_expected_argument_count() {
 fn anonymous_generator_expressions_default_name_to_empty_string() {
     let unit = compile_test_unit(
         218,
-        r#"
+        r"
             (function* () {}).name.length;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10178,7 +10178,7 @@ fn anonymous_generator_expressions_default_name_to_empty_string() {
 fn named_generator_expression_self_binding_ignores_sloppy_reassignment() {
     let unit = compile_test_unit(
         219,
-        r#"
+        r"
             let callCount = 0;
             let ref = function* BindingIdentifier() {
                 callCount++;
@@ -10187,7 +10187,7 @@ fn named_generator_expression_self_binding_ignores_sloppy_reassignment() {
             };
             let result = ref().next().value === ref ? 1 : 0;
             result * 10 + callCount;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10262,7 +10262,7 @@ fn generator_object_spread_uses_copy_data_properties() {
 fn generator_next_resumes_with_the_sent_value() {
     let unit = compile_test_unit(
         205,
-        r#"
+        r"
             function* g() {
                 const value = yield 1;
                 return value + 1;
@@ -10270,7 +10270,7 @@ fn generator_next_resumes_with_the_sent_value() {
             var iter = g();
             var first = iter.next();
             var second = iter.next(41);
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10293,7 +10293,7 @@ fn generator_next_resumes_with_the_sent_value() {
 fn generator_return_runs_finally_before_completing() {
     let unit = compile_test_unit(
         206,
-        r#"
+        r"
             var finalized = 0;
             function* g() {
                 try {
@@ -10306,7 +10306,7 @@ fn generator_return_runs_finally_before_completing() {
             iter.next();
             var result = iter.return(5);
             finalized;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10326,7 +10326,7 @@ fn generator_return_runs_finally_before_completing() {
 fn for_of_continue_to_outer_loop_closes_the_iterator() {
     let unit = compile_test_unit(
         208,
-        r#"
+        r"
             var finalized = 0;
             var count = 0;
             function* values() {
@@ -10346,7 +10346,7 @@ fn for_of_continue_to_outer_loop_closes_the_iterator() {
                 }
             }
             finalized * 10 + count;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10362,7 +10362,7 @@ fn for_of_continue_to_outer_loop_closes_the_iterator() {
 fn for_of_destructuring_assignment_defaults_only_for_undefined_values() {
     let unit = compile_test_unit(
         209,
-        r#"
+        r"
             var flag1 = false;
             var flag2 = false;
             var x, y;
@@ -10371,7 +10371,7 @@ fn for_of_destructuring_assignment_defaults_only_for_undefined_values() {
             for ({ x = flag1 = true, y = flag2 = true } of [{ y: 1 }]) {
                 counter += 1;
             }
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10425,7 +10425,7 @@ fn typed_array_for_of_tracks_resizable_array_buffer_growth() {
 fn yield_star_delegates_generator_values_and_final_completion() {
     let unit = compile_test_unit(
         207,
-        r#"
+        r"
             function* inner() {
                 yield 1;
                 return 2;
@@ -10437,7 +10437,7 @@ fn yield_star_delegates_generator_values_and_final_completion() {
             var iter = outer();
             var first = iter.next();
             var second = iter.next();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10460,7 +10460,7 @@ fn yield_star_delegates_generator_values_and_final_completion() {
 fn yield_star_forwards_inner_iterator_result_objects() {
     let unit = compile_test_unit(
         208,
-        r#"
+        r"
             var results = [{ value: 1 }, { value: 8 }, { value: 34, done: true }];
             var index = 0;
             var iterator = {
@@ -10487,7 +10487,7 @@ fn yield_star_forwards_inner_iterator_result_objects() {
                 && second.done === undefined
                 && final.value === undefined
                 && final.done === true;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10598,7 +10598,7 @@ fn yield_star_missing_throw_invokes_return_without_arguments() {
 fn generator_methods_on_classes_lower_through_the_shared_class_path() {
     let unit = compile_test_unit(
         208,
-        r#"
+        r"
             class C {
                 *values() {
                     yield 1;
@@ -10608,7 +10608,7 @@ fn generator_methods_on_classes_lower_through_the_shared_class_path() {
             var iter = new C().values();
             var first = iter.next();
             var second = iter.next();
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10631,12 +10631,12 @@ fn generator_methods_on_classes_lower_through_the_shared_class_path() {
 fn module_default_export_generator_declarations_lower_under_6e1() {
     let unit = compile_test_module(
         209,
-        r#"
+        r"
             export default function* g() {
                 yield 1;
             }
             export const value = g().next().value;
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10820,12 +10820,12 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
 fn vm_installs_callable_index_accessors_from_object_literals() {
     let unit = compile_test_unit(
         41,
-        r#"
+        r"
         var object = {
             get [1]() { return 10; },
             set [1](_) {}
         };
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -10871,21 +10871,21 @@ fn vm_installs_callable_index_accessors_from_object_literals() {
         agent
             .objects()
             .function_data(getter_object)
-            .and_then(|data| data.entry()),
+            .and_then(lyng_js_objects::FunctionObjectData::entry),
         Some(FunctionEntryIdentity::Bytecode(_))
     ));
     assert!(matches!(
         agent
             .objects()
             .function_data(setter_object)
-            .and_then(|data| data.entry()),
+            .and_then(lyng_js_objects::FunctionObjectData::entry),
         Some(FunctionEntryIdentity::Bytecode(_))
     ));
 
     let Some(FunctionEntryIdentity::Bytecode(getter_code)) = agent
         .objects()
         .function_data(getter_object)
-        .and_then(|data| data.entry())
+        .and_then(lyng_js_objects::FunctionObjectData::entry)
     else {
         panic!("getter should remain backed by installed bytecode");
     };
@@ -10895,7 +10895,7 @@ fn vm_installs_callable_index_accessors_from_object_literals() {
     let getter_environment = agent
         .objects()
         .function_data(getter_object)
-        .and_then(|data| data.environment())
+        .and_then(lyng_js_objects::FunctionObjectData::environment)
         .expect("getter closure should preserve its outer environment");
     let getter_result = vm
         .evaluate_installed(
@@ -10912,12 +10912,12 @@ fn vm_installs_callable_index_accessors_from_object_literals() {
 fn vm_bootstraps_phase5_default_global_bindings_before_script_entry() {
     let unit = compile_test_unit(
         52,
-        r#"
+        r"
         (globalThis === this ? 1 : 0)
             + (Infinity === 1 / 0 ? 2 : 0)
             + (NaN !== NaN ? 4 : 0)
             + (undefined === undefined ? 8 : 0);
-        "#,
+        ",
     );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -11869,11 +11869,11 @@ fn feedback_vectors_allocate_lazily_without_changing_entry_script_result() {
     let parsed = parse_script(
         &mut atoms,
         SourceId::new(21),
-        r#"
+        r"
             (function add(left, right) {
                 return left + right;
             })(1, 2);
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -11912,10 +11912,10 @@ fn feedback_vectors_allocate_lazily_without_changing_entry_script_result() {
     );
 }
 
-fn feedback_site<'a>(
-    snapshot: &'a FeedbackVectorSnapshot,
+fn feedback_site(
+    snapshot: &FeedbackVectorSnapshot,
     slot: FeedbackSlotId,
-) -> &'a crate::FeedbackSiteSnapshot {
+) -> &crate::FeedbackSiteSnapshot {
     snapshot
         .sites()
         .iter()
@@ -11929,12 +11929,12 @@ fn feedback_vector_snapshot_reports_scalar_sites_for_tier_decisions() {
     let parsed = parse_script(
         &mut atoms,
         SourceId::new(39),
-        r#"
+        r"
             function C(value) { this.value = value; }
             function add(left, right) { return left + right; }
             add(1, 2) < 5;
             new C(9);
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -11988,12 +11988,10 @@ fn feedback_vector_snapshot_reports_scalar_sites_for_tier_decisions() {
         .expect("add should have installed code");
 
     for _ in 0..2 {
-        assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
-                .unwrap()
-                .is_object(),
-            true
-        );
+        assert!(vm
+            .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap()
+            .is_object());
     }
 
     let entry_snapshot = vm
@@ -12363,11 +12361,11 @@ fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
     let parsed = parse_script(
         &mut atoms,
         SourceId::new(25),
-        r#"
+        r"
             (function add(left, right) {
                 return left + right;
             })(1, 2);
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -12439,7 +12437,7 @@ fn closures_sharing_one_code_ref_share_feedback_warmup_and_vector_state() {
     let parsed = parse_script(
         &mut atoms,
         SourceId::new(22),
-        r#"
+        r"
             function makeAdder(base) {
                 return function(delta) {
                     return base + delta;
@@ -12449,7 +12447,7 @@ fn closures_sharing_one_code_ref_share_feedback_warmup_and_vector_state() {
             let second = makeAdder(2);
             first(3);
             second(4);
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -12511,7 +12509,7 @@ fn closures_sharing_one_code_ref_share_tiering_hotness() {
     let parsed = parse_script(
         &mut atoms,
         SourceId::new(26),
-        r#"
+        r"
             function makeAdder(base) {
                 return function(delta) {
                     return base + delta;
@@ -12521,7 +12519,7 @@ fn closures_sharing_one_code_ref_share_tiering_hotness() {
             let second = makeAdder(2);
             first(3);
             second(4);
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -12572,13 +12570,13 @@ fn closures_sharing_one_code_ref_share_tiering_hotness() {
 fn loop_backedges_make_eligible_code_ready_and_invalidation_resets_hotness() {
     let unit = compile_test_unit(
         27,
-        r#"
+        r"
             let total = 0;
             for (let i = 0; i < 16; i = i + 1) {
                 total = total + i;
             }
             total;
-        "#,
+        ",
     );
 
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -13162,7 +13160,7 @@ fn keyed_dense_index_sites_fall_back_to_megamorphic_classification() {
 fn vm_addresses_metadata_by_code_and_instruction_offset() {
     let unit = compile_test_unit(
         37,
-        r#"
+        r"
         let make = function(value) { return value; };
         let count = 0;
         while (count < 1) {
@@ -13173,7 +13171,7 @@ fn vm_addresses_metadata_by_code_and_instruction_offset() {
         } catch (err) {
             err;
         }
-        "#,
+        ",
     );
 
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -13233,7 +13231,7 @@ fn vm_addresses_metadata_by_code_and_instruction_offset() {
 fn tail_calls_reuse_frame_depth_for_recursive_bytecode_calls() {
     let unit = compile_test_unit(
         35,
-        r#"
+        r"
         let countdown = function(self, value, acc) {
             if (value === 0) {
                 return acc;
@@ -13241,7 +13239,7 @@ fn tail_calls_reuse_frame_depth_for_recursive_bytecode_calls() {
             return self(self, value - 1, acc + 1);
         };
         countdown(countdown, 200, 0);
-        "#,
+        ",
     );
 
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -13293,14 +13291,14 @@ fn tail_calls_through_rebound_global_eval_reuse_frame_depth() {
 fn tail_calls_preserve_constructor_fallback_result_semantics() {
     let unit = compile_test_unit(
         36,
-        r#"
+        r"
         function Box(helper) {
             this.value = 4;
             return helper(1);
         }
         let box = new Box(function(value) { return value; });
         box.value;
-        "#,
+        ",
     );
 
     let mut runtime = Runtime::new(NoopHostHooks);

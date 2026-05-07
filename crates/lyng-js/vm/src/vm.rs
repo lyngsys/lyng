@@ -557,12 +557,14 @@ impl Vm {
     }
 
     #[cfg(test)]
-    pub(crate) fn string_code_units_scratch_capacity(&self) -> usize {
+    pub(crate) const fn string_code_units_scratch_capacity(&self) -> usize {
         self.string_code_units_scratch.capacity()
     }
 
     #[cfg(test)]
-    pub(crate) fn loop_iteration_scratch_state_for_tests(&self) -> (usize, usize, usize, usize) {
+    pub(crate) const fn loop_iteration_scratch_state_for_tests(
+        &self,
+    ) -> (usize, usize, usize, usize) {
         (
             self.loop_iteration_source_scratch.len(),
             self.loop_iteration_target_scratch.len(),
@@ -625,7 +627,7 @@ impl Vm {
 
     #[cfg(test)]
     #[inline]
-    pub(crate) fn peak_frame_depth(&self) -> usize {
+    pub(crate) const fn peak_frame_depth(&self) -> usize {
         self.peak_frame_depth
     }
 

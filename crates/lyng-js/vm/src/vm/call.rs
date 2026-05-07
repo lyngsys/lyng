@@ -556,12 +556,12 @@ mod tests {
     fn indexed_accessor_gets_match_direct_getter_invocation() {
         let unit = compile_test_unit(
             71,
-            r#"
+            r"
             var object = {
                 get [1]() { return 10; },
                 set [1](_) {}
             };
-            "#,
+            ",
         );
         let mut runtime = Runtime::new(NoopHostHooks);
         let agent = runtime.root_agent_mut();
@@ -595,14 +595,14 @@ mod tests {
         let Some(FunctionEntryIdentity::Bytecode(getter_code)) = agent
             .objects()
             .function_data(getter)
-            .and_then(|data| data.entry())
+            .and_then(lyng_js_objects::FunctionObjectData::entry)
         else {
             panic!("getter descriptor should reference bytecode");
         };
         let getter_environment = agent
             .objects()
             .function_data(getter)
-            .and_then(|data| data.environment())
+            .and_then(lyng_js_objects::FunctionObjectData::environment)
             .expect("getter closure should preserve its outer environment");
         let getter_entry = vm
             .installed_function(getter_code)

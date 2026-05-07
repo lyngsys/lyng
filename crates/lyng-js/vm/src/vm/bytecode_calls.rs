@@ -763,7 +763,7 @@ mod tests {
         let Some(FunctionEntryIdentity::Bytecode(code)) = agent
             .objects()
             .function_data(function_object)
-            .and_then(|data| data.entry())
+            .and_then(lyng_js_objects::FunctionObjectData::entry)
         else {
             panic!("function expression should remain backed by installed bytecode");
         };
@@ -820,7 +820,7 @@ mod tests {
         let Some(FunctionEntryIdentity::Bytecode(code)) = agent
             .objects()
             .function_data(function_object)
-            .and_then(|data| data.entry())
+            .and_then(lyng_js_objects::FunctionObjectData::entry)
         else {
             panic!("function expression should remain backed by installed bytecode");
         };
@@ -871,7 +871,7 @@ mod tests {
         let Some(FunctionEntryIdentity::Bytecode(code)) = agent
             .objects()
             .function_data(function_object)
-            .and_then(|data| data.entry())
+            .and_then(lyng_js_objects::FunctionObjectData::entry)
         else {
             panic!("function expression should remain backed by installed bytecode");
         };
