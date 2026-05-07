@@ -367,7 +367,7 @@ fn phase4_for_in_closures_preserve_body_lexicals_per_iteration() {
         "#,
     );
 
-    assert_eq!(result, Value::from_smi(111221));
+    assert_eq!(result, Value::from_smi(111_221));
 }
 
 #[test]

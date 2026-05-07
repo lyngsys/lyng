@@ -270,6 +270,10 @@ fn temporal_plain_time_with_replaces_time_fields() {
 }
 
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "single Temporal fixture preserves field and option access ordering"
+)]
 fn temporal_plain_time_with_rejects_invalid_bags_and_reads_fields_before_options() {
     let result = compile_and_run_string_with_host(
         r#"
@@ -469,6 +473,10 @@ fn temporal_plain_time_string_conversion_rounding_and_difference_are_exact_time_
 }
 
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "single Temporal fixture preserves other-value and options access ordering"
+)]
 fn temporal_plain_time_difference_reads_other_then_options_and_delays_validation() {
     let result = compile_and_run_string_with_host(
         r#"

@@ -373,6 +373,10 @@ fn embedding_cross_realm_data_view_methods_accept_foreign_views_and_buffers() {
 }
 
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "single cross-realm fixture keeps ArraySpeciesCreate observable cases together"
+)]
 fn array_species_create_handles_cross_realm_constructors() {
     let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
     let result = compile_and_run_string(

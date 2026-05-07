@@ -4873,49 +4873,49 @@ fn script_core_internal_spec_like_builtin_shims_use_public_semantics() {
         |agent, realm| {
             install_native_global(
                 agent,
-                realm,
+                &realm,
                 "internalStringIndexOf",
                 internal_string_index_of_builtin(),
                 false,
             );
             install_native_global(
                 agent,
-                realm,
+                &realm,
                 "internalStringReplace",
                 internal_string_replace_builtin(),
                 false,
             );
             install_native_global(
                 agent,
-                realm,
+                &realm,
                 "internalArrayIndexOf",
                 internal_array_index_of_builtin(),
                 false,
             );
             install_native_global(
                 agent,
-                realm,
+                &realm,
                 "internalArrayPush",
                 internal_array_push_builtin(),
                 false,
             );
             install_native_global(
                 agent,
-                realm,
+                &realm,
                 "internalArrayPop",
                 internal_array_pop_builtin(),
                 false,
             );
             install_native_global(
                 agent,
-                realm,
+                &realm,
                 "internalObjectToString",
                 internal_object_to_string_builtin(),
                 false,
             );
             install_native_global(
                 agent,
-                realm,
+                &realm,
                 "internalHasOwnProperty",
                 internal_object_has_own_property_builtin(),
                 false,
@@ -6408,6 +6408,10 @@ fn script_core_iterator_from_wrappers_forward_without_helper_state() {
 }
 
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "single conformance fixture exercises lazy iterator zip validation order"
+)]
 fn script_core_iterator_zip_defers_direct_next_validation() {
     let result = compile_and_run(
         r#"
@@ -7306,7 +7310,7 @@ fn script_core_regexp_unicode_sets_exec_uses_unicode_aware_matching() {
         "#,
     );
 
-    assert_eq!(result, Value::from_smi(262143));
+    assert_eq!(result, Value::from_smi(262_143));
 }
 
 #[test]
@@ -8116,7 +8120,8 @@ fn script_core_annex_b_regexp_legacy_pattern_extensions() {
         "#,
     );
 
-    assert_eq!(result, "]:{:}:x{o}x:16:2:b:e");
+    let expected = ["]", "{", "}", "x{o}x", "16", "2", "b", "e"].join(":");
+    assert_eq!(result, expected);
 }
 
 #[test]

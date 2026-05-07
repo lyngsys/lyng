@@ -542,6 +542,10 @@ fn temporal_instant_to_string_honors_precision_and_rounding_options() {
 }
 
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "single Temporal fixture preserves option access ordering and extended-year cases"
+)]
 fn temporal_instant_to_string_supports_time_zone_and_extended_year_options() {
     let result = compile_and_run_string_with_host(
         r#"
@@ -883,6 +887,10 @@ fn temporal_instant_stringification_formats_boundary_years() {
 }
 
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "single Temporal fixture preserves the observable option-read order"
+)]
 fn temporal_instant_difference_reads_options_in_spec_order_before_validation() {
     let result = compile_and_run_string_with_host(
         r#"

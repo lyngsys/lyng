@@ -36,6 +36,10 @@ fn compile_unit(source: &str, atoms: &mut AtomTable) -> lyng_js_bytecode::Compil
     compile_script(&parsed, &sema, atoms).expect("script should lower")
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Temporal tests pass zero-sized host hooks directly for concise fixtures"
+)]
 fn compile_and_run_with_host(source: &str, host: impl HostHooks + 'static) -> Value {
     let mut atoms = AtomTable::new();
     let unit = compile_unit(source, &mut atoms);
@@ -50,6 +54,10 @@ fn compile_and_run_with_host(source: &str, host: impl HostHooks + 'static) -> Va
         .expect("script should execute")
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Temporal tests pass zero-sized host hooks directly for concise fixtures"
+)]
 fn compile_and_run_string_with_host(source: &str, host: impl HostHooks + 'static) -> String {
     let mut atoms = AtomTable::new();
     let unit = compile_unit(source, &mut atoms);

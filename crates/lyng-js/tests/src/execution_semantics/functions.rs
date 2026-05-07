@@ -11,6 +11,7 @@ use lyng_js_objects::{
 use lyng_js_types::{
     BuiltinFunctionId, EnvironmentRef, NativeFunctionId, ObjectRef, RealmRef, Value,
 };
+use std::fmt::Write as _;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct RecordedNativeCall {
@@ -1046,8 +1047,8 @@ fn phase4_functions_expand_spread_arguments_for_calls_and_constructs() {
     let result = evaluate_with_registry(
         &unit,
         |agent, realm| {
-            install_native_global(agent, realm, "nativeFn", call_entry, false);
-            install_native_global(agent, realm, "NativeCtor", construct_entry, true);
+            install_native_global(agent, &realm, "nativeFn", call_entry, false);
+            install_native_global(agent, &realm, "NativeCtor", construct_entry, true);
         },
         &mut registry,
     );
@@ -1534,11 +1535,11 @@ fn phase4_functions_dispatch_native_call_and_construct_through_registry() {
             expected_realm = Some(realm.id());
             expected_environment = Some(realm.global_env());
             installed_function = Some(install_native_global(
-                agent, realm, "nativeFn", call_entry, false,
+                agent, &realm, "nativeFn", call_entry, false,
             ));
             installed_constructor = Some(install_native_global(
                 agent,
-                realm,
+                &realm,
                 "NativeCtor",
                 construct_entry,
                 true,
@@ -1622,7 +1623,7 @@ fn phase4_functions_delete_mapped_arguments_elements() {
 fn phase4_functions_bridge_high_register_calls_in_large_scripts() {
     let mut source = String::new();
     for index in 0..280 {
-        source.push_str(&format!("let value{index} = {index};\n"));
+        writeln!(source, "let value{index} = {index}").expect("writing to String should not fail");
     }
     source.push_str("let fnRef = function(value) { return value; };\n");
     source.push_str("fnRef(value279);\n");

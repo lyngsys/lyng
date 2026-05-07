@@ -252,6 +252,10 @@ fn regexp_raw_surrogate_literals_match_staging_semantics() {
 }
 
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "single conformance trace covers the observable split protocol order"
+)]
 fn regexp_symbol_split_trace_matches_staging_observability() {
     let result = compile_and_run_string(
         r#"

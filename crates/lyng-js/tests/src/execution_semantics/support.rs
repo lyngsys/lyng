@@ -115,7 +115,7 @@ pub(super) fn evaluate_with_registry(
 
 pub(super) fn install_native_global(
     agent: &mut Agent,
-    realm: RealmRecord,
+    realm: &RealmRecord,
     name: &str,
     entry: BuiltinFunctionId,
     constructible: bool,
