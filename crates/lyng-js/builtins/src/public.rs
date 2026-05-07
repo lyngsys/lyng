@@ -3,7 +3,7 @@ mod families;
 mod metadata;
 mod temporal;
 
-pub(crate) use lyng_js_types::regexp_unicode_sets_getter_builtin;
+pub use lyng_js_types::regexp_unicode_sets_getter_builtin;
 pub use metadata::{builtin_metadata, public_builtin_metadata};
 
 use crate::internal::{InternalBuiltinCache, InternalRealmBuiltins};
@@ -195,7 +195,7 @@ use lyng_js_types::{
 };
 use std::collections::HashMap;
 
-pub(crate) use dispatch::dispatch_internal_spec_like_builtin;
+pub use dispatch::dispatch_internal_spec_like_builtin;
 pub use dispatch::{dispatch_builtin, PublicBuiltinDispatchContext};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1124,7 +1124,7 @@ impl BuiltinCache {
     }
 }
 
-pub(crate) fn allocate_builtin_ordinary_object(
+pub fn allocate_builtin_ordinary_object(
     agent: &mut Agent,
     root_shape: ShapeId,
     prototype: Option<ObjectRef>,
@@ -1139,7 +1139,7 @@ pub(crate) fn allocate_builtin_ordinary_object(
     })
 }
 
-pub(crate) fn allocate_builtin_primitive_wrapper_object(
+pub fn allocate_builtin_primitive_wrapper_object(
     agent: &mut Agent,
     root_shape: ShapeId,
     prototype: Option<ObjectRef>,
@@ -1167,22 +1167,7 @@ pub(in crate::public) fn reparent_builtin_object(
     });
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn public_metadata_is_reexported_from_metadata_module() {
-        let entry = eval_builtin();
-
-        assert_eq!(
-            metadata::public_builtin_metadata(entry),
-            public_builtin_metadata(entry)
-        );
-    }
-}
-
-pub(crate) fn allocate_builtin_function_object(
+pub fn allocate_builtin_function_object(
     agent: &mut Agent,
     realm: RealmRef,
     global_env: EnvironmentRef,
@@ -1237,32 +1222,32 @@ pub(crate) fn allocate_builtin_function_object(
         true,
     );
 
-    if metadata.has_prototype_property() {
-        if let Some(prototype_object) = prototype_object {
-            define_builtin_data_property(
-                agent,
-                function,
-                PropertyKey::from_atom(WellKnownAtom::prototype.id()),
-                Value::from_object_ref(prototype_object),
-                false,
-                false,
-                false,
-            );
-            if prototype_object != prototype_parent
-                && agent
-                    .objects()
-                    .object_header(agent.heap().view(), prototype_object)
-                    .and_then(lyng_js_objects::ObjectHeader::prototype)
-                    .is_none()
-            {
-                let _ = agent.with_heap_and_objects(|heap, objects| {
-                    objects.set_prototype(
-                        &mut heap.mutator(),
-                        prototype_object,
-                        Some(prototype_parent),
-                    )
-                });
-            }
+    if metadata.has_prototype_property()
+        && let Some(prototype_object) = prototype_object
+    {
+        define_builtin_data_property(
+            agent,
+            function,
+            PropertyKey::from_atom(WellKnownAtom::prototype.id()),
+            Value::from_object_ref(prototype_object),
+            false,
+            false,
+            false,
+        );
+        if prototype_object != prototype_parent
+            && agent
+                .objects()
+                .object_header(agent.heap().view(), prototype_object)
+                .and_then(lyng_js_objects::ObjectHeader::prototype)
+                .is_none()
+        {
+            let _ = agent.with_heap_and_objects(|heap, objects| {
+                objects.set_prototype(
+                    &mut heap.mutator(),
+                    prototype_object,
+                    Some(prototype_parent),
+                )
+            });
         }
     }
 
@@ -1327,4 +1312,19 @@ pub(in crate::public) fn define_builtin_accessor_property(
         matches!(defined, Ok(true)),
         "builtin accessor installation should succeed"
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn public_metadata_is_reexported_from_metadata_module() {
+        let entry = eval_builtin();
+
+        assert_eq!(
+            metadata::public_builtin_metadata(entry),
+            public_builtin_metadata(entry)
+        );
+    }
 }

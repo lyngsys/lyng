@@ -1,4 +1,19 @@
-use super::*;
+use super::{
+    aggregate_error_builtin, array_buffer_builtin, array_builtin, big_int64_array_builtin,
+    big_uint64_array_builtin, bigint_builtin, boolean_builtin, data_view_builtin, date_builtin,
+    decode_uri_builtin, decode_uri_component_builtin, encode_uri_builtin,
+    encode_uri_component_builtin, error_builtin, escape_builtin, eval_builtin, eval_error_builtin,
+    finalization_registry_builtin, float16_array_builtin, float32_array_builtin,
+    float64_array_builtin, function_builtin, int16_array_builtin, int32_array_builtin,
+    int8_array_builtin, is_finite_builtin, is_nan_builtin, map_builtin, number_builtin,
+    object_builtin, parse_float_builtin, parse_int_builtin, promise_builtin, range_error_builtin,
+    reference_error_builtin, regexp_builtin, set_builtin, shared_array_buffer_builtin,
+    string_builtin, symbol_builtin, syntax_error_builtin, type_error_builtin, typed_array_builtin,
+    uint16_array_builtin, uint32_array_builtin, uint8_array_builtin, uint8_clamped_array_builtin,
+    unescape_builtin, uri_error_builtin, weak_map_builtin, weak_ref_builtin, weak_set_builtin,
+    Agent, BootstrapArtifacts, BuiltinAttributes, BuiltinPropertyDescriptor,
+    BuiltinPropertyKeySpec, BuiltinPropertyValueSpec, RealmRecord, Value, WellKnownAtom,
+};
 
 pub(super) fn default_global_descriptors(
     agent: &mut Agent,

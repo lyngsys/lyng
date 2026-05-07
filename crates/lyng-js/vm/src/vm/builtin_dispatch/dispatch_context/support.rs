@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    alloc_code_unit_string, errors, object, object_to_string_builtin, read, to_f64_number,
+    AbruptCompletion, Agent, HostErrorKind, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
+    Value, Vm, VmBuiltinDispatch, VmError, VmProxyBridge, VmResult, WellKnownAtom,
+};
 
 impl object::ToPrimitiveContext for VmBuiltinDispatch<'_, '_, '_> {
     type Error = VmError;

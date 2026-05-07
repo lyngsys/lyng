@@ -91,23 +91,23 @@ pub fn to_primitive<Cx: ToPrimitiveContext>(
         let agent = cx.agent();
         agent.well_known_symbol(WellKnownSymbolId::ToPrimitive)
     };
-    if let Some(symbol) = exotic {
-        if let Some(method) = get_method(cx, object, PropertyKey::from_symbol(symbol))? {
-            let hint_value = {
-                let agent = cx.agent();
-                Value::from_string_ref(agent.alloc_runtime_string(
-                    hint.hint_text(),
-                    None,
-                    AllocationLifetime::Default,
-                ))
-            };
-            let result =
-                cx.call_to_completion(method, Value::from_object_ref(object), &[hint_value])?;
-            if !result.is_object() {
-                return Ok(result);
-            }
-            return Err(cx.type_error());
+    if let Some(symbol) = exotic
+        && let Some(method) = get_method(cx, object, PropertyKey::from_symbol(symbol))?
+    {
+        let hint_value = {
+            let agent = cx.agent();
+            Value::from_string_ref(agent.alloc_runtime_string(
+                hint.hint_text(),
+                None,
+                AllocationLifetime::Default,
+            ))
+        };
+        let result =
+            cx.call_to_completion(method, Value::from_object_ref(object), &[hint_value])?;
+        if !result.is_object() {
+            return Ok(result);
         }
+        return Err(cx.type_error());
     }
 
     ordinary_to_primitive(cx, object, hint)

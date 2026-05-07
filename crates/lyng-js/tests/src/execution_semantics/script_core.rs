@@ -12,7 +12,7 @@ use lyng_js_types::{
 #[test]
 fn script_core_executes_locals_globals_objects_and_arrays() {
     let result = compile_and_run(
-        r#"
+        r"
         let x = 1;
         let y = 2;
         var z = 3;
@@ -25,7 +25,7 @@ fn script_core_executes_locals_globals_objects_and_arrays() {
             i = i + 1;
         }
         sum;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(6));
@@ -34,7 +34,7 @@ fn script_core_executes_locals_globals_objects_and_arrays() {
 #[test]
 fn script_core_executes_if_blocks_and_local_assignment() {
     let result = compile_and_run(
-        r#"
+        r"
         let value = 1;
         if (value < 2) {
             value = value + 4;
@@ -42,7 +42,7 @@ fn script_core_executes_if_blocks_and_local_assignment() {
             value = 99;
         }
         value;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(5));
@@ -127,13 +127,13 @@ fn script_core_instanceof_uses_symbol_has_instance_protocol() {
 #[test]
 fn script_core_executes_for_loops_with_local_register_updates() {
     let result = compile_and_run(
-        r#"
+        r"
         let total = 0;
         for (let i = 0; i < 4; i = i + 1) {
             total = total + i;
         }
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(6));
@@ -142,7 +142,7 @@ fn script_core_executes_for_loops_with_local_register_updates() {
 #[test]
 fn script_core_executes_sibling_lexical_for_loops_with_duplicate_names() {
     let result = compile_and_run(
-        r#"
+        r"
         let total = 0;
         for (let i = 0; i < 3; ++i) {
             total = total + 1;
@@ -151,7 +151,7 @@ fn script_core_executes_sibling_lexical_for_loops_with_duplicate_names() {
             total = total + 10;
         }
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(23));
@@ -160,7 +160,7 @@ fn script_core_executes_sibling_lexical_for_loops_with_duplicate_names() {
 #[test]
 fn script_core_supports_switch_fallthrough_and_break() {
     let result = compile_and_run(
-        r#"
+        r"
         let total = 0;
         switch (2) {
             case 1:
@@ -173,7 +173,7 @@ fn script_core_supports_switch_fallthrough_and_break() {
                 break;
         }
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(6));
@@ -182,13 +182,13 @@ fn script_core_supports_switch_fallthrough_and_break() {
 #[test]
 fn script_core_if_statement_completion_uses_a_fresh_undefined_seed() {
     let result = compile_and_run_string(
-        r#"
+        r"
         [
             String(eval('1; if (false) { }')),
             String(eval('2; do { 3; if (true) { 4; break; } 5; } while (false)')),
             String(eval('6; do { 7; if (false) { 8; } else { break; } } while (false)'))
         ].join(':');
-        "#,
+        ",
     );
 
     assert_eq!(result, "undefined:4:undefined");
@@ -217,14 +217,14 @@ fn script_core_eval_fast_paths_repeated_empty_blocks() {
 #[test]
 fn script_core_loop_statement_completion_updates_empty_abrupt_exits() {
     let result = compile_and_run_string(
-        r#"
+        r"
         [
             String(eval('1; while (true) { break; }')),
             String(eval('2; while (true) { 3; break; }')),
             String(eval('4; do { continue; } while (false)')),
             String(eval('5; do { 6; continue; } while (false)'))
         ].join(':');
-        "#,
+        ",
     );
 
     assert_eq!(result, "undefined:3:undefined:6");
@@ -233,12 +233,12 @@ fn script_core_loop_statement_completion_updates_empty_abrupt_exits() {
 #[test]
 fn script_core_debugger_statement_preserves_empty_completion() {
     let result = compile_and_run_string(
-        r#"
+        r"
         [
             String(eval('1; debugger;')),
             String(eval('2; while (false) debugger;'))
         ].join(':');
-        "#,
+        ",
     );
 
     assert_eq!(result, "1:undefined");
@@ -247,7 +247,7 @@ fn script_core_debugger_statement_preserves_empty_completion() {
 #[test]
 fn script_core_for_loop_completion_uses_undefined_seed() {
     let result = compile_and_run_string(
-        r#"
+        r"
         [
             String(eval('1; for (; false; ) { }')),
             String(eval('2; for (let i = 0; i < 1; i = i + 1) { }')),
@@ -259,7 +259,7 @@ fn script_core_for_loop_completion_uses_undefined_seed() {
             String(eval('var e; 11; outer: do { for (e of [0]) { continue outer; } } while (false)')),
             String(eval('var f; 12; outer: do { for (f of [0]) { 13; continue outer; } } while (false)'))
         ].join(':');
-        "#,
+        ",
     );
 
     assert_eq!(
@@ -339,7 +339,7 @@ fn script_core_switch_statement_matches_completion_and_lexical_open_rules() {
 #[test]
 fn script_core_switch_statement_opens_its_lexical_scope_for_case_evaluation_only() {
     let result = compile_and_run_string(
-        r#"
+        r"
         let x = 'outside';
         var probeExpr, probeSelector, probeStmt;
 
@@ -350,7 +350,7 @@ fn script_core_switch_statement_opens_its_lexical_scope_for_case_evaluation_only
         }
 
         [probeExpr(), probeSelector(), probeStmt()].join(':');
-        "#,
+        ",
     );
 
     assert_eq!(result, "outside:inside:inside");
@@ -359,7 +359,7 @@ fn script_core_switch_statement_opens_its_lexical_scope_for_case_evaluation_only
 #[test]
 fn script_core_try_statement_completion_preserves_the_pre_finally_value() {
     let result = compile_and_run_string(
-        r#"
+        r"
         [
             String(eval('1; try { } catch (err) { }')),
             String(eval('2; try { 3; } finally { 4; }')),
@@ -367,7 +367,7 @@ fn script_core_try_statement_completion_preserves_the_pre_finally_value() {
             String(eval('8; do { try { 9; break; } finally { 10; } } while (false)')),
             String(eval('11; do { try { break; } finally { 12; } } while (false)'))
         ].join(':');
-        "#,
+        ",
     );
 
     assert_eq!(result, "undefined:3:6:9:undefined");
@@ -957,7 +957,7 @@ fn script_core_supports_for_of_destructuring_assignment_heads() {
 #[test]
 fn script_core_closes_assignment_pattern_iterators_on_generator_return() {
     let result = compile_and_run(
-        r#"
+        r"
         let returnCount = 0;
         let iterator = {
             next: function() {
@@ -981,7 +981,7 @@ fn script_core_closes_assignment_pattern_iterators_on_generator_return() {
         iter.next();
         iter.return(7);
         returnCount;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -990,7 +990,7 @@ fn script_core_closes_assignment_pattern_iterators_on_generator_return() {
 #[test]
 fn script_core_does_not_require_iterator_next_before_assignment_reference_suspends() {
     let result = compile_and_run(
-        r#"
+        r"
         let returnCount = 0;
         let iterator = {
             return: function() {
@@ -1011,7 +1011,7 @@ fn script_core_does_not_require_iterator_next_before_assignment_reference_suspen
         iter.next();
         iter.return(9);
         returnCount;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -1057,11 +1057,11 @@ fn script_core_evaluates_array_rest_assignment_reference_before_iterating() {
 #[test]
 fn script_core_supports_for_of_destructuring_assignment_to_properties() {
     let result = compile_and_run(
-        r#"
+        r"
         let target = { value: 0 };
         for ({ value: target.value } of [{ value: 7 }]) {}
         target.value;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -1309,11 +1309,11 @@ fn script_core_destructuring_assignment_prepares_property_target_before_source_g
 #[test]
 fn script_core_parenthesized_assignment_target_does_not_infer_function_name() {
     let result = compile_and_run_string(
-        r#"
+        r"
         var fn;
         (fn) = function() {};
         fn.name;
-        "#,
+        ",
     );
 
     assert_eq!(result, "");
@@ -1369,7 +1369,7 @@ fn script_core_supports_for_of_var_binding_pattern_expressions() {
 #[test]
 fn script_core_supports_sloppy_for_of_destructuring_with_eval_and_arguments_targets() {
     let result = compile_and_run(
-        r#"
+        r"
         var eval, arguments;
         let score = 0;
         for ({ eval = 3, arguments = 4 } of [{}]) {
@@ -1381,7 +1381,7 @@ fn script_core_supports_sloppy_for_of_destructuring_with_eval_and_arguments_targ
             score += (arguments === 6 ? 8 : 0);
         }
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(15));
@@ -1585,11 +1585,11 @@ fn script_core_assigns_names_to_for_of_default_anonymous_functions() {
 #[test]
 fn script_core_assigns_names_to_for_in_var_initializer_anonymous_functions() {
     let result = compile_and_run_string(
-        r#"
+        r"
         for (var forInHead = function() {} in {}) {
         }
         forInHead.name;
-        "#,
+        ",
     );
 
     assert_eq!(result, "forInHead");
@@ -1632,7 +1632,7 @@ fn script_core_assigns_names_to_for_of_assignment_pattern_defaults() {
 #[test]
 fn script_core_consumes_iterables_for_for_of_array_binding_patterns() {
     let result = compile_and_run(
-        r#"
+        r"
         let iterator = {
             step: 0,
             next: function() {
@@ -1656,7 +1656,7 @@ fn script_core_consumes_iterables_for_for_of_array_binding_patterns() {
             seen = a + b;
         }
         seen;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(13));
@@ -1701,7 +1701,7 @@ fn script_core_hides_iterator_internal_state_and_requires_real_iterator_receiver
 #[test]
 fn script_core_closes_for_of_empty_array_assignment_patterns() {
     let result = compile_and_run(
-        r#"
+        r"
         let closed = 0;
         let iterator = {
             next: function() {
@@ -1719,7 +1719,7 @@ fn script_core_closes_for_of_empty_array_assignment_patterns() {
         };
         for ([] of [iterable]) {}
         closed;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -1728,11 +1728,11 @@ fn script_core_closes_for_of_empty_array_assignment_patterns() {
 #[test]
 fn script_core_supports_for_of_object_shorthand_defaults() {
     let result = compile_and_run(
-        r#"
+        r"
         var x = 0;
         for ({ x = 1 } of [{}]) {}
         x;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -1741,11 +1741,11 @@ fn script_core_supports_for_of_object_shorthand_defaults() {
 #[test]
 fn script_core_supports_for_of_object_rest_assignment_heads() {
     let result = compile_and_run(
-        r#"
+        r"
         let rest = null;
         for ({ value: ignored, ...rest } of [{ value: 1, other: 2 }]) {}
         rest.other;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(2));
@@ -1793,7 +1793,7 @@ fn script_core_supports_for_of_array_rest_assignment_heads() {
 #[test]
 fn script_core_requires_object_coercible_values_for_for_of_object_patterns() {
     let result = compile_and_run(
-        r#"
+        r"
         let score = 0;
         try {
             for ({} of [null]) {
@@ -1810,7 +1810,7 @@ fn script_core_requires_object_coercible_values_for_for_of_object_patterns() {
             score += (error.constructor === TypeError ? 2 : 0);
         }
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -1819,7 +1819,7 @@ fn script_core_requires_object_coercible_values_for_for_of_object_patterns() {
 #[test]
 fn script_core_requires_object_coercible_values_for_for_of_object_rest() {
     let result = compile_and_run(
-        r#"
+        r"
         let score = 0;
         let rest;
         try {
@@ -1837,7 +1837,7 @@ fn script_core_requires_object_coercible_values_for_for_of_object_rest() {
             score += (error.constructor === TypeError ? 2 : 0);
         }
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -1846,7 +1846,7 @@ fn script_core_requires_object_coercible_values_for_for_of_object_rest() {
 #[test]
 fn script_core_for_of_destructuring_assignments_respect_global_lexical_tdz() {
     let result = compile_and_run(
-        r#"
+        r"
         let score = 0;
         try {
             for ({ x } of [{}]) {
@@ -1857,7 +1857,7 @@ fn script_core_for_of_destructuring_assignments_respect_global_lexical_tdz() {
         }
         let x;
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -1906,11 +1906,11 @@ fn script_core_supports_string_keyed_computed_property_access() {
 #[test]
 fn script_core_supports_named_property_store_and_load() {
     let result = compile_and_run(
-        r#"
+        r"
         let obj = { total: 0 };
         obj.total = obj.total + 6;
         obj.total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(6));
@@ -1919,12 +1919,12 @@ fn script_core_supports_named_property_store_and_load() {
 #[test]
 fn script_core_supports_repeated_named_property_updates() {
     let result = compile_and_run(
-        r#"
+        r"
         let obj = { total: 0 };
         obj.total = obj.total + 1;
         obj.total = obj.total + 2;
         obj.total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -2052,10 +2052,10 @@ fn script_core_date_constructor_balances_local_components_and_timezone_offset() 
 #[test]
 fn script_core_date_constructor_has_function_prototype_shape() {
     let result = compile_and_run(
-        r#"
+        r"
         (Function.prototype.isPrototypeOf(Date) ? 1 : 0)
             + (Object.getPrototypeOf(Date) === Function.prototype ? 2 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -2193,14 +2193,14 @@ fn script_core_parse_and_uri_globals_match_phase6_baseline_behavior() {
 #[test]
 fn script_core_parse_and_numeric_predicate_globals_coerce_booleans() {
     let result = compile_and_run(
-        r#"
+        r"
         let score = 0;
         score = score + (parseInt(true) !== parseInt(true) ? 1 : 0);
         score = score + (parseFloat(false) !== parseFloat(false) ? 2 : 0);
         score = score + (isNaN(true) ? 0 : 4);
         score = score + (isFinite(false) ? 8 : 0);
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(15));
@@ -2263,10 +2263,10 @@ fn script_core_public_numeric_coercion_handles_arrays_symbols_and_radix_objects(
 #[test]
 fn script_core_keeps_array_length_non_configurable() {
     let result = compile_and_run(
-        r#"
+        r"
         let array = [1, 2, 3];
         (delete array.length ? 100 : 0) + array.length;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -2275,10 +2275,10 @@ fn script_core_keeps_array_length_non_configurable() {
 #[test]
 fn script_core_delete_returns_true_for_undeclared_global_assignments() {
     let result = compile_and_run(
-        r#"
+        r"
         x = 1;
         delete x ? 1 : 0;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -2287,11 +2287,11 @@ fn script_core_delete_returns_true_for_undeclared_global_assignments() {
 #[test]
 fn script_core_delete_returns_true_for_non_reference_unary_chains() {
     let result = compile_and_run(
-        r#"
+        r"
         (delete +-~!0 ? 1 : 0)
             + (delete typeof 0 ? 2 : 0)
             + (delete delete 0 ? 4 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -2300,9 +2300,9 @@ fn script_core_delete_returns_true_for_non_reference_unary_chains() {
 #[test]
 fn script_core_supports_template_literals_with_primitives() {
     let result = compile_and_run_string(
-        r#"
+        r"
         `foo ${5} ${true} ${1n} bar`;
-        "#,
+        ",
     );
 
     assert_eq!(result, "foo 5 true 1 bar");
@@ -2341,12 +2341,12 @@ fn script_core_supports_template_literals_with_object_string_coercion() {
 #[test]
 fn script_core_supports_postfix_update_expressions() {
     let result = compile_and_run(
-        r#"
+        r"
         let i = 0;
         let first = i++;
         let second = ++i;
         first * 10 + second * 100 + i;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(202));
@@ -2355,10 +2355,10 @@ fn script_core_supports_postfix_update_expressions() {
 #[test]
 fn script_core_supports_template_literal_left_to_right_updates() {
     let result = compile_and_run_string(
-        r#"
+        r"
         let i = 0;
         `a${i++}b${i++}c${i++}d`;
-        "#,
+        ",
     );
 
     assert_eq!(result, "a0b1c2d");
@@ -2623,10 +2623,10 @@ fn script_core_string_position_coercion_errors_preserve_type_error_identity() {
 #[test]
 fn script_core_supports_array_index_of_builtin_shim() {
     let result = compile_and_run(
-        r#"
+        r"
         let values = [1, 2, 3];
         values.indexOf(2);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -2635,7 +2635,7 @@ fn script_core_supports_array_index_of_builtin_shim() {
 #[test]
 fn script_core_array_search_helpers_are_generic() {
     let result = compile_and_run(
-        r#"
+        r"
         let score = 0;
         Math[1] = true;
         Math.length = 2;
@@ -2644,7 +2644,7 @@ fn script_core_array_search_helpers_are_generic() {
         score += Array.prototype.includes.call(true) === false ? 4 : 0;
         score += [0, NaN].includes(NaN) ? 8 : 0;
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(15));
@@ -2829,7 +2829,7 @@ fn script_core_array_result_helpers_define_indices_under_poisoned_array_prototyp
 #[test]
 fn script_core_array_is_array_observes_array_exotics_and_proxies() {
     let result = compile_and_run(
-        r#"
+        r"
         let score = 0;
 
         score += Array.isArray(Array.prototype) ? 1 : 0;
@@ -2850,7 +2850,7 @@ fn script_core_array_is_array_observes_array_exotics_and_proxies() {
         }
 
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(31));
@@ -3024,7 +3024,7 @@ fn script_core_array_slice_uses_species_and_defines_result_elements() {
 #[test]
 fn script_core_array_predicate_helpers_are_generic() {
     let result = compile_and_run(
-        r#"
+        r"
         let score = 0;
         let obj = new Date(0);
         obj.length = 2;
@@ -3037,7 +3037,7 @@ fn script_core_array_predicate_helpers_are_generic() {
             return receiver instanceof Date && value === 2 && index === 1;
         }) ? 2 : 0;
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -3807,7 +3807,7 @@ fn script_core_typed_array_delete_detached_numeric_indices_returns_true() {
 #[test]
 fn script_core_typed_array_for_in_skips_detached_indices() {
     let result = compile_and_run_string(
-        r#"
+        r"
         function testWithTypedArrayConstructors(f) {
             let constructors = [
                 Float64Array,
@@ -3848,7 +3848,7 @@ fn script_core_typed_array_for_in_skips_detached_indices() {
             total = total + probe(TA);
         });
         String(total);
-        "#,
+        ",
     );
 
     assert_eq!(result, "0");
@@ -4502,7 +4502,7 @@ fn script_core_array_predicate_helpers_read_length_before_callback_validation() 
 #[test]
 fn script_core_array_reduce_helpers_are_generic_and_skip_holes() {
     let result = compile_and_run(
-        r#"
+        r"
         let score = 0;
         let obj = new Date(0);
         obj.length = 3;
@@ -4522,7 +4522,7 @@ fn script_core_array_reduce_helpers_are_generic_and_skip_holes() {
             score += error.constructor === TypeError ? 100 : 0;
         }
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(210));
@@ -5032,13 +5032,13 @@ fn script_core_lowers_named_group_match_result_destructuring() {
 fn script_core_lowers_var_declarators_that_share_names_with_hoisted_functions() {
     let mut atoms = AtomTable::new();
     let _ = compile_unit(
-        r#"
+        r"
         var __string;
         var __re = /1|12/;
         __re.exec(__string);
         __re.test(__string);
         function __string() {}
-        "#,
+        ",
         &mut atoms,
     );
 }
@@ -5218,7 +5218,7 @@ fn script_core_proxy_is_construct_only_and_validates_constructor_arguments() {
 #[test]
 fn script_core_proxy_revocable_revokes_idempotently_and_throws_afterward() {
     let result = compile_and_run(
-        r#"
+        r"
         let pair = Proxy.revocable({ answer: 1 }, {});
         let total = 0;
         total += (pair.proxy.answer === 1 ? 1 : 0);
@@ -5235,7 +5235,7 @@ fn script_core_proxy_revocable_revokes_idempotently_and_throws_afterward() {
         }
         total += (pair.revoke() === undefined ? 16 : 0);
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(31));
@@ -5342,7 +5342,7 @@ fn script_core_proxy_named_property_caches_stay_proxy_aware() {
 #[test]
 fn script_core_proxy_null_traps_forward_and_own_keys_require_property_keys() {
     let result = compile_and_run(
-        r#"
+        r"
         let total = 0;
         let target = { value: 3 };
         let proxy = new Proxy(target, { get: null, set: null });
@@ -5368,7 +5368,7 @@ fn script_core_proxy_null_traps_forward_and_own_keys_require_property_keys() {
         }
 
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(31));
@@ -5511,7 +5511,7 @@ fn script_core_supports_phase6_number_math_and_bigint_basics() {
 #[test]
 fn script_core_number_min_value_is_minimum_subnormal() {
     let result = compile_and_run(
-        r#"
+        r"
         let total = 0;
         total += (Number.MIN_VALUE / 2 === 0 ? 1 : 0);
         total += (1 / (Number.MIN_VALUE / -2) === -Infinity ? 2 : 0);
@@ -5520,7 +5520,7 @@ fn script_core_number_min_value_is_minimum_subnormal() {
         total += (1 / (-0.5 * Number.MIN_VALUE) === -Infinity ? 16 : 0);
         total += (Number.MIN_VALUE * 0.51 === Number.MIN_VALUE ? 32 : 0);
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(63));
@@ -5571,7 +5571,7 @@ fn script_core_unary_plus_uses_to_number_instead_of_addition() {
 #[test]
 fn script_core_unary_minus_uses_to_primitive_number_hint() {
     let result = compile_and_run(
-        r#"
+        r"
         let total = 0;
         total += (-{ valueOf: function() { return -1; } } === 1 ? 1 : 0);
         total += (-new Boolean(true) === -1 ? 2 : 0);
@@ -5587,7 +5587,7 @@ fn script_core_unary_minus_uses_to_primitive_number_hint() {
             total += (error.constructor === TypeError ? 16 : 0);
         }
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(31));
@@ -5718,7 +5718,7 @@ fn script_core_supports_extended_math_builtins() {
 #[test]
 fn script_core_math_approximation_builtins_match_staging_tolerances() {
     let result = compile_and_run(
-        r#"
+        r"
         const f = new Float64Array([0, 0]);
         const u = new Uint32Array(f.buffer);
         let endian = 0;
@@ -5747,7 +5747,7 @@ fn script_core_math_approximation_builtins_match_staging_tolerances() {
         score += near(Math.atanh(-0.9999828338623047), -5.832855225378502, 2) ? 16 : 0;
         score += near(Math.atanh(0.3), 0.3095196042031117, 2) ? 32 : 0;
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(63));
@@ -5780,7 +5780,7 @@ fn script_core_number_prototype_carries_primitive_data_slot_but_bigint_does_not(
 #[test]
 fn script_core_number_constructor_distinguishes_absent_and_undefined_arguments() {
     let result = compile_and_run(
-        r#"
+        r"
         let functionDefault = Number();
         let constructorDefault = new Number().valueOf();
         let functionUndefined = Number(undefined);
@@ -5792,7 +5792,7 @@ fn script_core_number_constructor_distinguishes_absent_and_undefined_arguments()
         total += (constructorUndefined !== constructorUndefined ? 8 : 0);
         total += (Number.prototype.toString.length === 1 ? 16 : 0);
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(31));
@@ -5822,7 +5822,7 @@ fn script_core_bigint_boxing_exposes_wrapper_identity_and_value_of() {
 #[test]
 fn script_core_bigint_width_builtins_wrap_with_toindex_and_tobigint() {
     let result = compile_and_run(
-        r#"
+        r"
         let total = 0;
         total += (BigInt.asIntN(2, 3n) === -1n ? 1 : 0);
         total += (BigInt.asIntN(3, 10n) === 2n ? 2 : 0);
@@ -5841,7 +5841,7 @@ fn script_core_bigint_width_builtins_wrap_with_toindex_and_tobigint() {
             total += (error instanceof RangeError ? 128 : 0);
         }
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(255));
@@ -6008,14 +6008,14 @@ fn script_core_bigint_bitwise_operators_use_to_numeric() {
 #[test]
 fn script_core_bitwise_not_supports_number_and_bigint() {
     let result = compile_and_run(
-        r#"
+        r"
         let total = 0;
         total += (~0 === -1 ? 1 : 0);
         total += (~1n === -2n ? 2 : 0);
         total += (~Object(1n) === -2n ? 4 : 0);
         total += (~{ valueOf: function() { return 1n; } } === -2n ? 8 : 0);
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(15));
@@ -6163,7 +6163,7 @@ fn script_core_bigint_relational_comparison_uses_to_numeric_ordering() {
 #[test]
 fn script_core_sparse_array_literals_preserve_length_and_holes() {
     let result = compile_and_run(
-        r#"
+        r"
         let oneHole = [,];
         let twoHoles = [,,];
         let total = 0;
@@ -6174,7 +6174,7 @@ fn script_core_sparse_array_literals_preserve_length_and_holes() {
         total += (!(1 in twoHoles) ? 16 : 0);
         total += ([].length === 0 ? 32 : 0);
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(63));
@@ -7716,7 +7716,7 @@ fn script_core_string_substr_matches_annex_b_numeric_edges() {
 #[test]
 fn script_core_supports_annex_b_function_code_block_function_bindings() {
     let result = compile_and_run_string(
-        r#"
+        r"
         var before, after, blockValue, blockAfterAssignment;
 
         (function() {
@@ -7733,7 +7733,7 @@ fn script_core_supports_annex_b_function_code_block_function_bindings() {
         }());
 
         String(before) + ':' + blockValue + ':' + blockAfterAssignment + ':' + after;
-        "#,
+        ",
     );
 
     assert_eq!(result, "undefined:decl:123:decl");
@@ -7742,7 +7742,7 @@ fn script_core_supports_annex_b_function_code_block_function_bindings() {
 #[test]
 fn script_core_skips_annex_b_block_function_var_update_for_parameters() {
     let result = compile_and_run_string(
-        r#"
+        r"
         var init, after, ifTrue, ifFalse;
 
         (function(f) {
@@ -7764,7 +7764,7 @@ fn script_core_skips_annex_b_block_function_var_update_for_parameters() {
         }(789));
 
         [init, after, ifTrue, ifFalse].join(':');
-        "#,
+        ",
     );
 
     assert_eq!(result, "123:123:456:789");
@@ -7773,7 +7773,7 @@ fn script_core_skips_annex_b_block_function_var_update_for_parameters() {
 #[test]
 fn script_core_supports_annex_b_global_code_block_function_bindings() {
     let result = compile_and_run_string(
-        r#"
+        r"
         var before = f === undefined ? 'undefined' : 'other';
 
         {
@@ -7781,7 +7781,7 @@ fn script_core_supports_annex_b_global_code_block_function_bindings() {
         }
 
         before + ':' + f();
-        "#,
+        ",
     );
 
     assert_eq!(result, "undefined:global");
@@ -7876,10 +7876,10 @@ fn script_core_annex_b_for_in_var_initializer_runs_before_rhs() {
 #[test]
 fn script_core_annex_b_labeled_function_declaration_is_hoisted() {
     let result = compile_and_run_string(
-        r#"
+        r"
         label: function f() { return 'ok'; }
         f();
-        "#,
+        ",
     );
 
     assert_eq!(result, "ok");
@@ -7888,7 +7888,7 @@ fn script_core_annex_b_labeled_function_declaration_is_hoisted() {
 #[test]
 fn script_core_annex_b_block_labeled_function_is_instantiated_before_block_body() {
     let result = compile_and_run_string(
-        r#"
+        r"
         var before, after, directValue, labeledValue;
 
         {
@@ -7901,7 +7901,7 @@ fn script_core_annex_b_block_labeled_function_is_instantiated_before_block_body(
 
         after = f();
         [before, directValue, labeledValue, after].join(':');
-        "#,
+        ",
     );
 
     assert_eq!(result, "labeled:labeled:labeled:labeled");
@@ -7910,7 +7910,7 @@ fn script_core_annex_b_block_labeled_function_is_instantiated_before_block_body(
 #[test]
 fn script_core_annex_b_block_labeled_function_creates_var_binding() {
     let result = compile_and_run_string(
-        r#"
+        r"
         var before = typeof f;
         var after;
 
@@ -7925,7 +7925,7 @@ fn script_core_annex_b_block_labeled_function_creates_var_binding() {
         }
 
         before + ':' + after;
-        "#,
+        ",
     );
 
     assert_eq!(result, "undefined:labeled");
@@ -7934,7 +7934,7 @@ fn script_core_annex_b_block_labeled_function_creates_var_binding() {
 #[test]
 fn script_core_annex_b_switch_labeled_function_is_instantiated_before_case_body() {
     let result = compile_and_run_string(
-        r#"
+        r"
         var before, after;
 
         switch (1) {
@@ -7946,7 +7946,7 @@ fn script_core_annex_b_switch_labeled_function_is_instantiated_before_case_body(
 
         after = f();
         before + ':' + after;
-        "#,
+        ",
     );
 
     assert_eq!(result, "switch:switch");
@@ -8122,7 +8122,7 @@ fn script_core_annex_b_regexp_legacy_pattern_extensions() {
 #[test]
 fn script_core_typeof_before_for_lexical_shadow_returns_undefined() {
     let result = compile_and_run_string(
-        r#"
+        r"
         var beforeType;
 
         beforeType = typeof f;
@@ -8134,7 +8134,7 @@ fn script_core_typeof_before_for_lexical_shadow_returns_undefined() {
         }
 
         beforeType;
-        "#,
+        ",
     );
 
     assert_eq!(result, "undefined");
@@ -8143,7 +8143,7 @@ fn script_core_typeof_before_for_lexical_shadow_returns_undefined() {
 #[test]
 fn script_core_block_function_named_arguments_shadows_arguments_object() {
     let result = compile_and_run_string(
-        r#"
+        r"
         (function() {
             {
                 var before = arguments();
@@ -8151,7 +8151,7 @@ fn script_core_block_function_named_arguments_shadows_arguments_object() {
                 return before + ':' + arguments();
             }
         }());
-        "#,
+        ",
     );
 
     assert_eq!(result, "block:block");
@@ -8160,7 +8160,7 @@ fn script_core_block_function_named_arguments_shadows_arguments_object() {
 #[test]
 fn script_core_annex_b_block_function_named_arguments_updates_function_binding() {
     let result = compile_and_run_string(
-        r#"
+        r"
         (function() {
             var before = typeof arguments;
             {
@@ -8168,7 +8168,7 @@ fn script_core_annex_b_block_function_named_arguments_updates_function_binding()
             }
             return before + ':' + typeof arguments + ':' + arguments();
         }());
-        "#,
+        ",
     );
 
     assert_eq!(result, "object:function:block");
@@ -8201,7 +8201,7 @@ fn script_core_global_property_lookup_ignores_unscopables_outside_with() {
 #[test]
 fn script_core_skips_annex_b_block_function_var_binding_for_destructured_catch_conflicts() {
     let result = compile_and_run_string(
-        r#"
+        r"
         var destructured, simple;
 
         (function() {
@@ -8227,7 +8227,7 @@ fn script_core_skips_annex_b_block_function_var_binding_for_destructured_catch_c
         }());
 
         destructured + ':' + simple;
-        "#,
+        ",
     );
 
     assert_eq!(result, "undefined:allowed");
@@ -8236,7 +8236,7 @@ fn script_core_skips_annex_b_block_function_var_binding_for_destructured_catch_c
 #[test]
 fn script_core_skips_annex_b_block_function_var_binding_for_for_lexical_conflicts() {
     let result = compile_and_run_string(
-        r#"
+        r"
         var before, beforeType, loopResult, after, afterType;
 
         try {
@@ -8274,7 +8274,7 @@ fn script_core_skips_annex_b_block_function_var_binding_for_for_lexical_conflict
         }
 
         [before, beforeType, loopResult, after, afterType].join(':');
-        "#,
+        ",
     );
 
     assert_eq!(result, "ref:undefined:loop-ok:ref:undefined");
@@ -8386,9 +8386,9 @@ fn script_core_rejects_symbol_construction() {
 #[test]
 fn script_core_supports_bitwise_and_boolean_chains() {
     let result = compile_and_run(
-        r#"
+        r"
         ((1 === 1) & (2 === 2)) + (((3 === 4) & (5 === 5)) * 10);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -8397,9 +8397,9 @@ fn script_core_supports_bitwise_and_boolean_chains() {
 #[test]
 fn script_core_supports_bitwise_or_in_comparator_style_expressions() {
     let result = compile_and_run(
-        r#"
+        r"
         ((15 / 4) | 0) - ((3 / 4) | 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -8408,9 +8408,9 @@ fn script_core_supports_bitwise_or_in_comparator_style_expressions() {
 #[test]
 fn script_core_supports_exponentiation_and_right_associativity() {
     let result = compile_and_run(
-        r#"
+        r"
         (2 ** 5) + (2 ** 3 ** 2) + (-(2 ** 4));
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(528));
@@ -8419,7 +8419,7 @@ fn script_core_supports_exponentiation_and_right_associativity() {
 #[test]
 fn script_core_treats_for_in_over_nullish_values_as_empty() {
     let result = compile_and_run(
-        r#"
+        r"
         let seen = 0;
         for (var key in undefined) {
             seen = seen + 100;
@@ -8428,7 +8428,7 @@ fn script_core_treats_for_in_over_nullish_values_as_empty() {
             seen = seen + 100;
         }
         seen;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(0));
@@ -8437,7 +8437,7 @@ fn script_core_treats_for_in_over_nullish_values_as_empty() {
 #[test]
 fn script_core_supports_non_index_numeric_computed_property_keys() {
     let result = compile_and_run(
-        r#"
+        r"
         let obj = {
             [1.2]: 1,
             [1e55]: 2,
@@ -8454,7 +8454,7 @@ fn script_core_supports_non_index_numeric_computed_property_keys() {
             + (obj[Infinity] === 5 ? 16 : 0)
             + (obj[-Infinity] === 6 ? 32 : 0)
             + (obj[NaN] === 7 ? 64 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(127));
@@ -8643,10 +8643,10 @@ fn script_core_array_from_async_has_builtin_function_shape() {
 #[test]
 fn script_core_supports_fractional_computed_property_keys() {
     let result = compile_and_run(
-        r#"
+        r"
         let obj = { [1.2]: 3 };
         obj['1.2'];
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -8655,10 +8655,10 @@ fn script_core_supports_fractional_computed_property_keys() {
 #[test]
 fn script_core_supports_exponential_computed_property_keys() {
     let result = compile_and_run(
-        r#"
+        r"
         let obj = { [1e55]: 3 };
         obj['1e+55'];
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -8667,10 +8667,10 @@ fn script_core_supports_exponential_computed_property_keys() {
 #[test]
 fn script_core_supports_infinity_computed_property_keys() {
     let result = compile_and_run(
-        r#"
+        r"
         let obj = { [Infinity]: 3 };
         obj[Infinity];
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -8679,7 +8679,7 @@ fn script_core_supports_infinity_computed_property_keys() {
 #[test]
 fn script_core_supports_long_additive_conditional_chains() {
     let result = compile_and_run(
-        r#"
+        r"
         (1 === 1 ? 1 : 0)
             + (2 === 2 ? 2 : 0)
             + (3 === 3 ? 4 : 0)
@@ -8687,7 +8687,7 @@ fn script_core_supports_long_additive_conditional_chains() {
             + (5 === 5 ? 16 : 0)
             + (6 === 6 ? 32 : 0)
             + (7 === 7 ? 64 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(127));
@@ -8696,7 +8696,7 @@ fn script_core_supports_long_additive_conditional_chains() {
 #[test]
 fn script_core_supports_non_index_numeric_computed_property_keys_through_temporaries() {
     let result = compile_and_run(
-        r#"
+        r"
         let obj = {
             [1.2]: 1,
             [1e55]: 2,
@@ -8720,7 +8720,7 @@ fn script_core_supports_non_index_numeric_computed_property_keys_through_tempora
             + (e === 5 ? 16 : 0)
             + (f === 6 ? 32 : 0)
             + (g === 7 ? 64 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(127));
@@ -8729,7 +8729,7 @@ fn script_core_supports_non_index_numeric_computed_property_keys_through_tempora
 #[test]
 fn script_core_supports_fractional_computed_keys_after_full_object_literal() {
     let result = compile_and_run(
-        r#"
+        r"
         let obj = {
             [1.2]: 1,
             [1e55]: 2,
@@ -8740,7 +8740,7 @@ fn script_core_supports_fractional_computed_keys_after_full_object_literal() {
             [NaN]: 7
         };
         obj['1.2'];
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -8749,7 +8749,7 @@ fn script_core_supports_fractional_computed_keys_after_full_object_literal() {
 #[test]
 fn script_core_supports_infinity_computed_keys_after_full_object_literal() {
     let result = compile_and_run(
-        r#"
+        r"
         let obj = {
             [1.2]: 1,
             [1e55]: 2,
@@ -8760,7 +8760,7 @@ fn script_core_supports_infinity_computed_keys_after_full_object_literal() {
             [NaN]: 7
         };
         obj[Infinity];
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(5));

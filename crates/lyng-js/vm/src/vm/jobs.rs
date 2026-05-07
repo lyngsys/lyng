@@ -1,5 +1,8 @@
 use super::runtime_objects::VmIteratorBridge;
-use super::*;
+use super::{
+    Agent, CodeRef, FrameFlags, FrameRecord, InstalledCode, NativeFunctionRegistry, RealmRecord,
+    RegisterWindow, Vm, VmError, VmResult,
+};
 use lyng_js_env::{
     ExecutableId, JobQueueKind, PromiseCapabilityId, PromiseReactionHandler, PromiseReactionKind,
     PromiseReactionRecord, PromiseState, RuntimeJob, RuntimeJobPayload, WaiterToken,
@@ -105,7 +108,7 @@ impl Vm {
         let script_or_module_referrer = match job.payload() {
             RuntimeJobPayload::PromiseReaction { reaction, .. } => agent
                 .promise_reaction(reaction)
-                .and_then(|record| record.script_or_module_referrer()),
+                .and_then(lyng_js_env::PromiseReactionRecord::script_or_module_referrer),
             RuntimeJobPayload::DynamicImportEvaluate {
                 script_or_module_referrer,
                 ..
@@ -268,11 +271,11 @@ impl Vm {
                 Err(VmError::Abrupt(AbruptCompletion::throw(reason)))
             }
         };
-        if result.is_ok() {
-            if let Some(generator) = async_generator_return {
-                self.pop_async_generator_front_request(generator);
-                self.drain_async_generator_queue(agent, host, registry, generator)?;
-            }
+        if result.is_ok()
+            && let Some(generator) = async_generator_return
+        {
+            self.pop_async_generator_front_request(generator);
+            self.drain_async_generator_queue(agent, host, registry, generator)?;
         }
         result
     }
@@ -430,7 +433,7 @@ impl Vm {
         if agent.finalization_cleanup_pending(registry_object) {
             let _ = agent.enqueue_finalization_cleanup_job(registry_object);
         }
-        result.map(|_| ())
+        result
     }
 
     fn execute_promise_finally_reaction(
@@ -519,7 +522,7 @@ impl Vm {
     ) -> VmResult<()> {
         let script_or_module_referrer = agent
             .current_execution_context()
-            .and_then(|context| context.script_or_module_referrer());
+            .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer);
         let fulfill_reaction = agent.alloc_promise_reaction(
             PromiseReactionRecord::new(PromiseReactionKind::Fulfill, on_fulfilled, capability)
                 .with_script_or_module_referrer(script_or_module_referrer),

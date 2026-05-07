@@ -228,7 +228,7 @@ pub struct CompiledModuleUnit {
 
 impl CompiledModuleUnit {
     #[inline]
-    pub fn new(
+    pub const fn new(
         source: SourceId,
         entry: BytecodeFunctionId,
         functions: Vec<BytecodeFunction>,
@@ -346,7 +346,7 @@ impl CompiledModuleUnit {
     }
 
     #[inline]
-    pub fn with_import_meta(mut self, has_import_meta: bool) -> Self {
+    pub const fn with_import_meta(mut self, has_import_meta: bool) -> Self {
         self.has_import_meta = has_import_meta;
         self
     }
@@ -523,7 +523,7 @@ fn derive_decl_metadata(
                             *local,
                             local_binding_slot(*local, compilation, bindings_by_name)?,
                             ModuleImportKind::Named(WellKnownAtom::default.id()),
-                        ))
+                        ));
                     }
                     ImportSpecifier::Namespace { local, .. } => {
                         metadata.import_entries.push(ModuleImportEntry::new(
@@ -531,7 +531,7 @@ fn derive_decl_metadata(
                             *local,
                             local_binding_slot(*local, compilation, bindings_by_name)?,
                             ModuleImportKind::NamespaceObject,
-                        ))
+                        ));
                     }
                     ImportSpecifier::Source { local, .. } => {
                         metadata.import_entries.push(ModuleImportEntry::new(
@@ -539,7 +539,7 @@ fn derive_decl_metadata(
                             *local,
                             local_binding_slot(*local, compilation, bindings_by_name)?,
                             ModuleImportKind::Source,
-                        ))
+                        ));
                     }
                     ImportSpecifier::Named {
                         imported, local, ..
@@ -553,7 +553,7 @@ fn derive_decl_metadata(
             }
         }
         Decl::Export { kind, .. } => {
-            derive_export_metadata(ast, kind, compilation, bindings_by_name, metadata)?
+            derive_export_metadata(ast, kind, compilation, bindings_by_name, metadata)?;
         }
         _ => {}
     }
@@ -811,7 +811,7 @@ fn collect_expression_sites_from_stmt(
     match ast.get_stmt(stmt_id) {
         Stmt::Block { body, .. } => collect_module_expression_sites(ast, *body, metadata),
         Stmt::Expression { expression, .. } => {
-            collect_expression_sites_from_expr(ast, *expression, metadata)
+            collect_expression_sites_from_expr(ast, *expression, metadata);
         }
         Stmt::If {
             test,
@@ -844,7 +844,7 @@ fn collect_expression_sites_from_stmt(
                         }
                     }
                     lyng_js_ast::ForInit::Expression(expr) => {
-                        collect_expression_sites_from_expr(ast, *expr, metadata)
+                        collect_expression_sites_from_expr(ast, *expr, metadata);
                     }
                 }
             }
@@ -884,7 +884,7 @@ fn collect_expression_sites_from_stmt(
         }
         Stmt::Labeled { body, .. } => collect_expression_sites_from_stmt(ast, *body, metadata),
         Stmt::Throw { argument, .. } => {
-            collect_expression_sites_from_expr(ast, *argument, metadata)
+            collect_expression_sites_from_expr(ast, *argument, metadata);
         }
         Stmt::Try {
             block,
@@ -923,7 +923,7 @@ fn collect_expression_sites_from_decl(
             }
         }
         Decl::Function { function, .. } => {
-            collect_expression_sites_from_function(ast, *function, metadata)
+            collect_expression_sites_from_function(ast, *function, metadata);
         }
         Decl::Class {
             super_class, body, ..
@@ -936,17 +936,17 @@ fn collect_expression_sites_from_decl(
         Decl::Export { kind, .. } => match kind {
             ExportKind::Default { declaration } => match declaration {
                 ExportDefaultDecl::Function(function) => {
-                    collect_expression_sites_from_function(ast, *function, metadata)
+                    collect_expression_sites_from_function(ast, *function, metadata);
                 }
                 ExportDefaultDecl::Class(decl) => {
-                    collect_expression_sites_from_decl(ast, *decl, metadata)
+                    collect_expression_sites_from_decl(ast, *decl, metadata);
                 }
                 ExportDefaultDecl::Expression(expr) => {
-                    collect_expression_sites_from_expr(ast, *expr, metadata)
+                    collect_expression_sites_from_expr(ast, *expr, metadata);
                 }
             },
             ExportKind::Declaration { decl } => {
-                collect_expression_sites_from_decl(ast, *decl, metadata)
+                collect_expression_sites_from_decl(ast, *decl, metadata);
             }
             ExportKind::Named { .. } | ExportKind::All { .. } => {}
         },

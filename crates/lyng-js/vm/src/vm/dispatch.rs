@@ -3,7 +3,10 @@ use super::values::{
     bigint_shift_left_values, bigint_shift_right_values, compare_numeric_values,
     decode_env_operand, encode_number,
 };
-use super::*;
+use super::{
+    code_index, Agent, AllocationLifetime, CallRange, FrameRecord, HostHooks, Instruction,
+    NativeFunctionRegistry, Opcode, PropertyDescriptor, ThisState, Value, Vm, VmError, VmResult,
+};
 use crate::vm::property_access::ToPrimitiveHint;
 use crate::vm::property_access::VmProxyBridge;
 use lyng_js_ops::{errors, object, read};
@@ -874,7 +877,7 @@ impl Vm {
                                 CallRange::decode(payload),
                                 spread_mask,
                             );
-                            let Some(_) = self.handle_vm_result(agent, call_result)? else {
+                            let Some(()) = self.handle_vm_result(agent, call_result)? else {
                                 continue;
                             };
                             self.record_feedback_site(frame.code(), frame.instruction_offset());
@@ -929,7 +932,7 @@ impl Vm {
                                 CallRange::decode(payload),
                                 spread_mask,
                             );
-                            let Some(_) = self.handle_vm_result(agent, construct_result)? else {
+                            let Some(()) = self.handle_vm_result(agent, construct_result)? else {
                                 continue;
                             };
                             self.record_feedback_site(frame.code(), frame.instruction_offset());
@@ -1157,7 +1160,7 @@ impl Vm {
                             let assign_result = self.assign_name_with_context(
                                 agent, host, registry, frame, atom, value,
                             );
-                            let Some(_) = self.handle_vm_result(agent, assign_result)? else {
+                            let Some(()) = self.handle_vm_result(agent, assign_result)? else {
                                 continue;
                             };
                             self.advance_instruction()?;
@@ -1168,7 +1171,7 @@ impl Vm {
                             let assign_result = self.assign_variable_name_with_context(
                                 agent, host, registry, frame, atom, value,
                             );
-                            let Some(_) = self.handle_vm_result(agent, assign_result)? else {
+                            let Some(()) = self.handle_vm_result(agent, assign_result)? else {
                                 continue;
                             };
                             self.advance_instruction()?;
@@ -1258,7 +1261,7 @@ impl Vm {
                                 frame.code(),
                                 frame.instruction_offset(),
                             );
-                            let Some(_) = self.handle_vm_result(agent, store_result)? else {
+                            let Some(()) = self.handle_vm_result(agent, store_result)? else {
                                 continue;
                             };
                             self.advance_instruction()?;
@@ -1276,7 +1279,7 @@ impl Vm {
                                 frame.code(),
                                 frame.instruction_offset(),
                             );
-                            let Some(_) = self.handle_vm_result(agent, assign_result)? else {
+                            let Some(()) = self.handle_vm_result(agent, assign_result)? else {
                                 continue;
                             };
                             self.advance_instruction()?;
@@ -1291,23 +1294,18 @@ impl Vm {
                             self.advance_instruction()?;
                         }
                         Opcode::LoadThis => {
-                            let load_this = (|| -> VmResult<Value> {
-                                match agent
-                                    .current_execution_context()
-                                    .map(|context| context.this_state())
-                                    .unwrap_or(ThisState::Value(frame.this_value()))
-                                {
-                                    ThisState::Value(value) => Ok(value),
-                                    ThisState::Uninitialized => {
-                                        Err(VmError::Abrupt(errors::throw_reference_error(agent)))
-                                    }
-                                    ThisState::Lexical => Self::resolve_this_binding(
-                                        agent,
-                                        frame.lexical_env(),
-                                        frame,
-                                    ),
+                            let load_this = match agent.current_execution_context().map_or(
+                                ThisState::Value(frame.this_value()),
+                                lyng_js_env::ExecutionContext::this_state,
+                            ) {
+                                ThisState::Value(value) => Ok(value),
+                                ThisState::Uninitialized => {
+                                    Err(VmError::Abrupt(errors::throw_reference_error(agent)))
                                 }
-                            })();
+                                ThisState::Lexical => {
+                                    Self::resolve_this_binding(agent, frame.lexical_env(), frame)
+                                }
+                            };
                             let Some(value) = self.handle_vm_result(agent, load_this)? else {
                                 continue;
                             };
@@ -1689,7 +1687,7 @@ impl Vm {
         }
         if !left.is_number() || !right.is_number() {
             return Ok(None);
-        };
+        }
         let left = left
             .as_f64()
             .expect("Number value should expose an f64 payload");
@@ -1733,15 +1731,17 @@ impl Vm {
                 }
             }
             Opcode::Equal | Opcode::StrictEqual => Value::from_bool(left == right),
-            Opcode::LessThan => {
-                Value::from_bool(left.partial_cmp(&right).is_some_and(|o| o.is_lt()))
-            }
+            Opcode::LessThan => Value::from_bool(
+                left.partial_cmp(&right)
+                    .is_some_and(std::cmp::Ordering::is_lt),
+            ),
             Opcode::LessEqual => {
                 Value::from_bool(left.partial_cmp(&right).is_some_and(|o| !o.is_gt()))
             }
-            Opcode::GreaterThan => {
-                Value::from_bool(left.partial_cmp(&right).is_some_and(|o| o.is_gt()))
-            }
+            Opcode::GreaterThan => Value::from_bool(
+                left.partial_cmp(&right)
+                    .is_some_and(std::cmp::Ordering::is_gt),
+            ),
             Opcode::GreaterEqual => {
                 Value::from_bool(left.partial_cmp(&right).is_some_and(|o| !o.is_lt()))
             }

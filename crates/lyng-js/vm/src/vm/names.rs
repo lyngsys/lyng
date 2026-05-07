@@ -1,5 +1,10 @@
-use super::*;
+use super::{
+    ActiveEnvScopeRange, Agent, AtomId, CodeRef, EnvironmentRef, FrameRecord, ObjectRef, Value, Vm,
+    VmError, VmResult, WellKnownSymbolId,
+};
 use crate::name_refs::{CapturedNameReference, CapturedNameTarget};
+#[cfg(test)]
+use crate::vm::call::RejectingNativeRegistry;
 use crate::vm::property_access::VmProxyBridge;
 use lyng_js_env::{
     EnvironmentRecord, GlobalEnvironmentRecord, GlobalLexicalBindingRecord, ObjectEnvironmentRecord,
@@ -299,12 +304,12 @@ impl Vm {
         let mut current = Some(start);
         let mut consumed_overlay_source = None;
         while let Some(environment) = current {
-            if consumed_overlay_source != Some(environment) {
-                if let Some(overlay) = self.direct_eval_environment_overlay(environment) {
-                    consumed_overlay_source = Some(environment);
-                    current = Some(overlay);
-                    continue;
-                }
+            if consumed_overlay_source != Some(environment)
+                && let Some(overlay) = self.direct_eval_environment_overlay(environment)
+            {
+                consumed_overlay_source = Some(environment);
+                current = Some(overlay);
+                continue;
             }
 
             let record = agent
@@ -414,12 +419,12 @@ impl Vm {
         let mut current = Some(start);
         let mut consumed_overlay_source = None;
         while let Some(environment) = current {
-            if consumed_overlay_source != Some(environment) {
-                if let Some(overlay) = self.direct_eval_environment_overlay(environment) {
-                    consumed_overlay_source = Some(environment);
-                    current = Some(overlay);
-                    continue;
-                }
+            if consumed_overlay_source != Some(environment)
+                && let Some(overlay) = self.direct_eval_environment_overlay(environment)
+            {
+                consumed_overlay_source = Some(environment);
+                current = Some(overlay);
+                continue;
             }
 
             let Some(record) = agent.environment(environment) else {
@@ -1222,13 +1227,12 @@ impl Vm {
         global.has_lexical_name(name)
             || agent
                 .environment_layout(global.layout())
-                .map(|layout| {
+                .is_some_and(|layout| {
                     layout
                         .bindings()
                         .iter()
                         .any(|binding| binding.name() == Some(name))
                 })
-                .unwrap_or(false)
     }
 
     pub(super) fn lookup_global_lexical_binding(
@@ -1532,8 +1536,7 @@ impl Vm {
 
     pub(super) fn frame_is_strict(&self, frame: FrameRecord) -> bool {
         self.installed_function(frame.code())
-            .map(|function| function.flags().strict())
-            .unwrap_or(false)
+            .is_some_and(|function| function.flags().strict())
     }
 
     pub(super) fn environment_at_depth(

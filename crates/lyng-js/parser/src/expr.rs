@@ -578,7 +578,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 }
 
 /// Returns true if the token can appear as a property name.
-fn is_property_name_token(kind: TokenKind) -> bool {
+const fn is_property_name_token(kind: TokenKind) -> bool {
     matches!(
         kind,
         TokenKind::Identifier

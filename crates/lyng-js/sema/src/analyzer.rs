@@ -63,7 +63,7 @@ struct WalkContext {
 }
 
 /// The analyzer state accumulates all side tables during the walk.
-pub(crate) struct Analyzer<'a> {
+pub struct Analyzer<'a> {
     ast: &'a Ast,
     atoms: &'a AtomTable,
     pub(crate) scopes: ScopeTable,

@@ -1379,8 +1379,7 @@ pub(super) fn regexp_replace_with_string<Cx: PublicBuiltinDispatchContext>(
                 .is_some_and(regexp_replacement_template_is_literal)
             && regexp_object_supports_literal_global_replace_fast_path(cx, regexp_object)
             && regexp_uses_builtin_exec(cx, regexp_value)?
-        {
-            if let Some(value) = regexp_literal_global_replace_fast_path(
+            && let Some(value) = regexp_literal_global_replace_fast_path(
                 cx,
                 regexp_object,
                 source_ref,
@@ -1388,9 +1387,9 @@ pub(super) fn regexp_replace_with_string<Cx: PublicBuiltinDispatchContext>(
                 replacement_template_units
                     .as_deref()
                     .expect("template units should exist for non-callable replacements"),
-            )? {
-                return Ok(value);
-            }
+            )?
+        {
+            return Ok(value);
         }
 
         let mut results = Vec::new();

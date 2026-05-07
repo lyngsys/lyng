@@ -227,7 +227,7 @@ fn string_char_at_builtin<Cx: PublicBuiltinDispatchContext>(
     let Some(index) = string_position_index(position, units.len()) else {
         return Ok(string_from_code_units(cx, &[]));
     };
-    Ok(string_from_code_units(cx, &units[index..index + 1]))
+    Ok(string_from_code_units(cx, &units[index..=index]))
 }
 
 fn string_char_code_at_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -372,7 +372,7 @@ fn string_at_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Value::undefined());
     }
     let index = index as usize;
-    Ok(string_from_code_units(cx, &units[index..index + 1]))
+    Ok(string_from_code_units(cx, &units[index..=index]))
 }
 
 fn string_code_point_at_builtin<Cx: PublicBuiltinDispatchContext>(

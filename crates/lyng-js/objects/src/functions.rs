@@ -80,7 +80,7 @@ impl MapEntry {
     }
 
     #[inline]
-    pub fn set_value(&mut self, value: Value) {
+    pub const fn set_value(&mut self, value: Value) {
         self.value = value;
     }
 }
@@ -251,8 +251,8 @@ impl TypedArrayElementKind {
 #[inline]
 pub fn float16_bits_to_f64(bits: u16) -> f64 {
     let sign = (bits >> 15) & 0x1;
-    let exp = ((bits >> 10) & 0x1f) as i32;
-    let mant = (bits & 0x03ff) as u32;
+    let exp = i32::from((bits >> 10) & 0x1f);
+    let mant = u32::from(bits & 0x03ff);
     let sign_bit_f64 = u64::from(sign) << 63;
 
     if exp == 0 {
@@ -838,7 +838,7 @@ pub enum FunctionEntryIdentity {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct BoundFunctionInit {
+pub struct BoundFunctionInit {
     target: ObjectRef,
     this_value: Value,
     arguments: Box<[Value]>,
@@ -846,7 +846,7 @@ pub(crate) struct BoundFunctionInit {
 
 impl BoundFunctionInit {
     #[inline]
-    pub(crate) fn new(target: ObjectRef, this_value: Value, arguments: Box<[Value]>) -> Self {
+    pub(crate) const fn new(target: ObjectRef, this_value: Value, arguments: Box<[Value]>) -> Self {
         Self {
             target,
             this_value,
@@ -951,7 +951,7 @@ impl FunctionObjectData {
     }
 
     #[inline]
-    pub fn bound(
+    pub const fn bound(
         realm: RealmRef,
         environment: EnvironmentRef,
         target: ObjectRef,
@@ -1019,7 +1019,7 @@ impl FunctionObjectData {
     }
 
     #[inline]
-    pub(crate) fn bound_init(&self) -> Option<&BoundFunctionInit> {
+    pub(crate) const fn bound_init(&self) -> Option<&BoundFunctionInit> {
         self.bound_init.as_ref()
     }
 
@@ -1084,7 +1084,7 @@ impl FunctionObjectData {
         self
     }
 
-    pub(crate) fn runtime_record(&self) -> Option<RuntimeFunctionRecord> {
+    pub(crate) const fn runtime_record(&self) -> Option<RuntimeFunctionRecord> {
         if self.realm.is_none()
             && self.environment.is_none()
             && self.private_env.is_none()
@@ -1117,7 +1117,7 @@ impl FunctionObjectData {
         Some(record)
     }
 
-    pub(crate) fn with_gc_payload(mut self, payload: Option<FunctionPayloadRef>) -> Self {
+    pub(crate) const fn with_gc_payload(mut self, payload: Option<FunctionPayloadRef>) -> Self {
         self.gc_payload = payload;
         self
     }

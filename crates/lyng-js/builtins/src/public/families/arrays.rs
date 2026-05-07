@@ -336,7 +336,7 @@ fn install_array_iterator_prototype_descriptors(
     )
 }
 
-fn array_unscopables_property(atom: AtomId) -> crate::BuiltinPropertyDescriptor {
+const fn array_unscopables_property(atom: AtomId) -> crate::BuiltinPropertyDescriptor {
     data_atom_property(
         atom,
         Value::from_bool(true),

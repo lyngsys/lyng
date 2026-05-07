@@ -1,33 +1,21 @@
-use super::super::*;
+use super::super::{builtin_id, BuiltinFunctionId};
 
 #[inline]
-pub fn weak_set_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(WEAK_SET_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn weak_set_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::WEAK_SET_RAW)
 }
 
 #[inline]
-pub fn weak_set_add_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(WEAK_SET_ADD_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn weak_set_add_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::WEAK_SET_ADD_RAW)
 }
 
 #[inline]
-pub fn weak_set_has_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(WEAK_SET_HAS_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn weak_set_has_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::WEAK_SET_HAS_RAW)
 }
 
 #[inline]
-pub fn weak_set_delete_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(WEAK_SET_DELETE_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn weak_set_delete_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::WEAK_SET_DELETE_RAW)
 }

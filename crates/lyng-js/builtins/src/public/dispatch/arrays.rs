@@ -175,15 +175,14 @@ fn array_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Value::from_object_ref(array));
     }
 
-    if arguments.len() == 1 {
-        if arguments[0].as_smi().is_some() || arguments[0].as_f64().is_some() {
-            let number = to_number_for_builtin(cx, arguments[0])?;
-            let Some(length) = valid_array_length(number) else {
-                return Err(range_error(cx));
-            };
-            define_array_length(cx, array, length)?;
-            return Ok(Value::from_object_ref(array));
-        }
+    if arguments.len() == 1 && (arguments[0].as_smi().is_some() || arguments[0].as_f64().is_some())
+    {
+        let number = to_number_for_builtin(cx, arguments[0])?;
+        let Some(length) = valid_array_length(number) else {
+            return Err(range_error(cx));
+        };
+        define_array_length(cx, array, length)?;
+        return Ok(Value::from_object_ref(array));
     }
 
     for (index, value) in arguments.iter().copied().enumerate() {
@@ -586,7 +585,7 @@ fn array_of_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_object_ref(array))
 }
 
-fn array_species_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+const fn array_species_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     _cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
@@ -629,26 +628,26 @@ fn array_concat_builtin<Cx: PublicBuiltinDispatchContext>(
     for value in std::iter::once(Value::from_object_ref(object_ref))
         .chain(invocation.arguments().iter().copied())
     {
-        if let Some(source_object) = value.as_object_ref() {
-            if is_concat_spreadable(cx, value)? {
-                let length = array_like_length_u64(cx, source_object)?;
-                let Some(limit) = next_index.checked_add(length) else {
-                    return Err(type_error(cx));
-                };
-                if limit > MAX_SAFE_INTEGER_U64 {
-                    return Err(type_error(cx));
-                }
-                for index in 0..length {
-                    let source_key = array_like_index_property_key(cx, index);
-                    if has_property_on_object(cx, source_object, source_key)? {
-                        let item = get_property_from_object(cx, source_object, source_key)?;
-                        let target_key = array_like_index_property_key(cx, next_index);
-                        create_data_property_or_throw(cx, result, target_key, item)?;
-                    }
-                    next_index = next_index.saturating_add(1);
-                }
-                continue;
+        if let Some(source_object) = value.as_object_ref()
+            && is_concat_spreadable(cx, value)?
+        {
+            let length = array_like_length_u64(cx, source_object)?;
+            let Some(limit) = next_index.checked_add(length) else {
+                return Err(type_error(cx));
+            };
+            if limit > MAX_SAFE_INTEGER_U64 {
+                return Err(type_error(cx));
             }
+            for index in 0..length {
+                let source_key = array_like_index_property_key(cx, index);
+                if has_property_on_object(cx, source_object, source_key)? {
+                    let item = get_property_from_object(cx, source_object, source_key)?;
+                    let target_key = array_like_index_property_key(cx, next_index);
+                    create_data_property_or_throw(cx, result, target_key, item)?;
+                }
+                next_index = next_index.saturating_add(1);
+            }
+            continue;
         }
         if next_index >= MAX_SAFE_INTEGER_U64 {
             return Err(type_error(cx));
@@ -1396,9 +1395,7 @@ fn array_to_locale_string_builtin<Cx: PublicBuiltinDispatchContext>(
     let mut parts = Vec::with_capacity(usize::try_from(length).unwrap_or(usize::MAX));
     for index in 0..length {
         let key = PropertyKey::Index(index);
-        let text = if !has_property_on_object(cx, object_ref, key)? {
-            String::new()
-        } else {
+        let text = if has_property_on_object(cx, object_ref, key)? {
             let value = get_property_from_object(cx, object_ref, key)?;
             if value.is_undefined() || value.is_null() {
                 String::new()
@@ -1408,6 +1405,8 @@ fn array_to_locale_string_builtin<Cx: PublicBuiltinDispatchContext>(
                 let result = cx.call_to_completion(method, value, &[])?;
                 cx.value_to_string_text(result)?
             }
+        } else {
+            String::new()
         };
         parts.push(text);
     }

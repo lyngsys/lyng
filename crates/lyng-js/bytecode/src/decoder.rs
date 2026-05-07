@@ -115,7 +115,7 @@ pub fn decode_instruction_stream(bytes: &[u8]) -> DecodedInstructionStream {
     }
 }
 
-fn instruction_form(opcode: Opcode) -> InstructionForm {
+const fn instruction_form(opcode: Opcode) -> InstructionForm {
     match opcode {
         Opcode::Nop
         | Opcode::TypeOf
@@ -227,7 +227,7 @@ fn instruction_form(opcode: Opcode) -> InstructionForm {
     }
 }
 
-fn sign_extend_i24(bytes: [u8; 3]) -> i32 {
+const fn sign_extend_i24(bytes: [u8; 3]) -> i32 {
     let sign = if bytes[2] & 0x80 == 0 { 0 } else { 0xff };
     i32::from_le_bytes([bytes[0], bytes[1], bytes[2], sign])
 }

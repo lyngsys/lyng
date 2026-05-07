@@ -39,7 +39,7 @@ impl WeakHeapRef {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct WeakMapEntry {
+pub struct WeakMapEntry {
     key: WeakHeapRef,
     value: Value,
 }
@@ -62,7 +62,7 @@ impl WeakMapEntry {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct WeakMapState {
+pub struct WeakMapState {
     entries: HashMap<WeakHeapRef, Value>,
 }
 
@@ -99,7 +99,7 @@ impl WeakMapState {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct WeakSetState {
+pub struct WeakSetState {
     entries: Vec<WeakHeapRef>,
 }
 
@@ -134,7 +134,7 @@ impl WeakSetState {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct WeakRefState {
+pub struct WeakRefState {
     target: Option<WeakHeapRef>,
 }
 
@@ -202,7 +202,7 @@ mod tests {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct FinalizationCell {
+pub struct FinalizationCell {
     target: WeakHeapRef,
     holdings: Value,
     unregister_token: Option<WeakHeapRef>,
@@ -239,7 +239,7 @@ impl FinalizationCell {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct FinalizationRegistryState {
+pub struct FinalizationRegistryState {
     cells: Vec<FinalizationCell>,
     pending_holdings: Vec<Value>,
     cleanup_pending: bool,
@@ -319,7 +319,7 @@ impl FinalizationRegistryState {
     }
 
     #[inline]
-    pub(crate) fn set_cleanup_active(&mut self, active: bool) {
+    pub(crate) const fn set_cleanup_active(&mut self, active: bool) {
         self.cleanup_active = active;
     }
 }

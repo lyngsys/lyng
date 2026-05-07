@@ -3,7 +3,7 @@ use lyng_js_types::{AbruptCompletion, Value};
 use std::fmt::Write;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum LogicalType {
+pub enum LogicalType {
     Undefined,
     Null,
     Boolean,
@@ -15,7 +15,7 @@ pub(crate) enum LogicalType {
     Sentinel,
 }
 
-pub(crate) fn logical_type(value: Value) -> LogicalType {
+pub const fn logical_type(value: Value) -> LogicalType {
     if value.is_undefined() {
         LogicalType::Undefined
     } else if value.is_null() {
@@ -38,18 +38,18 @@ pub(crate) fn logical_type(value: Value) -> LogicalType {
 }
 
 #[inline]
-pub(crate) fn same_logical_type(left: Value, right: Value) -> bool {
+pub fn same_logical_type(left: Value, right: Value) -> bool {
     logical_type(left) == logical_type(right)
 }
 
 #[inline]
-pub(crate) fn phase2_type_error() -> AbruptCompletion {
+pub const fn phase2_type_error() -> AbruptCompletion {
     // Phase 2 keeps the stable Throw(Value) shape without realm-aware error allocation yet.
     AbruptCompletion::throw(Value::undefined())
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::float_cmp)]
-pub(crate) fn encode_number(number: f64) -> Value {
+pub fn encode_number(number: f64) -> Value {
     if !number.is_nan()
         && number.is_finite()
         && number == number.trunc()
@@ -135,7 +135,7 @@ pub fn number_to_string(number: f64) -> String {
     text
 }
 
-pub(crate) fn lossy_string_from_view(view: PrimitiveStringView<'_>) -> String {
+pub fn lossy_string_from_view(view: PrimitiveStringView<'_>) -> String {
     if let Some(bytes) = view.latin1_bytes() {
         let mut text = String::with_capacity(bytes.len());
         for byte in bytes {
@@ -154,7 +154,7 @@ pub(crate) fn lossy_string_from_view(view: PrimitiveStringView<'_>) -> String {
     String::from_utf16_lossy(&units)
 }
 
-pub(crate) fn string_to_number(text: &str) -> f64 {
+pub fn string_to_number(text: &str) -> f64 {
     let trimmed = text.trim_matches(is_ecmascript_trim_whitespace);
 
     if trimmed.is_empty() {
@@ -182,7 +182,7 @@ pub(crate) fn string_to_number(text: &str) -> f64 {
     trimmed.parse::<f64>().unwrap_or(f64::NAN)
 }
 
-pub(crate) fn parse_string_to_bigint(text: &str) -> Option<(BigIntSign, Vec<u64>)> {
+pub fn parse_string_to_bigint(text: &str) -> Option<(BigIntSign, Vec<u64>)> {
     let trimmed = text.trim_matches(is_ecmascript_trim_whitespace);
     if trimmed.is_empty() {
         return Some((BigIntSign::NonNegative, Vec::new()));
@@ -240,7 +240,7 @@ pub(crate) fn parse_string_to_bigint(text: &str) -> Option<(BigIntSign, Vec<u64>
     Some((sign, limbs))
 }
 
-pub(crate) fn bigint_view_equals_parts(
+pub fn bigint_view_equals_parts(
     view: PrimitiveBigIntView<'_>,
     sign: BigIntSign,
     limbs: &[u64],
@@ -262,19 +262,19 @@ pub(crate) fn bigint_view_equals_parts(
         .all(|(index, limb)| view.limb_at(index) == Some(*limb))
 }
 
-pub(crate) fn bigint_view_to_string(view: PrimitiveBigIntView<'_>) -> String {
+pub fn bigint_view_to_string(view: PrimitiveBigIntView<'_>) -> String {
     format_bigint_decimal_owned(view.sign(), view.to_limbs())
 }
 
-pub(crate) fn bigint_view_to_radix_string(view: PrimitiveBigIntView<'_>, radix: u32) -> String {
+pub fn bigint_view_to_radix_string(view: PrimitiveBigIntView<'_>, radix: u32) -> String {
     format_bigint_radix_owned(view.sign(), view.to_limbs(), radix)
 }
 
-pub(crate) fn bigint_parts_to_radix_string(sign: BigIntSign, limbs: &[u64], radix: u32) -> String {
+pub fn bigint_parts_to_radix_string(sign: BigIntSign, limbs: &[u64], radix: u32) -> String {
     format_bigint_radix_owned(sign, limbs.to_vec(), radix)
 }
 
-pub(crate) fn bigint_equals_integral_number(view: PrimitiveBigIntView<'_>, number: f64) -> bool {
+pub fn bigint_equals_integral_number(view: PrimitiveBigIntView<'_>, number: f64) -> bool {
     let Some((sign, limbs)) = integral_number_to_bigint(number) else {
         return false;
     };
@@ -343,7 +343,7 @@ fn format_bigint_radix_owned(sign: BigIntSign, mut magnitude: Vec<u64>, radix: u
 }
 
 #[allow(clippy::float_cmp)]
-pub(crate) fn integral_number_to_bigint(number: f64) -> Option<(BigIntSign, Vec<u64>)> {
+pub fn integral_number_to_bigint(number: f64) -> Option<(BigIntSign, Vec<u64>)> {
     if !number.is_finite() || number != number.trunc() {
         return None;
     }
@@ -531,7 +531,7 @@ fn is_non_ecmascript_infinity_literal(text: &str) -> bool {
             && text != "-Infinity")
 }
 
-fn is_ecmascript_trim_whitespace(ch: char) -> bool {
+const fn is_ecmascript_trim_whitespace(ch: char) -> bool {
     matches!(
         ch,
         '\u{0009}' | '\u{000B}' | '\u{000C}' | '\u{0020}' | '\u{00A0}' | '\u{1680}' | '\u{2000}'

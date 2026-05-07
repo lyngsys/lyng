@@ -161,11 +161,21 @@ fn regexp_legacy_static_state_records_matches_as_lazy_source_ranges() {
         })
     );
 
-    state.set_input(vec![b's' as u16, b'e' as u16, b'e' as u16, b'd' as u16]);
+    state.set_input(vec![
+        u16::from(b's'),
+        u16::from(b'e'),
+        u16::from(b'e'),
+        u16::from(b'd'),
+    ]);
 
     assert_eq!(
         state.input(),
-        &RegExpLegacyStaticText::Owned(vec![b's' as u16, b'e' as u16, b'e' as u16, b'd' as u16])
+        &RegExpLegacyStaticText::Owned(vec![
+            u16::from(b's'),
+            u16::from(b'e'),
+            u16::from(b'e'),
+            u16::from(b'd')
+        ])
     );
     assert_eq!(
         state.last_match(),

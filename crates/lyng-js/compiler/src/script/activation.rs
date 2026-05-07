@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    ArgumentsMode, AtomId, DeclarationKind, FunctionKind, FunctionSemaId, HashMap, HashSet,
+    LoweringResult, Pattern, ProgramSemaView, ProgramSource, ScopeId, SemanticBindingId,
+    WellKnownAtom,
+};
 
 #[derive(Clone, Debug)]
 pub(super) struct FunctionActivationPlan {
@@ -47,10 +51,10 @@ impl FunctionActivationPlan {
         binding: SemanticBindingId,
         sema_slot: Option<u32>,
     ) -> Option<u32> {
-        if self.arguments_mode == ArgumentsMode::Mapped {
-            if let Some(ordinal) = self.parameter_ordinals.get(&binding) {
-                return Some(u32::from(*ordinal));
-            }
+        if self.arguments_mode == ArgumentsMode::Mapped
+            && let Some(ordinal) = self.parameter_ordinals.get(&binding)
+        {
+            return Some(u32::from(*ordinal));
         }
         if self.rest_binding == Some(binding) {
             return self.rest_slot().map(u32::from);

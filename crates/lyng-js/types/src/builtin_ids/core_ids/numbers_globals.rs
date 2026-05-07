@@ -1,89 +1,56 @@
-use super::super::*;
+use super::super::{builtin_id, BuiltinFunctionId};
 
 #[inline]
-pub fn eval_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(EVAL_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn eval_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::EVAL_RAW)
 }
 
 #[inline]
-pub fn parse_int_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(PARSE_INT_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn parse_int_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::PARSE_INT_RAW)
 }
 
 #[inline]
-pub fn parse_float_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(PARSE_FLOAT_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn parse_float_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::PARSE_FLOAT_RAW)
 }
 
 #[inline]
-pub fn is_nan_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(IS_NAN_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn is_nan_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::IS_NAN_RAW)
 }
 
 #[inline]
-pub fn is_finite_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(IS_FINITE_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn is_finite_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::IS_FINITE_RAW)
 }
 
 #[inline]
-pub fn encode_uri_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(ENCODE_URI_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn encode_uri_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::ENCODE_URI_RAW)
 }
 
 #[inline]
-pub fn encode_uri_component_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(ENCODE_URI_COMPONENT_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn encode_uri_component_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::ENCODE_URI_COMPONENT_RAW)
 }
 
 #[inline]
-pub fn decode_uri_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(DECODE_URI_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn decode_uri_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::DECODE_URI_RAW)
 }
 
 #[inline]
-pub fn decode_uri_component_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(DECODE_URI_COMPONENT_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn decode_uri_component_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::DECODE_URI_COMPONENT_RAW)
 }
 
 #[inline]
-pub fn escape_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(ESCAPE_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn escape_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::ESCAPE_RAW)
 }
 
 #[inline]
-pub fn unescape_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(UNESCAPE_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn unescape_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::UNESCAPE_RAW)
 }

@@ -3,7 +3,7 @@ use lyng_js_common::WellKnownAtom;
 
 use super::{Analyzer, ContainmentQuery};
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     pub(super) fn walk_expr(&mut self, expr_id: lyng_js_ast::ExprId) {
         let expr = self.ast.get_expr(expr_id);
         match expr {

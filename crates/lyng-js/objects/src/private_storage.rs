@@ -35,7 +35,7 @@ impl ObjectRuntime {
         let slots = heap
             .view()
             .object(class_object)
-            .and_then(|record| record.private_slots())
+            .and_then(lyng_js_gc::RuntimeObjectRecord::private_slots)
             .ok_or(InternalMethodError::CorruptObjectState)?;
         if !heap.mut_store_value(ValueStoreTarget::ObjectSlot(slots, slot_index), key_value) {
             return Err(InternalMethodError::CorruptObjectState);
@@ -61,7 +61,7 @@ impl ObjectRuntime {
             .ok_or(InternalMethodError::MissingClassRecord)?;
         let slots = heap
             .object(class_object)
-            .and_then(|record| record.private_slots())
+            .and_then(lyng_js_gc::RuntimeObjectRecord::private_slots)
             .ok_or(InternalMethodError::CorruptObjectState)?;
         heap.object_slots(slots)
             .and_then(|slots| slots.get(slot_index as usize).copied())
@@ -120,7 +120,7 @@ impl ObjectRuntime {
         }
         let slots = heap
             .object(class_key)
-            .and_then(|record| record.private_slots())
+            .and_then(lyng_js_gc::RuntimeObjectRecord::private_slots)
             .ok_or(InternalMethodError::CorruptObjectState)?;
         heap.object_slots(slots)
             .and_then(|slots| slots.get(descriptor.slot_index() as usize).copied())
@@ -144,7 +144,7 @@ impl ObjectRuntime {
         let slots = heap
             .view()
             .object(class_key)
-            .and_then(|record| record.private_slots())
+            .and_then(lyng_js_gc::RuntimeObjectRecord::private_slots)
             .ok_or(InternalMethodError::CorruptObjectState)?;
         if !heap.mut_store_value(
             ValueStoreTarget::ObjectSlot(slots, descriptor.slot_index()),
@@ -453,7 +453,7 @@ impl ObjectRuntime {
         })
     }
 
-    fn private_brand_storage_slot(
+    const fn private_brand_storage_slot(
         &self,
         descriptor: super::object_metadata::ClassPrivateElementDescriptor,
         field_slot_count: u32,
@@ -700,7 +700,7 @@ impl ObjectRuntime {
             .ok_or(InternalMethodError::MissingObject)?;
         Ok(heap
             .object(object)
-            .and_then(|record| record.private_slots())
+            .and_then(lyng_js_gc::RuntimeObjectRecord::private_slots)
             .and_then(|slots| heap.object_slots(slots))
             .map_or(0usize, <[Value]>::len))
     }

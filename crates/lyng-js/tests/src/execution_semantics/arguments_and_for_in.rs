@@ -4,14 +4,14 @@ use lyng_js_types::Value;
 #[test]
 fn phase4_arguments_map_simple_sloppy_parameters() {
     let result = compile_and_run(
-        r#"
+        r"
         function alias(a, b) {
             a = 7;
             arguments[1] = 9;
             return arguments[0] + b;
         }
         alias(1, 2);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(16));
@@ -36,7 +36,7 @@ fn phase4_arguments_use_unmapped_objects_in_strict_functions() {
 #[test]
 fn phase4_duplicate_sloppy_parameters_resolve_to_last_binding() {
     let result = compile_and_run(
-        r#"
+        r"
         function duplicate(x, x) {
             return x;
         }
@@ -46,7 +46,7 @@ fn phase4_duplicate_sloppy_parameters_resolve_to_last_binding() {
         }
 
         duplicate(1, 2) + missing(1, 2);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(12));
@@ -55,13 +55,13 @@ fn phase4_duplicate_sloppy_parameters_resolve_to_last_binding() {
 #[test]
 fn phase4_function_declaration_replaces_parameter_binding() {
     let result = compile_and_run_string(
-        r#"
+        r"
         function hoisted(x) {
             return typeof x;
             function x() { return 7; }
         }
         hoisted();
-        "#,
+        ",
     );
 
     assert_eq!(result, "function");
@@ -70,13 +70,13 @@ fn phase4_function_declaration_replaces_parameter_binding() {
 #[test]
 fn phase4_var_declaration_reuses_parameter_binding() {
     let result = compile_and_run(
-        r#"
+        r"
         function keepParameter(x) {
             var x;
             return x;
         }
         keepParameter(1);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -208,7 +208,7 @@ fn phase6_parameter_default_closure_sees_arguments_before_body_var_shadowing() {
 #[test]
 fn phase4_nested_function_arguments_shadow_outer_var_arguments() {
     let result = compile_and_run(
-        r#"
+        r"
         function outer() {
             var arguments = undefined;
             return (function() {
@@ -216,7 +216,7 @@ fn phase4_nested_function_arguments_shadow_outer_var_arguments() {
             }());
         }
         outer();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(0));
@@ -225,13 +225,13 @@ fn phase4_nested_function_arguments_shadow_outer_var_arguments() {
 #[test]
 fn phase4_rest_parameters_materialize_fresh_arrays() {
     let result = compile_and_run(
-        r#"
+        r"
         function collect(head, ...rest) {
             rest[1] = rest[1] + 1;
             return rest[0] + rest[1] + rest.length;
         }
         collect(1, 2, 3);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(8));
@@ -240,14 +240,14 @@ fn phase4_rest_parameters_materialize_fresh_arrays() {
 #[test]
 fn phase4_for_in_enumerates_ordinary_object_keys() {
     let result = compile_and_run(
-        r#"
+        r"
         let obj = { alpha: 1, beta: 2, gamma: 3 };
         let total = 0;
         for (var key in obj) {
             total = total + obj[key];
         }
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(6));
@@ -270,14 +270,14 @@ fn phase4_for_in_accepts_named_function_expression_sources() {
 #[test]
 fn phase4_for_of_closures_observe_in_iteration_reassignments() {
     let result = compile_and_run(
-        r#"
+        r"
         let closures = [];
         for (let value of [1, 2]) {
             closures.push(function() { return value; });
             value = value + 10;
         }
         closures[0]() + closures[1]();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(23));
@@ -286,13 +286,13 @@ fn phase4_for_of_closures_observe_in_iteration_reassignments() {
 #[test]
 fn phase4_normal_for_let_closures_capture_fresh_iteration_bindings() {
     let result = compile_and_run(
-        r#"
+        r"
         let closures = [];
         for (let value = 0; value < 3; ++value) {
             closures.push(function() { return value; });
         }
         closures[0]() * 100 + closures[1]() * 10 + closures[2]();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(12));
@@ -301,7 +301,7 @@ fn phase4_normal_for_let_closures_capture_fresh_iteration_bindings() {
 #[test]
 fn phase4_normal_for_let_condition_and_update_closures_use_iteration_bindings() {
     let result = compile_and_run(
-        r#"
+        r"
         let conditionClosures = [];
         for (let value = 0; conditionClosures.push(function() { return value; }), value < 3; ++value) {
         }
@@ -314,7 +314,7 @@ fn phase4_normal_for_let_condition_and_update_closures_use_iteration_bindings() 
             + conditionClosures[1]() * 100
             + updateClosures[0]() * 10
             + updateClosures[1]();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(112));
@@ -323,13 +323,13 @@ fn phase4_normal_for_let_condition_and_update_closures_use_iteration_bindings() 
 #[test]
 fn phase4_normal_for_let_initializer_closure_keeps_initial_binding() {
     let result = compile_and_run(
-        r#"
+        r"
         let closures = [];
         for (let value = 0, closure = function() { return value; }; value < 3; ++value) {
             closures.push(closure);
         }
         closures[0]() * 100 + closures[1]() * 10 + closures[2]();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(0));
@@ -338,14 +338,14 @@ fn phase4_normal_for_let_initializer_closure_keeps_initial_binding() {
 #[test]
 fn phase4_for_of_closures_ignore_unrelated_var_declarations() {
     let result = compile_and_run(
-        r#"
+        r"
         let closures = [];
         for (let value of [1, 2]) {
             var scratch = value;
             closures.push(function() { return value; });
         }
         closures[0]() + closures[1]() + scratch;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(5));
@@ -397,7 +397,7 @@ fn phase4_for_in_closures_preserve_const_loop_binding_immutability() {
 #[test]
 fn phase4_for_of_closures_keep_shared_outer_bindings_live() {
     let result = compile_and_run(
-        r#"
+        r"
         let shared = 100;
         let closures = [];
         for (let value of [1, 2]) {
@@ -408,7 +408,7 @@ fn phase4_for_of_closures_keep_shared_outer_bindings_live() {
         }
         shared = 10;
         closures[0]() * 1000 + closures[1]();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(12014));
@@ -417,7 +417,7 @@ fn phase4_for_of_closures_keep_shared_outer_bindings_live() {
 #[test]
 fn phase4_for_of_closures_snapshot_body_bindings_without_loop_binding_captures() {
     let result = compile_and_run(
-        r#"
+        r"
         let closures = [];
         for (let value of [1, 2]) {
             let local = value * 10;
@@ -425,7 +425,7 @@ fn phase4_for_of_closures_snapshot_body_bindings_without_loop_binding_captures()
             local = local + 1;
         }
         closures[0]() * 100 + closures[1]();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1121));
@@ -434,7 +434,7 @@ fn phase4_for_of_closures_snapshot_body_bindings_without_loop_binding_captures()
 #[test]
 fn phase4_nested_for_of_closure_captures_preserve_undefined_iteration_values() {
     let result = compile_and_run(
-        r#"
+        r"
         let result = 0;
         for (const outer of [undefined]) {
             for (const inner of [undefined]) {
@@ -447,7 +447,7 @@ fn phase4_nested_for_of_closure_captures_preserve_undefined_iteration_values() {
             }
         }
         result;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -456,7 +456,7 @@ fn phase4_nested_for_of_closure_captures_preserve_undefined_iteration_values() {
 #[test]
 fn phase4_for_of_over_mapped_arguments_observes_alias_updates() {
     let result = compile_and_run(
-        r#"
+        r"
         let expected = [1, 3, 1];
         let index = 0;
         let ok = 1;
@@ -474,7 +474,7 @@ fn phase4_for_of_over_mapped_arguments_observes_alias_updates() {
         }(1, 2, 3));
 
         ok * 10 + index;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(13));

@@ -204,7 +204,7 @@ pub struct LoopIterationEnvironmentSite {
 
 impl LoopIterationEnvironmentSite {
     #[inline]
-    pub fn new(
+    pub const fn new(
         instruction_offset: u32,
         iteration_slots: Vec<u16>,
         shared_slots: Vec<u16>,
@@ -249,7 +249,7 @@ pub struct DirectEvalLexicalScope {
 
 impl DirectEvalLexicalScope {
     #[inline]
-    pub fn new(source_base: u32, bindings: Vec<BytecodeEnvironmentBinding>) -> Self {
+    pub const fn new(source_base: u32, bindings: Vec<BytecodeEnvironmentBinding>) -> Self {
         Self {
             source_base,
             bindings,
@@ -363,7 +363,7 @@ pub struct DirectEvalLexicalSite {
 
 impl DirectEvalLexicalSite {
     #[inline]
-    pub fn new(
+    pub const fn new(
         instruction_offset: u32,
         scopes: Vec<DirectEvalLexicalScope>,
         flags: DirectEvalSiteFlags,
@@ -1066,7 +1066,7 @@ pub struct DeoptSnapshot {
 
 impl DeoptSnapshot {
     #[inline]
-    pub fn new(safepoint_id: u32, values: Vec<DeoptValueSource>) -> Self {
+    pub const fn new(safepoint_id: u32, values: Vec<DeoptValueSource>) -> Self {
         Self {
             safepoint_id,
             values,

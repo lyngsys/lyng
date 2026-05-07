@@ -10,7 +10,7 @@ use super::{Analyzer, LexicalDeclaredName, LexicalDeclaredNameKind};
 use crate::binding::DeclarationKind;
 use crate::scope::ScopeKind;
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     fn hoist_function_binding(
         &mut self,
         name: AtomId,

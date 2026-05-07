@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    AtomId, CodeRef, CodeSlotsRef, EnvironmentRef, EnvironmentSlotsRef, FunctionPayloadRef,
+    ObjectRef, ObjectSlotsRef, PrimitiveHeap, PrimitiveValueCellRef, RealmRef, ShapeId, StringRef,
+    SuspendedRegistersRef, SymbolRef, Value,
+};
 
 impl PrimitiveHeap {
     pub(crate) fn cache_string_hash(&mut self, id: StringRef) -> Option<u32> {

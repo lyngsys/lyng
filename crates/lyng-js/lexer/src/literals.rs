@@ -16,7 +16,7 @@ pub enum StringLiteral {
 
 impl StringLiteral {
     #[inline]
-    pub fn from_utf8(value: String) -> Self {
+    pub const fn from_utf8(value: String) -> Self {
         Self::Utf8(value)
     }
 
@@ -60,21 +60,21 @@ impl StringLiteral {
 }
 
 /// Raw digit string for a BigInt literal (without the trailing `n`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BigIntLiteral {
     /// The raw digits, e.g. `"123"` for `123n`, `"0xff"` for `0xffn`.
     pub raw: String,
 }
 
 /// A regular expression literal's components.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RegExpLiteral {
     pub pattern: String,
     pub flags: String,
 }
 
 /// A template literal chunk (head, middle, tail, or no-substitution).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TemplateChunk {
     /// The cooked value (with escape sequences processed), or `None` if
     /// the chunk contains an invalid escape (tagged template).

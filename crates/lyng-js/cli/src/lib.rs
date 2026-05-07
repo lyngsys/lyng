@@ -51,7 +51,11 @@ pub struct CliInvocation {
 
 impl CliInvocation {
     #[inline]
-    pub fn new(script_path: PathBuf, bootstrap_mode: BootstrapMode, shell_mode: bool) -> Self {
+    pub const fn new(
+        script_path: PathBuf,
+        bootstrap_mode: BootstrapMode,
+        shell_mode: bool,
+    ) -> Self {
         Self {
             script_path,
             bootstrap_mode,
@@ -350,11 +354,7 @@ mod tests {
         let mut stderr = Vec::new();
 
         let exit_code = run_with_io(
-            CliCommand::Run(CliInvocation::new(
-                entry.clone(),
-                BootstrapMode::SpecOnly,
-                false,
-            )),
+            CliCommand::Run(CliInvocation::new(entry, BootstrapMode::SpecOnly, false)),
             &mut stdout,
             &mut stderr,
         )

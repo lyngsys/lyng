@@ -1,4 +1,11 @@
-use super::*;
+use super::{
+    errors, AbruptCompletion, Agent, AllocationLifetime, BuiltinFunctionId, DynamicFunctionKind,
+    GeneratorResumeKind, ObjectRef, PropertyDescriptor, PropertyKey, PublicBuiltinDispatchContext,
+    RealmRef, TemporalCivilTime, TemporalCivilToInstantRequest, TemporalCurrentInstantRequest,
+    TemporalDefaultTimeZone, TemporalDefaultTimeZoneRequest, TemporalInstant,
+    TemporalInstantToCivilRequest, TemporalInstantWithOffset, Value, Vm, VmBuiltinDispatch,
+    VmError,
+};
 
 const MAX_REUSABLE_STRING_CODE_UNITS: usize = 1 << 20;
 
@@ -640,7 +647,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .agent
             .objects()
             .function_data(function)
-            .and_then(|data| data.entry())
+            .and_then(lyng_js_objects::FunctionObjectData::entry)
         else {
             return self.vm.native_function_source_text(self.agent, function);
         };

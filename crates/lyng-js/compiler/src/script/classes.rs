@@ -1,5 +1,18 @@
 use super::state::ClassInstanceElementPlan;
-use super::*;
+use super::{
+    internal_bind_function_private_env_builtin, internal_define_class_getter_property_builtin,
+    internal_define_class_setter_property_builtin, internal_define_method_property_builtin,
+    internal_define_private_field_builtin, internal_get_instance_field_key_builtin,
+    internal_install_instance_field_key_builtin, internal_private_field_get_builtin,
+    internal_private_field_init_builtin, internal_private_field_set_builtin,
+    internal_private_has_builtin, internal_set_function_home_object_builtin,
+    object_set_prototype_of_builtin, ActiveClassContext, AtomId, BuiltinFunctionId,
+    BytecodeBuilder, BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags, BytecodeFunction,
+    BytecodeFunctionFlags, BytecodeFunctionId, BytecodeFunctionKind, CallRange, ConstantValue,
+    DeclId, DeclarationKind, Expr, ExprId, FunctionCompiler, FunctionId, HashMap, HashSet,
+    LoweringError, LoweringResult, NodeList, Opcode, SafepointKind, ScopeId, ScopeKind,
+    SemanticBindingId, Span, StmtId, StorageClass, ThisMode, WellKnownAtom,
+};
 use lyng_js_types::{
     internal_construct_super_array_like_builtin, internal_require_constructor_builtin,
 };
@@ -158,7 +171,7 @@ impl PrivateElementDescriptorLookup {
     }
 }
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_class_expression(
         &mut self,
         expr_id: ExprId,
@@ -227,8 +240,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .map(|expr| self.lower_class_strict_expr_to_temp(expr))
             .transpose()?;
         let super_is_literal_null = super_class
-            .map(|expr| matches!(self.ast().get_expr(expr), Expr::NullLiteral { .. }))
-            .unwrap_or(false);
+            .is_some_and(|expr| matches!(self.ast().get_expr(expr), Expr::NullLiteral { .. }));
         let super_span = super_class.map(|expr| self.ast().get_expr(expr).span());
         let has_derived_heritage = super_class.is_some();
         let mut next_computed_instance_field_key = 0u32;
@@ -461,10 +473,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                     let child_index = self.ensure_child_index(value)?;
                     self.emit_create_closure(method, child_index, span)?;
                     self.skip_class_body_function_scope(body);
-                    if kind == lyng_js_ast::MethodKind::Method {
-                        if let Some(name_register) = name_register {
-                            self.emit_set_function_name(method, name_register)?;
-                        }
+                    if kind == lyng_js_ast::MethodKind::Method
+                        && let Some(name_register) = name_register
+                    {
+                        self.emit_set_function_name(method, name_register)?;
                     }
                     let home_object = if r#static { dest } else { prototype };
                     self.bind_function_home_object(method, home_object, span)?;
@@ -647,10 +659,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 | lyng_js_ast::ClassElement::InvalidElement { .. } => {}
             }
         }
-        if let (Some(name), Some(binding_id)) = (name, class_self_binding) {
-            if class_self_binding_needs_initialization {
-                self.store_binding_value(binding_id, name, dest)?;
-            }
+        if let (Some(name), Some(binding_id)) = (name, class_self_binding)
+            && class_self_binding_needs_initialization
+        {
+            self.store_binding_value(binding_id, name, dest)?;
         }
         for element in pending_static_elements {
             self.lower_pending_static_class_element(
@@ -786,12 +798,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         key: ExprId,
         computed: bool,
     ) -> LoweringResult<(u16, Option<u16>)> {
-        if !computed {
-            if let Some(atom) = self.named_property_atom(key)? {
-                let key_value = self.alloc_temp()?;
-                self.emit_load_atom_string(key_value, atom)?;
-                return Ok((key_value, Some(key_value)));
-            }
+        if !computed && let Some(atom) = self.named_property_atom(key)? {
+            let key_value = self.alloc_temp()?;
+            self.emit_load_atom_string(key_value, atom)?;
+            return Ok((key_value, Some(key_value)));
         }
         let key_value = self.lower_class_strict_expr_to_temp(key)?;
         Ok((key_value, None))
@@ -837,10 +847,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         key: ExprId,
         computed: bool,
     ) -> LoweringResult<StaticPublicFieldKey> {
-        if !computed {
-            if let Some(atom) = self.named_property_atom(key)? {
-                return Ok(StaticPublicFieldKey::Atom(atom));
-            }
+        if !computed && let Some(atom) = self.named_property_atom(key)? {
+            return Ok(StaticPublicFieldKey::Atom(atom));
         }
         let inferred_name = if computed {
             None
@@ -1765,7 +1773,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         )
     }
 
-    fn private_element_kind_tag(kind: lyng_js_sema::ClassPrivateElementKind) -> i16 {
+    const fn private_element_kind_tag(kind: lyng_js_sema::ClassPrivateElementKind) -> i16 {
         match kind {
             lyng_js_sema::ClassPrivateElementKind::Field => 0,
             lyng_js_sema::ClassPrivateElementKind::Method => 1,

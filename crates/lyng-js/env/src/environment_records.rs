@@ -239,12 +239,12 @@ impl GlobalEnvironmentRecord {
     }
 
     #[inline]
-    pub fn var_names(&self) -> &HashSet<AtomId> {
+    pub const fn var_names(&self) -> &HashSet<AtomId> {
         &self.var_names
     }
 
     #[inline]
-    pub fn lexical_names(&self) -> &HashSet<AtomId> {
+    pub const fn lexical_names(&self) -> &HashSet<AtomId> {
         &self.lexical_names
     }
 
@@ -353,7 +353,7 @@ impl EnvironmentRecord {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum EnvironmentMetadata {
+pub enum EnvironmentMetadata {
     Declarative {
         layout: EnvironmentLayoutId,
     },

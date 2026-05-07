@@ -109,7 +109,7 @@ impl RegExpObjectFlags {
     }
 
     #[inline]
-    pub fn compile_flags(self) -> regress::Flags {
+    pub const fn compile_flags(self) -> regress::Flags {
         regress::Flags {
             icase: self.ignore_case(),
             multiline: self.multiline(),
@@ -187,7 +187,7 @@ pub struct RegExpNamedCapture {
 
 impl RegExpNamedCapture {
     #[inline]
-    pub fn new(name: Box<str>, range: Option<Range<usize>>) -> Self {
+    pub const fn new(name: Box<str>, range: Option<Range<usize>>) -> Self {
         Self { name, range }
     }
 
@@ -211,7 +211,7 @@ pub struct RegExpMatchRecord {
 
 impl RegExpMatchRecord {
     #[inline]
-    pub fn new(
+    pub const fn new(
         range: Range<usize>,
         captures: Box<[Option<Range<usize>>]>,
         named_captures: Box<[RegExpNamedCapture]>,
@@ -229,12 +229,12 @@ impl RegExpMatchRecord {
     }
 
     #[inline]
-    pub fn start(&self) -> usize {
+    pub const fn start(&self) -> usize {
         self.range.start
     }
 
     #[inline]
-    pub fn end(&self) -> usize {
+    pub const fn end(&self) -> usize {
         self.range.end
     }
 
@@ -337,7 +337,7 @@ enum IgnoreCaseLiteralClass {
 }
 
 impl IgnoreCaseLiteralClass {
-    fn matches(self, unit: u16) -> bool {
+    const fn matches(self, unit: u16) -> bool {
         match self {
             Self::MicroSign => matches!(unit, 0x00B5 | 0x039C | 0x03BC),
             Self::YDiaeresis => matches!(unit, 0x00FF | 0x0178),
@@ -455,13 +455,12 @@ fn normalize_legacy_identity_escapes(pattern: &str) -> String {
                 continue;
             }
         }
-        if !in_class {
-            if let Some(next) =
+        if !in_class
+            && let Some(next) =
                 normalize_legacy_quantifiable_assertion(&chars, index, &mut normalized)
-            {
-                index = next;
-                continue;
-            }
+        {
+            index = next;
+            continue;
         }
         if ch == '[' && !in_class {
             in_class = true;
@@ -568,7 +567,7 @@ fn normalize_legacy_quantifiable_assertion(
 ) -> Option<usize> {
     if chars.get(start) != Some(&'(')
         || chars.get(start + 1) != Some(&'?')
-        || !matches!(chars.get(start + 2), Some('=') | Some('!'))
+        || !matches!(chars.get(start + 2), Some('=' | '!'))
     {
         return None;
     }
@@ -655,11 +654,11 @@ fn valid_legacy_braced_quantifier_end(chars: &[char], start: usize) -> Option<us
     let valid = if let Some(comma) = inner.iter().position(|&ch| ch == ',') {
         let lhs = &inner[..comma];
         let rhs = &inner[comma + 1..];
-        if lhs.is_empty() || !lhs.iter().all(|ch| ch.is_ascii_digit()) {
+        if lhs.is_empty() || !lhs.iter().all(char::is_ascii_digit) {
             false
         } else if rhs.is_empty() {
             true
-        } else if !rhs.iter().all(|ch| ch.is_ascii_digit()) {
+        } else if !rhs.iter().all(char::is_ascii_digit) {
             false
         } else {
             let lhs = digits_to_u32(lhs);
@@ -667,7 +666,7 @@ fn valid_legacy_braced_quantifier_end(chars: &[char], start: usize) -> Option<us
             lhs <= rhs
         }
     } else {
-        inner.iter().all(|ch| ch.is_ascii_digit())
+        inner.iter().all(char::is_ascii_digit)
     };
 
     valid.then_some(end + 1)
@@ -680,14 +679,14 @@ fn digits_to_u32(chars: &[char]) -> u32 {
     })
 }
 
-fn is_legacy_backend_escape(ch: char) -> bool {
+const fn is_legacy_backend_escape(ch: char) -> bool {
     matches!(
         ch,
         'b' | 'B' | 'd' | 'D' | 's' | 'S' | 'w' | 'W' | 'f' | 'n' | 'r' | 't' | 'v'
     )
 }
 
-fn is_escaped_syntax_character(ch: char, in_class: bool) -> bool {
+const fn is_escaped_syntax_character(ch: char, in_class: bool) -> bool {
     if in_class {
         matches!(ch, '\\' | ']' | '-' | '^')
     } else {
@@ -793,7 +792,7 @@ fn named_capture_span_end(chars: &[char], start: usize) -> Option<usize> {
     if chars.get(start) != Some(&'(')
         || chars.get(start + 1) != Some(&'?')
         || chars.get(start + 2) != Some(&'<')
-        || matches!(chars.get(start + 3), Some('=') | Some('!'))
+        || matches!(chars.get(start + 3), Some('=' | '!'))
     {
         return None;
     }
@@ -880,7 +879,7 @@ impl RegExpPayload {
     }
 
     #[inline]
-    pub fn supports_literal_global_replace_fast_path(&self) -> bool {
+    pub const fn supports_literal_global_replace_fast_path(&self) -> bool {
         matches!(self.fast_pattern, Some(RegExpFastPattern::NonWhitespaceRun))
     }
 
@@ -1372,7 +1371,7 @@ impl RegExpPayload {
         text: &[u16],
         start: usize,
     ) -> Option<RegExpMatchRecord> {
-        if start != 0 || text.len() < 2 || text.len() % 2 != 0 {
+        if start != 0 || text.len() < 2 || !text.len().is_multiple_of(2) {
             return None;
         }
         let capture_end = text.len() / 2;
@@ -1657,15 +1656,16 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
     if flags.unicode() && (pattern == r"[\uD83D\u3042]*" || pattern == r"[\uD83D\u{3042}]*") {
         return Some(RegExpFastPattern::UnicodeLeadHiraganaClassStar);
     }
-    if flags.unicode_aware() && !flags.ignore_case() {
-        if let Some(pattern) = detect_fast_unicode_property_pattern(pattern, flags) {
-            return Some(pattern);
-        }
+    if flags.unicode_aware()
+        && !flags.ignore_case()
+        && let Some(pattern) = detect_fast_unicode_property_pattern(pattern, flags)
+    {
+        return Some(pattern);
     }
-    if flags.ignore_case() {
-        if let Some(pattern) = detect_fast_ignore_case_captured_literal_pattern(pattern, flags) {
-            return Some(pattern);
-        }
+    if flags.ignore_case()
+        && let Some(pattern) = detect_fast_ignore_case_captured_literal_pattern(pattern, flags)
+    {
+        return Some(pattern);
     }
     if flags.unicode_aware() && flags.ignore_case() {
         match pattern {
@@ -1721,15 +1721,17 @@ fn captured_literal_code_unit(pattern: &str) -> Option<(u16, bool)> {
 }
 
 fn decode_literal_code_unit(literal: &str) -> Option<u16> {
-    if let Some(hex) = literal.strip_prefix(r"\x") {
-        if hex.len() == 2 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return u16::from_str_radix(hex, 16).ok();
-        }
+    if let Some(hex) = literal.strip_prefix(r"\x")
+        && hex.len() == 2
+        && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return u16::from_str_radix(hex, 16).ok();
     }
-    if let Some(hex) = literal.strip_prefix(r"\u") {
-        if hex.len() == 4 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return u16::from_str_radix(hex, 16).ok();
-        }
+    if let Some(hex) = literal.strip_prefix(r"\u")
+        && hex.len() == 4
+        && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return u16::from_str_radix(hex, 16).ok();
     }
 
     let mut chars = literal.chars();
@@ -1742,7 +1744,7 @@ fn decode_literal_code_unit(literal: &str) -> Option<u16> {
     (encoded.len() == 1).then_some(encoded[0])
 }
 
-fn unicode_ignore_case_literal_class(unit: u16) -> Option<IgnoreCaseLiteralClass> {
+const fn unicode_ignore_case_literal_class(unit: u16) -> Option<IgnoreCaseLiteralClass> {
     match unit {
         0x00B5 | 0x039C | 0x03BC => Some(IgnoreCaseLiteralClass::MicroSign),
         0x00FF | 0x0178 => Some(IgnoreCaseLiteralClass::YDiaeresis),
@@ -1754,7 +1756,7 @@ fn unicode_ignore_case_literal_class(unit: u16) -> Option<IgnoreCaseLiteralClass
     }
 }
 
-fn legacy_ignore_case_literal_class(unit: u16) -> Option<IgnoreCaseLiteralClass> {
+const fn legacy_ignore_case_literal_class(unit: u16) -> Option<IgnoreCaseLiteralClass> {
     match unit {
         0x00B5 | 0x039C | 0x03BC => Some(IgnoreCaseLiteralClass::MicroSign),
         0x00FF | 0x0178 => Some(IgnoreCaseLiteralClass::YDiaeresis),
@@ -1791,7 +1793,7 @@ fn detect_fast_unicode_property_pattern(
 }
 
 #[inline]
-fn is_ascii_code_unit(unit: u16) -> bool {
+const fn is_ascii_code_unit(unit: u16) -> bool {
     unit <= 0x007F
 }
 
@@ -1814,7 +1816,7 @@ fn is_ascii_word_code_unit(unit: u16) -> bool {
 }
 
 #[inline]
-fn is_bidi_control_code_unit(unit: u16) -> bool {
+const fn is_bidi_control_code_unit(unit: u16) -> bool {
     matches!(unit, 0x061C | 0x200E..=0x200F | 0x202A..=0x202E | 0x2066..=0x2069)
 }
 
@@ -2044,7 +2046,7 @@ fn is_trail_surrogate(unit: u16) -> bool {
 }
 
 #[inline]
-fn is_line_terminator_code_unit(unit: u16) -> bool {
+const fn is_line_terminator_code_unit(unit: u16) -> bool {
     matches!(unit, 0x000A | 0x000D | 0x2028 | 0x2029)
 }
 

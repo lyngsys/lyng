@@ -5,7 +5,7 @@ use super::Analyzer;
 use crate::binding::DeclarationKind;
 use crate::ids::SemanticBindingId;
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     pub(crate) fn hoist_var_pattern(&mut self, pat_id: lyng_js_ast::PatternId, span: Span) {
         let pat = self.ast.get_pattern(pat_id);
         match pat {

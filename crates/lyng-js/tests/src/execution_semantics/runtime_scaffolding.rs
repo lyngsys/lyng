@@ -199,10 +199,10 @@ fn phase4_public_compile_and_evaluate_script_entrypoints_execute_end_to_end() {
     let parsed = parse_script(
         &mut atoms,
         SourceId::new(23),
-        r#"
+        r"
         let base = 40;
         base + 2;
-        "#,
+        ",
     );
     assert!(
         !parsed.diagnostics.has_errors(),
@@ -263,7 +263,7 @@ fn phase4_public_vm_metadata_accessors_resolve_installed_template_records() {
     let parsed = parse_script(
         &mut atoms,
         SourceId::new(31),
-        r#"
+        r"
         let make = function(value) { return value; };
         let count = 0;
         while (count < 1) {
@@ -274,7 +274,7 @@ fn phase4_public_vm_metadata_accessors_resolve_installed_template_records() {
         } catch (err) {
             err;
         }
-        "#,
+        ",
     );
     assert!(
         !parsed.diagnostics.has_errors(),
@@ -329,7 +329,7 @@ fn phase4_public_vm_feedback_footprint_reports_allocated_vector_bytes() {
     let parsed = parse_script(
         &mut atoms,
         SourceId::new(37),
-        r#"
+        r"
         var total = 0;
         var i = 0;
         while (i < 4) {
@@ -337,7 +337,7 @@ fn phase4_public_vm_feedback_footprint_reports_allocated_vector_bytes() {
             i = i + 1;
         }
         total;
-        "#,
+        ",
     );
     assert!(
         !parsed.diagnostics.has_errors(),

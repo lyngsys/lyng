@@ -48,9 +48,7 @@ fn typed_array_storage_bits_to_value(
         TypedArrayElementKind::Float64 => Value::from_f64(f64::from_bits(bits)),
         TypedArrayElementKind::Uint32 => {
             let value = bits as u32;
-            i32::try_from(value)
-                .map(Value::from_smi)
-                .unwrap_or_else(|_| Value::from_f64(f64::from(value)))
+            i32::try_from(value).map_or_else(|_| Value::from_f64(f64::from(value)), Value::from_smi)
         }
         TypedArrayElementKind::Uint16 => Value::from_smi(i32::from(bits as u16)),
         TypedArrayElementKind::Uint8Clamped | TypedArrayElementKind::Uint8 => {
@@ -201,11 +199,7 @@ pub(super) fn typed_array_numeric_key(
     )
 }
 
-pub(crate) fn is_typed_array_numeric_key(
-    agent: &Agent,
-    object: ObjectRef,
-    key: PropertyKey,
-) -> bool {
+pub fn is_typed_array_numeric_key(agent: &Agent, object: ObjectRef, key: PropertyKey) -> bool {
     typed_array_numeric_key(agent, object, key).is_some()
 }
 

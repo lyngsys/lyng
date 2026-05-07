@@ -1,4 +1,4 @@
-use super::*;
+use super::{code_index, Agent, FrameRecord, InstalledFunction, Value, Vm, VmResult};
 use lyng_js_bytecode::{ExceptionHandler, ExceptionHandlerKind, Instruction, Opcode};
 
 impl Vm {

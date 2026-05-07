@@ -1,81 +1,51 @@
-use super::super::*;
+use super::super::{builtin_id, BuiltinFunctionId};
 
 #[inline]
-pub fn int8_array_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(INT8_ARRAY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn int8_array_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::INT8_ARRAY_RAW)
 }
 
 #[inline]
-pub fn int16_array_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(INT16_ARRAY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn int16_array_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::INT16_ARRAY_RAW)
 }
 
 #[inline]
-pub fn int32_array_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(INT32_ARRAY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn int32_array_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::INT32_ARRAY_RAW)
 }
 
 #[inline]
-pub fn uint32_array_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(UINT32_ARRAY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn uint32_array_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::UINT32_ARRAY_RAW)
 }
 
 #[inline]
-pub fn float32_array_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(FLOAT32_ARRAY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn float32_array_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::FLOAT32_ARRAY_RAW)
 }
 
 #[inline]
-pub fn float16_array_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(FLOAT16_ARRAY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn float16_array_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::FLOAT16_ARRAY_RAW)
 }
 
 #[inline]
-pub fn float64_array_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(FLOAT64_ARRAY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn float64_array_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::FLOAT64_ARRAY_RAW)
 }
 
 #[inline]
-pub fn uint8_clamped_array_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(UINT8_CLAMPED_ARRAY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn uint8_clamped_array_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::UINT8_CLAMPED_ARRAY_RAW)
 }
 
 #[inline]
-pub fn big_uint64_array_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(BIG_UINT64_ARRAY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn big_uint64_array_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::BIG_UINT64_ARRAY_RAW)
 }
 
 #[inline]
-pub fn big_int64_array_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(BIG_INT64_ARRAY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn big_int64_array_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::BIG_INT64_ARRAY_RAW)
 }

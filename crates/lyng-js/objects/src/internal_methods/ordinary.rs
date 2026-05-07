@@ -29,10 +29,10 @@ impl ObjectRuntime {
         if !self.ordinary_is_extensible(id)? {
             return Ok(false);
         }
-        if let Some(prototype) = prototype {
-            if self.prototype_chain_contains(heap.view(), prototype, id)? {
-                return Ok(false);
-            }
+        if let Some(prototype) = prototype
+            && self.prototype_chain_contains(heap.view(), prototype, id)?
+        {
+            return Ok(false);
         }
         if self.set_prototype(heap, id, prototype) {
             Ok(true)

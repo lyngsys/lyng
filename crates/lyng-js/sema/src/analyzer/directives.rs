@@ -3,7 +3,7 @@ use lyng_js_common::Span;
 
 use super::{Analyzer, ContainmentQuery};
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     pub(super) fn check_global_code_contains(
         &mut self,
         body: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,

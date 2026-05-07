@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct CliHostSnapshot {
+pub struct CliHostSnapshot {
     diagnostics: Vec<DiagnosticReportRequest>,
     uncaught_exceptions: Vec<UncaughtExceptionReport>,
 }
@@ -26,7 +26,7 @@ impl CliHostSnapshot {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct CliHost {
+pub struct CliHost {
     state: Arc<Mutex<CliHostState>>,
 }
 

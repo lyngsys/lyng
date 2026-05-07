@@ -57,7 +57,7 @@ bitflags! {
 }
 
 /// A single token produced by the lexer.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
@@ -350,7 +350,7 @@ impl TokenKind {
 /// Map from `WellKnownAtom` keyword discriminant (1..=38) to `TokenKind`.
 ///
 /// Index 0 is unused (Empty atom). Indices 1..=38 correspond to keywords.
-pub(crate) const KEYWORD_TOKEN_KIND: [TokenKind; 39] = [
+pub const KEYWORD_TOKEN_KIND: [TokenKind; 39] = [
     TokenKind::Eof, // 0: placeholder for Empty
     TokenKind::Await,
     TokenKind::Break,

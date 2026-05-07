@@ -12,7 +12,7 @@ const SLOW_FILE_TIMING_LIMIT: usize = 25;
 const SLOW_VARIANT_TIMING_LIMIT: usize = 50;
 
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct CategoryStats {
+pub struct CategoryStats {
     pub(crate) pass: u32,
     pub(crate) fail: u32,
     pub(crate) skip: u32,
@@ -20,15 +20,15 @@ pub(crate) struct CategoryStats {
 }
 
 impl CategoryStats {
-    pub(crate) fn attempted(&self) -> u32 {
+    pub(crate) const fn attempted(&self) -> u32 {
         self.pass + self.fail + self.panic
     }
 
-    pub(crate) fn selected(&self) -> u32 {
+    pub(crate) const fn selected(&self) -> u32 {
         self.attempted() + self.skip
     }
 
-    pub(crate) fn reported_failures(&self) -> u32 {
+    pub(crate) const fn reported_failures(&self) -> u32 {
         self.fail
     }
 
@@ -42,7 +42,7 @@ impl CategoryStats {
     }
 }
 
-pub(crate) struct SuiteReport<'a> {
+pub struct SuiteReport<'a> {
     pub(crate) report_path: &'a str,
     pub(crate) manifest: &'a ExclusionManifest,
     pub(crate) filter: Option<&'a str>,
@@ -65,7 +65,7 @@ pub(crate) struct SuiteReport<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct TestTiming {
+pub struct TestTiming {
     pub(crate) file: String,
     pub(crate) variant: Option<String>,
     pub(crate) outcome: String,
@@ -100,7 +100,7 @@ struct ReportTotals {
     variant_panic: u32,
 }
 
-pub(crate) fn write_report(report: &SuiteReport<'_>) {
+pub fn write_report(report: &SuiteReport<'_>) {
     if let Some(parent) = Path::new(report.report_path).parent() {
         let _ = fs::create_dir_all(parent);
     }
@@ -131,7 +131,7 @@ pub(crate) fn write_report(report: &SuiteReport<'_>) {
     }
 }
 
-pub(crate) fn format_pass_rate(rate: f64) -> String {
+pub fn format_pass_rate(rate: f64) -> String {
     format!("{rate:.2}")
 }
 

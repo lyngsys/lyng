@@ -133,7 +133,7 @@ impl LoadedModuleRoot {
     }
 
     #[inline]
-    pub fn key(&self) -> &ModuleKey {
+    pub const fn key(&self) -> &ModuleKey {
         &self.key
     }
 
@@ -600,7 +600,7 @@ impl Vm {
     }
 
     #[inline]
-    pub fn current_exception(&self) -> Option<Value> {
+    pub const fn current_exception(&self) -> Option<Value> {
         self.current_exception
     }
 
@@ -754,9 +754,7 @@ impl Vm {
         provider: &SharedRealmExtensionProvider,
     ) -> VmResult<BootstrapArtifacts> {
         let artifacts = self.bootstrap_realm(agent, realm, BootstrapMode::SpecOnly)?;
-        let bootstrap_state = agent
-            .realm_bootstrap_state(realm)
-            .unwrap_or_else(lyng_js_env::RealmBootstrapState::new);
+        let bootstrap_state = agent.realm_bootstrap_state(realm).unwrap_or_default();
         if !bootstrap_state.embedding_ready() {
             let mut installation =
                 RealmExtensionInstallation::new(self, agent, provider, artifacts);
@@ -1682,15 +1680,15 @@ impl Vm {
                 AllocationLifetime::Default,
             )
             .ok_or(VmError::MissingEnvironmentLayout(code))?;
-        if function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Script {
-            if let Some(global_script_plan) = global_script_plan {
-                self.bind_global_script_lexical_bindings(
-                    agent,
-                    variable_env,
-                    lexical_env,
-                    global_script_plan,
-                );
-            }
+        if function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Script
+            && let Some(global_script_plan) = global_script_plan
+        {
+            self.bind_global_script_lexical_bindings(
+                agent,
+                variable_env,
+                lexical_env,
+                global_script_plan,
+            );
         }
         Ok((lexical_env, variable_env, this_value, new_target))
     }
@@ -1757,14 +1755,12 @@ impl Vm {
                 .ok_or(VmError::MissingInstalledCode(code))?
                 .id(),
         );
-        let module_env = match environment {
-            Some(environment) => environment,
-            None => {
-                let environment =
-                    self.allocate_module_entry_environment(agent, realm, installed)?;
-                let _ = agent.set_module_record_environment(key, Some(environment));
-                environment
-            }
+        let module_env = if let Some(environment) = environment {
+            environment
+        } else {
+            let environment = self.allocate_module_entry_environment(agent, realm, installed)?;
+            let _ = agent.set_module_record_environment(key, Some(environment));
+            environment
         };
         let _ = agent.set_module_record_status(key, ModuleStatus::Linking);
 
@@ -2005,7 +2001,7 @@ impl Vm {
                     let _ = agent.set_module_record_status(key, ModuleStatus::Errored);
                     let _ =
                         agent.set_module_record_evaluation_error(key, completion.thrown_value());
-                    if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
+                    if defer_waiter_flush_for.is_none_or(|deferred| deferred != key) {
                         self.settle_waiting_dynamic_imports_for_module(agent, host, registry, key)?;
                     }
                 }
@@ -2069,7 +2065,7 @@ impl Vm {
                 }
                 let _ = agent.set_module_record_status(key, ModuleStatus::Evaluated);
                 let _ = agent.set_module_record_evaluation_error(key, None);
-                if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
+                if defer_waiter_flush_for.is_none_or(|deferred| deferred != key) {
                     self.settle_waiting_dynamic_imports_for_module(agent, host, registry, key)?;
                 }
                 Ok(value)
@@ -2089,7 +2085,7 @@ impl Vm {
                         }
                         let _ = agent.set_module_record_status(key, ModuleStatus::Evaluated);
                         let _ = agent.set_module_record_evaluation_error(key, None);
-                        if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
+                        if defer_waiter_flush_for.is_none_or(|deferred| deferred != key) {
                             self.settle_waiting_dynamic_imports_for_module(
                                 agent, host, registry, key,
                             )?;
@@ -2105,7 +2101,7 @@ impl Vm {
                         let _ = agent.set_module_record_status(key, ModuleStatus::Errored);
                         let _ = agent
                             .set_module_record_evaluation_error(key, completion.thrown_value());
-                        if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
+                        if defer_waiter_flush_for.is_none_or(|deferred| deferred != key) {
                             self.settle_waiting_dynamic_imports_for_module(
                                 agent, host, registry, key,
                             )?;
@@ -2123,7 +2119,7 @@ impl Vm {
                 }
                 let _ = agent.set_module_record_status(key, ModuleStatus::Errored);
                 let _ = agent.set_module_record_evaluation_error(key, completion.thrown_value());
-                if !defer_waiter_flush_for.is_some_and(|deferred| deferred == key) {
+                if defer_waiter_flush_for.is_none_or(|deferred| deferred != key) {
                     self.settle_waiting_dynamic_imports_for_module(agent, host, registry, key)?;
                 }
                 Err(VmError::Abrupt(completion))
@@ -2166,7 +2162,7 @@ impl Vm {
                 | ModuleStatus::Linked
                 | ModuleStatus::Errored => continue,
             }
-            if !defer_waiter_flush_for.is_some_and(|deferred| deferred == &key) {
+            if defer_waiter_flush_for.is_none_or(|deferred| deferred != &key) {
                 self.settle_waiting_dynamic_imports_for_module(agent, host, registry, &key)?;
             }
         }

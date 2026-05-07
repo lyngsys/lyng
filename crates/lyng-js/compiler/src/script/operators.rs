@@ -1,6 +1,9 @@
-use super::*;
+use super::{
+    internal_instance_of_builtin, BinaryOp, BuiltinFunctionId, Expr, ExprId, FunctionCompiler,
+    LoweringResult, Opcode, ResolutionKind, SafepointKind,
+};
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_unary_expression(
         &mut self,
         _expr_id: ExprId,

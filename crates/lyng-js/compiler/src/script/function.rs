@@ -1,6 +1,13 @@
 use super::state::ClassFunctionMetadata;
 use super::stmt::ObjectRestExcludedKey;
-use super::*;
+use super::{
+    ArgumentsMode, AtomId, AtomTable, BytecodeBuilder, BytecodeFunction, BytecodeFunctionFlags,
+    BytecodeFunctionId, BytecodeFunctionKind, CaptureDescriptor, CaptureSource, CompilationState,
+    CompiledScriptUnit, Decl, Expr, ExprId, FunctionCompiler, FunctionId, FunctionKind,
+    FunctionSemaId, HashMap, HashSet, LoweringError, LoweringResult, Opcode, ParameterSource,
+    Pattern, ProgramRootKind, ProgramSource, SafepointKind, Stmt, StmtId, StorageClass, ThisMode,
+    WellKnownAtom,
+};
 use lyng_js_bytecode::{GlobalLexicalBindingPlan, GlobalScriptInstantiationPlan};
 use lyng_js_sema::{DeclarationKind, ScopeId, ScopeKind};
 
@@ -51,7 +58,7 @@ fn derive_global_script_instantiation_plan(
         }
         match binding.kind {
             DeclarationKind::Function => {
-                push_unique_name(&mut function_names, atoms.resolve(binding.name))
+                push_unique_name(&mut function_names, atoms.resolve(binding.name));
             }
             DeclarationKind::Var => push_unique_name(&mut var_names, atoms.resolve(binding.name)),
             kind if kind.is_lexical() => {
@@ -170,19 +177,15 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let activation = state.activation(sema_id).clone();
 
         let class_metadata = state.class_function_metadata(function);
-        let class_constructor = class_metadata
-            .map(|metadata| metadata.class_constructor)
-            .unwrap_or(false);
+        let class_constructor = class_metadata.is_some_and(|metadata| metadata.class_constructor);
         let class_constructor_needs_environment = state
             .class_constructor_plan(function)
-            .map(|plan| plan.needs_environment)
-            .unwrap_or(false);
+            .is_some_and(|plan| plan.needs_environment);
         let constructible = function_constructible(ast_function.kind, class_metadata);
         let has_prototype_property =
             function_has_prototype_property(ast_function.kind, class_metadata);
-        let derived_class_constructor = class_metadata
-            .map(|metadata| metadata.derived_class_constructor)
-            .unwrap_or(false);
+        let derived_class_constructor =
+            class_metadata.is_some_and(|metadata| metadata.derived_class_constructor);
         let mut builder = BytecodeBuilder::new(id, function_kind);
         builder.set_name(if class_constructor {
             None
@@ -392,23 +395,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 pattern: pattern_id,
                 binding: binding_id,
             });
-            if let Some(binding_id) = binding_id {
-                if self.binding(binding_id)?.storage_class == StorageClass::FrameLocal
-                    && activation.arguments_mode != ArgumentsMode::Mapped
-                {
-                    self.local_registers[binding_id.raw() as usize] = Some(register);
-                }
+            if let Some(binding_id) = binding_id
+                && self.binding(binding_id)?.storage_class == StorageClass::FrameLocal
+                && activation.arguments_mode != ArgumentsMode::Mapped
+            {
+                self.local_registers[binding_id.raw() as usize] = Some(register);
             }
         }
 
-        if let Some(rest_pattern) = ast_function.params.rest {
-            if matches!(
+        if let Some(rest_pattern) = ast_function.params.rest
+            && matches!(
                 self.ast().get_pattern(rest_pattern),
                 Pattern::Identifier { .. }
-            ) {
-                let _ =
-                    self.declared_binding_for_pattern(rest_pattern, DeclarationKind::Parameter)?;
-            }
+            )
+        {
+            let _ = self.declared_binding_for_pattern(rest_pattern, DeclarationKind::Parameter)?;
         }
 
         Ok(())
@@ -441,22 +442,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         if let Some(rest_pattern) = self
             .current_function_ast
             .and_then(|function| self.ast().get_function(function).params.rest)
-        {
-            if !matches!(
+            && !matches!(
                 self.ast().get_pattern(rest_pattern),
                 Pattern::Identifier { .. }
-            ) {
-                let rest_register = self.alloc_temp()?;
-                let rest_slot = activation
-                    .rest_slot()
-                    .expect("rest parameter should reserve a synthetic rest slot");
-                self.emit_load_env_slot(rest_register, 0, u32::from(rest_slot))?;
-                self.lower_binding_pattern_initialization(
-                    rest_pattern,
-                    DeclarationKind::Parameter,
-                    rest_register,
-                )?;
-            }
+            )
+        {
+            let rest_register = self.alloc_temp()?;
+            let rest_slot = activation
+                .rest_slot()
+                .expect("rest parameter should reserve a synthetic rest slot");
+            self.emit_load_env_slot(rest_register, 0, u32::from(rest_slot))?;
+            self.lower_binding_pattern_initialization(
+                rest_pattern,
+                DeclarationKind::Parameter,
+                rest_register,
+            )?;
         }
         Ok(())
     }
@@ -523,44 +523,36 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 let mut excluded_keys = Vec::new();
                 for property in self.ast().get_obj_pattern_prop_list(properties).to_vec() {
                     let value = self.alloc_temp()?;
-                    if !property.computed {
-                        if let Some(atom) = self.named_property_atom(property.key)? {
-                            let prepared_target = self
-                                .prepare_with_var_single_name_binding_target(
-                                    kind,
-                                    property.value,
-                                )?;
-                            self.emit_get_property_by_atom(value, source_register, atom)?;
-                            excluded_keys.push(ObjectRestExcludedKey::Atom(atom));
-                            if let Some((reference, name)) = prepared_target {
-                                self.lower_prepared_with_var_single_name_binding_initialization(
-                                    property.value,
-                                    value,
-                                    reference,
-                                    name,
-                                )?;
-                                continue;
-                            }
-                        } else {
-                            let raw_key = self.lower_expr_to_temp(property.key)?;
-                            let key = self.alloc_temp()?;
-                            self.emit_to_property_key(key, raw_key)?;
-                            let prepared_target = self
-                                .prepare_with_var_single_name_binding_target(
-                                    kind,
-                                    property.value,
-                                )?;
-                            self.emit_get_keyed_property(value, source_register, key)?;
-                            excluded_keys.push(ObjectRestExcludedKey::Register(key));
-                            if let Some((reference, name)) = prepared_target {
-                                self.lower_prepared_with_var_single_name_binding_initialization(
-                                    property.value,
-                                    value,
-                                    reference,
-                                    name,
-                                )?;
-                                continue;
-                            }
+                    if property.computed {
+                        let raw_key = self.lower_expr_to_temp(property.key)?;
+                        let key = self.alloc_temp()?;
+                        self.emit_to_property_key(key, raw_key)?;
+                        let prepared_target =
+                            self.prepare_with_var_single_name_binding_target(kind, property.value)?;
+                        self.emit_get_keyed_property(value, source_register, key)?;
+                        excluded_keys.push(ObjectRestExcludedKey::Register(key));
+                        if let Some((reference, name)) = prepared_target {
+                            self.lower_prepared_with_var_single_name_binding_initialization(
+                                property.value,
+                                value,
+                                reference,
+                                name,
+                            )?;
+                            continue;
+                        }
+                    } else if let Some(atom) = self.named_property_atom(property.key)? {
+                        let prepared_target =
+                            self.prepare_with_var_single_name_binding_target(kind, property.value)?;
+                        self.emit_get_property_by_atom(value, source_register, atom)?;
+                        excluded_keys.push(ObjectRestExcludedKey::Atom(atom));
+                        if let Some((reference, name)) = prepared_target {
+                            self.lower_prepared_with_var_single_name_binding_initialization(
+                                property.value,
+                                value,
+                                reference,
+                                name,
+                            )?;
+                            continue;
                         }
                     } else {
                         let raw_key = self.lower_expr_to_temp(property.key)?;
@@ -705,31 +697,30 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         inferred_name: Option<AtomId>,
         value_register: u16,
     ) -> LoweringResult<()> {
-        if let Some(name) = inferred_name {
-            if let Expr::ClassExpression {
+        if let Some(name) = inferred_name
+            && let Expr::ClassExpression {
                 name: None,
                 super_class,
                 body,
                 ..
             } = self.ast().get_expr(initializer).clone()
-            {
-                return self.lower_class_expression(
-                    initializer,
-                    Some(name),
-                    super_class,
-                    body,
-                    value_register,
-                );
-            }
+        {
+            return self.lower_class_expression(
+                initializer,
+                Some(name),
+                super_class,
+                body,
+                value_register,
+            );
         }
 
         self.lower_expr_into(initializer, value_register)?;
-        if let Some(name) = inferred_name {
-            if self.is_anonymous_function_definition(initializer) {
-                let name_value = self.alloc_temp()?;
-                self.emit_load_atom_string(name_value, name)?;
-                self.emit_set_function_name(value_register, name_value)?;
-            }
+        if let Some(name) = inferred_name
+            && self.is_anonymous_function_definition(initializer)
+        {
+            let name_value = self.alloc_temp()?;
+            self.emit_load_atom_string(name_value, name)?;
+            self.emit_set_function_name(value_register, name_value)?;
         }
         Ok(())
     }
@@ -960,7 +951,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     }
 }
 
-fn bytecode_function_kind(
+const fn bytecode_function_kind(
     function: FunctionId,
     kind: FunctionKind,
 ) -> LoweringResult<BytecodeFunctionKind> {
@@ -979,9 +970,7 @@ fn function_constructible(
     class_metadata: Option<ClassFunctionMetadata>,
 ) -> bool {
     match kind {
-        FunctionKind::Normal => class_metadata
-            .map(|metadata| metadata.constructible)
-            .unwrap_or(true),
+        FunctionKind::Normal => class_metadata.is_none_or(|metadata| metadata.constructible),
         FunctionKind::Generator
         | FunctionKind::Arrow
         | FunctionKind::AsyncArrow
@@ -1002,7 +991,7 @@ fn function_has_prototype_property(
         ))
 }
 
-fn function_this_mode(kind: BytecodeFunctionKind, strict: bool) -> ThisMode {
+const fn function_this_mode(kind: BytecodeFunctionKind, strict: bool) -> ThisMode {
     match kind {
         BytecodeFunctionKind::Arrow => ThisMode::Lexical,
         BytecodeFunctionKind::Function | BytecodeFunctionKind::Builtin => {

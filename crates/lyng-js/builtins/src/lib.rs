@@ -75,7 +75,7 @@ impl BuiltinsMarker {
     }
 
     #[inline]
-    pub fn runtime(&self) -> &RuntimeSubstrateMarker {
+    pub const fn runtime(&self) -> &RuntimeSubstrateMarker {
         &self.runtime
     }
 
@@ -90,7 +90,7 @@ impl BuiltinsMarker {
     }
 
     #[inline]
-    pub fn ops(&self) -> &PrimitiveOpsMarker {
+    pub const fn ops(&self) -> &PrimitiveOpsMarker {
         &self.ops
     }
 }

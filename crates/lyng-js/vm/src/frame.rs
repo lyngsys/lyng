@@ -219,7 +219,7 @@ impl FrameRecord {
     }
 
     #[inline]
-    pub(crate) fn set_tail_caller(
+    pub(crate) const fn set_tail_caller(
         &mut self,
         tail_caller: Option<ObjectRef>,
         tail_caller_strict: bool,
@@ -235,7 +235,7 @@ impl FrameRecord {
     }
 
     #[inline]
-    pub(crate) fn set_handler_cursor(&mut self, handler_cursor: u16) {
+    pub(crate) const fn set_handler_cursor(&mut self, handler_cursor: u16) {
         self.handler_cursor = handler_cursor;
     }
 
@@ -282,7 +282,7 @@ impl FrameRecord {
     }
 
     #[inline]
-    pub(crate) fn set_instruction_offset(&mut self, instruction_offset: u32) {
+    pub(crate) const fn set_instruction_offset(&mut self, instruction_offset: u32) {
         self.instruction_offset = instruction_offset;
     }
 
@@ -307,7 +307,7 @@ impl FrameRecord {
     }
 
     #[inline]
-    pub(crate) fn set_lexical_env(&mut self, lexical_env: EnvironmentRef) {
+    pub(crate) const fn set_lexical_env(&mut self, lexical_env: EnvironmentRef) {
         self.lexical_env = lexical_env;
     }
 
@@ -322,7 +322,7 @@ impl FrameRecord {
     }
 
     #[inline]
-    pub(crate) fn set_this_value(&mut self, this_value: Value) {
+    pub(crate) const fn set_this_value(&mut self, this_value: Value) {
         self.this_value = this_value;
     }
 
@@ -332,7 +332,7 @@ impl FrameRecord {
     }
 
     #[inline]
-    pub(crate) fn set_construct_this(&mut self, construct_this: Option<ObjectRef>) {
+    pub(crate) const fn set_construct_this(&mut self, construct_this: Option<ObjectRef>) {
         self.construct_this = construct_this;
     }
 
@@ -387,7 +387,7 @@ impl FrameRecord {
     }
 
     #[inline]
-    pub(crate) fn clear_resume(&mut self) {
+    pub(crate) const fn clear_resume(&mut self) {
         self.resume_active = false;
     }
 }

@@ -1,4 +1,10 @@
-use super::*;
+use super::{
+    AllocationLifetime, BigIntRef, CodeRef, CodeSlotsRef, EnvironmentRef, EnvironmentSlotsRef,
+    FunctionPayloadRef, ObjectRef, ObjectSlotsRef, PrimitiveDomainStats, PrimitiveValueCellRef,
+    RealmRef, ShapeId, SideAllocationClass, SideAllocationRef, SideAllocationStats, StringEncoding,
+    StringRef, SuspendedExecutionRef, SuspendedRegistersRef, SymbolRef, Value,
+    PRIMITIVE_SLOTS_PER_PAGE,
+};
 use std::array::from_fn;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
@@ -177,7 +183,7 @@ impl<Record, Handle> Default for SlotArena<Record, Handle> {
 }
 
 impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
-    pub(super) fn allocation_requires_growth(&self) -> bool {
+    pub(super) const fn allocation_requires_growth(&self) -> bool {
         !self.pages.is_empty() && self.pages_with_available_slots == 0
     }
 
@@ -390,7 +396,7 @@ impl<Record: Copy> SlotPage<Record> {
         Some(slot_index)
     }
 
-    fn has_available_slot(&self) -> bool {
+    const fn has_available_slot(&self) -> bool {
         !self.free_list.is_empty() || self.next_uninitialized < PRIMITIVE_SLOTS_PER_PAGE
     }
 

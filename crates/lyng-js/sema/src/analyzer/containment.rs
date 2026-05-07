@@ -3,7 +3,7 @@ use lyng_js_common::WellKnownAtom;
 
 use super::{Analyzer, ContainmentQuery};
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     pub(super) fn pattern_contains_query(
         &self,
         pat_id: lyng_js_ast::PatternId,

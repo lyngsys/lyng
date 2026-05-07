@@ -513,11 +513,11 @@ impl ObjectRuntime {
 }
 
 #[inline]
-fn object_index(id: ObjectRef) -> usize {
+const fn object_index(id: ObjectRef) -> usize {
     (id.get() - 1) as usize
 }
 
 #[inline]
-fn shape_index(id: ShapeId) -> usize {
+const fn shape_index(id: ShapeId) -> usize {
     (id.get() - 1) as usize
 }

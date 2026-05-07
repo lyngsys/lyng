@@ -1,4 +1,32 @@
-use super::super::*;
+use super::super::{
+    array_iterator_next_builtin, async_iterator_dispose_builtin, iterator_builtin,
+    iterator_concat_builtin, iterator_constructor_getter_builtin,
+    iterator_constructor_setter_builtin, iterator_dispose_builtin, iterator_drop_builtin,
+    iterator_every_builtin, iterator_filter_builtin, iterator_find_builtin,
+    iterator_flat_map_builtin, iterator_for_each_builtin, iterator_from_builtin,
+    iterator_helper_next_builtin, iterator_helper_return_builtin, iterator_map_builtin,
+    iterator_prototype_iterator_builtin, iterator_reduce_builtin, iterator_some_builtin,
+    iterator_take_builtin, iterator_to_array_builtin, iterator_to_string_tag_getter_builtin,
+    iterator_to_string_tag_setter_builtin, iterator_zip_builtin, iterator_zip_keyed_builtin,
+    map_iterator_next_builtin, set_iterator_next_builtin, string_anchor_builtin, string_at_builtin,
+    string_big_builtin, string_blink_builtin, string_bold_builtin, string_builtin,
+    string_char_at_builtin, string_char_code_at_builtin, string_code_point_at_builtin,
+    string_concat_builtin, string_ends_with_builtin, string_fixed_builtin,
+    string_fontcolor_builtin, string_fontsize_builtin, string_from_char_code_builtin,
+    string_from_code_point_builtin, string_includes_builtin, string_index_of_builtin,
+    string_is_well_formed_builtin, string_italics_builtin, string_iterator_builtin,
+    string_iterator_next_builtin, string_last_index_of_builtin, string_link_builtin,
+    string_locale_compare_builtin, string_match_all_builtin, string_match_builtin,
+    string_normalize_builtin, string_pad_end_builtin, string_pad_start_builtin, string_raw_builtin,
+    string_repeat_builtin, string_replace_all_builtin, string_replace_builtin,
+    string_search_builtin, string_slice_builtin, string_small_builtin, string_split_builtin,
+    string_starts_with_builtin, string_strike_builtin, string_sub_builtin, string_substr_builtin,
+    string_substring_builtin, string_sup_builtin, string_to_locale_lower_case_builtin,
+    string_to_locale_upper_case_builtin, string_to_lower_case_builtin, string_to_string_builtin,
+    string_to_upper_case_builtin, string_to_well_formed_builtin, string_trim_builtin,
+    string_trim_end_builtin, string_trim_start_builtin, string_value_of_builtin,
+    BuiltinEntryMetadata, PublicBuiltinMetadataRow,
+};
 
 pub(in crate::public::metadata) const PUBLIC_TEXT_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(

@@ -217,7 +217,7 @@ fn bigint_width_sign_bit(limbs: &[u64], bits: u64) -> bool {
         .is_some_and(|limb| (limb & (1_u64 << bit_index)) != 0)
 }
 
-fn mask_bigint_width(limbs: &mut [u64], bits: u64) {
+const fn mask_bigint_width(limbs: &mut [u64], bits: u64) {
     let remainder = bits % 64;
     if remainder == 0 {
         return;
@@ -245,7 +245,7 @@ fn normalize_bigint_limbs(limbs: &mut Vec<u64>) {
     }
 }
 
-fn normalize_bigint_sign(sign: BigIntSign, limbs: &[u64]) -> BigIntSign {
+const fn normalize_bigint_sign(sign: BigIntSign, limbs: &[u64]) -> BigIntSign {
     if limbs.is_empty() {
         BigIntSign::NonNegative
     } else {

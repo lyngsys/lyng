@@ -124,7 +124,7 @@ impl AggregatedOutcome {
         }
     }
 
-    fn merge(self, next: Self) -> Self {
+    const fn merge(self, next: Self) -> Self {
         match (self, next) {
             (Self::Panic, _) | (_, Self::Panic) => Self::Panic,
             (Self::Fail, _) | (_, Self::Fail) => Self::Fail,
@@ -132,7 +132,7 @@ impl AggregatedOutcome {
         }
     }
 
-    fn record(self, stats: &mut CategoryStats) {
+    const fn record(self, stats: &mut CategoryStats) {
         match self {
             Self::Pass => stats.pass += 1,
             Self::Fail => stats.fail += 1,
@@ -459,10 +459,10 @@ fn execute_suite(
                     );
 
                     let should_recycle = worker.as_ref().is_some_and(WorkerHandle::should_recycle);
-                    if !execution.reusable || should_recycle {
-                        if let Some(mut stale_worker) = worker.take() {
-                            stale_worker.shutdown();
-                        }
+                    if (!execution.reusable || should_recycle)
+                        && let Some(mut stale_worker) = worker.take()
+                    {
+                        stale_worker.shutdown();
                     }
 
                     let done = done_count.fetch_add(1, Ordering::Relaxed) + 1;

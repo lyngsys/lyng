@@ -170,7 +170,7 @@ pub struct CatchClause {
 
 impl Stmt {
     /// Returns the span of this statement.
-    pub fn span(&self) -> Span {
+    pub const fn span(&self) -> Span {
         match self {
             Self::Block { span, .. }
             | Self::Empty { span, .. }

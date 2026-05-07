@@ -80,12 +80,12 @@ impl NativeFunctionRegistry for RecordingRegistry {
 #[test]
 fn phase4_functions_hoist_declarations_and_return_across_frames() {
     let result = compile_and_run(
-        r#"
+        r"
         run();
         function run() {
             return 7;
         }
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -94,12 +94,12 @@ fn phase4_functions_hoist_declarations_and_return_across_frames() {
 #[test]
 fn phase4_functions_execute_anonymous_function_expressions() {
     let result = compile_and_run(
-        r#"
+        r"
         let twice = function(value) {
             return value + value;
         };
         twice(5);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(10));
@@ -108,7 +108,7 @@ fn phase4_functions_execute_anonymous_function_expressions() {
 #[test]
 fn phase4_functions_capture_outer_bindings_through_closures() {
     let result = compile_and_run(
-        r#"
+        r"
         function outer(base) {
             return function(step) {
                 return base + step;
@@ -116,7 +116,7 @@ fn phase4_functions_capture_outer_bindings_through_closures() {
         }
         let add = outer(40);
         add(2);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(42));
@@ -125,7 +125,7 @@ fn phase4_functions_capture_outer_bindings_through_closures() {
 #[test]
 fn phase4_functions_capture_top_level_lexicals_across_intermediate_frames() {
     let result = compile_and_run(
-        r#"
+        r"
         let base = 40;
         function outer(step) {
             return function(delta) {
@@ -134,7 +134,7 @@ fn phase4_functions_capture_top_level_lexicals_across_intermediate_frames() {
         }
         let add = outer(1);
         add(2);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(43));
@@ -143,7 +143,7 @@ fn phase4_functions_capture_top_level_lexicals_across_intermediate_frames() {
 #[test]
 fn phase4_functions_allow_block_lexicals_to_shadow_parameters() {
     let result = compile_and_run(
-        r#"
+        r"
         function read(value) {
             let total = value;
             {
@@ -153,7 +153,7 @@ fn phase4_functions_allow_block_lexicals_to_shadow_parameters() {
             return total;
         }
         read(1);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -185,7 +185,7 @@ fn phase4_functions_allow_named_function_expressions_with_shadowed_bindings() {
 #[test]
 fn phase4_functions_preserve_constructor_result_and_new_target() {
     let result = compile_and_run(
-        r#"
+        r"
         function Thing(value) {
             this.value = value;
             this.constructed = new.target ? 1 : 0;
@@ -193,7 +193,7 @@ fn phase4_functions_preserve_constructor_result_and_new_target() {
         }
         let thing = new Thing(6);
         thing.value + thing.constructed;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -202,12 +202,12 @@ fn phase4_functions_preserve_constructor_result_and_new_target() {
 #[test]
 fn phase5_functions_install_constructor_backlinks_on_instance_prototypes() {
     let result = compile_and_run(
-        r#"
+        r"
         function Test262Error() {}
         let instance = new Test262Error();
         (instance.constructor === Test262Error ? 1 : 0)
             + (Test262Error.prototype.constructor === Test262Error ? 2 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -216,7 +216,7 @@ fn phase5_functions_install_constructor_backlinks_on_instance_prototypes() {
 #[test]
 fn phase4_functions_keep_arrow_lexical_this_across_call_boundaries() {
     let result = compile_and_run(
-        r#"
+        r"
         function Box(value) {
             this.value = value;
             this.read = () => this.value;
@@ -224,7 +224,7 @@ fn phase4_functions_keep_arrow_lexical_this_across_call_boundaries() {
         let box = new Box(8);
         let read = box.read;
         read();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(8));
@@ -251,12 +251,12 @@ fn phase4_functions_support_function_prototype_call_with_primitive_this() {
 #[test]
 fn phase5_functions_support_function_prototype_apply_with_array_like_arguments() {
     let result = compile_and_run(
-        r#"
+        r"
         function add(a, b) {
             return this.base + a + b;
         }
         add.apply({ base: 10 }, { length: 2, 0: 4, 1: 5 });
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(19));
@@ -414,13 +414,13 @@ fn phase6_newer_function_forms_inherit_restricted_caller_arguments() {
 #[test]
 fn phase5_functions_support_bound_function_calls() {
     let result = compile_and_run(
-        r#"
+        r"
         function add(a, b) {
             return this.base + a + b;
         }
         let bound = add.bind({ base: 10 }, 4);
         bound(5);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(19));
@@ -429,7 +429,7 @@ fn phase5_functions_support_bound_function_calls() {
 #[test]
 fn phase5_functions_support_bound_function_construction() {
     let result = compile_and_run(
-        r#"
+        r"
         function Add(a, b) {
             this.total = a + b;
         }
@@ -437,7 +437,7 @@ fn phase5_functions_support_bound_function_construction() {
         let Bound = Add.bind(null, 3);
         let instance = new Bound(5);
         instance.total + instance.bump;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(15));
@@ -464,7 +464,7 @@ fn phase6_bound_functions_preserve_target_object_prototype() {
 #[test]
 fn phase6_bound_functions_can_be_subclassed_with_forwarded_new_target() {
     let result = compile_and_run_string(
-        r#"
+        r"
         function Target() {}
         let total = 0;
 
@@ -487,7 +487,7 @@ fn phase6_bound_functions_can_be_subclassed_with_forwarded_new_target() {
         }
 
         String(total);
-        "#,
+        ",
     );
 
     assert_eq!(result, "75");
@@ -653,7 +653,7 @@ fn phase6_function_bind_uses_proxy_length_and_name() {
 #[test]
 fn phase5_functions_apply_rejects_primitive_arg_arrays_and_preserves_abrupt_getters() {
     let result = compile_and_run(
-        r#"
+        r"
         function noop() {}
         let total = 0;
         let marker = {};
@@ -679,7 +679,7 @@ fn phase5_functions_apply_rejects_primitive_arg_arrays_and_preserves_abrupt_gett
         }
 
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -717,10 +717,10 @@ fn phase5_functions_bind_preserves_name_getter_abrupt_completion() {
 #[test]
 fn phase5_boolean_wrapper_loose_equality_uses_to_primitive() {
     let result = compile_and_run(
-        r#"
+        r"
         (new Boolean(true) == true ? 1 : 0)
             + (new Boolean(false) == false ? 2 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -816,14 +816,14 @@ fn phase5_functions_do_not_capture_outer_lexical_scope_in_function_constructor()
 #[test]
 fn phase5_function_prototype_is_callable_but_not_constructible() {
     let result = compile_and_run(
-        r#"
+        r"
         try {
             new Function.prototype();
             0;
         } catch (_) {
             (Function.prototype() === undefined ? 1 : 0) + 2;
         }
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -889,7 +889,7 @@ fn phase5_functions_to_string_formats_native_functions_stably() {
 
 #[test]
 fn phase6_function_to_string_formats_bound_functions_as_native() {
-    let result = compile_and_run_string(r#"function target() {} target.bind(null).toString();"#);
+    let result = compile_and_run_string(r"function target() {} target.bind(null).toString();");
 
     assert_eq!(result, "function () { [native code] }");
 }
@@ -1034,11 +1034,11 @@ fn phase4_functions_expand_spread_arguments_for_calls_and_constructs() {
     let construct_entry = BuiltinFunctionId::from_raw(2).unwrap();
     let mut atoms = AtomTable::new();
     let unit = compile_unit(
-        r#"
+        r"
         let callResult = nativeFn(0, ...[1, 2], 3, ...[]);
         new NativeCtor(...[7], ...[8, 9]);
         callResult;
-        "#,
+        ",
         &mut atoms,
     );
 
@@ -1081,7 +1081,7 @@ fn phase4_functions_expand_spread_arguments_for_calls_and_constructs() {
 #[test]
 fn phase6_functions_expand_custom_iterables_for_all_spread_positions() {
     let result = compile_and_run(
-        r#"
+        r"
         function makeIter(start, end) {
             return {
                 [Symbol.iterator]: function() {
@@ -1131,7 +1131,7 @@ fn phase6_functions_expand_custom_iterables_for_all_spread_positions() {
                     ? 8
                     : 0
             );
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(15));
@@ -1141,12 +1141,12 @@ fn phase6_functions_expand_custom_iterables_for_all_spread_positions() {
 fn phase4_functions_mark_tail_call_capable_headers_when_lowering_tail_calls() {
     let mut atoms = AtomTable::new();
     let unit = compile_unit(
-        r#"
+        r"
         function outer(fn, value) {
             return fn(value);
         }
         outer(function(x) { return x; }, 1);
-        "#,
+        ",
         &mut atoms,
     );
 
@@ -1312,7 +1312,7 @@ fn phase4_functions_match_computed_setter_keys_across_string_number_and_symbol()
 #[test]
 fn phase4_functions_support_numeric_keyed_accessors() {
     let result = compile_and_run(
-        r#"
+        r"
         let calls = 0;
         let object = {
             get [1]() { return 10; },
@@ -1321,7 +1321,7 @@ fn phase4_functions_support_numeric_keyed_accessors() {
         let read = object[1];
         object[1] = read;
         read + calls;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(11));
@@ -1330,12 +1330,12 @@ fn phase4_functions_support_numeric_keyed_accessors() {
 #[test]
 fn phase4_functions_read_numeric_keyed_getters() {
     let result = compile_and_run(
-        r#"
+        r"
         let object = {
             get [1]() { return 10; }
         };
         object[1];
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(10));
@@ -1344,14 +1344,14 @@ fn phase4_functions_read_numeric_keyed_getters() {
 #[test]
 fn phase4_functions_write_numeric_keyed_setters() {
     let result = compile_and_run(
-        r#"
+        r"
         let calls = 0;
         let object = {
             set [1](_) { calls = calls + 1; }
         };
         object[1] = 10;
         calls;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -1360,10 +1360,10 @@ fn phase4_functions_write_numeric_keyed_setters() {
 #[test]
 fn phase4_functions_accept_empty_object_destructuring_parameters() {
     let result = compile_and_run(
-        r#"
+        r"
         function probe({}) { return 1; }
         probe(0) + probe(false) + probe([]);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -1373,13 +1373,13 @@ fn phase4_functions_accept_empty_object_destructuring_parameters() {
 fn phase4_functions_compile_nested_destructuring_parameter_shapes() {
     let mut atoms = AtomTable::new();
     let _ = compile_unit(
-        r#"
+        r"
         function fn1([{}]) {}
         function fn2([{a: [{}]}]) {}
         function fn3({a: [,,,] = 42}) {}
         function fn4([], [[]], [[[[[[[[[x]]]]]]]]]) {}
         function fn5([[x, y, ...z]]) {}
-        "#,
+        ",
         &mut atoms,
     );
 }
@@ -1401,7 +1401,7 @@ fn phase4_functions_support_object_pattern_rest_parameters() {
 #[test]
 fn phase4_functions_cache_tagged_template_objects_by_site() {
     let result = compile_and_run(
-        r#"
+        r"
         let seen = [];
         function tag(strings) {
             seen.push(strings);
@@ -1412,7 +1412,7 @@ fn phase4_functions_cache_tagged_template_objects_by_site() {
         run(1);
         run(2);
         seen.length === 2 && seen[0] === seen[1] ? 1 : 0;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -1515,11 +1515,11 @@ fn phase4_functions_dispatch_native_call_and_construct_through_registry() {
     let construct_entry = BuiltinFunctionId::from_raw(2).unwrap();
     let mut atoms = AtomTable::new();
     let unit = compile_unit(
-        r#"
+        r"
         let callResult = nativeFn(3, 4);
         let built = new NativeCtor(7);
         callResult;
-        "#,
+        ",
         &mut atoms,
     );
 
@@ -1579,12 +1579,12 @@ fn phase4_functions_dispatch_native_call_and_construct_through_registry() {
 #[test]
 fn phase4_functions_evaluate_argument_assignments_left_to_right_and_create_globals() {
     let result = compile_and_run(
-        r#"
+        r"
         function readThird(first, second, third) {
             return third;
         }
         readThird(x = 1, y = x, x + y) + x + y;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(4));
@@ -1607,12 +1607,12 @@ fn phase4_functions_call_default_parameter_function_with_supplied_argument() {
 #[test]
 fn phase4_functions_delete_mapped_arguments_elements() {
     let result = compile_and_run(
-        r#"
+        r"
         function inspect(a, b) {
             return delete arguments[0] && arguments[0] === undefined ? 1 : 0;
         }
         inspect(1, 2);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(1));
@@ -1635,7 +1635,7 @@ fn phase4_functions_bridge_high_register_calls_in_large_scripts() {
 #[test]
 fn phase4_functions_execute_tail_recursive_calls_without_growing_frames() {
     let result = compile_and_run(
-        r#"
+        r"
         let countdown = function(self, value, acc) {
             if (value === 0) {
                 return acc;
@@ -1643,7 +1643,7 @@ fn phase4_functions_execute_tail_recursive_calls_without_growing_frames() {
             return self(self, value - 1, acc + 1);
         };
         countdown(countdown, 120, 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(120));
@@ -1652,7 +1652,7 @@ fn phase4_functions_execute_tail_recursive_calls_without_growing_frames() {
 #[test]
 fn phase4_functions_treat_nullish_coalescing_rhs_as_tail_position() {
     let result = compile_and_run(
-        r#"
+        r"
         let countdown = function(self, value, acc) {
             if (value === 0) {
                 return acc;
@@ -1660,7 +1660,7 @@ fn phase4_functions_treat_nullish_coalescing_rhs_as_tail_position() {
             return null ?? self(self, value - 1, acc + 1);
         };
         countdown(countdown, 120, 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(120));
@@ -1669,14 +1669,14 @@ fn phase4_functions_treat_nullish_coalescing_rhs_as_tail_position() {
 #[test]
 fn phase4_functions_preserve_constructor_return_fallback_across_tail_calls() {
     let result = compile_and_run(
-        r#"
+        r"
         function Box(helper) {
             this.value = 9;
             return helper(1);
         }
         let box = new Box(function(value) { return value; });
         box.value;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(9));

@@ -317,28 +317,25 @@ fn typed_array_reduce_common<Cx: PublicBuiltinDispatchContext>(
     let this_value = invocation.this_value();
     let mut accumulator;
     let mut next_index;
-    match invocation.arguments().get(1).copied() {
-        Some(initial_value) => {
-            accumulator = initial_value;
-            next_index = match direction {
-                TypedArrayReduceDirection::Forward => Some(0),
-                TypedArrayReduceDirection::Reverse => len.checked_sub(1),
-            };
+    if let Some(initial_value) = invocation.arguments().get(1).copied() {
+        accumulator = initial_value;
+        next_index = match direction {
+            TypedArrayReduceDirection::Forward => Some(0),
+            TypedArrayReduceDirection::Reverse => len.checked_sub(1),
+        };
+    } else {
+        if len == 0 {
+            return Err(type_error(cx));
         }
-        None => {
-            if len == 0 {
-                return Err(type_error(cx));
-            }
-            let initial_index = match direction {
-                TypedArrayReduceDirection::Forward => 0,
-                TypedArrayReduceDirection::Reverse => len - 1,
-            };
-            accumulator = typed_array_read_element_value(cx.agent(), record, initial_index);
-            next_index = match direction {
-                TypedArrayReduceDirection::Forward => initial_index.checked_add(1),
-                TypedArrayReduceDirection::Reverse => initial_index.checked_sub(1),
-            };
-        }
+        let initial_index = match direction {
+            TypedArrayReduceDirection::Forward => 0,
+            TypedArrayReduceDirection::Reverse => len - 1,
+        };
+        accumulator = typed_array_read_element_value(cx.agent(), record, initial_index);
+        next_index = match direction {
+            TypedArrayReduceDirection::Forward => initial_index.checked_add(1),
+            TypedArrayReduceDirection::Reverse => initial_index.checked_sub(1),
+        };
     }
 
     match direction {

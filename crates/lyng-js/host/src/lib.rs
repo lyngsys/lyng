@@ -395,7 +395,7 @@ mod tests {
             date_time: TemporalCivilDateTime::new(1970, 1, 1, 1, 0, 0, 0, 0, 123),
             offset_nanoseconds: 3_600_000_000_000,
         };
-        host.define_temporal_instant_to_civil(instant_request.clone(), Ok(civil_response.clone()));
+        host.define_temporal_instant_to_civil(instant_request.clone(), Ok(civil_response));
 
         let civil_request = TemporalCivilToInstantRequest {
             time_zone_id: "Europe/Berlin".into(),

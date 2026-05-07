@@ -16,7 +16,7 @@ mod store_helpers;
 mod weak_state;
 
 pub use records::*;
-use storage::*;
+use storage::{SideAllocator, SlotArena, ValueSlotAllocator};
 
 pub struct PrimitiveHeap {
     strings: SlotArena<PrimitiveStringRecord, StringRef>,
@@ -266,7 +266,7 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub(crate) fn symbol_allocation_requires_growth(&self) -> bool {
+    pub(crate) const fn symbol_allocation_requires_growth(&self) -> bool {
         self.symbols.allocation_requires_growth()
     }
 
@@ -401,7 +401,7 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub(crate) fn value_cell_allocation_requires_growth(&self) -> bool {
+    pub(crate) const fn value_cell_allocation_requires_growth(&self) -> bool {
         self.value_cells.allocation_requires_growth()
     }
 
@@ -443,7 +443,7 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub(crate) fn object_allocation_requires_growth(&self) -> bool {
+    pub(crate) const fn object_allocation_requires_growth(&self) -> bool {
         self.objects.allocation_requires_growth()
     }
 
@@ -458,7 +458,7 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub(crate) fn function_payload_allocation_requires_growth(&self) -> bool {
+    pub(crate) const fn function_payload_allocation_requires_growth(&self) -> bool {
         self.function_payloads.allocation_requires_growth()
     }
 
@@ -527,7 +527,7 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub(crate) fn suspended_execution_allocation_requires_growth(&self) -> bool {
+    pub(crate) const fn suspended_execution_allocation_requires_growth(&self) -> bool {
         self.suspended_executions.allocation_requires_growth()
     }
 
@@ -618,7 +618,7 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub(crate) fn environment_allocation_requires_growth(&self) -> bool {
+    pub(crate) const fn environment_allocation_requires_growth(&self) -> bool {
         self.environments.allocation_requires_growth()
     }
 
@@ -684,7 +684,7 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub(crate) fn code_allocation_requires_growth(&self) -> bool {
+    pub(crate) const fn code_allocation_requires_growth(&self) -> bool {
         self.codes.allocation_requires_growth()
     }
 
@@ -746,7 +746,7 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub(crate) fn realm_allocation_requires_growth(&self) -> bool {
+    pub(crate) const fn realm_allocation_requires_growth(&self) -> bool {
         self.realms.allocation_requires_growth()
     }
 
@@ -785,7 +785,7 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub(crate) fn shape_allocation_requires_growth(&self) -> bool {
+    pub(crate) const fn shape_allocation_requires_growth(&self) -> bool {
         self.shapes.allocation_requires_growth()
     }
 
@@ -913,7 +913,7 @@ fn normalized_bigint_limb_count(limbs: &[u64]) -> usize {
         .map_or(0, |index| index + 1)
 }
 
-fn expected_string_payload_len(encoding: StringEncoding, code_unit_len: u32) -> usize {
+const fn expected_string_payload_len(encoding: StringEncoding, code_unit_len: u32) -> usize {
     match encoding {
         StringEncoding::Latin1 => code_unit_len as usize,
         StringEncoding::Utf16 => (code_unit_len as usize)

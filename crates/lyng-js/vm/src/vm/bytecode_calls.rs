@@ -56,7 +56,7 @@ impl Vm {
         }
         let construct_this = construct_call
             .then_some(())
-            .and_then(|_| this_value.as_object_ref());
+            .and_then(|()| this_value.as_object_ref());
         self.install_prepared_bytecode_call(
             agent,
             prepared,
@@ -86,7 +86,7 @@ impl Vm {
                 .flags()
                 .contains(FrameFlags::construct())
                 .then_some(())
-                .and_then(|_| caller_frame.this_value().as_object_ref())
+                .and_then(|()| caller_frame.this_value().as_object_ref())
         });
         self.teardown_tail_frame(agent, caller_frame)?;
         self.install_prepared_bytecode_call(
@@ -253,7 +253,7 @@ impl Vm {
 
         let script_or_module_referrer = agent
             .current_execution_context()
-            .and_then(|context| context.script_or_module_referrer());
+            .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer);
         let context = ExecutionContext::bytecode(
             prepared.realm,
             prepared.code,
@@ -429,7 +429,7 @@ impl Vm {
             if let Some(home_object) = agent
                 .objects()
                 .function_data(record.function_object())
-                .and_then(|data| data.home_object())
+                .and_then(lyng_js_objects::FunctionObjectData::home_object)
             {
                 return Ok(home_object);
             }
@@ -440,7 +440,7 @@ impl Vm {
                 agent
                     .objects()
                     .function_data(callee)
-                    .and_then(|data| data.home_object())
+                    .and_then(lyng_js_objects::FunctionObjectData::home_object)
             })
             .ok_or_else(|| VmError::Abrupt(errors::throw_reference_error(agent)))
     }
@@ -519,7 +519,7 @@ impl Vm {
         };
         let root_shape = agent
             .realm(realm)
-            .and_then(|realm| realm.root_shape())
+            .and_then(lyng_js_env::RealmRecord::root_shape)
             .ok_or(VmError::MissingRootShape(realm))?;
         Ok(agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();

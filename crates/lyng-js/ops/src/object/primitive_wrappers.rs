@@ -129,7 +129,7 @@ pub fn require_primitive_wrapper_value(
         .ok_or_else(|| throw_type_error(agent))
 }
 
-fn primitive_wrapper_kind_for_value(value: Value) -> Option<PrimitiveWrapperKind> {
+const fn primitive_wrapper_kind_for_value(value: Value) -> Option<PrimitiveWrapperKind> {
     if value.is_string() {
         return Some(PrimitiveWrapperKind::String);
     }
@@ -163,7 +163,7 @@ fn wrapper_prototype(
     }
 }
 
-fn primitive_matches_kind(expected: PrimitiveWrapperKind, value: Value) -> bool {
+const fn primitive_matches_kind(expected: PrimitiveWrapperKind, value: Value) -> bool {
     match expected {
         PrimitiveWrapperKind::String => value.is_string(),
         PrimitiveWrapperKind::Number => value.is_number(),

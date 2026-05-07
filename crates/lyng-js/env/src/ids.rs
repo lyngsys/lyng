@@ -92,21 +92,21 @@ define_runtime_id!(
 );
 
 #[inline]
-pub(crate) fn agent_index(id: AgentId) -> usize {
+pub const fn agent_index(id: AgentId) -> usize {
     (id.get() - 1) as usize
 }
 
 #[inline]
-pub(crate) fn layout_index(id: EnvironmentLayoutId) -> usize {
+pub const fn layout_index(id: EnvironmentLayoutId) -> usize {
     (id.get() - 1) as usize
 }
 
 #[inline]
-pub(crate) fn environment_index(id: EnvironmentRef) -> usize {
+pub const fn environment_index(id: EnvironmentRef) -> usize {
     (id.get() - 1) as usize
 }
 
 #[inline]
-pub(crate) fn realm_index(id: RealmRef) -> usize {
+pub const fn realm_index(id: RealmRef) -> usize {
     (id.get() - 1) as usize
 }

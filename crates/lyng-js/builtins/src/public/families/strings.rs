@@ -574,7 +574,7 @@ impl StringDescriptorAtoms {
     }
 }
 
-fn string_constructor_method_specs(
+const fn string_constructor_method_specs(
     atoms: StringDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 3] {
     [
@@ -584,7 +584,7 @@ fn string_constructor_method_specs(
     ]
 }
 
-fn string_prototype_method_specs(
+const fn string_prototype_method_specs(
     atoms: StringDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 50] {
     [

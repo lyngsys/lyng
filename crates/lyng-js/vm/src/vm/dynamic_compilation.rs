@@ -77,7 +77,7 @@ fn split_eval_regexp_literal_source(source: &str) -> Option<(&str, &str)> {
     None
 }
 
-fn is_regexp_literal_flag_char(ch: char) -> bool {
+const fn is_regexp_literal_flag_char(ch: char) -> bool {
     ch == '$' || ch == '_' || ch.is_ascii_alphanumeric()
 }
 
@@ -131,7 +131,7 @@ fn string_ref_code_units(agent: &Agent, string: StringRef) -> Option<Vec<u16>> {
 }
 
 impl Vm {
-    fn compiler_dynamic_function_kind(
+    const fn compiler_dynamic_function_kind(
         kind: BuiltinDynamicFunctionKind,
     ) -> dynamic::DynamicFunctionKind {
         match kind {
@@ -144,7 +144,7 @@ impl Vm {
         }
     }
 
-    fn dynamic_stage_message<'a>(
+    const fn dynamic_stage_message<'a>(
         error: &dynamic::DynamicCompilationError,
         parse: &'a str,
         semantic: &'a str,
@@ -159,8 +159,7 @@ impl Vm {
 
     pub(super) fn caller_is_strict(&self, caller: FrameRecord) -> bool {
         self.installed_function(caller.code())
-            .map(|function| function.flags().strict())
-            .unwrap_or(false)
+            .is_some_and(|function| function.flags().strict())
     }
 
     pub(super) fn install_dynamic_function(
@@ -392,18 +391,17 @@ impl Vm {
             .global_env();
         let root_var_names = Self::direct_eval_root_var_names(analysis.sema());
         let root_function_names = Self::direct_eval_root_function_names(analysis.sema());
-        if !analysis.parsed().strict {
-            if let Some(lyng_js_env::EnvironmentRecord::Global(record)) =
+        if !analysis.parsed().strict
+            && let Some(lyng_js_env::EnvironmentRecord::Global(record)) =
                 agent.environment(global_env)
-            {
-                self.validate_direct_eval_global_declarations(
-                    agent,
-                    global_env,
-                    record.global_object(),
-                    &root_function_names,
-                    &root_var_names,
-                )?;
-            }
+        {
+            self.validate_direct_eval_global_declarations(
+                agent,
+                global_env,
+                record.global_object(),
+                &root_function_names,
+                &root_var_names,
+            )?;
         }
 
         let hosted_names = self.rewrite_direct_eval_root_bindings(
@@ -428,9 +426,9 @@ impl Vm {
         let (lexical_env, variable_env) = if analysis.parsed().strict {
             let indirect_eval_env =
                 self.create_direct_eval_var_environment(agent, global_env, &hosted_names)?;
-            indirect_eval_env
-                .map(|environment| (environment, environment))
-                .unwrap_or((global_env, global_env))
+            indirect_eval_env.map_or((global_env, global_env), |environment| {
+                (environment, environment)
+            })
         } else {
             if let Some(lyng_js_env::EnvironmentRecord::Global(record)) =
                 agent.environment(global_env)
@@ -503,7 +501,7 @@ impl Vm {
         }
     }
 
-    fn caller_in_parameter_initializer(caller: FrameRecord) -> bool {
+    const fn caller_in_parameter_initializer(caller: FrameRecord) -> bool {
         let end_offset = caller.parameter_initializer_end_offset();
         end_offset != 0 && caller.instruction_offset() < end_offset
     }
@@ -598,7 +596,7 @@ impl Vm {
 
         Ok(matches!(
             self.installed_function(caller.code())
-                .map(|function| function.kind()),
+                .map(lyng_js_bytecode::BytecodeFunction::kind),
             Some(lyng_js_bytecode::BytecodeFunctionKind::Function)
         ))
     }
@@ -606,13 +604,13 @@ impl Vm {
     fn caller_allows_direct_eval_function_code(&self, agent: &Agent, caller: FrameRecord) -> bool {
         match self
             .installed_function(caller.code())
-            .map(|function| function.kind())
+            .map(lyng_js_bytecode::BytecodeFunction::kind)
         {
             Some(lyng_js_bytecode::BytecodeFunctionKind::Function) => true,
             Some(lyng_js_bytecode::BytecodeFunctionKind::Arrow) => {
                 let global_object = agent
                     .realm(caller.realm())
-                    .map(|realm| realm.global_object());
+                    .map(lyng_js_env::RealmRecord::global_object);
                 Self::this_environment_record(agent, caller.lexical_env()).is_ok_and(|record| {
                     record.is_some_and(|record| Some(record.function_object()) != global_object)
                 })
@@ -634,7 +632,7 @@ impl Vm {
             if let Some(home_object) = agent
                 .objects()
                 .function_data(record.function_object())
-                .and_then(|data| data.home_object())
+                .and_then(lyng_js_objects::FunctionObjectData::home_object)
             {
                 return Some(home_object);
             }
@@ -648,7 +646,7 @@ impl Vm {
             agent
                 .objects()
                 .function_data(callee)
-                .and_then(|data| data.home_object())
+                .and_then(lyng_js_objects::FunctionObjectData::home_object)
         })
     }
 
@@ -660,7 +658,7 @@ impl Vm {
         Self::this_environment_record(agent, lexical_env)
             .ok()
             .flatten()
-            .map(|record| record.function_object())
+            .map(lyng_js_env::FunctionEnvironmentRecord::function_object)
             .or_else(|| caller.callee())
     }
 
@@ -671,13 +669,13 @@ impl Vm {
     ) -> Option<lyng_js_types::EnvironmentRef> {
         agent
             .current_execution_context()
-            .and_then(|context| context.private_env())
+            .and_then(lyng_js_env::ExecutionContext::private_env)
             .or_else(|| {
                 caller.callee().and_then(|callee| {
                     agent
                         .objects()
                         .function_data(callee)
-                        .and_then(|data| data.private_env())
+                        .and_then(lyng_js_objects::FunctionObjectData::private_env)
                 })
             })
     }
@@ -688,15 +686,17 @@ impl Vm {
         lexical_env: lyng_js_types::EnvironmentRef,
         caller: FrameRecord,
     ) -> VmResult<(Value, Option<ObjectRef>)> {
-        if let Some(context) = agent.current_execution_context() {
-            if let ThisState::Value(value) = context.this_state() {
-                return Ok((value, context.new_target()));
-            }
+        if let Some(context) = agent.current_execution_context()
+            && let ThisState::Value(value) = context.this_state()
+        {
+            return Ok((value, context.new_target()));
         }
         Self::lexical_call_state(agent, lexical_env, caller)
     }
 
-    fn sema_private_element_kind(kind: ClassPrivateElementKind) -> SemaClassPrivateElementKind {
+    const fn sema_private_element_kind(
+        kind: ClassPrivateElementKind,
+    ) -> SemaClassPrivateElementKind {
         match kind {
             ClassPrivateElementKind::Field => SemaClassPrivateElementKind::Field,
             ClassPrivateElementKind::Method => SemaClassPrivateElementKind::Method,
@@ -841,10 +841,10 @@ impl Vm {
             return;
         };
         for binding in layout.bindings() {
-            if binding.flags().is_lexical() {
-                if let Some(name) = binding.name() {
-                    Self::push_unique_atom(out, name);
-                }
+            if binding.flags().is_lexical()
+                && let Some(name) = binding.name()
+            {
+                Self::push_unique_atom(out, name);
             }
         }
     }
@@ -977,32 +977,28 @@ impl Vm {
         for &name in function_names {
             if let Some((environment, is_lexical)) = self
                 .direct_eval_chain_lexical_binding_before_var_env(agent, lexical_env, var_env, name)
-            {
-                if !annex_b_catch_environments
+                && !annex_b_catch_environments
                     .iter()
                     .any(|&(_, _, catch_env, _, catch_name)| {
                         catch_env == environment && catch_name == name
                     })
-                    && (is_lexical || !annex_b_catch_names.contains(&name))
-                {
-                    return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
-                }
+                && (is_lexical || !annex_b_catch_names.contains(&name))
+            {
+                return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
             }
         }
 
         for &name in var_names {
             if let Some((environment, is_lexical)) = self
                 .direct_eval_chain_lexical_binding_before_var_env(agent, lexical_env, var_env, name)
-            {
-                if !annex_b_catch_environments
+                && !annex_b_catch_environments
                     .iter()
                     .any(|&(_, _, catch_env, _, catch_name)| {
                         catch_env == environment && catch_name == name
                     })
-                    && (is_lexical || !annex_b_catch_names.contains(&name))
-                {
-                    return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
-                }
+                && (is_lexical || !annex_b_catch_names.contains(&name))
+            {
+                return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
             }
         }
 
@@ -1609,9 +1605,9 @@ impl Vm {
         let (lexical_env, variable_env) = if strict_eval {
             let direct_eval_env =
                 self.create_direct_eval_var_environment(agent, caller_lexical_env, &hosted_names)?;
-            direct_eval_env
-                .map(|environment| (environment, environment))
-                .unwrap_or((caller_lexical_env, caller_variable_env))
+            direct_eval_env.map_or((caller_lexical_env, caller_variable_env), |environment| {
+                (environment, environment)
+            })
         } else if let Some(record) = caller_is_script.then_some(()).and_then(|()| {
             match agent.environment(caller_variable_env) {
                 Some(lyng_js_env::EnvironmentRecord::Global(record)) => Some(record),

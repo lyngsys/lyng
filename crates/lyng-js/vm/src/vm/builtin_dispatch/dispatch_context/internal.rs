@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    errors, eval_builtin, BuiltinInvocation, InternalBuiltinDispatchContext, Value, Vm,
+    VmBuiltinDispatch, VmError,
+};
 
 impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     type Error = VmError;

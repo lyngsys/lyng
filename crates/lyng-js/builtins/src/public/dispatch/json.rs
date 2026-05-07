@@ -1,4 +1,13 @@
-use super::*;
+use super::{
+    allocate_json_raw_object, array_like_index_property_key, array_like_length,
+    callable_object_from_value, create_array_result, create_data_property_or_throw,
+    get_property_from_object, is_array_for_species, number_value, property_key_from_text,
+    property_key_string_value, proxy_get_own_property, proxy_own_property_keys,
+    string_from_code_units, string_ref_code_units, string_ref_text, string_value, syntax_error,
+    to_integer_or_infinity_for_builtin, to_number_for_builtin, to_number_value_for_builtin,
+    to_string_string_ref, try_create_data_property, try_delete_property_from_object, type_error,
+    BuiltinFunctionId, BuiltinInvocation, PropertyKey, PublicBuiltinDispatchContext, Value,
+};
 use lyng_js_objects::{ObjectKind, PrimitiveWrapperKind};
 use lyng_js_types::{ObjectRef, StringRef};
 use std::fmt::Write as _;
@@ -205,16 +214,16 @@ enum JsonParseNode {
     },
     Array {
         object: ObjectRef,
-        elements: Vec<JsonParseNode>,
+        elements: Vec<Self>,
     },
     Object {
         object: ObjectRef,
-        entries: Vec<(PropertyKey, JsonParseNode)>,
+        entries: Vec<(PropertyKey, Self)>,
     },
 }
 
 impl JsonParseNode {
-    fn value(&self) -> Value {
+    const fn value(&self) -> Value {
         match self {
             Self::Primitive { value, .. } => *value,
             Self::Array { object, .. } | Self::Object { object, .. } => {
@@ -237,7 +246,7 @@ impl JsonParseNode {
         }
     }
 
-    fn array_elements_for_object(&self, object: ObjectRef) -> Option<&[JsonParseNode]> {
+    fn array_elements_for_object(&self, object: ObjectRef) -> Option<&[Self]> {
         match self {
             Self::Array {
                 object: original,
@@ -247,7 +256,7 @@ impl JsonParseNode {
         }
     }
 
-    fn object_entry_for_key(&self, object: ObjectRef, key: PropertyKey) -> Option<&JsonParseNode> {
+    fn object_entry_for_key(&self, object: ObjectRef, key: PropertyKey) -> Option<&Self> {
         match self {
             Self::Object {
                 object: original,
@@ -267,7 +276,7 @@ struct JsonParser<'a> {
 }
 
 impl<'a> JsonParser<'a> {
-    fn new(units: &'a [u16]) -> Self {
+    const fn new(units: &'a [u16]) -> Self {
         Self { units, index: 0 }
     }
 
@@ -842,13 +851,13 @@ fn json_raw_json_string<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Option<String>, Cx::Error> {
     let raw_json_string = {
         let agent = cx.agent();
-        if !agent.objects().is_json_raw_object(object) {
-            None
-        } else {
+        if agent.objects().is_json_raw_object(object) {
             agent
                 .objects()
                 .ordinary_payload_value(agent.heap().view(), object)
                 .and_then(Value::as_string_ref)
+        } else {
+            None
         }
     };
     raw_json_string
@@ -879,10 +888,10 @@ fn json_serialize_property<Cx: PublicBuiltinDispatchContext>(
             &[key_value, value],
         )?;
     }
-    if let Some(object) = value.as_object_ref() {
-        if let Some(normalized) = json_normalize_wrapper_value(cx, value, object)? {
-            value = normalized;
-        }
+    if let Some(object) = value.as_object_ref()
+        && let Some(normalized) = json_normalize_wrapper_value(cx, value, object)?
+    {
+        value = normalized;
     }
 
     if value.is_undefined() || value.as_symbol_ref().is_some() {

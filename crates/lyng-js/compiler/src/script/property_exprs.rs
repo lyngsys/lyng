@@ -1,7 +1,14 @@
-use super::*;
+use super::{
+    internal_define_getter_property_builtin, internal_define_setter_property_builtin,
+    internal_object_literal_set_prototype_builtin, internal_super_base_builtin,
+    internal_super_property_get_builtin, internal_super_property_set_builtin,
+    reference_error_builtin, AtomId, Expr, ExprId, FunctionCompiler, LoweringError, LoweringResult,
+    Opcode, Property, PropertyKind, ReferenceUsage, ResolutionKind, SafepointKind, Span,
+    StorageClass, WellKnownAtom,
+};
 use lyng_js_types::internal_import_meta_builtin;
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_update_expression(
         &mut self,
         expr_id: ExprId,
@@ -186,12 +193,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     }
 
     fn lower_object_property_key_value(&mut self, property: Property) -> LoweringResult<u16> {
-        if !property.computed {
-            if let Some(atom) = self.named_property_atom(property.key)? {
-                let key = self.alloc_temp()?;
-                self.emit_load_atom_string(key, atom)?;
-                return Ok(key);
-            }
+        if !property.computed
+            && let Some(atom) = self.named_property_atom(property.key)?
+        {
+            let key = self.alloc_temp()?;
+            self.emit_load_atom_string(key, atom)?;
+            return Ok(key);
         }
         let raw_key = self.lower_expr_to_temp(property.key)?;
         let key = self.alloc_temp()?;

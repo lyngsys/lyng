@@ -1,10 +1,12 @@
-use super::*;
+use super::{
+    AtomId, Expr, ExprId, FeedbackSiteKind, FunctionCompiler, LoweringResult, Opcode, SafepointKind,
+};
 
 struct OptionalNullishGuard {
     jump_end: u32,
 }
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn expr_continues_optional_chain(&self, expr_id: ExprId) -> bool {
         match self.ast().get_expr(expr_id) {
             Expr::OptionalChainExpression { .. } => true,

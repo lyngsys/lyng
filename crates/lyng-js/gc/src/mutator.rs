@@ -93,12 +93,12 @@ pub enum ShapeHandleStoreTarget {
 
 impl PrimitiveHeap {
     #[inline]
-    pub fn view(&self) -> PrimitiveHeapView<'_> {
+    pub const fn view(&self) -> PrimitiveHeapView<'_> {
         PrimitiveHeapView { heap: self }
     }
 
     #[inline]
-    pub fn mutator(&mut self) -> PrimitiveMutator<'_> {
+    pub const fn mutator(&mut self) -> PrimitiveMutator<'_> {
         PrimitiveMutator {
             heap: self,
             roots: None,
@@ -107,7 +107,10 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub fn mutator_with_roots<'a>(&'a mut self, roots: &'a PrimitiveRoots) -> PrimitiveMutator<'a> {
+    pub const fn mutator_with_roots<'a>(
+        &'a mut self,
+        roots: &'a PrimitiveRoots,
+    ) -> PrimitiveMutator<'a> {
         PrimitiveMutator {
             heap: self,
             roots: Some(roots),
@@ -123,7 +126,7 @@ impl<'a> PrimitiveHeapView<'a> {
     }
 
     #[inline]
-    pub fn collection_budget_bytes(self) -> usize {
+    pub const fn collection_budget_bytes(self) -> usize {
         self.heap.collection_budget_bytes()
     }
 
@@ -313,12 +316,12 @@ impl PrimitiveMutator<'_> {
     }
 
     #[inline]
-    pub fn collection_budget_bytes(&self) -> usize {
+    pub const fn collection_budget_bytes(&self) -> usize {
         self.heap.collection_budget_bytes()
     }
 
     #[inline]
-    pub fn last_collection_report(&self) -> Option<PrimitiveCollectionReport> {
+    pub const fn last_collection_report(&self) -> Option<PrimitiveCollectionReport> {
         self.last_collection_report
     }
 
@@ -412,7 +415,7 @@ impl PrimitiveMutator<'_> {
     }
 
     #[inline]
-    pub fn view(&self) -> PrimitiveHeapView<'_> {
+    pub const fn view(&self) -> PrimitiveHeapView<'_> {
         PrimitiveHeapView { heap: self.heap }
     }
 

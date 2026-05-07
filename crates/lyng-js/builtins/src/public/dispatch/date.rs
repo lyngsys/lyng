@@ -418,11 +418,11 @@ fn date_balance_year_month(year: i64, month: i64) -> Option<(i32, u8)> {
     ))
 }
 
-fn date_is_leap_year(year: i32) -> bool {
+const fn date_is_leap_year(year: i32) -> bool {
     year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 }
 
-fn date_days_in_month(year: i32, month: u8) -> u8 {
+const fn date_days_in_month(year: i32, month: u8) -> u8 {
     match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
@@ -452,7 +452,7 @@ fn date_civil_from_days(days_since_epoch: i64) -> Option<(i32, u8, u8)> {
     let mp = (5 * doy + 2) / 153;
     let day = doy - (153 * mp + 2) / 5 + 1;
     let month = mp + if mp < 10 { 3 } else { -9 };
-    let year = y + if month <= 2 { 1 } else { 0 };
+    let year = y + i64::from(month <= 2);
     Some((
         i32::try_from(year).ok()?,
         u8::try_from(month).ok()?,
@@ -498,10 +498,13 @@ fn date_make_time(hour: f64, minute: f64, second: f64, millisecond: f64) -> Opti
         return None;
     }
     Some(
-        hour.trunc() * DATE_MS_PER_HOUR as f64
-            + minute.trunc() * DATE_MS_PER_MINUTE as f64
-            + second.trunc() * DATE_MS_PER_SECOND as f64
-            + millisecond.trunc(),
+        second.trunc().mul_add(
+            DATE_MS_PER_SECOND as f64,
+            hour.trunc().mul_add(
+                DATE_MS_PER_HOUR as f64,
+                minute.trunc() * DATE_MS_PER_MINUTE as f64,
+            ),
+        ) + millisecond.trunc(),
     )
 }
 
@@ -520,7 +523,7 @@ fn date_make_utc_value(
     let Some(time) = date_make_time(hour, minute, second, millisecond) else {
         return Value::from_f64(f64::NAN);
     };
-    date_time_clip_value(day as f64 * DATE_MS_PER_DAY as f64 + time)
+    date_time_clip_value((day as f64).mul_add(DATE_MS_PER_DAY as f64, time))
 }
 
 fn date_make_local_value<Cx: PublicBuiltinDispatchContext>(
@@ -816,7 +819,7 @@ fn date_builtin<Cx: PublicBuiltinDispatchContext>(
         let agent = cx.agent();
         agent
             .realm_intrinsics(realm)
-            .and_then(|intrinsics| intrinsics.date_prototype())
+            .and_then(lyng_js_env::Intrinsics::date_prototype)
     }
     .ok_or_else(|| type_error(cx))?;
 

@@ -6,7 +6,7 @@ use lyng_js_env::Agent;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_types::{BuiltinFunctionId, Value, WellKnownSymbolId};
 
-pub(super) fn builtin_function_atom_property(
+pub(super) const fn builtin_function_atom_property(
     atom: AtomId,
     entry: BuiltinFunctionId,
 ) -> BuiltinPropertyDescriptor {
@@ -17,7 +17,7 @@ pub(super) fn builtin_function_atom_property(
     )
 }
 
-pub(super) fn builtin_function_symbol_property(
+pub(super) const fn builtin_function_symbol_property(
     symbol: WellKnownSymbolId,
     entry: BuiltinFunctionId,
     attributes: BuiltinAttributes,
@@ -29,7 +29,7 @@ pub(super) fn builtin_function_symbol_property(
     )
 }
 
-pub(super) fn data_atom_property(
+pub(super) const fn data_atom_property(
     atom: AtomId,
     value: Value,
     attributes: BuiltinAttributes,
@@ -41,7 +41,7 @@ pub(super) fn data_atom_property(
     )
 }
 
-pub(super) fn data_symbol_property(
+pub(super) const fn data_symbol_property(
     symbol: WellKnownSymbolId,
     value: Value,
     attributes: BuiltinAttributes,
@@ -53,7 +53,7 @@ pub(super) fn data_symbol_property(
     )
 }
 
-pub(super) fn accessor_atom_property(
+pub(super) const fn accessor_atom_property(
     atom: AtomId,
     get: Option<BuiltinFunctionId>,
     set: Option<BuiltinFunctionId>,
@@ -66,7 +66,7 @@ pub(super) fn accessor_atom_property(
     )
 }
 
-pub(super) fn accessor_symbol_property(
+pub(super) const fn accessor_symbol_property(
     symbol: WellKnownSymbolId,
     get: Option<BuiltinFunctionId>,
     set: Option<BuiltinFunctionId>,

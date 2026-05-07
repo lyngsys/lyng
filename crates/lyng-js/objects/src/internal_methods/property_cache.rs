@@ -36,19 +36,19 @@ impl ObjectRuntime {
             return Ok(None);
         }
 
-        if !receiver_header.flags().uses_named_property_dictionary() {
-            if let Some(property) = self.shape_property(receiver_header.shape(), key) {
-                return Ok(Self::build_named_property_cache_entry(
-                    purpose,
-                    receiver_header.shape(),
-                    receiver,
-                    receiver_header.shape(),
-                    property,
-                    NamedPropertyCachePath::OwnData,
-                    dependency_count,
-                    dependencies,
-                ));
-            }
+        if !receiver_header.flags().uses_named_property_dictionary()
+            && let Some(property) = self.shape_property(receiver_header.shape(), key)
+        {
+            return Ok(Self::build_named_property_cache_entry(
+                purpose,
+                receiver_header.shape(),
+                receiver,
+                receiver_header.shape(),
+                property,
+                NamedPropertyCachePath::OwnData,
+                dependency_count,
+                dependencies,
+            ));
         }
 
         if matches!(purpose, NamedPropertyCachePurpose::Store) {

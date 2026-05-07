@@ -29,7 +29,7 @@ pub struct BytecodeFunction {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct BytecodeFunctionBody {
+pub struct BytecodeFunctionBody {
     pub(crate) environment_bindings: Vec<BytecodeEnvironmentBinding>,
     pub(crate) instructions: Vec<Instruction>,
     pub(crate) constants: Vec<ConstantValue>,

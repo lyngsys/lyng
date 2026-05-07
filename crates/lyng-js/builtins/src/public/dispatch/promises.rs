@@ -193,10 +193,9 @@ fn promise_builtin<Cx: PublicBuiltinDispatchContext>(
             Value::from_object_ref(resolve),
             Value::from_object_ref(reject),
         ],
-    ) {
-        if let Some(thrown) = cx.extract_thrown_value(error)? {
-            let _ = cx.call_to_completion(reject, Value::undefined(), &[thrown])?;
-        }
+    ) && let Some(thrown) = cx.extract_thrown_value(error)?
+    {
+        let _ = cx.call_to_completion(reject, Value::undefined(), &[thrown])?;
     }
     Ok(Value::from_object_ref(promise_object))
 }
@@ -423,7 +422,7 @@ fn promise_any_builtin<Cx: PublicBuiltinDispatchContext>(
     promise_collecting_combinator_builtin(cx, invocation, PromiseCombinatorKind::Any)
 }
 
-fn promise_species_getter_builtin<Cx: PublicBuiltinDispatchContext>(
+const fn promise_species_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     _cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
@@ -1012,7 +1011,7 @@ fn allocate_promise_combinator_element<Cx: PublicBuiltinDispatchContext>(
     Ok(function)
 }
 
-fn promise_combinator_element_entry(kind: PromiseCombinatorElementKind) -> BuiltinFunctionId {
+const fn promise_combinator_element_entry(kind: PromiseCombinatorElementKind) -> BuiltinFunctionId {
     match kind {
         PromiseCombinatorElementKind::AllResolve => promise_all_resolve_element_builtin(),
         PromiseCombinatorElementKind::AllSettledResolve => {

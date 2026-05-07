@@ -9,11 +9,11 @@ use lyng_js_env::Agent;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_types::{Completion, Value};
 
-/// Converts one already-primitive ECMAScript value into a BigInt.
+/// Converts one already-primitive ECMAScript value into a `BigInt`.
 ///
 /// # Errors
 /// Returns `TypeError` for unsupported logical types, `SyntaxError` for invalid
-/// BigInt strings, and `RangeError` for non-integral number input.
+/// `BigInt` strings, and `RangeError` for non-integral number input.
 pub fn primitive_to_bigint(agent: &mut Agent, value: Value) -> Completion<Value> {
     if value.is_bigint() {
         return Ok(value);
@@ -81,10 +81,10 @@ pub fn string_to_bigint_value(agent: &mut Agent, value: Value) -> Completion<Opt
     Ok(Some(Value::from_bigint_ref(bigint)))
 }
 
-/// Formats one BigInt value using the selected radix.
+/// Formats one `BigInt` value using the selected radix.
 ///
 /// # Errors
-/// Returns `TypeError` when the value is not a live BigInt handle.
+/// Returns `TypeError` when the value is not a live `BigInt` handle.
 pub fn bigint_to_string(agent: &mut Agent, value: Value, radix: u32) -> Completion<String> {
     let bigint = value
         .as_bigint_ref()

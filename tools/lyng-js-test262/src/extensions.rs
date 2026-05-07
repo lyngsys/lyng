@@ -41,13 +41,13 @@ const TEST262_BUILD_STRING_RAW: u32 = 12;
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone)]
-pub(crate) enum Test262TemporalCurrentInstantSource {
+pub enum Test262TemporalCurrentInstantSource {
     Fixed(TemporalInstant),
     SystemClock,
 }
 
 #[derive(Clone)]
-pub(crate) struct Test262Host {
+pub struct Test262Host {
     entry_path: PathBuf,
     entry_key: ModuleKey,
     entry_source: String,
@@ -325,62 +325,62 @@ impl HostHooks for Test262Host {
     }
 }
 
-fn test262_eval_script_entry() -> EmbeddingFunctionId {
+const fn test262_eval_script_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_EVAL_SCRIPT_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_create_realm_entry() -> EmbeddingFunctionId {
+const fn test262_create_realm_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_CREATE_REALM_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_detach_array_buffer_entry() -> EmbeddingFunctionId {
+const fn test262_detach_array_buffer_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_DETACH_ARRAY_BUFFER_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_gc_entry() -> EmbeddingFunctionId {
+const fn test262_gc_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_GC_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_print_entry() -> EmbeddingFunctionId {
+const fn test262_print_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_PRINT_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_same_value_entry() -> EmbeddingFunctionId {
+const fn test262_same_value_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_SAME_VALUE_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_agent_get_report_entry() -> EmbeddingFunctionId {
+const fn test262_agent_get_report_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_AGENT_GET_REPORT_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_agent_sleep_entry() -> EmbeddingFunctionId {
+const fn test262_agent_sleep_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_AGENT_SLEEP_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_agent_monotonic_now_entry() -> EmbeddingFunctionId {
+const fn test262_agent_monotonic_now_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_AGENT_MONOTONIC_NOW_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_set_timeout_entry() -> EmbeddingFunctionId {
+const fn test262_set_timeout_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_SET_TIMEOUT_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_is_html_dda_entry() -> EmbeddingFunctionId {
+const fn test262_is_html_dda_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_IS_HTMLDDA_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
 
-fn test262_build_string_entry() -> EmbeddingFunctionId {
+const fn test262_build_string_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(TEST262_BUILD_STRING_RAW)
         .expect("test262 embedding function ids should stay non-zero")
 }
@@ -401,7 +401,7 @@ fn read_test262_object(agent: &mut Agent, global_object: ObjectRef) -> Result<Ob
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct Test262PrintObserver {
+pub struct Test262PrintObserver {
     messages: Arc<Mutex<Vec<String>>>,
 }
 
@@ -422,12 +422,12 @@ impl Test262PrintObserver {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct Test262RealmExtension {
+pub struct Test262RealmExtension {
     print_observer: Test262PrintObserver,
 }
 
 impl Test262RealmExtension {
-    pub(crate) fn new(print_observer: Test262PrintObserver) -> Self {
+    pub(crate) const fn new(print_observer: Test262PrintObserver) -> Self {
         Self { print_observer }
     }
 }

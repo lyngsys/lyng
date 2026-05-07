@@ -16,12 +16,16 @@ pub fn is_promise(agent: &Agent, value: Value) -> bool {
 
 #[inline]
 pub fn promise_state(agent: &Agent, promise: ObjectRef) -> Option<PromiseState> {
-    agent.promise_record(promise).map(|record| record.state())
+    agent
+        .promise_record(promise)
+        .map(lyng_js_env::PromiseRecord::state)
 }
 
 #[inline]
 pub fn promise_result(agent: &Agent, promise: ObjectRef) -> Option<Value> {
-    agent.promise_record(promise).map(|record| record.result())
+    agent
+        .promise_record(promise)
+        .map(lyng_js_env::PromiseRecord::result)
 }
 
 #[inline]
@@ -33,7 +37,7 @@ pub fn create_promise_reaction(
 ) -> lyng_js_env::PromiseReactionId {
     let script_or_module_referrer = agent
         .current_execution_context()
-        .and_then(|context| context.script_or_module_referrer());
+        .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer);
     agent.alloc_promise_reaction(
         PromiseReactionRecord::new(kind, handler, capability)
             .with_script_or_module_referrer(script_or_module_referrer),

@@ -459,7 +459,7 @@ fn string_to_well_formed_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(string_from_code_units(cx, &to_well_formed_utf16(&units)))
 }
 
-fn is_ecmascript_trim_unit(unit: u16) -> bool {
+const fn is_ecmascript_trim_unit(unit: u16) -> bool {
     matches!(
         unit,
         0x0009 | 0x000A | 0x000B | 0x000C | 0x000D | 0x0020 | 0x00A0 | 0x1680 | 0x2000
@@ -528,7 +528,7 @@ fn utf16_code_points(units: &[u16]) -> Vec<u32> {
     points
 }
 
-fn is_case_ignorable_code_point(code_point: u32) -> bool {
+const fn is_case_ignorable_code_point(code_point: u32) -> bool {
     matches!(
         code_point,
         0x00AD | 0x0345 | 0x180E | 0x0300..=0x036F | 0x1D242
@@ -753,14 +753,13 @@ fn string_match_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
-    if pattern_value.as_object_ref().is_some() {
-        if let Some(matcher) =
+    if pattern_value.as_object_ref().is_some()
+        && let Some(matcher) =
             regexp::get_method_for_well_known_symbol(cx, pattern_value, WellKnownSymbolId::Match)?
-        {
-            let source_ref = string_this_ref(cx, invocation.this_value())?;
-            let source_value = Value::from_string_ref(source_ref);
-            return cx.call_to_completion(matcher, pattern_value, &[source_value]);
-        }
+    {
+        let source_ref = string_this_ref(cx, invocation.this_value())?;
+        let source_value = Value::from_string_ref(source_ref);
+        return cx.call_to_completion(matcher, pattern_value, &[source_value]);
     }
 
     let source_ref = string_this_ref(cx, invocation.this_value())?;
@@ -871,17 +870,16 @@ fn string_search_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
-    if pattern_value.as_object_ref().is_some() {
-        if let Some(searcher) =
+    if pattern_value.as_object_ref().is_some()
+        && let Some(searcher) =
             regexp::get_method_for_well_known_symbol(cx, pattern_value, WellKnownSymbolId::Search)?
-        {
-            let source_ref = string_this_ref(cx, invocation.this_value())?;
-            return cx.call_to_completion(
-                searcher,
-                pattern_value,
-                &[Value::from_string_ref(source_ref)],
-            );
-        }
+    {
+        let source_ref = string_this_ref(cx, invocation.this_value())?;
+        return cx.call_to_completion(
+            searcher,
+            pattern_value,
+            &[Value::from_string_ref(source_ref)],
+        );
     }
 
     let source_ref = string_this_ref(cx, invocation.this_value())?;
@@ -1090,16 +1088,15 @@ pub(super) fn string_replace_builtin<Cx: PublicBuiltinDispatchContext>(
         .get(1)
         .copied()
         .unwrap_or(Value::undefined());
-    if search_value.as_object_ref().is_some() {
-        if let Some(replacer) =
+    if search_value.as_object_ref().is_some()
+        && let Some(replacer) =
             regexp::get_method_for_well_known_symbol(cx, search_value, WellKnownSymbolId::Replace)?
-        {
-            return cx.call_to_completion(
-                replacer,
-                search_value,
-                &[invocation.this_value(), replacement],
-            );
-        }
+    {
+        return cx.call_to_completion(
+            replacer,
+            search_value,
+            &[invocation.this_value(), replacement],
+        );
     }
 
     let source_ref = string_this_ref(cx, invocation.this_value())?;
@@ -1156,16 +1153,15 @@ fn string_split_builtin<Cx: PublicBuiltinDispatchContext>(
         .get(1)
         .copied()
         .unwrap_or(Value::undefined());
-    if separator_value.as_object_ref().is_some() {
-        if let Some(splitter) =
+    if separator_value.as_object_ref().is_some()
+        && let Some(splitter) =
             regexp::get_method_for_well_known_symbol(cx, separator_value, WellKnownSymbolId::Split)?
-        {
-            return cx.call_to_completion(
-                splitter,
-                separator_value,
-                &[invocation.this_value(), limit_value],
-            );
-        }
+    {
+        return cx.call_to_completion(
+            splitter,
+            separator_value,
+            &[invocation.this_value(), limit_value],
+        );
     }
 
     let source_ref = string_this_ref(cx, invocation.this_value())?;
@@ -1192,7 +1188,7 @@ fn string_split_builtin<Cx: PublicBuiltinDispatchContext>(
     }
 
     match separator_units {
-        None => parts.push(source_units.clone()),
+        None => parts.push(source_units),
         Some(ref separator) if separator.is_empty() => {
             for unit in &source_units {
                 if parts.len() >= usize::try_from(limit).unwrap_or(usize::MAX) {

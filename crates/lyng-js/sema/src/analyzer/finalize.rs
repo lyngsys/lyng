@@ -4,7 +4,7 @@ use crate::ids::{FunctionSemaId, ScopeId, SemanticBindingId};
 use crate::scope::ScopeKind;
 use crate::use_site::ResolutionKind;
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     pub(super) fn finalize(&mut self) {
         self.propagate_eval_with();
         self.promote_bindings_visible_to_nested_eval();

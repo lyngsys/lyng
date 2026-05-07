@@ -145,7 +145,7 @@ pub struct ImportMetaProperties {
 
 impl ImportMetaProperties {
     #[inline]
-    pub fn new(properties: Vec<ImportMetaProperty>) -> Self {
+    pub const fn new(properties: Vec<ImportMetaProperty>) -> Self {
         Self { properties }
     }
 }
@@ -514,7 +514,7 @@ fn require_supported_time_zone(operation: &'static str, time_zone_id: &str) -> H
     }
 }
 
-fn floor_div_rem(value: i128, divisor: i128) -> (i128, i128) {
+const fn floor_div_rem(value: i128, divisor: i128) -> (i128, i128) {
     let mut quotient = value / divisor;
     let mut remainder = value % divisor;
     if remainder < 0 {
@@ -524,11 +524,11 @@ fn floor_div_rem(value: i128, divisor: i128) -> (i128, i128) {
     (quotient, remainder)
 }
 
-fn is_leap_year(year: i32) -> bool {
+const fn is_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
-fn days_in_month(year: i32, month: u8) -> Option<u8> {
+const fn days_in_month(year: i32, month: u8) -> Option<u8> {
     Some(match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
@@ -548,7 +548,7 @@ fn civil_from_days(days_since_epoch: i128) -> HostResult<(i32, u8, u8)> {
     let mp = (5 * doy + 2) / 153;
     let day = doy - (153 * mp + 2) / 5 + 1;
     let month = mp + if mp < 10 { 3 } else { -9 };
-    let year = y + if month <= 2 { 1 } else { 0 };
+    let year = y + i128::from(month <= 2);
 
     let year = i32::try_from(year).map_err(|_| {
         HostError::invalid_request(

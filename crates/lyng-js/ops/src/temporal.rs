@@ -57,7 +57,7 @@ pub enum TemporalDurationExactUnit {
 }
 
 impl TemporalDurationExactUnit {
-    fn order(self) -> u8 {
+    const fn order(self) -> u8 {
         match self {
             Self::Day => 0,
             Self::Hour => 1,
@@ -69,7 +69,7 @@ impl TemporalDurationExactUnit {
         }
     }
 
-    fn nanoseconds(self) -> i128 {
+    const fn nanoseconds(self) -> i128 {
         match self {
             Self::Day => NANOS_PER_DAY,
             Self::Hour => NANOS_PER_HOUR,
@@ -90,7 +90,7 @@ enum DurationLargestTimeUnit {
     Second,
 }
 
-pub fn duration_components(data: TemporalDurationObjectData) -> [i128; 10] {
+pub const fn duration_components(data: TemporalDurationObjectData) -> [i128; 10] {
     [
         data.years(),
         data.months(),
@@ -140,7 +140,7 @@ pub fn duration_signs_are_balanced(data: TemporalDurationObjectData) -> bool {
 
 pub fn duration_is_within_limits(data: TemporalDurationObjectData) -> bool {
     for component in [data.years(), data.months(), data.weeks()] {
-        if i128::from(component).abs() > DURATION_DATE_UNIT_MAX {
+        if component.abs() > DURATION_DATE_UNIT_MAX {
             return false;
         }
     }
@@ -157,15 +157,15 @@ pub fn durations_are_equal(
     duration_components(left) == duration_components(right)
 }
 
-pub fn duration_has_calendar_relative_units(data: TemporalDurationObjectData) -> bool {
+pub const fn duration_has_calendar_relative_units(data: TemporalDurationObjectData) -> bool {
     data.years() != 0 || data.months() != 0 || data.weeks() != 0
 }
 
-pub fn duration_has_date_units(data: TemporalDurationObjectData) -> bool {
+pub const fn duration_has_date_units(data: TemporalDurationObjectData) -> bool {
     data.years() != 0 || data.months() != 0 || data.weeks() != 0 || data.days() != 0
 }
 
-pub fn duration_calendar_relative_components_are_equal(
+pub const fn duration_calendar_relative_components_are_equal(
     left: TemporalDurationObjectData,
     right: TemporalDurationObjectData,
 ) -> bool {
@@ -183,7 +183,7 @@ pub fn compare_time_duration(
     Some(left.cmp(&right))
 }
 
-pub fn duration_default_largest_exact_unit(
+pub const fn duration_default_largest_exact_unit(
     data: TemporalDurationObjectData,
     smallest_unit: TemporalDurationExactUnit,
 ) -> TemporalDurationExactUnit {
@@ -211,7 +211,7 @@ pub fn duration_default_largest_exact_unit(
     }
 }
 
-pub fn duration_exact_unit_allows_largest_smallest(
+pub const fn duration_exact_unit_allows_largest_smallest(
     largest_unit: TemporalDurationExactUnit,
     smallest_unit: TemporalDurationExactUnit,
 ) -> bool {
@@ -219,18 +219,18 @@ pub fn duration_exact_unit_allows_largest_smallest(
 }
 
 fn duration_total_time_nanoseconds(data: TemporalDurationObjectData) -> Option<i128> {
-    let days = i128::from(data.days()).checked_mul(NANOS_PER_DAY)?;
-    let hours = i128::from(data.hours()).checked_mul(NANOS_PER_HOUR)?;
-    let minutes = i128::from(data.minutes()).checked_mul(NANOS_PER_MINUTE)?;
-    let seconds = i128::from(data.seconds()).checked_mul(NANOS_PER_SECOND)?;
-    let milliseconds = i128::from(data.milliseconds()).checked_mul(NANOS_PER_MILLISECOND)?;
-    let microseconds = i128::from(data.microseconds()).checked_mul(NANOS_PER_MICROSECOND)?;
+    let days = data.days().checked_mul(NANOS_PER_DAY)?;
+    let hours = data.hours().checked_mul(NANOS_PER_HOUR)?;
+    let minutes = data.minutes().checked_mul(NANOS_PER_MINUTE)?;
+    let seconds = data.seconds().checked_mul(NANOS_PER_SECOND)?;
+    let milliseconds = data.milliseconds().checked_mul(NANOS_PER_MILLISECOND)?;
+    let microseconds = data.microseconds().checked_mul(NANOS_PER_MICROSECOND)?;
     days.checked_add(hours)?
         .checked_add(minutes)?
         .checked_add(seconds)?
         .checked_add(milliseconds)?
         .checked_add(microseconds)?
-        .checked_add(i128::from(data.nanoseconds()))
+        .checked_add(data.nanoseconds())
 }
 
 pub fn round_duration_exact(
@@ -419,7 +419,7 @@ fn combine_component(left: i128, right: i128, right_sign: i128) -> Option<i128> 
     clippy::cast_precision_loss,
     reason = "Temporal Duration fields are stored as float64-representable integer values."
 )]
-fn duration_component_from_integer(value: i128) -> Option<i128> {
+const fn duration_component_from_integer(value: i128) -> Option<i128> {
     Some((value as f64) as i128)
 }
 
@@ -615,7 +615,7 @@ fn parse_decimal_i64(text: &str) -> Option<i64> {
 fn fraction_nanoseconds(text: &str, unit_nanoseconds: i128) -> Option<i128> {
     let fraction = i128::from(parse_decimal_i64(text)?);
     let scale = 10_i128.checked_pow(u32::try_from(text.len()).ok()?)?;
-    Some(fraction.checked_mul(unit_nanoseconds)?.checked_div(scale)?)
+    fraction.checked_mul(unit_nanoseconds)?.checked_div(scale)
 }
 
 fn distribute_nanoseconds(nanoseconds: i128) -> Option<[i64; 5]> {
@@ -658,7 +658,8 @@ fn round_duration_to_fractional_digits(
     rounding_mode: TemporalRoundingMode,
 ) -> Option<TemporalDurationObjectData> {
     let increment = 10_i128.pow(u32::from(9 - fractional_digits));
-    let day_time_nanoseconds = i128::from(data.days())
+    let day_time_nanoseconds = data
+        .days()
         .checked_mul(NANOS_PER_DAY)?
         .checked_add(duration_time_nanoseconds(data))?;
     let rounded = round_i128_to_increment(day_time_nanoseconds, increment, rounding_mode)?;
@@ -824,7 +825,7 @@ fn round_i128_to_increment_as_if_positive(
     Some(rounded)
 }
 
-fn duration_largest_time_unit(data: TemporalDurationObjectData) -> DurationLargestTimeUnit {
+const fn duration_largest_time_unit(data: TemporalDurationObjectData) -> DurationLargestTimeUnit {
     if data.days() != 0 {
         DurationLargestTimeUnit::Day
     } else if data.hours() != 0 {
@@ -836,7 +837,9 @@ fn duration_largest_time_unit(data: TemporalDurationObjectData) -> DurationLarge
     }
 }
 
-pub fn duration_largest_exact_unit(data: TemporalDurationObjectData) -> TemporalDurationExactUnit {
+pub const fn duration_largest_exact_unit(
+    data: TemporalDurationObjectData,
+) -> TemporalDurationExactUnit {
     if data.days() != 0 {
         TemporalDurationExactUnit::Day
     } else if data.hours() != 0 {
@@ -1006,12 +1009,12 @@ fn format_duration_parts(
     let days = data.days().unsigned_abs();
     let hours = data.hours().unsigned_abs();
     let minutes = data.minutes().unsigned_abs();
-    let seconds = u128::from(data.seconds().unsigned_abs());
+    let seconds = data.seconds().unsigned_abs();
     let total_subsecond_nanoseconds = seconds
         .saturating_mul(1_000_000_000)
-        .saturating_add(u128::from(data.milliseconds().unsigned_abs()).saturating_mul(1_000_000))
-        .saturating_add(u128::from(data.microseconds().unsigned_abs()).saturating_mul(1_000))
-        .saturating_add(u128::from(data.nanoseconds().unsigned_abs()));
+        .saturating_add(data.milliseconds().unsigned_abs().saturating_mul(1_000_000))
+        .saturating_add(data.microseconds().unsigned_abs().saturating_mul(1_000))
+        .saturating_add(data.nanoseconds().unsigned_abs());
     let whole_seconds = total_subsecond_nanoseconds / 1_000_000_000;
     let fractional_nanoseconds = total_subsecond_nanoseconds % 1_000_000_000;
 
@@ -1083,7 +1086,7 @@ pub fn negate_duration(data: TemporalDurationObjectData) -> TemporalDurationObje
     )
 }
 
-pub fn duration_has_lower_than_month_units(data: TemporalDurationObjectData) -> bool {
+pub const fn duration_has_lower_than_month_units(data: TemporalDurationObjectData) -> bool {
     data.weeks() != 0
         || data.days() != 0
         || data.hours() != 0
@@ -1094,24 +1097,24 @@ pub fn duration_has_lower_than_month_units(data: TemporalDurationObjectData) -> 
         || data.nanoseconds() != 0
 }
 
-pub fn duration_time_nanoseconds(data: TemporalDurationObjectData) -> i128 {
-    i128::from(data.hours()) * NANOS_PER_HOUR
-        + i128::from(data.minutes()) * NANOS_PER_MINUTE
-        + i128::from(data.seconds()) * NANOS_PER_SECOND
-        + i128::from(data.milliseconds()) * NANOS_PER_MILLISECOND
-        + i128::from(data.microseconds()) * NANOS_PER_MICROSECOND
-        + i128::from(data.nanoseconds())
+pub const fn duration_time_nanoseconds(data: TemporalDurationObjectData) -> i128 {
+    data.hours() * NANOS_PER_HOUR
+        + data.minutes() * NANOS_PER_MINUTE
+        + data.seconds() * NANOS_PER_SECOND
+        + data.milliseconds() * NANOS_PER_MILLISECOND
+        + data.microseconds() * NANOS_PER_MICROSECOND
+        + data.nanoseconds()
 }
 
-pub fn duration_whole_days_from_time(data: TemporalDurationObjectData) -> i128 {
+pub const fn duration_whole_days_from_time(data: TemporalDurationObjectData) -> i128 {
     duration_time_nanoseconds(data) / NANOS_PER_DAY
 }
 
-pub fn is_iso_leap_year(year: i32) -> bool {
+pub const fn is_iso_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
-pub fn iso_days_in_month(year: i32, month: u8) -> u8 {
+pub const fn iso_days_in_month(year: i32, month: u8) -> u8 {
     match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
@@ -1165,7 +1168,7 @@ fn iso_weeks_in_year(year: i32) -> i32 {
     }
 }
 
-pub fn iso_days_in_year(year: i32) -> i32 {
+pub const fn iso_days_in_year(year: i32) -> i32 {
     if is_iso_leap_year(year) {
         366
     } else {

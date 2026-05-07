@@ -276,7 +276,7 @@ pub struct Property {
 
 impl Expr {
     /// Returns the span of this expression.
-    pub fn span(&self) -> Span {
+    pub const fn span(&self) -> Span {
         match self {
             Self::This { span, .. }
             | Self::Super { span, .. }

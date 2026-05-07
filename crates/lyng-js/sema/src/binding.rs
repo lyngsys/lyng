@@ -35,7 +35,7 @@ pub enum DeclarationKind {
 
 impl DeclarationKind {
     /// Returns true if this binding kind has a temporal dead zone.
-    pub fn has_tdz(self) -> bool {
+    pub const fn has_tdz(self) -> bool {
         matches!(
             self,
             Self::Let
@@ -48,7 +48,7 @@ impl DeclarationKind {
     }
 
     /// Returns true if this is a lexical (block-scoped) binding kind.
-    pub fn is_lexical(self) -> bool {
+    pub const fn is_lexical(self) -> bool {
         matches!(
             self,
             Self::Let
@@ -62,7 +62,7 @@ impl DeclarationKind {
     }
 
     /// Returns true if this binding is hoisted to function scope.
-    pub fn is_hoisted(self) -> bool {
+    pub const fn is_hoisted(self) -> bool {
         matches!(self, Self::Var | Self::Function)
     }
 }
@@ -113,7 +113,7 @@ pub struct BindingTable {
 }
 
 impl BindingTable {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             bindings: Vec::new(),
         }
@@ -140,12 +140,12 @@ impl BindingTable {
 
     /// Returns the number of bindings.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.bindings.len()
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.bindings.is_empty()
     }
 

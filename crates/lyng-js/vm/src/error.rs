@@ -6,7 +6,7 @@ use lyng_js_types::{
     SuspendedExecutionRef, Value,
 };
 
-pub(crate) type VmResult<T> = Result<T, VmError>;
+pub type VmResult<T> = Result<T, VmError>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ModuleLoadError {

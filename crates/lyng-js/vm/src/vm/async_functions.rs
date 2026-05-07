@@ -1,5 +1,8 @@
 use super::bytecode_calls::PreparedBytecodeCall;
-use super::*;
+use super::{
+    Agent, AsyncFrameState, FrameRecord, HostHooks, ModuleStatus, NativeFunctionRegistry,
+    ObjectRef, RealmRef, Vm, VmError, VmResult, WellKnownAtom,
+};
 use crate::frame::GeneratorResumeKind;
 use lyng_js_env::{
     PromiseCapabilityId, PromiseReactionHandler, PromiseReactionKind, PromiseReactionRecord,
@@ -37,8 +40,7 @@ impl Vm {
         let prior_register_len = usize::try_from(
             self.frames
                 .get(prior_frame_depth)
-                .map(|frame| frame.registers().end())
-                .unwrap_or(0),
+                .map_or(0, |frame| frame.registers().end()),
         )
         .expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
@@ -56,11 +58,11 @@ impl Vm {
 
         match result {
             Ok(_) => {
-                if let Some(key) = resumed_module_key {
-                    if self.async_body_suspended_modules.contains(&key) {
-                        let _ = agent.set_module_record_status(&key, ModuleStatus::Evaluated);
-                        let _ = agent.set_module_record_evaluation_error(&key, None);
-                    }
+                if let Some(key) = resumed_module_key
+                    && self.async_body_suspended_modules.contains(&key)
+                {
+                    let _ = agent.set_module_record_status(&key, ModuleStatus::Evaluated);
+                    let _ = agent.set_module_record_evaluation_error(&key, None);
                 }
                 Ok(())
             }
@@ -203,8 +205,7 @@ impl Vm {
         let prior_register_len = usize::try_from(
             self.frames
                 .get(prior_frame_depth)
-                .map(|frame| frame.registers().end())
-                .unwrap_or(0),
+                .map_or(0, |frame| frame.registers().end()),
         )
         .expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
@@ -324,7 +325,7 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         agent
             .promise_capability(capability)
-            .and_then(|record| record.promise())
+            .and_then(lyng_js_env::PromiseCapabilityRecord::promise)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))
     }
 

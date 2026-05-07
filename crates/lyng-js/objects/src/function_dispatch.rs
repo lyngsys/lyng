@@ -271,7 +271,7 @@ impl ObjectRuntime {
             .gc_payload()
             .ok_or(InternalMethodError::MissingFunctionPayload)?;
         heap.function_payload(payload)
-            .and_then(|record| record.bound())
+            .and_then(lyng_js_gc::RuntimeFunctionRecord::bound)
             .ok_or(InternalMethodError::MissingFunctionPayload)
     }
 }

@@ -237,7 +237,7 @@ impl<'a> PrimitiveStringView<'a> {
     }
 
     #[inline]
-    pub fn latin1_bytes(self) -> Option<&'a [u8]> {
+    pub const fn latin1_bytes(self) -> Option<&'a [u8]> {
         match self.encoding() {
             StringEncoding::Latin1 => Some(self.payload),
             StringEncoding::Utf16 => None,
@@ -245,7 +245,7 @@ impl<'a> PrimitiveStringView<'a> {
     }
 
     #[inline]
-    pub fn utf16_bytes(self) -> Option<&'a [u8]> {
+    pub const fn utf16_bytes(self) -> Option<&'a [u8]> {
         match self.encoding() {
             StringEncoding::Latin1 => None,
             StringEncoding::Utf16 => Some(self.payload),

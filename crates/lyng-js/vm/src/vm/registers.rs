@@ -1,5 +1,5 @@
 use super::call::finalize_frame_result;
-use super::*;
+use super::{Agent, FrameRecord, Value, Vm, VmError, VmResult};
 use lyng_js_types::AbruptCompletion;
 
 impl Vm {

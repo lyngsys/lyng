@@ -412,7 +412,7 @@ pub(super) fn typed_array_iterator_factory_builtin<Cx: PublicBuiltinDispatchCont
     Ok(Value::from_object_ref(iterator_object))
 }
 
-fn iterator_prototype_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
+const fn iterator_prototype_iterator_builtin<Cx: PublicBuiltinDispatchContext>(
     _cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
@@ -1665,21 +1665,21 @@ fn iterator_helper_return_builtin<Cx: PublicBuiltinDispatchContext>(
         set_iterator_helper_running(cx, helper, false)?;
         return result;
     }
-    if kind == IteratorHelperKind::FlatMap {
-        if let Some(mut inner_record) = iterator_helper_inner_record(cx, helper)? {
-            clear_iterator_helper_inner(cx, helper)?;
-            let inner_close = {
-                let mut bridge = BuiltinIteratorBridge { cx };
-                iterator::iterator_close(
-                    &mut bridge,
-                    &mut inner_record,
-                    Ok::<(), lyng_js_types::AbruptCompletion>(()),
-                )
-            };
-            if let Err(error) = inner_close {
-                set_iterator_helper_running(cx, helper, false)?;
-                return Err(error);
-            }
+    if kind == IteratorHelperKind::FlatMap
+        && let Some(mut inner_record) = iterator_helper_inner_record(cx, helper)?
+    {
+        clear_iterator_helper_inner(cx, helper)?;
+        let inner_close = {
+            let mut bridge = BuiltinIteratorBridge { cx };
+            iterator::iterator_close(
+                &mut bridge,
+                &mut inner_record,
+                Ok::<(), lyng_js_types::AbruptCompletion>(()),
+            )
+        };
+        if let Err(error) = inner_close {
+            set_iterator_helper_running(cx, helper, false)?;
+            return Err(error);
         }
     }
     let mut iterator_record = iterator_helper_record(cx, helper)?;
@@ -2874,7 +2874,7 @@ fn iterator_helper_zip_key<Cx: PublicBuiltinDispatchContext>(
     iterator_zip_key_from_slot_values(cx, kind, payload)
 }
 
-fn iterator_zip_key_from_property_key(key: PropertyKey) -> IteratorZipKey {
+const fn iterator_zip_key_from_property_key(key: PropertyKey) -> IteratorZipKey {
     match key {
         PropertyKey::Index(index) => IteratorZipKey::Index(index),
         PropertyKey::Atom(atom) => IteratorZipKey::Atom(atom),
@@ -2929,7 +2929,11 @@ fn iterator_zip_u32_payload<Cx: PublicBuiltinDispatchContext>(
         return u32::try_from(value).map_err(|_| type_error(cx));
     }
     let number = value.as_f64().ok_or_else(|| type_error(cx))?;
-    if !number.is_finite() || number < 0.0 || number.trunc() != number || number > u32::MAX as f64 {
+    if !number.is_finite()
+        || number < 0.0
+        || number.trunc() != number
+        || number > f64::from(u32::MAX)
+    {
         return Err(type_error(cx));
     }
     Ok(number as u32)

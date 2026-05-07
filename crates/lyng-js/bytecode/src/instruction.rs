@@ -32,7 +32,7 @@ impl Instruction {
     }
 
     #[inline]
-    pub fn encode_word(self) -> u32 {
+    pub const fn encode_word(self) -> u32 {
         let bytes = match self {
             Self::Abc { opcode, a, b, c } => [opcode as u8, a, b, c],
             Self::Abx { opcode, a, bx } => {

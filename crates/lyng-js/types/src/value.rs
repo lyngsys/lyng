@@ -139,7 +139,7 @@ impl Value {
     }
 
     #[inline]
-    pub fn from_f64(value: f64) -> Self {
+    pub const fn from_f64(value: f64) -> Self {
         if value.is_nan() {
             Self(CANONICAL_NAN_BITS)
         } else {
@@ -285,7 +285,7 @@ impl Value {
     }
 
     #[inline]
-    pub fn is_nan(self) -> bool {
+    pub const fn is_nan(self) -> bool {
         self.is_double() && f64::from_bits(self.0).is_nan()
     }
 

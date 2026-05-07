@@ -7,7 +7,7 @@ use crate::ids::{ScopeId, SemanticBindingId};
 use crate::scope::ScopeKind;
 use crate::use_site::{ResolutionKind, UseSiteRecord};
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     pub(super) fn declare_binding(
         &mut self,
         name: AtomId,
@@ -118,7 +118,7 @@ impl<'a> Analyzer<'a> {
         self.function_binding_is_lexical_in_scope_kind(self.scopes.get(scope).kind)
     }
 
-    pub(super) fn function_binding_is_lexical_in_scope_kind(&self, kind: ScopeKind) -> bool {
+    pub(super) const fn function_binding_is_lexical_in_scope_kind(&self, kind: ScopeKind) -> bool {
         !matches!(kind, ScopeKind::Global | ScopeKind::Function)
     }
 

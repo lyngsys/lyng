@@ -355,7 +355,7 @@ impl TraceHeapEdges for ExecutionContext {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct RealmMetadata {
+pub struct RealmMetadata {
     pub(crate) intrinsics: Intrinsics,
     pub(crate) bootstrap_state: RealmBootstrapState,
     pub(crate) is_default: bool,
@@ -373,7 +373,7 @@ pub struct RegExpLegacyStaticState {
     parens: [RegExpLegacyStaticText; 9],
 }
 
-/// Lazily materialized text backing for Annex B RegExp legacy static accessors.
+/// Lazily materialized text backing for Annex B `RegExp` legacy static accessors.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RegExpLegacyStaticText {
     Empty,
@@ -399,27 +399,27 @@ impl Default for RegExpLegacyStaticState {
 
 impl RegExpLegacyStaticState {
     #[inline]
-    pub fn input(&self) -> &RegExpLegacyStaticText {
+    pub const fn input(&self) -> &RegExpLegacyStaticText {
         &self.input
     }
 
     #[inline]
-    pub fn last_match(&self) -> &RegExpLegacyStaticText {
+    pub const fn last_match(&self) -> &RegExpLegacyStaticText {
         &self.last_match
     }
 
     #[inline]
-    pub fn last_paren(&self) -> &RegExpLegacyStaticText {
+    pub const fn last_paren(&self) -> &RegExpLegacyStaticText {
         &self.last_paren
     }
 
     #[inline]
-    pub fn left_context(&self) -> &RegExpLegacyStaticText {
+    pub const fn left_context(&self) -> &RegExpLegacyStaticText {
         &self.left_context
     }
 
     #[inline]
-    pub fn right_context(&self) -> &RegExpLegacyStaticText {
+    pub const fn right_context(&self) -> &RegExpLegacyStaticText {
         &self.right_context
     }
 
@@ -465,7 +465,7 @@ impl RegExpLegacyStaticState {
 
 impl RegExpLegacyStaticText {
     #[inline]
-    fn source_slice(source: StringRef, range: Range<usize>) -> Self {
+    const fn source_slice(source: StringRef, range: Range<usize>) -> Self {
         if range.start == range.end {
             Self::Empty
         } else {

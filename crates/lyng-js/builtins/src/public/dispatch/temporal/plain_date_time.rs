@@ -1,4 +1,50 @@
-use super::*;
+use super::{
+    allocate_temporal_duration_object, allocate_temporal_plain_date_object,
+    allocate_temporal_zoned_date_time_object, current_temporal_duration_prototype,
+    current_temporal_plain_date_prototype, current_temporal_plain_date_time_prototype,
+    current_temporal_plain_time_prototype, current_temporal_zoned_date_time_prototype,
+    format_temporal_plain_date, format_temporal_plain_time_with_precision, map_completion,
+    negate_temporal_duration, object, parse_temporal_plain_date_time, plain_time, range_error,
+    string_ref_text, string_value, temporal_civil_date_time_from_plain_date_time,
+    temporal_compare_ordering, temporal_constructor_prototype,
+    temporal_duration_from_nanoseconds_with_largest_unit, temporal_duration_from_value,
+    temporal_duration_round_calendar_relative, temporal_duration_round_calendar_relative_exact,
+    temporal_duration_rounding_increment_option, temporal_duration_rounding_mode_option,
+    temporal_duration_rounding_mode_option_with_default, temporal_duration_time_nanoseconds,
+    temporal_exact_time_rounding_increment_is_valid,
+    temporal_instant_fractional_second_digits_option, temporal_instant_smallest_unit_precision,
+    temporal_integer_part_from_argument, temporal_is_iso_leap_year, temporal_iso_day_of_week,
+    temporal_iso_day_of_year, temporal_iso_days_in_month, temporal_iso_days_in_year,
+    temporal_iso_week_of_year, temporal_month_from_month_code_text,
+    temporal_month_from_property_bag, temporal_optional_integer_part_from_property,
+    temporal_optional_time_part_from_property, temporal_overflow_from_options,
+    temporal_plain_date_add_duration, temporal_plain_date_difference_trunc,
+    temporal_plain_date_from_ordinal_day, temporal_plain_date_from_parts_with_overflow,
+    temporal_plain_date_ordinal_day, temporal_plain_date_time_bag_fields,
+    temporal_plain_date_time_is_within_limits, temporal_plain_time_from_nanoseconds,
+    temporal_plain_time_from_parts_with_overflow, temporal_plain_time_from_value,
+    temporal_plain_time_nanoseconds, temporal_property_value,
+    temporal_reject_calendar_or_time_zone_properties, temporal_required_integer_part_from_property,
+    temporal_resolve_month_from_fields, temporal_round_duration_nanoseconds_to_increment,
+    temporal_round_epoch_nanoseconds_to_fractional_digits,
+    temporal_round_epoch_nanoseconds_to_increment, temporal_rounding_mode_for_negated_duration,
+    temporal_string_option, temporal_subsecond_parts_from_nanoseconds,
+    temporal_time_part_from_argument, temporal_time_part_from_property,
+    temporal_time_zone_id_from_value, temporal_validate_iso_calendar_value,
+    temporal_validate_optional_iso_calendar_identifier_argument,
+    temporal_validate_optional_iso_calendar_property, temporal_validate_options_object,
+    temporal_zoned_date_time_civil, temporal_zoned_date_time_from_parts, to_string_string_ref,
+    type_error, validate_temporal_duration, AllocationLifetime, BuiltinFunctionId,
+    BuiltinInvocation, ObjectAllocation, ObjectColdData, ObjectRef, OrdinaryObjectData,
+    PublicBuiltinDispatchContext, RealmRecord, TemporalBuiltinDurationExactUnit,
+    TemporalBuiltinRoundingMode, TemporalCivilToInstantRequest, TemporalDateDifferenceUnit,
+    TemporalDisambiguation, TemporalDurationObjectData, TemporalDurationRelativeTo,
+    TemporalInstantStringPrecision, TemporalObjectData, TemporalObjectKind, TemporalOverflow,
+    TemporalPlainDateObjectData, TemporalPlainDateTimeBagFields, TemporalPlainDateTimeObjectData,
+    TemporalPlainTimeObjectData, TemporalZonedDateTimeCalendarNameOption, Value,
+    TEMPORAL_NANOS_PER_DAY, TEMPORAL_NANOS_PER_HOUR, TEMPORAL_NANOS_PER_MICROSECOND,
+    TEMPORAL_NANOS_PER_MILLISECOND, TEMPORAL_NANOS_PER_MINUTE, TEMPORAL_NANOS_PER_SECOND,
+};
 
 pub(super) fn dispatch_temporal_plain_date_time_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
@@ -982,13 +1028,13 @@ pub(super) fn temporal_plain_date_time_with_calendar_builtin<Cx: PublicBuiltinDi
     allocate_temporal_plain_date_time_object(cx, prototype, data)
 }
 
-pub(super) fn temporal_plain_date_time_date(
+pub(super) const fn temporal_plain_date_time_date(
     data: TemporalPlainDateTimeObjectData,
 ) -> TemporalPlainDateObjectData {
     TemporalPlainDateObjectData::new(data.year(), data.month(), data.day(), data.calendar())
 }
 
-pub(super) fn temporal_plain_date_time_time(
+pub(super) const fn temporal_plain_date_time_time(
     data: TemporalPlainDateTimeObjectData,
 ) -> TemporalPlainTimeObjectData {
     TemporalPlainTimeObjectData::new(
@@ -1193,7 +1239,9 @@ pub(super) fn temporal_date_time_difference_unit_from_value<Cx: PublicBuiltinDis
     temporal_date_time_difference_unit_from_text(&text).ok_or_else(|| range_error(cx))
 }
 
-pub(super) fn temporal_date_time_difference_unit_order(unit: TemporalDateTimeDifferenceUnit) -> u8 {
+pub(super) const fn temporal_date_time_difference_unit_order(
+    unit: TemporalDateTimeDifferenceUnit,
+) -> u8 {
     match unit {
         TemporalDateTimeDifferenceUnit::Year => 0,
         TemporalDateTimeDifferenceUnit::Month => 1,
@@ -1208,7 +1256,7 @@ pub(super) fn temporal_date_time_difference_unit_order(unit: TemporalDateTimeDif
     }
 }
 
-pub(super) fn temporal_date_time_difference_unit_nanoseconds(
+pub(super) const fn temporal_date_time_difference_unit_nanoseconds(
     unit: TemporalDateTimeDifferenceUnit,
 ) -> Option<i128> {
     match unit {
@@ -1224,7 +1272,7 @@ pub(super) fn temporal_date_time_difference_unit_nanoseconds(
     }
 }
 
-pub(super) fn temporal_date_time_date_difference_unit(
+pub(super) const fn temporal_date_time_date_difference_unit(
     unit: TemporalDateTimeDifferenceUnit,
 ) -> Option<TemporalDateDifferenceUnit> {
     match unit {
@@ -1241,7 +1289,7 @@ pub(super) fn temporal_date_time_date_difference_unit(
     }
 }
 
-pub(super) fn temporal_date_time_exact_unit(
+pub(super) const fn temporal_date_time_exact_unit(
     unit: TemporalDateTimeDifferenceUnit,
 ) -> Option<TemporalBuiltinDurationExactUnit> {
     match unit {
@@ -1264,7 +1312,7 @@ pub(super) fn temporal_date_time_exact_unit(
     }
 }
 
-pub(super) fn temporal_date_time_rounding_increment_is_valid(
+pub(super) const fn temporal_date_time_rounding_increment_is_valid(
     smallest_unit: TemporalDateTimeDifferenceUnit,
     rounding_increment: i128,
 ) -> bool {
@@ -1287,7 +1335,7 @@ pub(super) fn temporal_date_time_rounding_increment_is_valid(
     }
 }
 
-fn temporal_plain_date_time_rounding_increment_is_valid(
+const fn temporal_plain_date_time_rounding_increment_is_valid(
     smallest_unit: TemporalDateTimeDifferenceUnit,
     rounding_increment: i128,
 ) -> bool {

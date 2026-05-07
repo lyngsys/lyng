@@ -81,10 +81,10 @@ fn parse_function_declaration() {
 fn parse_generator_declaration() {
     let p = script_ok("function* gen() { yield 1; }");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Function { function, .. } = p.ast.get_decl(*decl) {
-            assert_eq!(p.ast.get_function(*function).kind, FunctionKind::Generator);
-        }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Function { function, .. } = p.ast.get_decl(*decl)
+    {
+        assert_eq!(p.ast.get_function(*function).kind, FunctionKind::Generator);
     }
 }
 
@@ -92,10 +92,10 @@ fn parse_generator_declaration() {
 fn parse_async_function_declaration() {
     let p = script_ok("async function foo() { await x; }");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Function { function, .. } = p.ast.get_decl(*decl) {
-            assert_eq!(p.ast.get_function(*function).kind, FunctionKind::Async);
-        }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Function { function, .. } = p.ast.get_decl(*decl)
+    {
+        assert_eq!(p.ast.get_function(*function).kind, FunctionKind::Async);
     }
 }
 
@@ -181,10 +181,10 @@ fn parse_decorator_private_member_expression_in_class_static_block() {
 fn parse_class_extends() {
     let p = script_ok("class Foo extends Bar {}");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Class { super_class, .. } = p.ast.get_decl(*decl) {
-            assert!(super_class.is_some());
-        }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Class { super_class, .. } = p.ast.get_decl(*decl)
+    {
+        assert!(super_class.is_some());
     }
 }
 
@@ -192,13 +192,13 @@ fn parse_class_extends() {
 fn parse_class_static_method() {
     let p = script_ok("class Foo { static bar() {} }");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Class { body, .. } = p.ast.get_decl(*decl) {
-            let elements = p.ast.get_class_element_list(*body);
-            assert_eq!(elements.len(), 1);
-            if let ClassElement::Method { r#static, .. } = p.ast.get_class_element(elements[0]) {
-                assert!(*r#static);
-            }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Class { body, .. } = p.ast.get_decl(*decl)
+    {
+        let elements = p.ast.get_class_element_list(*body);
+        assert_eq!(elements.len(), 1);
+        if let ClassElement::Method { r#static, .. } = p.ast.get_class_element(elements[0]) {
+            assert!(*r#static);
         }
     }
 }
@@ -207,15 +207,15 @@ fn parse_class_static_method() {
 fn parse_class_field() {
     let p = script_ok("class Foo { x = 1; }");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Class { body, .. } = p.ast.get_decl(*decl) {
-            let elements = p.ast.get_class_element_list(*body);
-            assert_eq!(elements.len(), 1);
-            assert!(matches!(
-                p.ast.get_class_element(elements[0]),
-                ClassElement::Property { .. }
-            ));
-        }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Class { body, .. } = p.ast.get_decl(*decl)
+    {
+        let elements = p.ast.get_class_element_list(*body);
+        assert_eq!(elements.len(), 1);
+        assert!(matches!(
+            p.ast.get_class_element(elements[0]),
+            ClassElement::Property { .. }
+        ));
     }
 }
 
@@ -234,16 +234,16 @@ fn class_field_initializer_does_not_inherit_async_await_context() {
 fn parse_class_accessor_field_definition() {
     let p = script_ok("class Foo { accessor $; accessor _ = 1; }");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Class { body, .. } = p.ast.get_decl(*decl) {
-            let elements = p.ast.get_class_element_list(*body);
-            assert_eq!(elements.len(), 2);
-            for element in elements {
-                assert!(matches!(
-                    p.ast.get_class_element(*element),
-                    ClassElement::Property { .. }
-                ));
-            }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Class { body, .. } = p.ast.get_decl(*decl)
+    {
+        let elements = p.ast.get_class_element_list(*body);
+        assert_eq!(elements.len(), 2);
+        for element in elements {
+            assert!(matches!(
+                p.ast.get_class_element(*element),
+                ClassElement::Property { .. }
+            ));
         }
     }
 }
@@ -252,11 +252,11 @@ fn parse_class_accessor_field_definition() {
 fn parse_class_accessor_line_terminator_as_field_name() {
     let p = script_ok("class Foo { accessor\n$; static accessor\n$; }");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Class { body, .. } = p.ast.get_decl(*decl) {
-            let elements = p.ast.get_class_element_list(*body);
-            assert_eq!(elements.len(), 4);
-        }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Class { body, .. } = p.ast.get_decl(*decl)
+    {
+        let elements = p.ast.get_class_element_list(*body);
+        assert_eq!(elements.len(), 4);
     }
 }
 
@@ -264,16 +264,16 @@ fn parse_class_accessor_line_terminator_as_field_name() {
 fn parse_class_getter_setter() {
     let p = script_ok("class Foo { get x() { return 1; } set x(v) {} }");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Class { body, .. } = p.ast.get_decl(*decl) {
-            let elements = p.ast.get_class_element_list(*body);
-            assert_eq!(elements.len(), 2);
-            if let ClassElement::Method { kind, .. } = p.ast.get_class_element(elements[0]) {
-                assert_eq!(*kind, MethodKind::Get);
-            }
-            if let ClassElement::Method { kind, .. } = p.ast.get_class_element(elements[1]) {
-                assert_eq!(*kind, MethodKind::Set);
-            }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Class { body, .. } = p.ast.get_decl(*decl)
+    {
+        let elements = p.ast.get_class_element_list(*body);
+        assert_eq!(elements.len(), 2);
+        if let ClassElement::Method { kind, .. } = p.ast.get_class_element(elements[0]) {
+            assert_eq!(*kind, MethodKind::Get);
+        }
+        if let ClassElement::Method { kind, .. } = p.ast.get_class_element(elements[1]) {
+            assert_eq!(*kind, MethodKind::Set);
         }
     }
 }
@@ -282,20 +282,20 @@ fn parse_class_getter_setter() {
 fn parse_private_class_elements_mark_private() {
     let p = script_ok("class Foo { #x() {} #y = 1; }");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Class { body, .. } = p.ast.get_decl(*decl) {
-            let elements = p.ast.get_class_element_list(*body);
-            assert_eq!(elements.len(), 2);
-            if let ClassElement::Method { private, .. } = p.ast.get_class_element(elements[0]) {
-                assert!(*private);
-            } else {
-                panic!("expected private method");
-            }
-            if let ClassElement::Property { private, .. } = p.ast.get_class_element(elements[1]) {
-                assert!(*private);
-            } else {
-                panic!("expected private property");
-            }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Class { body, .. } = p.ast.get_decl(*decl)
+    {
+        let elements = p.ast.get_class_element_list(*body);
+        assert_eq!(elements.len(), 2);
+        if let ClassElement::Method { private, .. } = p.ast.get_class_element(elements[0]) {
+            assert!(*private);
+        } else {
+            panic!("expected private method");
+        }
+        if let ClassElement::Property { private, .. } = p.ast.get_class_element(elements[1]) {
+            assert!(*private);
+        } else {
+            panic!("expected private property");
         }
     }
 }
@@ -304,20 +304,20 @@ fn parse_private_class_elements_mark_private() {
 fn parse_static_as_instance_class_element_name() {
     let p = script_ok("class Foo { static; static() {} }");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Class { body, .. } = p.ast.get_decl(*decl) {
-            let elements = p.ast.get_class_element_list(*body);
-            assert_eq!(elements.len(), 2);
-            if let ClassElement::Property { r#static, .. } = p.ast.get_class_element(elements[0]) {
-                assert!(!r#static);
-            } else {
-                panic!("expected instance field named static");
-            }
-            if let ClassElement::Method { r#static, .. } = p.ast.get_class_element(elements[1]) {
-                assert!(!r#static);
-            } else {
-                panic!("expected instance method named static");
-            }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Class { body, .. } = p.ast.get_decl(*decl)
+    {
+        let elements = p.ast.get_class_element_list(*body);
+        assert_eq!(elements.len(), 2);
+        if let ClassElement::Property { r#static, .. } = p.ast.get_class_element(elements[0]) {
+            assert!(!r#static);
+        } else {
+            panic!("expected instance field named static");
+        }
+        if let ClassElement::Method { r#static, .. } = p.ast.get_class_element(elements[1]) {
+            assert!(!r#static);
+        } else {
+            panic!("expected instance method named static");
         }
     }
 }

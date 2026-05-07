@@ -1,4 +1,9 @@
-use super::*;
+use super::{
+    builtin_metadata, errors, Agent, AllocationLifetime, BuiltinFunctionId, EmbeddingFunctionId,
+    FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, ObjectAllocation,
+    ObjectColdData, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value, Vm, VmError,
+    VmResult, WellKnownAtom,
+};
 
 impl Vm {
     pub(in crate::vm) fn allocate_builtin_function_object(

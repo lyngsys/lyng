@@ -1,6 +1,10 @@
-use super::*;
+use super::{
+    internal_get_template_object_builtin, internal_template_to_string_builtin, ExprId,
+    FeedbackSiteKind, FeedbackSiteMetadata, FunctionCompiler, LoweringError, LoweringResult,
+    Opcode, SafepointKind, Span,
+};
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_template_literal(
         &mut self,
         expr_id: ExprId,

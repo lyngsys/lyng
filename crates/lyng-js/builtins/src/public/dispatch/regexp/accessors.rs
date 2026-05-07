@@ -53,43 +53,43 @@ fn escape_regexp_pattern_units(units: &[u16]) -> Vec<u16> {
     for unit in units {
         let is_escaped = trailing_backslashes % 2 == 1;
         match *unit {
-            ch if ch == b'[' as u16 && !is_escaped => {
+            ch if ch == u16::from(b'[') && !is_escaped => {
                 in_character_class = true;
                 escaped.push(ch);
             }
-            ch if ch == b']' as u16 && !is_escaped => {
+            ch if ch == u16::from(b']') && !is_escaped => {
                 in_character_class = false;
                 escaped.push(ch);
             }
             0x002F if !in_character_class && !is_escaped => {
-                escaped.extend_from_slice(&[b'\\' as u16, b'/' as u16]);
+                escaped.extend_from_slice(&[u16::from(b'\\'), u16::from(b'/')]);
                 trailing_backslashes = 0;
             }
             0x002F => {
-                escaped.push(b'/' as u16);
+                escaped.push(u16::from(b'/'));
                 trailing_backslashes = 0;
             }
-            0x000A => escaped.extend_from_slice(&[b'\\' as u16, b'n' as u16]),
-            0x000D => escaped.extend_from_slice(&[b'\\' as u16, b'r' as u16]),
+            0x000A => escaped.extend_from_slice(&[u16::from(b'\\'), u16::from(b'n')]),
+            0x000D => escaped.extend_from_slice(&[u16::from(b'\\'), u16::from(b'r')]),
             0x2028 => escaped.extend_from_slice(&[
-                b'\\' as u16,
-                b'u' as u16,
-                b'2' as u16,
-                b'0' as u16,
-                b'2' as u16,
-                b'8' as u16,
+                u16::from(b'\\'),
+                u16::from(b'u'),
+                u16::from(b'2'),
+                u16::from(b'0'),
+                u16::from(b'2'),
+                u16::from(b'8'),
             ]),
             0x2029 => escaped.extend_from_slice(&[
-                b'\\' as u16,
-                b'u' as u16,
-                b'2' as u16,
-                b'0' as u16,
-                b'2' as u16,
-                b'9' as u16,
+                u16::from(b'\\'),
+                u16::from(b'u'),
+                u16::from(b'2'),
+                u16::from(b'0'),
+                u16::from(b'2'),
+                u16::from(b'9'),
             ]),
             unit => escaped.push(unit),
         }
-        if *unit == b'\\' as u16 {
+        if *unit == u16::from(b'\\') {
             trailing_backslashes += 1;
         } else if *unit != 0x002F {
             trailing_backslashes = 0;

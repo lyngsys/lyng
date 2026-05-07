@@ -139,7 +139,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 .is_some_and(|atom| self.lexer.resolve_atom(atom) == "defer")
     }
 
-    fn token_is_binding_identifier_in_current_context(&self, token: Token) -> bool {
+    const fn token_is_binding_identifier_in_current_context(&self, token: Token) -> bool {
         match token.kind {
             TokenKind::Identifier => true,
             TokenKind::Yield => !self.allow_yield && !self.is_strict(),

@@ -1,4 +1,4 @@
-use super::*;
+use super::{Agent, AllocationLifetime, FrameRecord, Value, Vm, VmResult, WithEnvironmentState};
 
 impl Vm {
     pub(super) fn push_with_environment(

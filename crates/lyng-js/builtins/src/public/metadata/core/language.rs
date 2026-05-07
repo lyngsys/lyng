@@ -1,4 +1,29 @@
-use super::super::*;
+use super::super::{
+    abstract_module_source_builtin, abstract_module_source_to_string_tag_getter_builtin,
+    add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin,
+    aggregate_error_builtin, async_disposable_stack_adopt_builtin, async_disposable_stack_builtin,
+    async_disposable_stack_defer_builtin, async_disposable_stack_dispose_async_builtin,
+    async_disposable_stack_disposed_getter_builtin, async_disposable_stack_move_builtin,
+    async_disposable_stack_use_builtin, async_disposal_resume_builtin,
+    create_async_disposal_scope_builtin, create_sync_disposal_scope_builtin, decode_uri_builtin,
+    decode_uri_component_builtin, disposable_stack_adopt_builtin, disposable_stack_builtin,
+    disposable_stack_defer_builtin, disposable_stack_dispose_builtin,
+    disposable_stack_disposed_getter_builtin, disposable_stack_move_builtin,
+    disposable_stack_use_builtin, dispose_scope_async_builtin, dispose_scope_builtin,
+    encode_uri_builtin, encode_uri_component_builtin, error_builtin, error_is_error_builtin,
+    error_to_string_builtin, escape_builtin, eval_builtin, eval_error_builtin, is_finite_builtin,
+    is_nan_builtin, parse_float_builtin, parse_int_builtin, promise_all_builtin,
+    promise_all_resolve_element_builtin, promise_all_settled_builtin,
+    promise_all_settled_reject_element_builtin, promise_all_settled_resolve_element_builtin,
+    promise_any_builtin, promise_any_reject_element_builtin, promise_builtin,
+    promise_capability_executor_builtin, promise_catch_builtin, promise_finally_builtin,
+    promise_finally_continuation_builtin, promise_finally_function_builtin, promise_race_builtin,
+    promise_reject_builtin, promise_reject_function_builtin, promise_resolve_builtin,
+    promise_resolve_function_builtin, promise_species_getter_builtin, promise_then_builtin,
+    promise_try_builtin, promise_with_resolvers_builtin, range_error_builtin,
+    reference_error_builtin, suppressed_error_builtin, syntax_error_builtin, type_error_builtin,
+    unescape_builtin, uri_error_builtin, BuiltinEntryMetadata, PublicBuiltinMetadataRow,
+};
 
 pub(in crate::public::metadata) const PUBLIC_MODULE_BUILTIN_METADATA:
     &[PublicBuiltinMetadataRow] = &[

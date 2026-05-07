@@ -226,7 +226,7 @@ fn date_parse_iso_text<Cx: PublicBuiltinDispatchContext>(
         let Some(millis) = utc.as_f64().filter(|millis| millis.is_finite()) else {
             return Ok(Some(Value::from_f64(f64::NAN)));
         };
-        date_time_clip_value(millis - f64::from(offset) * DATE_MS_PER_MINUTE as f64)
+        date_time_clip_value(f64::from(offset).mul_add(-(DATE_MS_PER_MINUTE as f64), millis))
     } else if date_only {
         date_make_utc_value(
             f64::from(year),
@@ -400,7 +400,7 @@ fn date_parse_space_separated_text<Cx: PublicBuiltinDispatchContext>(
         let Some(millis) = utc.as_f64().filter(|millis| millis.is_finite()) else {
             return Ok(Some(Value::from_f64(f64::NAN)));
         };
-        date_time_clip_value(millis - f64::from(offset) * DATE_MS_PER_MINUTE as f64)
+        date_time_clip_value(f64::from(offset).mul_add(-(DATE_MS_PER_MINUTE as f64), millis))
     } else {
         date_make_local_value(
             cx,
@@ -457,7 +457,7 @@ fn date_parse_local_string(text: &str) -> Option<Value> {
     );
     let millis = utc.as_f64().filter(|millis| millis.is_finite())?;
     Some(date_time_clip_value(
-        millis - f64::from(offset) * DATE_MS_PER_MINUTE as f64,
+        f64::from(offset).mul_add(-(DATE_MS_PER_MINUTE as f64), millis),
     ))
 }
 

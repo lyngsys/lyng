@@ -455,13 +455,13 @@ impl Ast {
 
     /// Returns a mutable reference to the literal table.
     #[inline]
-    pub fn literals_mut(&mut self) -> &mut LiteralTable {
+    pub const fn literals_mut(&mut self) -> &mut LiteralTable {
         &mut self.literals
     }
 
     /// Returns a reference to the literal table.
     #[inline]
-    pub fn literals(&self) -> &LiteralTable {
+    pub const fn literals(&self) -> &LiteralTable {
         &self.literals
     }
 
@@ -471,13 +471,13 @@ impl Ast {
 
     /// Returns a mutable reference to the template arena.
     #[inline]
-    pub fn templates_mut(&mut self) -> &mut TemplateArena {
+    pub const fn templates_mut(&mut self) -> &mut TemplateArena {
         &mut self.templates
     }
 
     /// Returns a reference to the template arena.
     #[inline]
-    pub fn templates(&self) -> &TemplateArena {
+    pub const fn templates(&self) -> &TemplateArena {
         &self.templates
     }
 }

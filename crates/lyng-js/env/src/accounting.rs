@@ -57,7 +57,7 @@ pub struct RuntimePhase6Accounting {
 }
 
 #[inline]
-pub(crate) const fn total_live_bytes(
+pub const fn total_live_bytes(
     heap: PrimitiveHeapAccounting,
     iterator_records: RuntimeDomainAccounting,
     regexp_payloads: RuntimeDomainAccounting,
@@ -76,7 +76,7 @@ pub(crate) const fn total_live_bytes(
 }
 
 #[inline]
-pub(crate) const fn merge_primitive_domain_accounting(
+pub const fn merge_primitive_domain_accounting(
     left: PrimitiveDomainAccounting,
     right: PrimitiveDomainAccounting,
 ) -> PrimitiveDomainAccounting {
@@ -88,7 +88,7 @@ pub(crate) const fn merge_primitive_domain_accounting(
 }
 
 #[allow(clippy::too_many_lines)]
-pub(crate) fn merge_primitive_heap_accounting(
+pub const fn merge_primitive_heap_accounting(
     left: PrimitiveHeapAccounting,
     right: PrimitiveHeapAccounting,
 ) -> PrimitiveHeapAccounting {

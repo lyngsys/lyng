@@ -29,7 +29,7 @@ pub struct RuntimeSubstrateMarker {
 
 impl RuntimeSubstrateMarker {
     #[inline]
-    pub fn new(
+    pub const fn new(
         objects: ObjectSubstrateMarker,
         host: HostMarker,
         executable: ExecutableId,
@@ -44,22 +44,22 @@ impl RuntimeSubstrateMarker {
     }
 
     #[inline]
-    pub fn objects(&self) -> ObjectSubstrateMarker {
+    pub const fn objects(&self) -> ObjectSubstrateMarker {
         self.objects
     }
 
     #[inline]
-    pub fn host(&self) -> HostMarker {
+    pub const fn host(&self) -> HostMarker {
         self.host
     }
 
     #[inline]
-    pub fn executable(&self) -> ExecutableId {
+    pub const fn executable(&self) -> ExecutableId {
         self.executable
     }
 
     #[inline]
-    pub fn layout(&self) -> &EnvironmentLayout {
+    pub const fn layout(&self) -> &EnvironmentLayout {
         &self.layout
     }
 }
@@ -84,17 +84,17 @@ impl Runtime {
     }
 
     #[inline]
-    pub fn root_cluster(&self) -> &AgentCluster {
+    pub const fn root_cluster(&self) -> &AgentCluster {
         &self.root_cluster
     }
 
     #[inline]
-    pub fn root_cluster_mut(&mut self) -> &mut AgentCluster {
+    pub const fn root_cluster_mut(&mut self) -> &mut AgentCluster {
         &mut self.root_cluster
     }
 
     #[inline]
-    pub fn root_agent_id(&self) -> AgentId {
+    pub const fn root_agent_id(&self) -> AgentId {
         self.root_cluster.root_agent_id()
     }
 

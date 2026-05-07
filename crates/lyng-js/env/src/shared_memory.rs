@@ -138,7 +138,7 @@ impl SharedBackingStoreRecord {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct WaitQueueKey {
+pub struct WaitQueueKey {
     pub(crate) backing_store: BackingStoreRef,
     pub(crate) byte_offset: u64,
 }
@@ -153,7 +153,7 @@ impl From<WaitLocation> for WaitQueueKey {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct SharedMemoryRuntime {
+pub struct SharedMemoryRuntime {
     pub(crate) shared_backing_stores: HashMap<BackingStoreRef, SharedBackingStoreRecord>,
     pub(crate) shared_backing_store_handles: HashMap<HostSharedBufferId, BackingStoreRef>,
     pub(crate) wait_queues: HashMap<WaitQueueKey, VecDeque<WaiterRecord>>,

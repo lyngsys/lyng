@@ -27,7 +27,7 @@ fn optional_chaining_short_circuits_continuations_and_preserves_this() {
 #[test]
 fn derived_super_calls_accept_spread_arguments() {
     let result = compile_and_run(
-        r#"
+        r"
             class Base {
                 constructor(first, second, third) {
                     this.value = first + second + third;
@@ -41,7 +41,7 @@ fn derived_super_calls_accept_spread_arguments() {
             }
 
             new Derived([2, 3]).value;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(6));
@@ -66,11 +66,11 @@ fn optional_calls_support_builtin_and_spread_arguments() {
 #[test]
 fn optional_chain_class_heritage_allows_runtime_null_superclass() {
     let result = compile_and_run_string(
-        r#"
+        r"
             const holder = { base: null };
             class Derived extends holder?.base {}
             String(Object.getPrototypeOf(Derived.prototype) === null);
-        "#,
+        ",
     );
 
     assert_eq!(result, "true");
@@ -122,7 +122,7 @@ fn optional_call_short_circuit_skips_following_call_continuations() {
 #[test]
 fn delete_super_property_throws_reference_error() {
     let result = compile_and_run(
-        r#"
+        r"
             let status = 0;
             class Derived extends Object {
                 constructor() {
@@ -138,7 +138,7 @@ fn delete_super_property_throws_reference_error() {
 
             new Derived();
             status;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(2));

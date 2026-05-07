@@ -147,12 +147,11 @@ pub fn has_property<Cx: ProxyTrapContext>(
         &[Value::from_object_ref(target), key_value],
     )?;
     let trap_result = to_boolean(cx, trap_result)?;
-    if !trap_result {
-        if let Some(target_descriptor) = get_own_property(cx, target, key)? {
-            if target_descriptor.configurable() == Some(false) || !is_extensible(cx, target)? {
-                return Err(cx.type_error());
-            }
-        }
+    if !trap_result
+        && let Some(target_descriptor) = get_own_property(cx, target, key)?
+        && (target_descriptor.configurable() == Some(false) || !is_extensible(cx, target)?)
+    {
+        return Err(cx.type_error());
     }
     Ok(trap_result)
 }
@@ -178,24 +177,24 @@ pub fn get<Cx: ProxyTrapContext>(
         handler,
         &[Value::from_object_ref(target), key_value, receiver],
     )?;
-    if let Some(target_descriptor) = get_own_property(cx, target, key)? {
-        if target_descriptor.configurable() == Some(false) {
-            if is_data_descriptor(target_descriptor)
-                && target_descriptor.writable() == Some(false)
-                && !same_value(
-                    cx,
-                    trap_result,
-                    target_descriptor.value().unwrap_or(Value::undefined()),
-                )?
-            {
-                return Err(cx.type_error());
-            }
-            if is_accessor_descriptor(target_descriptor)
-                && target_descriptor.getter() == Some(Value::undefined())
-                && !trap_result.is_undefined()
-            {
-                return Err(cx.type_error());
-            }
+    if let Some(target_descriptor) = get_own_property(cx, target, key)?
+        && target_descriptor.configurable() == Some(false)
+    {
+        if is_data_descriptor(target_descriptor)
+            && target_descriptor.writable() == Some(false)
+            && !same_value(
+                cx,
+                trap_result,
+                target_descriptor.value().unwrap_or(Value::undefined()),
+            )?
+        {
+            return Err(cx.type_error());
+        }
+        if is_accessor_descriptor(target_descriptor)
+            && target_descriptor.getter() == Some(Value::undefined())
+            && !trap_result.is_undefined()
+        {
+            return Err(cx.type_error());
         }
     }
     Ok(trap_result)
@@ -289,10 +288,10 @@ pub fn get_own_property<Cx: ProxyTrapContext>(
     )?;
     let target_descriptor = get_own_property(cx, target, key)?;
     if trap_result.is_undefined() {
-        if let Some(target_descriptor) = target_descriptor {
-            if target_descriptor.configurable() == Some(false) || !is_extensible(cx, target)? {
-                return Err(cx.type_error());
-            }
+        if let Some(target_descriptor) = target_descriptor
+            && (target_descriptor.configurable() == Some(false) || !is_extensible(cx, target)?)
+        {
+            return Err(cx.type_error());
         }
         return Ok(None);
     }
@@ -366,14 +365,13 @@ pub fn define_property<Cx: ProxyTrapContext>(
     {
         return Err(cx.type_error());
     }
-    if let Some(target_descriptor) = target_descriptor {
-        if is_data_descriptor(target_descriptor)
-            && target_descriptor.configurable() == Some(false)
-            && target_descriptor.writable() == Some(true)
-            && descriptor.writable() == Some(false)
-        {
-            return Err(cx.type_error());
-        }
+    if let Some(target_descriptor) = target_descriptor
+        && is_data_descriptor(target_descriptor)
+        && target_descriptor.configurable() == Some(false)
+        && target_descriptor.writable() == Some(true)
+        && descriptor.writable() == Some(false)
+    {
+        return Err(cx.type_error());
     }
     if descriptor.configurable() == Some(false) {
         let Some(target_descriptor) = target_descriptor else {
@@ -529,23 +527,23 @@ pub fn set<Cx: ProxyTrapContext>(
         return Ok(false);
     }
 
-    if let Some(target_descriptor) = get_own_property(cx, target, key)? {
-        if target_descriptor.configurable() == Some(false) {
-            if is_data_descriptor(target_descriptor)
-                && target_descriptor.writable() == Some(false)
-                && !same_value(
-                    cx,
-                    value,
-                    target_descriptor.value().unwrap_or(Value::undefined()),
-                )?
-            {
-                return Err(cx.type_error());
-            }
-            if is_accessor_descriptor(target_descriptor)
-                && target_descriptor.setter() == Some(Value::undefined())
-            {
-                return Err(cx.type_error());
-            }
+    if let Some(target_descriptor) = get_own_property(cx, target, key)?
+        && target_descriptor.configurable() == Some(false)
+    {
+        if is_data_descriptor(target_descriptor)
+            && target_descriptor.writable() == Some(false)
+            && !same_value(
+                cx,
+                value,
+                target_descriptor.value().unwrap_or(Value::undefined()),
+            )?
+        {
+            return Err(cx.type_error());
+        }
+        if is_accessor_descriptor(target_descriptor)
+            && target_descriptor.setter() == Some(Value::undefined())
+        {
+            return Err(cx.type_error());
         }
     }
     Ok(true)
@@ -779,7 +777,7 @@ fn is_module_namespace<Cx: ProxyTrapContext>(cx: &mut Cx, object: ObjectRef) -> 
     cx.agent().objects().is_module_namespace_object(object)
 }
 
-fn descriptor_kind(descriptor: PropertyDescriptor) -> Result<DescriptorKind, ()> {
+const fn descriptor_kind(descriptor: PropertyDescriptor) -> Result<DescriptorKind, ()> {
     let is_data = descriptor.has_value() || descriptor.has_writable();
     let is_accessor = descriptor.has_get() || descriptor.has_set();
     match (is_data, is_accessor) {
@@ -790,11 +788,11 @@ fn descriptor_kind(descriptor: PropertyDescriptor) -> Result<DescriptorKind, ()>
     }
 }
 
-fn is_data_descriptor(descriptor: PropertyDescriptor) -> bool {
+const fn is_data_descriptor(descriptor: PropertyDescriptor) -> bool {
     matches!(descriptor_kind(descriptor), Ok(DescriptorKind::Data))
 }
 
-fn is_accessor_descriptor(descriptor: PropertyDescriptor) -> bool {
+const fn is_accessor_descriptor(descriptor: PropertyDescriptor) -> bool {
     matches!(descriptor_kind(descriptor), Ok(DescriptorKind::Accessor))
 }
 
@@ -847,10 +845,10 @@ fn is_compatible_property_descriptor(
         if descriptor.configurable() == Some(true) {
             return Ok(false);
         }
-        if let Some(enumerable) = descriptor.enumerable() {
-            if Some(enumerable) != current.enumerable() {
-                return Ok(false);
-            }
+        if let Some(enumerable) = descriptor.enumerable()
+            && Some(enumerable) != current.enumerable()
+        {
+            return Ok(false);
         }
     }
     if descriptor_kind == DescriptorKind::Generic {
@@ -866,25 +864,25 @@ fn is_compatible_property_descriptor(
                 if descriptor.writable() == Some(true) {
                     return Ok(false);
                 }
-                if let Some(value) = descriptor.value() {
-                    if current.value() != Some(value) {
-                        return Ok(false);
-                    }
+                if let Some(value) = descriptor.value()
+                    && current.value() != Some(value)
+                {
+                    return Ok(false);
                 }
             }
             Ok(true)
         }
         DescriptorKind::Accessor => {
             if current.configurable() == Some(false) {
-                if let Some(getter) = descriptor.getter() {
-                    if current.getter() != Some(getter) {
-                        return Ok(false);
-                    }
+                if let Some(getter) = descriptor.getter()
+                    && current.getter() != Some(getter)
+                {
+                    return Ok(false);
                 }
-                if let Some(setter) = descriptor.setter() {
-                    if current.setter() != Some(setter) {
-                        return Ok(false);
-                    }
+                if let Some(setter) = descriptor.setter()
+                    && current.setter() != Some(setter)
+                {
+                    return Ok(false);
                 }
             }
             Ok(true)

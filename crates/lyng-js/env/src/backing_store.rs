@@ -3,10 +3,10 @@ use lyng_js_types::BackingStoreRef;
 use std::mem::size_of;
 use std::sync::{Arc, Mutex};
 
-pub(crate) const MAX_BACKING_STORE_BYTE_LENGTH: usize = 1 << 30;
+pub const MAX_BACKING_STORE_BYTE_LENGTH: usize = 1 << 30;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum BackingStoreRecord {
+pub enum BackingStoreRecord {
     Local(LocalBackingStoreRecord),
     Shared(SharedBackingStoreRecord),
 }
@@ -23,21 +23,21 @@ impl BackingStoreRecord {
         Some(Self::Shared(SharedBackingStoreRecord::new(byte_length)?))
     }
 
-    fn byte_length(&self) -> usize {
+    const fn byte_length(&self) -> usize {
         match self {
             Self::Local(record) => record.byte_length(),
             Self::Shared(record) => record.byte_length(),
         }
     }
 
-    fn is_detached(&self) -> bool {
+    const fn is_detached(&self) -> bool {
         match self {
             Self::Local(record) => record.is_detached(),
             Self::Shared(record) => record.is_detached(),
         }
     }
 
-    fn is_shared(&self) -> bool {
+    const fn is_shared(&self) -> bool {
         matches!(self, Self::Shared(_))
     }
 
@@ -116,13 +116,13 @@ impl BackingStoreRecord {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct LocalBackingStoreRecord {
+pub struct LocalBackingStoreRecord {
     bytes: Vec<u8>,
     detached: bool,
 }
 
 impl LocalBackingStoreRecord {
-    fn byte_length(&self) -> usize {
+    const fn byte_length(&self) -> usize {
         if self.detached {
             0
         } else {
@@ -130,7 +130,7 @@ impl LocalBackingStoreRecord {
         }
     }
 
-    fn is_detached(&self) -> bool {
+    const fn is_detached(&self) -> bool {
         self.detached
     }
 
@@ -206,7 +206,7 @@ impl LocalBackingStoreRecord {
 }
 
 #[derive(Clone)]
-pub(crate) struct SharedBackingStoreRecord {
+pub struct SharedBackingStoreRecord {
     byte_length: usize,
     bytes: Arc<Mutex<Vec<u8>>>,
 }
@@ -219,11 +219,11 @@ impl SharedBackingStoreRecord {
         })
     }
 
-    fn byte_length(&self) -> usize {
+    const fn byte_length(&self) -> usize {
         self.byte_length
     }
 
-    fn is_detached(&self) -> bool {
+    const fn is_detached(&self) -> bool {
         false
     }
 
@@ -323,14 +323,14 @@ impl std::fmt::Debug for SharedBackingStoreRecord {
 impl PartialEq for SharedBackingStoreRecord {
     fn eq(&self, other: &Self) -> bool {
         self.byte_length == other.byte_length
-            && self.with_bytes(|bytes| bytes.to_vec()) == other.with_bytes(|bytes| bytes.to_vec())
+            && self.with_bytes(<[u8]>::to_vec) == other.with_bytes(<[u8]>::to_vec)
     }
 }
 
 impl Eq for SharedBackingStoreRecord {}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct BackingStoreRuntime {
+pub struct BackingStoreRuntime {
     records: Vec<Option<BackingStoreRecord>>,
 }
 

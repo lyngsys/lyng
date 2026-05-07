@@ -141,12 +141,12 @@ impl DescriptorPresent {
     }
 
     #[inline]
-    fn insert(&mut self, mask: u8) {
+    const fn insert(&mut self, mask: u8) {
         self.0 |= mask;
     }
 
     #[inline]
-    fn remove(&mut self, mask: u8) {
+    const fn remove(&mut self, mask: u8) {
         self.0 &= !mask;
     }
 }
@@ -187,32 +187,32 @@ impl DescriptorAttributes {
     }
 
     #[inline]
-    pub fn set_writable(&mut self, writable: bool) {
+    pub const fn set_writable(&mut self, writable: bool) {
         self.set(Self::WRITABLE, writable);
     }
 
     #[inline]
-    pub fn set_enumerable(&mut self, enumerable: bool) {
+    pub const fn set_enumerable(&mut self, enumerable: bool) {
         self.set(Self::ENUMERABLE, enumerable);
     }
 
     #[inline]
-    pub fn set_configurable(&mut self, configurable: bool) {
+    pub const fn set_configurable(&mut self, configurable: bool) {
         self.set(Self::CONFIGURABLE, configurable);
     }
 
     #[inline]
-    pub fn clear_writable(&mut self) {
+    pub const fn clear_writable(&mut self) {
         self.0 &= !Self::WRITABLE;
     }
 
     #[inline]
-    pub fn clear_enumerable(&mut self) {
+    pub const fn clear_enumerable(&mut self) {
         self.0 &= !Self::ENUMERABLE;
     }
 
     #[inline]
-    pub fn clear_configurable(&mut self) {
+    pub const fn clear_configurable(&mut self) {
         self.0 &= !Self::CONFIGURABLE;
     }
 
@@ -222,7 +222,7 @@ impl DescriptorAttributes {
     }
 
     #[inline]
-    fn set(&mut self, mask: u8, enabled: bool) {
+    const fn set(&mut self, mask: u8, enabled: bool) {
         if enabled {
             self.0 |= mask;
         } else {
@@ -349,73 +349,73 @@ impl PropertyDescriptor {
     }
 
     #[inline]
-    pub fn set_value(&mut self, value: Value) {
+    pub const fn set_value(&mut self, value: Value) {
         self.value = value;
         self.present.insert(DescriptorPresent::VALUE);
     }
 
     #[inline]
-    pub fn clear_value(&mut self) {
+    pub const fn clear_value(&mut self) {
         self.value = Value::undefined();
         self.present.remove(DescriptorPresent::VALUE);
     }
 
     #[inline]
-    pub fn set_getter(&mut self, getter: Value) {
+    pub const fn set_getter(&mut self, getter: Value) {
         self.get = getter;
         self.present.insert(DescriptorPresent::GET);
     }
 
     #[inline]
-    pub fn clear_getter(&mut self) {
+    pub const fn clear_getter(&mut self) {
         self.get = Value::undefined();
         self.present.remove(DescriptorPresent::GET);
     }
 
     #[inline]
-    pub fn set_setter(&mut self, setter: Value) {
+    pub const fn set_setter(&mut self, setter: Value) {
         self.set = setter;
         self.present.insert(DescriptorPresent::SET);
     }
 
     #[inline]
-    pub fn clear_setter(&mut self) {
+    pub const fn clear_setter(&mut self) {
         self.set = Value::undefined();
         self.present.remove(DescriptorPresent::SET);
     }
 
     #[inline]
-    pub fn set_writable(&mut self, writable: bool) {
+    pub const fn set_writable(&mut self, writable: bool) {
         self.attrs.set_writable(writable);
         self.present.insert(DescriptorPresent::WRITABLE);
     }
 
     #[inline]
-    pub fn clear_writable(&mut self) {
+    pub const fn clear_writable(&mut self) {
         self.attrs.clear_writable();
         self.present.remove(DescriptorPresent::WRITABLE);
     }
 
     #[inline]
-    pub fn set_enumerable(&mut self, enumerable: bool) {
+    pub const fn set_enumerable(&mut self, enumerable: bool) {
         self.attrs.set_enumerable(enumerable);
         self.present.insert(DescriptorPresent::ENUMERABLE);
     }
 
     #[inline]
-    pub fn clear_enumerable(&mut self) {
+    pub const fn clear_enumerable(&mut self) {
         self.attrs.clear_enumerable();
         self.present.remove(DescriptorPresent::ENUMERABLE);
     }
 
     #[inline]
-    pub fn set_configurable(&mut self, configurable: bool) {
+    pub const fn set_configurable(&mut self, configurable: bool) {
         self.attrs.set_configurable(configurable);
         self.present.insert(DescriptorPresent::CONFIGURABLE);
     }
 
     #[inline]
-    pub fn clear_configurable(&mut self) {
+    pub const fn clear_configurable(&mut self) {
         self.attrs.clear_configurable();
         self.present.remove(DescriptorPresent::CONFIGURABLE);
     }

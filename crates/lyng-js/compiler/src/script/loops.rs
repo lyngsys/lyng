@@ -1,4 +1,9 @@
-use super::*;
+use super::{
+    AtomId, CompletionKind, ControlTargetKind, Decl, DeclId, DeclarationKind, ExceptionHandler,
+    ExceptionHandlerKind, Expr, ExprId, ForInOfLeft, ForInit, FunctionCompiler, FunctionId,
+    LoweringError, LoweringResult, Opcode, Pattern, SafepointKind, ScopeId, ScopeKind,
+    SemanticBindingId, Span, Stmt, StmtId, VariableKind,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LoopIterationEnvironmentPlan {
@@ -7,7 +12,7 @@ struct LoopIterationEnvironmentPlan {
     copy_slots: Vec<u16>,
 }
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     fn for_init_has_lexical_scope(&self, init: Option<ForInit>) -> bool {
         matches!(init, Some(ForInit::Declaration(decl_id)) if matches!(
             self.ast().get_decl(decl_id),
@@ -609,12 +614,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let [declarator] = declarators.as_slice() else {
             return Err(LoweringError::UnsupportedDeclaration { decl: decl_id });
         };
-        if kind == VariableKind::Var {
-            if let Pattern::Identifier { name, .. } = self.ast().get_pattern(declarator.id) {
-                if let Some(catch_binding) = self.active_simple_catch_binding_for_name(*name) {
-                    return self.assign_binding_value(catch_binding, *name, value_register);
-                }
-            }
+        if kind == VariableKind::Var
+            && let Pattern::Identifier { name, .. } = self.ast().get_pattern(declarator.id)
+            && let Some(catch_binding) = self.active_simple_catch_binding_for_name(*name)
+        {
+            return self.assign_binding_value(catch_binding, *name, value_register);
         }
         self.lower_binding_pattern_initialization(
             declarator.id,
@@ -1197,7 +1201,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     fn collect_functions_in_for_in_left(&self, left: ForInOfLeft, functions: &mut Vec<FunctionId>) {
         match left {
             ForInOfLeft::Declaration(decl) => {
-                self.collect_functions_in_declaration(decl, functions)
+                self.collect_functions_in_declaration(decl, functions);
             }
             ForInOfLeft::Pattern(pattern) => self.collect_functions_in_pattern(pattern, functions),
             ForInOfLeft::Expression(expr) => self.collect_functions_in_expression(expr, functions),

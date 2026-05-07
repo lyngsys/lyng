@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    Agent, AtomId, BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, EnvironmentRef,
+    FrameRecord, HostHooks, InstalledFunction, NativeFunctionRegistry, ObjectRef, Opcode, RealmRef,
+    Value, Vm, VmError, VmResult,
+};
 use crate::vm::property_access::ToPrimitiveHint;
 use lyng_js_bytecode::{WideAbcOperands, WideAbxOperands};
 use lyng_js_gc::{AllocationLifetime, BigIntSign, PrimitiveStringView, StringEncoding};
@@ -466,10 +470,10 @@ impl Vm {
         if let Some(index) = value.as_smi().and_then(|index| u32::try_from(index).ok()) {
             return Ok(PropertyKey::Index(index));
         }
-        if let Some(number) = value.as_f64() {
-            if let Some(index) = number_to_array_index(number) {
-                return Ok(PropertyKey::Index(index));
-            }
+        if let Some(number) = value.as_f64()
+            && let Some(index) = number_to_array_index(number)
+        {
+            return Ok(PropertyKey::Index(index));
         }
         if let Some(string) = value.as_string_ref() {
             return self.string_ref_to_property_key(agent, code, instruction_offset, value, string);
@@ -612,13 +616,13 @@ impl Vm {
         if current == Value::uninitialized_lexical() {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
-        if let Some(flags) = self.environment_slot_flags(agent, environment, slot) {
-            if !flags.is_mutable() {
-                if flags.sloppy_immutable_assign_silent() && !strict {
-                    return Ok(());
-                }
-                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        if let Some(flags) = self.environment_slot_flags(agent, environment, slot)
+            && !flags.is_mutable()
+        {
+            if flags.sloppy_immutable_assign_silent() && !strict {
+                return Ok(());
             }
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         Self::set_environment_slot_raw(agent, environment, slot, value)?;
         self.sync_loop_iteration_slot(agent, environment, slot, value)
@@ -634,7 +638,7 @@ impl Vm {
         agent
             .environment_layout(layout)?
             .binding(slot)
-            .map(|binding| binding.flags())
+            .map(lyng_js_env::EnvironmentBindingLayout::flags)
     }
 
     pub(super) fn property_key_to_enumeration_value(
@@ -649,7 +653,11 @@ impl Vm {
                 Value::from_string_ref(alloc_atom_string(agent, atom, &text))
             }
             PropertyKey::Atom(atom) => {
-                if let Some(text) = self.atom_texts.get(&atom).map(|text| text.to_string()) {
+                if let Some(text) = self
+                    .atom_texts
+                    .get(&atom)
+                    .map(std::string::ToString::to_string)
+                {
                     return Value::from_string_ref(alloc_atom_string(agent, atom, &text));
                 }
                 if let Some(text) = agent.atoms().get(atom).map(ToOwned::to_owned) {
@@ -721,7 +729,7 @@ impl Vm {
             .heap()
             .view()
             .code(code)
-            .and_then(|record| record.constants())
+            .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
             .and_then(|slots| agent.heap().view().code_slots(slots))
             .and_then(|slots| slots.get(index_usize))
             .copied()
@@ -862,14 +870,14 @@ fn concat_string_refs(agent: &mut Agent, left: StringRef, right: StringRef) -> V
             && right_view.encoding() == StringEncoding::Latin1
     };
 
-    if can_use_latin1_concat {
-        if let Some(string) = agent.heap_mut().mutator().alloc_latin1_concat_string(
+    if can_use_latin1_concat
+        && let Some(string) = agent.heap_mut().mutator().alloc_latin1_concat_string(
             left,
             right,
             AllocationLifetime::Default,
-        ) {
-            return Ok(string);
-        }
+        )
+    {
+        return Ok(string);
     }
     if let Some(string) = agent.heap_mut().mutator().alloc_utf16_concat_string(
         left,
@@ -1067,17 +1075,17 @@ fn alloc_utf16_string(
 }
 
 #[inline]
-fn lookup_compiled_atom<'a>(
-    atom_texts: &'a [(AtomId, CompiledAtom)],
+fn lookup_compiled_atom(
+    atom_texts: &[(AtomId, CompiledAtom)],
     atom: AtomId,
-) -> Option<&'a CompiledAtom> {
+) -> Option<&CompiledAtom> {
     atom_texts
         .iter()
         .find_map(|(candidate, text)| (*candidate == atom).then_some(text))
 }
 
 #[inline]
-fn immediate_constant_value(constant: ConstantValue) -> Option<Value> {
+const fn immediate_constant_value(constant: ConstantValue) -> Option<Value> {
     match constant {
         ConstantValue::Smi(value) => Some(Value::from_smi(value)),
         ConstantValue::Float64Bits(bits) => Some(Value::from_f64(f64::from_bits(bits))),

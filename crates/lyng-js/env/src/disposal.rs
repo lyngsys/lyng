@@ -121,7 +121,7 @@ pub struct DisposalCapabilityRecord {
 
 impl DisposalCapabilityRecord {
     #[inline]
-    pub fn new(kind: DisposalCapabilityKind) -> Self {
+    pub const fn new(kind: DisposalCapabilityKind) -> Self {
         Self {
             kind,
             state: DisposalCapabilityState::Active,
@@ -231,7 +231,7 @@ impl AsyncDisposalResumeRecord {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct AgentDisposalTables {
+pub struct AgentDisposalTables {
     capabilities: Vec<Option<DisposalCapabilityRecord>>,
     capability_by_object: Vec<Option<DisposalCapabilityId>>,
     async_operations: Vec<Option<AsyncDisposalOperationRecord>>,

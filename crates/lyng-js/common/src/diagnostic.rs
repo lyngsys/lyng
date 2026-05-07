@@ -18,8 +18,8 @@ pub enum Severity {
 impl fmt::Debug for Severity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Severity::Warning => f.write_str("warning"),
-            Severity::Error => f.write_str("error"),
+            Self::Warning => f.write_str("warning"),
+            Self::Error => f.write_str("error"),
         }
     }
 }
@@ -112,11 +112,11 @@ impl DiagnosticList {
     }
 
     /// Returns the number of diagnostics.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.diagnostics.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.diagnostics.is_empty()
     }
 
@@ -126,7 +126,7 @@ impl DiagnosticList {
     }
 
     /// Drains all diagnostics from `other` into this list.
-    pub fn extend(&mut self, other: &mut DiagnosticList) {
+    pub fn extend(&mut self, other: &mut Self) {
         self.diagnostics.append(&mut other.diagnostics);
     }
 }

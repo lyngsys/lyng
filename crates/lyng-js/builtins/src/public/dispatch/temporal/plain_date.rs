@@ -1,4 +1,36 @@
-use super::*;
+use super::{
+    allocate_temporal_duration_object, allocate_temporal_plain_date_time_object,
+    allocate_temporal_zoned_date_time_object, current_temporal_duration_prototype,
+    current_temporal_plain_date_prototype, current_temporal_plain_date_time_prototype,
+    current_temporal_plain_month_day_prototype, current_temporal_plain_year_month_prototype,
+    current_temporal_zoned_date_time_prototype, format_temporal_plain_date, map_completion,
+    negate_temporal_duration, object, plain_month_day, plain_year_month, range_error,
+    string_ref_text, string_value, temporal_compare_ordering, temporal_constructor_prototype,
+    temporal_duration_from_value, temporal_duration_round_calendar_relative,
+    temporal_duration_rounding_increment_option, temporal_duration_rounding_mode_option,
+    temporal_duration_whole_days_from_time, temporal_integer_part_from_argument,
+    temporal_is_iso_leap_year, temporal_iso_day_of_week, temporal_iso_day_of_year,
+    temporal_iso_days_before_year, temporal_iso_days_in_month, temporal_iso_days_in_year,
+    temporal_iso_week_of_year, temporal_month_from_month_code_text, temporal_ops,
+    temporal_optional_integer_part_from_property, temporal_optional_month_code_text_from_property,
+    temporal_overflow_from_options, temporal_plain_date_ordinal_day,
+    temporal_plain_date_time_total_nanoseconds, temporal_plain_time_from_value,
+    temporal_property_value, temporal_resolve_month_from_fields,
+    temporal_round_duration_nanoseconds_to_increment, temporal_rounding_mode_for_negated_duration,
+    temporal_string_option, temporal_time_part_from_property, temporal_time_zone_id_from_value,
+    temporal_validate_iso_calendar_value,
+    temporal_validate_optional_iso_calendar_identifier_argument,
+    temporal_validate_optional_iso_calendar_property, temporal_zoned_date_time_civil,
+    temporal_zoned_date_time_from_parts, to_string_string_ref, type_error,
+    validate_temporal_duration, AllocationLifetime, AtomId, BuiltinFunctionId, BuiltinInvocation,
+    ObjectAllocation, ObjectColdData, ObjectRef, OrdinaryObjectData, PublicBuiltinDispatchContext,
+    RealmRecord, TemporalBuiltinRoundingMode, TemporalCivilDateTime, TemporalCivilToInstantRequest,
+    TemporalDisambiguation, TemporalDurationObjectData, TemporalDurationRelativeTo,
+    TemporalObjectData, TemporalObjectKind, TemporalOverflow, TemporalPlainDateObjectData,
+    TemporalPlainDateTimeObjectData, TemporalPlainMonthDayObjectData, TemporalPlainTimeObjectData,
+    TemporalPlainYearMonthObjectData, TemporalZonedDateTimeCalendarNameOption, Value,
+    TEMPORAL_NANOS_PER_DAY,
+};
 
 pub(super) fn dispatch_temporal_plain_date_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
@@ -730,8 +762,8 @@ pub(super) fn temporal_plain_date_add_duration<Cx: PublicBuiltinDispatchContext>
 ) -> Result<TemporalPlainDateObjectData, Cx::Error> {
     let total_months = i128::from(date.year()) * 12
         + i128::from(date.month() - 1)
-        + i128::from(duration.years()) * 12
-        + i128::from(duration.months());
+        + duration.years() * 12
+        + duration.months();
     let year = total_months.div_euclid(12);
     let month = total_months.rem_euclid(12) + 1;
     if !(-271_821..=275_760).contains(&year) {
@@ -753,9 +785,8 @@ pub(super) fn temporal_plain_date_add_duration<Cx: PublicBuiltinDispatchContext>
         overflow,
     )?;
 
-    let day_delta = i128::from(duration.weeks()) * 7
-        + i128::from(duration.days())
-        + temporal_duration_whole_days_from_time(duration);
+    let day_delta =
+        duration.weeks() * 7 + duration.days() + temporal_duration_whole_days_from_time(duration);
     let ordinal_day = temporal_plain_date_ordinal_day(constrained)
         .checked_add(day_delta)
         .ok_or_else(|| range_error(cx))?;
@@ -844,7 +875,7 @@ pub(super) fn temporal_date_difference_unit_from_value<Cx: PublicBuiltinDispatch
     temporal_date_difference_unit_from_text(&text).ok_or_else(|| range_error(cx))
 }
 
-pub(super) fn temporal_date_difference_unit_order(unit: TemporalDateDifferenceUnit) -> u8 {
+pub(super) const fn temporal_date_difference_unit_order(unit: TemporalDateDifferenceUnit) -> u8 {
     match unit {
         TemporalDateDifferenceUnit::Year => 0,
         TemporalDateDifferenceUnit::Month => 1,
@@ -906,7 +937,7 @@ pub(super) fn temporal_date_difference_options<Cx: PublicBuiltinDispatchContext>
         if text == "auto" {
             default_largest_unit
         } else {
-            temporal_date_difference_unit_from_text(&text).ok_or_else(|| range_error(cx))?
+            temporal_date_difference_unit_from_text(text).ok_or_else(|| range_error(cx))?
         }
     } else {
         default_largest_unit

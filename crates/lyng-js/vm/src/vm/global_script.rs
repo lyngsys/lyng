@@ -1,4 +1,6 @@
-use super::*;
+use super::{
+    Agent, AllocationLifetime, AtomId, ObjectRef, RealmRecord, Value, Vm, VmError, VmResult,
+};
 use lyng_js_bytecode::GlobalScriptInstantiationPlan;
 use lyng_js_ops::{errors, object};
 use lyng_js_types::{PropertyDescriptor, PropertyKey};
@@ -187,6 +189,6 @@ fn define_global_binding_property(
     }
 }
 
-fn is_data_descriptor(descriptor: PropertyDescriptor) -> bool {
+const fn is_data_descriptor(descriptor: PropertyDescriptor) -> bool {
     descriptor.has_value() || descriptor.has_writable()
 }

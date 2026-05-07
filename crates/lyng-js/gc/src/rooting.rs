@@ -106,7 +106,7 @@ impl PrimitiveRoots {
     }
 
     #[inline]
-    pub fn scope(&self) -> PrimitiveRootScope<'_> {
+    pub const fn scope(&self) -> PrimitiveRootScope<'_> {
         PrimitiveRootScope { roots: self }
     }
 
@@ -361,11 +361,11 @@ impl<'a> PrimitiveTracer<'a> {
     }
 
     #[inline]
-    pub fn finish(self) -> PrimitiveTraceStats {
+    pub const fn finish(self) -> PrimitiveTraceStats {
         self.stats
     }
 
-    fn total_live_marks(&self) -> usize {
+    const fn total_live_marks(&self) -> usize {
         self.stats.strings_marked
             + self.stats.symbols_marked
             + self.stats.bigints_marked
@@ -441,10 +441,10 @@ impl<'a> PrimitiveTracer<'a> {
             self.stats.objects_marked += 1;
             if let Some(record) = self.heap.object(id) {
                 record.trace_heap_edges(self);
-                if let Some(function_payload) = record.function_payload() {
-                    if let Some(payload) = self.heap.function_payload(function_payload) {
-                        payload.trace_heap_edges(self);
-                    }
+                if let Some(function_payload) = record.function_payload()
+                    && let Some(payload) = self.heap.function_payload(function_payload)
+                {
+                    payload.trace_heap_edges(self);
                 }
             }
         }
@@ -691,8 +691,8 @@ impl TraceHeapEdges for ShapeId {
 impl TraceHeapEdges for crate::WeakHeapRef {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
         match self {
-            crate::WeakHeapRef::Object(object) => object.trace_heap_edges(tracer),
-            crate::WeakHeapRef::Symbol(symbol) => symbol.trace_heap_edges(tracer),
+            Self::Object(object) => object.trace_heap_edges(tracer),
+            Self::Symbol(symbol) => symbol.trace_heap_edges(tracer),
         }
     }
 }

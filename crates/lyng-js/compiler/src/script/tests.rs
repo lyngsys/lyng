@@ -112,13 +112,13 @@ fn compile_script_emits_child_templates_and_call_sites() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(1),
-        r#"
+        r"
             function outer(x) {
                 return (y) => x + y;
             }
             let add = outer(2);
             add(3);
-            "#,
+            ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -189,12 +189,12 @@ fn compile_script_allocates_function_environment_for_direct_arrow_children() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(2),
-        r#"
+        r"
             function outer() {
                 return () => this;
             }
             outer();
-            "#,
+            ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -342,11 +342,11 @@ fn compile_script_lowers_with_call_targets_through_captured_name_reference() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(6),
-        r#"
+        r"
             with ({}) {
                 Object();
             }
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -388,13 +388,13 @@ fn compile_script_lowers_dynamic_lookup_delete_through_delete_name() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(6),
-        r#"
+        r"
             function testcase() {
                 delete x;
                 var x;
             }
             testcase();
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let mut sema = analyze_script(&parsed, &atoms);
@@ -479,7 +479,7 @@ fn compile_script_lowers_typeof_before_for_lexical_shadow_through_resolve_global
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(37),
-        r#"
+        r"
             var beforeType;
             beforeType = typeof f;
             for (let f; ; ) {
@@ -489,7 +489,7 @@ fn compile_script_lowers_typeof_before_for_lexical_shadow_through_resolve_global
                 break;
             }
             beforeType;
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -550,14 +550,14 @@ fn compile_script_named_function_expression_self_binding_allocates_own_environme
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(33),
-        r#"
+        r"
             let outcomes = [];
             let saved;
             (function observe() {
                 saved = observe;
                 return outcomes.length;
             })();
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -638,14 +638,14 @@ fn compile_script_lowers_dynamic_identifier_updates_through_captured_name_ops() 
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(31),
-        r#"
+        r"
             var obj = { x: 1 };
             with (obj) {
                 x += 1;
                 x++;
                 x = (delete obj.x, 4);
             }
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -809,7 +809,7 @@ fn compile_script_allocates_script_environment_for_captured_top_level_bindings()
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(4),
-        r#"
+        r"
             let base = 40;
             function outer(step) {
                 return function(delta) {
@@ -818,7 +818,7 @@ fn compile_script_allocates_script_environment_for_captured_top_level_bindings()
             }
             let add = outer(1);
             add(2);
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -982,10 +982,10 @@ fn compile_script_uses_direct_env_slot_updates_for_sibling_lexical_for_loops() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(9999),
-        r#"
+        r"
             for (let i = 0; i < 3; ++i) {}
             for (let i = 0; i < 2; ++i) {}
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1035,11 +1035,11 @@ fn compile_script_marks_direct_tail_calls_explicitly() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(6),
-        r#"
+        r"
             function recur(step, value) {
                 return step(value);
             }
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1074,7 +1074,7 @@ fn compile_script_keeps_non_tail_calls_and_finally_returns_non_tail() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(7),
-        r#"
+        r"
             function direct(value) {
                 let inner = function(next) { return next; };
                 let result = inner(value);
@@ -1088,7 +1088,7 @@ fn compile_script_keeps_non_tail_calls_and_finally_returns_non_tail() {
                     value;
                 }
             }
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1149,11 +1149,11 @@ fn compile_script_marks_conditional_tail_calls_in_each_branch() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(8),
-        r#"
+        r"
             function branch(flag, left, right) {
                 return flag ? left() : right();
             }
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1188,12 +1188,12 @@ fn compile_script_keeps_shadowed_eval_fallback_on_the_tail_path() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(22),
-        r#"
+        r"
             function recur(step, value) {
                 var eval = step;
                 return eval(value);
             }
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1228,7 +1228,7 @@ fn compile_script_attaches_metadata_at_allocation_loop_and_exception_boundaries(
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(9),
-        r#"
+        r"
             function run(make) {
                 let value = 0;
                 while (value < 1) {
@@ -1240,7 +1240,7 @@ fn compile_script_attaches_metadata_at_allocation_loop_and_exception_boundaries(
                     return err;
                 }
             }
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1344,7 +1344,7 @@ fn compile_script_lowers_class_expressions_and_static_blocks() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(11),
-        r#"
+        r"
             let value = class Named {
                 static total = 1;
                 static {
@@ -1355,7 +1355,7 @@ fn compile_script_lowers_class_expressions_and_static_blocks() {
                 }
             };
             value;
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1388,12 +1388,12 @@ fn compile_script_counts_class_field_arrow_context_in_capture_depths() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(11_001),
-        r#"
+        r"
             class C {
                 static field = () => C;
             }
             C.field();
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1426,12 +1426,12 @@ fn compile_script_counts_class_field_arrow_context_in_capture_depths() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(11_002),
-        r#"
+        r"
             class D {
                 field = () => D;
             }
             new D().field();
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1468,7 +1468,7 @@ fn compile_script_forces_environments_for_explicit_derived_class_constructors() 
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(12),
-        r#"
+        r"
             class Base {
                 constructor(value) {
                     this.value = value;
@@ -1481,7 +1481,7 @@ fn compile_script_forces_environments_for_explicit_derived_class_constructors() 
                 }
             }
             Derived;
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1504,7 +1504,7 @@ fn compile_script_counts_forced_derived_constructor_environment_in_capture_depth
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(14),
-        r#"
+        r"
             let source = { value: 3 };
             class Base {
                 constructor(value) {
@@ -1517,7 +1517,7 @@ fn compile_script_counts_forced_derived_constructor_environment_in_capture_depth
                 }
             }
             Derived;
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1542,13 +1542,13 @@ fn compile_script_lowers_repeated_empty_class_bodies_with_shared_name() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(15),
-        r#"
+        r"
             const Base = function() {}.bind();
             class C extends Base {}
             (function() {
                 class C extends Base {}
             })();
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1564,13 +1564,13 @@ fn compile_script_marks_generator_functions_and_emits_resume_dispatch() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(14),
-        r#"
+        r"
             function* g() {
                 const value = yield 1;
                 return value;
             }
             g;
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1622,12 +1622,12 @@ fn compile_script_marks_async_functions_and_emits_await_suspension() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(17),
-        r#"
+        r"
             async function f(value) {
                 return await value;
             }
             f;
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1662,12 +1662,12 @@ fn compile_script_marks_async_generators_and_emits_suspend_resume_points() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(19),
-        r#"
+        r"
             async function* g(value) {
                 yield await value;
             }
             g;
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1727,12 +1727,12 @@ fn compile_script_marks_generator_methods_with_prototype_properties() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(15),
-        r#"
+        r"
             let ordinary = { method() {} };
             let object = { *gen() { yield 1; } };
             class C { *gen() { yield 2; } }
             ordinary;
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1763,14 +1763,14 @@ fn compile_script_lowers_for_await_of_loops_with_async_iterator_acquisition() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(18),
-        r#"
+        r"
             async function collect(iterable) {
                 for await (const value of iterable) {
                     return value;
                 }
             }
             collect;
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
@@ -1806,12 +1806,12 @@ fn compile_script_computes_expected_argument_count_for_generator_defaults() {
     let parsed = parse_script(
         &mut atoms,
         lyng_js_common::SourceId::new(16),
-        r#"
+        r"
             function* g(x, y = 1, z) {
                 yield x + y + z;
             }
             g;
-        "#,
+        ",
     );
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);

@@ -20,15 +20,12 @@ use std::sync::Arc;
 
 const ENTRY_SOURCE_ID: SourceId = SourceId::new(1);
 
-pub(crate) fn run_script(
-    invocation: &CliInvocation,
-    stderr: &mut dyn Write,
-) -> Result<i32, CliError> {
+pub fn run_script(invocation: &CliInvocation, stderr: &mut dyn Write) -> Result<i32, CliError> {
     let host = CliHost::new();
     let outcome = if invocation.is_module_entry() {
-        execute_module(invocation, host.clone())?
+        execute_module(invocation, host)?
     } else {
-        execute_script(invocation, host.clone())?
+        execute_script(invocation, host)?
     };
     write_reports(stderr, &outcome.display_name, &outcome.snapshot)?;
     Ok(outcome.exit_code)

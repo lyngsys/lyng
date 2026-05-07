@@ -1,5 +1,13 @@
 use crate::ids::BuiltinFunctionId;
 
+#[inline]
+const fn builtin_id(raw: u32) -> BuiltinFunctionId {
+    let Some(id) = BuiltinFunctionId::from_raw(raw) else {
+        unreachable!();
+    };
+    id
+}
+
 mod binary_data;
 mod collections;
 mod core_ids;

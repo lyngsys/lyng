@@ -91,7 +91,7 @@ fn phase5_property_is_enumerable_converts_key_before_this_object() {
 #[test]
 fn phase5_objects_support_null_prototypes_and_integrity_helpers() {
     let result = compile_and_run(
-        r#"
+        r"
         let nullProto = Object.create(null);
         let sealed = Object.seal({ answer: 1 });
         let frozen = Object.freeze({ answer: 2 });
@@ -105,7 +105,7 @@ fn phase5_objects_support_null_prototypes_and_integrity_helpers() {
             + (Object.isFrozen(frozen) ? 16 : 0)
             + (!Object.isExtensible(sealed) ? 32 : 0)
             + (!Object.isExtensible(frozen) ? 64 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(127));
@@ -228,13 +228,13 @@ fn phase6_object_literal_computed_key_coerces_before_value_evaluation() {
 #[test]
 fn phase6_object_literal_function_expression_keys_use_trimmed_source_text() {
     let result = compile_and_run(
-        r#"
+        r"
         let object = {
             [function () {}]: 7
         };
 
         object[function () {}] + object[String(function () {})];
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(14));
@@ -540,7 +540,7 @@ fn phase6_object_from_entries_defines_ordinary_data_properties() {
 #[test]
 fn phase6_object_from_entries_closes_iterator_after_bad_entry() {
     let result = compile_and_run_string(
-        r#"
+        r"
         let closed = false;
         let iterable = {
             [Symbol.iterator]() {
@@ -561,7 +561,7 @@ fn phase6_object_from_entries_closes_iterator_after_bad_entry() {
         } catch (error) {}
 
         String(closed);
-        "#,
+        ",
     );
 
     assert_eq!(result, "true");
@@ -659,7 +659,7 @@ fn phase6_annex_b_define_and_lookup_accessors_walk_prototypes() {
 #[test]
 fn phase6_proto_cycle_detection_stops_at_proxy_exotic_prototype() {
     let result = compile_and_run_string(
-        r#"
+        r"
         let root = {};
         let intermediary = new Proxy(Object.create(root), {});
         let leaf = Object.create(intermediary);
@@ -667,7 +667,7 @@ fn phase6_proto_cycle_detection_stops_at_proxy_exotic_prototype() {
         root.__proto__ = leaf;
 
         String(Object.getPrototypeOf(root) === leaf);
-        "#,
+        ",
     );
 
     assert_eq!(result, "true");
@@ -912,7 +912,7 @@ fn phase5_object_define_property_respects_engine_array_length_rules() {
 #[test]
 fn phase5_object_get_prototype_of_uses_runtime_prototype_graphs() {
     let result = compile_and_run(
-        r#"
+        r"
         let total = 0;
         total += Object.getPrototypeOf(Boolean) === Function.prototype ? 1 : 0;
         total += Object.getPrototypeOf(RangeError) === Error ? 2 : 0;
@@ -921,7 +921,7 @@ fn phase5_object_get_prototype_of_uses_runtime_prototype_graphs() {
             ? 8
             : 0;
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(15));

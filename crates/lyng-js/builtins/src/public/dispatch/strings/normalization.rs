@@ -30,7 +30,7 @@ pub(super) fn string_locale_compare_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_smi(result))
 }
 
-fn canonical_combining_class(code_point: u32) -> u8 {
+const fn canonical_combining_class(code_point: u32) -> u8 {
     match code_point {
         0x093C => 7,
         0x031B => 216,
@@ -142,7 +142,7 @@ fn compose_hangul_pair(left: u32, right: u32) -> Option<u32> {
         return Some(S_BASE + (left - L_BASE) * N_COUNT + (right - V_BASE) * T_COUNT);
     }
     if (S_BASE..S_BASE + S_COUNT).contains(&left)
-        && (left - S_BASE) % T_COUNT == 0
+        && (left - S_BASE).is_multiple_of(T_COUNT)
         && (T_BASE + 1..T_BASE + T_COUNT).contains(&right)
     {
         return Some(left + (right - T_BASE));
@@ -184,13 +184,12 @@ fn compose_normalized_code_points(points: &[u32]) -> Vec<u32> {
     let mut previous_class = 0;
     for point in points {
         let class = canonical_combining_class(*point);
-        if let Some(starter) = starter_index {
-            if previous_class == 0 || previous_class < class {
-                if let Some(composed) = compose_pair(result[starter], *point) {
-                    result[starter] = composed;
-                    continue;
-                }
-            }
+        if let Some(starter) = starter_index
+            && (previous_class == 0 || previous_class < class)
+            && let Some(composed) = compose_pair(result[starter], *point)
+        {
+            result[starter] = composed;
+            continue;
         }
         if class == 0 {
             starter_index = Some(result.len());

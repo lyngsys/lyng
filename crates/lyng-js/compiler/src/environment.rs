@@ -47,7 +47,7 @@ pub struct ScopeEnvironmentLayoutPlan {
 
 impl ScopeEnvironmentLayoutPlan {
     #[inline]
-    pub fn new(layout: EnvironmentLayout, global_var_names: Vec<AtomId>) -> Self {
+    pub const fn new(layout: EnvironmentLayout, global_var_names: Vec<AtomId>) -> Self {
         Self {
             layout,
             global_var_names,
@@ -274,7 +274,7 @@ pub fn seed_global_var_names(
     true
 }
 
-fn scope_layout_kind(kind: ScopeKind) -> Option<EnvironmentLayoutKind> {
+const fn scope_layout_kind(kind: ScopeKind) -> Option<EnvironmentLayoutKind> {
     match kind {
         ScopeKind::Global => Some(EnvironmentLayoutKind::Global),
         ScopeKind::Module => Some(EnvironmentLayoutKind::Module),
@@ -309,7 +309,7 @@ fn scope_needs_environment(
     }
 }
 
-fn binding_flags(binding: &BindingRecord) -> EnvironmentSlotFlags {
+const fn binding_flags(binding: &BindingRecord) -> EnvironmentSlotFlags {
     EnvironmentSlotFlags::new(
         binding_is_mutable(binding.kind),
         binding.kind.is_lexical(),
@@ -322,7 +322,7 @@ fn binding_flags(binding: &BindingRecord) -> EnvironmentSlotFlags {
     .with_sloppy_immutable_assign_silent(matches!(binding.kind, DeclarationKind::FunctionName))
 }
 
-fn binding_is_mutable(kind: DeclarationKind) -> bool {
+const fn binding_is_mutable(kind: DeclarationKind) -> bool {
     !matches!(
         kind,
         DeclarationKind::Const

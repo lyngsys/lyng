@@ -4,7 +4,7 @@ use lyng_js_types::Value;
 #[test]
 fn phase4_try_catch_finally_runs_in_order() {
     let result = compile_and_run(
-        r#"
+        r"
         let marker = 0;
         try {
             throw 6;
@@ -14,7 +14,7 @@ fn phase4_try_catch_finally_runs_in_order() {
             marker = marker + 1;
         }
         marker;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -23,7 +23,7 @@ fn phase4_try_catch_finally_runs_in_order() {
 #[test]
 fn phase4_try_catch_handles_throws_from_called_functions() {
     let result = compile_and_run(
-        r#"
+        r"
         function fail() {
             throw 6;
         }
@@ -34,7 +34,7 @@ fn phase4_try_catch_handles_throws_from_called_functions() {
             marker = error;
         }
         marker;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(6));
@@ -58,7 +58,7 @@ fn phase4_try_catch_handles_primitive_string_throws() {
 #[test]
 fn phase4_finally_preserves_return_completion() {
     let result = compile_and_run(
-        r#"
+        r"
         function read() {
             let box = { marker: 0 };
             try {
@@ -69,7 +69,7 @@ fn phase4_finally_preserves_return_completion() {
         }
         let result = read();
         result.marker;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(5));
@@ -78,7 +78,7 @@ fn phase4_finally_preserves_return_completion() {
 #[test]
 fn phase4_catch_parameters_shadow_outer_bindings() {
     let result = compile_and_run(
-        r#"
+        r"
         function run(value) {
             try {
                 throw 2;
@@ -87,7 +87,7 @@ fn phase4_catch_parameters_shadow_outer_bindings() {
             }
         }
         run(1);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(2));
@@ -96,7 +96,7 @@ fn phase4_catch_parameters_shadow_outer_bindings() {
 #[test]
 fn phase4_labeled_break_and_continue_run_finally_cleanup() {
     let result = compile_and_run(
-        r#"
+        r"
         let total = 0;
         outer: for (let i = 0; i < 4; i = i + 1) {
             try {
@@ -108,7 +108,7 @@ fn phase4_labeled_break_and_continue_run_finally_cleanup() {
             }
         }
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(42));
@@ -130,7 +130,7 @@ fn phase6_finally_abrupt_completion_uses_finalizer_value() {
 #[test]
 fn phase6_nested_finally_normal_completion_preserves_outer_return() {
     let result = compile_and_run(
-        r#"
+        r"
         function run() {
             try {
                 return 42;
@@ -143,7 +143,7 @@ fn phase6_nested_finally_normal_completion_preserves_outer_return() {
             }
         }
         run();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(42));
@@ -179,14 +179,14 @@ fn phase6_typeof_global_identifier_invokes_accessors() {
 #[test]
 fn phase4_sloppy_delete_identifier_reference_uses_phase4_special_cases() {
     let result = compile_and_run(
-        r#"
+        r"
         let local = 1;
         var globalVar = 2;
         let localDeleted = delete local;
         let globalDeleted = delete globalVar;
         let missingDeleted = delete missingName;
         (localDeleted ? 1 : 0) + (globalDeleted ? 2 : 0) + (missingDeleted ? 4 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(4));

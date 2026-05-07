@@ -320,7 +320,7 @@ struct NativeErrorPrototypeSpec {
     name: Value,
 }
 
-fn native_error_prototype_specs(
+const fn native_error_prototype_specs(
     builtins: &PublicRealmBuiltins,
     values: ErrorDescriptorValues,
 ) -> [NativeErrorPrototypeSpec; 8] {
@@ -368,7 +368,7 @@ fn native_error_prototype_specs(
     ]
 }
 
-fn native_error_prototype_descriptors(
+const fn native_error_prototype_descriptors(
     constructor: ObjectRef,
     message: AtomId,
     empty_string: Value,

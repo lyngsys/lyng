@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    FinalizationRegistryState, ObjectRef, PrimitiveHeap, SymbolRef, Value, WeakHeapRef,
+    WeakMapState, WeakRefState, WeakSetState,
+};
 
 impl PrimitiveHeap {
     #[inline]

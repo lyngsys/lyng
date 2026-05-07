@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    errors, object, Agent, AllocationLifetime, ClassPrivateElementKind, FrameRecord, HostHooks,
+    NativeFunctionRegistry, ObjectRef, Value, Vm, VmError, VmResult,
+};
 
 impl Vm {
     pub(in crate::vm::builtin_dispatch) fn bind_function_private_env_builtin(
@@ -24,11 +27,11 @@ impl Vm {
         let outer = agent
             .objects()
             .function_data(function)
-            .and_then(|data| data.private_env())
+            .and_then(lyng_js_objects::FunctionObjectData::private_env)
             .or_else(|| {
                 agent
                     .current_execution_context()
-                    .and_then(|context| context.private_env())
+                    .and_then(lyng_js_env::ExecutionContext::private_env)
             });
         let installs_private_names = arguments
             .get(3)
@@ -122,7 +125,7 @@ impl Vm {
             agent
                 .objects()
                 .function_data(callee)
-                .and_then(|data| data.home_object())
+                .and_then(lyng_js_objects::FunctionObjectData::home_object)
         }) {
             if remaining == 0 {
                 return home_object;
@@ -168,7 +171,7 @@ impl Vm {
     ) -> Option<ObjectRef> {
         let mut current = agent
             .current_execution_context()
-            .and_then(|context| context.private_env());
+            .and_then(lyng_js_env::ExecutionContext::private_env);
         let mut remaining = class_depth;
 
         while let Some(environment) = current {

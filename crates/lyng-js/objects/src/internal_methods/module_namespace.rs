@@ -47,14 +47,14 @@ impl ObjectRuntime {
         if descriptor.writable() == Some(false) {
             return Ok(false);
         }
-        if let Some(value) = descriptor.value() {
-            if !descriptor_same_value(
+        if let Some(value) = descriptor.value()
+            && !descriptor_same_value(
                 heap.view(),
                 value,
                 self.module_namespace_export_value(heap.view(), export)?,
-            )? {
-                return Ok(false);
-            }
+            )?
+        {
+            return Ok(false);
         }
         Ok(true)
     }
@@ -117,7 +117,7 @@ impl ObjectRuntime {
             crate::ModuleNamespaceExportTarget::Binding { environment, slot } => {
                 let slots = heap
                     .environment(environment)
-                    .and_then(|record| record.slots())
+                    .and_then(lyng_js_gc::RuntimeEnvironmentRecord::slots)
                     .and_then(|slots| heap.environment_slots(slots))
                     .ok_or(InternalMethodError::CorruptObjectState)?;
                 let value = slots

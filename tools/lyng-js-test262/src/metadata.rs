@@ -1,5 +1,5 @@
 #[derive(Debug, Clone)]
-pub(crate) struct TestMetadata {
+pub struct TestMetadata {
     pub(crate) features: Vec<String>,
     pub(crate) flags: Vec<String>,
     pub(crate) includes: Vec<String>,
@@ -7,13 +7,13 @@ pub(crate) struct TestMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NegativeExpectation {
+pub struct NegativeExpectation {
     pub(crate) phase: String,
     pub(crate) error_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum TestVariant {
+pub enum TestVariant {
     Default,
     NonStrict,
     Strict,
@@ -58,7 +58,7 @@ impl TestVariant {
     }
 }
 
-pub(crate) fn parse_metadata(source: &str) -> TestMetadata {
+pub fn parse_metadata(source: &str) -> TestMetadata {
     let mut features = Vec::new();
     let mut flags = Vec::new();
     let mut includes = Vec::new();
@@ -172,15 +172,15 @@ fn parse_inline_list(rest: &str, dest: &mut Vec<String>) {
     }
 }
 
-pub(crate) fn is_module_test(metadata: &TestMetadata) -> bool {
+pub fn is_module_test(metadata: &TestMetadata) -> bool {
     metadata.flags.iter().any(|flag| flag == "module")
 }
 
-pub(crate) fn has_async_flag(metadata: &TestMetadata) -> bool {
+pub fn has_async_flag(metadata: &TestMetadata) -> bool {
     metadata.flags.iter().any(|flag| flag == "async")
 }
 
-pub(crate) fn variants_for_metadata(metadata: &TestMetadata) -> Vec<TestVariant> {
+pub fn variants_for_metadata(metadata: &TestMetadata) -> Vec<TestVariant> {
     if metadata.flags.iter().any(|flag| flag == "raw") {
         return vec![TestVariant::Raw];
     }
@@ -204,7 +204,7 @@ pub(crate) fn variants_for_metadata(metadata: &TestMetadata) -> Vec<TestVariant>
     vec![TestVariant::NonStrict, TestVariant::Strict]
 }
 
-pub(crate) fn effective_parse_source(source: &str, variant: TestVariant) -> String {
+pub fn effective_parse_source(source: &str, variant: TestVariant) -> String {
     if variant.uses_strict_directive() {
         format!("\"use strict\";\n{source}")
     } else {

@@ -8,7 +8,7 @@ use lyng_js_types::{PropertyDescriptor, PropertyKey};
 use std::collections::HashMap;
 
 #[inline]
-pub(crate) fn flattened_property_lookup(
+pub fn flattened_property_lookup(
     properties: &[ShapeProperty],
 ) -> Option<HashMap<PropertyKey, usize>> {
     if properties.len() <= SMALL_SHAPE_INLINE_PROPERTY_LIMIT {
@@ -22,7 +22,7 @@ pub(crate) fn flattened_property_lookup(
     Some(lookup)
 }
 
-pub(crate) fn update_integrity_flags(
+pub fn update_integrity_flags(
     kind: ShapePropertyKind,
     attrs: DescriptorAttributes,
     sealed: &mut bool,
@@ -40,13 +40,13 @@ pub(crate) fn update_integrity_flags(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum DescriptorKind {
+pub enum DescriptorKind {
     Generic,
     Data,
     Accessor,
 }
 
-pub(crate) fn descriptor_kind(
+pub const fn descriptor_kind(
     descriptor: PropertyDescriptor,
 ) -> InternalMethodResult<DescriptorKind> {
     let is_data = descriptor.has_value() || descriptor.has_writable();
@@ -59,7 +59,7 @@ pub(crate) fn descriptor_kind(
     }
 }
 
-pub(crate) fn descriptor_from_payload(
+pub const fn descriptor_from_payload(
     payload: NamedPropertyValue,
     attrs: DescriptorAttributes,
 ) -> PropertyDescriptor {
@@ -79,7 +79,7 @@ pub(crate) fn descriptor_from_payload(
     descriptor
 }
 
-pub(crate) fn payload_from_complete_descriptor(
+pub fn payload_from_complete_descriptor(
     descriptor: PropertyDescriptor,
 ) -> InternalMethodResult<NamedPropertyValue> {
     match descriptor_kind(descriptor)? {
@@ -93,7 +93,7 @@ pub(crate) fn payload_from_complete_descriptor(
     }
 }
 
-pub(crate) fn complete_descriptor_update(
+pub fn complete_descriptor_update(
     current: Option<PropertyDescriptor>,
     update: PropertyDescriptor,
 ) -> InternalMethodResult<(NamedPropertyValue, DescriptorAttributes)> {
@@ -186,7 +186,7 @@ pub(crate) fn complete_descriptor_update(
     }
 }
 
-pub(crate) fn validate_descriptor_change(
+pub fn validate_descriptor_change(
     heap: PrimitiveHeapView<'_>,
     current: PropertyDescriptor,
     update: PropertyDescriptor,
@@ -201,10 +201,10 @@ pub(crate) fn validate_descriptor_change(
     if update.configurable() == Some(true) {
         return Ok(false);
     }
-    if let Some(enumerable) = update.enumerable() {
-        if enumerable != current.enumerable().unwrap_or(false) {
-            return Ok(false);
-        }
+    if let Some(enumerable) = update.enumerable()
+        && enumerable != current.enumerable().unwrap_or(false)
+    {
+        return Ok(false);
     }
     if update_kind != DescriptorKind::Generic && update_kind != current_kind {
         return Ok(false);
@@ -218,35 +218,35 @@ pub(crate) fn validate_descriptor_change(
                 if update.writable() == Some(true) {
                     return Ok(false);
                 }
-                if let Some(value) = update.value() {
-                    if !descriptor_same_value(
+                if let Some(value) = update.value()
+                    && !descriptor_same_value(
                         heap,
                         value,
                         current.value().unwrap_or(Value::undefined()),
-                    )? {
-                        return Ok(false);
-                    }
+                    )?
+                {
+                    return Ok(false);
                 }
             }
             Ok(true)
         }
         DescriptorKind::Accessor => {
-            if let Some(getter) = update.getter() {
-                if getter != current.getter().unwrap_or(Value::undefined()) {
-                    return Ok(false);
-                }
+            if let Some(getter) = update.getter()
+                && getter != current.getter().unwrap_or(Value::undefined())
+            {
+                return Ok(false);
             }
-            if let Some(setter) = update.setter() {
-                if setter != current.setter().unwrap_or(Value::undefined()) {
-                    return Ok(false);
-                }
+            if let Some(setter) = update.setter()
+                && setter != current.setter().unwrap_or(Value::undefined())
+            {
+                return Ok(false);
             }
             Ok(true)
         }
     }
 }
 
-pub(crate) fn descriptor_same_value(
+pub fn descriptor_same_value(
     heap: PrimitiveHeapView<'_>,
     left: Value,
     right: Value,
@@ -292,7 +292,7 @@ pub(crate) fn descriptor_same_value(
     Ok(left == right)
 }
 
-pub(crate) fn resolve_get_from_descriptor(
+pub fn resolve_get_from_descriptor(
     descriptor: PropertyDescriptor,
     _receiver: Value,
 ) -> InternalMethodResult<Value> {
@@ -311,7 +311,7 @@ pub(crate) fn resolve_get_from_descriptor(
     }
 }
 
-pub(crate) fn write_named_payload(
+pub fn write_named_payload(
     heap: &mut PrimitiveMutator<'_>,
     slots: ObjectSlotsRef,
     slot_offset: u32,
@@ -351,7 +351,7 @@ pub(crate) fn write_named_payload(
 }
 
 #[inline]
-pub(crate) fn ordinary_property_attrs() -> DescriptorAttributes {
+pub const fn ordinary_property_attrs() -> DescriptorAttributes {
     let mut attrs = DescriptorAttributes::empty();
     attrs.set_writable(true);
     attrs.set_enumerable(true);
@@ -360,7 +360,7 @@ pub(crate) fn ordinary_property_attrs() -> DescriptorAttributes {
 }
 
 #[inline]
-pub(crate) fn dense_element_growth_capacity(current_capacity: usize, target_index: u32) -> usize {
+pub fn dense_element_growth_capacity(current_capacity: usize, target_index: u32) -> usize {
     let required = target_index as usize + 1;
     let mut capacity = current_capacity.max(MIN_DENSE_ELEMENT_CAPACITY);
     while capacity < required {
@@ -369,7 +369,7 @@ pub(crate) fn dense_element_growth_capacity(current_capacity: usize, target_inde
     capacity
 }
 
-pub(crate) fn trim_dense_logical_len(buffer: &[Value], current_len: u32) -> u32 {
+pub fn trim_dense_logical_len(buffer: &[Value], current_len: u32) -> u32 {
     let mut trimmed = current_len as usize;
     while trimmed > 0 {
         if buffer

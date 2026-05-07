@@ -59,11 +59,11 @@ fn temporal_bootstrap_exposes_namespace_now_and_instant() {
 #[test]
 fn temporal_instant_constructor_and_epoch_getters_round_trip_epoch_nanoseconds() {
     let result = compile_and_run_with_host(
-        r#"
+        r"
         let instant = new Temporal.Instant(1234567890123456789n);
         (instant.epochNanoseconds === 1234567890123456789n ? 1 : 0)
             + (instant.epochMilliseconds === 1234567890123 ? 2 : 0);
-        "#,
+        ",
         lyng_js_host::NoopHostHooks,
     );
 
@@ -73,12 +73,12 @@ fn temporal_instant_constructor_and_epoch_getters_round_trip_epoch_nanoseconds()
 #[test]
 fn temporal_instant_static_from_and_compare_accept_instant_instances() {
     let result = compile_and_run_with_host(
-        r#"
+        r"
         let instant = new Temporal.Instant(1234567890123456789n);
         let later = Temporal.Instant.fromEpochNanoseconds(1234567890123456790n);
         (Temporal.Instant.compare(instant, later) === -1 ? 1 : 0)
             + (Temporal.Instant.from(instant).epochNanoseconds === instant.epochNanoseconds ? 2 : 0);
-        "#,
+        ",
         lyng_js_host::NoopHostHooks,
     );
 

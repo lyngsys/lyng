@@ -715,7 +715,7 @@ impl DateDescriptorAtoms {
     }
 }
 
-fn date_static_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 3] {
+const fn date_static_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 3] {
     [
         (atoms.now, date_now_builtin()),
         (atoms.parse, date_parse_builtin()),
@@ -723,7 +723,7 @@ fn date_static_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunc
     ]
 }
 
-fn date_format_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 6] {
+const fn date_format_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 6] {
     [
         (WellKnownAtom::toString.id(), date_to_string_builtin()),
         (atoms.to_date_string, date_to_date_string_builtin()),
@@ -740,11 +740,11 @@ fn date_format_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunc
     ]
 }
 
-fn date_value_method_specs() -> [(AtomId, BuiltinFunctionId); 1] {
+const fn date_value_method_specs() -> [(AtomId, BuiltinFunctionId); 1] {
     [(WellKnownAtom::valueOf.id(), date_value_of_builtin())]
 }
 
-fn date_getter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 19] {
+const fn date_getter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 19] {
     [
         (atoms.get_time, date_get_time_builtin()),
         (atoms.get_full_year, date_get_full_year_builtin()),
@@ -774,7 +774,7 @@ fn date_getter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunc
     ]
 }
 
-fn date_setter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 16] {
+const fn date_setter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 16] {
     [
         (atoms.set_time, date_set_time_builtin()),
         (atoms.set_milliseconds, date_set_milliseconds_builtin()),
@@ -798,7 +798,9 @@ fn date_setter_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunc
     ]
 }
 
-fn date_conversion_method_specs(atoms: DateDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 5] {
+const fn date_conversion_method_specs(
+    atoms: DateDescriptorAtoms,
+) -> [(AtomId, BuiltinFunctionId); 5] {
     [
         (atoms.to_utc_string, date_to_utc_string_builtin()),
         (atoms.to_gmt_string, date_to_utc_string_builtin()),

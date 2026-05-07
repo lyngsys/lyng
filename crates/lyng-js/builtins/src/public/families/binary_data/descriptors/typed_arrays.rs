@@ -98,7 +98,7 @@ pub(super) struct TypedArrayDescriptorSets {
     pub(super) uint8_array_prototype_descriptors: [BuiltinPropertyDescriptor; 6],
 }
 
-fn concrete_typed_array_prototype_descriptors(
+const fn concrete_typed_array_prototype_descriptors(
     constructor: ObjectRef,
     bytes_per_element_atom: AtomId,
     bytes_per_element: i32,
@@ -117,7 +117,7 @@ fn concrete_typed_array_prototype_descriptors(
     ]
 }
 
-fn uint8_array_prototype_descriptors(
+const fn uint8_array_prototype_descriptors(
     constructor: ObjectRef,
     bytes_per_element_atom: AtomId,
     set_from_base64_atom: AtomId,
@@ -160,7 +160,7 @@ fn uint8_array_prototype_descriptors(
 }
 
 #[allow(clippy::too_many_lines)]
-pub(super) fn descriptor_sets(
+pub(super) const fn descriptor_sets(
     builtins: &PublicRealmBuiltins,
     atoms: TypedArrayDescriptorAtoms,
 ) -> TypedArrayDescriptorSets {

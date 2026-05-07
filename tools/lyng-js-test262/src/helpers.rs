@@ -43,9 +43,9 @@ function decimalToPercentHexString(n) {
   return "%" + hex.charAt((n - low) / 16) + hex.charAt(low);
 }
 "#;
-const ASYNC_DONE_GLOBAL_BRIDGE_SOURCE: &str = r#"
+const ASYNC_DONE_GLOBAL_BRIDGE_SOURCE: &str = r"
 globalThis.$DONE = $DONE;
-"#;
+";
 const SINGLE_PROCESS_AGENT_ADAPTER_SOURCE: &str = r#"
 (function() {
   var reports = [];
@@ -504,7 +504,7 @@ const SINGLE_PROCESS_AGENT_ADAPTER_SOURCE: &str = r#"
   };
 }());
 "#;
-const SINGLE_PROCESS_AGENT_TIMEOUTS_SOURCE: &str = r#"
+const SINGLE_PROCESS_AGENT_TIMEOUTS_SOURCE: &str = r"
 // The single-process harness drives async wait timeouts as queued jobs instead
 // of sleeping wall-clock threads. Keep the short harness timeout deterministic
 // so no-spurious-wakeup tests do not burn real time.
@@ -539,7 +539,7 @@ $262.agent.timeouts.huge = 1000000;
     return nativeGetReport();
   };
 }());
-"#;
+";
 const CAN_BLOCK_FALSE_ATOMICS_WAIT_SOURCE: &str = r#"
 (function() {
   var nativeWait = Atomics.wait;
@@ -552,19 +552,19 @@ const CAN_BLOCK_FALSE_ATOMICS_WAIT_SOURCE: &str = r#"
   };
 }());
 "#;
-const DATE_DST_OFFSET_FRESH_OBJECT_SOURCE: &str = r#"  function tzOffsetFromUnixTimestamp(timestamp)
+const DATE_DST_OFFSET_FRESH_OBJECT_SOURCE: &str = r"  function tzOffsetFromUnixTimestamp(timestamp)
   {
     var d = new Date(NaN);
     d.setTime(timestamp); // local slot = NaN, UTC slot = timestamp
     return d.getTimezoneOffset(); // get UTC, calculate local => diff in minutes
-  }"#;
-const DATE_DST_OFFSET_REUSED_OBJECT_SOURCE: &str = r#"  var lyngDSTOffsetDate = new Date(NaN);
+  }";
+const DATE_DST_OFFSET_REUSED_OBJECT_SOURCE: &str = r"  var lyngDSTOffsetDate = new Date(NaN);
   function tzOffsetFromUnixTimestamp(timestamp)
   {
     lyngDSTOffsetDate.setTime(timestamp); // local slot = NaN, UTC slot = timestamp
     return lyngDSTOffsetDate.getTimezoneOffset(); // get UTC, calculate local => diff in minutes
-  }"#;
-const DATE_DST_CLEAR_CACHE_SOURCE: &str = r#"  function clearDSTOffsetCache(undesiredTimestamp)
+  }";
+const DATE_DST_CLEAR_CACHE_SOURCE: &str = r"  function clearDSTOffsetCache(undesiredTimestamp)
   {
     var opposite = (undesiredTimestamp + MAX_UNIX_TIMET / 2) % MAX_UNIX_TIMET;
 
@@ -578,18 +578,18 @@ const DATE_DST_CLEAR_CACHE_SOURCE: &str = r#"  function clearDSTOffsetCache(unde
     tzOffsetFromUnixTimestamp(undesiredTimestamp);
     tzOffsetFromUnixTimestamp(opposite);
     tzOffsetFromUnixTimestamp(undesiredTimestamp);
-  }"#;
-const DATE_DST_CLEAR_CACHE_NOOP_SOURCE: &str = r#"  function clearDSTOffsetCache(undesiredTimestamp)
+  }";
+const DATE_DST_CLEAR_CACHE_NOOP_SOURCE: &str = r"  function clearDSTOffsetCache(undesiredTimestamp)
   {
     // Lyng computes Date offsets directly through host hooks; there is no
     // SpiderMonkey DST offset cache to purge between deterministic lookups.
-  }"#;
-const REGEXP_BUILD_STRING_WRAPPER_SOURCE: &str = r#"
+  }";
+const REGEXP_BUILD_STRING_WRAPPER_SOURCE: &str = r"
 function buildString(args) {
   var fast = $262.buildString(args);
   return fast === null ? buildStringFallback(args) : fast;
-}"#;
-pub(crate) const SUPPORTED_INCLUDES: &[&str] = &[
+}";
+pub const SUPPORTED_INCLUDES: &[&str] = &[
     "compareArray.js",
     "deepEqual.js",
     "propertyHelper.js",
@@ -629,7 +629,7 @@ pub(crate) const SUPPORTED_INCLUDES: &[&str] = &[
 ];
 
 #[derive(Clone)]
-pub(crate) struct HelperCatalog {
+pub struct HelperCatalog {
     base_source: String,
     async_done_source: String,
     include_sources: HashMap<&'static str, String>,
@@ -735,7 +735,7 @@ impl HelperCatalog {
     }
 }
 
-pub(crate) fn resolve_test262_root(workspace_root: &Path) -> Result<PathBuf, String> {
+pub fn resolve_test262_root(workspace_root: &Path) -> Result<PathBuf, String> {
     for candidate in workspace_root.ancestors() {
         let test262_root = candidate.join("testdata/test262");
         if test262_root.join("harness/assert.js").is_file() && test262_root.join("test").is_dir() {

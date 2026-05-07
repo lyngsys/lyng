@@ -35,12 +35,12 @@ impl ForInEnumerator {
     }
 
     #[inline]
-    pub fn is_done(&self) -> bool {
+    pub const fn is_done(&self) -> bool {
         self.next_index >= self.keys.len()
     }
 
     #[inline]
-    pub fn remaining(&self) -> usize {
+    pub const fn remaining(&self) -> usize {
         self.keys.len().saturating_sub(self.next_index)
     }
 

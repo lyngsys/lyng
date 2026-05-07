@@ -1,9 +1,6 @@
-use super::super::*;
+use super::super::{builtin_id, BuiltinFunctionId};
 
 #[inline]
-pub fn suppressed_error_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(SUPPRESSED_ERROR_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn suppressed_error_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::SUPPRESSED_ERROR_RAW)
 }

@@ -80,7 +80,7 @@ impl TextRange {
 
     /// Extends this range to cover `other` as well.
     #[inline]
-    pub const fn cover(self, other: TextRange) -> TextRange {
+    pub const fn cover(self, other: Self) -> Self {
         let start = if self.start.0 < other.start.0 {
             self.start
         } else {
@@ -91,7 +91,7 @@ impl TextRange {
         } else {
             other.end
         };
-        TextRange { start, end }
+        Self { start, end }
     }
 }
 
@@ -127,9 +127,9 @@ impl Span {
 
     /// Extends this span to cover `other`. Both must be in the same source.
     #[inline]
-    pub const fn cover(self, other: Span) -> Span {
+    pub const fn cover(self, other: Self) -> Self {
         // Debug assertion: same source. In release, we just use self.source.
-        Span {
+        Self {
             source: self.source,
             range: self.range.cover(other.range),
         }

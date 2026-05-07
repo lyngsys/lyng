@@ -1,4 +1,11 @@
-use super::super::*;
+use super::super::{
+    async_function_builtin, async_generator_function_builtin, async_generator_next_builtin,
+    async_generator_return_builtin, async_generator_throw_builtin, function_apply_builtin,
+    function_bind_builtin, function_builtin, function_call_builtin, function_prototype_builtin,
+    function_symbol_has_instance_builtin, function_to_string_builtin, generator_function_builtin,
+    generator_next_builtin, generator_return_builtin, generator_throw_builtin,
+    BuiltinEntryMetadata, PublicBuiltinMetadataRow,
+};
 
 pub(in crate::public::metadata) const PUBLIC_FUNCTION_BUILTIN_METADATA:
     &[PublicBuiltinMetadataRow] = &[

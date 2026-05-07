@@ -24,7 +24,7 @@ impl<Id, N> Default for NodeArena<Id, N> {
 
 impl<Id, N> NodeArena<Id, N> {
     /// Creates an empty arena.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             nodes: Vec::new(),
             _marker: PhantomData,
@@ -41,13 +41,13 @@ impl<Id, N> NodeArena<Id, N> {
 
     /// Returns the number of nodes in this arena.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.nodes.len()
     }
 
     /// Returns `true` if the arena is empty.
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }
 }
@@ -136,7 +136,7 @@ impl<T: Copy> Default for ListArena<T> {
 
 impl<T: Copy> ListArena<T> {
     /// Creates an empty list arena.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { data: Vec::new() }
     }
 
@@ -168,13 +168,13 @@ impl<T: Copy> ListArena<T> {
 
     /// Returns the total number of items stored.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.data.len()
     }
 
     /// Returns `true` if no items are stored.
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 }

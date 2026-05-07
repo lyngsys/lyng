@@ -833,7 +833,7 @@ pub(super) fn temporal_string_option<Cx: PublicBuiltinDispatchContext>(
     Err(range_error(cx))
 }
 
-pub(super) fn temporal_compare_ordering(ordering: std::cmp::Ordering) -> Value {
+pub(super) const fn temporal_compare_ordering(ordering: std::cmp::Ordering) -> Value {
     Value::from_smi(match ordering {
         std::cmp::Ordering::Less => -1,
         std::cmp::Ordering::Equal => 0,
@@ -914,7 +914,7 @@ pub(super) fn temporal_instant_largest_unit_default(
     }
 }
 
-pub(super) fn temporal_exact_time_rounding_increment_is_valid(
+pub(super) const fn temporal_exact_time_rounding_increment_is_valid(
     smallest_unit: TemporalBuiltinDurationExactUnit,
     rounding_increment: i128,
 ) -> bool {
@@ -922,7 +922,7 @@ pub(super) fn temporal_exact_time_rounding_increment_is_valid(
     rounding_increment > 0 && rounding_increment < maximum && maximum % rounding_increment == 0
 }
 
-pub(super) fn temporal_exact_time_rounding_increment_maximum(
+pub(super) const fn temporal_exact_time_rounding_increment_maximum(
     smallest_unit: TemporalBuiltinDurationExactUnit,
 ) -> i128 {
     match smallest_unit {

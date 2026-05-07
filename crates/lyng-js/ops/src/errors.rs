@@ -25,7 +25,7 @@ fn current_realm(agent: &Agent) -> Option<RealmRecord> {
     agent.realm(realm)
 }
 
-fn intrinsic_error_prototype(intrinsics: Intrinsics, kind: ErrorKind) -> Option<ObjectRef> {
+const fn intrinsic_error_prototype(intrinsics: Intrinsics, kind: ErrorKind) -> Option<ObjectRef> {
     match kind {
         ErrorKind::Error => intrinsics.error_prototype(),
         ErrorKind::Eval => intrinsics.eval_error_prototype(),
@@ -38,7 +38,7 @@ fn intrinsic_error_prototype(intrinsics: Intrinsics, kind: ErrorKind) -> Option<
 }
 
 #[inline]
-fn fallback_throw_completion() -> AbruptCompletion {
+const fn fallback_throw_completion() -> AbruptCompletion {
     AbruptCompletion::throw(Value::undefined())
 }
 
@@ -119,8 +119,7 @@ pub fn error_value(agent: &mut Agent, kind: ErrorKind) -> Value {
         .transpose()
         .ok()
         .flatten()
-        .map(Value::from_object_ref)
-        .unwrap_or(Value::undefined())
+        .map_or(Value::undefined(), Value::from_object_ref)
 }
 
 /// Returns the current realm-aware throw value for `TypeError` paths.

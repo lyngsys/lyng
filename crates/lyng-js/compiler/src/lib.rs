@@ -71,7 +71,7 @@ impl LoweringContext {
     }
 
     #[inline]
-    pub fn allocate_register(&mut self) -> u16 {
+    pub const fn allocate_register(&mut self) -> u16 {
         let register = self.next_register;
         self.next_register = self
             .next_register
@@ -81,7 +81,7 @@ impl LoweringContext {
     }
 
     #[inline]
-    pub fn allocate_hidden_register(&mut self) -> u16 {
+    pub const fn allocate_hidden_register(&mut self) -> u16 {
         let register = self.next_hidden_register;
         self.next_hidden_register = self
             .next_hidden_register
@@ -238,7 +238,7 @@ impl CompilerMarker {
 }
 
 /// Placeholder script-compilation entrypoint reserved for later Phase 4 lowering work.
-pub fn installable_script_unit(
+pub const fn installable_script_unit(
     source: SourceId,
     unit: CompiledScriptUnit,
 ) -> (SourceId, CompiledScriptUnit) {
@@ -246,7 +246,7 @@ pub fn installable_script_unit(
 }
 
 /// Minimal module-compilation entrypoint reserved for runtime installation wiring.
-pub fn installable_module_unit(
+pub const fn installable_module_unit(
     source: SourceId,
     unit: CompiledModuleUnit,
 ) -> (SourceId, CompiledModuleUnit) {
@@ -254,7 +254,7 @@ pub fn installable_module_unit(
 }
 
 /// Placeholder function-compilation entrypoint reserved for later Phase 4 lowering work.
-pub fn installable_function_unit(
+pub const fn installable_function_unit(
     code: CodeRef,
     unit: CompiledFunctionUnit,
 ) -> (CodeRef, CompiledFunctionUnit) {

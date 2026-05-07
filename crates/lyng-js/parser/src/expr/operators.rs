@@ -6,7 +6,7 @@ use crate::parser::Parser;
 
 /// Binding power (precedence) for binary/logical operators.
 /// Higher values bind tighter.
-pub(super) fn binary_precedence(kind: TokenKind, no_in: bool) -> Option<u8> {
+pub(super) const fn binary_precedence(kind: TokenKind, no_in: bool) -> Option<u8> {
     match kind {
         TokenKind::PipePipe => Some(4),
         TokenKind::AmpAmp => Some(5),
@@ -29,7 +29,7 @@ pub(super) fn binary_precedence(kind: TokenKind, no_in: bool) -> Option<u8> {
     }
 }
 
-pub(super) fn token_to_binary_op(kind: TokenKind) -> Option<BinaryOp> {
+pub(super) const fn token_to_binary_op(kind: TokenKind) -> Option<BinaryOp> {
     match kind {
         TokenKind::Plus => Some(BinaryOp::Add),
         TokenKind::Minus => Some(BinaryOp::Sub),
@@ -57,7 +57,7 @@ pub(super) fn token_to_binary_op(kind: TokenKind) -> Option<BinaryOp> {
     }
 }
 
-pub(super) fn token_to_logical_op(kind: TokenKind) -> Option<LogicalOp> {
+pub(super) const fn token_to_logical_op(kind: TokenKind) -> Option<LogicalOp> {
     match kind {
         TokenKind::AmpAmp => Some(LogicalOp::And),
         TokenKind::PipePipe => Some(LogicalOp::Or),
@@ -66,7 +66,7 @@ pub(super) fn token_to_logical_op(kind: TokenKind) -> Option<LogicalOp> {
     }
 }
 
-pub(super) fn token_to_assign_op(kind: TokenKind) -> Option<AssignOp> {
+pub(super) const fn token_to_assign_op(kind: TokenKind) -> Option<AssignOp> {
     match kind {
         TokenKind::Eq => Some(AssignOp::Assign),
         TokenKind::PlusEq => Some(AssignOp::AddAssign),
@@ -88,7 +88,7 @@ pub(super) fn token_to_assign_op(kind: TokenKind) -> Option<AssignOp> {
     }
 }
 
-pub(super) fn token_can_start_expression(kind: TokenKind) -> bool {
+pub(super) const fn token_can_start_expression(kind: TokenKind) -> bool {
     matches!(
         kind,
         TokenKind::Identifier

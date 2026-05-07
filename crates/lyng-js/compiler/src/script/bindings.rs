@@ -1,6 +1,11 @@
-use super::*;
+use super::{
+    ArgumentsMode, AtomId, DeclarationKind, ExprId, FunctionActivationPlan, FunctionCompiler,
+    FunctionId, FunctionKind, FunctionSemaId, LoweringError, LoweringResult, Pattern,
+    ResolutionKind, ScopeId, ScopeKind, SemanticBindingId, StorageClass, UseSiteRecord,
+    WellKnownAtom,
+};
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     fn declaration_kind_matches(
         actual_kind: DeclarationKind,
         expected_kind: DeclarationKind,
@@ -115,10 +120,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let Pattern::Identifier { name, .. } = self.ast().get_pattern(pattern).clone() else {
             return Err(LoweringError::UnsupportedPattern { pattern });
         };
-        if let Some(binding) = self.state.sema.pattern_binding(pattern) {
-            if Self::declaration_kind_matches(self.binding(binding)?.kind, expected_kind) {
-                return Ok(binding);
-            }
+        if let Some(binding) = self.state.sema.pattern_binding(pattern)
+            && Self::declaration_kind_matches(self.binding(binding)?.kind, expected_kind)
+        {
+            return Ok(binding);
         }
         self.find_innermost_named_binding(name, expected_kind)
             .ok_or(LoweringError::MissingDeclarationBinding { name })
@@ -195,26 +200,22 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 ) && self.state.function_needs_arguments(owner)
                     && !activation.has_parameter_expressions
             })
-        {
-            if let Some(slot) =
+            && let Some(slot) =
                 owner.and_then(|owner| self.state.activation(owner).arguments_slot())
-            {
-                return Ok(Some((
-                    self.binding_environment_depth(binding)?,
-                    u32::from(slot),
-                )));
-            }
+        {
+            return Ok(Some((
+                self.binding_environment_depth(binding)?,
+                u32::from(slot),
+            )));
         }
-        let (synthetic_parameter, synthetic_rest) = owner
-            .map(|owner| {
-                let activation = self.state.activation(owner);
-                (
-                    activation.arguments_mode == ArgumentsMode::Mapped
-                        && binding_record.kind == DeclarationKind::Parameter,
-                    activation.rest_binding == Some(binding),
-                )
-            })
-            .unwrap_or((false, false));
+        let (synthetic_parameter, synthetic_rest) = owner.map_or((false, false), |owner| {
+            let activation = self.state.activation(owner);
+            (
+                activation.arguments_mode == ArgumentsMode::Mapped
+                    && binding_record.kind == DeclarationKind::Parameter,
+                activation.rest_binding == Some(binding),
+            )
+        });
         if !matches!(
             binding_record.storage_class,
             StorageClass::EnvironmentSlot

@@ -1,9 +1,6 @@
-use super::super::*;
+use super::super::{builtin_id, BuiltinFunctionId};
 
 #[inline]
-pub fn aggregate_error_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(AGGREGATE_ERROR_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn aggregate_error_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::AGGREGATE_ERROR_RAW)
 }

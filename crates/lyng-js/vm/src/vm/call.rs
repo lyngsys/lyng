@@ -283,8 +283,7 @@ impl Vm {
             if let Some(code) = Self::bytecode_entry(agent, callee) {
                 let derived_construct = self
                     .installed_function(code)
-                    .map(|function| function.flags().derived_class_constructor())
-                    .unwrap_or(false);
+                    .is_some_and(|function| function.flags().derived_class_constructor());
                 let this_value = if derived_construct {
                     Value::undefined()
                 } else {
@@ -375,7 +374,7 @@ impl Vm {
         agent
             .objects()
             .function_data(function)
-            .and_then(|data| data.realm())
+            .and_then(lyng_js_objects::FunctionObjectData::realm)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))
     }
 

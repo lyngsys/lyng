@@ -561,10 +561,10 @@ impl AtomTable {
     /// Starts a GC-driven collection session for collectible atoms.
     pub fn start_collection(&mut self) -> AtomCollection<'_> {
         for entry in &mut self.entries {
-            if let AtomEntry::Occupied(entry) = entry {
-                if entry.lifetime == AtomLifetime::Collectible {
-                    entry.marked = false;
-                }
+            if let AtomEntry::Occupied(entry) = entry
+                && entry.lifetime == AtomLifetime::Collectible
+            {
+                entry.marked = false;
             }
         }
 
@@ -633,18 +633,18 @@ impl AtomTable {
 
     /// Returns the number of interned atoms.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.live_len
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.live_len == 0
     }
 
     /// Returns the live payload bytes held by the atom storage buffers.
     #[inline]
-    pub fn payload_bytes(&self) -> usize {
+    pub const fn payload_bytes(&self) -> usize {
         self.utf8_buffer.len() + self.utf16_buffer.len() * size_of::<u16>()
     }
 
@@ -654,10 +654,11 @@ impl AtomTable {
     /// This is used by the lexer to classify identifiers as keywords.
     pub fn keyword_atom(&self, s: &str) -> Option<AtomId> {
         // Only check the keyword range (1..=38 are keywords)
-        if let Some(&id) = self.utf8_lookup.get(s) {
-            if id.0 >= WellKnownAtom::r#await as u32 && id.0 <= WellKnownAtom::yield_ as u32 {
-                return Some(id);
-            }
+        if let Some(&id) = self.utf8_lookup.get(s)
+            && id.0 >= WellKnownAtom::r#await as u32
+            && id.0 <= WellKnownAtom::yield_ as u32
+        {
+            return Some(id);
         }
         None
     }

@@ -158,7 +158,7 @@ fn require_uint8_array_record<Cx: PublicBuiltinDispatchContext>(
     Ok(record)
 }
 
-fn is_ascii_whitespace(c: char) -> bool {
+const fn is_ascii_whitespace(c: char) -> bool {
     matches!(c, '\t' | '\n' | '\u{000C}' | '\r' | ' ')
 }
 
@@ -176,7 +176,7 @@ fn base64_alphabet_value(alphabet: Base64Alphabet, c: char) -> Option<u8> {
     Some(value)
 }
 
-fn hex_value(c: char) -> Option<u8> {
+const fn hex_value(c: char) -> Option<u8> {
     match c {
         '0'..='9' => Some((c as u8) - b'0'),
         'a'..='f' => Some((c as u8) - b'a' + 10),
@@ -190,14 +190,14 @@ struct DecodeBase64Result {
     bytes: Vec<u8>,
     /// Number of UTF-16 code units consumed from the source string.
     read: usize,
-    /// `Some(())` if a SyntaxError should be raised after writing the
+    /// `Some(())` if a `SyntaxError` should be raised after writing the
     /// already-decoded bytes; otherwise the decode finished cleanly.
     error: bool,
 }
 
 /// Decode `input` as base64 into bytes.
 ///
-/// Mirrors the proposal's FromBase64 abstract operation.
+/// Mirrors the proposal's `FromBase64` abstract operation.
 /// `max_length` of `None` means unbounded (used by `fromBase64`).
 fn decode_base64(
     input: &str,
@@ -254,10 +254,10 @@ fn decode_base64(
                     if let Some(bytes) = decode_partial_chunk(&chunk, chunk_len, false) {
                         // If the partial chunk would not fit, silently stop
                         // (no error, no write, do not update read).
-                        if let Some(max) = max_length {
-                            if result.bytes.len() + bytes.len() > max {
-                                return result;
-                            }
+                        if let Some(max) = max_length
+                            && result.bytes.len() + bytes.len() > max
+                        {
+                            return result;
                         }
                         result.bytes.extend_from_slice(&bytes);
                         result.read = i;
@@ -314,20 +314,20 @@ fn decode_base64(
             // Complete 4-char chunk -> 3 output bytes.
             // Per spec FromBase64 step 10.l.ii: if the chunk would not fit,
             // return without writing and without updating read.
-            if let Some(max) = max_length {
-                if result.bytes.len() + 3 > max {
-                    return result;
-                }
+            if let Some(max) = max_length
+                && result.bytes.len() + 3 > max
+            {
+                return result;
             }
             let bytes = decode_complete_chunk(&chunk);
             result.bytes.extend_from_slice(&bytes);
             result.read = i;
             chunk_len = 0;
 
-            if let Some(max) = max_length {
-                if result.bytes.len() == max {
-                    return result;
-                }
+            if let Some(max) = max_length
+                && result.bytes.len() == max
+            {
+                return result;
             }
         }
     }
@@ -446,12 +446,12 @@ fn handle_base64_padding(
         result.error = true;
         return;
     };
-    if let Some(max) = max_length {
-        if result.bytes.len() + bytes.len() > max {
-            // Per spec, when there isn't room for the partial chunk, stop
-            // without error.
-            return;
-        }
+    if let Some(max) = max_length
+        && result.bytes.len() + bytes.len() > max
+    {
+        // Per spec, when there isn't room for the partial chunk, stop
+        // without error.
+        return;
     }
     result.bytes.extend_from_slice(&bytes);
     result.read = *i;
@@ -467,13 +467,13 @@ struct DecodeHexResult {
 /// Decode `input` as hex into bytes.
 ///
 /// Per the proposal, `Uint8Array.fromHex` and `prototype.setFromHex` use the
-/// FromHex abstract operation which does not skip whitespace. Odd-length input
-/// is a SyntaxError. Each pair must be `[0-9A-Fa-f]{2}`.
+/// `FromHex` abstract operation which does not skip whitespace. Odd-length input
+/// is a `SyntaxError`. Each pair must be `[0-9A-Fa-f]{2}`.
 fn decode_hex(input: &str, max_length: Option<usize>) -> DecodeHexResult {
     let mut result = DecodeHexResult::default();
     let units: Vec<u16> = input.encode_utf16().collect();
 
-    if units.len() % 2 != 0 {
+    if !units.len().is_multiple_of(2) {
         // Even an empty `max_length=0` array still rejects odd-length input
         // (per `Uint8Array.fromHex('a')` -> SyntaxError). For setFromHex with
         // max_length=0, the spec also throws SyntaxError; the trailing-garbage
@@ -520,7 +520,7 @@ fn encode_base64(bytes: &[u8], alphabet: Base64Alphabet, omit_padding: bool) -> 
         }
         Base64Alphabet::Url => b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_",
     };
-    let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     let chunks = bytes.chunks_exact(3);
     let remainder = chunks.remainder();
     for chunk in chunks {

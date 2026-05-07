@@ -354,7 +354,7 @@ impl PromiseDisposalDescriptorAtoms {
     }
 }
 
-fn promise_static_method_specs(
+const fn promise_static_method_specs(
     atoms: &PromiseDisposalDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 8] {
     [

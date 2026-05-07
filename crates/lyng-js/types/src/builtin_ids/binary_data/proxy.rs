@@ -1,25 +1,16 @@
-use super::super::*;
+use super::super::{builtin_id, BuiltinFunctionId};
 
 #[inline]
-pub fn proxy_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(PROXY_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn proxy_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::PROXY_RAW)
 }
 
 #[inline]
-pub fn proxy_revocable_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(PROXY_REVOCABLE_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn proxy_revocable_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::PROXY_REVOCABLE_RAW)
 }
 
 #[inline]
-pub fn proxy_revoke_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(PROXY_REVOKE_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn proxy_revoke_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::PROXY_REVOKE_RAW)
 }

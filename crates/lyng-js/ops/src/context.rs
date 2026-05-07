@@ -9,32 +9,32 @@ pub struct PrimitiveContext<'a> {
 
 impl<'a> PrimitiveContext<'a> {
     #[inline]
-    pub fn new(heap: &'a mut PrimitiveHeap, atoms: &'a mut AtomTable) -> Self {
+    pub const fn new(heap: &'a mut PrimitiveHeap, atoms: &'a mut AtomTable) -> Self {
         Self { heap, atoms }
     }
 
     #[inline]
-    pub fn heap(&self) -> PrimitiveHeapView<'_> {
+    pub const fn heap(&self) -> PrimitiveHeapView<'_> {
         self.heap.view()
     }
 
     #[inline]
-    pub fn mutator(&mut self) -> PrimitiveMutator<'_> {
+    pub const fn mutator(&mut self) -> PrimitiveMutator<'_> {
         self.heap.mutator()
     }
 
     #[inline]
-    pub fn atoms(&self) -> &AtomTable {
+    pub const fn atoms(&self) -> &AtomTable {
         self.atoms
     }
 
     #[inline]
-    pub fn atoms_mut(&mut self) -> &mut AtomTable {
+    pub const fn atoms_mut(&mut self) -> &mut AtomTable {
         self.atoms
     }
 
     #[inline]
-    pub fn split_mut(&mut self) -> (PrimitiveMutator<'_>, &mut AtomTable) {
+    pub const fn split_mut(&mut self) -> (PrimitiveMutator<'_>, &mut AtomTable) {
         let heap = &mut *self.heap;
         let atoms = &mut *self.atoms;
         (heap.mutator(), atoms)

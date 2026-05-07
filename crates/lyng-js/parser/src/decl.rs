@@ -653,7 +653,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 }
 
-fn is_property_name_start(kind: TokenKind) -> bool {
+const fn is_property_name_start(kind: TokenKind) -> bool {
     matches!(
         kind,
         TokenKind::Identifier
@@ -666,7 +666,7 @@ fn is_property_name_start(kind: TokenKind) -> bool {
     ) || kind.is_keyword()
 }
 
-fn is_accessor_field_name_start(kind: TokenKind) -> bool {
+const fn is_accessor_field_name_start(kind: TokenKind) -> bool {
     matches!(
         kind,
         TokenKind::Identifier

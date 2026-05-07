@@ -25,7 +25,7 @@ fn format_atom_operand(function: &BytecodeFunction, index: u32) -> String {
     }
 }
 
-fn format_this_mode(this_mode: ThisMode) -> &'static str {
+const fn format_this_mode(this_mode: ThisMode) -> &'static str {
     match this_mode {
         ThisMode::Lexical => "Lexical",
         ThisMode::Strict => "Strict",

@@ -137,7 +137,7 @@ impl<'a> RealmExtensionInstallation<'a> {
     }
 
     #[inline]
-    pub fn agent(&mut self) -> &mut Agent {
+    pub const fn agent(&mut self) -> &mut Agent {
         self.agent
     }
 
@@ -148,7 +148,7 @@ impl<'a> RealmExtensionInstallation<'a> {
         let root_shape = self
             .agent
             .realm(self.realm())
-            .and_then(|record| record.root_shape())
+            .and_then(lyng_js_env::RealmRecord::root_shape)
             .ok_or(VmError::MissingRootShape(self.realm()))?;
         Ok(self.agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
@@ -276,7 +276,7 @@ impl<'a> EmbeddingFunctionContext<'a> {
     }
 
     #[inline]
-    pub fn agent(&mut self) -> &mut Agent {
+    pub const fn agent(&mut self) -> &mut Agent {
         self.agent
     }
 
@@ -294,7 +294,7 @@ impl<'a> EmbeddingFunctionContext<'a> {
         self.agent
             .objects()
             .function_data(self.callee_object)
-            .and_then(|data| data.realm())
+            .and_then(lyng_js_objects::FunctionObjectData::realm)
             .unwrap_or(self.caller_frame.realm())
     }
 

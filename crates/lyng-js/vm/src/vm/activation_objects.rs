@@ -56,28 +56,27 @@ impl Vm {
             true,
         )?;
 
-        if let Some(iterator_symbol) = agent.well_known_symbol(WellKnownSymbolId::Iterator) {
-            if let Some(array_prototype) = agent
+        if let Some(iterator_symbol) = agent.well_known_symbol(WellKnownSymbolId::Iterator)
+            && let Some(array_prototype) = agent
                 .realm(realm)
                 .and_then(|record| record.intrinsics().array_prototype())
-            {
-                let iterator_method = object::ordinary_get(
+        {
+            let iterator_method = object::ordinary_get(
+                agent,
+                array_prototype,
+                PropertyKey::from_symbol(iterator_symbol),
+            )
+            .map_err(VmError::Abrupt)?;
+            if !iterator_method.is_undefined() {
+                self.define_data_property_with_attrs(
                     agent,
-                    array_prototype,
+                    object,
                     PropertyKey::from_symbol(iterator_symbol),
-                )
-                .map_err(VmError::Abrupt)?;
-                if !iterator_method.is_undefined() {
-                    self.define_data_property_with_attrs(
-                        agent,
-                        object,
-                        PropertyKey::from_symbol(iterator_symbol),
-                        iterator_method,
-                        true,
-                        false,
-                        true,
-                    )?;
-                }
+                    iterator_method,
+                    true,
+                    false,
+                    true,
+                )?;
             }
         }
 
@@ -202,7 +201,7 @@ impl Vm {
             )
             .ok()
             .flatten()
-            .map(|descriptor| {
+            .map_or((logical_len, true), |descriptor| {
                 let current_len = descriptor
                     .value()
                     .and_then(|value| value.as_smi().and_then(|value| u32::try_from(value).ok()))
@@ -213,8 +212,7 @@ impl Vm {
                     })
                     .unwrap_or(logical_len);
                 (current_len, descriptor.writable().unwrap_or(true))
-            })
-            .unwrap_or((logical_len, true));
+            });
         Self::define_length_property_with_attrs(
             agent,
             object,

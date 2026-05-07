@@ -60,7 +60,7 @@ fn regexp_escape_is_syntax_character(unit: u16) -> bool {
     .contains(&unit)
 }
 
-fn regexp_escape_is_whitespace_or_line_terminator(unit: u16) -> bool {
+const fn regexp_escape_is_whitespace_or_line_terminator(unit: u16) -> bool {
     matches!(
         unit,
         0x0009

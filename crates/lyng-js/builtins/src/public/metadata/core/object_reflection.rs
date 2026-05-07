@@ -1,4 +1,12 @@
-use super::super::*;
+use super::super::{
+    json_is_raw_json_builtin, json_parse_builtin, json_raw_json_builtin, json_stringify_builtin,
+    proxy_builtin, proxy_revocable_builtin, proxy_revoke_builtin, reflect_apply_builtin,
+    reflect_construct_builtin, reflect_define_property_builtin, reflect_delete_property_builtin,
+    reflect_get_builtin, reflect_get_own_property_descriptor_builtin,
+    reflect_get_prototype_of_builtin, reflect_has_builtin, reflect_is_extensible_builtin,
+    reflect_own_keys_builtin, reflect_prevent_extensions_builtin, reflect_set_builtin,
+    reflect_set_prototype_of_builtin, BuiltinEntryMetadata, PublicBuiltinMetadataRow,
+};
 
 pub(in crate::public::metadata) const PUBLIC_OBJECT_REFLECTION_BUILTIN_METADATA:
     &[PublicBuiltinMetadataRow] = &[

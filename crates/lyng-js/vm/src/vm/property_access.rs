@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    AbruptCompletion, Agent, AllocationLifetime, ArgumentsMode, FrameRecord, HostHooks, ModuleKey,
+    ModuleRecord, ModuleStatus, NativeFunctionRegistry, ObjectRef, Value, Vm, VmError, VmResult,
+    WellKnownAtom,
+};
 use crate::vm::values::alloc_code_unit_string;
 use crate::vm::values::encode_number;
 use lyng_js_objects::{f64_to_float16_bits, TypedArrayElementKind, TypedArrayObjectData};
@@ -138,7 +142,7 @@ fn primitive_string_code_unit_len(agent: &mut Agent, string: StringRef) -> VmRes
         .heap()
         .view()
         .string_view(string)
-        .map(|view| view.code_unit_len())
+        .map(lyng_js_gc::PrimitiveStringView::code_unit_len)
     {
         return Ok(length);
     }
@@ -644,11 +648,11 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         let object = self.to_object_for_value(agent, frame.realm(), receiver)?;
-        if let Some(index) = key.as_index() {
-            if let Some(result) = self.mapped_arguments_set(agent, object, index, value) {
-                result?;
-                return Ok(true);
-            }
+        if let Some(index) = key.as_index()
+            && let Some(result) = self.mapped_arguments_set(agent, object, index, value)
+        {
+            result?;
+            return Ok(true);
         }
         self.set_property_on_object(agent, host, registry, frame, object, receiver, key, value)
     }
@@ -684,7 +688,7 @@ impl Vm {
         let mut current = agent
             .objects()
             .object_header(agent.heap().view(), object)
-            .and_then(|header| header.prototype());
+            .and_then(lyng_js_objects::ObjectHeader::prototype);
         while let Some(prototype) = current {
             if agent.objects().is_proxy_object(prototype)
                 || agent.objects().is_typed_array_object(prototype)
@@ -695,7 +699,7 @@ impl Vm {
             current = agent
                 .objects()
                 .object_header(agent.heap().view(), prototype)
-                .and_then(|header| header.prototype());
+                .and_then(lyng_js_objects::ObjectHeader::prototype);
         }
         Ok(true)
     }
@@ -709,7 +713,7 @@ impl Vm {
             current = agent
                 .objects()
                 .object_header(agent.heap().view(), object)
-                .and_then(|header| header.prototype());
+                .and_then(lyng_js_objects::ObjectHeader::prototype);
         }
         false
     }
@@ -975,10 +979,10 @@ impl Vm {
         key: PropertyKey,
     ) -> VmResult<Value> {
         self.evaluate_deferred_module_namespace(agent, host, registry, caller, object, key)?;
-        if let Some(index) = key.as_index() {
-            if let Some(result) = self.mapped_arguments_get(agent, object, index) {
-                return result;
-            }
+        if let Some(index) = key.as_index()
+            && let Some(result) = self.mapped_arguments_get(agent, object, index)
+        {
+            return result;
         }
         if agent.objects().typed_array(object).is_some()
             && (key.as_index().is_some() || typed_array_numeric_atom_index(agent, key).is_some())
@@ -1295,10 +1299,8 @@ impl Vm {
     ) -> VmResult<bool> {
         let deleted =
             object::ordinary_delete_property(agent, object, key).map_err(VmError::Abrupt)?;
-        if deleted {
-            if let Some(index) = key.as_index() {
-                let _ = self.activation_tables.detach_mapped_argument(object, index);
-            }
+        if deleted && let Some(index) = key.as_index() {
+            let _ = self.activation_tables.detach_mapped_argument(object, index);
         }
         Ok(deleted)
     }
@@ -1344,16 +1346,16 @@ impl Vm {
         if agent.objects().is_module_namespace_object(object) {
             return Ok(false);
         }
-        if let Some(typed_array) = agent.objects().typed_array(object) {
-            if let Some(index) = typed_array_numeric_property_index(agent, key) {
-                if receiver.as_object_ref() == Some(object) {
-                    return self.set_typed_array_numeric_index(
-                        agent, host, registry, caller, object, index, value,
-                    );
-                }
-                if vm_typed_array_numeric_index_is_valid(agent, typed_array, index).is_none() {
-                    return Ok(true);
-                }
+        if let Some(typed_array) = agent.objects().typed_array(object)
+            && let Some(index) = typed_array_numeric_property_index(agent, key)
+        {
+            if receiver.as_object_ref() == Some(object) {
+                return self.set_typed_array_numeric_index(
+                    agent, host, registry, caller, object, index, value,
+                );
+            }
+            if vm_typed_array_numeric_index_is_valid(agent, typed_array, index).is_none() {
+                return Ok(true);
             }
         }
         if Self::is_engine_array_length_property(agent, object, key) {
@@ -1586,7 +1588,7 @@ impl Vm {
         let element_size = typed_array.kind().bytes_per_element();
         let absolute_index = typed_array
             .byte_offset()
-            .checked_add(index.checked_mul(element_size).unwrap_or(usize::MAX))
+            .checked_add(index.saturating_mul(element_size))
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         if !agent.backing_store_store_bits(
             typed_array.backing_store(),

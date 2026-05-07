@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    errors, object, Agent, FrameRecord, FunctionEntryIdentity, FunctionThisMode, HostHooks,
+    NativeFunctionRegistry, ObjectRef, ThisBindingStatus, ThisState, Value, Vm, VmError, VmResult,
+};
 
 #[derive(Clone, Copy, Debug)]
 struct SuperConstructContext {
@@ -142,7 +145,7 @@ impl Vm {
         let record = self.super_constructor_this_environment_record(agent, caller.lexical_env())?;
         let function_env = record.map(|record| record.declarative().id());
         let active_function = record
-            .map(|record| record.function_object())
+            .map(lyng_js_env::FunctionEnvironmentRecord::function_object)
             .or_else(|| caller.callee())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let derived_constructor = {
@@ -154,8 +157,7 @@ impl Vm {
                     _ => None,
                 })
                 .and_then(|code| self.installed_function(code))
-                .map(|function| function.flags().derived_class_constructor())
-                .unwrap_or(false)
+                .is_some_and(|function| function.flags().derived_class_constructor())
         } || caller
             .flags()
             .contains(crate::FrameFlags::derived_construct());
@@ -174,10 +176,10 @@ impl Vm {
                     lyng_js_env::ThisBindingStatus::Uninitialized
                 }
             },
-            |record| record.this_binding_status(),
+            lyng_js_env::FunctionEnvironmentRecord::this_binding_status,
         );
         let new_target = record
-            .and_then(|record| record.new_target())
+            .and_then(lyng_js_env::FunctionEnvironmentRecord::new_target)
             .or_else(|| caller.new_target())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         Ok(SuperConstructContext {

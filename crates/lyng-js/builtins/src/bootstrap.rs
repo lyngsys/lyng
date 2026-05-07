@@ -4,7 +4,7 @@ use crate::{
     BuiltinPropertyValueSpec,
 };
 use lyng_js_common::WellKnownAtom;
-use lyng_js_env::{Agent, RealmBootstrapState, RealmRecord};
+use lyng_js_env::{Agent, RealmRecord};
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_types::{
     aggregate_error_builtin, array_buffer_builtin, array_builtin, big_int64_array_builtin,
@@ -25,7 +25,7 @@ use lyng_js_types::{
 mod descriptors;
 mod globals;
 
-pub(crate) use descriptors::install_descriptor_tables;
+pub use descriptors::install_descriptor_tables;
 
 use globals::default_global_descriptors;
 
@@ -162,9 +162,7 @@ pub fn bootstrap_realm(
         .ok_or(BuiltinBootstrapError::MissingRootShape(realm))?;
 
     let artifacts = BootstrapArtifacts::new(realm, global_object, global_env);
-    let bootstrap_state = agent
-        .realm_bootstrap_state(realm)
-        .unwrap_or_else(RealmBootstrapState::new);
+    let bootstrap_state = agent.realm_bootstrap_state(realm).unwrap_or_default();
 
     if !bootstrap_state.spec_ready() {
         install_spec_bootstrap(agent, builtin_cache, artifacts)?;

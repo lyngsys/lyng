@@ -1249,10 +1249,10 @@ pub(super) fn try_create_data_property<Cx: PublicBuiltinDispatchContext>(
     key: PropertyKey,
     value: Value,
 ) -> Result<bool, Cx::Error> {
-    if let Some(index) = key.as_index() {
-        if cx.try_fast_create_data_property(object_ref, index, value)? {
-            return Ok(true);
-        }
+    if let Some(index) = key.as_index()
+        && cx.try_fast_create_data_property(object_ref, index, value)?
+    {
+        return Ok(true);
     }
 
     let mut descriptor = PropertyDescriptor::new();
@@ -1871,7 +1871,7 @@ pub(super) fn code_unit_range_value<Cx: PublicBuiltinDispatchContext>(
     units: &[u16],
     range: std::ops::Range<usize>,
 ) -> Value {
-    string_from_code_units(cx, &units[range.start..range.end])
+    string_from_code_units(cx, &units[range])
 }
 
 pub(super) fn primitive_wrapper_constructor<Cx: PublicBuiltinDispatchContext>(

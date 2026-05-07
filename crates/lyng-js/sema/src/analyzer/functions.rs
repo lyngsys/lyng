@@ -6,7 +6,7 @@ use crate::binding::DeclarationKind;
 use crate::function_sema::FunctionSemaRecord;
 use crate::scope::ScopeKind;
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     pub(super) fn walk_function(&mut self, func_id: lyng_js_ast::FunctionId) {
         let func = self.ast.get_function(func_id);
         let func_span = func.span;

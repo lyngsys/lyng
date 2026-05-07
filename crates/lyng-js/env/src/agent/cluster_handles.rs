@@ -8,11 +8,11 @@ use lyng_js_types::BackingStoreRef;
 use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone)]
-pub(crate) struct ClusterBackingStoreHandle(Rc<RefCell<BackingStoreRuntime>>);
+pub struct ClusterBackingStoreHandle(Rc<RefCell<BackingStoreRuntime>>);
 
 impl ClusterBackingStoreHandle {
     #[inline]
-    pub(crate) fn new(runtime: Rc<RefCell<BackingStoreRuntime>>) -> Self {
+    pub(crate) const fn new(runtime: Rc<RefCell<BackingStoreRuntime>>) -> Self {
         Self(runtime)
     }
 
@@ -137,11 +137,11 @@ impl ClusterBackingStoreHandle {
 }
 
 #[derive(Clone)]
-pub(crate) struct ClusterSharedMemoryHandle(Rc<RefCell<SharedMemoryRuntime>>);
+pub struct ClusterSharedMemoryHandle(Rc<RefCell<SharedMemoryRuntime>>);
 
 impl ClusterSharedMemoryHandle {
     #[inline]
-    pub(crate) fn new(runtime: Rc<RefCell<SharedMemoryRuntime>>) -> Self {
+    pub(crate) const fn new(runtime: Rc<RefCell<SharedMemoryRuntime>>) -> Self {
         Self(runtime)
     }
 
@@ -222,7 +222,7 @@ impl ClusterSharedMemoryHandle {
 
 impl Agent {
     #[inline]
-    pub fn backing_store_allocation_limit(&self) -> usize {
+    pub const fn backing_store_allocation_limit(&self) -> usize {
         crate::backing_store::MAX_BACKING_STORE_BYTE_LENGTH
     }
 

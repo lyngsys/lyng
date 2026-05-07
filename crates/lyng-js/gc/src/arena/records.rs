@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    CodeRef, EnvironmentRef, ObjectRef, PrimitiveStringView, RealmRef, ShapeId, StringRef,
+    SymbolRef, Value,
+};
 use std::num::NonZeroU32;
 
 pub const PRIMITIVE_SLOTS_PER_PAGE: usize = 64;

@@ -116,7 +116,7 @@ impl RuntimeJob {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct AgentJobQueues {
+pub struct AgentJobQueues {
     promise: VecDeque<RuntimeJob>,
     script: VecDeque<RuntimeJob>,
     module: VecDeque<RuntimeJob>,
@@ -166,7 +166,7 @@ impl AgentJobQueues {
         }
     }
 
-    fn queue(&self, kind: JobQueueKind) -> &VecDeque<RuntimeJob> {
+    const fn queue(&self, kind: JobQueueKind) -> &VecDeque<RuntimeJob> {
         match kind {
             JobQueueKind::Promise => &self.promise,
             JobQueueKind::Script => &self.script,
@@ -176,7 +176,7 @@ impl AgentJobQueues {
         }
     }
 
-    fn queue_mut(&mut self, kind: JobQueueKind) -> &mut VecDeque<RuntimeJob> {
+    const fn queue_mut(&mut self, kind: JobQueueKind) -> &mut VecDeque<RuntimeJob> {
         match kind {
             JobQueueKind::Promise => &mut self.promise,
             JobQueueKind::Script => &mut self.script,

@@ -1,4 +1,9 @@
-use super::*;
+use super::{
+    alloc_string, errors, object, promise_capability_executor_builtin, Agent, AllocationLifetime,
+    FrameRecord, HostHooks, ImportMetaValue, ModuleImportAttribute, ModuleKey, ModuleSourceRequest,
+    NativeFunctionRegistry, ObjectAllocation, ObjectRef, PromiseResolvingFunctionKind, PropertyKey,
+    RealmRef, ToPrimitiveHint, Value, Vm, VmError, VmProxyBridge, VmResult,
+};
 use crate::vm::DynamicImportPhase;
 use crate::vm::{DynamicImportRequest, PendingDynamicImport};
 use lyng_js_bytecode::Opcode;
@@ -110,7 +115,7 @@ impl Vm {
         )?;
         let promise = agent
             .promise_capability(capability)
-            .and_then(|record| record.promise())
+            .and_then(lyng_js_env::PromiseCapabilityRecord::promise)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let specifier = arguments.first().copied().unwrap_or(Value::undefined());
         let options = arguments.get(1).copied().unwrap_or(Value::undefined());
@@ -146,10 +151,10 @@ impl Vm {
 
         match outcome {
             Ok(request) => {
-                self.enqueue_dynamic_import_evaluate_job(agent, realm, capability, request, phase)
+                self.enqueue_dynamic_import_evaluate_job(agent, realm, capability, request, phase);
             }
             Err(reason) => {
-                self.enqueue_dynamic_import_settle_job(agent, realm, capability, reason, true)
+                self.enqueue_dynamic_import_settle_job(agent, realm, capability, reason, true);
             }
         }
         Ok(Value::from_object_ref(promise))
@@ -287,7 +292,7 @@ impl Vm {
     pub(crate) fn active_script_or_module_referrer(&self, agent: &Agent) -> Option<ModuleKey> {
         agent
             .current_execution_context()
-            .and_then(|context| context.script_or_module_referrer())
+            .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer)
             .map(|atom| ModuleKey::new(agent.atoms().resolve(atom).to_owned().into_boxed_str()))
     }
 
@@ -301,7 +306,7 @@ impl Vm {
     ) {
         let script_or_module_referrer = agent
             .current_execution_context()
-            .and_then(|context| context.script_or_module_referrer());
+            .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer);
         let _ = agent.enqueue_job_with_payload(
             lyng_js_host::HostJobKind::Promise,
             lyng_js_env::ExecutableId::Builtin,

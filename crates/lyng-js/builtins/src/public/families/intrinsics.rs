@@ -53,7 +53,7 @@ pub(in crate::public) fn install_public_realm_intrinsics(
     agent.set_realm_intrinsics(realm, intrinsics)
 }
 
-fn with_core_intrinsics(
+const fn with_core_intrinsics(
     intrinsics: &Intrinsics,
     builtins: &PublicRealmBuiltins,
     prototypes: &PublicRealmPrototypeHandles,
@@ -83,7 +83,7 @@ fn with_core_intrinsics(
         .with_array_iterator_prototype(Some(prototypes.array_iterator_prototype))
 }
 
-fn with_collection_intrinsics(
+const fn with_collection_intrinsics(
     intrinsics: &Intrinsics,
     builtins: &PublicRealmBuiltins,
     prototypes: &PublicRealmPrototypeHandles,
@@ -105,7 +105,7 @@ fn with_collection_intrinsics(
         .with_finalization_registry_prototype(Some(prototypes.finalization_registry_prototype))
 }
 
-fn with_binary_data_intrinsics(
+const fn with_binary_data_intrinsics(
     intrinsics: &Intrinsics,
     builtins: &PublicRealmBuiltins,
     prototypes: &PublicRealmPrototypeHandles,
@@ -146,7 +146,7 @@ fn with_binary_data_intrinsics(
         .with_uint8_array_prototype(Some(prototypes.uint8_array_prototype))
 }
 
-fn with_namespace_intrinsics(
+const fn with_namespace_intrinsics(
     intrinsics: &Intrinsics,
     builtins: &PublicRealmBuiltins,
     prototypes: &PublicRealmPrototypeHandles,
@@ -174,7 +174,7 @@ fn with_namespace_intrinsics(
         .with_proxy(Some(builtins.proxy))
 }
 
-fn with_error_and_promise_intrinsics(
+const fn with_error_and_promise_intrinsics(
     intrinsics: &Intrinsics,
     builtins: &PublicRealmBuiltins,
 ) -> Intrinsics {

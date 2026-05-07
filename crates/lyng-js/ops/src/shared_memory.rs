@@ -107,7 +107,7 @@ pub fn validate_atomic_index(
 }
 
 #[inline]
-pub fn atomic_access_record(
+pub const fn atomic_access_record(
     typed_array: TypedArrayObjectData,
     element_index: usize,
 ) -> AtomicAccessRecord {
@@ -141,13 +141,7 @@ pub fn wait_location(record: AtomicAccessRecord) -> WaitLocation {
     let byte_offset = record
         .typed_array
         .byte_offset()
-        .checked_add(
-            record
-                .element_index
-                .checked_mul(element_size)
-                .unwrap_or(usize::MAX),
-        )
-        .unwrap_or(usize::MAX);
+        .saturating_add(record.element_index.saturating_mul(element_size));
     WaitLocation::new(
         record.typed_array.backing_store(),
         u64::try_from(byte_offset).unwrap_or(u64::MAX),
@@ -236,9 +230,7 @@ pub fn atomic_value_from_bits(agent: &mut Agent, kind: TypedArrayElementKind, bi
         TypedArrayElementKind::Int32 => Value::from_smi(bits as u32 as i32),
         TypedArrayElementKind::Uint32 => {
             let value = bits as u32;
-            i32::try_from(value)
-                .map(Value::from_smi)
-                .unwrap_or_else(|_| Value::from_f64(f64::from(value)))
+            i32::try_from(value).map_or_else(|_| Value::from_f64(f64::from(value)), Value::from_smi)
         }
         TypedArrayElementKind::Uint16 => Value::from_smi(i32::from(bits as u16)),
         TypedArrayElementKind::Uint8 | TypedArrayElementKind::Uint8Clamped => {

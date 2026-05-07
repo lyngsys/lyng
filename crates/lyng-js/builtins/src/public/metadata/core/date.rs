@@ -1,4 +1,22 @@
-use super::super::*;
+use super::super::{
+    date_builtin, date_get_date_builtin, date_get_day_builtin, date_get_full_year_builtin,
+    date_get_hours_builtin, date_get_milliseconds_builtin, date_get_minutes_builtin,
+    date_get_month_builtin, date_get_seconds_builtin, date_get_time_builtin,
+    date_get_timezone_offset_builtin, date_get_utc_date_builtin, date_get_utc_day_builtin,
+    date_get_utc_full_year_builtin, date_get_utc_hours_builtin, date_get_utc_milliseconds_builtin,
+    date_get_utc_minutes_builtin, date_get_utc_month_builtin, date_get_utc_seconds_builtin,
+    date_get_year_builtin, date_now_builtin, date_parse_builtin, date_set_date_builtin,
+    date_set_full_year_builtin, date_set_hours_builtin, date_set_milliseconds_builtin,
+    date_set_minutes_builtin, date_set_month_builtin, date_set_seconds_builtin,
+    date_set_time_builtin, date_set_utc_date_builtin, date_set_utc_full_year_builtin,
+    date_set_utc_hours_builtin, date_set_utc_milliseconds_builtin, date_set_utc_minutes_builtin,
+    date_set_utc_month_builtin, date_set_utc_seconds_builtin, date_set_year_builtin,
+    date_to_date_string_builtin, date_to_iso_string_builtin, date_to_json_builtin,
+    date_to_locale_date_string_builtin, date_to_locale_string_builtin,
+    date_to_locale_time_string_builtin, date_to_primitive_builtin, date_to_string_builtin,
+    date_to_temporal_instant_builtin, date_to_time_string_builtin, date_to_utc_string_builtin,
+    date_utc_builtin, date_value_of_builtin, BuiltinEntryMetadata, PublicBuiltinMetadataRow,
+};
 
 pub(in crate::public::metadata) const PUBLIC_DATE_BUILTIN_METADATA: &[PublicBuiltinMetadataRow] = &[
     PublicBuiltinMetadataRow::new(

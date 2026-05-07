@@ -608,10 +608,7 @@ fn perform_weak_map_constructor_entries<Cx: PublicBuiltinDispatchContext>(
             let mut bridge = BuiltinIteratorBridge { cx };
             iterator::iterator_value(&mut bridge, next)
         };
-        let next_value = match next_value {
-            Ok(next_value) => next_value,
-            Err(error) => return Err(error),
-        };
+        let next_value = next_value?;
         let Some(entry) = next_value.as_object_ref() else {
             let error = type_error(cx);
             return close_iterator_after_error(cx, &mut iterator_record, error);
@@ -666,10 +663,7 @@ fn perform_weak_set_constructor_values<Cx: PublicBuiltinDispatchContext>(
             let mut bridge = BuiltinIteratorBridge { cx };
             iterator::iterator_value(&mut bridge, next)
         };
-        let next_value = match next_value {
-            Ok(next_value) => next_value,
-            Err(error) => return Err(error),
-        };
+        let next_value = next_value?;
         if let Err(error) =
             cx.call_to_completion(adder, Value::from_object_ref(object), &[next_value])
         {
@@ -1115,10 +1109,11 @@ fn map_get_or_insert_computed_builtin<Cx: PublicBuiltinDispatchContext>(
 
 #[inline]
 fn canonicalize_keyed_collection_key(key: Value) -> Value {
-    if let Some(number) = key.as_f64() {
-        if number == 0.0 && number.is_sign_negative() {
-            return Value::from_smi(0);
-        }
+    if let Some(number) = key.as_f64()
+        && number == 0.0
+        && number.is_sign_negative()
+    {
+        return Value::from_smi(0);
     }
     key
 }
@@ -1452,10 +1447,10 @@ fn set_union_builtin<Cx: PublicBuiltinDispatchContext>(
             Ok(value) => canonical_set_value(value),
             Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
         };
-        if !set_contains_value(cx, result, next_value)? {
-            if let Err(error) = set_push_value(cx, result, next_value) {
-                return close_iterator_after_error(cx, &mut iterator_record, error);
-            }
+        if !set_contains_value(cx, result, next_value)?
+            && let Err(error) = set_push_value(cx, result, next_value)
+        {
+            return close_iterator_after_error(cx, &mut iterator_record, error);
         }
     }
     Ok(Value::from_object_ref(result))
@@ -1528,10 +1523,11 @@ fn set_intersection_builtin<Cx: PublicBuiltinDispatchContext>(
                 Ok(b) => b,
                 Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
             };
-            if in_this && !set_contains_value(cx, result, next_value)? {
-                if let Err(error) = set_push_value(cx, result, next_value) {
-                    return close_iterator_after_error(cx, &mut iterator_record, error);
-                }
+            if in_this
+                && !set_contains_value(cx, result, next_value)?
+                && let Err(error) = set_push_value(cx, result, next_value)
+            {
+                return close_iterator_after_error(cx, &mut iterator_record, error);
             }
         }
     }
@@ -1669,10 +1665,10 @@ fn set_symmetric_difference_builtin<Cx: PublicBuiltinDispatchContext>(
                     return close_iterator_after_error(cx, &mut iterator_record, error);
                 }
             }
-        } else if result_index.is_none() {
-            if let Err(error) = set_push_value(cx, result, next_value) {
-                return close_iterator_after_error(cx, &mut iterator_record, error);
-            }
+        } else if result_index.is_none()
+            && let Err(error) = set_push_value(cx, result, next_value)
+        {
+            return close_iterator_after_error(cx, &mut iterator_record, error);
         }
     }
     Ok(Value::from_object_ref(result))

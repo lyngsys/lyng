@@ -69,7 +69,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         )
     }
 
-    fn token_starts_using_binding(token: lyng_js_lexer::Token) -> bool {
+    const fn token_starts_using_binding(token: lyng_js_lexer::Token) -> bool {
         matches!(
             token.kind,
             TokenKind::Identifier | TokenKind::Yield | TokenKind::Await

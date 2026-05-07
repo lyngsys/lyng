@@ -41,13 +41,13 @@ use lyng_js_types::{
 use crate::error::{LoweringError, LoweringResult};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ProgramRootKind {
+pub enum ProgramRootKind {
     Script,
     Module,
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct ProgramSource<'a> {
+pub struct ProgramSource<'a> {
     pub(crate) ast: &'a Ast,
     pub(crate) body: NodeList<StmtId>,
     pub(crate) span: Span,
@@ -83,7 +83,7 @@ use activation::{
     FunctionActivationPlan,
 };
 use reference_targets::{PreparedReferenceTarget, ReferenceUsage};
-pub(crate) use state::CompilationState;
+pub use state::CompilationState;
 use state::{
     ActiveClassContext, CallBridgeRegisters, CompletionKind, CompletionRegisters, ControlTarget,
     ControlTargetKind, FinallyContext, FunctionCompiler, LoweredCallArguments, ParameterSource,

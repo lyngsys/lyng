@@ -9,11 +9,76 @@ mod plain_year_month;
 mod support;
 mod zoned_date_time;
 
-use duration::*;
-use plain_date::*;
-use plain_date_time::*;
-use support::*;
-use zoned_date_time::*;
+use duration::{
+    allocate_temporal_duration_object, temporal_duration_from_additive_argument,
+    temporal_duration_from_value, temporal_duration_round_calendar_relative,
+    temporal_duration_round_calendar_relative_exact, temporal_duration_rounding_increment_option,
+    temporal_duration_rounding_mode_option, temporal_duration_rounding_mode_option_with_default,
+    temporal_duration_validate_month_rounding_boundary, temporal_option_string_text,
+    temporal_rounding_mode_for_negated_duration, validate_temporal_duration,
+    TemporalDurationRelativeTo,
+};
+use plain_date::{
+    allocate_temporal_plain_date_object, temporal_date_difference_options,
+    temporal_date_difference_unit_order, temporal_duration_from_date_units,
+    temporal_plain_date_add_duration, temporal_plain_date_difference_trunc,
+    temporal_plain_date_from_ordinal_day, temporal_plain_date_from_parts,
+    temporal_plain_date_from_parts_with_overflow, temporal_plain_date_from_value,
+    temporal_plain_date_time_bag_fields, temporal_plain_date_time_is_within_limits,
+    temporal_plain_date_to_string_calendar_name, temporal_reject_calendar_or_time_zone_properties,
+    temporal_round_i128_to_increment, TemporalDateDifferenceUnit, TemporalPlainDateTimeBagFields,
+};
+use plain_date_time::{
+    allocate_temporal_plain_date_time_object, temporal_date_time_date_difference_unit,
+    temporal_date_time_difference_unit_nanoseconds, temporal_date_time_exact_unit,
+    temporal_disambiguation_from_options, temporal_duration_from_date_time_nanoseconds,
+    temporal_plain_date_time_add_duration, temporal_plain_date_time_calendar_difference_duration,
+    temporal_plain_date_time_date, temporal_plain_date_time_difference_options,
+    temporal_plain_date_time_from_parts, temporal_plain_date_time_from_parts_with_overflow,
+    temporal_plain_date_time_from_total_nanoseconds, temporal_plain_date_time_from_value,
+    temporal_plain_date_time_round_options, temporal_plain_date_time_time,
+    temporal_plain_date_time_total_nanoseconds, TemporalDateTimeDifferenceUnit,
+};
+use support::{
+    current_temporal_duration_prototype, current_temporal_instant_prototype,
+    current_temporal_plain_date_prototype, current_temporal_plain_date_time_prototype,
+    current_temporal_plain_month_day_prototype, current_temporal_plain_time_prototype,
+    current_temporal_plain_year_month_prototype, current_temporal_zoned_date_time_prototype,
+    format_temporal_civil_date_time_with_precision, format_temporal_plain_time_with_precision,
+    temporal_compare_ordering, temporal_constructor_prototype,
+    temporal_duration_from_nanoseconds_with_largest_unit, temporal_exact_time_round_options,
+    temporal_exact_time_rounding_increment_is_valid, temporal_exact_time_unit_from_text,
+    temporal_exact_time_unit_nanoseconds, temporal_exact_time_unit_order,
+    temporal_instant_fractional_second_digits_option, temporal_instant_largest_unit_default,
+    temporal_instant_round_options, temporal_instant_smallest_unit_precision,
+    temporal_instant_smallest_unit_precision_from_text, temporal_instant_to_string_options,
+    temporal_integer_part_from_argument, temporal_integer_part_from_value,
+    temporal_month_from_month_code_text, temporal_month_from_month_code_value,
+    temporal_month_from_property_bag, temporal_optional_integer_part_from_property,
+    temporal_optional_month_code_text_from_property, temporal_optional_string_text_from_property,
+    temporal_optional_time_part_from_property, temporal_overflow_from_options,
+    temporal_parse_month_code_syntax, temporal_plain_time_for_string_precision,
+    temporal_plain_time_from_nanoseconds, temporal_plain_time_from_parts,
+    temporal_plain_time_from_parts_with_overflow, temporal_plain_time_from_value,
+    temporal_plain_time_from_value_with_overflow, temporal_plain_time_parts_from_property_bag,
+    temporal_property_value, temporal_required_integer_part_from_property,
+    temporal_resolve_month_from_fields, temporal_safe_integer_number, temporal_string_option,
+    temporal_subsecond_parts_from_nanoseconds, temporal_time_part_from_argument,
+    temporal_time_part_from_property, temporal_time_part_from_value,
+    temporal_validate_iso_calendar_value,
+    temporal_validate_optional_iso_calendar_identifier_argument,
+    temporal_validate_optional_iso_calendar_property, temporal_validate_options_object,
+    TemporalInstantStringPrecision, TemporalOverflow,
+};
+use zoned_date_time::{
+    allocate_temporal_zoned_date_time_object, temporal_civil_date_time_from_plain_date_time,
+    temporal_now_instant_and_civil, temporal_parse_offset_string,
+    temporal_time_zone_id_from_optional_value, temporal_time_zone_id_from_value,
+    temporal_zoned_date_time_add_duration, temporal_zoned_date_time_civil,
+    temporal_zoned_date_time_data, temporal_zoned_date_time_explicit_offset,
+    temporal_zoned_date_time_from_parts, temporal_zoned_date_time_from_value,
+    temporal_zoned_date_time_zone_annotation, TemporalZonedDateTimeCalendarNameOption,
+};
 
 use super::{
     map_completion, range_error, string_ref_text, string_value, to_bigint_for_builtin,

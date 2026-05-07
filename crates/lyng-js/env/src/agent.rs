@@ -27,7 +27,7 @@ mod regexp_literals;
 mod symbols;
 mod weak_finalization;
 
-pub(crate) use self::cluster_handles::{ClusterBackingStoreHandle, ClusterSharedMemoryHandle};
+pub use self::cluster_handles::{ClusterBackingStoreHandle, ClusterSharedMemoryHandle};
 #[derive(Clone)]
 struct AgentCollectionSnapshot {
     well_known_symbols: WellKnownSymbols,
@@ -219,32 +219,32 @@ impl Agent {
     }
 
     #[inline]
-    pub(crate) fn bind_thread(&mut self, thread_id: HostThreadId) {
+    pub(crate) const fn bind_thread(&mut self, thread_id: HostThreadId) {
         self.bound_thread = Some(thread_id);
     }
 
     #[inline]
-    pub fn heap(&self) -> &PrimitiveHeap {
+    pub const fn heap(&self) -> &PrimitiveHeap {
         &self.heap
     }
 
     #[inline]
-    pub fn heap_mut(&mut self) -> &mut PrimitiveHeap {
+    pub const fn heap_mut(&mut self) -> &mut PrimitiveHeap {
         &mut self.heap
     }
 
     #[inline]
-    pub fn roots(&self) -> &PrimitiveRoots {
+    pub const fn roots(&self) -> &PrimitiveRoots {
         &self.roots
     }
 
     #[inline]
-    pub fn objects(&self) -> &ObjectRuntime {
+    pub const fn objects(&self) -> &ObjectRuntime {
         &self.objects
     }
 
     #[inline]
-    pub fn objects_mut(&mut self) -> &mut ObjectRuntime {
+    pub const fn objects_mut(&mut self) -> &mut ObjectRuntime {
         &mut self.objects
     }
 

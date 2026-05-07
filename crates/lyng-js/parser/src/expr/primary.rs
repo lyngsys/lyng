@@ -609,13 +609,13 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             0
         };
         let params = self.convert_exprs_to_patterns(&args[..params_end]);
-        if let Some(rest_end) = rest_end {
-            if self.has_trailing_comma_before_closing_paren(rest_end, span.range.end.raw()) {
-                self.error_at(
-                    span,
-                    "rest parameter must not be followed by a trailing comma".to_string(),
-                );
-            }
+        if let Some(rest_end) = rest_end
+            && self.has_trailing_comma_before_closing_paren(rest_end, span.range.end.raw())
+        {
+            self.error_at(
+                span,
+                "rest parameter must not be followed by a trailing comma".to_string(),
+            );
         }
         Some(self.parse_arrow_function_body(span, &params, rest, true))
     }
@@ -1137,22 +1137,17 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
                     if let Expr::SpreadElement { span, argument } =
                         self.ast().get_expr(prop.value).clone()
+                        && prop.key == prop.value
                     {
-                        if prop.key == prop.value {
-                            if seen_rest || idx + 1 != props.len() {
-                                self.error_at(
-                                    span,
-                                    "rest property must be the last property".to_string(),
-                                );
-                            }
-                            seen_rest = true;
-                            self.validate_pattern_expression(
-                                argument,
-                                true,
-                                allow_assignment_targets,
+                        if seen_rest || idx + 1 != props.len() {
+                            self.error_at(
+                                span,
+                                "rest property must be the last property".to_string(),
                             );
-                            continue;
                         }
+                        seen_rest = true;
+                        self.validate_pattern_expression(argument, true, allow_assignment_targets);
+                        continue;
                     }
 
                     if seen_rest {
@@ -1256,11 +1251,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 for prop in src_props {
                     if let Expr::SpreadElement { argument, .. } =
                         self.ast().get_expr(prop.value).clone()
+                        && prop.key == prop.value
                     {
-                        if prop.key == prop.value {
-                            rest = Some(self.convert_expr_to_pattern(argument));
-                            break;
-                        }
+                        rest = Some(self.convert_expr_to_pattern(argument));
+                        break;
                     }
 
                     let value_pat =

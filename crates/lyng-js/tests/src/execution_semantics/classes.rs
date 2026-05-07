@@ -8,7 +8,7 @@ use lyng_js_vm::Vm;
 #[test]
 fn phase6_classes_execute_base_constructors_methods_and_instance_fields() {
     let result = compile_and_run(
-        r#"
+        r"
         class Box {
             constructor(value) {
                 this.value = value;
@@ -22,7 +22,7 @@ fn phase6_classes_execute_base_constructors_methods_and_instance_fields() {
         }
 
         new Box(5).read();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -31,7 +31,7 @@ fn phase6_classes_execute_base_constructors_methods_and_instance_fields() {
 #[test]
 fn phase6_unused_named_class_self_binding_does_not_reinitialize_in_loops() {
     let result = compile_and_run_string(
-        r#"
+        r"
         let count = 0;
         for (let i = 0; i < 3; i++) {
             class C {}
@@ -39,7 +39,7 @@ fn phase6_unused_named_class_self_binding_does_not_reinitialize_in_loops() {
             count++;
         }
         String(count);
-        "#,
+        ",
     );
 
     assert_eq!(result, "3");
@@ -96,7 +96,7 @@ fn phase6_named_class_inner_bindings_are_immutable_and_tdz_for_computed_keys() {
 #[test]
 fn phase6_classes_instance_fields_capture_outer_bindings() {
     let result = compile_and_run(
-        r#"
+        r"
         function outer(value) {
             return class Box {
                 constructor() {}
@@ -105,7 +105,7 @@ fn phase6_classes_instance_fields_capture_outer_bindings() {
         }
 
         new (outer(3))().field;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -146,7 +146,7 @@ fn phase6_public_auto_accessors_install_backed_accessor_descriptors() {
 #[test]
 fn phase6_classes_reject_calling_class_constructors_without_new() {
     let result = compile_and_run(
-        r#"
+        r"
         let ok = false;
         class C {}
         try {
@@ -155,7 +155,7 @@ fn phase6_classes_reject_calling_class_constructors_without_new() {
             ok = true;
         }
         ok;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_bool(true));
@@ -187,7 +187,7 @@ fn phase6_string_literal_constructor_method_defines_class_constructor() {
 #[test]
 fn phase6_classes_default_base_constructors_initialize_instance_fields() {
     let result = compile_and_run(
-        r#"
+        r"
         function outer(value) {
             return class Box {
                 field = value;
@@ -195,7 +195,7 @@ fn phase6_classes_default_base_constructors_initialize_instance_fields() {
         }
 
         new (outer(4))().field;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(4));
@@ -204,7 +204,7 @@ fn phase6_classes_default_base_constructors_initialize_instance_fields() {
 #[test]
 fn phase6_classes_execute_static_fields_blocks_and_self_bindings() {
     let result = compile_and_run(
-        r#"
+        r"
         let C = class Named {
             static total = 1;
             static {
@@ -217,7 +217,7 @@ fn phase6_classes_execute_static_fields_blocks_and_self_bindings() {
         };
 
         (C.total === 2 ? 1 : 0) + (C.self() === C ? 2 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -226,7 +226,7 @@ fn phase6_classes_execute_static_fields_blocks_and_self_bindings() {
 #[test]
 fn phase6_class_field_initializers_capture_inner_class_name_binding() {
     let result = compile_and_run(
-        r#"
+        r"
         class InstanceDecl {
             field = () => InstanceDecl;
         }
@@ -255,7 +255,7 @@ fn phase6_class_field_initializers_capture_inner_class_name_binding() {
             + (new InstanceExprAlias().field() === InstanceExprAlias ? 2 : 0)
             + (StaticAlias.field() === StaticAlias ? 4 : 0)
             + (StaticExprAlias.field() === StaticExprAlias ? 8 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(15));
@@ -323,13 +323,13 @@ fn phase6_class_field_direct_eval_resolves_inner_class_name_binding() {
 #[test]
 fn phase6_static_field_initializers_bind_this_to_the_class_object() {
     let result = compile_and_run_string(
-        r#"
+        r"
         let field = (class Named {
             static value = this.name;
         }).value;
 
         field;
-        "#,
+        ",
     );
 
     assert_eq!(result, "Named");
@@ -355,7 +355,7 @@ fn phase6_direct_eval_in_static_field_initializer_uses_class_this() {
 #[test]
 fn phase6_class_static_blocks_lower_class_declarations_after_private_decorators() {
     let result = compile_and_run(
-        r#"
+        r"
         class C {
             static #dec() {}
 
@@ -368,7 +368,7 @@ fn phase6_class_static_blocks_lower_class_declarations_after_private_decorators(
         }
 
         C.value;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -521,14 +521,14 @@ fn phase6_async_private_methods_async_arrows_capture_parent_arguments() {
 #[test]
 fn phase6_anonymous_class_expressions_infer_names_before_static_initializers() {
     let result = compile_and_run_string(
-        r#"
+        r"
         let className;
         let C = class {
             static value = (className = this.name);
         };
 
         className;
-        "#,
+        ",
     );
 
     assert_eq!(result, "C");
@@ -562,13 +562,13 @@ fn phase6_class_expression_name_descriptors_match_class_names() {
 #[test]
 fn phase6_classes_link_derived_constructor_and_prototype_chains() {
     let result = compile_and_run(
-        r#"
+        r"
         class Base {}
         class Derived extends Base {}
 
         (Object.getPrototypeOf(Derived) === Base ? 1 : 0)
             + (Object.getPrototypeOf(Derived.prototype) === Base.prototype ? 2 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -720,7 +720,7 @@ fn phase6_computed_class_element_keys_apply_to_property_key() {
 #[test]
 fn phase6_class_computed_names_use_strict_assignment_semantics() {
     let result = compile_and_run(
-        r#"
+        r"
         var threw = false;
         try {
             class C {
@@ -730,7 +730,7 @@ fn phase6_class_computed_names_use_strict_assignment_semantics() {
             threw = error instanceof TypeError;
         }
         threw;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_bool(true));
@@ -739,7 +739,7 @@ fn phase6_class_computed_names_use_strict_assignment_semantics() {
 #[test]
 fn phase6_computed_class_function_expression_keys_use_trimmed_source_text() {
     let result = compile_and_run(
-        r#"
+        r"
         class C {
             [function () {}]() {
                 return 1;
@@ -753,7 +753,7 @@ fn phase6_computed_class_function_expression_keys_use_trimmed_source_text() {
             + C[function () {}]()
             + new C()[String(function () {})]()
             + C[String(function () {})]();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(6));
@@ -787,7 +787,7 @@ fn phase6_intercalated_static_and_instance_computed_field_keys_run_before_values
 #[test]
 fn phase6_classes_execute_private_instance_fields_and_brand_checks() {
     let result = compile_and_run(
-        r#"
+        r"
         class Box {
             #value = 4;
 
@@ -802,7 +802,7 @@ fn phase6_classes_execute_private_instance_fields_and_brand_checks() {
 
         let box = new Box();
         (Box.hasBox(box) ? 1 : 0) + box.read();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(5));
@@ -811,7 +811,7 @@ fn phase6_classes_execute_private_instance_fields_and_brand_checks() {
 #[test]
 fn phase6_base_class_private_fields_initialize_before_constructor_defaults() {
     let result = compile_and_run(
-        r#"
+        r"
         class A {
             #x = 41;
             constructor(value = this.#x) {
@@ -820,7 +820,7 @@ fn phase6_base_class_private_fields_initialize_before_constructor_defaults() {
         }
 
         new A().value;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(41));
@@ -829,7 +829,7 @@ fn phase6_base_class_private_fields_initialize_before_constructor_defaults() {
 #[test]
 fn phase6_default_class_constructors_support_arrow_field_initializers() {
     let result = compile_and_run(
-        r#"
+        r"
         let C = class {
             field = function() {};
             #field = (a, b, c, d) => undefined;
@@ -841,7 +841,7 @@ fn phase6_default_class_constructors_support_arrow_field_initializers() {
 
         let instance = new C();
         instance.field.length + instance.accessPrivateField().length;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(4));
@@ -850,7 +850,7 @@ fn phase6_default_class_constructors_support_arrow_field_initializers() {
 #[test]
 fn phase6_classes_private_fields_reject_wrong_brands_and_support_static_storage() {
     let result = compile_and_run(
-        r#"
+        r"
         let wrongBrand = false;
         class Counter {
             static #total = 1;
@@ -873,7 +873,7 @@ fn phase6_classes_private_fields_reject_wrong_brands_and_support_static_storage(
         }
 
         (wrongBrand ? 1 : 0) + Counter.bump();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -1254,7 +1254,7 @@ fn phase6_class_fields_after_arrow_initializers_do_not_require_semicolons() {
 #[test]
 fn phase6_private_method_initialization_throws_on_duplicate_install() {
     let result = compile_and_run(
-        r#"
+        r"
         class Base {
             constructor(value) {
                 return value;
@@ -1276,7 +1276,7 @@ fn phase6_private_method_initialization_throws_on_duplicate_install() {
         }
 
         threw;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_bool(true));
@@ -1285,7 +1285,7 @@ fn phase6_private_method_initialization_throws_on_duplicate_install() {
 #[test]
 fn phase6_private_accessor_initialization_throws_on_duplicate_install() {
     let result = compile_and_run(
-        r#"
+        r"
         class Base {
             constructor(value) {
                 return value;
@@ -1329,7 +1329,7 @@ fn phase6_private_accessor_initialization_throws_on_duplicate_install() {
         }
 
         total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -1448,7 +1448,7 @@ fn phase6_private_destructuring_target_evaluation_matches_test262_rows() {
 #[test]
 fn phase6_second_super_from_arrow_runs_base_only_once_for_fields() {
     let result = compile_and_run(
-        r#"
+        r"
         let baseCtorCalled = 0;
         let fieldInitCalled = 0;
         let secondSuper = false;
@@ -1477,7 +1477,7 @@ fn phase6_second_super_from_arrow_runs_base_only_once_for_fields() {
         (baseCtorCalled === 2 ? 1 : 0)
             + (fieldInitCalled === 1 ? 2 : 0)
             + (secondSuper ? 4 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -1486,7 +1486,7 @@ fn phase6_second_super_from_arrow_runs_base_only_once_for_fields() {
 #[test]
 fn phase6_private_fields_capture_into_inner_functions_and_arrows() {
     let result = compile_and_run(
-        r#"
+        r"
         class Box {
             #value = 5;
 
@@ -1500,7 +1500,7 @@ fn phase6_private_fields_capture_into_inner_functions_and_arrows() {
         }
 
         new Box().read();
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(10));
@@ -1509,7 +1509,7 @@ fn phase6_private_fields_capture_into_inner_functions_and_arrows() {
 #[test]
 fn phase6_nested_classes_can_capture_outer_private_fields() {
     let result = compile_and_run(
-        r#"
+        r"
         class Outer {
             #value = 7;
 
@@ -1525,7 +1525,7 @@ fn phase6_nested_classes_can_capture_outer_private_fields() {
         let outer = new Outer();
         let Reader = outer.makeReader();
         new Reader().read(outer);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -1534,7 +1534,7 @@ fn phase6_nested_classes_can_capture_outer_private_fields() {
 #[test]
 fn phase6_nested_classes_can_capture_outer_private_methods() {
     let result = compile_and_run(
-        r#"
+        r"
         class Outer {
             #value() {
                 return 9;
@@ -1552,7 +1552,7 @@ fn phase6_nested_classes_can_capture_outer_private_methods() {
         let outer = new Outer();
         let Reader = outer.makeReader();
         new Reader().read(outer);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(9));
@@ -1561,7 +1561,7 @@ fn phase6_nested_classes_can_capture_outer_private_methods() {
 #[test]
 fn phase6_nested_classes_can_capture_outer_private_getters() {
     let result = compile_and_run(
-        r#"
+        r"
         class Outer {
             get #value() {
                 return 8;
@@ -1579,7 +1579,7 @@ fn phase6_nested_classes_can_capture_outer_private_getters() {
         let outer = new Outer();
         let Reader = outer.makeReader();
         new Reader().read(outer);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(8));
@@ -1588,7 +1588,7 @@ fn phase6_nested_classes_can_capture_outer_private_getters() {
 #[test]
 fn phase6_nested_classes_can_access_outer_static_private_setters() {
     let result = compile_and_run(
-        r#"
+        r"
         let wrongBrand = false;
         class Outer {
             static _value = 0;
@@ -1612,7 +1612,7 @@ fn phase6_nested_classes_can_access_outer_static_private_setters() {
         }
 
         (wrongBrand ? 1 : 0) + Outer._value;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -1621,7 +1621,7 @@ fn phase6_nested_classes_can_access_outer_static_private_setters() {
 #[test]
 fn phase6_nested_classes_can_access_outer_static_private_fields() {
     let result = compile_and_run(
-        r#"
+        r"
         let wrongBrand = false;
 
         class Outer {
@@ -1642,7 +1642,7 @@ fn phase6_nested_classes_can_access_outer_static_private_fields() {
         }
 
         read + (wrongBrand ? 1 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(7));
@@ -1651,7 +1651,7 @@ fn phase6_nested_classes_can_access_outer_static_private_fields() {
 #[test]
 fn phase6_class_expressions_support_nested_static_private_field_access() {
     let result = compile_and_run(
-        r#"
+        r"
         let C = class {
             static #value = 6;
 
@@ -1663,7 +1663,7 @@ fn phase6_class_expressions_support_nested_static_private_field_access() {
         };
 
         C.Inner.read(C);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(6));
@@ -1672,7 +1672,7 @@ fn phase6_class_expressions_support_nested_static_private_field_access() {
 #[test]
 fn phase6_class_expressions_catch_type_error_after_nested_static_private_field_access() {
     let result = compile_and_run(
-        r#"
+        r"
         let caught = false;
 
         let C = class {
@@ -1693,7 +1693,7 @@ fn phase6_class_expressions_catch_type_error_after_nested_static_private_field_a
         }
 
         (read === 6 ? 1 : 0) + (caught ? 2 : 0);
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -1702,7 +1702,7 @@ fn phase6_class_expressions_catch_type_error_after_nested_static_private_field_a
 #[test]
 fn phase6_private_methods_are_not_installed_before_super_returns() {
     let result = compile_and_run(
-        r#"
+        r"
         let threw = false;
 
         class Base {
@@ -1726,7 +1726,7 @@ fn phase6_private_methods_are_not_installed_before_super_returns() {
         }
 
         threw;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_bool(true));
@@ -1905,14 +1905,14 @@ fn phase6_super_assignment_null_base_evaluates_rhs_before_type_error() {
 fn phase6_methods_record_home_object_for_super_dispatch() {
     let mut atoms = AtomTable::new();
     let unit = compile_unit(
-        r#"
+        r"
         let obj = {
             method() {
                 return super.value;
             }
         };
         obj.method;
-        "#,
+        ",
         &mut atoms,
     );
 
@@ -1929,7 +1929,7 @@ fn phase6_methods_record_home_object_for_super_dispatch() {
         agent
             .objects()
             .function_data(method)
-            .and_then(|data| data.home_object())
+            .and_then(lyng_js_objects::FunctionObjectData::home_object)
             .is_some(),
         "method closures using super should retain [[HomeObject]] metadata"
     );
@@ -1938,11 +1938,11 @@ fn phase6_methods_record_home_object_for_super_dispatch() {
 #[test]
 fn phase6_object_literal_proto_data_properties_set_the_prototype() {
     let result = compile_and_run(
-        r#"
+        r"
         let proto = { value: 4 };
         let obj = { __proto__: proto };
         obj.value;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(4));
@@ -1951,7 +1951,7 @@ fn phase6_object_literal_proto_data_properties_set_the_prototype() {
 #[test]
 fn phase6_derived_constructors_bind_this_once_and_initialize_instance_elements() {
     let result = compile_and_run(
-        r#"
+        r"
         let summary = 0;
         class Base {
             constructor() {
@@ -1988,7 +1988,7 @@ fn phase6_derived_constructors_bind_this_once_and_initialize_instance_elements()
 
         new Derived();
         summary;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(6));
@@ -1997,7 +1997,7 @@ fn phase6_derived_constructors_bind_this_once_and_initialize_instance_elements()
 #[test]
 fn phase6_derived_constructors_resolve_outer_lexical_bindings_with_forced_environment() {
     let result = compile_and_run(
-        r#"
+        r"
         let source = { c: 3, d: 4 };
 
         class Base {
@@ -2013,7 +2013,7 @@ fn phase6_derived_constructors_resolve_outer_lexical_bindings_with_forced_enviro
         }
 
         new Derived().total;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(9));
@@ -2048,7 +2048,7 @@ fn phase6_super_property_set_is_a_strict_reference() {
 #[test]
 fn phase6_derived_constructors_reject_primitive_return_before_super() {
     let result = compile_and_run(
-        r#"
+        r"
         let failed = false;
         class Base {}
         class Derived extends Base {
@@ -2063,7 +2063,7 @@ fn phase6_derived_constructors_reject_primitive_return_before_super() {
             failed = true;
         }
         failed;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_bool(true));
@@ -2113,7 +2113,7 @@ fn phase6_derived_super_call_selects_constructor_before_evaluating_arguments() {
 #[test]
 fn phase6_default_derived_constructors_call_super_and_initialize_fields() {
     let result = compile_and_run(
-        r#"
+        r"
         class Base {
             constructor() {
                 this.base = 1;
@@ -2126,7 +2126,7 @@ fn phase6_default_derived_constructors_call_super_and_initialize_fields() {
 
         let value = new Derived();
         value.base + value.extra;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -2135,7 +2135,7 @@ fn phase6_default_derived_constructors_call_super_and_initialize_fields() {
 #[test]
 fn phase6_default_derived_constructors_forward_arguments_to_super() {
     let result = compile_and_run(
-        r#"
+        r"
         class Base {
             constructor(value) {
                 return value;
@@ -2146,7 +2146,7 @@ fn phase6_default_derived_constructors_forward_arguments_to_super() {
 
         let object = {};
         new Derived(object) === object;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_bool(true));

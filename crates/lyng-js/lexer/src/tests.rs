@@ -658,7 +658,10 @@ fn template_with_lone_surrogate_escape_preserves_utf16() {
     let id = literal_id(&tok);
     let chunk = lexer.literals.get_template(id);
     assert_eq!(
-        chunk.cooked.as_ref().map(|value| value.code_units()),
+        chunk
+            .cooked
+            .as_ref()
+            .map(super::literals::StringLiteral::code_units),
         Some(vec![0xDC38])
     );
     assert_eq!(chunk.raw, "\\uDC38");

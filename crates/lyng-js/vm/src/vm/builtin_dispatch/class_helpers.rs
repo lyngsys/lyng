@@ -1,4 +1,9 @@
-use super::*;
+use super::{
+    errors, object, Agent, AllocationLifetime, ClassPrivateElementKind, EnvironmentLayout,
+    EnvironmentLayoutKind, FrameRecord, FunctionEntryIdentity, FunctionThisMode, HostHooks,
+    NativeFunctionRegistry, ObjectRef, PropertyDescriptor, ThisBindingStatus, ThisState, Value, Vm,
+    VmError, VmResult,
+};
 
 mod private_fields;
 mod super_ops;
@@ -160,11 +165,11 @@ impl Vm {
         let outer = agent
             .objects()
             .function_data(function)
-            .and_then(|data| data.environment())
+            .and_then(lyng_js_objects::FunctionObjectData::environment)
             .or_else(|| {
                 agent
                     .current_execution_context()
-                    .map(|context| context.lexical_env())
+                    .map(lyng_js_env::ExecutionContext::lexical_env)
             })
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let layout = agent.alloc_environment_layout(EnvironmentLayout::empty(
@@ -173,7 +178,7 @@ impl Vm {
         ));
         let new_target = agent
             .current_execution_context()
-            .and_then(|context| context.new_target());
+            .and_then(lyng_js_env::ExecutionContext::new_target);
         let env = agent
             .alloc_function_environment(
                 Some(outer),

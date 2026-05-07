@@ -5,7 +5,7 @@ use lyng_js_types::RealmRef;
 
 impl Agent {
     #[cfg(test)]
-    pub(crate) fn set_next_job_id_for_test(&mut self, next_job_id: u32) {
+    pub(crate) const fn set_next_job_id_for_test(&mut self, next_job_id: u32) {
         self.next_job_id = next_job_id;
     }
 

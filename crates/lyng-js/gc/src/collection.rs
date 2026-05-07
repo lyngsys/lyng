@@ -7,7 +7,7 @@ use crate::{
 };
 use std::mem::size_of;
 
-pub(crate) const DEFAULT_COLLECTION_BUDGET_BYTES: usize = 1024;
+pub const DEFAULT_COLLECTION_BUDGET_BYTES: usize = 1024;
 const COLLECTION_GROWTH_FACTOR: usize = 2;
 
 /// Accounting summary for one primitive heap domain.
@@ -119,12 +119,12 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub fn collection_budget_bytes(&self) -> usize {
+    pub const fn collection_budget_bytes(&self) -> usize {
         self.collection_budget_bytes
     }
 
     #[inline]
-    pub fn set_collection_budget_bytes(&mut self, bytes: usize) {
+    pub const fn set_collection_budget_bytes(&mut self, bytes: usize) {
         self.collection_budget_bytes = bytes;
     }
 
@@ -199,7 +199,7 @@ impl PrimitiveHeap {
     }
 }
 
-fn domain_accounting<Record>(stats: PrimitiveDomainStats) -> PrimitiveDomainAccounting {
+const fn domain_accounting<Record>(stats: PrimitiveDomainStats) -> PrimitiveDomainAccounting {
     let slot_bytes = size_of::<Record>();
 
     PrimitiveDomainAccounting {
@@ -211,7 +211,7 @@ fn domain_accounting<Record>(stats: PrimitiveDomainStats) -> PrimitiveDomainAcco
     }
 }
 
-fn merge_domain_accounting(
+const fn merge_domain_accounting(
     left: PrimitiveDomainAccounting,
     right: PrimitiveDomainAccounting,
 ) -> PrimitiveDomainAccounting {

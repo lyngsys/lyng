@@ -9,7 +9,7 @@ use crate::error::VmResult;
 use crate::{RegisterWindow, VmError};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct ForInStateTable {
+pub struct ForInStateTable {
     states: HashMap<u32, ForInEnumerator>,
 }
 
@@ -99,7 +99,7 @@ fn slot_key(register_base: u32, enumerator_register: u16) -> u32 {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct IteratorStateTable {
+pub struct IteratorStateTable {
     states: HashMap<u32, IteratorRecord>,
 }
 
@@ -142,7 +142,7 @@ impl IteratorStateTable {
                 drained.push((
                     u16::try_from(register.saturating_sub(start))
                         .expect("iterator register offset should fit into u16"),
-                    iterator.clone(),
+                    *iterator,
                 ));
             }
             keep

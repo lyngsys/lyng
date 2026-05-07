@@ -20,7 +20,7 @@ pub const NAMED_PROPERTY_CHURN_DICTIONARY_THRESHOLD: u32 = 3;
 /// Dense elements switch to sparse mode when a single write would create a gap
 /// beyond this checked-in threshold.
 pub const DENSE_ELEMENT_SPARSE_GAP_THRESHOLD: u32 = 16;
-pub(crate) const MIN_DENSE_ELEMENT_CAPACITY: usize = 4;
+pub const MIN_DENSE_ELEMENT_CAPACITY: usize = 4;
 const PROXY_TARGET_SLOT_INDEX: u32 = 0;
 const PROXY_HANDLER_SLOT_INDEX: u32 = 1;
 
@@ -190,10 +190,10 @@ impl ObjectRuntime {
 
         let metadata = self.take_shape_metadata(id)?;
         if let Some(parent) = shape.parent() {
-            if let Some(parent_metadata) = self.shape_metadata_mut(parent) {
-                if let Some(transition_key) = metadata.transition_key {
-                    parent_metadata.transitions.remove(&transition_key);
-                }
+            if let Some(parent_metadata) = self.shape_metadata_mut(parent)
+                && let Some(transition_key) = metadata.transition_key
+            {
+                parent_metadata.transitions.remove(&transition_key);
             }
         } else {
             self.root_shapes.remove(&RootShapeKey {
@@ -528,7 +528,8 @@ impl ObjectRuntime {
         id: ObjectRef,
     ) -> Option<Value> {
         let payload = heap.object(id)?.ordinary_payload()?;
-        heap.value_cell(payload).map(|cell| cell.stored_value())
+        heap.value_cell(payload)
+            .map(lyng_js_gc::PrimitiveValueCellRecord::stored_value)
     }
 
     pub fn is_date_object(&self, id: ObjectRef) -> bool {
@@ -917,7 +918,7 @@ impl ObjectRuntime {
         let payload = match heap
             .view()
             .object(id)
-            .and_then(|record| record.ordinary_payload())
+            .and_then(lyng_js_gc::RuntimeObjectRecord::ordinary_payload)
         {
             Some(payload) => payload,
             None => return false,

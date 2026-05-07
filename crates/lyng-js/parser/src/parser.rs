@@ -88,19 +88,19 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Returns the current token kind.
     #[inline]
-    pub fn current_kind(&self) -> TokenKind {
+    pub const fn current_kind(&self) -> TokenKind {
         self.current.kind
     }
 
     /// Returns the current token.
     #[inline]
-    pub fn current(&self) -> Token {
+    pub const fn current(&self) -> Token {
         self.current
     }
 
     /// Returns the span of the current token.
     #[inline]
-    pub fn current_span(&self) -> Span {
+    pub const fn current_span(&self) -> Span {
         self.current.span
     }
 
@@ -113,57 +113,57 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Returns a reference to the lexer (for accessing literal tables).
     #[inline]
-    pub fn lexer(&self) -> &Lexer<'src, 'atoms> {
+    pub const fn lexer(&self) -> &Lexer<'src, 'atoms> {
         &self.lexer
     }
 
     /// Returns a mutable reference to the lexer (for rewind/mode changes).
     #[inline]
     #[allow(dead_code)]
-    pub fn lexer_mut(&mut self) -> &mut Lexer<'src, 'atoms> {
+    pub const fn lexer_mut(&mut self) -> &mut Lexer<'src, 'atoms> {
         &mut self.lexer
     }
 
     /// Returns a mutable reference to the AST.
     #[inline]
-    pub fn ast_mut(&mut self) -> &mut Ast {
+    pub const fn ast_mut(&mut self) -> &mut Ast {
         &mut self.ast
     }
 
     /// Returns a reference to the AST.
     #[inline]
-    pub fn ast(&self) -> &Ast {
+    pub const fn ast(&self) -> &Ast {
         &self.ast
     }
 
     #[inline]
-    pub fn is_strict(&self) -> bool {
+    pub const fn is_strict(&self) -> bool {
         self.strict
     }
 
     #[inline]
     #[allow(dead_code)]
-    pub fn is_module(&self) -> bool {
+    pub const fn is_module(&self) -> bool {
         self.is_module
     }
 
     #[inline]
-    pub fn no_in(&self) -> bool {
+    pub const fn no_in(&self) -> bool {
         self.no_in
     }
 
     #[inline]
-    pub fn in_function(&self) -> bool {
+    pub const fn in_function(&self) -> bool {
         self.in_function
     }
 
     #[inline]
-    pub fn in_iteration(&self) -> bool {
+    pub const fn in_iteration(&self) -> bool {
         self.in_iteration
     }
 
     #[inline]
-    pub fn in_switch(&self) -> bool {
+    pub const fn in_switch(&self) -> bool {
         self.in_switch
     }
 
@@ -172,45 +172,45 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     // -----------------------------------------------------------------------
 
     #[inline]
-    pub fn set_strict(&mut self, v: bool) {
+    pub const fn set_strict(&mut self, v: bool) {
         self.strict = v;
     }
 
     #[inline]
-    pub fn set_module(&mut self, v: bool) {
+    pub const fn set_module(&mut self, v: bool) {
         self.is_module = v;
         self.lexer.set_allow_html_comments(!v);
     }
 
     #[inline]
-    pub fn set_no_in(&mut self, v: bool) {
+    pub const fn set_no_in(&mut self, v: bool) {
         self.no_in = v;
     }
 
     #[inline]
     #[allow(dead_code)]
-    pub fn set_allow_yield(&mut self, v: bool) {
+    pub const fn set_allow_yield(&mut self, v: bool) {
         self.allow_yield = v;
     }
 
     #[inline]
     #[allow(dead_code)]
-    pub fn set_allow_await(&mut self, v: bool) {
+    pub const fn set_allow_await(&mut self, v: bool) {
         self.allow_await = v;
     }
 
     #[inline]
-    pub fn set_in_function(&mut self, v: bool) {
+    pub const fn set_in_function(&mut self, v: bool) {
         self.in_function = v;
     }
 
     #[inline]
-    pub fn set_in_iteration(&mut self, v: bool) {
+    pub const fn set_in_iteration(&mut self, v: bool) {
         self.in_iteration = v;
     }
 
     #[inline]
-    pub fn set_in_switch(&mut self, v: bool) {
+    pub const fn set_in_switch(&mut self, v: bool) {
         self.in_switch = v;
     }
 
@@ -296,13 +296,13 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Returns true if the current token was preceded by a line terminator.
     #[inline]
-    pub fn preceded_by_line_terminator(&self) -> bool {
+    pub const fn preceded_by_line_terminator(&self) -> bool {
         self.current.preceded_by_line_terminator()
     }
 
     /// Sets the lexer mode for the next token scan.
     #[inline]
-    pub fn set_lexer_mode(&mut self, mode: LexerMode) {
+    pub const fn set_lexer_mode(&mut self, mode: LexerMode) {
         self.lexer.set_mode(mode);
     }
 
@@ -317,7 +317,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Returns the atom ID of the current token if it carries one.
     #[inline]
-    pub fn current_atom(&self) -> Option<AtomId> {
+    pub const fn current_atom(&self) -> Option<AtomId> {
         match self.current.payload {
             TokenPayload::Atom(id) => Some(id),
             _ => None,
@@ -325,12 +325,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     #[inline]
-    pub(crate) fn enter_statement_list(&mut self) {
+    pub(crate) const fn enter_statement_list(&mut self) {
         self.statement_list_depth += 1;
     }
 
     #[inline]
-    pub(crate) fn exit_statement_list(&mut self) {
+    pub(crate) const fn exit_statement_list(&mut self) {
         self.statement_list_depth = self.statement_list_depth.saturating_sub(1);
     }
 
@@ -348,7 +348,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     #[inline]
-    pub(crate) fn in_program_statement_list(&self) -> bool {
+    pub(crate) const fn in_program_statement_list(&self) -> bool {
         self.statement_list_depth == 1 && !self.in_function && !self.in_static_block
     }
 
@@ -447,7 +447,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     /// Returns true if the current token is an identifier or a contextual
     /// keyword that can be used as an identifier in the current context.
     #[allow(dead_code)]
-    pub fn at_identifier(&self) -> bool {
+    pub const fn at_identifier(&self) -> bool {
         match self.current.kind {
             TokenKind::Identifier => true,
             TokenKind::Yield if !self.allow_yield => true,
@@ -458,7 +458,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Returns true if the current token can be used as an `IdentifierReference`
     /// in the current parse context.
-    pub fn at_identifier_reference(&self) -> bool {
+    pub const fn at_identifier_reference(&self) -> bool {
         match self.current.kind {
             TokenKind::Identifier => true,
             TokenKind::Yield => !self.allow_yield && !self.strict,
@@ -495,7 +495,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         self.parse_binding_identifier_with_strict(self.strict)
     }
 
-    pub fn at_binding_identifier_in_context(&self, strict_context: bool) -> bool {
+    pub const fn at_binding_identifier_in_context(&self, strict_context: bool) -> bool {
         match self.current.kind {
             TokenKind::Identifier => true,
             TokenKind::Yield => !self.allow_yield && !strict_context,
@@ -533,7 +533,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Returns true if the current token may be used as a function expression
     /// name in the current context.
-    pub fn at_function_expression_name(&self) -> bool {
+    pub const fn at_function_expression_name(&self) -> bool {
         match self.current.kind {
             TokenKind::Identifier => true,
             TokenKind::Yield => !self.strict,
@@ -574,7 +574,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Returns true if the current token can be used as a `LabelIdentifier`
     /// in the current parse context.
-    pub fn at_label_identifier(&self) -> bool {
+    pub const fn at_label_identifier(&self) -> bool {
         match self.current.kind {
             TokenKind::Identifier => true,
             TokenKind::Yield => !self.allow_yield && !self.strict,
@@ -821,11 +821,11 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Converts the current keyword token to its atom ID.
     /// Used for property names where keywords are valid identifiers.
-    pub fn keyword_to_atom(&self) -> AtomId {
+    pub const fn keyword_to_atom(&self) -> AtomId {
         Self::keyword_kind_to_atom(self.current.kind)
     }
 
-    fn keyword_kind_to_atom(kind: TokenKind) -> AtomId {
+    const fn keyword_kind_to_atom(kind: TokenKind) -> AtomId {
         // Map keyword TokenKind → WellKnownAtom discriminant (1..=38)
         let idx = match kind {
             TokenKind::Await => 1,
@@ -939,7 +939,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     #[inline]
-    pub(crate) fn allows_annex_b_sloppy_function_declarations(&self) -> bool {
+    pub(crate) const fn allows_annex_b_sloppy_function_declarations(&self) -> bool {
         !self.is_strict() && !self.is_module
     }
 

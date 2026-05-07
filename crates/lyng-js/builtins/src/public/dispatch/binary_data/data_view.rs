@@ -1042,8 +1042,8 @@ fn data_view_set_big_uint64_builtin<Cx: PublicBuiltinDispatchContext>(
 /// finite results, so any quiet NaN bit pattern is acceptable.
 fn float16_bits_to_f64(bits: u16) -> f64 {
     let sign = (bits >> 15) & 0x1;
-    let exp = ((bits >> 10) & 0x1F) as i32;
-    let mant = (bits & 0x3FF) as u32;
+    let exp = i32::from((bits >> 10) & 0x1F);
+    let mant = u32::from(bits & 0x3FF);
 
     let sign_bit_f64: u64 = u64::from(sign) << 63;
 
@@ -1093,7 +1093,7 @@ fn float16_bits_to_f64(bits: u16) -> f64 {
 /// Overflow rounds to sign-preserved Infinity (`exp = 0x1F`, `mant = 0`).
 /// Underflow rounds to sign-preserved zero. NaN inputs yield a canonical
 /// quiet NaN.
-fn f64_to_float16_bits(value: f64) -> u16 {
+const fn f64_to_float16_bits(value: f64) -> u16 {
     let bits = value.to_bits();
     let sign16: u16 = ((bits >> 63) as u16) & 0x1;
     let exp64 = ((bits >> 52) & 0x7FF) as i32;
@@ -1174,7 +1174,7 @@ fn f64_to_float16_bits(value: f64) -> u16 {
 /// `shift` is the number of bits to discard. Returns the rounded high-half of
 /// the value. The caller guarantees `signif` has its bit 52 set (or, for
 /// subnormal codepaths, that the value is non-zero).
-fn round_shift_signif(signif: u64, shift: u32) -> u64 {
+const fn round_shift_signif(signif: u64, shift: u32) -> u64 {
     if shift == 0 {
         return signif;
     }

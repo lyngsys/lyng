@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    code_index, Agent, AllocationLifetime, AtomId, DirectEvalEnvironmentState, EnvironmentLayoutId,
+    EnvironmentRef, FrameRecord, Vm, VmError, VmResult,
+};
 use lyng_js_bytecode::DirectEvalSiteFlags;
 use lyng_js_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
@@ -183,26 +186,25 @@ impl Vm {
                     return Err(VmError::MissingEnvironment(environment));
                 }
             }
-            if let Some(name) = scope.annex_b_catch_name() {
-                if let Some((index, _)) = scope
+            if let Some(name) = scope.annex_b_catch_name()
+                && let Some((index, _)) = scope
                     .bindings()
                     .iter()
                     .enumerate()
                     .find(|(_, binding)| binding.name() == Some(name))
-                {
-                    let cloned_slot = u32::try_from(index).unwrap_or(u32::MAX);
-                    let source_slot = scope
-                        .source_base()
-                        .checked_add(cloned_slot)
-                        .ok_or(VmError::MissingEnvironment(source_environment))?;
-                    annex_b_catch_environments.push((
-                        source_environment,
-                        source_slot,
-                        environment,
-                        cloned_slot,
-                        name,
-                    ));
-                }
+            {
+                let cloned_slot = u32::try_from(index).unwrap_or(u32::MAX);
+                let source_slot = scope
+                    .source_base()
+                    .checked_add(cloned_slot)
+                    .ok_or(VmError::MissingEnvironment(source_environment))?;
+                annex_b_catch_environments.push((
+                    source_environment,
+                    source_slot,
+                    environment,
+                    cloned_slot,
+                    name,
+                ));
             }
             current_outer = environment;
         }

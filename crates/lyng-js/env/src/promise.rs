@@ -279,7 +279,7 @@ pub struct PromiseCombinatorRecord {
 
 impl PromiseCombinatorRecord {
     #[inline]
-    pub fn new(kind: PromiseCombinatorKind, capability: PromiseCapabilityId) -> Self {
+    pub const fn new(kind: PromiseCombinatorKind, capability: PromiseCapabilityId) -> Self {
         Self {
             kind,
             capability,
@@ -372,7 +372,7 @@ pub struct PromiseRecord {
 
 impl PromiseRecord {
     #[inline]
-    pub fn new(object: ObjectRef, realm: RealmRef) -> Self {
+    pub const fn new(object: ObjectRef, realm: RealmRef) -> Self {
         Self {
             object,
             realm,
@@ -421,7 +421,7 @@ impl PromiseRecord {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct AgentPromiseTables {
+pub struct AgentPromiseTables {
     promises: Vec<Option<PromiseRecord>>,
     promise_by_object: Vec<Option<PromiseId>>,
     reactions: Vec<Option<PromiseReactionRecord>>,

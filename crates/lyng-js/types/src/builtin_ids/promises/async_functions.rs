@@ -1,9 +1,6 @@
-use super::super::*;
+use super::super::{builtin_id, BuiltinFunctionId};
 
 #[inline]
-pub fn async_function_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(ASYNC_FUNCTION_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn async_function_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::ASYNC_FUNCTION_RAW)
 }

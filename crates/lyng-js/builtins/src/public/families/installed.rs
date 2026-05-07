@@ -28,7 +28,7 @@ pub(in crate::public) struct InstalledBuiltinFamilies {
 
 impl InstalledBuiltinFamilies {
     #[allow(clippy::too_many_lines)]
-    pub(in crate::public) fn public_realm_builtins(self) -> PublicRealmBuiltins {
+    pub(in crate::public) const fn public_realm_builtins(self) -> PublicRealmBuiltins {
         let Self {
             object: object_family,
             function: function_family,

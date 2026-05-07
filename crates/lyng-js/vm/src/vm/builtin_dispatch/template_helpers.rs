@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    alloc_string, errors, Agent, AllocationLifetime, FrameRecord, HostHooks,
+    NativeFunctionRegistry, PropertyKey, TemplateCacheKey, Value, Vm, VmError, VmResult,
+    WellKnownAtom,
+};
 
 impl Vm {
     pub(super) fn template_to_string_builtin(
@@ -34,11 +38,10 @@ impl Vm {
             to_string,
             Value::from_object_ref(object),
             &[],
-        )? {
-            if !result.is_object() {
-                let text = self.value_to_string_text(agent, result)?;
-                return Ok(Value::from_string_ref(alloc_string(agent, &text, None)));
-            }
+        )? && !result.is_object()
+        {
+            let text = self.value_to_string_text(agent, result)?;
+            return Ok(Value::from_string_ref(alloc_string(agent, &text, None)));
         }
 
         let value_of = self.get_property_from_object(
@@ -58,11 +61,10 @@ impl Vm {
             value_of,
             Value::from_object_ref(object),
             &[],
-        )? {
-            if !result.is_object() {
-                let text = self.value_to_string_text(agent, result)?;
-                return Ok(Value::from_string_ref(alloc_string(agent, &text, None)));
-            }
+        )? && !result.is_object()
+        {
+            let text = self.value_to_string_text(agent, result)?;
+            return Ok(Value::from_string_ref(alloc_string(agent, &text, None)));
         }
 
         Err(VmError::Abrupt(errors::throw_type_error(agent)))

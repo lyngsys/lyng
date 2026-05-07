@@ -1,4 +1,6 @@
-use super::*;
+use super::{
+    Agent, FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef, Value, Vm, VmError, VmResult,
+};
 use crate::vm::property_access::VmProxyBridge;
 use lyng_js_ops::{errors, object, proxy};
 use lyng_js_types::PropertyDescriptor;
@@ -213,8 +215,7 @@ impl Vm {
         let prior_register_len = self.register_stack.len();
         let derived_construct = Self::bytecode_entry(agent, callee)
             .and_then(|code| self.installed_function(code))
-            .map(|function| function.flags().derived_class_constructor())
-            .unwrap_or(false);
+            .is_some_and(|function| function.flags().derived_class_constructor());
         let construct_this = if derived_construct {
             None
         } else {

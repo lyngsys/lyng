@@ -131,7 +131,7 @@ pub struct ProgramSemaView<'a> {
     pub direct_eval_allows_super: bool,
 }
 
-impl<'a> ProgramSemaView<'a> {
+impl ProgramSemaView<'_> {
     #[inline]
     pub fn pattern_binding(&self, pattern: PatternId) -> Option<SemanticBindingId> {
         self.pattern_bindings

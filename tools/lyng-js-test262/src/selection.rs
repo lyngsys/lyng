@@ -5,7 +5,7 @@ use crate::helpers::HelperCatalog;
 use crate::metadata::{is_module_test, TestMetadata};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ProposalStage {
+pub enum ProposalStage {
     Stage4,
     Stage3,
     Stage2_7,
@@ -105,26 +105,26 @@ const SUPPORTED_FEATURE_PREFIXES: &[(&str, &[&str])] = &[
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ExclusionManifest {
+pub struct ExclusionManifest {
     pub(crate) path: String,
     pub(crate) rules: Vec<ExclusionRule>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ExclusionRule {
+pub struct ExclusionRule {
     pub(crate) kind: ExclusionKind,
     pub(crate) pattern: String,
     pub(crate) reason: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ExclusionKind {
+pub enum ExclusionKind {
     SuitePrefix,
     Path,
 }
 
 impl ExclusionKind {
-    pub(crate) fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::SuitePrefix => "suite",
             Self::Path => "path",
@@ -133,22 +133,19 @@ impl ExclusionKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum SkipDecision {
+pub enum SkipDecision {
     ExcludedFromSelection(String),
     Skip(String),
 }
 
-pub(crate) fn disabled_manifest(configured_path: &str) -> ExclusionManifest {
+pub fn disabled_manifest(configured_path: &str) -> ExclusionManifest {
     ExclusionManifest {
         path: format!("disabled via --no-skip (configured path: {configured_path})"),
         rules: Vec::new(),
     }
 }
 
-pub(crate) fn select_test_paths(
-    filter: Option<&str>,
-    test_dir: &Path,
-) -> Result<Vec<PathBuf>, String> {
+pub fn select_test_paths(filter: Option<&str>, test_dir: &Path) -> Result<Vec<PathBuf>, String> {
     if let Some(filter) = filter {
         let relative_candidate = test_dir.join(filter);
         if relative_candidate.exists() {
@@ -184,7 +181,7 @@ pub(crate) fn select_test_paths(
     Ok(collect_tests(test_dir))
 }
 
-pub(crate) fn category_for_test(path: &Path, test_dir: &Path) -> String {
+pub fn category_for_test(path: &Path, test_dir: &Path) -> String {
     let relative = path.strip_prefix(test_dir).unwrap_or(path);
     let mut parts = Vec::new();
     for component in relative.components().take(1) {
@@ -199,14 +196,14 @@ pub(crate) fn category_for_test(path: &Path, test_dir: &Path) -> String {
     }
 }
 
-pub(crate) fn relative_test_path(path: &Path, test_dir: &Path) -> String {
+pub fn relative_test_path(path: &Path, test_dir: &Path) -> String {
     path.strip_prefix(test_dir)
         .unwrap_or(path)
         .display()
         .to_string()
 }
 
-pub(crate) fn skip_decision(
+pub fn skip_decision(
     path: &Path,
     test_dir: &Path,
     manifest: &ExclusionManifest,
@@ -228,7 +225,7 @@ pub(crate) fn skip_decision(
     skip_reason(path, test_dir, manifest, metadata, helpers).map(SkipDecision::Skip)
 }
 
-pub(crate) fn load_manifest(
+pub fn load_manifest(
     workspace_root: &Path,
     manifest_path: &str,
 ) -> Result<ExclusionManifest, String> {
@@ -275,12 +272,11 @@ fn collect_tests(dir: &Path) -> Vec<PathBuf> {
             let path = entry.path();
             if path.is_dir() {
                 tests.extend(collect_tests(&path));
-            } else if path.extension().is_some_and(|ext| ext == "js") {
-                if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
-                    if !name.contains("_FIXTURE") {
-                        tests.push(path);
-                    }
-                }
+            } else if path.extension().is_some_and(|ext| ext == "js")
+                && let Some(name) = path.file_name().and_then(|name| name.to_str())
+                && !name.contains("_FIXTURE")
+            {
+                tests.push(path);
             }
         }
     }

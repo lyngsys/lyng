@@ -113,7 +113,7 @@ impl AgentCluster {
     }
 
     #[cfg(test)]
-    pub(crate) fn set_next_agent_id_for_test(&mut self, next_agent_id: u32) {
+    pub(crate) const fn set_next_agent_id_for_test(&mut self, next_agent_id: u32) {
         self.next_agent_id = next_agent_id;
     }
 
@@ -122,9 +122,7 @@ impl AgentCluster {
         owner: AgentId,
         byte_length: usize,
     ) -> Option<BackingStoreRef> {
-        if self.agent(owner).is_none() {
-            return None;
-        }
+        self.agent(owner)?;
         let Some(backing_store) = self
             .backing_stores
             .borrow_mut()

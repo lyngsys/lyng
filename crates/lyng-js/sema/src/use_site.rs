@@ -43,7 +43,7 @@ pub struct UseSiteTable {
 }
 
 impl UseSiteTable {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             records: Vec::new(),
         }
@@ -69,12 +69,12 @@ impl UseSiteTable {
 
     /// Returns the number of use sites.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.records.len()
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
 

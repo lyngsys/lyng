@@ -7,7 +7,7 @@ use lyng_js_types::EnvironmentRef;
 use crate::RegisterWindow;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum CapturedNameTarget {
+pub enum CapturedNameTarget {
     EnvironmentSlot {
         environment: EnvironmentRef,
         slot: u32,
@@ -24,7 +24,7 @@ pub(crate) enum CapturedNameTarget {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct CapturedNameReference {
+pub struct CapturedNameReference {
     name: AtomId,
     target: CapturedNameTarget,
 }
@@ -47,7 +47,7 @@ impl CapturedNameReference {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct CapturedNameReferenceTable {
+pub struct CapturedNameReferenceTable {
     states: HashMap<u32, CapturedNameReference>,
 }
 

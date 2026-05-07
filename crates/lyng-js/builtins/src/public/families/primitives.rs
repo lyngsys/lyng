@@ -777,7 +777,7 @@ impl PrimitiveDescriptorAtoms {
     }
 }
 
-fn number_static_method_specs(
+const fn number_static_method_specs(
     atoms: &PrimitiveDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 6] {
     [
@@ -790,7 +790,7 @@ fn number_static_method_specs(
     ]
 }
 
-fn number_prototype_method_specs(
+const fn number_prototype_method_specs(
     atoms: &PrimitiveDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 6] {
     [
@@ -803,7 +803,7 @@ fn number_prototype_method_specs(
     ]
 }
 
-fn math_method_specs(atoms: &PrimitiveDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 37] {
+const fn math_method_specs(atoms: &PrimitiveDescriptorAtoms) -> [(AtomId, BuiltinFunctionId); 37] {
     [
         (atoms.abs, math_abs_builtin()),
         (atoms.acos, math_acos_builtin()),
@@ -845,7 +845,7 @@ fn math_method_specs(atoms: &PrimitiveDescriptorAtoms) -> [(AtomId, BuiltinFunct
     ]
 }
 
-fn bigint_static_method_specs(
+const fn bigint_static_method_specs(
     atoms: &PrimitiveDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 2] {
     [
@@ -854,7 +854,7 @@ fn bigint_static_method_specs(
     ]
 }
 
-fn symbol_static_method_specs(
+const fn symbol_static_method_specs(
     atoms: &PrimitiveDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 2] {
     [

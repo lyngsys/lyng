@@ -69,13 +69,13 @@ pub fn parse_script_with_initial_strict(
     if !strict && parser.at(TokenKind::StringLiteral) {
         // Check if this is a "use strict" directive
         let token = parser.current();
-        if !token.contains_escape() {
-            if let TokenPayload::Literal(lit_id) = token.payload {
-                let lit = parser.lexer().literals.get_string(lit_id);
-                if lit.equals_text("use strict") {
-                    strict = true;
-                    parser.set_strict(true);
-                }
+        if !token.contains_escape()
+            && let TokenPayload::Literal(lit_id) = token.payload
+        {
+            let lit = parser.lexer().literals.get_string(lit_id);
+            if lit.equals_text("use strict") {
+                strict = true;
+                parser.set_strict(true);
             }
         }
     }

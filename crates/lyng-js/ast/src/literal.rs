@@ -124,7 +124,7 @@ impl Default for LiteralTable {
 
 impl LiteralTable {
     /// Creates an empty literal table.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             strings: Vec::new(),
             bigints: Vec::new(),

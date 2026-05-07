@@ -212,24 +212,21 @@ fn parse_import_expression_second_argument_allows_in_operator() {
     if let Stmt::For {
         init: Some(init), ..
     } = p.ast.get_stmt(stmts[0])
+        && let lyng_js_ast::ForInit::Declaration(decl) = init
+        && let lyng_js_ast::Decl::Variable { declarators, .. } = p.ast.get_decl(*decl)
     {
-        if let lyng_js_ast::ForInit::Declaration(decl) = init {
-            if let lyng_js_ast::Decl::Variable { declarators, .. } = p.ast.get_decl(*decl) {
-                let declarators = p.ast.get_var_declarator_list(*declarators).to_vec();
-                assert_eq!(declarators.len(), 1);
-                let initializer = declarators[0]
-                    .init
-                    .expect("for-init declarator should keep its initializer");
-                if let Expr::ImportExpression { options, .. } = p.ast.get_expr(initializer) {
-                    let options =
-                        options.expect("import expression should keep its options argument");
-                    assert!(matches!(
-                        p.ast.get_expr(options),
-                        Expr::LogicalExpression { .. }
-                    ));
-                    return;
-                }
-            }
+        let declarators = p.ast.get_var_declarator_list(*declarators).to_vec();
+        assert_eq!(declarators.len(), 1);
+        let initializer = declarators[0]
+            .init
+            .expect("for-init declarator should keep its initializer");
+        if let Expr::ImportExpression { options, .. } = p.ast.get_expr(initializer) {
+            let options = options.expect("import expression should keep its options argument");
+            assert!(matches!(
+                p.ast.get_expr(options),
+                Expr::LogicalExpression { .. }
+            ));
+            return;
         }
     }
     panic!("expected import expression with an options argument");
@@ -248,21 +245,20 @@ fn parse_exponentiation() {
     // ** is right-associative: 2 ** 3 ** 2 = 2 ** (3 ** 2)
     let p = script_ok("2 ** 3 ** 2;");
     let stmts = body(&p);
-    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Expr::BinaryExpression {
+    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0])
+        && let Expr::BinaryExpression {
             operator, right, ..
         } = p.ast.get_expr(*expression)
-        {
-            assert_eq!(*operator, BinaryOp::Exp);
-            // Right should also be **
-            assert!(matches!(
-                p.ast.get_expr(*right),
-                Expr::BinaryExpression {
-                    operator: BinaryOp::Exp,
-                    ..
-                }
-            ));
-        }
+    {
+        assert_eq!(*operator, BinaryOp::Exp);
+        // Right should also be **
+        assert!(matches!(
+            p.ast.get_expr(*right),
+            Expr::BinaryExpression {
+                operator: BinaryOp::Exp,
+                ..
+            }
+        ));
     }
 }
 
@@ -270,10 +266,10 @@ fn parse_exponentiation() {
 fn parse_instanceof() {
     let p = script_ok("x instanceof Foo;");
     let stmts = body(&p);
-    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Expr::BinaryExpression { operator, .. } = p.ast.get_expr(*expression) {
-            assert_eq!(*operator, BinaryOp::Instanceof);
-        }
+    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0])
+        && let Expr::BinaryExpression { operator, .. } = p.ast.get_expr(*expression)
+    {
+        assert_eq!(*operator, BinaryOp::Instanceof);
     }
 }
 
@@ -281,10 +277,10 @@ fn parse_instanceof() {
 fn parse_in_operator() {
     let p = script_ok("'x' in obj;");
     let stmts = body(&p);
-    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Expr::BinaryExpression { operator, .. } = p.ast.get_expr(*expression) {
-            assert_eq!(*operator, BinaryOp::In);
-        }
+    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0])
+        && let Expr::BinaryExpression { operator, .. } = p.ast.get_expr(*expression)
+    {
+        assert_eq!(*operator, BinaryOp::In);
     }
 }
 
@@ -293,15 +289,15 @@ fn parse_void_delete() {
     let p = script_ok("void 0; delete obj.x;");
     let stmts = body(&p);
     assert_eq!(stmts.len(), 2);
-    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Expr::UnaryExpression { operator, .. } = p.ast.get_expr(*expression) {
-            assert_eq!(*operator, UnaryOp::Void);
-        }
+    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0])
+        && let Expr::UnaryExpression { operator, .. } = p.ast.get_expr(*expression)
+    {
+        assert_eq!(*operator, UnaryOp::Void);
     }
-    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[1]) {
-        if let Expr::UnaryExpression { operator, .. } = p.ast.get_expr(*expression) {
-            assert_eq!(*operator, UnaryOp::Delete);
-        }
+    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[1])
+        && let Expr::UnaryExpression { operator, .. } = p.ast.get_expr(*expression)
+    {
+        assert_eq!(*operator, UnaryOp::Delete);
     }
 }
 
@@ -339,15 +335,15 @@ fn parse_catch_without_param() {
 fn parse_spread_in_call() {
     let p = script_ok("f(...args);");
     let stmts = body(&p);
-    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Expr::CallExpression { arguments, .. } = p.ast.get_expr(*expression) {
-            let args = p.ast.get_expr_list(*arguments);
-            assert_eq!(args.len(), 1);
-            assert!(matches!(
-                p.ast.get_expr(args[0]),
-                Expr::SpreadElement { .. }
-            ));
-        }
+    if let Stmt::Expression { expression, .. } = p.ast.get_stmt(stmts[0])
+        && let Expr::CallExpression { arguments, .. } = p.ast.get_expr(*expression)
+    {
+        let args = p.ast.get_expr_list(*arguments);
+        assert_eq!(args.len(), 1);
+        assert!(matches!(
+            p.ast.get_expr(args[0]),
+            Expr::SpreadElement { .. }
+        ));
     }
 }
 
@@ -355,12 +351,12 @@ fn parse_spread_in_call() {
 fn parse_function_with_params() {
     let p = script_ok("function foo(a, b, c) { return a + b + c; }");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Function { function, .. } = p.ast.get_decl(*decl) {
-            let func = p.ast.get_function(*function);
-            let params = p.ast.get_pattern_list(func.params.params);
-            assert_eq!(params.len(), 3);
-        }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Function { function, .. } = p.ast.get_decl(*decl)
+    {
+        let func = p.ast.get_function(*function);
+        let params = p.ast.get_pattern_list(func.params.params);
+        assert_eq!(params.len(), 3);
     }
 }
 
@@ -368,12 +364,12 @@ fn parse_function_with_params() {
 fn parse_rest_parameter() {
     let p = script_ok("function foo(a, ...rest) {}");
     let stmts = body(&p);
-    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) {
-        if let Decl::Function { function, .. } = p.ast.get_decl(*decl) {
-            let func = p.ast.get_function(*function);
-            assert!(func.params.rest.is_some());
-            let params = p.ast.get_pattern_list(func.params.params);
-            assert_eq!(params.len(), 1);
-        }
+    if let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0])
+        && let Decl::Function { function, .. } = p.ast.get_decl(*decl)
+    {
+        let func = p.ast.get_function(*function);
+        assert!(func.params.rest.is_some());
+        let params = p.ast.get_pattern_list(func.params.params);
+        assert_eq!(params.len(), 1);
     }
 }

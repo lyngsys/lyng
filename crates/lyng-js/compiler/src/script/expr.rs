@@ -1,6 +1,9 @@
-use super::*;
+use super::{
+    bigint_builtin, Expr, ExprId, FeedbackSiteKind, FunctionCompiler, FunctionId, FunctionKind,
+    ImportExpressionPhase, LoweringError, LoweringResult, Opcode, SafepointKind, WellKnownAtom,
+};
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_expr_into(&mut self, expr_id: ExprId, dest: u16) -> LoweringResult<()> {
         let expr = self.ast().get_expr(expr_id).clone();
         match expr {
@@ -329,16 +332,17 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             for element in elements {
                 match element {
                     None => self.bump_array_literal_index(next_index, one)?,
-                    Some(element) => match self.ast().get_expr(element).clone() {
-                        Expr::SpreadElement { argument, .. } => {
+                    Some(element) => {
+                        if let Expr::SpreadElement { argument, .. } =
+                            self.ast().get_expr(element).clone()
+                        {
                             self.lower_array_spread_element(dest, next_index, one, argument)?;
-                        }
-                        _ => {
+                        } else {
                             let value_register = self.lower_expr_to_temp(element)?;
                             self.emit_set_keyed_property(dest, value_register, next_index)?;
                             self.bump_array_literal_index(next_index, one)?;
                         }
-                    },
+                    }
                 }
             }
             self.emit_set_property_by_atom(dest, next_index, WellKnownAtom::length.id())?;
@@ -348,22 +352,21 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             let Some(element) = element else {
                 continue;
             };
-            let value_register = match self.ast().get_expr(*element).clone() {
-                Expr::ArrayExpression { elements, .. } => {
-                    let array_register = self.array_literal_result_register(depth + 1)?;
-                    self.lower_array_expression_at_depth(
-                        *element,
-                        elements,
-                        array_register,
-                        depth + 1,
-                    )?;
-                    array_register
-                }
-                _ => {
-                    let value_register = self.array_literal_value_register(depth)?;
-                    self.lower_expr_into(*element, value_register)?;
-                    value_register
-                }
+            let value_register = if let Expr::ArrayExpression { elements, .. } =
+                self.ast().get_expr(*element).clone()
+            {
+                let array_register = self.array_literal_result_register(depth + 1)?;
+                self.lower_array_expression_at_depth(
+                    *element,
+                    elements,
+                    array_register,
+                    depth + 1,
+                )?;
+                array_register
+            } else {
+                let value_register = self.array_literal_value_register(depth)?;
+                self.lower_expr_into(*element, value_register)?;
+                value_register
             };
             let index = u16::try_from(index).map_err(|_| LoweringError::ConstantIndexOverflow {
                 index: u32::try_from(index).unwrap_or(u32::MAX),

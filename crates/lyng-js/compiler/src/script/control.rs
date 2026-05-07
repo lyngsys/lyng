@@ -1,6 +1,11 @@
-use super::*;
+use super::{
+    AtomId, CatchClause, CompletionKind, CompletionRegisters, ControlTarget, ControlTargetKind,
+    DeclarationKind, ExceptionHandler, ExceptionHandlerKind, Expr, ExprId, FinallyContext,
+    FunctionCompiler, FunctionKind, LoweringError, LoweringResult, Opcode, SafepointKind,
+    ScopeKind, Stmt, StmtId,
+};
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_return_statement(
         &mut self,
         argument: Option<ExprId>,

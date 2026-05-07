@@ -99,7 +99,7 @@ impl GlobalLexicalBindingPlan {
 
 impl GlobalScriptInstantiationPlan {
     #[inline]
-    pub fn new(
+    pub const fn new(
         lexical_names: Vec<Box<str>>,
         lexical_bindings: Vec<GlobalLexicalBindingPlan>,
         function_names: Vec<Box<str>>,
@@ -188,7 +188,7 @@ impl CompiledScriptUnit {
     }
 
     #[inline]
-    pub fn instantiation_plan(&self) -> &GlobalScriptInstantiationPlan {
+    pub const fn instantiation_plan(&self) -> &GlobalScriptInstantiationPlan {
         &self.instantiation_plan
     }
 
@@ -245,7 +245,7 @@ pub struct CompiledFunctionUnit {
 
 impl CompiledFunctionUnit {
     #[inline]
-    pub fn new(
+    pub const fn new(
         source: SourceId,
         entry: BytecodeFunctionId,
         functions: Vec<BytecodeFunction>,

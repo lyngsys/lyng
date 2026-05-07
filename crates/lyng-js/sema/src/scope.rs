@@ -67,7 +67,7 @@ pub struct ScopeTable {
 }
 
 impl ScopeTable {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { scopes: Vec::new() }
     }
 
@@ -92,12 +92,12 @@ impl ScopeTable {
 
     /// Returns the number of scopes.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.scopes.len()
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.scopes.is_empty()
     }
 

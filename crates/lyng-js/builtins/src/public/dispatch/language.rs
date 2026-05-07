@@ -85,7 +85,7 @@ fn to_int32(number: f64) -> i32 {
     }
 }
 
-fn is_ecmascript_whitespace(ch: char) -> bool {
+const fn is_ecmascript_whitespace(ch: char) -> bool {
     matches!(
         ch,
         '\u{0009}' | '\u{000B}' | '\u{000C}' | '\u{0020}' | '\u{00A0}' | '\u{1680}' | '\u{2000}'
@@ -164,20 +164,20 @@ fn parse_float_string(text: &str) -> f64 {
     if input.is_empty() {
         return f64::NAN;
     }
-    if let Some(rest) = input.strip_prefix("+Infinity") {
-        if rest.is_empty() || !rest.starts_with(['n', 'N']) {
-            return f64::INFINITY;
-        }
+    if let Some(rest) = input.strip_prefix("+Infinity")
+        && (rest.is_empty() || !rest.starts_with(['n', 'N']))
+    {
+        return f64::INFINITY;
     }
-    if let Some(rest) = input.strip_prefix("-Infinity") {
-        if rest.is_empty() || !rest.starts_with(['n', 'N']) {
-            return f64::NEG_INFINITY;
-        }
+    if let Some(rest) = input.strip_prefix("-Infinity")
+        && (rest.is_empty() || !rest.starts_with(['n', 'N']))
+    {
+        return f64::NEG_INFINITY;
     }
-    if let Some(rest) = input.strip_prefix("Infinity") {
-        if rest.is_empty() || !rest.starts_with(['n', 'N']) {
-            return f64::INFINITY;
-        }
+    if let Some(rest) = input.strip_prefix("Infinity")
+        && (rest.is_empty() || !rest.starts_with(['n', 'N']))
+    {
+        return f64::INFINITY;
     }
 
     let bytes = input.as_bytes();
@@ -233,7 +233,7 @@ fn parse_float_string(text: &str) -> f64 {
     input[..index].parse::<f64>().unwrap_or(f64::NAN)
 }
 
-fn is_uri_unescaped(component: bool, ch: char) -> bool {
+const fn is_uri_unescaped(component: bool, ch: char) -> bool {
     matches!(ch, 'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '!' | '~' | '*' | '\'' | '(' | ')')
         || (!component
             && matches!(
@@ -242,14 +242,14 @@ fn is_uri_unescaped(component: bool, ch: char) -> bool {
             ))
 }
 
-fn is_uri_reserved(ch: char) -> bool {
+const fn is_uri_reserved(ch: char) -> bool {
     matches!(
         ch,
         ';' | ',' | '/' | '?' | ':' | '@' | '&' | '=' | '+' | '$' | '#'
     )
 }
 
-fn uri_hex_value(byte: u8) -> Option<u8> {
+const fn uri_hex_value(byte: u8) -> Option<u8> {
     match byte {
         b'0'..=b'9' => Some(byte - b'0'),
         b'a'..=b'f' => Some(byte - b'a' + 10),
@@ -284,7 +284,7 @@ fn push_legacy_escape_unit(output: &mut String, unit: u16) {
     }
 }
 
-fn is_legacy_escape_unescaped(unit: u16) -> bool {
+const fn is_legacy_escape_unescaped(unit: u16) -> bool {
     matches!(
         unit,
         0x0041..=0x005A
@@ -328,19 +328,20 @@ fn legacy_unescape_units(units: &[u16]) -> Vec<u16> {
     let mut index = 0_usize;
     while index < units.len() {
         if units[index] == u16::from(b'%') {
-            if index + 5 < units.len() && units[index + 1] == u16::from(b'u') {
-                if let Some(unit) = legacy_unescape_hex_unit(units, index + 2, 4) {
-                    output.push(unit);
-                    index += 6;
-                    continue;
-                }
+            if index + 5 < units.len()
+                && units[index + 1] == u16::from(b'u')
+                && let Some(unit) = legacy_unescape_hex_unit(units, index + 2, 4)
+            {
+                output.push(unit);
+                index += 6;
+                continue;
             }
-            if index + 2 < units.len() {
-                if let Some(unit) = legacy_unescape_hex_unit(units, index + 1, 2) {
-                    output.push(unit);
-                    index += 3;
-                    continue;
-                }
+            if index + 2 < units.len()
+                && let Some(unit) = legacy_unescape_hex_unit(units, index + 1, 2)
+            {
+                output.push(unit);
+                index += 3;
+                continue;
             }
         }
         output.push(units[index]);

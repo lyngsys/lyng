@@ -1,17 +1,11 @@
-use super::super::*;
+use super::super::{builtin_id, BuiltinFunctionId};
 
 #[inline]
-pub fn weak_ref_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(WEAK_REF_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn weak_ref_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::WEAK_REF_RAW)
 }
 
 #[inline]
-pub fn weak_ref_deref_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(WEAK_REF_DEREF_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn weak_ref_deref_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::WEAK_REF_DEREF_RAW)
 }

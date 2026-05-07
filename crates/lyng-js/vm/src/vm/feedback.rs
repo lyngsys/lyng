@@ -1,4 +1,4 @@
-use super::*;
+use super::{code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, Value, Vm};
 use lyng_js_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
 use lyng_js_objects::{
     NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyCachePurpose,
@@ -91,7 +91,7 @@ pub struct NamedPropertyFeedbackSnapshot {
 
 impl NamedPropertyFeedbackSnapshot {
     #[inline]
-    fn uninitialized(execution_count: u32) -> Self {
+    const fn uninitialized(execution_count: u32) -> Self {
         Self {
             execution_count,
             state: FeedbackInlineCacheState::Uninitialized,
@@ -163,7 +163,7 @@ pub struct KeyedPropertyFeedbackSnapshot {
 
 impl KeyedPropertyFeedbackSnapshot {
     #[inline]
-    fn uninitialized(execution_count: u32) -> Self {
+    const fn uninitialized(execution_count: u32) -> Self {
         Self {
             execution_count,
             state: FeedbackInlineCacheState::Uninitialized,
@@ -227,7 +227,7 @@ pub struct FeedbackSiteSnapshot {
 
 impl FeedbackSiteSnapshot {
     #[inline]
-    fn new(
+    const fn new(
         descriptor: FeedbackSiteDescriptor,
         execution_count: u32,
         detail: FeedbackSiteDetail,
@@ -278,7 +278,7 @@ pub struct FeedbackVectorSnapshot {
 
 impl FeedbackVectorSnapshot {
     #[inline]
-    fn new(
+    const fn new(
         allocated: bool,
         warmup_counter: u16,
         slot_count: usize,
@@ -431,13 +431,12 @@ impl NamedPropertyFeedback {
             InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => return None,
         }
         for entry in self.active_entries() {
-            match agent.objects().load_from_named_property_cache(
-                agent.heap().view(),
-                receiver,
-                entry,
-            ) {
-                Ok(Some(value)) => return Some(value),
-                Ok(None) | Err(_) => {}
+            if let Ok(Some(value)) =
+                agent
+                    .objects()
+                    .load_from_named_property_cache(agent.heap().view(), receiver, entry)
+            {
+                return Some(value);
             }
         }
         None
@@ -454,9 +453,8 @@ impl NamedPropertyFeedback {
                 let mut mutator = heap.mutator();
                 objects.store_to_named_property_cache(&mut mutator, receiver, entry, value)
             });
-            match result {
-                Ok(Some(stored)) => return Some(stored),
-                Ok(None) | Err(_) => {}
+            if let Ok(Some(stored)) = result {
+                return Some(stored);
             }
         }
         None
@@ -500,14 +498,14 @@ impl NamedPropertyFeedback {
     }
 
     #[inline]
-    fn install_first_entry(&mut self, entry: NamedPropertyCacheEntry) {
+    const fn install_first_entry(&mut self, entry: NamedPropertyCacheEntry) {
         self.entries[0] = Some(entry);
         self.entry_count = 1;
         self.cache_state = InlineCacheState::Monomorphic;
     }
 
     #[inline]
-    fn promote_to_megamorphic(&mut self) {
+    const fn promote_to_megamorphic(&mut self) {
         self.cache_state = InlineCacheState::Megamorphic;
         self.entry_count = 0;
         self.entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
@@ -546,13 +544,12 @@ impl KeyedPropertyFeedback {
             if entry.atom != atom {
                 continue;
             }
-            match agent.objects().load_from_named_property_cache(
+            if let Ok(Some(value)) = agent.objects().load_from_named_property_cache(
                 agent.heap().view(),
                 receiver,
                 entry.entry,
             ) {
-                Ok(Some(value)) => return Some(value),
-                Ok(None) | Err(_) => {}
+                return Some(value);
             }
         }
         None
@@ -581,9 +578,8 @@ impl KeyedPropertyFeedback {
                 let mut mutator = heap.mutator();
                 objects.store_to_named_property_cache(&mut mutator, receiver, entry.entry, value)
             });
-            match result {
-                Ok(Some(stored)) => return Some(stored),
-                Ok(None) | Err(_) => {}
+            if let Ok(Some(stored)) = result {
+                return Some(stored);
             }
         }
         None
@@ -640,7 +636,7 @@ impl KeyedPropertyFeedback {
     }
 
     #[inline]
-    fn observe_dense_index(&mut self) {
+    const fn observe_dense_index(&mut self) {
         match self.family {
             None | Some(KeyedPropertyFamily::DenseIndex) => {
                 self.promote_to_megamorphic(Some(KeyedPropertyFamily::DenseIndex));
@@ -652,7 +648,7 @@ impl KeyedPropertyFeedback {
     }
 
     #[inline]
-    fn observe_generic(&mut self) {
+    const fn observe_generic(&mut self) {
         self.promote_to_megamorphic(Some(KeyedPropertyFamily::Generic));
     }
 
@@ -675,7 +671,7 @@ impl KeyedPropertyFeedback {
     }
 
     #[inline]
-    fn promote_to_megamorphic(&mut self, family: Option<KeyedPropertyFamily>) {
+    const fn promote_to_megamorphic(&mut self, family: Option<KeyedPropertyFamily>) {
         self.family = family;
         self.cache_state = InlineCacheState::Megamorphic;
         self.entry_count = 0;
@@ -685,7 +681,7 @@ impl KeyedPropertyFeedback {
 
 impl FeedbackSiteState {
     #[inline]
-    fn for_descriptor(descriptor: FeedbackSiteDescriptor) -> Self {
+    const fn for_descriptor(descriptor: FeedbackSiteDescriptor) -> Self {
         match descriptor.kind() {
             FeedbackSiteKind::Arithmetic => {
                 Self::Arithmetic(ArithmeticFeedback { execution_count: 0 })
@@ -711,7 +707,7 @@ impl FeedbackSiteState {
     }
 
     #[inline]
-    fn record_execution(&mut self) {
+    const fn record_execution(&mut self) {
         match self {
             Self::Arithmetic(feedback) => {
                 feedback.execution_count = feedback.execution_count.saturating_add(1);
@@ -779,7 +775,7 @@ impl FeedbackSiteState {
     }
 
     #[inline]
-    fn unallocated_snapshot(descriptor: FeedbackSiteDescriptor) -> FeedbackSiteSnapshot {
+    const fn unallocated_snapshot(descriptor: FeedbackSiteDescriptor) -> FeedbackSiteSnapshot {
         let detail = match descriptor.kind() {
             FeedbackSiteKind::Arithmetic => FeedbackSiteDetail::Arithmetic,
             FeedbackSiteKind::Comparison => FeedbackSiteDetail::Comparison,
@@ -921,10 +917,10 @@ impl Vm {
             }
         }
 
-        if let Some(vector) = self.feedback_vectors[index].as_mut() {
-            if let Some(site) = vector.site_mut(descriptor.slot()) {
-                site.record_execution();
-            }
+        if let Some(vector) = self.feedback_vectors[index].as_mut()
+            && let Some(site) = vector.site_mut(descriptor.slot())
+        {
+            site.record_execution();
         }
         self.observe_tier_feedback_event(code);
 

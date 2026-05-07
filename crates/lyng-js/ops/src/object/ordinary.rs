@@ -62,7 +62,7 @@ pub fn ordinary_get_with_receiver(
         return match numeric_key {
             TypedArrayNumericKey::Valid(index) => {
                 Ok(typed_array_index_descriptor(agent, object, index)?
-                    .and_then(|descriptor| descriptor.value())
+                    .and_then(lyng_js_types::PropertyDescriptor::value)
                     .unwrap_or(Value::undefined()))
             }
             TypedArrayNumericKey::Invalid => Ok(Value::undefined()),

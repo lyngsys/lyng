@@ -408,10 +408,10 @@ pub(super) fn typed_array_species_create_with_arguments<Cx: PublicBuiltinDispatc
     let object = cx.construct_to_completion(constructor, arguments, None)?;
     let (record, actual_length) =
         typed_array_validated_record_and_length(cx, Value::from_object_ref(object))?;
-    if let Some(length) = minimum_length {
-        if actual_length < length {
-            return Err(type_error(cx));
-        }
+    if let Some(length) = minimum_length
+        && actual_length < length
+    {
+        return Err(type_error(cx));
     }
     Ok((object, record))
 }

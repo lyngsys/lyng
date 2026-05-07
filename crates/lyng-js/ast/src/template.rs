@@ -52,7 +52,7 @@ impl Default for TemplateArena {
 
 impl TemplateArena {
     /// Creates an empty template arena.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             templates: Vec::new(),
             quasi_lists: ListArena::new(),
@@ -93,13 +93,13 @@ impl TemplateArena {
 
     /// Returns the number of stored templates.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.templates.len()
     }
 
     /// Returns `true` if no templates are stored.
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.templates.is_empty()
     }
 }

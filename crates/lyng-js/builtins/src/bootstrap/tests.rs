@@ -1,5 +1,6 @@
 use super::*;
 use lyng_js_common::{AtomId, AtomLifetime};
+use lyng_js_env::RealmBootstrapState;
 use lyng_js_gc::{AllocationLifetime, AtomGcSweep};
 use lyng_js_host::NoopHostHooks;
 use lyng_js_types::{
@@ -522,8 +523,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         object.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().object())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().object())
             .map(Value::from_object_ref)
     );
     assert_eq!(object.writable(), Some(true));
@@ -533,8 +533,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         function.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().function())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().function())
             .map(Value::from_object_ref)
     );
     assert_eq!(function.writable(), Some(true));
@@ -544,8 +543,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         string.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().string())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().string())
             .map(Value::from_object_ref)
     );
     assert_eq!(string.writable(), Some(true));
@@ -555,8 +553,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         regexp.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().regexp())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().regexp())
             .map(Value::from_object_ref)
     );
     assert_eq!(regexp.writable(), Some(true));
@@ -566,8 +563,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         date.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().date())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().date())
             .map(Value::from_object_ref)
     );
     assert_eq!(date.writable(), Some(true));
@@ -577,8 +573,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         number.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().number())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().number())
             .map(Value::from_object_ref)
     );
     assert_eq!(number.writable(), Some(true));
@@ -588,8 +583,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         boolean.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().boolean())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().boolean())
             .map(Value::from_object_ref)
     );
     assert_eq!(boolean.writable(), Some(true));
@@ -599,8 +593,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         symbol.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().symbol())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().symbol())
             .map(Value::from_object_ref)
     );
     assert_eq!(symbol.writable(), Some(true));
@@ -610,8 +603,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         bigint.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().bigint())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().bigint())
             .map(Value::from_object_ref)
     );
     assert_eq!(bigint.writable(), Some(true));
@@ -621,8 +613,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         error.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().error())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().error())
             .map(Value::from_object_ref)
     );
     assert_eq!(error.writable(), Some(true));
@@ -632,8 +623,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         type_error.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().type_error())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().type_error())
             .map(Value::from_object_ref)
     );
     assert_eq!(type_error.writable(), Some(true));
@@ -643,8 +633,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         eval_error.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().eval_error())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().eval_error())
             .map(Value::from_object_ref)
     );
     assert_eq!(eval_error.writable(), Some(true));
@@ -654,8 +643,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         range_error.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().range_error())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().range_error())
             .map(Value::from_object_ref)
     );
     assert_eq!(range_error.writable(), Some(true));
@@ -665,8 +653,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         reference_error.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().reference_error())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().reference_error())
             .map(Value::from_object_ref)
     );
     assert_eq!(reference_error.writable(), Some(true));
@@ -676,8 +663,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         math.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().math())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().math())
             .map(Value::from_object_ref)
     );
     assert_eq!(math.writable(), Some(true));
@@ -687,8 +673,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         syntax_error.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().syntax_error())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().syntax_error())
             .map(Value::from_object_ref)
     );
     assert_eq!(syntax_error.writable(), Some(true));
@@ -698,8 +683,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
         uri_error.value(),
         agent
             .realm(artifacts.realm())
-            .map(|realm| realm.intrinsics().uri_error())
-            .flatten()
+            .and_then(|realm| realm.intrinsics().uri_error())
             .map(Value::from_object_ref)
     );
     assert_eq!(uri_error.writable(), Some(true));

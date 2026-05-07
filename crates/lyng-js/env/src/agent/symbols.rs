@@ -6,7 +6,7 @@ use lyng_js_types::{StringRef, SymbolRef, WellKnownSymbolId};
 
 impl Agent {
     #[inline]
-    pub fn atoms(&self) -> &AtomTable {
+    pub const fn atoms(&self) -> &AtomTable {
         &self.atoms
     }
 
@@ -41,7 +41,7 @@ impl Agent {
     }
 
     #[inline]
-    pub fn atoms_mut(&mut self) -> &mut AtomTable {
+    pub const fn atoms_mut(&mut self) -> &mut AtomTable {
         &mut self.atoms
     }
 
@@ -87,7 +87,7 @@ impl Agent {
         if let Some(atom) = cached_atom {
             return self.alloc_string_for_atom(atom, lifetime);
         }
-        if text.chars().all(|ch| u32::from(ch) <= u32::from(u8::MAX)) {
+        if text.chars().all(|ch| u8::try_from(u32::from(ch)).is_ok()) {
             let bytes: Vec<u8> = text
                 .chars()
                 .map(|ch| u8::try_from(u32::from(ch)).expect("Latin-1 code point must fit into u8"))
@@ -139,7 +139,7 @@ impl Agent {
     fn alloc_string_for_atom(&mut self, atom: AtomId, lifetime: AllocationLifetime) -> StringRef {
         if let Some(text) = self.atoms.get(atom) {
             let text = text.to_owned();
-            if text.chars().all(|ch| u32::from(ch) <= u32::from(u8::MAX)) {
+            if text.chars().all(|ch| u8::try_from(u32::from(ch)).is_ok()) {
                 let bytes: Vec<u8> = text
                     .chars()
                     .map(|ch| {

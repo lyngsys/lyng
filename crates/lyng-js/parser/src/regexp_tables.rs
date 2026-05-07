@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
-pub(crate) fn is_valid_unicode_property_escape(
+pub fn is_valid_unicode_property_escape(
     body: &str,
     unicode_sets: bool,
     negated: bool,

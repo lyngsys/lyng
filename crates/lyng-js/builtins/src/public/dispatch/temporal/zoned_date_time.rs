@@ -1461,7 +1461,7 @@ pub(super) fn temporal_zoned_date_time_equals_builtin<Cx: PublicBuiltinDispatchC
     Ok(Value::from_bool(left == right))
 }
 
-pub(super) fn temporal_civil_date_time_from_plain_date_time(
+pub(super) const fn temporal_civil_date_time_from_plain_date_time(
     date_time: TemporalPlainDateTimeObjectData,
 ) -> TemporalCivilDateTime {
     TemporalCivilDateTime::new(
@@ -1787,7 +1787,7 @@ pub(super) fn temporal_zoned_date_time_with_builtin<Cx: PublicBuiltinDispatchCon
     let time_zone_id = temporal_atom_text(cx, zoned.time_zone())?;
     let date_time = temporal_civil_date_time_from_plain_date_time(date_time);
     let instant = cx.temporal_civil_time_to_instant(&TemporalCivilToInstantRequest {
-        time_zone_id: time_zone_id.clone(),
+        time_zone_id,
         date_time,
         disambiguation: options.disambiguation,
     })?;

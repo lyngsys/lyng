@@ -11,7 +11,7 @@ use crate::ids::ScopeId;
 use crate::private_use::PrivateUseRecord;
 use crate::scope::ScopeKind;
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     fn class_element_name_is(&self, key: lyng_js_ast::ExprId, atom: WellKnownAtom) -> bool {
         match self.ast.get_expr(key) {
             Expr::Identifier { name: actual, .. } => *actual == atom.id(),

@@ -1,6 +1,11 @@
-use super::*;
+use super::{
+    Agent, AllocationLifetime, BuiltinBootstrapError, BuiltinCache, BuiltinDescriptorTable,
+    BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor, BuiltinPropertyKeySpec,
+    BuiltinPropertyValueSpec, ObjectRef, PropertyDescriptor, PropertyKey, RealmRecord, RealmRef,
+    Value,
+};
 
-pub(crate) fn install_descriptor_tables(
+pub fn install_descriptor_tables(
     agent: &mut Agent,
     builtin_cache: &mut BuiltinCache,
     realm: RealmRef,

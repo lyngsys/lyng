@@ -768,7 +768,7 @@ impl RegExpDescriptorAtoms {
     }
 }
 
-fn regexp_prototype_atom_method_specs(
+const fn regexp_prototype_atom_method_specs(
     atoms: RegExpDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 4] {
     [
@@ -779,7 +779,7 @@ fn regexp_prototype_atom_method_specs(
     ]
 }
 
-fn regexp_prototype_symbol_method_specs() -> [(WellKnownSymbolId, BuiltinFunctionId); 5] {
+const fn regexp_prototype_symbol_method_specs() -> [(WellKnownSymbolId, BuiltinFunctionId); 5] {
     [
         (WellKnownSymbolId::Match, regexp_symbol_match_builtin()),
         (WellKnownSymbolId::Replace, regexp_symbol_replace_builtin()),
@@ -792,7 +792,7 @@ fn regexp_prototype_symbol_method_specs() -> [(WellKnownSymbolId, BuiltinFunctio
     ]
 }
 
-fn regexp_prototype_accessor_specs(
+const fn regexp_prototype_accessor_specs(
     atoms: RegExpDescriptorAtoms,
 ) -> [(AtomId, BuiltinFunctionId); 10] {
     [

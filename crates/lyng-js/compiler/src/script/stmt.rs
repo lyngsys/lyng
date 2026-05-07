@@ -1,4 +1,14 @@
-use super::*;
+use super::{
+    add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin,
+    create_async_disposal_scope_builtin, create_sync_disposal_scope_builtin,
+    dispose_scope_async_builtin, dispose_scope_builtin, internal_private_field_set_builtin,
+    AssignOp, AtomId, CompletionKind, ControlTargetKind, Decl, DeclId, DeclarationKind,
+    DirectEvalLexicalScope, ExceptionHandler, ExceptionHandlerKind, Expr, ExprId, ForInOfLeft,
+    ForInit, FunctionCompiler, FunctionId, FunctionKind, LoweringError, LoweringResult, Opcode,
+    Pattern, PreparedReferenceTarget, ReferenceUsage, ResolutionKind, SafepointKind, ScopeId,
+    ScopeKind, SemanticBindingId, Span, Stmt, StmtId, StorageClass, SwitchCase, VariableKind,
+    WellKnownAtom,
+};
 use lyng_js_bytecode::DirectEvalSiteFlags;
 
 #[derive(Clone, Copy)]
@@ -23,7 +33,7 @@ struct PreparedPrivateAssignmentTarget {
     span: Span,
 }
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn next_child_scope_with_kind(&mut self, kind: ScopeKind) -> Option<ScopeId> {
         let children = self
             .state
@@ -175,7 +185,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         (names.len() == 1).then(|| names[0])
     }
 
-    pub(super) fn active_direct_eval_site_flags(&self) -> DirectEvalSiteFlags {
+    pub(super) const fn active_direct_eval_site_flags(&self) -> DirectEvalSiteFlags {
         DirectEvalSiteFlags::empty()
             .with_forbid_arguments_in_class_initializer(self.in_class_field_initializer)
             .with_forbid_super_call_in_class_initializer(self.in_class_field_initializer)
@@ -187,10 +197,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let mut names = Vec::new();
         let mut current = Some(self.current_scope);
         while let Some(scope) = current {
-            if let Some(name) = self.annex_b_simple_catch_name_for_scope(scope) {
-                if !names.contains(&name) {
-                    names.push(name);
-                }
+            if let Some(name) = self.annex_b_simple_catch_name_for_scope(scope)
+                && !names.contains(&name)
+            {
+                names.push(name);
             }
             current = self.state.sema.scope_table.get(scope).parent;
         }
@@ -227,7 +237,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         None
     }
 
-    fn merge_disposal_scope_kind(
+    const fn merge_disposal_scope_kind(
         current: Option<lyng_js_env::DisposalCapabilityKind>,
         next: Option<lyng_js_env::DisposalCapabilityKind>,
     ) -> Option<lyng_js_env::DisposalCapabilityKind> {
@@ -927,12 +937,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         continue;
                     }
                     let value = self.alloc_temp()?;
-                    let source_key = if !property.computed {
-                        if let Some(atom) = self.named_property_atom(property.key)? {
-                            ObjectRestExcludedKey::Atom(atom)
-                        } else {
-                            self.lower_object_destructuring_property_key(property.key)?
-                        }
+                    let source_key = if property.computed {
+                        self.lower_object_destructuring_property_key(property.key)?
+                    } else if let Some(atom) = self.named_property_atom(property.key)? {
+                        ObjectRestExcludedKey::Atom(atom)
                     } else {
                         self.lower_object_destructuring_property_key(property.key)?
                     };
@@ -1720,11 +1728,10 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         )?;
         self.store_binding_value(binding_id, name, value_register)?;
 
-        if self.function_declaration_uses_annex_b_var_update(&ast_function) {
-            if let Some(var_binding) = self.annex_b_var_binding_for_block_function(name, binding_id)
-            {
-                self.assign_binding_value(var_binding, name, value_register)?;
-            }
+        if self.function_declaration_uses_annex_b_var_update(&ast_function)
+            && let Some(var_binding) = self.annex_b_var_binding_for_block_function(name, binding_id)
+        {
+            self.assign_binding_value(var_binding, name, value_register)?;
         }
 
         Ok(())
@@ -1752,14 +1759,14 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
     fn function_declaration_binding(&self, name: AtomId) -> LoweringResult<SemanticBindingId> {
         let scope_kind = self.state.sema.scope_table.get(self.current_scope).kind;
-        if matches!(scope_kind, ScopeKind::Block | ScopeKind::Switch) {
-            if let Some(binding) = self.find_named_binding_in_scope(
+        if matches!(scope_kind, ScopeKind::Block | ScopeKind::Switch)
+            && let Some(binding) = self.find_named_binding_in_scope(
                 name,
                 DeclarationKind::Function,
                 self.current_scope,
-            ) {
-                return Ok(binding);
-            }
+            )
+        {
+            return Ok(binding);
         }
 
         self.find_named_binding_in_scope(name, DeclarationKind::Function, self.nearest_var_scope())
@@ -1834,11 +1841,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         let var_scope = self.nearest_var_scope();
         let mut scope_id = self.current_scope;
         loop {
-            if let Some(binding) = self.find_any_named_binding_in_scope(name, scope_id) {
-                if binding != lexical_binding && self.annex_b_binding_is_lexical(binding, scope_id)
-                {
-                    return true;
-                }
+            if let Some(binding) = self.find_any_named_binding_in_scope(name, scope_id)
+                && binding != lexical_binding
+                && self.annex_b_binding_is_lexical(binding, scope_id)
+            {
+                return true;
             }
             if scope_id == var_scope {
                 return false;

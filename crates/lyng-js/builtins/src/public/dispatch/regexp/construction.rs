@@ -17,7 +17,7 @@ enum RegExpFlagsSeed {
     Value(Value),
 }
 
-pub(super) fn regexp_species_getter_builtin(invocation: BuiltinInvocation<'_>) -> Value {
+pub(super) const fn regexp_species_getter_builtin(invocation: BuiltinInvocation<'_>) -> Value {
     invocation.this_value()
 }
 
@@ -29,16 +29,16 @@ pub(super) fn normalize_regexp_constructor_pattern_text(
     let mut trailing_backslashes = 0usize;
     for ch in pattern.chars() {
         match ch {
-            '\n' if trailing_backslashes % 2 == 0 => normalized.push_str("\\n"),
+            '\n' if trailing_backslashes.is_multiple_of(2) => normalized.push_str("\\n"),
             '\n' if !unicode_aware => normalized.push('n'),
             '\n' => normalized.push(ch),
-            '\r' if trailing_backslashes % 2 == 0 => normalized.push_str("\\r"),
+            '\r' if trailing_backslashes.is_multiple_of(2) => normalized.push_str("\\r"),
             '\r' if !unicode_aware => normalized.push('r'),
             '\r' => normalized.push(ch),
-            '\u{2028}' if trailing_backslashes % 2 == 0 => normalized.push_str("\\u2028"),
+            '\u{2028}' if trailing_backslashes.is_multiple_of(2) => normalized.push_str("\\u2028"),
             '\u{2028}' if !unicode_aware => normalized.push_str("u2028"),
             '\u{2028}' => normalized.push(ch),
-            '\u{2029}' if trailing_backslashes % 2 == 0 => normalized.push_str("\\u2029"),
+            '\u{2029}' if trailing_backslashes.is_multiple_of(2) => normalized.push_str("\\u2029"),
             '\u{2029}' if !unicode_aware => normalized.push_str("u2029"),
             '\u{2029}' => normalized.push(ch),
             _ => normalized.push(ch),
@@ -96,24 +96,22 @@ pub(super) fn regexp_builtin<Cx: PublicBuiltinDispatchContext>(
         .unwrap_or(Value::undefined());
 
     let pattern_is_regexp = is_regexp_value(cx, pattern_value)?;
-    if pattern_is_regexp {
-        if flags_value.is_undefined() && invocation.new_target().is_none() {
-            let object_ref = pattern_value
-                .as_object_ref()
-                .ok_or_else(|| type_error(cx))?;
-            let active_constructor = {
-                let agent = cx.agent();
-                agent
-                    .realm(realm)
-                    .and_then(|record| record.intrinsics().regexp())
-            };
-            let constructor = cx.get_property_value(
-                Value::from_object_ref(object_ref),
-                PropertyKey::from_atom(WellKnownAtom::constructor.id()),
-            )?;
-            if constructor.as_object_ref() == active_constructor {
-                return Ok(Value::from_object_ref(object_ref));
-            }
+    if pattern_is_regexp && flags_value.is_undefined() && invocation.new_target().is_none() {
+        let object_ref = pattern_value
+            .as_object_ref()
+            .ok_or_else(|| type_error(cx))?;
+        let active_constructor = {
+            let agent = cx.agent();
+            agent
+                .realm(realm)
+                .and_then(|record| record.intrinsics().regexp())
+        };
+        let constructor = cx.get_property_value(
+            Value::from_object_ref(object_ref),
+            PropertyKey::from_atom(WellKnownAtom::constructor.id()),
+        )?;
+        if constructor.as_object_ref() == active_constructor {
+            return Ok(Value::from_object_ref(object_ref));
         }
     }
 

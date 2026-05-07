@@ -100,10 +100,7 @@ mod tests {
     }
 
     fn maybe_break(label: Option<AtomId>) -> Completion<()> {
-        match label {
-            Some(label) => Err(AbruptCompletion::break_(Some(label))),
-            None => Ok(()),
-        }
+        label.map_or(Ok(()), |label| Err(AbruptCompletion::break_(Some(label))))
     }
 
     fn propagate_with_question_mark(should_throw: bool, label: Option<AtomId>) -> Completion<u32> {

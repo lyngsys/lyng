@@ -615,7 +615,7 @@ fn allocate_promise_disposal_prototypes(
     }
 }
 
-fn public_intrinsic_handles(
+const fn public_intrinsic_handles(
     collection: CollectionFamilyPrototypes,
     binary_data: BinaryDataFamilyPrototypes,
     iterators: IteratorScaffolding,

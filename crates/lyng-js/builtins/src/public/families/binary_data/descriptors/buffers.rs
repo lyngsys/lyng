@@ -40,7 +40,7 @@ pub(super) struct BufferDescriptorSets {
     pub(super) shared_array_buffer_prototype: [BuiltinPropertyDescriptor; 7],
 }
 
-pub(super) fn descriptor_sets(
+pub(super) const fn descriptor_sets(
     builtins: &PublicRealmBuiltins,
     atoms: BufferDescriptorAtoms,
     tags: BufferDescriptorTags,

@@ -147,7 +147,7 @@ pub struct ExportSpecifier {
 
 impl Decl {
     /// Returns the span of this declaration.
-    pub fn span(&self) -> Span {
+    pub const fn span(&self) -> Span {
         match self {
             Self::Variable { span, .. }
             | Self::Function { span, .. }

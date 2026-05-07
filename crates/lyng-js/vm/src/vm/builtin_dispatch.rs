@@ -154,7 +154,7 @@ impl Vm {
         agent
             .objects()
             .function_data(callee_object)
-            .and_then(|data| data.realm())
+            .and_then(lyng_js_objects::FunctionObjectData::realm)
             .unwrap_or(caller_frame.realm())
     }
 }

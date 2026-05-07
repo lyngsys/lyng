@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use lyng_js_types::{EnvironmentRef, ObjectRef};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct MappedArgumentsObject {
+pub struct MappedArgumentsObject {
     environment: EnvironmentRef,
     mapped_slots: Vec<Option<u32>>,
 }
 
 impl MappedArgumentsObject {
     #[inline]
-    pub(crate) fn new(environment: EnvironmentRef, mapped_slots: Vec<Option<u32>>) -> Self {
+    pub(crate) const fn new(environment: EnvironmentRef, mapped_slots: Vec<Option<u32>>) -> Self {
         Self {
             environment,
             mapped_slots,
@@ -56,7 +56,7 @@ impl MappedArgumentsObject {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct ActivationSideTables {
+pub struct ActivationSideTables {
     mapped_arguments: HashMap<ObjectRef, MappedArgumentsObject>,
 }
 

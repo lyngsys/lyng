@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    errors, object, proxy, read, Agent, AllocationLifetime, FrameRecord, HostHooks,
+    NativeFunctionRegistry, ObjectAllocation, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
+    Value, Vm, VmError, VmProxyBridge, VmResult, WellKnownAtom, WellKnownSymbolId,
+};
 
 impl Vm {
     pub(in crate::vm) fn allocate_ordinary_object_with_prototype(
@@ -9,7 +13,7 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         let root_shape = agent
             .realm(realm)
-            .and_then(|record| record.root_shape())
+            .and_then(lyng_js_env::RealmRecord::root_shape)
             .ok_or(VmError::MissingRootShape(realm))?;
         Ok(agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();

@@ -1,4 +1,27 @@
-use super::*;
+use super::{
+    allocate_temporal_duration_object, allocate_temporal_plain_date_object,
+    current_temporal_duration_prototype, current_temporal_plain_date_prototype,
+    current_temporal_plain_year_month_prototype, format_temporal_plain_year_month, map_completion,
+    negate_temporal_duration, object, parse_temporal_plain_year_month, range_error,
+    string_ref_text, string_value, temporal_compare_ordering, temporal_constructor_prototype,
+    temporal_date_difference_options, temporal_duration_from_date_units,
+    temporal_duration_from_value, temporal_duration_has_lower_than_month_units,
+    temporal_duration_validate_month_rounding_boundary, temporal_integer_part_from_argument,
+    temporal_integer_part_from_value, temporal_is_iso_leap_year, temporal_iso_days_in_month,
+    temporal_iso_days_in_year, temporal_ops, temporal_optional_integer_part_from_property,
+    temporal_optional_month_code_text_from_property, temporal_overflow_from_options,
+    temporal_plain_date_from_parts, temporal_plain_date_from_parts_with_overflow,
+    temporal_plain_date_to_string_calendar_name, temporal_reject_calendar_or_time_zone_properties,
+    temporal_required_integer_part_from_property, temporal_resolve_month_from_fields,
+    temporal_round_i128_to_increment, temporal_rounding_mode_for_negated_duration,
+    temporal_validate_optional_iso_calendar_identifier_argument,
+    temporal_validate_optional_iso_calendar_property, type_error, validate_temporal_duration,
+    AllocationLifetime, BuiltinFunctionId, BuiltinInvocation, ObjectAllocation, ObjectColdData,
+    ObjectRef, OrdinaryObjectData, PublicBuiltinDispatchContext, RealmRecord,
+    TemporalBuiltinRoundingMode, TemporalDateDifferenceUnit, TemporalDurationObjectData,
+    TemporalObjectData, TemporalObjectKind, TemporalOverflow, TemporalPlainDateObjectData,
+    TemporalPlainYearMonthObjectData, TemporalZonedDateTimeCalendarNameOption, Value,
+};
 
 pub(super) fn dispatch_temporal_plain_year_month_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
@@ -543,8 +566,8 @@ fn temporal_plain_year_month_add_duration<Cx: PublicBuiltinDispatchContext>(
 
     let total_months = i128::from(year_month.year()) * 12
         + i128::from(year_month.month() - 1)
-        + i128::from(duration.years()) * 12
-        + i128::from(duration.months());
+        + duration.years() * 12
+        + duration.months();
     let year = total_months.div_euclid(12);
     let month = total_months.rem_euclid(12) + 1;
     if !(-271_821..=275_760).contains(&year) {
@@ -722,7 +745,9 @@ fn temporal_plain_year_month_difference_builtin<Cx: PublicBuiltinDispatchContext
         return Err(range_error(cx));
     }
 
-    let start_date = if year_month != other {
+    let start_date = if year_month == other {
+        None
+    } else {
         let start_date = temporal_plain_date_from_parts(
             cx,
             i64::from(year_month.year()),
@@ -736,8 +761,6 @@ fn temporal_plain_year_month_difference_builtin<Cx: PublicBuiltinDispatchContext
             1,
         )?;
         Some(start_date)
-    } else {
-        None
     };
 
     let left = i128::from(year_month.year()) * 12 + i128::from(year_month.month() - 1);

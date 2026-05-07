@@ -1,4 +1,12 @@
-use super::*;
+use super::{
+    build_function_activation_plan, collect_arguments_owners, parent_function_for, ArgumentsMode,
+    AtomId, AtomTable, BuiltinFunctionId, BytecodeBuilder, BytecodeEnvironmentBinding,
+    BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionId, CompiledAtom, Decl, DeclId,
+    DeclarationKind, Expr, ExprId, ForInOfLeft, ForInit, FunctionActivationPlan, FunctionId,
+    FunctionKind, FunctionSemaId, HashMap, HashSet, LoweringError, LoweringResult, NonZeroU32,
+    Pattern, ProgramRootKind, ProgramSemaView, ProgramSource, ScopeId, ScopeKind,
+    SemanticBindingId, Span, Stmt, StorageClass, WellKnownAtom,
+};
 
 struct ComputedEnvironmentLayouts {
     scope_environment_bases: Vec<Option<u32>>,
@@ -86,7 +94,7 @@ pub(super) struct ControlTarget {
 }
 
 impl ControlTarget {
-    pub(super) fn new(id: u16, label: Option<AtomId>, kind: ControlTargetKind) -> Self {
+    pub(super) const fn new(id: u16, label: Option<AtomId>, kind: ControlTargetKind) -> Self {
         Self {
             id,
             label,
@@ -104,7 +112,7 @@ pub(super) struct FinallyContext {
     pub(super) in_finalizer: bool,
 }
 
-pub(crate) struct CompilationState<'a> {
+pub struct CompilationState<'a> {
     pub(super) program: ProgramSource<'a>,
     pub(super) sema: ProgramSemaView<'a>,
     pub(super) atoms: &'a mut AtomTable,
@@ -151,7 +159,7 @@ impl<'a> CompilationState<'a> {
             .map(|(index, record)| {
                 let current = FunctionSemaId::new(index as u32);
                 Ok(parent_function_for(
-                    &sema.scope_table,
+                    sema.scope_table,
                     record.scope_root,
                     current,
                 ))
@@ -287,7 +295,7 @@ impl<'a> CompilationState<'a> {
         Ok(id)
     }
 
-    pub(super) fn alloc_function_id(&mut self) -> BytecodeFunctionId {
+    pub(super) const fn alloc_function_id(&mut self) -> BytecodeFunctionId {
         let id = BytecodeFunctionId::new(
             NonZeroU32::new(self.next_function_raw).expect("function id must remain non-zero"),
         );
@@ -487,11 +495,10 @@ impl<'a> CompilationState<'a> {
                 .and_then(|base| base.checked_add(slot))
         });
         self.scope_owner(binding_record.scope)
-            .map(|owner| {
+            .map_or(flattened_slot, |owner| {
                 self.activation(owner)
                     .runtime_slot_for_binding(binding, flattened_slot)
             })
-            .unwrap_or(flattened_slot)
             .ok_or(LoweringError::MissingEnvironmentSlot { binding })
     }
 
@@ -565,7 +572,7 @@ impl<'a> CompilationState<'a> {
         &self.root_environment_bindings
     }
 
-    pub(crate) fn sema(&self) -> ProgramSemaView<'_> {
+    pub(crate) const fn sema(&self) -> ProgramSemaView<'_> {
         self.sema
     }
 
@@ -591,7 +598,7 @@ impl<'a> CompilationState<'a> {
         self.atoms.resolve(atom)
     }
 
-    pub(crate) fn module_default_export_slot(&self) -> Option<u32> {
+    pub(crate) const fn module_default_export_slot(&self) -> Option<u32> {
         self.module_default_export_slot
     }
 }
@@ -1006,7 +1013,7 @@ fn collect_class_lowering_from_pattern(
     }
 }
 
-fn generator_function_has_prototype(kind: FunctionKind) -> bool {
+const fn generator_function_has_prototype(kind: FunctionKind) -> bool {
     matches!(kind, FunctionKind::Generator | FunctionKind::AsyncGenerator)
 }
 
@@ -1293,26 +1300,26 @@ fn collect_class_lowering_from_class_body(
                 if is_constructor {
                     constructor = Some(*value);
                 }
-                if !*r#static && *private {
-                    if let lyng_js_ast::Expr::Identifier { name, .. } = ast.get_expr(*key) {
-                        let element_kind = match kind {
-                            lyng_js_ast::MethodKind::Method
-                            | lyng_js_ast::MethodKind::Constructor => {
-                                lyng_js_sema::ClassPrivateElementKind::Method
-                            }
-                            lyng_js_ast::MethodKind::Get => {
-                                lyng_js_sema::ClassPrivateElementKind::Getter
-                            }
-                            lyng_js_ast::MethodKind::Set => {
-                                lyng_js_sema::ClassPrivateElementKind::Setter
-                            }
-                        };
-                        instance_elements.push(ClassInstanceElementPlan::PrivateElement {
-                            name: *name,
-                            kind: element_kind,
-                            value: None,
-                        });
-                    }
+                if !*r#static
+                    && *private
+                    && let lyng_js_ast::Expr::Identifier { name, .. } = ast.get_expr(*key)
+                {
+                    let element_kind = match kind {
+                        lyng_js_ast::MethodKind::Method | lyng_js_ast::MethodKind::Constructor => {
+                            lyng_js_sema::ClassPrivateElementKind::Method
+                        }
+                        lyng_js_ast::MethodKind::Get => {
+                            lyng_js_sema::ClassPrivateElementKind::Getter
+                        }
+                        lyng_js_ast::MethodKind::Set => {
+                            lyng_js_sema::ClassPrivateElementKind::Setter
+                        }
+                    };
+                    instance_elements.push(ClassInstanceElementPlan::PrivateElement {
+                        name: *name,
+                        kind: element_kind,
+                        value: None,
+                    });
                 }
                 collect_class_lowering_from_function(
                     ast,
@@ -1540,7 +1547,7 @@ fn scope_environment_bindings(
     }
 
     assert!(
-        bindings.iter().all(|binding| binding.is_some()),
+        bindings.iter().all(std::option::Option::is_some),
         "environment-stored scope bindings should be densely indexed"
     );
     bindings
@@ -1562,7 +1569,7 @@ fn synthetic_function_environment_bindings(
                 Some(bytecode_environment_binding(binding, false));
         }
         assert!(
-            parameter_bindings.iter().all(|binding| binding.is_some()),
+            parameter_bindings.iter().all(std::option::Option::is_some),
             "mapped parameter slots should be densely ordered"
         );
         bindings.extend(
@@ -1599,7 +1606,7 @@ fn synthetic_function_environment_bindings(
     bindings
 }
 
-fn bytecode_environment_binding(
+const fn bytecode_environment_binding(
     binding: &lyng_js_sema::BindingRecord,
     scoped: bool,
 ) -> BytecodeEnvironmentBinding {
@@ -1617,14 +1624,14 @@ fn bytecode_environment_binding(
     BytecodeEnvironmentBinding::new(Some(binding.name), flags)
 }
 
-fn scope_environment_binding_is_scoped(scope: &lyng_js_sema::ScopeRecord) -> bool {
+const fn scope_environment_binding_is_scoped(scope: &lyng_js_sema::ScopeRecord) -> bool {
     !matches!(
         scope.kind,
         ScopeKind::Global | ScopeKind::Module | ScopeKind::Function | ScopeKind::Parameter
     )
 }
 
-fn binding_is_mutable(kind: DeclarationKind) -> bool {
+const fn binding_is_mutable(kind: DeclarationKind) -> bool {
     !matches!(
         kind,
         DeclarationKind::Const

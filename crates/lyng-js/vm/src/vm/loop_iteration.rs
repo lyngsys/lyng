@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    Agent, AllocationLifetime, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
+    EnvironmentRef, FrameRecord, LoopIterationEnvironment, Value, Vm, VmError, VmResult,
+};
 use lyng_js_bytecode::{CaptureDescriptor, CaptureSource};
 
 impl Vm {
@@ -142,8 +145,7 @@ impl Vm {
         if let Some(source_layout) = source_layout {
             let slot_count = agent
                 .environment_layout(source_layout)
-                .map(|layout| layout.slot_count())
-                .unwrap_or(0);
+                .map_or(0, lyng_js_env::EnvironmentLayout::slot_count);
             for slot in 0..slot_count {
                 if iteration_slots.contains(&slot) {
                     continue;
@@ -467,7 +469,6 @@ impl Vm {
                     && (record.iteration_slots.contains(&slot)
                         || record.shared_slots.contains(&slot))
             })
-            .map(|record| record.iteration_environment)
-            .unwrap_or(environment))
+            .map_or(environment, |record| record.iteration_environment))
     }
 }

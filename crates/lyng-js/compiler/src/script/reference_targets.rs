@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    internal_private_field_get_builtin, internal_private_field_set_builtin, AtomId, Expr, ExprId,
+    FunctionCompiler, LoweringError, LoweringResult, ResolutionKind, SemanticBindingId, Span,
+    StorageClass,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum ReferenceUsage {
@@ -46,7 +50,7 @@ pub(super) struct PreparedPrivateReferenceTarget {
     span: Span,
 }
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn prepare_reference_target(
         &mut self,
         expr_id: ExprId,
@@ -102,7 +106,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
     }
 
-    pub(super) fn reference_target_inferred_name(
+    pub(super) const fn reference_target_inferred_name(
         &self,
         target: PreparedReferenceTarget,
     ) -> Option<AtomId> {

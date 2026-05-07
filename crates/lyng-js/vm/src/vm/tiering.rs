@@ -1,4 +1,4 @@
-use super::*;
+use super::{code_index, CodeRef, Vm};
 use std::num::NonZeroU32;
 
 const TIER_READY_HOTNESS_THRESHOLD: u32 = 8;
@@ -90,7 +90,7 @@ impl Default for TieringState {
 
 impl TieringState {
     #[inline]
-    fn snapshot(self) -> TieringSnapshot {
+    const fn snapshot(self) -> TieringSnapshot {
         TieringSnapshot {
             eligible: self.eligible,
             status: self.status,
@@ -119,7 +119,7 @@ impl TieringState {
     }
 
     #[inline]
-    fn invalidate(&mut self) {
+    const fn invalidate(&mut self) {
         self.status = TierStatus::Invalidated;
         self.hotness = 0;
         self.feedback_events = 0;

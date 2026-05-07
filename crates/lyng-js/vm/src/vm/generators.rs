@@ -1,6 +1,10 @@
 use super::bytecode_calls::PreparedBytecodeCall;
 use super::runtime_objects::VmIteratorBridge;
-use super::*;
+use super::{
+    Agent, AsyncGeneratorFrameState, AsyncGeneratorRequest, ExecutionContext, FrameFlags,
+    FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef, RealmRef, RegisterWindow,
+    SuspendedExecutionSideState, Vm, VmError, VmResult,
+};
 use crate::frame::GeneratorResumeKind;
 use lyng_js_common::WellKnownAtom;
 use lyng_js_env::{ExecutableId, ExecutionContextKind, ThisState};
@@ -705,8 +709,7 @@ impl Vm {
         let prior_register_len = usize::try_from(
             self.frames
                 .get(prior_frame_depth)
-                .map(|frame| frame.registers().end())
-                .unwrap_or(0),
+                .map_or(0, |frame| frame.registers().end()),
         )
         .expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
@@ -1312,21 +1315,21 @@ impl Vm {
             .frame()
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         if resume_kind == GeneratorResumeKind::Throw {
-            if let iterator::DelegateYieldAwaitState::Value { done: false, .. } = await_state {
-                if record.is_async_from_sync() {
-                    let mut bridge = VmIteratorBridge {
-                        vm: self,
-                        agent,
-                        host,
-                        registry,
-                        frame,
-                    };
-                    let _: () = iterator::iterator_close(
-                        &mut bridge,
-                        &mut record,
-                        Err(lyng_js_types::AbruptCompletion::Throw(resume_value)),
-                    )?;
-                }
+            if let iterator::DelegateYieldAwaitState::Value { done: false, .. } = await_state
+                && record.is_async_from_sync()
+            {
+                let mut bridge = VmIteratorBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                };
+                let _: () = iterator::iterator_close(
+                    &mut bridge,
+                    &mut record,
+                    Err(lyng_js_types::AbruptCompletion::Throw(resume_value)),
+                )?;
             }
             return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::Throw(
                 resume_value,
@@ -1772,7 +1775,7 @@ impl Vm {
     }
 }
 
-fn encode_execution_context_kind(kind: ExecutionContextKind) -> u8 {
+const fn encode_execution_context_kind(kind: ExecutionContextKind) -> u8 {
     match kind {
         ExecutionContextKind::Script => 0,
         ExecutionContextKind::Module => 1,
@@ -1783,7 +1786,7 @@ fn encode_execution_context_kind(kind: ExecutionContextKind) -> u8 {
     }
 }
 
-fn decode_execution_context_kind(raw: u8) -> Option<ExecutionContextKind> {
+const fn decode_execution_context_kind(raw: u8) -> Option<ExecutionContextKind> {
     match raw {
         0 => Some(ExecutionContextKind::Script),
         1 => Some(ExecutionContextKind::Module),
@@ -1795,7 +1798,7 @@ fn decode_execution_context_kind(raw: u8) -> Option<ExecutionContextKind> {
     }
 }
 
-fn encode_this_state_kind(this_state: ThisState) -> u8 {
+const fn encode_this_state_kind(this_state: ThisState) -> u8 {
     match this_state {
         ThisState::Lexical => THIS_STATE_LEXICAL_RAW,
         ThisState::Uninitialized => THIS_STATE_UNINITIALIZED_RAW,
@@ -1803,7 +1806,7 @@ fn encode_this_state_kind(this_state: ThisState) -> u8 {
     }
 }
 
-fn decode_this_state(kind: u8, value: Value) -> ThisState {
+const fn decode_this_state(kind: u8, value: Value) -> ThisState {
     match kind {
         THIS_STATE_LEXICAL_RAW => ThisState::Lexical,
         THIS_STATE_UNINITIALIZED_RAW => ThisState::Uninitialized,

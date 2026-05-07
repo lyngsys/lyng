@@ -112,19 +112,19 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
 
     /// Sets the lexer mode for the next token.
     #[inline]
-    pub fn set_mode(&mut self, mode: LexerMode) {
+    pub const fn set_mode(&mut self, mode: LexerMode) {
         self.mode = mode;
     }
 
     /// Enables or disables Annex B HTML-like comments.
     #[inline]
-    pub fn set_allow_html_comments(&mut self, allow: bool) {
+    pub const fn set_allow_html_comments(&mut self, allow: bool) {
         self.allow_html_comments = allow;
     }
 
     /// Returns the current byte position.
     #[inline]
-    pub fn position(&self) -> usize {
+    pub const fn position(&self) -> usize {
         self.pos
     }
 
@@ -132,13 +132,13 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
     /// re-lex `/` as a regexp literal after discovering the token is in
     /// expression position.
     #[inline]
-    pub fn rewind_to(&mut self, pos: usize) {
+    pub const fn rewind_to(&mut self, pos: usize) {
         self.pos = pos;
     }
 
     /// Returns a reference to the literal table.
     #[inline]
-    pub fn literal_table(&self) -> &LiteralTable {
+    pub const fn literal_table(&self) -> &LiteralTable {
         &self.literals
     }
 
@@ -264,7 +264,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
     // =========================================================================
 
     #[inline]
-    fn at_end(&self) -> bool {
+    const fn at_end(&self) -> bool {
         self.pos >= self.source.len()
     }
 
@@ -284,12 +284,12 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
     }
 
     #[inline]
-    fn advance(&mut self) {
+    const fn advance(&mut self) {
         self.pos += 1;
     }
 
     #[inline]
-    fn advance_n(&mut self, n: usize) {
+    const fn advance_n(&mut self, n: usize) {
         self.pos += n;
     }
 
@@ -304,7 +304,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
     }
 
     #[inline]
-    fn span(&self, start: usize, end: usize) -> Span {
+    const fn span(&self, start: usize, end: usize) -> Span {
         Span::from_offsets(self.source_id, start as u32, end as u32)
     }
 
@@ -312,7 +312,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
         self.diagnostics.error(self.span(start, end), message);
     }
 
-    fn single(&mut self, kind: TokenKind, start: usize, flags: TokenFlags) -> Token {
+    const fn single(&mut self, kind: TokenKind, start: usize, flags: TokenFlags) -> Token {
         self.advance();
         Token::new(kind, self.span(start, self.pos), flags)
     }
@@ -685,11 +685,9 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
         };
 
         // Check for keyword (only if no escape sequences)
-        if !has_escape {
-            if let Some(kw_atom_id) = self.atoms.keyword_atom(ident_text) {
-                let kind = KEYWORD_TOKEN_KIND[kw_atom_id.raw() as usize];
-                return Token::new(kind, self.span(start, self.pos), result_flags);
-            }
+        if !has_escape && let Some(kw_atom_id) = self.atoms.keyword_atom(ident_text) {
+            let kind = KEYWORD_TOKEN_KIND[kw_atom_id.raw() as usize];
+            return Token::new(kind, self.span(start, self.pos), result_flags);
         }
 
         // It's an identifier. Intern it.
@@ -707,12 +705,10 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
         let b = self.current();
         if b < 0x80 {
             self.advance();
+        } else if let Some(ch) = self.next_code_point_from(self.pos) {
+            self.advance_n(ch.len_utf8());
         } else {
-            if let Some(ch) = self.next_code_point_from(self.pos) {
-                self.advance_n(ch.len_utf8());
-            } else {
-                self.advance();
-            }
+            self.advance();
         }
     }
 
@@ -795,10 +791,10 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
             let hex = self.text(hex_start, self.pos);
             self.advance(); // skip `}`
             let code = u32::from_str_radix(hex, 16).ok()?;
-            if let Ok(unit) = u16::try_from(code) {
-                if (0xD800..=0xDFFF).contains(&unit) {
-                    return Some(UnicodeStringEscape::CodeUnit(unit));
-                }
+            if let Ok(unit) = u16::try_from(code)
+                && (0xD800..=0xDFFF).contains(&unit)
+            {
+                return Some(UnicodeStringEscape::CodeUnit(unit));
             }
             return char::from_u32(code).map(UnicodeStringEscape::Scalar);
         }
@@ -816,14 +812,14 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                 && self.source[self.pos + 1] == b'u'
             {
                 let low_hex = self.text(self.pos + 2, self.pos + 6);
-                if let Ok(low) = u16::from_str_radix(low_hex, 16) {
-                    if (0xDC00..=0xDFFF).contains(&low) {
-                        self.advance_n(6);
-                        let combined = 0x10000
-                            + ((u32::from(code_unit) - 0xD800) << 10)
-                            + (u32::from(low) - 0xDC00);
-                        return char::from_u32(combined).map(UnicodeStringEscape::Scalar);
-                    }
+                if let Ok(low) = u16::from_str_radix(low_hex, 16)
+                    && (0xDC00..=0xDFFF).contains(&low)
+                {
+                    self.advance_n(6);
+                    let combined = 0x10000
+                        + ((u32::from(code_unit) - 0xD800) << 10)
+                        + (u32::from(low) - 0xDC00);
+                    return char::from_u32(combined).map(UnicodeStringEscape::Scalar);
                 }
             }
             return Some(UnicodeStringEscape::CodeUnit(code_unit));
@@ -841,14 +837,14 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
     // =========================================================================
 
     fn scan_numeric(&mut self, start: usize, flags: TokenFlags) -> Token {
-        if self.current() == b'0' {
-            if let Some(next) = self.peek() {
-                match next {
-                    b'x' | b'X' => return self.scan_hex(start, flags),
-                    b'o' | b'O' => return self.scan_octal(start, flags),
-                    b'b' | b'B' => return self.scan_binary(start, flags),
-                    _ => {}
-                }
+        if self.current() == b'0'
+            && let Some(next) = self.peek()
+        {
+            match next {
+                b'x' | b'X' => return self.scan_hex(start, flags),
+                b'o' | b'O' => return self.scan_octal(start, flags),
+                b'b' | b'B' => return self.scan_binary(start, flags),
+                _ => {}
             }
         }
         self.scan_decimal(start, flags)
@@ -1655,24 +1651,24 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                                             && self.source[self.pos + 1] == b'u'
                                         {
                                             let low_hex = self.text(self.pos + 2, self.pos + 6);
-                                            if let Ok(low) = u16::from_str_radix(low_hex, 16) {
-                                                if (0xDC00..=0xDFFF).contains(&low) {
-                                                    raw.push('\\');
-                                                    raw.push('u');
-                                                    raw.push_str(low_hex);
-                                                    self.advance_n(6);
-                                                    let combined = 0x10000
-                                                        + ((u32::from(code_unit) - 0xD800) << 10)
-                                                        + (u32::from(low) - 0xDC00);
-                                                    if let Some(ch) = char::from_u32(combined) {
-                                                        if let Some(ref mut ck) = cooked {
-                                                            push_utf16_char(ck, ch);
-                                                        }
-                                                    } else {
-                                                        cooked = None;
+                                            if let Ok(low) = u16::from_str_radix(low_hex, 16)
+                                                && (0xDC00..=0xDFFF).contains(&low)
+                                            {
+                                                raw.push('\\');
+                                                raw.push('u');
+                                                raw.push_str(low_hex);
+                                                self.advance_n(6);
+                                                let combined = 0x10000
+                                                    + ((u32::from(code_unit) - 0xD800) << 10)
+                                                    + (u32::from(low) - 0xDC00);
+                                                if let Some(ch) = char::from_u32(combined) {
+                                                    if let Some(ref mut ck) = cooked {
+                                                        push_utf16_char(ck, ch);
                                                     }
-                                                    continue;
+                                                } else {
+                                                    cooked = None;
                                                 }
+                                                continue;
                                             }
                                         }
 
@@ -1680,10 +1676,8 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                                             if let Some(ref mut ck) = cooked {
                                                 push_utf16_char(ck, ch);
                                             }
-                                        } else {
-                                            if let Some(ref mut ck) = cooked {
-                                                ck.push(code_unit);
-                                            }
+                                        } else if let Some(ref mut ck) = cooked {
+                                            ck.push(code_unit);
                                         }
                                     } else {
                                         cooked = None;
@@ -2182,12 +2176,11 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                 // Scan the identifier part
                 let ident_start = self.pos;
                 let inner = self.scan_identifier(ident_start, flags);
-                let payload = match inner.payload {
-                    TokenPayload::Atom(_) => inner.payload,
-                    _ => {
-                        let text = self.text(ident_start, self.pos).to_owned();
-                        TokenPayload::Atom(self.atoms.intern(&text))
-                    }
+                let payload = if let TokenPayload::Atom(_) = inner.payload {
+                    inner.payload
+                } else {
+                    let text = self.text(ident_start, self.pos).to_owned();
+                    TokenPayload::Atom(self.atoms.intern(&text))
                 };
                 return Token::with_payload(
                     TokenKind::PrivateIdentifier,

@@ -366,10 +366,10 @@ fn array_last_index_of_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Value::from_smi(-1));
     }
     let mut index = if from_index >= 0.0 {
-        if !from_index.is_finite() {
-            length - 1
-        } else {
+        if from_index.is_finite() {
             (from_index as u64).min(length - 1)
+        } else {
+            length - 1
         }
     } else {
         let computed = (length as f64) + from_index;
@@ -427,48 +427,45 @@ fn array_reduce_common<Cx: PublicBuiltinDispatchContext>(
 
     let mut accumulator;
     let mut next_index;
-    match invocation.arguments().get(1).copied() {
-        Some(initial_value) => {
-            accumulator = initial_value;
-            next_index = match direction {
-                ArrayReduceDirection::Forward => Some(0),
-                ArrayReduceDirection::Reverse => length.checked_sub(1),
-            };
+    if let Some(initial_value) = invocation.arguments().get(1).copied() {
+        accumulator = initial_value;
+        next_index = match direction {
+            ArrayReduceDirection::Forward => Some(0),
+            ArrayReduceDirection::Reverse => length.checked_sub(1),
+        };
+    } else {
+        if length == 0 {
+            return Err(type_error(cx));
         }
-        None => {
-            if length == 0 {
-                return Err(type_error(cx));
-            }
-            match direction {
-                ArrayReduceDirection::Forward => {
-                    let mut index = 0_u64;
-                    loop {
-                        let key = array_like_index_property_key(cx, index);
-                        if has_property_on_object(cx, object_ref, key)? {
-                            accumulator = get_property_from_object(cx, object_ref, key)?;
-                            next_index = index.checked_add(1);
-                            break;
-                        }
-                        index += 1;
-                        if index >= length {
-                            return Err(type_error(cx));
-                        }
+        match direction {
+            ArrayReduceDirection::Forward => {
+                let mut index = 0_u64;
+                loop {
+                    let key = array_like_index_property_key(cx, index);
+                    if has_property_on_object(cx, object_ref, key)? {
+                        accumulator = get_property_from_object(cx, object_ref, key)?;
+                        next_index = index.checked_add(1);
+                        break;
+                    }
+                    index += 1;
+                    if index >= length {
+                        return Err(type_error(cx));
                     }
                 }
-                ArrayReduceDirection::Reverse => {
-                    let mut index = length - 1;
-                    loop {
-                        let key = array_like_index_property_key(cx, index);
-                        if has_property_on_object(cx, object_ref, key)? {
-                            accumulator = get_property_from_object(cx, object_ref, key)?;
-                            next_index = index.checked_sub(1);
-                            break;
-                        }
-                        if index == 0 {
-                            return Err(type_error(cx));
-                        }
-                        index -= 1;
+            }
+            ArrayReduceDirection::Reverse => {
+                let mut index = length - 1;
+                loop {
+                    let key = array_like_index_property_key(cx, index);
+                    if has_property_on_object(cx, object_ref, key)? {
+                        accumulator = get_property_from_object(cx, object_ref, key)?;
+                        next_index = index.checked_sub(1);
+                        break;
                     }
+                    if index == 0 {
+                        return Err(type_error(cx));
+                    }
+                    index -= 1;
                 }
             }
         }

@@ -42,7 +42,7 @@ impl ModuleRequestRecord {
     }
 
     #[inline]
-    pub fn resolved_key(&self) -> Option<&ModuleKey> {
+    pub const fn resolved_key(&self) -> Option<&ModuleKey> {
         self.resolved_key.as_ref()
     }
 
@@ -326,7 +326,7 @@ impl ModuleRecord {
     }
 
     #[inline]
-    pub fn key(&self) -> &ModuleKey {
+    pub const fn key(&self) -> &ModuleKey {
         &self.key
     }
 
@@ -386,7 +386,7 @@ impl ModuleRecord {
     }
 
     #[inline]
-    pub fn import_meta_properties(&self) -> Option<&ImportMetaProperties> {
+    pub const fn import_meta_properties(&self) -> Option<&ImportMetaProperties> {
         self.import_meta_properties.as_ref()
     }
 
@@ -437,27 +437,27 @@ impl ModuleRecord {
     }
 
     #[inline]
-    pub fn set_code(&mut self, code: Option<CodeRef>) {
+    pub const fn set_code(&mut self, code: Option<CodeRef>) {
         self.code = code;
     }
 
     #[inline]
-    pub fn set_environment(&mut self, environment: Option<EnvironmentRef>) {
+    pub const fn set_environment(&mut self, environment: Option<EnvironmentRef>) {
         self.environment = environment;
     }
 
     #[inline]
-    pub fn set_namespace(&mut self, namespace: Option<ObjectRef>) {
+    pub const fn set_namespace(&mut self, namespace: Option<ObjectRef>) {
         self.namespace = namespace;
     }
 
     #[inline]
-    pub fn set_deferred_namespace(&mut self, namespace: Option<ObjectRef>) {
+    pub const fn set_deferred_namespace(&mut self, namespace: Option<ObjectRef>) {
         self.deferred_namespace = namespace;
     }
 
     #[inline]
-    pub fn set_import_meta_object(&mut self, import_meta_object: Option<ObjectRef>) {
+    pub const fn set_import_meta_object(&mut self, import_meta_object: Option<ObjectRef>) {
         self.import_meta_object = import_meta_object;
     }
 
@@ -472,17 +472,17 @@ impl ModuleRecord {
     }
 
     #[inline]
-    pub fn set_status(&mut self, status: ModuleStatus) {
+    pub const fn set_status(&mut self, status: ModuleStatus) {
         self.status = status;
     }
 
     #[inline]
-    pub fn set_evaluation_error(&mut self, evaluation_error: Option<Value>) {
+    pub const fn set_evaluation_error(&mut self, evaluation_error: Option<Value>) {
         self.evaluation_error = evaluation_error;
     }
 
     #[inline]
-    pub fn set_dfs_state(&mut self, dfs_index: Option<u32>, dfs_ancestor_index: Option<u32>) {
+    pub const fn set_dfs_state(&mut self, dfs_index: Option<u32>, dfs_ancestor_index: Option<u32>) {
         self.dfs_index = dfs_index;
         self.dfs_ancestor_index = dfs_ancestor_index;
     }

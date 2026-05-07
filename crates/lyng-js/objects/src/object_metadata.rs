@@ -8,7 +8,7 @@ use lyng_js_common::AtomId;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ObjectMetadata {
+pub struct ObjectMetadata {
     pub(crate) kind: ObjectKind,
     pub(crate) flags: ObjectFlags,
     pub(crate) cold: ObjectColdData,
@@ -20,7 +20,7 @@ pub(crate) struct ObjectMetadata {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct PrivateBrandId(u32);
+pub struct PrivateBrandId(u32);
 
 impl PrivateBrandId {
     #[inline]
@@ -30,7 +30,7 @@ impl PrivateBrandId {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct InstalledPrivateBrand {
+pub struct InstalledPrivateBrand {
     brand: PrivateBrandId,
     slot_base: u32,
     slot_count: u32,
@@ -71,7 +71,7 @@ pub enum ClassPrivateElementKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ClassPrivateElementDescriptor {
+pub struct ClassPrivateElementDescriptor {
     name: AtomId,
     is_static: bool,
     kind: ClassPrivateElementKind,
@@ -149,7 +149,7 @@ impl PrivateDescriptorSummary {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ClassRecord {
+pub struct ClassRecord {
     pub(crate) instance_brand: Option<PrivateBrandId>,
     pub(crate) static_brand: Option<PrivateBrandId>,
     pub(crate) instance_slot_count: u32,
@@ -162,7 +162,7 @@ pub(crate) struct ClassRecord {
 
 impl ClassRecord {
     #[inline]
-    pub(crate) fn new(
+    pub(crate) const fn new(
         instance_brand: Option<PrivateBrandId>,
         static_brand: Option<PrivateBrandId>,
     ) -> Self {
@@ -180,7 +180,7 @@ impl ClassRecord {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum NamedPropertyStorage {
+pub enum NamedPropertyStorage {
     ShapeStable,
     Dictionary(NamedPropertyDictionary),
 }
@@ -201,13 +201,13 @@ impl NamedPropertyStorage {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct NamedPropertyDictionary {
+pub struct NamedPropertyDictionary {
     pub(crate) entries: HashMap<PropertyKey, NamedPropertyDictionaryEntry>,
     pub(crate) next_enumeration_index: u32,
 }
 
 impl NamedPropertyDictionary {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         entries: HashMap<PropertyKey, NamedPropertyDictionaryEntry>,
         next_index: u32,
     ) -> Self {
@@ -252,7 +252,7 @@ impl NamedPropertyDictionary {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum ElementStorageMetadata {
+pub enum ElementStorageMetadata {
     Empty,
     Dense {
         logical_len: u32,
@@ -283,7 +283,7 @@ impl ElementStorageMetadata {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ShapeMetadata {
+pub struct ShapeMetadata {
     pub(crate) transition_key: Option<ShapeTransitionKey>,
     pub(crate) property: Option<ShapeProperty>,
     pub(crate) properties: Vec<ShapeProperty>,
@@ -332,6 +332,6 @@ impl ShapeMetadata {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct RootShapeKey {
+pub struct RootShapeKey {
     pub(crate) prototype_guard: Option<ObjectRef>,
 }

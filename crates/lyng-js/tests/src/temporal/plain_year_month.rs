@@ -221,7 +221,7 @@ fn temporal_plain_year_month_from_reads_options_before_validation_and_constrains
 #[test]
 fn temporal_plain_year_month_from_requires_string_month_code() {
     let result = compile_and_run_string_with_host(
-        r#"
+        r"
         let monthCodeValues = [5, 5n, false, null, { toString: () => 5 }];
         let typeErrors = 0;
         for (let monthCode of monthCodeValues) {
@@ -237,7 +237,7 @@ fn temporal_plain_year_month_from_requires_string_month_code() {
             typeErrors += error.constructor === TypeError ? 1 : 0;
         }
         String(typeErrors);
-        "#,
+        ",
         lyng_js_host::NoopHostHooks,
     );
 

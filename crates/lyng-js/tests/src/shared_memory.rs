@@ -128,11 +128,11 @@ fn run_spec_script_with_forced_collection_and_readback(source: &str, readback: &
 #[test]
 fn phase6_forced_collection_keeps_typed_array_construction_surface_live() {
     let result = run_spec_script_with_forced_collection_and_readback(
-        r#"
+        r"
         let buffer = new ArrayBuffer(4);
         let view = new DataView(buffer);
         view = 1;
-        "#,
+        ",
         r#"
         let dv = new DataView(new ArrayBuffer(20 * 1024 * 1024));
         dv.setInt8(dv.byteLength - 10, 99);
@@ -242,7 +242,7 @@ fn phase6_shared_array_buffer_growable_surface_tracks_max_byte_length() {
 #[test]
 fn phase6_atomics_integer_surface_loads_stores_and_updates_shared_typed_arrays() {
     let result = run_spec_script(
-        r#"
+        r"
         let sab = new SharedArrayBuffer(16);
         let i32 = new Int32Array(sab);
         let u32 = new Uint32Array(sab);
@@ -262,7 +262,7 @@ fn phase6_atomics_integer_surface_loads_stores_and_updates_shared_typed_arrays()
         if (Atomics.isLockFree(4) && !Atomics.isLockFree(3)) score += 2048;
 
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(4095));
@@ -271,7 +271,7 @@ fn phase6_atomics_integer_surface_loads_stores_and_updates_shared_typed_arrays()
 #[test]
 fn phase6_atomics_store_returns_converted_value_before_storage_truncation() {
     let result = run_spec_script(
-        r#"
+        r"
         let sab = new SharedArrayBuffer(32);
         let i8 = new Int8Array(sab, 0, 8);
         let u8 = new Uint8Array(sab, 8, 8);
@@ -288,7 +288,7 @@ fn phase6_atomics_store_returns_converted_value_before_storage_truncation() {
         if (Atomics.load(big, 0) === 1n) score += 32;
 
         score;
-        "#,
+        ",
     );
 
     assert_eq!(result, Value::from_smi(63));
@@ -398,7 +398,7 @@ fn phase6_wait_async_positive_timeout_can_be_notified_before_timeout() {
 #[test]
 fn phase6_wait_async_positive_timeout_coerces_timeout_objects() {
     let result = run_spec_script_with_readback(
-        r#"
+        r"
         let sab = new SharedArrayBuffer(8);
         let i32 = new Int32Array(sab);
         const valueOf = {
@@ -419,7 +419,7 @@ fn phase6_wait_async_positive_timeout_coerces_timeout_objects() {
         ]).then(values => {
             globalThis.phase6WaitAsyncTimeoutObjectValues = values;
         });
-        "#,
+        ",
         r#"
         let score = 0;
         if (phase6WaitAsyncTimeoutObjectValues[0] === "timed-out") score += 1;

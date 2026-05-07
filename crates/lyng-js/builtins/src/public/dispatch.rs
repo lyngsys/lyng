@@ -535,7 +535,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 /// The reserved IDs remain useful as compatibility function identities for older
 /// lowering/bootstrap paths, but the semantic algorithms are owned by the
 /// public builtin family modules.
-pub(crate) fn dispatch_internal_spec_like_builtin<Cx: PublicBuiltinDispatchContext>(
+pub fn dispatch_internal_spec_like_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,

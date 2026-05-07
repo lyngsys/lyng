@@ -3,7 +3,7 @@ use lyng_js_common::{AtomId, Span, WellKnownAtom};
 
 use super::Analyzer;
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     fn record_export_name(&mut self, name: AtomId, span: Span) {
         if !self.ctx.exported_names.insert(name) {
             let name_str = self.atoms.resolve(name);

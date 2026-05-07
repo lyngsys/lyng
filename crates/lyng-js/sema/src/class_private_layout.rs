@@ -72,7 +72,7 @@ pub struct ClassPrivateLayoutRecord {
 
 impl ClassPrivateLayoutRecord {
     #[inline]
-    pub fn new(
+    pub const fn new(
         body: NodeList<ClassElementId>,
         span: Span,
         scope: ScopeId,
@@ -170,12 +170,12 @@ impl ClassPrivateLayoutTable {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.records.len()
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
 

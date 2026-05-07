@@ -1,6 +1,10 @@
-use super::*;
+use super::{
+    AssignOp, AtomId, DeclarationKind, Expr, ExprId, FunctionCompiler, FunctionId, LoweringError,
+    LoweringResult, PreparedReferenceTarget, ReferenceUsage, ResolutionKind, SemanticBindingId,
+    StorageClass,
+};
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn assignment_target(&self, expr_id: ExprId) -> ExprId {
         let mut current = expr_id;
         while let Expr::ParenthesizedExpression { expression, .. } = self.ast().get_expr(current) {

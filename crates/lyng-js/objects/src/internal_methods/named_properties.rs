@@ -88,13 +88,13 @@ impl ObjectRuntime {
         metadata.flags = metadata
             .flags
             .union(ObjectFlags::NAMED_PROPERTIES_DICTIONARY);
-        if !preserve_named_slots {
-            if !heap.mut_store_object_slots_handle(
+        if !preserve_named_slots
+            && !heap.mut_store_object_slots_handle(
                 ObjectSlotsHandleStoreTarget::ObjectNamedSlots(id),
                 None,
-            ) {
-                return false;
-            }
+            )
+        {
+            return false;
         }
         self.bump_invalidation(id, InvalidationCause::DictionaryTransition)
     }

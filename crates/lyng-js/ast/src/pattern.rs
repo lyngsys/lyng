@@ -65,7 +65,7 @@ pub struct ArrayPatternElement {
 
 impl Pattern {
     /// Returns the span of this pattern.
-    pub fn span(&self) -> Span {
+    pub const fn span(&self) -> Span {
         match self {
             Self::Identifier { span, .. }
             | Self::Object { span, .. }

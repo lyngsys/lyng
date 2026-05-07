@@ -32,15 +32,15 @@ use crate::metadata::{
     TestMetadata, TestVariant,
 };
 
-pub(crate) const WORKER_RESULT_PREFIX: &str = "__lyng_js_test262_result__:";
-pub(crate) const WORKER_REQUEST_SEPARATOR: char = '\t';
+pub const WORKER_RESULT_PREFIX: &str = "__lyng_js_test262_result__:";
+pub const WORKER_REQUEST_SEPARATOR: char = '\t';
 const ASYNC_COMPLETE_MESSAGE: &str = "Test262:AsyncTestComplete";
 const ASYNC_FAILURE_PREFIX: &str = "Test262:AsyncTestFailure:";
 const STDERR_TAIL_LIMIT: usize = 8;
 const WORKER_RECYCLE_LIMIT: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RunOutcome {
+pub enum RunOutcome {
     Pass,
     Fail(String),
 }
@@ -53,18 +53,18 @@ enum WorkerMessage {
     ProtocolError(String),
 }
 
-pub(crate) struct WorkerExecution {
+pub struct WorkerExecution {
     pub(crate) outcome: RunOutcome,
     pub(crate) reusable: bool,
 }
 
-pub(crate) struct DiagnosticExecution {
+pub struct DiagnosticExecution {
     pub(crate) outcome_label: String,
     pub(crate) timings: Test262DiagnosticTimings,
     pub(crate) diagnostics: Option<Test262RuntimeDiagnostics>,
 }
 
-pub(crate) struct WorkerHandle {
+pub struct WorkerHandle {
     child: Child,
     stdin: Option<ChildStdin>,
     results: Receiver<WorkerMessage>,
@@ -75,7 +75,7 @@ pub(crate) struct WorkerHandle {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct PreparedTest {
+pub struct PreparedTest {
     pub(crate) path: PathBuf,
     pub(crate) category: String,
     pub(crate) metadata: TestMetadata,
@@ -162,7 +162,7 @@ enum ModuleExecutionError {
 }
 
 #[allow(clippy::too_many_lines)]
-pub(crate) fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> RunOutcome {
+pub fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> RunOutcome {
     let source = match fs::read_to_string(&test.path) {
         Ok(source) => source,
         Err(error) => {
@@ -348,7 +348,7 @@ pub(crate) fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> Run
 }
 
 #[allow(clippy::too_many_lines)]
-pub(crate) fn run_test_with_diagnostics(
+pub fn run_test_with_diagnostics(
     test: &PreparedTest,
     helpers: &Arc<HelperCatalog>,
 ) -> DiagnosticExecution {
@@ -822,7 +822,7 @@ fn hot_test_runtime_source<'a>(path: &Path, source: &'a str) -> Cow<'a, str> {
     Cow::Borrowed(source)
 }
 
-pub(crate) fn run_single_test_path(
+pub fn run_single_test_path(
     path: &Path,
     variant: TestVariant,
     helpers: &Arc<HelperCatalog>,
@@ -857,7 +857,7 @@ fn async_completion_outcome(messages: &[String]) -> RunOutcome {
     RunOutcome::Fail("async test did not signal completion".to_string())
 }
 
-pub(crate) fn encode_worker_request(request_id: u64, path: &Path, variant: TestVariant) -> String {
+pub fn encode_worker_request(request_id: u64, path: &Path, variant: TestVariant) -> String {
     format!(
         "{request_id}{WORKER_REQUEST_SEPARATOR}{}{WORKER_REQUEST_SEPARATOR}{}",
         variant.as_str(),
@@ -865,7 +865,7 @@ pub(crate) fn encode_worker_request(request_id: u64, path: &Path, variant: TestV
     )
 }
 
-pub(crate) fn decode_worker_request_line(line: &str) -> Option<(u64, TestVariant, PathBuf)> {
+pub fn decode_worker_request_line(line: &str) -> Option<(u64, TestVariant, PathBuf)> {
     let mut parts = line.splitn(3, WORKER_REQUEST_SEPARATOR);
     let request_id = parts.next()?.parse().ok()?;
     let variant = TestVariant::from_str(parts.next()?)?;
@@ -873,7 +873,7 @@ pub(crate) fn decode_worker_request_line(line: &str) -> Option<(u64, TestVariant
     Some((request_id, variant, path))
 }
 
-pub(crate) fn encode_worker_result(request_id: u64, result: &RunOutcome) -> String {
+pub fn encode_worker_result(request_id: u64, result: &RunOutcome) -> String {
     match result {
         RunOutcome::Pass => format!("{WORKER_RESULT_PREFIX}{request_id}:PASS"),
         RunOutcome::Fail(message) => format!(
@@ -883,7 +883,7 @@ pub(crate) fn encode_worker_result(request_id: u64, result: &RunOutcome) -> Stri
     }
 }
 
-pub(crate) fn decode_worker_result_line(line: &str) -> Option<(u64, RunOutcome)> {
+pub fn decode_worker_result_line(line: &str) -> Option<(u64, RunOutcome)> {
     let payload = line.strip_prefix(WORKER_RESULT_PREFIX)?;
     let (request_id, body) = payload.split_once(':')?;
     let request_id = request_id.parse().ok()?;
@@ -896,7 +896,7 @@ pub(crate) fn decode_worker_result_line(line: &str) -> Option<(u64, RunOutcome)>
     Some((request_id, RunOutcome::Fail(message)))
 }
 
-pub(crate) fn worker_main(helpers: &Arc<HelperCatalog>) -> ! {
+pub fn worker_main(helpers: &Arc<HelperCatalog>) -> ! {
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout().lock();
 
@@ -1022,7 +1022,7 @@ impl WorkerHandle {
         }
     }
 
-    pub(crate) fn should_recycle(&self) -> bool {
+    pub(crate) const fn should_recycle(&self) -> bool {
         self.completed_requests >= WORKER_RECYCLE_LIMIT
     }
 
@@ -1083,24 +1083,21 @@ fn spawn_stdout_reader(stdout: ChildStdout, sender: mpsc::Sender<WorkerMessage>)
                     return;
                 }
             };
-            match decode_worker_result_line(&line) {
-                Some((request_id, outcome)) => {
-                    if sender
-                        .send(WorkerMessage::Result {
-                            request_id,
-                            outcome,
-                        })
-                        .is_err()
-                    {
-                        return;
-                    }
-                }
-                None => {
-                    let _ = sender.send(WorkerMessage::ProtocolError(format!(
-                        "malformed worker output `{line}`"
-                    )));
+            if let Some((request_id, outcome)) = decode_worker_result_line(&line) {
+                if sender
+                    .send(WorkerMessage::Result {
+                        request_id,
+                        outcome,
+                    })
+                    .is_err()
+                {
                     return;
                 }
+            } else {
+                let _ = sender.send(WorkerMessage::ProtocolError(format!(
+                    "malformed worker output `{line}`"
+                )));
+                return;
             }
         }
     });
@@ -1136,7 +1133,7 @@ fn spawn_stderr_reader(stderr: ChildStderr, stderr_tail: Arc<Mutex<VecDeque<Stri
     });
 }
 
-pub(crate) fn panic_message(info: &Box<dyn std::any::Any + Send>) -> String {
+pub fn panic_message(info: &Box<dyn std::any::Any + Send>) -> String {
     if let Some(message) = info.downcast_ref::<String>() {
         return message.clone();
     }
@@ -1150,12 +1147,12 @@ fn frontend_negative_outcome(phase: &str, expectation: TestExpectation) -> RunOu
     let Some(negative) = expectation.negative else {
         return RunOutcome::Fail(format!("unexpected {phase} error"));
     };
-    if let Some(expected_type) = negative.error_type.as_deref() {
-        if expected_type != "SyntaxError" {
-            return RunOutcome::Fail(format!(
-                "expected {phase} error of type {expected_type} but frontend reports SyntaxError"
-            ));
-        }
+    if let Some(expected_type) = negative.error_type.as_deref()
+        && expected_type != "SyntaxError"
+    {
+        return RunOutcome::Fail(format!(
+            "expected {phase} error of type {expected_type} but frontend reports SyntaxError"
+        ));
     }
     RunOutcome::Pass
 }
@@ -1167,12 +1164,12 @@ fn negative_resolution_frontend_outcome(
     match negative.map(|negative| &negative.phase) {
         Some(ExpectedFailurePhase::Resolution) => {
             let expected_type = negative.and_then(|negative| negative.error_type.as_deref());
-            if let Some(expected_type) = expected_type {
-                if expected_type != "SyntaxError" {
-                    return RunOutcome::Fail(format!(
+            if let Some(expected_type) = expected_type
+                && expected_type != "SyntaxError"
+            {
+                return RunOutcome::Fail(format!(
                         "expected resolution error of type {expected_type} but {stage} surfaced SyntaxError"
                     ));
-                }
             }
             RunOutcome::Pass
         }

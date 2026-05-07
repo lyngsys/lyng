@@ -109,7 +109,7 @@ pub struct BytecodeBuilder {
 
 impl BytecodeBuilder {
     #[inline]
-    pub fn new(id: BytecodeFunctionId, kind: BytecodeFunctionKind) -> Self {
+    pub const fn new(id: BytecodeFunctionId, kind: BytecodeFunctionKind) -> Self {
         Self {
             header: BytecodeFunctionHeader::new(
                 id,
@@ -160,7 +160,7 @@ impl BytecodeBuilder {
     }
 
     #[inline]
-    pub fn set_name(&mut self, name: Option<AtomId>) {
+    pub const fn set_name(&mut self, name: Option<AtomId>) {
         self.header = BytecodeFunctionHeader::new(
             self.header.id(),
             self.header.kind(),
@@ -186,12 +186,12 @@ impl BytecodeBuilder {
     }
 
     #[inline]
-    pub fn set_flags(&mut self, flags: BytecodeFunctionFlags) {
+    pub const fn set_flags(&mut self, flags: BytecodeFunctionFlags) {
         self.header = self.header.with_flags(flags);
     }
 
     #[inline]
-    pub fn set_this_mode(&mut self, this_mode: ThisMode) {
+    pub const fn set_this_mode(&mut self, this_mode: ThisMode) {
         self.header = BytecodeFunctionHeader::new(
             self.header.id(),
             self.header.kind(),
@@ -217,7 +217,7 @@ impl BytecodeBuilder {
     }
 
     #[inline]
-    pub fn set_arguments_mode(&mut self, arguments_mode: ArgumentsMode) {
+    pub const fn set_arguments_mode(&mut self, arguments_mode: ArgumentsMode) {
         self.header = BytecodeFunctionHeader::new(
             self.header.id(),
             self.header.kind(),
@@ -243,26 +243,36 @@ impl BytecodeBuilder {
     }
 
     #[inline]
-    pub fn set_parameter_counts(&mut self, parameter_count: u16, minimum_argument_count: u16) {
+    pub const fn set_parameter_counts(
+        &mut self,
+        parameter_count: u16,
+        minimum_argument_count: u16,
+    ) {
         self.header = self
             .header
             .with_parameter_counts(parameter_count, minimum_argument_count);
     }
 
     #[inline]
-    pub fn set_parameter_initializer_end_offset(&mut self, parameter_initializer_end_offset: u32) {
+    pub const fn set_parameter_initializer_end_offset(
+        &mut self,
+        parameter_initializer_end_offset: u32,
+    ) {
         self.header = self
             .header
             .with_parameter_initializer_end_offset(parameter_initializer_end_offset);
     }
 
     #[inline]
-    pub fn set_environment_layout(&mut self, environment_layout: Option<EnvironmentLayoutRef>) {
+    pub const fn set_environment_layout(
+        &mut self,
+        environment_layout: Option<EnvironmentLayoutRef>,
+    ) {
         self.header = self.header.with_environment_layout(environment_layout);
     }
 
     #[inline]
-    pub fn set_source_span(&mut self, source_span: Option<Span>) {
+    pub const fn set_source_span(&mut self, source_span: Option<Span>) {
         self.header = self.header.with_source_span(source_span);
     }
 
@@ -314,26 +324,26 @@ impl BytecodeBuilder {
     }
 
     #[inline]
-    pub fn set_hidden_register_count(&mut self, hidden_register_count: u16) {
+    pub const fn set_hidden_register_count(&mut self, hidden_register_count: u16) {
         self.header = self
             .header
             .with_register_counts(self.header.register_count(), hidden_register_count);
     }
 
     #[inline]
-    pub fn set_environment_slot_count(&mut self, environment_slot_count: u16) {
+    pub const fn set_environment_slot_count(&mut self, environment_slot_count: u16) {
         self.header = self
             .header
             .with_environment_slot_count(environment_slot_count);
     }
 
     #[inline]
-    pub fn set_has_rest_parameter(&mut self, has_rest_parameter: bool) {
+    pub const fn set_has_rest_parameter(&mut self, has_rest_parameter: bool) {
         self.header = self.header.with_has_rest_parameter(has_rest_parameter);
     }
 
     #[inline]
-    pub fn set_needs_environment(&mut self, needs_environment: bool) {
+    pub const fn set_needs_environment(&mut self, needs_environment: bool) {
         self.header = self.header.with_needs_environment(needs_environment);
     }
 

@@ -1,7 +1,12 @@
 use super::state::GeneratorResumeRegisters;
-use super::*;
+use super::{
+    AssignOp, AtomId, BinaryOp, BuiltinFunctionId, BytecodeBuildError, BytecodeLimitKind,
+    CompletionKind, ConstantValue, DeoptFrameValue, DeoptSnapshot, DeoptValueSource, Expr, ExprId,
+    FeedbackSiteKind, FeedbackSiteMetadata, FunctionCompiler, LoweringError, LoweringResult,
+    Opcode, SafepointKind, Span,
+};
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     pub(super) fn alloc_temp(&mut self) -> LoweringResult<u16> {
         let register = self
             .builder
@@ -811,7 +816,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
-    pub(super) fn binary_opcode(&self, operator: BinaryOp) -> LoweringResult<Opcode> {
+    pub(super) const fn binary_opcode(&self, operator: BinaryOp) -> LoweringResult<Opcode> {
         match operator {
             BinaryOp::Add => Ok(Opcode::Add),
             BinaryOp::Sub => Ok(Opcode::Sub),
@@ -837,7 +842,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         }
     }
 
-    pub(super) fn assignment_opcode(&self, operator: AssignOp) -> LoweringResult<Opcode> {
+    pub(super) const fn assignment_opcode(&self, operator: AssignOp) -> LoweringResult<Opcode> {
         match operator {
             AssignOp::AddAssign => Ok(Opcode::Add),
             AssignOp::SubAssign => Ok(Opcode::Sub),
@@ -937,7 +942,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(index)
     }
 
-    pub(super) fn encode_register(&self, register: u16) -> LoweringResult<u16> {
+    pub(super) const fn encode_register(&self, register: u16) -> LoweringResult<u16> {
         Ok(register)
     }
 
@@ -945,11 +950,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         u16::try_from(index).map_err(|_| LoweringError::ConstantIndexOverflow { index })
     }
 
-    pub(super) fn ast(&self) -> &lyng_js_ast::Ast {
+    pub(super) const fn ast(&self) -> &lyng_js_ast::Ast {
         self.state.program.ast
     }
 
-    pub(super) fn root_span(&self) -> Span {
+    pub(super) const fn root_span(&self) -> Span {
         self.state.program.span
     }
 

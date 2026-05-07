@@ -121,7 +121,7 @@ impl IteratorRecord {
     }
 
     #[inline]
-    pub fn set_async_from_sync_state(&mut self, state: AsyncFromSyncState) {
+    pub const fn set_async_from_sync_state(&mut self, state: AsyncFromSyncState) {
         self.async_from_sync_state = state;
     }
 
@@ -131,7 +131,7 @@ impl IteratorRecord {
     }
 
     #[inline]
-    pub fn set_delegate_yield_await_state(&mut self, state: DelegateYieldAwaitState) {
+    pub const fn set_delegate_yield_await_state(&mut self, state: DelegateYieldAwaitState) {
         self.delegate_yield_await_state = state;
     }
 
@@ -141,7 +141,7 @@ impl IteratorRecord {
     }
 
     #[inline]
-    pub fn set_preserve_completion_on_close(&mut self, preserve_completion_on_close: bool) {
+    pub const fn set_preserve_completion_on_close(&mut self, preserve_completion_on_close: bool) {
         self.preserve_completion_on_close = preserve_completion_on_close;
     }
 
@@ -151,7 +151,7 @@ impl IteratorRecord {
     }
 
     #[inline]
-    pub fn set_done(&mut self, done: bool) {
+    pub const fn set_done(&mut self, done: bool) {
         self.done = done;
     }
 
@@ -161,7 +161,7 @@ impl IteratorRecord {
     }
 
     #[inline]
-    pub fn set_delegate_started(&mut self, delegate_started: bool) {
+    pub const fn set_delegate_started(&mut self, delegate_started: bool) {
         self.delegate_started = delegate_started;
     }
 }

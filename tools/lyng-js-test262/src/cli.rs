@@ -2,13 +2,13 @@ use crate::selection::ProposalStage;
 
 use std::env;
 
-pub(crate) const DEFAULT_REPORT_PATH: &str = "reports/js/lyng-js/test262.md";
-pub(crate) const DEFAULT_MANIFEST_PATH: &str = "reports/js/lyng-js/test262-exclusions.txt";
-pub(crate) const DEFAULT_TIMEOUT_MS: u64 = 1_000;
-pub(crate) const WORKER_FLAG: &str = "--worker";
+pub const DEFAULT_REPORT_PATH: &str = "reports/js/lyng-js/test262.md";
+pub const DEFAULT_MANIFEST_PATH: &str = "reports/js/lyng-js/test262-exclusions.txt";
+pub const DEFAULT_TIMEOUT_MS: u64 = 1_000;
+pub const WORKER_FLAG: &str = "--worker";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct RunnerConfig {
+pub struct RunnerConfig {
     pub(crate) filter: Option<String>,
     pub(crate) report_path: String,
     pub(crate) manifest_path: String,
@@ -20,12 +20,12 @@ pub(crate) struct RunnerConfig {
     pub(crate) worker: bool,
 }
 
-pub(crate) fn parse_args() -> RunnerConfig {
+pub fn parse_args() -> RunnerConfig {
     let args: Vec<String> = env::args().skip(1).collect();
     parse_args_from(&args)
 }
 
-pub(crate) fn parse_args_from(args: &[String]) -> RunnerConfig {
+pub fn parse_args_from(args: &[String]) -> RunnerConfig {
     let mut filter = None;
     let mut report_path = DEFAULT_REPORT_PATH.to_string();
     let mut manifest_path = DEFAULT_MANIFEST_PATH.to_string();
@@ -132,7 +132,7 @@ pub(crate) fn parse_args_from(args: &[String]) -> RunnerConfig {
     }
 }
 
-pub(crate) fn parse_proposal_stage_arg(value: &str) -> Option<ProposalStage> {
+pub fn parse_proposal_stage_arg(value: &str) -> Option<ProposalStage> {
     match value {
         "4" => Some(ProposalStage::Stage4),
         "3" => Some(ProposalStage::Stage3),
@@ -141,7 +141,7 @@ pub(crate) fn parse_proposal_stage_arg(value: &str) -> Option<ProposalStage> {
     }
 }
 
-pub(crate) fn print_help() {
+pub fn print_help() {
     eprintln!(
         "Usage: lyng-js-test262 [--filter <path-or-fragment>] [--report <path>] [--manifest <path>] [--proposal-stage <4|3|2.7>] [--no-skip] [--list-failures] [--timeout-ms <N>] [-j <N>]"
     );

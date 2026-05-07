@@ -5,7 +5,7 @@ use super::Analyzer;
 use crate::binding::DeclarationKind;
 use crate::scope::ScopeKind;
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     pub(super) fn walk_stmt_list(&mut self, list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>) {
         let scope_kind = self.scopes.get(self.ctx.current_scope).kind;
         let stmts = self.ast.get_stmt_list(list).to_vec();

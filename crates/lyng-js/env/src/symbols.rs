@@ -914,7 +914,7 @@ impl WellKnownSymbols {
     }
 
     #[inline]
-    pub fn set(&mut self, id: WellKnownSymbolId, value: Option<SymbolRef>) {
+    pub const fn set(&mut self, id: WellKnownSymbolId, value: Option<SymbolRef>) {
         match id {
             WellKnownSymbolId::HasInstance => self.has_instance = value,
             WellKnownSymbolId::IsConcatSpreadable => self.is_concat_spreadable = value,

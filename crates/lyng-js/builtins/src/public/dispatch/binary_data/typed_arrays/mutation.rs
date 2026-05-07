@@ -638,7 +638,7 @@ fn uint8_array_subarray_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         )?,
     );
     let end_argument = invocation.arguments().get(1).copied();
-    let end_is_undefined = end_argument.is_none_or(|value| value.is_undefined());
+    let end_is_undefined = end_argument.is_none_or(lyng_js_types::Value::is_undefined);
     let end = match end_argument {
         Some(value) if value.is_undefined() => source_length,
         Some(value) => normalize_relative_index_u64(

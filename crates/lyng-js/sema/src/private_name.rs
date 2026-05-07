@@ -22,7 +22,7 @@ pub struct PrivateNameTable {
 }
 
 impl PrivateNameTable {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             records: Vec::new(),
         }
@@ -43,12 +43,12 @@ impl PrivateNameTable {
 
     /// Returns the number of private name records.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.records.len()
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
 

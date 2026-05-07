@@ -20,7 +20,7 @@ pub struct ObjectAllocation {
 
 impl ObjectAllocation {
     #[inline]
-    pub fn ordinary(shape: ShapeId) -> Self {
+    pub const fn ordinary(shape: ShapeId) -> Self {
         Self {
             kind: ObjectKind::Ordinary,
             flags: ObjectFlags::extensible(),
@@ -52,7 +52,7 @@ impl ObjectAllocation {
     }
 
     #[inline]
-    pub fn proxy(shape: ShapeId, data: ProxyObjectData) -> Self {
+    pub const fn proxy(shape: ShapeId, data: ProxyObjectData) -> Self {
         Self {
             kind: ObjectKind::Proxy,
             flags: ObjectFlags::extensible(),
@@ -68,13 +68,13 @@ impl ObjectAllocation {
     }
 
     #[inline]
-    pub fn with_flags(mut self, flags: ObjectFlags) -> Self {
+    pub const fn with_flags(mut self, flags: ObjectFlags) -> Self {
         self.flags = flags;
         self
     }
 
     #[inline]
-    pub fn with_prototype(mut self, prototype: Option<ObjectRef>) -> Self {
+    pub const fn with_prototype(mut self, prototype: Option<ObjectRef>) -> Self {
         self.prototype = prototype;
         self
     }
@@ -82,37 +82,37 @@ impl ObjectAllocation {
     /// Sets the minimum named-slot buffer size. If the shape requires more
     /// slots, the shape wins.
     #[inline]
-    pub fn with_named_slot_count(mut self, named_slot_count: usize) -> Self {
+    pub const fn with_named_slot_count(mut self, named_slot_count: usize) -> Self {
         self.named_slot_count = named_slot_count;
         self
     }
 
     #[inline]
-    pub fn with_named_slot_fill(mut self, fill: Value) -> Self {
+    pub const fn with_named_slot_fill(mut self, fill: Value) -> Self {
         self.named_slot_fill = fill;
         self
     }
 
     #[inline]
-    pub fn with_element_capacity(mut self, element_capacity: usize) -> Self {
+    pub const fn with_element_capacity(mut self, element_capacity: usize) -> Self {
         self.element_capacity = element_capacity;
         self
     }
 
     #[inline]
-    pub fn with_element_fill(mut self, fill: Value) -> Self {
+    pub const fn with_element_fill(mut self, fill: Value) -> Self {
         self.element_fill = fill;
         self
     }
 
     #[inline]
-    pub fn with_ordinary_payload_value(mut self, value: Value) -> Self {
+    pub const fn with_ordinary_payload_value(mut self, value: Value) -> Self {
         self.ordinary_payload_value = Some(value);
         self
     }
 
     #[inline]
-    pub fn with_primitive_wrapper_value(self, value: Value) -> Self {
+    pub const fn with_primitive_wrapper_value(self, value: Value) -> Self {
         self.with_ordinary_payload_value(value)
     }
 
@@ -223,7 +223,7 @@ impl ObjectRecord {
     }
 
     #[inline]
-    pub fn cold(&self) -> &ObjectColdData {
+    pub const fn cold(&self) -> &ObjectColdData {
         &self.cold
     }
 }

@@ -1,5 +1,9 @@
 use super::property_access::VmProxyBridge;
-use super::*;
+use super::{
+    Agent, AllocationLifetime, BytecodeFunction, CodeRef, FrameRecord, HostHooks,
+    NativeFunctionRegistry, ObjectAllocation, ObjectRef, RealmRef, Value, Vm, VmError, VmResult,
+    WellKnownAtom,
+};
 use lyng_js_objects::{
     FunctionConstructorFlags, FunctionKindFlags, FunctionObjectData, FunctionThisMode,
     InternalMethodError, ObjectColdData, ObjectFlags, OrdinaryObjectData, RegExpPayload,
@@ -89,7 +93,7 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         let root_shape = agent
             .realm(realm)
-            .and_then(|realm| realm.root_shape())
+            .and_then(lyng_js_env::RealmRecord::root_shape)
             .ok_or(VmError::MissingRootShape(realm))?;
         let prototype = agent
             .realm(realm)
@@ -148,7 +152,7 @@ impl Vm {
         let kind_flags = bytecode_kind_flags(child);
         let root_shape = agent
             .realm(frame.realm())
-            .and_then(|realm| realm.root_shape())
+            .and_then(lyng_js_env::RealmRecord::root_shape)
             .ok_or(VmError::MissingRootShape(frame.realm()))?;
         let home_object = if child.flags().has_prototype_property() {
             Some(self.create_function_prototype(
@@ -161,7 +165,7 @@ impl Vm {
         };
         let private_env = agent
             .current_execution_context()
-            .and_then(|context| context.private_env());
+            .and_then(lyng_js_env::ExecutionContext::private_env);
         let environment = if child.captures().is_empty() {
             let lexical_env = frame.lexical_env();
             if matches!(
@@ -198,18 +202,18 @@ impl Vm {
             )
         });
 
-        if let Some(prototype) = home_object {
-            if !kind_flags.is_generator() {
-                self.define_data_property_with_attrs(
-                    agent,
-                    prototype,
-                    PropertyKey::from_atom(WellKnownAtom::constructor.id()),
-                    Value::from_object_ref(function),
-                    true,
-                    false,
-                    true,
-                )?;
-            }
+        if let Some(prototype) = home_object
+            && !kind_flags.is_generator()
+        {
+            self.define_data_property_with_attrs(
+                agent,
+                prototype,
+                PropertyKey::from_atom(WellKnownAtom::constructor.id()),
+                Value::from_object_ref(function),
+                true,
+                false,
+                true,
+            )?;
         }
 
         self.define_data_property_with_attrs(
@@ -253,7 +257,7 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         let root_shape = agent
             .realm(realm)
-            .and_then(|realm| realm.root_shape())
+            .and_then(lyng_js_env::RealmRecord::root_shape)
             .ok_or(VmError::MissingRootShape(realm))?;
         Ok(agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
@@ -384,23 +388,20 @@ impl Vm {
         key: PropertyKey,
         prefix: Option<&str>,
     ) -> VmResult<()> {
-        let name_value = match (prefix, key) {
-            (None, PropertyKey::Atom(atom)) => {
-                let name = agent.atoms().resolve(atom).to_owned();
-                Value::from_string_ref(agent.alloc_runtime_string(
-                    &name,
-                    Some(atom),
-                    AllocationLifetime::Default,
-                ))
-            }
-            _ => {
-                let name = function_name_text_from_property_key(agent, key, prefix);
-                Value::from_string_ref(agent.alloc_runtime_string(
-                    &name,
-                    None,
-                    AllocationLifetime::Default,
-                ))
-            }
+        let name_value = if let (None, PropertyKey::Atom(atom)) = (prefix, key) {
+            let name = agent.atoms().resolve(atom).to_owned();
+            Value::from_string_ref(agent.alloc_runtime_string(
+                &name,
+                Some(atom),
+                AllocationLifetime::Default,
+            ))
+        } else {
+            let name = function_name_text_from_property_key(agent, key, prefix);
+            Value::from_string_ref(agent.alloc_runtime_string(
+                &name,
+                None,
+                AllocationLifetime::Default,
+            ))
         };
         self.set_function_name(agent, function, name_value)
     }
@@ -642,30 +643,26 @@ impl Vm {
             {
                 Ok(value_wrapper) => value_wrapper,
                 Err(VmError::Abrupt(completion)) => {
-                    let completion = if !done {
-                        if let Some((iterator, next_method)) = close_on_rejection {
-                            let mut record = iterator::IteratorRecord::new_async_from_sync(
-                                iterator,
-                                next_method,
-                            );
-                            let mut bridge = VmIteratorBridge {
-                                vm: self,
-                                agent,
-                                host,
-                                registry,
-                                frame,
-                            };
-                            match iterator::iterator_close::<_, ()>(
-                                &mut bridge,
-                                &mut record,
-                                Err(completion),
-                            ) {
-                                Ok(()) => completion,
-                                Err(VmError::Abrupt(completion)) => completion,
-                                Err(error) => return Err(error),
-                            }
-                        } else {
-                            completion
+                    let completion = if done {
+                        completion
+                    } else if let Some((iterator, next_method)) = close_on_rejection {
+                        let mut record =
+                            iterator::IteratorRecord::new_async_from_sync(iterator, next_method);
+                        let mut bridge = VmIteratorBridge {
+                            vm: self,
+                            agent,
+                            host,
+                            registry,
+                            frame,
+                        };
+                        match iterator::iterator_close::<_, ()>(
+                            &mut bridge,
+                            &mut record,
+                            Err(completion),
+                        ) {
+                            Ok(()) => completion,
+                            Err(VmError::Abrupt(completion)) => completion,
+                            Err(error) => return Err(error),
                         }
                     } else {
                         completion
@@ -694,7 +691,9 @@ impl Vm {
             realm,
             value_wrapper,
             lyng_js_env::PromiseReactionHandler::AsyncFromSyncIteratorValue { done },
-            if !done {
+            if done {
+                lyng_js_env::PromiseReactionHandler::Thrower
+            } else {
                 close_on_rejection.map_or(
                     lyng_js_env::PromiseReactionHandler::Thrower,
                     |(iterator, next_method)| {
@@ -704,8 +703,6 @@ impl Vm {
                         }
                     },
                 )
-            } else {
-                lyng_js_env::PromiseReactionHandler::Thrower
             },
             Some(capability),
         )?;
@@ -1092,7 +1089,7 @@ impl Vm {
     }
 }
 
-fn bytecode_this_mode(function: &BytecodeFunction) -> lyng_js_objects::FunctionThisMode {
+const fn bytecode_this_mode(function: &BytecodeFunction) -> lyng_js_objects::FunctionThisMode {
     match function.this_mode() {
         lyng_js_bytecode::ThisMode::Lexical => FunctionThisMode::Lexical,
         lyng_js_bytecode::ThisMode::Strict => FunctionThisMode::Strict,
@@ -1100,7 +1097,7 @@ fn bytecode_this_mode(function: &BytecodeFunction) -> lyng_js_objects::FunctionT
     }
 }
 
-fn bytecode_constructor_flags(function: &BytecodeFunction) -> FunctionConstructorFlags {
+const fn bytecode_constructor_flags(function: &BytecodeFunction) -> FunctionConstructorFlags {
     match function.kind() {
         lyng_js_bytecode::BytecodeFunctionKind::Function => {
             FunctionConstructorFlags::empty().with_constructible(function.flags().constructible())
@@ -1112,7 +1109,7 @@ fn bytecode_constructor_flags(function: &BytecodeFunction) -> FunctionConstructo
     }
 }
 
-fn bytecode_kind_flags(function: &BytecodeFunction) -> FunctionKindFlags {
+const fn bytecode_kind_flags(function: &BytecodeFunction) -> FunctionKindFlags {
     let mut flags = match function.kind() {
         lyng_js_bytecode::BytecodeFunctionKind::Arrow => FunctionKindFlags::ARROW,
         _ => FunctionKindFlags::empty(),
@@ -1139,7 +1136,7 @@ fn callable_prototype_for_function(
 ) -> VmResult<Option<ObjectRef>> {
     let intrinsics = agent
         .realm(realm)
-        .map(|record| record.intrinsics())
+        .map(lyng_js_env::RealmRecord::intrinsics)
         .ok_or(VmError::MissingRootShape(realm))?;
     Ok(if kind_flags.is_async_generator() {
         intrinsics.async_generator_function_prototype()
@@ -1159,7 +1156,7 @@ fn prototype_parent_for_function(
 ) -> VmResult<ObjectRef> {
     let intrinsics = agent
         .realm(realm)
-        .map(|record| record.intrinsics())
+        .map(lyng_js_env::RealmRecord::intrinsics)
         .ok_or(VmError::MissingRootShape(realm))?;
     if kind_flags.is_async_generator() {
         intrinsics
@@ -1177,9 +1174,7 @@ fn prototype_parent_for_function(
 }
 
 pub(super) fn length_value(length: u32) -> Value {
-    i32::try_from(length)
-        .map(Value::from_smi)
-        .unwrap_or_else(|_| Value::from_f64(f64::from(length)))
+    i32::try_from(length).map_or_else(|_| Value::from_f64(f64::from(length)), Value::from_smi)
 }
 
 fn function_name_text_from_property_key(
@@ -1194,7 +1189,7 @@ fn function_name_text_from_property_key(
             .heap()
             .view()
             .symbol_view(symbol)
-            .and_then(|symbol| symbol.description_view())
+            .and_then(lyng_js_gc::PrimitiveSymbolView::description_view)
             .and_then(decode_function_name_text)
             .map_or_else(String::new, |description| format!("[{description}]")),
     };
@@ -1227,12 +1222,15 @@ fn string_ref_is_empty(agent: &Agent, string: lyng_js_types::StringRef) -> bool 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::frame::RegisterWindow;
     use lyng_js_bytecode::{
         BytecodeBuilder, BytecodeFunctionFlags, BytecodeFunctionId, BytecodeFunctionKind,
         CompiledFunctionUnit,
     };
     use lyng_js_common::SourceId;
-    use lyng_js_env::{EnvironmentLayout, EnvironmentLayoutKind, ExecutionContextKind, Runtime};
+    use lyng_js_env::{
+        EnvironmentLayout, EnvironmentLayoutKind, ExecutionContext, ExecutionContextKind, Runtime,
+    };
     use lyng_js_host::NoopHostHooks;
     use lyng_js_ops::object;
     use lyng_js_types::PropertyKey;

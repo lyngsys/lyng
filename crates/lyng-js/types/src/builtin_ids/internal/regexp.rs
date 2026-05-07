@@ -1,9 +1,6 @@
-use super::super::*;
+use super::super::{builtin_id, BuiltinFunctionId};
 
 #[inline]
-pub fn internal_regexp_literal_builtin() -> BuiltinFunctionId {
-    match BuiltinFunctionId::from_raw(INTERNAL_REGEXP_LITERAL_RAW) {
-        Some(id) => id,
-        None => unreachable!("builtin id should stay non-zero"),
-    }
+pub const fn internal_regexp_literal_builtin() -> BuiltinFunctionId {
+    builtin_id(super::super::INTERNAL_REGEXP_LITERAL_RAW)
 }

@@ -100,7 +100,7 @@ impl DynamicScriptAnalysis {
     }
 
     #[inline]
-    pub fn sema_mut(&mut self) -> &mut ScriptSema {
+    pub const fn sema_mut(&mut self) -> &mut ScriptSema {
         &mut self.sema
     }
 
@@ -228,7 +228,7 @@ fn collect_var_initializer_names_from_stmt(ast: &Ast, stmt: StmtId, names: &mut 
             }
         }
         Stmt::Declaration { decl, .. } => {
-            collect_var_initializer_names_from_decl(ast, *decl, names)
+            collect_var_initializer_names_from_decl(ast, *decl, names);
         }
         Stmt::Empty { .. }
         | Stmt::Expression { .. }

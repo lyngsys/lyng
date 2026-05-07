@@ -88,7 +88,7 @@ fn validate_flags(flags: &str) -> Result<RegExpFlags, &'static str> {
     Ok(parsed)
 }
 
-fn regexp_flag_bit(ch: char) -> Option<u8> {
+const fn regexp_flag_bit(ch: char) -> Option<u8> {
     match ch {
         'd' => Some(1 << 0),
         'g' => Some(1 << 1),
@@ -179,7 +179,7 @@ fn validate_pattern(
         match ch {
             '\\' => {
                 let (next, kind) = parse_escape(
-                    &chars,
+                    chars,
                     i,
                     flags,
                     false,
@@ -194,11 +194,11 @@ fn validate_pattern(
                 };
             }
             '[' => {
-                i = parse_character_class(&chars, i, flags, total_captures, &all_named_groups)?;
+                i = parse_character_class(chars, i, flags, total_captures, &all_named_groups)?;
                 last_atom = AtomKind::Atom;
             }
             '(' => {
-                let (next, kind) = parse_group_start(&chars, i, &mut named_groups)?;
+                let (next, kind) = parse_group_start(chars, i, &mut named_groups)?;
                 groups.push(kind);
                 i = next;
                 last_atom = AtomKind::None;
@@ -229,7 +229,7 @@ fn validate_pattern(
                 last_atom = AtomKind::None;
             }
             '{' => {
-                let quantifier = parse_braced_quantifier(&chars, i);
+                let quantifier = parse_braced_quantifier(chars, i);
                 if let Some((next, valid)) = quantifier {
                     if !valid {
                         if flags.unicode || !allow_annex_b_invalid_braced_quantifier {
@@ -468,12 +468,11 @@ fn parse_character_class(
             (i + 1, ClassAtomKind::Single)
         };
 
-        if let Some(left) = pending_range_left.take() {
-            if flags.unicode
-                && (left != ClassAtomKind::Single || atom_kind != ClassAtomKind::Single)
-            {
-                return Err("invalid regular expression pattern");
-            }
+        if let Some(left) = pending_range_left.take()
+            && flags.unicode
+            && (left != ClassAtomKind::Single || atom_kind != ClassAtomKind::Single)
+        {
+            return Err("invalid regular expression pattern");
         }
 
         prev_atom = Some(atom_kind);
@@ -506,18 +505,18 @@ fn is_unescaped_class_set_reserved_syntax(chars: &[char], index: usize) -> bool 
         .is_some_and(|&next| next == ch && is_class_set_reserved_double_punctuator(ch))
 }
 
-fn is_class_set_syntax_character(ch: char) -> bool {
+const fn is_class_set_syntax_character(ch: char) -> bool {
     matches!(ch, '(' | ')' | '[' | '{' | '}' | '/' | '-' | '|')
 }
 
-fn is_class_set_reserved_punctuator(ch: char) -> bool {
+const fn is_class_set_reserved_punctuator(ch: char) -> bool {
     matches!(
         ch,
         '&' | '!' | '#' | '%' | ',' | ':' | ';' | '<' | '=' | '>' | '@' | '`' | '~'
     )
 }
 
-fn is_class_set_reserved_double_punctuator(ch: char) -> bool {
+const fn is_class_set_reserved_double_punctuator(ch: char) -> bool {
     matches!(
         ch,
         '!' | '#'
@@ -862,10 +861,11 @@ fn collect_named_group_names(chars: &[char]) -> HashSet<String> {
                             end += 1;
                         }
 
-                        if end < chars.len() && chars[end] == '>' {
-                            if let Some(name) = parse_group_name_contents(&chars[i + 3..end]) {
-                                names.insert(name);
-                            }
+                        if end < chars.len()
+                            && chars[end] == '>'
+                            && let Some(name) = parse_group_name_contents(&chars[i + 3..end])
+                        {
+                            names.insert(name);
                         }
 
                         i += 1;
@@ -1027,13 +1027,13 @@ fn parse_group_name_unicode_escape(chars: &[char], start: usize) -> Option<(u32,
     Some((u32::from(code_unit), start + 6))
 }
 
-fn is_unicode_identity_escape(ch: char, in_class: bool) -> bool {
+const fn is_unicode_identity_escape(ch: char, in_class: bool) -> bool {
     matches!(
         ch,
         '^' | '$' | '\\' | '.' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '|' | '/'
     ) || (in_class && ch == '-')
 }
 
-fn is_line_terminator(ch: char) -> bool {
+const fn is_line_terminator(ch: char) -> bool {
     matches!(ch, '\n' | '\r' | '\u{2028}' | '\u{2029}')
 }

@@ -1,4 +1,10 @@
-use super::*;
+use super::{
+    alloc_code_unit_string, alloc_string, errors, object, parse_script, read,
+    string_from_code_point_builtin, Agent, AllocationLifetime, AtomTable, FrameRecord,
+    FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, HostHooks,
+    NativeFunctionRegistry, ObjectAllocation, ObjectColdData, ObjectRef, PropertyKey, RealmRef,
+    ToPrimitiveHint, Value, Vm, VmError, VmProxyBridge, VmResult, WellKnownAtom,
+};
 
 const MAX_FAST_APPLY_STRING_CODE_UNITS: usize = 1 << 20;
 
@@ -395,18 +401,17 @@ impl Vm {
         let Some(installed) = self.installed_function(code) else {
             return self.native_function_source_text(agent, function);
         };
-        if let Some(span) = installed.source_span() {
-            if let Some(source_text) = self.source_text(span.source) {
-                let start = usize::try_from(span.range.start.raw()).unwrap_or(usize::MAX);
-                let end = usize::try_from(span.range.end.raw()).unwrap_or(usize::MAX);
-                if start <= end && end <= source_text.len() {
-                    let candidate = &source_text[start..end];
-                    if let Some(trimmed) = Self::trim_function_source_prefix(span.source, candidate)
-                    {
-                        return Ok(trimmed);
-                    }
-                    return Ok(candidate.to_owned());
+        if let Some(span) = installed.source_span()
+            && let Some(source_text) = self.source_text(span.source)
+        {
+            let start = usize::try_from(span.range.start.raw()).unwrap_or(usize::MAX);
+            let end = usize::try_from(span.range.end.raw()).unwrap_or(usize::MAX);
+            if start <= end && end <= source_text.len() {
+                let candidate = &source_text[start..end];
+                if let Some(trimmed) = Self::trim_function_source_prefix(span.source, candidate) {
+                    return Ok(trimmed);
                 }
+                return Ok(candidate.to_owned());
             }
         }
         let name = self.function_name_text(agent, function)?;
@@ -547,10 +552,10 @@ fn bound_function_length_value(target_length: Value, bound_argument_count: usize
     if length.is_infinite() {
         return Value::from_f64(length);
     }
-    if let Ok(integer) = i32::try_from(length as i64) {
-        if f64::from(integer) == length {
-            return Value::from_smi(integer);
-        }
+    if let Ok(integer) = i32::try_from(length as i64)
+        && f64::from(integer) == length
+    {
+        return Value::from_smi(integer);
     }
     Value::from_f64(length)
 }

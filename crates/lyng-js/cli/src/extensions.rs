@@ -8,9 +8,9 @@ use std::io::{self, Write};
 
 const CLI_PRINT_RAW: u32 = 1;
 
-pub(crate) struct CliRealmExtension;
+pub struct CliRealmExtension;
 
-fn cli_print_entry() -> EmbeddingFunctionId {
+const fn cli_print_entry() -> EmbeddingFunctionId {
     EmbeddingFunctionId::from_raw(CLI_PRINT_RAW)
         .expect("CLI embedding function ids should stay non-zero")
 }

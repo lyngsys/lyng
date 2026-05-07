@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    bytecode_index, code_index, Agent, AllocationLifetime, AtomId, BytecodeFunction,
+    BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode, RealmRef,
+    TieringState, Value, Vm, VmError, VmResult,
+};
 use lyng_js_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
 };

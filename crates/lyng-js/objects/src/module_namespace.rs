@@ -90,13 +90,13 @@ impl ModuleNamespaceExport {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ModuleNamespaceObject {
+pub struct ModuleNamespaceObject {
     exports: Vec<ModuleNamespaceExport>,
 }
 
 impl ModuleNamespaceObject {
     #[inline]
-    pub(crate) fn new(exports: Vec<ModuleNamespaceExport>) -> Self {
+    pub(crate) const fn new(exports: Vec<ModuleNamespaceExport>) -> Self {
         Self { exports }
     }
 

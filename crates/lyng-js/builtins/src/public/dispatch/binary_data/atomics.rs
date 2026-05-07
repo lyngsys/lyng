@@ -67,15 +67,15 @@ fn atomics_pause_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    if let Some(argument) = invocation.arguments().first().copied() {
-        if !argument.is_undefined() {
-            if !argument.is_number() {
-                return Err(type_error(cx));
-            }
-            let number = argument.as_f64().ok_or_else(|| type_error(cx))?;
-            if !number.is_finite() || number.fract() != 0.0 {
-                return Err(type_error(cx));
-            }
+    if let Some(argument) = invocation.arguments().first().copied()
+        && !argument.is_undefined()
+    {
+        if !argument.is_number() {
+            return Err(type_error(cx));
+        }
+        let number = argument.as_f64().ok_or_else(|| type_error(cx))?;
+        if !number.is_finite() || number.fract() != 0.0 {
+            return Err(type_error(cx));
         }
     }
     Ok(Value::undefined())

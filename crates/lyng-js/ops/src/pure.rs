@@ -105,7 +105,7 @@ pub const fn is_mixed_descriptor(descriptor: PropertyDescriptor) -> bool {
 ///
 /// The returned descriptor is a normalized copy. Callers that need the raw
 /// presence bits can keep the original descriptor alongside the completed one.
-pub fn complete_property_descriptor(descriptor: PropertyDescriptor) -> PropertyDescriptor {
+pub const fn complete_property_descriptor(descriptor: PropertyDescriptor) -> PropertyDescriptor {
     let mut completed = descriptor;
 
     if is_generic_descriptor(descriptor) || is_data_descriptor(descriptor) {

@@ -49,7 +49,7 @@ pub(super) struct DataViewDescriptorSets {
     pub(super) data_view_prototype: [BuiltinPropertyDescriptor; 27],
 }
 
-pub(super) fn descriptor_sets(
+pub(super) const fn descriptor_sets(
     builtins: &PublicRealmBuiltins,
     atoms: DataViewDescriptorAtoms,
     data_view_tag: Value,

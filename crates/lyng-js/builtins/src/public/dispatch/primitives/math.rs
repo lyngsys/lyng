@@ -242,11 +242,13 @@ fn acosh_number(value: f64) -> f64 {
         return value.ln() + LN_2;
     }
     if value > 2.0 {
-        return (2.0 * value - 1.0 / (value + (value * value - 1.0).sqrt())).ln();
+        return 2.0f64
+            .mul_add(value, -(1.0 / (value + value.mul_add(value, -1.0).sqrt())))
+            .ln();
     }
 
     let delta = value - 1.0;
-    (delta + (2.0 * delta + delta * delta).sqrt()).ln_1p()
+    (delta + 2.0f64.mul_add(delta, delta * delta).sqrt()).ln_1p()
 }
 
 fn atanh_number(value: f64) -> f64 {
@@ -992,10 +994,10 @@ fn magnitude_shr_to_u64(limbs: &[u64], shift: usize) -> u64 {
         return 0;
     };
     let mut result = low >> bit_shift;
-    if bit_shift != 0 {
-        if let Some(high) = limbs.get(limb_shift + 1).copied() {
-            result |= high << (64 - bit_shift);
-        }
+    if bit_shift != 0
+        && let Some(high) = limbs.get(limb_shift + 1).copied()
+    {
+        result |= high << (64 - bit_shift);
     }
     result
 }

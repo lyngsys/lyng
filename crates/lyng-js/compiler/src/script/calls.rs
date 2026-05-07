@@ -1,6 +1,12 @@
-use super::*;
+use super::{
+    eval_builtin, internal_construct_super_builtin, internal_direct_eval_builtin,
+    internal_private_field_get_builtin, internal_super_constructor_builtin, CallBridgeRegisters,
+    CallRange, Expr, ExprId, FeedbackSiteKind, FeedbackSiteMetadata, FunctionCompiler,
+    FunctionKind, LoweredCallArguments, LoweringError, LoweringResult, Opcode, ResolutionKind,
+    SafepointKind, WellKnownAtom,
+};
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
+impl FunctionCompiler<'_, '_> {
     fn direct_eval_identifier(&self, callee: ExprId) -> LoweringResult<bool> {
         let mut current = callee;
         while let Expr::ParenthesizedExpression { expression, .. } = self.ast().get_expr(current) {
@@ -202,9 +208,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         callee: u16,
         this_value: u16,
     ) -> LoweringResult<(u16, u16, u16, Option<u16>)> {
-        if dest <= u16::from(u8::MAX)
-            && callee <= u16::from(u8::MAX)
-            && this_value <= u16::from(u8::MAX)
+        if u8::try_from(dest).is_ok()
+            && u8::try_from(callee).is_ok()
+            && u8::try_from(this_value).is_ok()
         {
             return Ok((dest, callee, this_value, None));
         }
@@ -241,7 +247,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         dest: u16,
         callee: u16,
     ) -> LoweringResult<(u16, u16, Option<u16>)> {
-        if dest <= u16::from(u8::MAX) && callee <= u16::from(u8::MAX) {
+        if u8::try_from(dest).is_ok() && u8::try_from(callee).is_ok() {
             return Ok((dest, callee, None));
         }
 
@@ -270,7 +276,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         callee: u16,
         this_value: u16,
     ) -> LoweringResult<(u16, u16)> {
-        if callee <= u16::from(u8::MAX) && this_value <= u16::from(u8::MAX) {
+        if u8::try_from(callee).is_ok() && u8::try_from(this_value).is_ok() {
             return Ok((callee, this_value));
         }
 
@@ -573,7 +579,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(CallRange::new(base, count))
     }
 
-    pub(super) fn call_feedback_metadata(
+    pub(super) const fn call_feedback_metadata(
         &self,
         expected_arity: u16,
         spread_mask: u64,
@@ -616,15 +622,12 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         arguments: lyng_js_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
-        let current_direct_eval_arrow = self
-            .current_function_ast
-            .map(|function| {
-                matches!(
-                    self.ast().get_function(function).kind,
-                    FunctionKind::Arrow | FunctionKind::AsyncArrow
-                )
-            })
-            .unwrap_or(false);
+        let current_direct_eval_arrow = self.current_function_ast.is_some_and(|function| {
+            matches!(
+                self.ast().get_function(function).kind,
+                FunctionKind::Arrow | FunctionKind::AsyncArrow
+            )
+        });
         if self.state.sema.direct_eval_allows_super
             && (self.current_function.is_none() || current_direct_eval_arrow)
         {

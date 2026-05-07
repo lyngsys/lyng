@@ -173,20 +173,20 @@ fn object_builtin<Cx: PublicBuiltinDispatchContext>(
         .copied()
         .unwrap_or(Value::undefined());
     let realm = cx.builtin_realm();
-    if let Some(new_target) = invocation.new_target() {
-        if new_target != cx.callee_object() {
-            let default_prototype = {
-                let agent = cx.agent();
-                agent
-                    .realm(realm)
-                    .and_then(|record| record.intrinsics().object_prototype())
-            }
-            .ok_or_else(|| type_error(cx))?;
-            let prototype =
-                cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)?;
-            let object = cx.allocate_ordinary_object_with_prototype(realm, Some(prototype))?;
-            return Ok(Value::from_object_ref(object));
+    if let Some(new_target) = invocation.new_target()
+        && new_target != cx.callee_object()
+    {
+        let default_prototype = {
+            let agent = cx.agent();
+            agent
+                .realm(realm)
+                .and_then(|record| record.intrinsics().object_prototype())
         }
+        .ok_or_else(|| type_error(cx))?;
+        let prototype =
+            cx.ordinary_constructor_prototype(realm, Some(new_target), default_prototype)?;
+        let object = cx.allocate_ordinary_object_with_prototype(realm, Some(prototype))?;
+        return Ok(Value::from_object_ref(object));
     }
     if let Some(object) = argument.as_object_ref() {
         return Ok(Value::from_object_ref(object));
@@ -226,10 +226,10 @@ fn object_create_builtin<Cx: PublicBuiltinDispatchContext>(
         return Err(type_error(cx));
     };
     let object = cx.allocate_ordinary_object_with_prototype(cx.builtin_realm(), prototype)?;
-    if let Some(properties) = invocation.arguments().get(1).copied() {
-        if !properties.is_undefined() {
-            define_properties_from_source(cx, object, properties)?;
-        }
+    if let Some(properties) = invocation.arguments().get(1).copied()
+        && !properties.is_undefined()
+    {
+        define_properties_from_source(cx, object, properties)?;
     }
     Ok(Value::from_object_ref(object))
 }
@@ -1174,10 +1174,10 @@ fn object_has_own_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    if let Some(index) = key.as_index() {
-        if let Some(has_own) = cx.try_fast_has_own_index_property(object_ref, index)? {
-            return Ok(Value::from_bool(has_own));
-        }
+    if let Some(index) = key.as_index()
+        && let Some(has_own) = cx.try_fast_has_own_index_property(object_ref, index)?
+    {
+        return Ok(Value::from_bool(has_own));
     }
     Ok(Value::from_bool(
         proxy_get_own_property(cx, object_ref, key)?.is_some(),
@@ -1196,10 +1196,10 @@ pub(super) fn object_has_own_property_builtin<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let object_ref = cx.to_object_for_builtin_value(cx.builtin_realm(), invocation.this_value())?;
-    if let Some(index) = key.as_index() {
-        if let Some(has_own) = cx.try_fast_has_own_index_property(object_ref, index)? {
-            return Ok(Value::from_bool(has_own));
-        }
+    if let Some(index) = key.as_index()
+        && let Some(has_own) = cx.try_fast_has_own_index_property(object_ref, index)?
+    {
+        return Ok(Value::from_bool(has_own));
     }
     Ok(Value::from_bool(
         proxy_get_own_property(cx, object_ref, key)?.is_some(),

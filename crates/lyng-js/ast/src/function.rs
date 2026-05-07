@@ -71,7 +71,7 @@ pub enum ClassElement {
 
 impl ClassElement {
     /// Returns the span of this class element.
-    pub fn span(&self) -> Span {
+    pub const fn span(&self) -> Span {
         match self {
             Self::Method { span, .. }
             | Self::Property { span, .. }
