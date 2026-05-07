@@ -190,7 +190,7 @@ impl AgentJobQueues {
 impl TraceHeapEdges for RuntimeJobPayload {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
         match self {
-            Self::Executable => {}
+            Self::Executable | Self::DynamicImportEvaluate { .. } => {}
             Self::PromiseReaction { argument, .. } => argument.trace_heap_edges(tracer),
             Self::PromiseThenableResolve {
                 promise,
@@ -201,7 +201,6 @@ impl TraceHeapEdges for RuntimeJobPayload {
                 thenable.trace_heap_edges(tracer);
                 then.trace_heap_edges(tracer);
             }
-            Self::DynamicImportEvaluate { .. } => {}
             Self::DynamicImportSettle { value, .. } => value.trace_heap_edges(tracer),
             Self::AtomicsWaitAsyncTimeout { promise, .. } => promise.trace_heap_edges(tracer),
             Self::FinalizationCleanup { registry } => registry.trace_heap_edges(tracer),

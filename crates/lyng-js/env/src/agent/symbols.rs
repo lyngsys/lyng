@@ -78,6 +78,11 @@ impl Agent {
         self.global_symbol_registry.insert(key, symbol)
     }
 
+    /// Allocates a runtime string using the narrowest available internal encoding.
+    ///
+    /// # Panics
+    /// Panics if the string length exceeds the `u32` code-unit limit used by runtime string
+    /// headers.
     pub fn alloc_runtime_string(
         &mut self,
         text: &str,
@@ -87,11 +92,11 @@ impl Agent {
         if let Some(atom) = cached_atom {
             return self.alloc_string_for_atom(atom, lifetime);
         }
-        if text.chars().all(|ch| u8::try_from(u32::from(ch)).is_ok()) {
-            let bytes: Vec<u8> = text
-                .chars()
-                .map(|ch| u8::try_from(u32::from(ch)).expect("Latin-1 code point must fit into u8"))
-                .collect();
+        if let Ok(bytes) = text
+            .chars()
+            .map(|ch| u8::try_from(u32::from(ch)))
+            .collect::<Result<Vec<_>, _>>()
+        {
             return self.heap.mutator().alloc_string(
                 StringEncoding::Latin1,
                 u32::try_from(bytes.len()).expect("Latin-1 string length must fit into u32"),

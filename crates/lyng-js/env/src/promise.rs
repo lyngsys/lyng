@@ -161,6 +161,12 @@ impl PromiseCapabilityRecord {
     }
 }
 
+impl Default for PromiseCapabilityRecord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PromiseResolvingFunctionKind {
     Resolve,
@@ -438,10 +444,9 @@ pub struct AgentPromiseTables {
 impl TraceHeapEdges for PromiseReactionHandler {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
         match self {
-            Self::Identity | Self::Thrower => {}
+            Self::Identity | Self::Thrower | Self::AsyncFromSyncIteratorValue { .. } => {}
             Self::Callable(object) => object.trace_heap_edges(tracer),
             Self::PassThrough(value) | Self::ThrowWith(value) => value.trace_heap_edges(tracer),
-            Self::AsyncFromSyncIteratorValue { .. } => {}
             Self::AsyncFromSyncIteratorReject {
                 iterator,
                 next_method,

@@ -78,9 +78,11 @@ impl Agent {
         layout: EnvironmentLayoutId,
         lifetime: AllocationLifetime,
     ) -> Option<EnvironmentRef> {
-        if self.environment_layout(layout)?.kind() != EnvironmentLayoutKind::Module {
+        let layout_record = self.environment_layout(layout)?;
+        if layout_record.kind() != EnvironmentLayoutKind::Module {
             return None;
         }
+        let import_aliases = vec![None; usize::try_from(layout_record.slot_count()).ok()?];
         Some(self.alloc_environment_record(
             outer,
             Some(layout),
@@ -90,15 +92,7 @@ impl Agent {
             None,
             EnvironmentMetadata::Module {
                 layout,
-                import_aliases: vec![
-                    None;
-                    usize::try_from(
-                        self.environment_layout(layout)
-                            .expect("checked module layout should exist")
-                            .slot_count()
-                    )
-                    .expect("module layout slot count must fit into usize")
-                ],
+                import_aliases,
             },
             lifetime,
         ))

@@ -123,13 +123,10 @@ impl AgentCluster {
         byte_length: usize,
     ) -> Option<BackingStoreRef> {
         self.agent(owner)?;
-        let Some(backing_store) = self
+        let backing_store = self
             .backing_stores
             .borrow_mut()
-            .allocate_shared(byte_length)
-        else {
-            return None;
-        };
+            .allocate_shared(byte_length)?;
         if self
             .shared_memory
             .borrow_mut()
@@ -205,10 +202,8 @@ impl AgentCluster {
         if self.agent(parked.agent()).is_none() {
             return false;
         }
-        self.shared_memory
-            .borrow_mut()
-            .park_agent(location, parked)
-            .is_some()
+        let _token = self.shared_memory.borrow_mut().park_agent(location, parked);
+        true
     }
 
     pub fn waiter_count(&self, location: WaitLocation) -> usize {
@@ -239,11 +234,11 @@ impl AgentCluster {
             .collect()
     }
 
-    fn backing_store_handle(&mut self) -> ClusterBackingStoreHandle {
+    fn backing_store_handle(&self) -> ClusterBackingStoreHandle {
         ClusterBackingStoreHandle::new(Rc::clone(&self.backing_stores))
     }
 
-    fn shared_memory_handle(&mut self) -> ClusterSharedMemoryHandle {
+    fn shared_memory_handle(&self) -> ClusterSharedMemoryHandle {
         ClusterSharedMemoryHandle::new(Rc::clone(&self.shared_memory))
     }
 }

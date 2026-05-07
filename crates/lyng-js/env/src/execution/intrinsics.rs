@@ -120,6 +120,10 @@ pub struct Intrinsics {
 
 impl Intrinsics {
     #[inline]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "intrinsic initialization is a deliberately explicit table of spec intrinsics"
+    )]
     pub const fn new() -> Self {
         Self {
             object: None,
@@ -1477,6 +1481,10 @@ impl Intrinsics {
 }
 
 impl TraceHeapEdges for Intrinsics {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "intrinsic tracing mirrors the explicit intrinsic field table"
+    )]
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
         for intrinsic in [
             self.object,

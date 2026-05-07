@@ -195,7 +195,7 @@ impl ClusterSharedMemoryHandle {
     }
 
     #[inline]
-    fn park_agent(&self, location: WaitLocation, parked: ParkedAgentRecord) -> Option<WaiterToken> {
+    fn park_agent(&self, location: WaitLocation, parked: ParkedAgentRecord) -> WaiterToken {
         self.0.borrow_mut().park_agent(location, parked)
     }
 
@@ -404,7 +404,7 @@ impl Agent {
         location: WaitLocation,
         parked: ParkedAgentRecord,
     ) -> Option<WaiterToken> {
-        self.shared_memory.park_agent(location, parked)
+        Some(self.shared_memory.park_agent(location, parked))
     }
 
     #[inline]

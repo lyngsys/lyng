@@ -33,7 +33,7 @@ impl BackingStoreRecord {
     const fn is_detached(&self) -> bool {
         match self {
             Self::Local(record) => record.is_detached(),
-            Self::Shared(record) => record.is_detached(),
+            Self::Shared(_) => false,
         }
     }
 
@@ -223,10 +223,6 @@ impl SharedBackingStoreRecord {
         self.byte_length
     }
 
-    const fn is_detached(&self) -> bool {
-        false
-    }
-
     fn get_byte(&self, index: usize) -> Option<u8> {
         self.with_bytes(|bytes| bytes.get(index).copied())
     }
@@ -311,6 +307,10 @@ impl SharedBackingStoreRecord {
     }
 }
 
+#[allow(
+    clippy::missing_fields_in_debug,
+    reason = "debug output intentionally omits the shared byte payload to avoid locking and dumping large buffers"
+)]
 impl std::fmt::Debug for SharedBackingStoreRecord {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter

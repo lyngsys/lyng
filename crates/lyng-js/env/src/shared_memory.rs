@@ -245,8 +245,8 @@ impl SharedMemoryRuntime {
         &mut self,
         location: WaitLocation,
         parked: ParkedAgentRecord,
-    ) -> Option<WaiterToken> {
-        Some(self.push_waiter(location, WaiterKind::Blocking(parked)))
+    ) -> WaiterToken {
+        self.push_waiter(location, WaiterKind::Blocking(parked))
     }
 
     pub(crate) fn park_async_waiter(

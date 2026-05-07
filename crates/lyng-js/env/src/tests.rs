@@ -1354,24 +1354,33 @@ fn shared_backing_store_visibility_crosses_os_threads() {
     let worker = runtime.clone();
 
     std::thread::spawn(move || {
-        let runtime = worker.lock().expect("worker mutex should stay healthy");
-        assert!(runtime.atomic_load_bits(store, 0, 4).is_some());
+        let loaded = {
+            let runtime = worker.lock().expect("worker mutex should stay healthy");
+            runtime.atomic_load_bits(store, 0, 4).is_some()
+        };
+        assert!(loaded);
     })
     .join()
     .expect("worker thread should complete");
 
     let worker = runtime.clone();
     std::thread::spawn(move || {
-        let mut runtime = worker.lock().expect("worker mutex should stay healthy");
-        assert!(runtime.atomic_store_bits(store, 0, 4, 0x7856_3412));
+        let stored = {
+            let mut runtime = worker.lock().expect("worker mutex should stay healthy");
+            runtime.atomic_store_bits(store, 0, 4, 0x7856_3412)
+        };
+        assert!(stored);
     })
     .join()
     .expect("writer thread should complete");
 
-    let runtime = runtime
-        .lock()
-        .expect("backing-store mutex should stay healthy");
-    assert_eq!(runtime.atomic_load_bits(store, 0, 4), Some(0x7856_3412));
+    let loaded = {
+        let runtime = runtime
+            .lock()
+            .expect("backing-store mutex should stay healthy");
+        runtime.atomic_load_bits(store, 0, 4)
+    };
+    assert_eq!(loaded, Some(0x7856_3412));
 }
 
 #[test]
@@ -1382,8 +1391,7 @@ fn shared_wait_queue_wakes_waiters_across_os_threads() {
     let token = runtime
         .lock()
         .expect("shared-memory mutex should stay healthy")
-        .park_agent(location, parked)
-        .expect("waiter should receive a token");
+        .park_agent(location, parked);
     let worker = runtime.clone();
 
     let woken = std::thread::spawn(move || {

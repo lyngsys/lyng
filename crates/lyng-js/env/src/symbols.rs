@@ -119,6 +119,10 @@ pub struct BootstrapAtoms {
 }
 
 impl BootstrapAtoms {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "bootstrap atom initialization is an explicit interned-name table"
+    )]
     pub fn new(atoms: &mut AtomTable) -> Self {
         Self {
             boolean: atoms.intern("Boolean"),
@@ -739,6 +743,10 @@ impl BootstrapAtoms {
 }
 
 impl TraceAtomEdges for BootstrapAtoms {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "atom tracing mirrors the explicit bootstrap atom field table"
+    )]
     fn trace_atom_edges(&self, sweep: &mut AtomGcSweep<'_>) {
         self.boolean.trace_atom_edges(sweep);
         self.create.trace_atom_edges(sweep);

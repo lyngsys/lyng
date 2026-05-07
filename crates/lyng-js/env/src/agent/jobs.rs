@@ -29,6 +29,10 @@ impl Agent {
         )
     }
 
+    /// Enqueues one runtime job with a pre-built payload.
+    ///
+    /// # Panics
+    /// Panics if the monotonic job id overflows the supported non-zero `u32` range.
     pub fn enqueue_job_with_payload(
         &mut self,
         kind: HostJobKind,
