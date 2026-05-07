@@ -25,48 +25,82 @@ pub fn parse_args() -> RunnerConfig {
     parse_args_from(&args)
 }
 
+struct ParsedArgs {
+    filter: Option<String>,
+    report_path: String,
+    manifest_path: String,
+    no_skip: bool,
+    list_failures: bool,
+    timeout_ms: u64,
+    proposal_stage: ProposalStage,
+    worker: bool,
+    jobs: usize,
+}
+
+impl ParsedArgs {
+    fn new() -> Self {
+        Self {
+            filter: None,
+            report_path: DEFAULT_REPORT_PATH.to_string(),
+            manifest_path: DEFAULT_MANIFEST_PATH.to_string(),
+            no_skip: false,
+            list_failures: false,
+            timeout_ms: DEFAULT_TIMEOUT_MS,
+            proposal_stage: ProposalStage::Stage3,
+            worker: false,
+            jobs: std::thread::available_parallelism()
+                .map(std::num::NonZeroUsize::get)
+                .unwrap_or(4),
+        }
+    }
+
+    fn into_config(self) -> RunnerConfig {
+        RunnerConfig {
+            filter: self.filter,
+            report_path: self.report_path,
+            manifest_path: self.manifest_path,
+            no_skip: self.no_skip,
+            list_failures: self.list_failures,
+            jobs: self.jobs,
+            timeout_ms: self.timeout_ms,
+            proposal_stage: self.proposal_stage,
+            worker: self.worker,
+        }
+    }
+}
+
 pub fn parse_args_from(args: &[String]) -> RunnerConfig {
-    let mut filter = None;
-    let mut report_path = DEFAULT_REPORT_PATH.to_string();
-    let mut manifest_path = DEFAULT_MANIFEST_PATH.to_string();
-    let mut no_skip = false;
-    let mut list_failures = false;
-    let mut timeout_ms = DEFAULT_TIMEOUT_MS;
-    let mut proposal_stage = ProposalStage::Stage3;
-    let mut worker = false;
-    let mut jobs = std::thread::available_parallelism()
-        .map(std::num::NonZeroUsize::get)
-        .unwrap_or(4);
+    let mut parsed = ParsedArgs::new();
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
             "--filter" => {
                 index += 1;
-                filter = args.get(index).cloned();
+                parsed.filter = args.get(index).cloned();
             }
             "--report" => {
                 index += 1;
-                report_path = args
+                parsed.report_path = args
                     .get(index)
                     .cloned()
                     .unwrap_or_else(|| DEFAULT_REPORT_PATH.to_string());
             }
             "--manifest" => {
                 index += 1;
-                manifest_path = args
+                parsed.manifest_path = args
                     .get(index)
                     .cloned()
                     .unwrap_or_else(|| DEFAULT_MANIFEST_PATH.to_string());
             }
             "--no-skip" => {
-                no_skip = true;
+                parsed.no_skip = true;
             }
             "--list-failures" => {
-                list_failures = true;
+                parsed.list_failures = true;
             }
             "--timeout-ms" => {
                 index += 1;
-                timeout_ms = args
+                parsed.timeout_ms = args
                     .get(index)
                     .and_then(|value| value.parse().ok())
                     .unwrap_or(DEFAULT_TIMEOUT_MS)
@@ -79,7 +113,7 @@ pub fn parse_args_from(args: &[String]) -> RunnerConfig {
                     print_help();
                     std::process::exit(1);
                 };
-                proposal_stage = parse_proposal_stage_arg(value).unwrap_or_else(|| {
+                parsed.proposal_stage = parse_proposal_stage_arg(value).unwrap_or_else(|| {
                     eprintln!("Invalid proposal stage: {value}");
                     print_help();
                     std::process::exit(1);
@@ -87,20 +121,20 @@ pub fn parse_args_from(args: &[String]) -> RunnerConfig {
             }
             "--jobs" | "-j" => {
                 index += 1;
-                jobs = args
+                parsed.jobs = args
                     .get(index)
                     .and_then(|value| value.parse().ok())
                     .unwrap_or(4);
-                if jobs == 0 {
-                    jobs = 1;
+                if parsed.jobs == 0 {
+                    parsed.jobs = 1;
                 }
             }
             WORKER_FLAG => {
-                worker = true;
+                parsed.worker = true;
             }
             arg if arg.starts_with("-j") && arg.len() > 2 => {
-                if let Ok(parsed) = arg[2..].parse::<usize>() {
-                    jobs = parsed.max(1);
+                if let Ok(job_count) = arg[2..].parse::<usize>() {
+                    parsed.jobs = job_count.max(1);
                 }
             }
             "--help" | "-h" => {
@@ -113,23 +147,13 @@ pub fn parse_args_from(args: &[String]) -> RunnerConfig {
                 std::process::exit(1);
             }
             arg => {
-                filter = Some(arg.to_string());
+                parsed.filter = Some(arg.to_string());
             }
         }
         index += 1;
     }
 
-    RunnerConfig {
-        filter,
-        report_path,
-        manifest_path,
-        no_skip,
-        list_failures,
-        jobs,
-        timeout_ms,
-        proposal_stage,
-        worker,
-    }
+    parsed.into_config()
 }
 
 pub fn parse_proposal_stage_arg(value: &str) -> Option<ProposalStage> {

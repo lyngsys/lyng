@@ -289,9 +289,11 @@ pub fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> RunOutcome
                 ),
                 _ => RunOutcome::Pass,
             },
-            Err(ModuleExecutionError::Abrupt { actual_type }) => {
-                negative_runtime_outcome(expectation.negative.as_ref(), "runtime", actual_type)
-            }
+            Err(ModuleExecutionError::Abrupt { actual_type }) => negative_runtime_outcome(
+                expectation.negative.as_ref(),
+                "runtime",
+                actual_type.as_deref(),
+            ),
             Err(ModuleExecutionError::FrontendSyntax { stage }) => {
                 negative_resolution_frontend_outcome(expectation.negative.as_ref(), stage)
             }
@@ -324,9 +326,11 @@ pub fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> RunOutcome
                 ),
                 _ => RunOutcome::Pass,
             },
-            Err(ScriptExecutionError::Abrupt { actual_type }) => {
-                negative_runtime_outcome(expectation.negative.as_ref(), "runtime", actual_type)
-            }
+            Err(ScriptExecutionError::Abrupt { actual_type }) => negative_runtime_outcome(
+                expectation.negative.as_ref(),
+                "runtime",
+                actual_type.as_deref(),
+            ),
             Err(ScriptExecutionError::Vm(error)) => match expectation
                 .negative
                 .as_ref()
@@ -444,9 +448,11 @@ pub fn run_test_with_diagnostics(
                 ),
                 _ => RunOutcome::Pass,
             },
-            Err(ModuleExecutionError::Abrupt { actual_type }) => {
-                negative_runtime_outcome(expectation.negative.as_ref(), "runtime", actual_type)
-            }
+            Err(ModuleExecutionError::Abrupt { actual_type }) => negative_runtime_outcome(
+                expectation.negative.as_ref(),
+                "runtime",
+                actual_type.as_deref(),
+            ),
             Err(ModuleExecutionError::FrontendSyntax { stage }) => {
                 negative_resolution_frontend_outcome(expectation.negative.as_ref(), stage)
             }
@@ -702,9 +708,11 @@ fn run_script_with_diagnostics(
 
 fn script_error_outcome(error: ScriptExecutionError, expectation: &TestExpectation) -> RunOutcome {
     match error {
-        ScriptExecutionError::Abrupt { actual_type } => {
-            negative_runtime_outcome(expectation.negative.as_ref(), "runtime", actual_type)
-        }
+        ScriptExecutionError::Abrupt { actual_type } => negative_runtime_outcome(
+            expectation.negative.as_ref(),
+            "runtime",
+            actual_type.as_deref(),
+        ),
         ScriptExecutionError::Vm(error) => match expectation
             .negative
             .as_ref()
@@ -976,14 +984,14 @@ impl WorkerHandle {
         );
 
         let Some(stdin) = self.stdin.as_mut() else {
-            return self.discard_with_error("worker stdin closed unexpectedly".to_string(), true);
+            return self.discard_with_error("worker stdin closed unexpectedly", true);
         };
         if let Err(error) = stdin
             .write_all(request_line.as_bytes())
             .and_then(|()| stdin.flush())
         {
-            return self
-                .discard_with_error(format!("failed to send worker request: {error}"), true);
+            let reason = format!("failed to send worker request: {error}");
+            return self.discard_with_error(&reason, true);
         }
 
         match self.results.recv_timeout(timeout) {
@@ -992,12 +1000,10 @@ impl WorkerHandle {
                 outcome,
             }) => {
                 if actual_request_id != request_id {
-                    return self.discard_with_error(
-                        format!(
-                            "worker response id {actual_request_id} did not match request {request_id}"
-                        ),
-                        false,
+                    let reason = format!(
+                        "worker response id {actual_request_id} did not match request {request_id}"
                     );
+                    return self.discard_with_error(&reason, false);
                 }
                 self.completed_requests += 1;
                 WorkerExecution {
@@ -1005,7 +1011,7 @@ impl WorkerHandle {
                     reusable: true,
                 }
             }
-            Ok(WorkerMessage::ProtocolError(error)) => self.discard_with_error(error, false),
+            Ok(WorkerMessage::ProtocolError(error)) => self.discard_with_error(&error, false),
             Err(RecvTimeoutError::Timeout) => {
                 self.kill_worker();
                 WorkerExecution {
@@ -1017,7 +1023,7 @@ impl WorkerHandle {
                 }
             }
             Err(RecvTimeoutError::Disconnected) => {
-                self.discard_with_error("worker exited before replying".to_string(), true)
+                self.discard_with_error("worker exited before replying", true)
             }
         }
     }
@@ -1030,14 +1036,13 @@ impl WorkerHandle {
         self.kill_worker();
     }
 
-    fn discard_with_error(&mut self, reason: String, include_stderr_tail: bool) -> WorkerExecution {
+    fn discard_with_error(&mut self, reason: &str, include_stderr_tail: bool) -> WorkerExecution {
         self.kill_worker();
         let outcome = if include_stderr_tail {
-            if let Some(details) = self.stderr_tail_summary() {
-                RunOutcome::Fail(format!("runner error: {reason} ({details})"))
-            } else {
-                RunOutcome::Fail(format!("runner error: {reason}"))
-            }
+            self.stderr_tail_summary().map_or_else(
+                || RunOutcome::Fail(format!("runner error: {reason}")),
+                |details| RunOutcome::Fail(format!("runner error: {reason} ({details})")),
+            )
         } else {
             RunOutcome::Fail(format!("runner error: {reason}"))
         };
@@ -1114,23 +1119,27 @@ fn spawn_stderr_reader(stderr: ChildStderr, stderr_tail: Arc<Mutex<VecDeque<Stri
             if trimmed.is_empty() {
                 continue;
             }
-            match stderr_tail.lock() {
-                Ok(mut tail) => {
-                    tail.push_back(trimmed.to_string());
-                    while tail.len() > STDERR_TAIL_LIMIT {
-                        tail.pop_front();
-                    }
-                }
-                Err(poisoned) => {
-                    let mut tail = poisoned.into_inner();
-                    tail.push_back(trimmed.to_string());
-                    while tail.len() > STDERR_TAIL_LIMIT {
-                        tail.pop_front();
-                    }
-                }
-            }
+            push_stderr_tail(&stderr_tail, trimmed);
         }
     });
+}
+
+fn push_stderr_tail(stderr_tail: &Mutex<VecDeque<String>>, line: &str) {
+    let message = line.to_string();
+    {
+        let mut tail = {
+            let lock_result = stderr_tail.lock();
+            match lock_result {
+                Ok(tail) => tail,
+                Err(poisoned) => poisoned.into_inner(),
+            }
+        };
+        tail.push_back(message);
+        while tail.len() > STDERR_TAIL_LIMIT {
+            tail.pop_front();
+        }
+        drop(tail);
+    }
 }
 
 pub fn panic_message(info: &Box<dyn std::any::Any + Send>) -> String {
@@ -1183,41 +1192,40 @@ fn negative_resolution_frontend_outcome(
 fn negative_runtime_outcome(
     negative: Option<&ExpectedFailure>,
     phase: &str,
-    actual_type: Option<String>,
+    actual_type: Option<&str>,
 ) -> RunOutcome {
     match negative {
-        Some(expected) if matches!(expected.phase, ExpectedFailurePhase::Runtime) => {
-            if let Some(expected_type) = expected.error_type.as_deref() {
-                if actual_type.as_deref() == Some(expected_type) {
-                    RunOutcome::Pass
-                } else {
-                    RunOutcome::Fail(format!(
-                        "expected runtime error of type {expected_type} but got {}",
-                        actual_type.unwrap_or_else(|| "unknown error".to_string())
-                    ))
-                }
-            } else {
-                RunOutcome::Pass
-            }
-        }
-        Some(expected) if matches!(expected.phase, ExpectedFailurePhase::Resolution) => {
-            if let Some(expected_type) = expected.error_type.as_deref() {
-                if actual_type.as_deref() == Some(expected_type) {
-                    RunOutcome::Pass
-                } else {
-                    RunOutcome::Fail(format!(
-                        "expected resolution error of type {expected_type} but got {}",
-                        actual_type.unwrap_or_else(|| "unknown error".to_string())
-                    ))
-                }
-            } else {
-                RunOutcome::Pass
-            }
-        }
+        Some(expected) if matches!(expected.phase, ExpectedFailurePhase::Runtime) => expected
+            .error_type
+            .as_deref()
+            .map_or(RunOutcome::Pass, |expected_type| {
+                expected_negative_error_outcome("runtime", expected_type, actual_type)
+            }),
+        Some(expected) if matches!(expected.phase, ExpectedFailurePhase::Resolution) => expected
+            .error_type
+            .as_deref()
+            .map_or(RunOutcome::Pass, |expected_type| {
+                expected_negative_error_outcome("resolution", expected_type, actual_type)
+            }),
         _ => RunOutcome::Fail(format!(
             "{phase} error: {}",
-            actual_type.unwrap_or_else(|| "abrupt completion".to_string())
+            actual_type.unwrap_or("abrupt completion")
         )),
+    }
+}
+
+fn expected_negative_error_outcome(
+    phase: &str,
+    expected_type: &str,
+    actual_type: Option<&str>,
+) -> RunOutcome {
+    if actual_type == Some(expected_type) {
+        RunOutcome::Pass
+    } else {
+        RunOutcome::Fail(format!(
+            "expected {phase} error of type {expected_type} but got {}",
+            actual_type.unwrap_or("unknown error")
+        ))
     }
 }
 
@@ -1395,7 +1403,7 @@ fn thrown_error_type(
     None
 }
 
-fn value_string(agent: &mut Agent, value: Value) -> Option<String> {
+fn value_string(agent: &Agent, value: Value) -> Option<String> {
     let string = value.as_string_ref()?;
     let view = agent.heap().view().string_view(string)?;
     if let Some(bytes) = view.latin1_bytes() {

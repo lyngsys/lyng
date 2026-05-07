@@ -268,7 +268,7 @@ fn runner_supports_single_agent_atomics_helper_set_timeout_callback() {
 
     let _report = run_passing_test(
         &entry_path,
-        r#"
+        r"
         /*---
         flags: [async]
         includes: [atomicsHelper.js]
@@ -276,7 +276,7 @@ fn runner_supports_single_agent_atomics_helper_set_timeout_callback() {
         ---*/
 
         $262.agent.setTimeout(() => $DONE(), 0);
-        "#,
+        ",
     );
 
     let _ = fs::remove_dir_all(root);
@@ -387,7 +387,7 @@ fn runner_supports_single_agent_wait_async_timeout_promise_all_without_polling()
 
     let _report = run_passing_test(
         &entry_path,
-        r#"
+        r"
         /*---
         flags: [async]
         includes: [atomicsHelper.js]
@@ -420,7 +420,7 @@ fn runner_supports_single_agent_wait_async_timeout_promise_all_without_polling()
           assert.sameValue(outcomes[2], 'timed-out');
           $DONE();
         }, $DONE);
-        "#,
+        ",
     );
 
     let _ = fs::remove_dir_all(root);
@@ -793,14 +793,14 @@ fn runner_temporal_helper_plain_date_time_fast_path_check_catches_getter_reads()
 
     let report = run_single_test(
         &entry_path,
-        r#"
+        r"
         /*---
         includes: [temporalHelpers.js, compareArray.js]
         ---*/
         TemporalHelpers.checkToTemporalPlainDateTimeFastPath((date) => {
           date.year;
         });
-        "#,
+        ",
     );
 
     assert_passed(&report, 0, 0);

@@ -430,6 +430,16 @@ impl Test262RealmExtension {
     pub(crate) const fn new(print_observer: Test262PrintObserver) -> Self {
         Self { print_observer }
     }
+
+    fn call_print(
+        &self,
+        context: &mut EmbeddingFunctionContext<'_>,
+        invocation: EmbeddingInvocation<'_>,
+    ) -> Result<Value, VmError> {
+        let message = context.value_to_string_text(first_invocation_argument(&invocation))?;
+        self.print_observer.record(message);
+        Ok(Value::undefined())
+    }
 }
 
 impl RealmExtensionProvider for Test262RealmExtension {
@@ -511,6 +521,7 @@ impl RealmExtensionProvider for Test262RealmExtension {
         installation: &mut RealmExtensionInstallation<'_>,
     ) -> Result<(), VmError> {
         let realm = installation.realm();
+        let global = installation.global_object();
         let object_prototype = installation
             .agent()
             .realm(realm)
@@ -518,155 +529,96 @@ impl RealmExtensionProvider for Test262RealmExtension {
             .ok_or(VmError::MissingRootShape(realm))?;
         let harness = installation.allocate_ordinary_object(Some(object_prototype))?;
 
-        let harness_key = test262_property_key(installation.agent(), "$262");
-        let agent_key = test262_property_key(installation.agent(), "agent");
-        let global_key = test262_property_key(installation.agent(), "global");
-        let eval_script_key = test262_property_key(installation.agent(), "evalScript");
-        let create_realm_key = test262_property_key(installation.agent(), "createRealm");
-        let detach_key = test262_property_key(installation.agent(), "detachArrayBuffer");
-        let gc_key = test262_property_key(installation.agent(), "gc");
-        let print_key = test262_property_key(installation.agent(), "print");
-        let set_timeout_key = test262_property_key(installation.agent(), "setTimeout");
-        let same_value_key = test262_property_key(installation.agent(), "sameValue");
-        let is_html_dda_key = test262_property_key(installation.agent(), "IsHTMLDDA");
-        let build_string_key = test262_property_key(installation.agent(), "buildString");
-        let get_report_key = test262_property_key(installation.agent(), "getReport");
-        let sleep_key = test262_property_key(installation.agent(), "sleep");
-        let monotonic_now_key = test262_property_key(installation.agent(), "monotonicNow");
-        let abstract_module_source_key =
-            test262_property_key(installation.agent(), "AbstractModuleSource");
-
-        installation.define_data_property(
-            installation.global_object(),
-            harness_key,
+        define_test262_data_property(
+            installation,
+            global,
+            "$262",
             Value::from_object_ref(harness),
-            true,
-            false,
-            true,
         )?;
         let agent = installation.allocate_ordinary_object(Some(object_prototype))?;
-        installation.define_data_property(
+        define_test262_data_property(
+            installation,
             harness,
-            agent_key,
+            "agent",
             Value::from_object_ref(agent),
-            true,
-            false,
-            true,
         )?;
-        installation.define_data_property(
+        define_test262_data_property(
+            installation,
             harness,
-            global_key,
-            Value::from_object_ref(installation.global_object()),
-            true,
-            false,
-            true,
+            "global",
+            Value::from_object_ref(global),
         )?;
-        let _ = installation.define_function_property(
+        let _ = define_test262_function_property(
+            installation,
             harness,
-            eval_script_key,
+            "evalScript",
             test262_eval_script_entry(),
-            true,
-            false,
-            true,
         )?;
-        let _ = installation.define_function_property(
+        let _ = define_test262_function_property(
+            installation,
             harness,
-            create_realm_key,
+            "createRealm",
             test262_create_realm_entry(),
-            true,
-            false,
-            true,
         )?;
-        let _ = installation.define_function_property(
+        let _ = define_test262_function_property(
+            installation,
             harness,
-            detach_key,
+            "detachArrayBuffer",
             test262_detach_array_buffer_entry(),
-            true,
-            false,
-            true,
         )?;
-        let _ = installation.define_function_property(
-            harness,
-            gc_key,
-            test262_gc_entry(),
-            true,
-            false,
-            true,
-        )?;
-        let _ = installation.define_function_property(
-            installation.global_object(),
-            print_key,
-            test262_print_entry(),
-            true,
-            false,
-            true,
-        )?;
-        let _ = installation.define_function_property(
-            installation.global_object(),
-            set_timeout_key,
+        let _ = define_test262_function_property(installation, harness, "gc", test262_gc_entry())?;
+        let _ =
+            define_test262_function_property(installation, global, "print", test262_print_entry())?;
+        let _ = define_test262_function_property(
+            installation,
+            global,
+            "setTimeout",
             test262_set_timeout_entry(),
-            true,
-            false,
-            true,
         )?;
-        let _ = installation.define_function_property(
+        let _ = define_test262_function_property(
+            installation,
             harness,
-            same_value_key,
+            "sameValue",
             test262_same_value_entry(),
-            true,
-            false,
-            true,
         )?;
-        let is_html_dda = installation.define_function_property(
+        let is_html_dda = define_test262_function_property(
+            installation,
             harness,
-            is_html_dda_key,
+            "IsHTMLDDA",
             test262_is_html_dda_entry(),
-            true,
-            false,
-            true,
         )?;
         installation.mark_is_html_dda_object(is_html_dda)?;
-        let _ = installation.define_function_property(
+        let _ = define_test262_function_property(
+            installation,
             harness,
-            build_string_key,
+            "buildString",
             test262_build_string_entry(),
-            true,
-            false,
-            true,
         )?;
-        let _ = installation.define_function_property(
+        let _ = define_test262_function_property(
+            installation,
             agent,
-            get_report_key,
+            "getReport",
             test262_agent_get_report_entry(),
-            true,
-            false,
-            true,
         )?;
-        let _ = installation.define_function_property(
+        let _ = define_test262_function_property(
+            installation,
             agent,
-            sleep_key,
+            "sleep",
             test262_agent_sleep_entry(),
-            true,
-            false,
-            true,
         )?;
-        let _ = installation.define_function_property(
+        let _ = define_test262_function_property(
+            installation,
             agent,
-            monotonic_now_key,
+            "monotonicNow",
             test262_agent_monotonic_now_entry(),
-            true,
-            false,
-            true,
         )?;
         let abstract_module_source =
             installation.builtin_constant(abstract_module_source_builtin())?;
-        installation.define_data_property(
+        define_test262_data_property(
+            installation,
             harness,
-            abstract_module_source_key,
+            "AbstractModuleSource",
             abstract_module_source,
-            true,
-            false,
-            true,
         )?;
         Ok(())
     }
@@ -678,35 +630,13 @@ impl RealmExtensionProvider for Test262RealmExtension {
         invocation: EmbeddingInvocation<'_>,
     ) -> Result<Value, VmError> {
         if entry == test262_eval_script_entry() {
-            let source = invocation
-                .arguments()
-                .first()
-                .copied()
-                .unwrap_or(Value::undefined());
-            let source_text = context.value_to_string_text(source)?;
-            return context.evaluate_script_in_realm(context.function_realm(), &source_text);
+            return call_eval_script(context, invocation);
         }
         if entry == test262_create_realm_entry() {
-            let artifacts = context.create_embedding_realm()?;
-            return read_test262_object(context.agent(), artifacts.global_object())
-                .map(Value::from_object_ref);
+            return call_create_realm(context);
         }
         if entry == test262_detach_array_buffer_entry() {
-            let value = invocation
-                .arguments()
-                .first()
-                .copied()
-                .unwrap_or(Value::undefined());
-            let Some(object) = value.as_object_ref() else {
-                return Err(VmError::Abrupt(errors::throw_type_error(context.agent())));
-            };
-            let Some(array_buffer) = context.agent().objects().array_buffer(object) else {
-                return Err(VmError::Abrupt(errors::throw_type_error(context.agent())));
-            };
-            let _ = context
-                .agent()
-                .detach_backing_store(array_buffer.backing_store());
-            return Ok(Value::undefined());
+            return call_detach_array_buffer(context, invocation);
         }
         if entry == test262_gc_entry() {
             // The primitive collector is not yet safe to run from arbitrary
@@ -715,34 +645,10 @@ impl RealmExtensionProvider for Test262RealmExtension {
             return Ok(Value::undefined());
         }
         if entry == test262_print_entry() {
-            let value = invocation
-                .arguments()
-                .first()
-                .copied()
-                .unwrap_or(Value::undefined());
-            let message = context.value_to_string_text(value)?;
-            self.print_observer.record(message);
-            return Ok(Value::undefined());
+            return self.call_print(context, invocation);
         }
         if entry == test262_same_value_entry() {
-            let actual = invocation
-                .arguments()
-                .first()
-                .copied()
-                .unwrap_or(Value::undefined());
-            let expected = invocation
-                .arguments()
-                .get(1)
-                .copied()
-                .unwrap_or(Value::undefined());
-            let same = {
-                let agent = context.agent();
-                read::same_value(agent.heap().view(), actual, expected).map_err(VmError::Abrupt)?
-            };
-            if same {
-                return Ok(Value::undefined());
-            }
-            return Err(VmError::Abrupt(errors::throw_type_error(context.agent())));
+            return call_same_value(context, invocation);
         }
         if entry == test262_agent_get_report_entry() {
             return Ok(Value::null());
@@ -751,41 +657,10 @@ impl RealmExtensionProvider for Test262RealmExtension {
             return Ok(Value::undefined());
         }
         if entry == test262_agent_monotonic_now_entry() {
-            let milliseconds = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|duration| duration.as_secs_f64() * 1000.0)
-                .unwrap_or(0.0);
-            return Ok(Value::from_f64(milliseconds));
+            return Ok(Value::from_f64(monotonic_now_milliseconds()));
         }
         if entry == test262_set_timeout_entry() {
-            let callback = invocation
-                .arguments()
-                .first()
-                .copied()
-                .unwrap_or(Value::undefined())
-                .as_object_ref()
-                .filter(|object| context.agent().objects().is_callable(*object))
-                .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(context.agent())))?;
-            let realm = context.function_realm();
-            let reaction = context.agent().alloc_promise_reaction(
-                PromiseReactionRecord::new(
-                    PromiseReactionKind::Fulfill,
-                    PromiseReactionHandler::Callable(callback),
-                    None,
-                )
-                .with_script_or_module_referrer(None),
-            );
-            let _ = context.agent().enqueue_job_with_payload(
-                HostJobKind::Harness,
-                ExecutableId::Builtin,
-                RuntimeJobPayload::PromiseReaction {
-                    reaction,
-                    argument: Value::undefined(),
-                },
-                Some(realm),
-                Some("Test262SetTimeout".into()),
-            );
-            return Ok(Value::undefined());
+            return call_set_timeout(context, invocation);
         }
         if entry == test262_is_html_dda_entry() {
             return Ok(Value::null());
@@ -795,6 +670,121 @@ impl RealmExtensionProvider for Test262RealmExtension {
         }
         Err(VmError::MissingEmbeddingFunction(entry))
     }
+}
+
+fn define_test262_data_property(
+    installation: &mut RealmExtensionInstallation<'_>,
+    object: ObjectRef,
+    name: &str,
+    value: Value,
+) -> Result<(), VmError> {
+    let key = test262_property_key(installation.agent(), name);
+    installation.define_data_property(object, key, value, true, false, true)
+}
+
+fn define_test262_function_property(
+    installation: &mut RealmExtensionInstallation<'_>,
+    object: ObjectRef,
+    name: &str,
+    entry: EmbeddingFunctionId,
+) -> Result<ObjectRef, VmError> {
+    let key = test262_property_key(installation.agent(), name);
+    installation.define_function_property(object, key, entry, true, false, true)
+}
+
+fn first_invocation_argument(invocation: &EmbeddingInvocation<'_>) -> Value {
+    invocation
+        .arguments()
+        .first()
+        .copied()
+        .unwrap_or(Value::undefined())
+}
+
+fn call_eval_script(
+    context: &mut EmbeddingFunctionContext<'_>,
+    invocation: EmbeddingInvocation<'_>,
+) -> Result<Value, VmError> {
+    let source_text = context.value_to_string_text(first_invocation_argument(&invocation))?;
+    context.evaluate_script_in_realm(context.function_realm(), &source_text)
+}
+
+fn call_create_realm(context: &mut EmbeddingFunctionContext<'_>) -> Result<Value, VmError> {
+    let artifacts = context.create_embedding_realm()?;
+    read_test262_object(context.agent(), artifacts.global_object()).map(Value::from_object_ref)
+}
+
+fn call_detach_array_buffer(
+    context: &mut EmbeddingFunctionContext<'_>,
+    invocation: EmbeddingInvocation<'_>,
+) -> Result<Value, VmError> {
+    let Some(object) = first_invocation_argument(&invocation).as_object_ref() else {
+        return Err(VmError::Abrupt(errors::throw_type_error(context.agent())));
+    };
+    let Some(array_buffer) = context.agent().objects().array_buffer(object) else {
+        return Err(VmError::Abrupt(errors::throw_type_error(context.agent())));
+    };
+    let _ = context
+        .agent()
+        .detach_backing_store(array_buffer.backing_store());
+    Ok(Value::undefined())
+}
+
+fn call_same_value(
+    context: &mut EmbeddingFunctionContext<'_>,
+    invocation: EmbeddingInvocation<'_>,
+) -> Result<Value, VmError> {
+    let actual = first_invocation_argument(&invocation);
+    let expected = invocation
+        .arguments()
+        .get(1)
+        .copied()
+        .unwrap_or(Value::undefined());
+    let same = {
+        let agent = context.agent();
+        read::same_value(agent.heap().view(), actual, expected).map_err(VmError::Abrupt)?
+    };
+    if same {
+        Ok(Value::undefined())
+    } else {
+        Err(VmError::Abrupt(errors::throw_type_error(context.agent())))
+    }
+}
+
+fn monotonic_now_milliseconds() -> f64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs_f64() * 1000.0)
+        .unwrap_or(0.0)
+}
+
+fn call_set_timeout(
+    context: &mut EmbeddingFunctionContext<'_>,
+    invocation: EmbeddingInvocation<'_>,
+) -> Result<Value, VmError> {
+    let callback = first_invocation_argument(&invocation)
+        .as_object_ref()
+        .filter(|object| context.agent().objects().is_callable(*object))
+        .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(context.agent())))?;
+    let realm = context.function_realm();
+    let reaction = context.agent().alloc_promise_reaction(
+        PromiseReactionRecord::new(
+            PromiseReactionKind::Fulfill,
+            PromiseReactionHandler::Callable(callback),
+            None,
+        )
+        .with_script_or_module_referrer(None),
+    );
+    let _ = context.agent().enqueue_job_with_payload(
+        HostJobKind::Harness,
+        ExecutableId::Builtin,
+        RuntimeJobPayload::PromiseReaction {
+            reaction,
+            argument: Value::undefined(),
+        },
+        Some(realm),
+        Some("Test262SetTimeout".into()),
+    );
+    Ok(Value::undefined())
 }
 
 fn test262_build_string(
@@ -895,13 +885,15 @@ fn code_point_from_value(value: Value) -> Option<u32> {
 
 fn append_code_point_units(units: &mut Vec<u16>, code_point: u32) {
     if code_point <= 0xFFFF {
-        units.push(code_point as u16);
+        units.push(u16::try_from(code_point).expect("BMP code point should fit u16"));
         return;
     }
 
     let adjusted = code_point - 0x1_0000;
-    units.push(0xD800 | ((adjusted >> 10) as u16));
-    units.push(0xDC00 | ((adjusted as u16) & 0x03FF));
+    let high = u16::try_from(adjusted >> 10).expect("surrogate high bits should fit u16");
+    let low = u16::try_from(adjusted & 0x03FF).expect("surrogate low bits should fit u16");
+    units.push(0xD800 | high);
+    units.push(0xDC00 | low);
 }
 
 #[cfg(test)]

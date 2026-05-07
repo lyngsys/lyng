@@ -74,10 +74,10 @@ pub struct TestTiming {
 
 impl TestTiming {
     fn display_name(&self) -> String {
-        match &self.variant {
-            Some(variant) => format!("{} [{variant}]", self.file),
-            None => self.file.clone(),
-        }
+        self.variant.as_ref().map_or_else(
+            || self.file.clone(),
+            |variant| format!("{} [{variant}]", self.file),
+        )
     }
 }
 

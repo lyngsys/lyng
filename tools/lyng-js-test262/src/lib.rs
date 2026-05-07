@@ -484,18 +484,17 @@ fn execute_suite(
     });
     eprintln!();
 
-    let failures = match failures_lock.into_inner() {
-        Ok(failures) => failures,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-    let outcomes = match outcomes_lock.into_inner() {
-        Ok(outcomes) => outcomes,
-        Err(poisoned) => poisoned.into_inner(),
-    };
     ExecutionResults {
         elapsed: start.elapsed(),
-        failures,
-        outcomes,
+        failures: mutex_into_inner(failures_lock),
+        outcomes: mutex_into_inner(outcomes_lock),
+    }
+}
+
+fn mutex_into_inner<T>(mutex: Mutex<T>) -> T {
+    match mutex.into_inner() {
+        Ok(value) => value,
+        Err(poisoned) => poisoned.into_inner(),
     }
 }
 

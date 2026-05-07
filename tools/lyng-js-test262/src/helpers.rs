@@ -773,7 +773,7 @@ fn adapt_helper_source(name: &str, source: String) -> String {
             adapted
         }
         "decimalToHexString.js" => DECIMAL_TO_HEX_STRING_ADAPTER_SOURCE.to_string(),
-        "regExpUtils.js" => adapt_regexp_helper_source(source),
+        "regExpUtils.js" => adapt_regexp_helper_source(&source),
         "sm/non262-Date-shell.js" => source
             .replace(
                 DATE_DST_OFFSET_FRESH_OBJECT_SOURCE,
@@ -788,7 +788,7 @@ fn adapt_helper_source(name: &str, source: String) -> String {
     }
 }
 
-fn adapt_regexp_helper_source(source: String) -> String {
+fn adapt_regexp_helper_source(source: &str) -> String {
     let adapted = source.replacen(
         "function buildString(args) {",
         "function buildStringFallback(args) {",
