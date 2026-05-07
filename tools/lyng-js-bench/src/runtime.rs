@@ -112,6 +112,16 @@ struct RuntimeSnapshot {
     note: &'static str,
 }
 
+/// Runs the runtime benchmark suite and writes a Markdown report.
+///
+/// # Errors
+///
+/// Returns an error if the command-line arguments are invalid.
+///
+/// # Panics
+///
+/// Panics if a benchmark fixture fails to compile or execute, or if the report
+/// file cannot be written.
 pub fn run(args: &[String]) -> Result<(), String> {
     let options = parse_options(args)?;
 
@@ -153,7 +163,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
             "--report" => {
                 options.report_path = args.next().map_or_else(
                     || Err("--report requires a path".to_string()),
-                    |value| Ok(value.to_string()),
+                    |value| Ok(value.clone()),
                 )?;
             }
             "--samples" => {
@@ -548,14 +558,14 @@ fn capture_runtime_snapshots() -> Vec<RuntimeSnapshot> {
         let mut atoms = AtomTable::new();
         let unit = compile_script_unit(
             SourceId::new(90),
-            r#"
+            r"
             function make() {
                 return /cache/g;
             }
             make();
             make();
             make();
-            "#,
+            ",
             &mut atoms,
         );
         let mut runtime = Runtime::new(NoopHostHooks);
@@ -735,7 +745,7 @@ fn compiled_unit_atom_payload_bytes(unit: &CompiledScriptUnit) -> usize {
         .sum()
 }
 
-fn atom_payload_bytes(atoms: &AtomTable) -> usize {
+const fn atom_payload_bytes(atoms: &AtomTable) -> usize {
     atoms.payload_bytes()
 }
 
@@ -1057,7 +1067,7 @@ fn median_duration(mut durations: Vec<Duration>) -> Duration {
     durations[durations.len() / 2]
 }
 
-fn duration_seconds(duration: Duration) -> f64 {
+const fn duration_seconds(duration: Duration) -> f64 {
     duration.as_secs_f64()
 }
 
@@ -1283,7 +1293,7 @@ fn regexp_stable_exec_runtime_workload(loop_trip_count: usize) -> String {
 
 fn array_heavy_runtime_workload(loop_trip_count: usize) -> String {
     format!(
-        r#"
+        r"
         (function() {{
             function run(limit) {{
                 var total = 0;
@@ -1299,13 +1309,13 @@ fn array_heavy_runtime_workload(loop_trip_count: usize) -> String {
             }}
             return run({loop_trip_count});
         }})()
-        "#
+        "
     )
 }
 
 fn array_iterator_runtime_workload(loop_trip_count: usize) -> String {
     format!(
-        r#"
+        r"
         (function() {{
             function sum4(a, b, c, d) {{
                 return a + b + c + d;
@@ -1329,13 +1339,13 @@ fn array_iterator_runtime_workload(loop_trip_count: usize) -> String {
 
             return run({loop_trip_count});
         }})()
-        "#
+        "
     )
 }
 
 fn class_heavy_runtime_workload(loop_trip_count: usize) -> String {
     format!(
-        r#"
+        r"
         (function() {{
             class Base {{
                 constructor(seed) {{
@@ -1385,7 +1395,7 @@ fn class_heavy_runtime_workload(loop_trip_count: usize) -> String {
 
             return run({loop_trip_count});
         }})()
-        "#
+        "
     )
 }
 
@@ -1420,7 +1430,7 @@ fn async_heavy_frontend_workload(repetitions: usize) -> String {
 
 fn typed_array_heavy_runtime_workload(loop_trip_count: usize) -> String {
     format!(
-        r#"
+        r"
         (function() {{
             function run(limit) {{
                 var buffer = new ArrayBuffer(16);
@@ -1442,7 +1452,7 @@ fn typed_array_heavy_runtime_workload(loop_trip_count: usize) -> String {
 
             return run({loop_trip_count});
         }})()
-        "#
+        "
     )
 }
 

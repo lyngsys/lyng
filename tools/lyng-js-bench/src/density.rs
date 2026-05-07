@@ -72,6 +72,16 @@ struct WorkloadReport {
     throughput: ThroughputResult,
 }
 
+/// Runs the bytecode-density benchmark and writes a Markdown report.
+///
+/// # Errors
+///
+/// Returns an error if the command-line arguments are invalid.
+///
+/// # Panics
+///
+/// Panics if a benchmark fixture fails to compile or execute, or if the report
+/// file cannot be written.
 pub fn run(args: &[String]) -> Result<(), String> {
     let options = parse_options(args)?;
 
@@ -104,7 +114,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
             "--report" => {
                 options.report_path = args.next().map_or_else(
                     || Err("--report requires a path".to_string()),
-                    |value| Ok(value.to_string()),
+                    |value| Ok(value.clone()),
                 )?;
             }
             "--samples" => {
@@ -141,6 +151,7 @@ fn usage() -> String {
         .to_string()
 }
 
+#[must_use]
 pub fn default_report_path(arch: &str) -> String {
     format!("reports/js/lyng-js/bytecode-density-{arch}.md")
 }
@@ -265,11 +276,7 @@ fn collect_density_metrics(unit: &CompiledScriptUnit) -> DensityMetrics {
         unit_bytes: unit_words * 4,
         base_words,
         wide_words,
-        wide_share_percent: if encoded_words == 0 {
-            0.0
-        } else {
-            (wide_words as f64 / encoded_words as f64) * 100.0
-        },
+        wide_share_percent: percent_of(wide_words, encoded_words),
         metadata_records,
         max_registers,
     }
@@ -308,8 +315,7 @@ fn measure_throughput(
         samples: options.samples,
         evals_per_sample: options.evals_per_sample,
         median_total: median.elapsed,
-        median_us_per_eval: median.elapsed.as_secs_f64() * 1_000_000.0
-            / options.evals_per_sample as f64,
+        median_us_per_eval: micros_per_iteration(median.elapsed, options.evals_per_sample),
         checksum: median.checksum,
     }
 }
@@ -490,11 +496,7 @@ fn aggregate_density(reports: &[WorkloadReport]) -> AggregateDensity {
         unit_bytes,
         base_words,
         wide_words,
-        wide_share_percent: if encoded_words == 0 {
-            0.0
-        } else {
-            (wide_words as f64 / encoded_words as f64) * 100.0
-        },
+        wide_share_percent: percent_of(wide_words, encoded_words),
         max_entry_bytes: reports
             .iter()
             .map(|report| report.density.entry_bytes)
@@ -518,6 +520,26 @@ fn format_duration(duration: Duration) -> String {
     } else {
         format!("{}ns", duration.as_nanos())
     }
+}
+
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "benchmark reports use approximate floating-point percentages; exact counts are reported separately"
+)]
+fn percent_of(part: usize, total: usize) -> f64 {
+    if total == 0 {
+        0.0
+    } else {
+        (part as f64 / total as f64) * 100.0
+    }
+}
+
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "benchmark throughput is reported as an approximate per-iteration floating-point value"
+)]
+fn micros_per_iteration(total: Duration, iterations: usize) -> f64 {
+    total.as_secs_f64() * 1_000_000.0 / iterations as f64
 }
 
 fn write_report(path: &str, report: &str) {
@@ -544,7 +566,7 @@ fn print_summary(path: &str, reports: &[WorkloadReport]) {
 
 fn script_core_workload(loop_trip_count: usize) -> String {
     format!(
-        r#"
+        r"
         let obj = {{ base: 3 }};
         let arr = [1, 2, 3, 4];
         let total = 0;
@@ -560,13 +582,13 @@ fn script_core_workload(loop_trip_count: usize) -> String {
             i = i + 1;
         }}
         total;
-        "#
+        "
     )
 }
 
 fn closure_call_workload(loop_trip_count: usize) -> String {
     format!(
-        r#"
+        r"
         function outer(base) {{
             return function(step) {{
                 return base + step;
@@ -580,13 +602,13 @@ fn closure_call_workload(loop_trip_count: usize) -> String {
             i = i + 1;
         }}
         total;
-        "#
+        "
     )
 }
 
 fn activation_workload(loop_trip_count: usize) -> String {
     format!(
-        r#"
+        r"
         function alias(a, b) {{
             a = 7;
             arguments[1] = 9;
@@ -613,13 +635,13 @@ fn activation_workload(loop_trip_count: usize) -> String {
             i = i + 1;
         }}
         total;
-        "#
+        "
     )
 }
 
 fn exception_workload(loop_trip_count: usize) -> String {
     format!(
-        r#"
+        r"
         function step(value) {{
             try {{
                 if (value < 2) {{
@@ -639,24 +661,24 @@ fn exception_workload(loop_trip_count: usize) -> String {
             i = i + 1;
         }}
         total;
-        "#
+        "
     )
 }
 
 fn wide_register_workload(loop_trip_count: usize) -> String {
     let mut out = String::from(
-        r#"
+        r"
         let fnRef = function(value) {
             return value;
         };
-"#,
+",
     );
     for index in 0..320 {
         let _ = writeln!(out, "            let value{index} = {index};");
     }
     let _ = writeln!(
         out,
-        r#"
+        r"
         let total = 0;
         let i = 0;
         while (i < {loop_trip_count}) {{
@@ -664,7 +686,7 @@ fn wide_register_workload(loop_trip_count: usize) -> String {
             i = i + 1;
         }}
         total;
-"#
+"
     );
     out
 }
