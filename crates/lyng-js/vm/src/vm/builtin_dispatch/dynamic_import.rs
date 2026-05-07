@@ -45,10 +45,10 @@ impl Vm {
 
         let realm = agent
             .realm(caller_frame.realm())
-            .ok_or(VmError::MissingRootShape(caller_frame.realm()))?;
+            .ok_or_else(|| VmError::MissingRootShape(caller_frame.realm()))?;
         let root_shape = realm
             .root_shape()
-            .ok_or(VmError::MissingRootShape(caller_frame.realm()))?;
+            .ok_or_else(|| VmError::MissingRootShape(caller_frame.realm()))?;
         let import_meta = agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
             objects.alloc_object(

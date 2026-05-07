@@ -172,7 +172,7 @@ impl Vm {
                     layout,
                     AllocationLifetime::Default,
                 )
-                .ok_or(VmError::MissingEnvironmentLayout(caller.code()))?;
+                .ok_or_else(|| VmError::MissingEnvironmentLayout(caller.code()))?;
             for (index, _) in scope.bindings().iter().enumerate() {
                 let slot = u32::try_from(index).unwrap_or(u32::MAX);
                 let source_slot = scope
@@ -259,7 +259,7 @@ impl Vm {
 
     pub(super) fn lexical_name_start_environment(&self, frame: FrameRecord) -> EnvironmentRef {
         self.active_loop_iteration_environment(frame.lexical_env())
-            .unwrap_or(frame.lexical_env())
+            .unwrap_or_else(|| frame.lexical_env())
     }
 
     pub(super) fn dynamic_name_start_environment(

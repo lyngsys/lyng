@@ -45,7 +45,7 @@ impl Vm {
                 .installed
                 .get(code_index(frame.code()))
                 .and_then(Option::as_ref)
-                .ok_or(VmError::MissingInstalledCode(frame.code()))?;
+                .ok_or_else(|| VmError::MissingInstalledCode(frame.code()))?;
             let instruction = installed
                 .function
                 .instructions()
@@ -54,7 +54,7 @@ impl Vm {
                         .expect("instruction offset should fit into usize"),
                 )
                 .copied()
-                .ok_or(VmError::InstructionOutOfBounds {
+                .ok_or_else(|| VmError::InstructionOutOfBounds {
                     code: frame.code(),
                     instruction_offset: frame.instruction_offset(),
                 })?;
@@ -858,7 +858,7 @@ impl Vm {
                         Opcode::Call => {
                             let payload = installed
                                 .wide_payload(frame.instruction_offset())
-                                .ok_or(VmError::MissingWideOperand {
+                                .ok_or_else(|| VmError::MissingWideOperand {
                                     code: frame.code(),
                                     instruction_offset: frame.instruction_offset(),
                                     opcode,
@@ -885,7 +885,7 @@ impl Vm {
                         Opcode::TailCall => {
                             let payload = installed
                                 .wide_payload(frame.instruction_offset())
-                                .ok_or(VmError::MissingWideOperand {
+                                .ok_or_else(|| VmError::MissingWideOperand {
                                     code: frame.code(),
                                     instruction_offset: frame.instruction_offset(),
                                     opcode,
@@ -914,7 +914,7 @@ impl Vm {
                         Opcode::Construct => {
                             let payload = installed
                                 .wide_payload(frame.instruction_offset())
-                                .ok_or(VmError::MissingWideOperand {
+                                .ok_or_else(|| VmError::MissingWideOperand {
                                     code: frame.code(),
                                     instruction_offset: frame.instruction_offset(),
                                     opcode,
@@ -1294,8 +1294,8 @@ impl Vm {
                             self.advance_instruction()?;
                         }
                         Opcode::LoadThis => {
-                            let load_this = match agent.current_execution_context().map_or(
-                                ThisState::Value(frame.this_value()),
+                            let load_this = match agent.current_execution_context().map_or_else(
+                                || ThisState::Value(frame.this_value()),
                                 lyng_js_env::ExecutionContext::this_state,
                             ) {
                                 ThisState::Value(value) => Ok(value),

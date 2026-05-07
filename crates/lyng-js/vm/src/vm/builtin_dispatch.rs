@@ -155,6 +155,6 @@ impl Vm {
             .objects()
             .function_data(callee_object)
             .and_then(lyng_js_objects::FunctionObjectData::realm)
-            .unwrap_or(caller_frame.realm())
+            .unwrap_or_else(|| caller_frame.realm())
     }
 }

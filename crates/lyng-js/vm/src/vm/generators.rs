@@ -104,7 +104,7 @@ impl Vm {
                 objects.generator_suspended(agent.heap().view(), generator),
             )
         };
-        let state = state.ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let state = state.ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
 
         match state {
             GeneratorState::Executing => Err(VmError::Abrupt(errors::throw_type_error(agent))),
@@ -218,7 +218,7 @@ impl Vm {
         let promise = self.promise_capability_promise(agent, capability)?;
         let realm = agent
             .realm(caller_frame.realm())
-            .ok_or(VmError::MissingRootShape(caller_frame.realm()))?;
+            .ok_or_else(|| VmError::MissingRootShape(caller_frame.realm()))?;
         let Some(generator) = this_value.as_object_ref() else {
             let type_error_value = errors::throw_type_error(agent)
                 .thrown_value()
@@ -399,7 +399,7 @@ impl Vm {
                     objects.generator_suspended(agent.heap().view(), generator),
                 )
             };
-            let state = state.ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+            let state = state.ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
 
             match state {
                 GeneratorState::Executing => return Ok(()),
@@ -1462,7 +1462,7 @@ impl Vm {
                 .unwrap_or_default();
             (record, saved_registers)
         };
-        let record = record.ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let record = record.ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         {
             let _ = agent
                 .heap_mut()
@@ -1562,7 +1562,7 @@ impl Vm {
     ) -> VmResult<SuspendedExecutionRef> {
         let context = agent
             .current_execution_context()
-            .ok_or(VmError::MissingEnvironment(frame.lexical_env()))?;
+            .ok_or_else(|| VmError::MissingEnvironment(frame.lexical_env()))?;
         let register_base =
             usize::try_from(frame.registers().base()).expect("register base should fit usize");
         let register_end =
@@ -1672,7 +1672,7 @@ impl Vm {
             let view = agent.heap().view();
             let record = view
                 .suspended_execution(suspended)
-                .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+                .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
             match record.callee() {
                 Some(callee) => object::ordinary_get(
                     agent,

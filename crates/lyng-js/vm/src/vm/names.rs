@@ -802,7 +802,7 @@ impl Vm {
         let reference = self
             .captured_name_references
             .get(frame.registers().base(), reference_register)
-            .ok_or(VmError::RegisterOutOfBounds {
+            .ok_or_else(|| VmError::RegisterOutOfBounds {
                 code: frame.code(),
                 register: reference_register,
             })?;
@@ -844,7 +844,7 @@ impl Vm {
         let reference = self
             .captured_name_references
             .get(frame.registers().base(), reference_register)
-            .ok_or(VmError::RegisterOutOfBounds {
+            .ok_or_else(|| VmError::RegisterOutOfBounds {
                 code: frame.code(),
                 register: reference_register,
             })?;
@@ -871,7 +871,7 @@ impl Vm {
         let reference = self
             .captured_name_references
             .get(frame.registers().base(), reference_register)
-            .ok_or(VmError::RegisterOutOfBounds {
+            .ok_or_else(|| VmError::RegisterOutOfBounds {
                 code: frame.code(),
                 register: reference_register,
             })?;

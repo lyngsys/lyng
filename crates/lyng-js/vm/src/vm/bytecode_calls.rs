@@ -152,8 +152,10 @@ impl Vm {
 
         let outer_environment = function_data
             .environment()
-            .ok_or(VmError::MissingEnvironment(caller_frame.lexical_env()))?;
-        let realm = function_data.realm().unwrap_or(caller_frame.realm());
+            .ok_or_else(|| VmError::MissingEnvironment(caller_frame.lexical_env()))?;
+        let realm = function_data
+            .realm()
+            .unwrap_or_else(|| caller_frame.realm());
         let derived_construct_call = new_target.is_some() && derived_class_constructor;
         let (effective_this, execution_this_state, env_this_status, effective_new_target) =
             match function_data.this_mode() {

@@ -144,7 +144,7 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         let child_code = self
             .installed_child_code(frame.code(), child_index)
-            .ok_or(VmError::MissingInstalledCode(frame.code()))?;
+            .ok_or_else(|| VmError::MissingInstalledCode(frame.code()))?;
         let child = self
             .installed_function(child_code)
             .ok_or(VmError::MissingInstalledCode(child_code))?;
@@ -153,7 +153,7 @@ impl Vm {
         let root_shape = agent
             .realm(frame.realm())
             .and_then(lyng_js_env::RealmRecord::root_shape)
-            .ok_or(VmError::MissingRootShape(frame.realm()))?;
+            .ok_or_else(|| VmError::MissingRootShape(frame.realm()))?;
         let home_object = if child.flags().has_prototype_property() {
             Some(self.create_function_prototype(
                 agent,
@@ -556,7 +556,7 @@ impl Vm {
         let mut record = self
             .iterator_states
             .remove(frame.registers().base(), iterator_register)
-            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         if record.is_async() {
             return self.advance_async_iterator_state(
                 agent,
@@ -669,7 +669,7 @@ impl Vm {
                     };
                     let realm = agent
                         .realm(frame.realm())
-                        .ok_or(VmError::MissingRootShape(frame.realm()))?;
+                        .ok_or_else(|| VmError::MissingRootShape(frame.realm()))?;
                     self.settle_promise_capability(
                         agent,
                         host,
@@ -685,7 +685,7 @@ impl Vm {
             };
         let realm = agent
             .realm(frame.realm())
-            .ok_or(VmError::MissingRootShape(frame.realm()))?;
+            .ok_or_else(|| VmError::MissingRootShape(frame.realm()))?;
         self.enqueue_promise_then(
             agent,
             realm,

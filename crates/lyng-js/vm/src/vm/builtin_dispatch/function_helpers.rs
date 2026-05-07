@@ -36,17 +36,17 @@ impl Vm {
         let realm = target_data
             .as_ref()
             .and_then(FunctionObjectData::realm)
-            .unwrap_or(caller.realm());
+            .unwrap_or_else(|| caller.realm());
         let realm_record = agent
             .realm(realm)
-            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let root_shape = realm_record
             .root_shape()
-            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let environment = target_data
             .as_ref()
             .and_then(FunctionObjectData::environment)
-            .unwrap_or(realm_record.global_env());
+            .unwrap_or_else(|| realm_record.global_env());
         let mut function_data = FunctionObjectData::bound(
             realm,
             environment,

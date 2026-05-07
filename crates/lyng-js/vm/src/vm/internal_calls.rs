@@ -198,7 +198,7 @@ impl Vm {
             )? {
                 return result
                     .as_object_ref()
-                    .ok_or(VmError::Abrupt(errors::throw_type_error(agent)));
+                    .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)));
             }
             return object::construct(
                 agent,
@@ -261,7 +261,7 @@ impl Vm {
 
         result?
             .as_object_ref()
-            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))
     }
 
     pub(super) fn call_optional_callback(

@@ -20,7 +20,7 @@ impl Vm {
 
         let object = value
             .as_object_ref()
-            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let to_string = self.get_property_from_object(
             agent,
             host,
@@ -83,7 +83,7 @@ impl Vm {
             .copied()
             .and_then(Value::as_smi)
             .and_then(|value| u32::try_from(value).ok())
-            .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?;
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let key = TemplateCacheKey {
             realm: caller.realm(),
             code: caller.code(),

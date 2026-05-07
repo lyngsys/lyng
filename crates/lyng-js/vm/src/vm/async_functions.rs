@@ -394,13 +394,13 @@ impl Vm {
             lyng_js_env::PromiseState::Fulfilled => {
                 let realm = agent
                     .realm(record.realm())
-                    .ok_or(VmError::MissingRootShape(record.realm()))?;
+                    .ok_or_else(|| VmError::MissingRootShape(record.realm()))?;
                 self.enqueue_promise_reaction_job(agent, realm, fulfill_reaction, record.result());
             }
             lyng_js_env::PromiseState::Rejected => {
                 let realm = agent
                     .realm(record.realm())
-                    .ok_or(VmError::MissingRootShape(record.realm()))?;
+                    .ok_or_else(|| VmError::MissingRootShape(record.realm()))?;
                 self.enqueue_promise_reaction_job(agent, realm, reject_reaction, record.result());
             }
         }

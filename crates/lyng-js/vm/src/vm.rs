@@ -1603,7 +1603,7 @@ impl Vm {
             .ok_or(VmError::MissingCodeRecord(code))?;
         let realm = code_record
             .realm()
-            .or(agent.default_realm_id())
+            .or_else(|| agent.default_realm_id())
             .ok_or(VmError::MissingDefaultRealm)?;
         let _ = bootstrap_realm(
             agent,
@@ -1811,21 +1811,21 @@ impl Vm {
         let function = self
             .installed_function(installed.code())
             .cloned()
-            .ok_or(VmError::MissingInstalledCode(installed.code()))?;
+            .ok_or_else(|| VmError::MissingInstalledCode(installed.code()))?;
         if !function.needs_environment() {
             return Ok(realm.global_env());
         }
         let layout = function
             .environment_layout()
             .and_then(|layout| lyng_js_env::EnvironmentLayoutId::from_raw(layout.get()))
-            .ok_or(VmError::MissingEnvironmentLayout(installed.code()))?;
+            .ok_or_else(|| VmError::MissingEnvironmentLayout(installed.code()))?;
         agent
             .alloc_module_environment(
                 Some(realm.global_env()),
                 layout,
                 AllocationLifetime::Default,
             )
-            .ok_or(VmError::MissingEnvironmentLayout(installed.code()))
+            .ok_or_else(|| VmError::MissingEnvironmentLayout(installed.code()))
     }
 
     fn link_module_graph(
@@ -2732,7 +2732,7 @@ impl Vm {
 
         let root_shape = realm
             .root_shape()
-            .ok_or(VmError::MissingRootShape(realm.id()))?;
+            .ok_or_else(|| VmError::MissingRootShape(realm.id()))?;
         let mut exports = agent
             .module_record(key)
             .ok_or(VmError::MissingModuleRecord)?

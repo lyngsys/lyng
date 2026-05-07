@@ -452,11 +452,13 @@ impl Vm {
     }
 
     pub(super) fn require_object(&self, frame: FrameRecord, value: Value) -> VmResult<ObjectRef> {
-        value.as_object_ref().ok_or(VmError::ExpectedObject {
-            code: frame.code(),
-            instruction_offset: frame.instruction_offset(),
-            value,
-        })
+        value
+            .as_object_ref()
+            .ok_or_else(|| VmError::ExpectedObject {
+                code: frame.code(),
+                instruction_offset: frame.instruction_offset(),
+                value,
+            })
     }
 
     pub(super) fn value_to_property_key(

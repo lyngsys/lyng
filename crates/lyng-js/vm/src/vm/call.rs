@@ -327,7 +327,7 @@ impl Vm {
             )? {
                 result
                     .as_object_ref()
-                    .ok_or(VmError::Abrupt(errors::throw_type_error(agent)))?
+                    .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?
             } else {
                 object::construct(
                     agent,
@@ -483,7 +483,7 @@ pub(super) fn finalize_frame_result(
         }
         return Ok(frame
             .construct_this()
-            .map_or(frame.this_value(), Value::from_object_ref));
+            .map_or_else(|| frame.this_value(), Value::from_object_ref));
     }
     Ok(result)
 }

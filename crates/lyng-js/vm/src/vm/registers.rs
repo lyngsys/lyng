@@ -8,7 +8,7 @@ impl Vm {
         self.register_stack
             .get(absolute)
             .copied()
-            .ok_or(VmError::RegisterOutOfBounds {
+            .ok_or_else(|| VmError::RegisterOutOfBounds {
                 code: frame.code(),
                 register,
             })
@@ -21,13 +21,13 @@ impl Vm {
         value: Value,
     ) -> VmResult<()> {
         let absolute = absolute_register(frame, register)?;
-        let slot = self
-            .register_stack
-            .get_mut(absolute)
-            .ok_or(VmError::RegisterOutOfBounds {
-                code: frame.code(),
-                register,
-            })?;
+        let slot =
+            self.register_stack
+                .get_mut(absolute)
+                .ok_or_else(|| VmError::RegisterOutOfBounds {
+                    code: frame.code(),
+                    register,
+                })?;
         *slot = value;
         Ok(())
     }

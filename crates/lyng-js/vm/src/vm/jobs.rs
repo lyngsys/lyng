@@ -108,7 +108,7 @@ impl Vm {
     ) -> VmResult<()> {
         let realm = job
             .realm()
-            .or(agent.default_realm_id())
+            .or_else(|| agent.default_realm_id())
             .ok_or(VmError::MissingDefaultRealm)?;
         let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
         let lexical_env = realm_record.global_env();

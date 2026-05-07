@@ -111,30 +111,30 @@ impl Vm {
         let active_iteration_outer = self.active_loop_iteration_environment(environment);
         let (outer, source_layout) = match agent.environment(environment) {
             Some(lyng_js_env::EnvironmentRecord::Declarative(record)) => (
-                active_iteration_outer.or(record.outer()),
+                active_iteration_outer.or_else(|| record.outer()),
                 Some(record.layout()),
             ),
             Some(lyng_js_env::EnvironmentRecord::Private(record)) => (
-                active_iteration_outer.or(record.outer()),
+                active_iteration_outer.or_else(|| record.outer()),
                 Some(record.layout()),
             ),
             Some(lyng_js_env::EnvironmentRecord::Function(record)) => {
                 let declarative = record.declarative();
                 (
-                    active_iteration_outer.or(declarative.outer()),
+                    active_iteration_outer.or_else(|| declarative.outer()),
                     Some(declarative.layout()),
                 )
             }
             Some(lyng_js_env::EnvironmentRecord::Module(record)) => (
-                active_iteration_outer.or(record.outer()),
+                active_iteration_outer.or_else(|| record.outer()),
                 Some(record.layout()),
             ),
             Some(lyng_js_env::EnvironmentRecord::Global(record)) => (
-                active_iteration_outer.or(record.outer()),
+                active_iteration_outer.or_else(|| record.outer()),
                 Some(record.layout()),
             ),
             Some(lyng_js_env::EnvironmentRecord::Object(record)) => {
-                (active_iteration_outer.or(record.outer()), None)
+                (active_iteration_outer.or_else(|| record.outer()), None)
             }
             None => return Err(VmError::MissingEnvironment(environment)),
         };
