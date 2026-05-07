@@ -435,6 +435,7 @@ impl HostHooks for TestHost {
         let mut state = self.state.lock().expect("test host mutex poisoned");
         state.calls.push(HostCall::CreateAgent(request.clone()));
         if let Some(result) = state.create_agent_results.pop_front() {
+            drop(state);
             return result;
         }
 
@@ -442,6 +443,7 @@ impl HostHooks for TestHost {
         state.next_agent_id = next_raw
             .checked_add(1)
             .expect("test host agent id overflowed supported u32 range");
+        drop(state);
         Ok(CreateAgentResponse {
             agent_id: HostAgentId::from_raw(next_raw)
                 .expect("test host agent id must stay non-zero"),
@@ -457,6 +459,7 @@ impl HostHooks for TestHost {
             .calls
             .push(HostCall::StartAgentThread(request.clone()));
         if let Some(result) = state.start_thread_results.pop_front() {
+            drop(state);
             return result;
         }
 
@@ -464,6 +467,7 @@ impl HostHooks for TestHost {
         state.next_thread_id = next_raw
             .checked_add(1)
             .expect("test host thread id overflowed supported u32 range");
+        drop(state);
         Ok(StartAgentThreadResponse {
             thread_id: HostThreadId::from_raw(next_raw)
                 .expect("test host thread id must stay non-zero"),
@@ -478,6 +482,7 @@ impl HostHooks for TestHost {
         let mut state = self.state.lock().expect("test host mutex poisoned");
         state.calls.push(HostCall::TransferArrayBuffer(*request));
         if let Some(result) = state.transfer_results.pop_front() {
+            drop(state);
             return result;
         }
 
@@ -485,6 +490,7 @@ impl HostHooks for TestHost {
         state.next_transfer_buffer_id = next_raw
             .checked_add(1)
             .expect("test host transfer buffer id overflowed supported u32 range");
+        drop(state);
         Ok(ArrayBufferTransferResponse {
             buffer_id: HostTransferredBufferId::from_raw(next_raw)
                 .expect("test host buffer id must stay non-zero"),
@@ -499,26 +505,27 @@ impl HostHooks for TestHost {
         let mut state = self.state.lock().expect("test host mutex poisoned");
         state.calls.push(HostCall::ShareArrayBuffer(*request));
         if let Some(result) = state.share_results.pop_front() {
+            drop(state);
             return result;
         }
 
-        if let Some(shared_buffer) = state
+        let shared_buffer = state
             .shared_buffer_by_backing_store
             .get(&request.backing_store)
             .copied()
-        {
-            return Ok(SharedArrayBufferShareResponse { shared_buffer });
-        }
-
-        let next_raw = state.next_shared_buffer_id.max(1);
-        state.next_shared_buffer_id = next_raw
-            .checked_add(1)
-            .expect("test host shared-buffer id overflowed supported u32 range");
-        let shared_buffer = HostSharedBufferId::from_raw(next_raw)
-            .expect("test host shared-buffer id must stay non-zero");
-        state
-            .shared_buffer_by_backing_store
-            .insert(request.backing_store, shared_buffer);
+            .unwrap_or_else(|| {
+                let next_raw = state.next_shared_buffer_id.max(1);
+                state.next_shared_buffer_id = next_raw
+                    .checked_add(1)
+                    .expect("test host shared-buffer id overflowed supported u32 range");
+                let shared_buffer = HostSharedBufferId::from_raw(next_raw)
+                    .expect("test host shared-buffer id must stay non-zero");
+                state
+                    .shared_buffer_by_backing_store
+                    .insert(request.backing_store, shared_buffer);
+                shared_buffer
+            });
+        drop(state);
         Ok(SharedArrayBufferShareResponse { shared_buffer })
     }
 
@@ -526,9 +533,11 @@ impl HostHooks for TestHost {
         let mut state = self.state.lock().expect("test host mutex poisoned");
         state.calls.push(HostCall::ParkAgent(*request));
         if let Some(result) = state.park_results.pop_front() {
+            drop(state);
             return result;
         }
 
+        drop(state);
         Ok(ParkAgentResult {
             status: ParkAgentStatus::Parked,
         })
@@ -538,9 +547,11 @@ impl HostHooks for TestHost {
         let mut state = self.state.lock().expect("test host mutex poisoned");
         state.calls.push(HostCall::UnparkAgent(*request));
         if let Some(result) = state.unpark_results.pop_front() {
+            drop(state);
             return result;
         }
 
+        drop(state);
         Ok(UnparkAgentResult {
             woken_agents: request.max_count.min(1),
             remaining_waiters: false,

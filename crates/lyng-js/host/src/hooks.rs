@@ -434,6 +434,16 @@ const NANOS_PER_HOUR: i128 = 60 * NANOS_PER_MINUTE;
 const NANOS_PER_DAY: i128 = 24 * NANOS_PER_HOUR;
 const UTC_TIME_ZONE_ID: &str = "UTC";
 
+fn parse_two_digits(bytes: &[u8], index: &mut usize) -> Option<i128> {
+    let tens = *bytes.get(*index)?;
+    let ones = *bytes.get(*index + 1)?;
+    if !tens.is_ascii_digit() || !ones.is_ascii_digit() {
+        return None;
+    }
+    *index += 2;
+    Some(i128::from(tens - b'0') * 10 + i128::from(ones - b'0'))
+}
+
 fn parse_fixed_offset_time_zone_id(time_zone_id: &str) -> Option<i64> {
     if time_zone_id == UTC_TIME_ZONE_ID {
         return Some(0);
@@ -444,15 +454,6 @@ fn parse_fixed_offset_time_zone_id(time_zone_id: &str) -> Option<i64> {
         b'-' => -1_i128,
         _ => return None,
     };
-    fn parse_two_digits(bytes: &[u8], index: &mut usize) -> Option<i128> {
-        let tens = *bytes.get(*index)?;
-        let ones = *bytes.get(*index + 1)?;
-        if !tens.is_ascii_digit() || !ones.is_ascii_digit() {
-            return None;
-        }
-        *index += 2;
-        Some(i128::from(tens - b'0') * 10 + i128::from(ones - b'0'))
-    }
 
     let mut index = 1;
     let hours = parse_two_digits(bytes, &mut index)?;
@@ -502,16 +503,17 @@ fn parse_fixed_offset_time_zone_id(time_zone_id: &str) -> Option<i64> {
 }
 
 fn require_supported_time_zone(operation: &'static str, time_zone_id: &str) -> HostResult<i64> {
-    if let Some(offset_nanoseconds) = parse_fixed_offset_time_zone_id(time_zone_id) {
-        Ok(offset_nanoseconds)
-    } else {
-        Err(HostError::unsupported(
-            operation,
-            format!(
-                "host only provides deterministic `{UTC_TIME_ZONE_ID}` and fixed-offset resolution for `{time_zone_id}`"
-            ),
-        ))
-    }
+    parse_fixed_offset_time_zone_id(time_zone_id).map_or_else(
+        || {
+            Err(HostError::unsupported(
+                operation,
+                format!(
+                    "host only provides deterministic `{UTC_TIME_ZONE_ID}` and fixed-offset resolution for `{time_zone_id}`"
+                ),
+            ))
+        },
+        Ok,
+    )
 }
 
 const fn floor_div_rem(value: i128, divisor: i128) -> (i128, i128) {
@@ -633,8 +635,8 @@ fn utc_instant_to_civil_time(epoch_nanoseconds: i128) -> HostResult<TemporalCivi
     Ok(TemporalCivilTime {
         date_time: TemporalCivilDateTime::new(
             year,
-            u8::try_from(month).expect("civil month should stay in u8 range"),
-            u8::try_from(day).expect("civil day should stay in u8 range"),
+            month,
+            day,
             u8::try_from(hour).expect("hour should stay in u8 range"),
             u8::try_from(minute).expect("minute should stay in u8 range"),
             u8::try_from(second).expect("second should stay in u8 range"),
