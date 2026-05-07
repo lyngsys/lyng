@@ -141,6 +141,10 @@ pub(super) struct ZonedDateTimePrototypeProperties {
     pub(super) prototype_tag: Value,
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "ZonedDateTime builtin allocation follows the ordered Temporal function table"
+)]
 pub(super) fn allocate_functions(
     agent: &mut Agent,
     context: ZonedDateTimeBootstrapContext,
@@ -850,11 +854,15 @@ pub(super) fn install_constructor_properties(
     );
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "ZonedDateTime prototype descriptors are kept inline as an ordered Temporal table"
+)]
 pub(super) fn install_prototype_properties(
     agent: &mut Agent,
     zoned_date_time_prototype: ObjectRef,
     functions: ZonedDateTimeFunctions,
-    properties: ZonedDateTimePrototypeProperties,
+    properties: &ZonedDateTimePrototypeProperties,
 ) {
     define_builtin_data_property(
         agent,

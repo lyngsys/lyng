@@ -72,6 +72,10 @@ pub(super) struct InstantPrototypeProperties {
     pub(super) prototype_tag: Value,
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Instant builtin allocation follows the ordered Temporal function table"
+)]
 pub(super) fn allocate_functions(
     agent: &mut Agent,
     context: InstantBootstrapContext,
@@ -365,6 +369,10 @@ pub(super) fn install_constructor_properties(
     );
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Instant prototype descriptors are kept inline as an ordered Temporal table"
+)]
 pub(super) fn install_prototype_properties(
     agent: &mut Agent,
     instant_prototype: ObjectRef,

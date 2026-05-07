@@ -90,6 +90,10 @@ pub(super) struct DurationPrototypeProperties {
     pub(super) prototype_tag: Value,
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Duration builtin allocation follows the ordered Temporal function table"
+)]
 pub(super) fn allocate_functions(
     agent: &mut Agent,
     context: DurationBootstrapContext,
@@ -455,6 +459,10 @@ pub(super) fn install_constructor_properties(
     );
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Duration prototype descriptors are kept inline as an ordered Temporal table"
+)]
 pub(super) fn install_prototype_properties(
     agent: &mut Agent,
     duration_prototype: ObjectRef,

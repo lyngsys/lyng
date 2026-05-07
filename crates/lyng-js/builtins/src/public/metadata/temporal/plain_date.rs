@@ -1,6 +1,10 @@
 use crate::BuiltinEntryMetadata;
 use lyng_js_types::BuiltinFunctionId;
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "PlainDate metadata mirrors the ordered Temporal builtin ID table"
+)]
 pub(super) fn plain_date_public_builtin_metadata(
     entry: BuiltinFunctionId,
 ) -> Option<BuiltinEntryMetadata> {

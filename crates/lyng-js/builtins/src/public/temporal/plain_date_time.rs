@@ -120,6 +120,10 @@ pub(super) struct PlainDateTimePrototypeProperties {
     pub(super) prototype_tag: Value,
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "PlainDateTime builtin allocation follows the ordered Temporal function table"
+)]
 pub(super) fn allocate_functions(
     agent: &mut Agent,
     context: PlainDateTimeBootstrapContext,
@@ -697,11 +701,15 @@ pub(super) fn install_constructor_properties(
     );
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "PlainDateTime prototype descriptors are kept inline as an ordered Temporal table"
+)]
 pub(super) fn install_prototype_properties(
     agent: &mut Agent,
     plain_date_time_prototype: ObjectRef,
     functions: PlainDateTimeFunctions,
-    properties: PlainDateTimePrototypeProperties,
+    properties: &PlainDateTimePrototypeProperties,
 ) {
     define_builtin_data_property(
         agent,

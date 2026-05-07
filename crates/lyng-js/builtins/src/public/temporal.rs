@@ -16,6 +16,11 @@ mod plain_time;
 mod plain_year_month;
 mod zoned_date_time;
 
+#[allow(
+    clippy::similar_names,
+    clippy::too_many_lines,
+    reason = "Temporal property-key locals intentionally mirror similarly named ECMA fields in one ordered builtin graph"
+)]
 pub(super) fn install_temporal_public_objects(
     agent: &mut Agent,
     realm: RealmRef,
@@ -773,7 +778,7 @@ pub(super) fn install_temporal_public_objects(
         agent,
         plain_date_time_prototype,
         plain_date_time_functions,
-        plain_date_time::PlainDateTimePrototypeProperties {
+        &plain_date_time::PlainDateTimePrototypeProperties {
             year_key,
             month_key,
             month_code_key,
@@ -865,7 +870,7 @@ pub(super) fn install_temporal_public_objects(
         agent,
         zoned_date_time_prototype,
         zoned_date_time_functions,
-        zoned_date_time::ZonedDateTimePrototypeProperties {
+        &zoned_date_time::ZonedDateTimePrototypeProperties {
             year_key,
             month_key,
             month_code_key,

@@ -106,6 +106,10 @@ pub(super) struct PlainDatePrototypeProperties {
     pub(super) prototype_tag: Value,
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "PlainDate builtin allocation follows the ordered Temporal function table"
+)]
 pub(super) fn allocate_functions(
     agent: &mut Agent,
     context: PlainDateBootstrapContext,
@@ -569,6 +573,10 @@ pub(super) fn install_constructor_properties(
     );
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "PlainDate prototype descriptors are kept inline as an ordered Temporal table"
+)]
 pub(super) fn install_prototype_properties(
     agent: &mut Agent,
     plain_date_prototype: ObjectRef,
