@@ -44,6 +44,10 @@ pub fn create_promise_reaction(
     )
 }
 
+/// Fulfills a pending promise and enqueues its fulfillment reactions.
+///
+/// # Errors
+/// Returns a type-error completion when the promise record is missing or cannot be transitioned.
 pub fn fulfill_promise(agent: &mut Agent, promise: ObjectRef, value: Value) -> Completion<()> {
     let Some(record) = agent.promise_record(promise).cloned() else {
         return Err(throw_type_error(agent));
@@ -73,6 +77,10 @@ pub fn fulfill_promise(agent: &mut Agent, promise: ObjectRef, value: Value) -> C
     Ok(())
 }
 
+/// Rejects a pending promise and enqueues its rejection reactions.
+///
+/// # Errors
+/// Returns a type-error completion when the promise record is missing or cannot be transitioned.
 pub fn reject_promise(agent: &mut Agent, promise: ObjectRef, reason: Value) -> Completion<()> {
     let Some(record) = agent.promise_record(promise).cloned() else {
         return Err(throw_type_error(agent));

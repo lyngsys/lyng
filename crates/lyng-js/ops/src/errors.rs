@@ -21,11 +21,11 @@ fn current_realm(agent: &Agent) -> Option<RealmRecord> {
     let realm = agent
         .current_execution_context()
         .map(lyng_js_env::ExecutionContext::realm)
-        .or(agent.default_realm_id())?;
+        .or_else(|| agent.default_realm_id())?;
     agent.realm(realm)
 }
 
-const fn intrinsic_error_prototype(intrinsics: Intrinsics, kind: ErrorKind) -> Option<ObjectRef> {
+const fn intrinsic_error_prototype(intrinsics: &Intrinsics, kind: ErrorKind) -> Option<ObjectRef> {
     match kind {
         ErrorKind::Error => intrinsics.error_prototype(),
         ErrorKind::Eval => intrinsics.eval_error_prototype(),
@@ -49,10 +49,13 @@ pub fn intrinsic_error_prototype_for_realm(
     realm: RealmRef,
     kind: ErrorKind,
 ) -> Option<ObjectRef> {
-    intrinsic_error_prototype(agent.realm(realm)?.intrinsics(), kind)
+    intrinsic_error_prototype(&agent.realm(realm)?.intrinsics(), kind)
 }
 
 /// Allocates one bootstrapped error object with an explicit realm/prototype target.
+///
+/// # Errors
+/// Returns an abrupt throw completion when realm lookup, shape lookup, or property definition fails.
 #[inline]
 pub fn create_error_object(
     agent: &mut Agent,
@@ -99,6 +102,10 @@ pub fn create_error_object(
 }
 
 /// Allocates one bootstrapped intrinsic error object for the selected realm.
+///
+/// # Errors
+/// Returns an abrupt throw completion when the intrinsic prototype or error object cannot be
+/// materialized.
 #[inline]
 pub fn create_intrinsic_error_object(
     agent: &mut Agent,

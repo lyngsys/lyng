@@ -6,6 +6,10 @@ use lyng_js_types::{
 };
 use std::collections::HashSet;
 
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "trap-context methods abstract completion plumbing supplied by each caller"
+)]
 pub trait ProxyTrapContext {
     type Error;
 
@@ -101,6 +105,11 @@ pub trait ProxyTrapContext {
     fn create_array_from_values(&mut self, values: &[Value]) -> Result<ObjectRef, Self::Error>;
 }
 
+/// Implements proxy `[[HasProperty]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn has_property<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -156,6 +165,11 @@ pub fn has_property<Cx: ProxyTrapContext>(
     Ok(trap_result)
 }
 
+/// Implements proxy `[[Get]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn get<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -200,6 +214,11 @@ pub fn get<Cx: ProxyTrapContext>(
     Ok(trap_result)
 }
 
+/// Implements proxy `[[GetPrototypeOf]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn get_prototype_of<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -230,6 +249,11 @@ pub fn get_prototype_of<Cx: ProxyTrapContext>(
     }
 }
 
+/// Implements proxy `[[SetPrototypeOf]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn set_prototype_of<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -266,6 +290,11 @@ pub fn set_prototype_of<Cx: ProxyTrapContext>(
     }
 }
 
+/// Implements proxy `[[GetOwnProperty]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn get_own_property<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -324,6 +353,11 @@ pub fn get_own_property<Cx: ProxyTrapContext>(
     Ok(Some(result_descriptor))
 }
 
+/// Implements proxy `[[DefineOwnProperty]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn define_property<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -391,6 +425,11 @@ pub fn define_property<Cx: ProxyTrapContext>(
     Ok(true)
 }
 
+/// Implements proxy `[[IsExtensible]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn is_extensible<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -416,6 +455,11 @@ pub fn is_extensible<Cx: ProxyTrapContext>(
     }
 }
 
+/// Implements proxy `[[PreventExtensions]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn prevent_extensions<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -444,6 +488,11 @@ pub fn prevent_extensions<Cx: ProxyTrapContext>(
     }
 }
 
+/// Implements proxy `[[OwnPropertyKeys]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn own_property_keys<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -500,6 +549,11 @@ pub fn own_property_keys<Cx: ProxyTrapContext>(
     }
 }
 
+/// Implements proxy `[[Set]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn set<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -549,6 +603,11 @@ pub fn set<Cx: ProxyTrapContext>(
     Ok(true)
 }
 
+/// Implements proxy `[[Delete]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, ordinary fallback, or invariant checking
+/// completes abruptly.
 pub fn delete_property<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     object: ObjectRef,
@@ -583,6 +642,10 @@ pub fn delete_property<Cx: ProxyTrapContext>(
     Ok(true)
 }
 
+/// Implements proxy `[[Call]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation or target call dispatch completes abruptly.
 pub fn call<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     callee: ObjectRef,
@@ -610,6 +673,11 @@ pub fn call<Cx: ProxyTrapContext>(
     )
 }
 
+/// Implements proxy `[[Construct]]`.
+///
+/// # Errors
+/// Returns the trap-context error when trap invocation, target construct dispatch, or result
+/// validation completes abruptly.
 pub fn construct<Cx: ProxyTrapContext>(
     cx: &mut Cx,
     callee: ObjectRef,
@@ -890,6 +958,11 @@ fn is_compatible_property_descriptor(
     }
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "ToLength clamps to the safe integer range before converting to an integer length"
+)]
 fn to_length(number: f64) -> u64 {
     if !number.is_finite() || number <= 0.0 {
         0

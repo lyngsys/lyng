@@ -70,9 +70,7 @@ pub fn allocate_primitive_wrapper_object(
     lifetime: AllocationLifetime,
 ) -> Completion<ObjectRef> {
     let string_plan = if wrapper_kind == PrimitiveWrapperKind::String {
-        let string = if let Some(string) = value.as_string_ref() {
-            string
-        } else {
+        let Some(string) = value.as_string_ref() else {
             return Err(throw_type_error(agent));
         };
         Some(plan_string_wrapper_cache(agent, string)?)

@@ -44,6 +44,11 @@ impl ForInEnumerator {
         self.keys.len().saturating_sub(self.next_index)
     }
 
+    /// Returns the next currently enumerable key.
+    ///
+    /// # Errors
+    /// Returns an abrupt completion when descriptor lookup fails through the object internal-method
+    /// surface.
     pub fn next_key(&mut self, agent: &mut Agent) -> Completion<Option<PropertyKey>> {
         while let Some(entry) = self.keys.get(self.next_index).copied() {
             self.next_index += 1;

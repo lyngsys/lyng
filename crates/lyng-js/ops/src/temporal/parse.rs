@@ -181,12 +181,10 @@ pub fn parse_plain_year_month(text: &str) -> Option<(i32, u8, u8)> {
     let mut index = 0;
     let mut saw_time = false;
     let year = parse_iso_year(text, &mut index)?;
-    let month = if matches!(bytes.get(index).copied(), Some(b'-')) {
+    if matches!(bytes.get(index).copied(), Some(b'-')) {
         index += 1;
-        parse_fixed_u8(text, &mut index, 2)?
-    } else {
-        parse_fixed_u8(text, &mut index, 2)?
-    };
+    }
+    let month = parse_fixed_u8(text, &mut index, 2)?;
     let day = if matches!(bytes.get(index).copied(), Some(b'-')) {
         index += 1;
         let day = parse_fixed_u8(text, &mut index, 2)?;
@@ -357,11 +355,9 @@ fn validate_temporal_annotation(
     calendar_annotation_count: &mut u8,
     critical_calendar_annotation_seen: &mut bool,
 ) -> Option<()> {
-    let (critical, body) = if let Some(body) = item.strip_prefix('!') {
-        (true, body)
-    } else {
-        (false, item)
-    };
+    let (critical, body) = item
+        .strip_prefix('!')
+        .map_or((false, item), |body| (true, body));
     if body.is_empty() {
         return None;
     }

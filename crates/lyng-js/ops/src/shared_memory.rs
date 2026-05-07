@@ -63,6 +63,11 @@ pub const fn is_waitable_kind(kind: TypedArrayElementKind) -> bool {
     )
 }
 
+/// Validates that an object is usable for Atomics operations.
+///
+/// # Errors
+/// Returns [`AtomicAccessError`] when the object is not a compatible typed array, is detached, or
+/// does not satisfy the requested waitable/shared constraints.
 pub fn validate_atomic_typed_array(
     agent: &Agent,
     typed_array_object: ObjectRef,
@@ -95,6 +100,10 @@ pub fn validate_atomic_typed_array(
     Ok(typed_array)
 }
 
+/// Validates an Atomics element index against a typed-array length.
+///
+/// # Errors
+/// Returns [`AtomicAccessError::Range`] when the element index is out of range.
 pub fn validate_atomic_index(
     typed_array: TypedArrayObjectData,
     element_index: u64,
@@ -118,6 +127,10 @@ pub const fn atomic_access_record(
     }
 }
 
+/// Validates a typed array and element index for one Atomics access.
+///
+/// # Errors
+/// Returns [`AtomicAccessError`] when typed-array validation or index validation fails.
 pub fn validate_atomic_access(
     agent: &Agent,
     typed_array_object: ObjectRef,
@@ -202,6 +215,18 @@ pub fn atomic_rmw_bits(
     }
 }
 
+fn low_u8(bits: u64) -> u8 {
+    u8::try_from(bits & u64::from(u8::MAX)).expect("masked typed-array byte should fit u8")
+}
+
+fn low_u16(bits: u64) -> u16 {
+    u16::try_from(bits & u64::from(u16::MAX)).expect("masked typed-array bits should fit u16")
+}
+
+fn low_u32(bits: u64) -> u32 {
+    u32::try_from(bits & u64::from(u32::MAX)).expect("masked typed-array bits should fit u32")
+}
+
 pub fn atomic_value_from_bits(agent: &mut Agent, kind: TypedArrayElementKind, bits: u64) -> Value {
     match kind {
         TypedArrayElementKind::BigInt64 => {
@@ -225,19 +250,19 @@ pub fn atomic_value_from_bits(agent: &mut Agent, kind: TypedArrayElementKind, bi
             );
             Value::from_bigint_ref(bigint)
         }
-        TypedArrayElementKind::Int8 => Value::from_smi(i32::from((bits as u8) as i8)),
-        TypedArrayElementKind::Int16 => Value::from_smi(i32::from((bits as u16) as i16)),
-        TypedArrayElementKind::Int32 => Value::from_smi(bits as u32 as i32),
+        TypedArrayElementKind::Int8 => Value::from_smi(i32::from(low_u8(bits).cast_signed())),
+        TypedArrayElementKind::Int16 => Value::from_smi(i32::from(low_u16(bits).cast_signed())),
+        TypedArrayElementKind::Int32 => Value::from_smi(low_u32(bits).cast_signed()),
         TypedArrayElementKind::Uint32 => {
-            let value = bits as u32;
+            let value = low_u32(bits);
             i32::try_from(value).map_or_else(|_| Value::from_f64(f64::from(value)), Value::from_smi)
         }
-        TypedArrayElementKind::Uint16 => Value::from_smi(i32::from(bits as u16)),
+        TypedArrayElementKind::Uint16 => Value::from_smi(i32::from(low_u16(bits))),
         TypedArrayElementKind::Uint8 | TypedArrayElementKind::Uint8Clamped => {
-            Value::from_smi(i32::from(bits as u8))
+            Value::from_smi(i32::from(low_u8(bits)))
         }
-        TypedArrayElementKind::Float16 => Value::from_f64(float16_bits_to_f64(bits as u16)),
-        TypedArrayElementKind::Float32 => Value::from_f64(f64::from(f32::from_bits(bits as u32))),
+        TypedArrayElementKind::Float16 => Value::from_f64(float16_bits_to_f64(low_u16(bits))),
+        TypedArrayElementKind::Float32 => Value::from_f64(f64::from(f32::from_bits(low_u32(bits)))),
         TypedArrayElementKind::Float64 => Value::from_f64(f64::from_bits(bits)),
     }
 }
@@ -279,14 +304,15 @@ fn typed_array_start(typed_array: TypedArrayObjectData, element_index: usize) ->
 
 fn normalize_integer_bits(kind: TypedArrayElementKind, bits: u64) -> u64 {
     match kind {
-        TypedArrayElementKind::BigInt64 | TypedArrayElementKind::BigUint64 => bits,
-        TypedArrayElementKind::Int8
-        | TypedArrayElementKind::Uint8
-        | TypedArrayElementKind::Uint8Clamped => u64::from(bits as u8),
-        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => u64::from(bits as u16),
-        TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => u64::from(bits as u32),
-        TypedArrayElementKind::Float16
+        TypedArrayElementKind::BigInt64
+        | TypedArrayElementKind::BigUint64
+        | TypedArrayElementKind::Float16
         | TypedArrayElementKind::Float32
         | TypedArrayElementKind::Float64 => bits,
+        TypedArrayElementKind::Int8
+        | TypedArrayElementKind::Uint8
+        | TypedArrayElementKind::Uint8Clamped => u64::from(low_u8(bits)),
+        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => u64::from(low_u16(bits)),
+        TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => u64::from(low_u32(bits)),
     }
 }

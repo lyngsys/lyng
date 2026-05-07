@@ -516,13 +516,9 @@ fn parse_non_decimal_to_f64(digits: &str, radix: u32) -> f64 {
 }
 
 fn is_non_ecmascript_infinity_literal(text: &str) -> bool {
-    let unsigned = if let Some(rest) = text.strip_prefix('+') {
-        rest
-    } else if let Some(rest) = text.strip_prefix('-') {
-        rest
-    } else {
-        text
-    };
+    let unsigned = text
+        .strip_prefix('+')
+        .unwrap_or_else(|| text.strip_prefix('-').map_or(text, |rest| rest));
 
     unsigned.eq_ignore_ascii_case("inf")
         || (unsigned.eq_ignore_ascii_case("infinity")

@@ -5,6 +5,10 @@ use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::ClassPrivateElementKind;
 use lyng_js_types::{Completion, ObjectRef, Value};
 
+/// Defines a private field descriptor layout for a class.
+///
+/// # Errors
+/// Returns a type-error completion when the class/prototype layout cannot be recorded.
 pub fn define_private_field_layout(
     agent: &mut Agent,
     class_object: ObjectRef,
@@ -19,6 +23,10 @@ pub fn define_private_field_layout(
         .ok_or_else(|| throw_type_error(agent))
 }
 
+/// Defines a private method/accessor/field descriptor layout for a class.
+///
+/// # Errors
+/// Returns a type-error completion when the class/prototype layout cannot be recorded.
 pub fn define_private_element_layout(
     agent: &mut Agent,
     class_object: ObjectRef,
@@ -34,6 +42,10 @@ pub fn define_private_element_layout(
         .ok_or_else(|| throw_type_error(agent))
 }
 
+/// Installs a private method or accessor value.
+///
+/// # Errors
+/// Returns an abrupt completion when object private storage rejects the install.
 pub fn install_private_element_value(
     agent: &mut Agent,
     class_key: ObjectRef,
@@ -55,6 +67,10 @@ pub fn install_private_element_value(
         .map(|()| value)
 }
 
+/// Installs the runtime key value for an instance public field.
+///
+/// # Errors
+/// Returns an abrupt completion when class private storage cannot record the key.
 pub fn install_instance_public_field_key(
     agent: &mut Agent,
     class_object: ObjectRef,
@@ -76,6 +92,10 @@ pub fn install_instance_public_field_key(
         .map(|()| key_value)
 }
 
+/// Reads the runtime key value for an instance public field.
+///
+/// # Errors
+/// Returns an abrupt completion when the class record or backing slot is missing.
 pub fn instance_public_field_key(
     agent: &mut Agent,
     class_object: ObjectRef,
@@ -87,6 +107,10 @@ pub fn instance_public_field_key(
         .map_err(|error| internal_method_error(agent, error))
 }
 
+/// Reads the kind of a private element descriptor.
+///
+/// # Errors
+/// Returns an abrupt completion when the class record or descriptor is missing.
 pub fn private_element_kind(
     agent: &mut Agent,
     class_key: ObjectRef,
@@ -98,6 +122,10 @@ pub fn private_element_kind(
         .map_err(|error| internal_method_error(agent, error))
 }
 
+/// Reads a shared private method or accessor value.
+///
+/// # Errors
+/// Returns an abrupt completion when the descriptor or storage is invalid.
 pub fn private_shared_element_value(
     agent: &mut Agent,
     class_key: ObjectRef,
@@ -109,6 +137,11 @@ pub fn private_shared_element_value(
         .map_err(|error| internal_method_error(agent, error))
 }
 
+/// Initializes a private field on a receiver.
+///
+/// # Errors
+/// Returns an abrupt completion when the brand is invalid, already initialized, or storage is
+/// corrupt.
 pub fn private_field_init(
     agent: &mut Agent,
     receiver: ObjectRef,
@@ -132,6 +165,10 @@ pub fn private_field_init(
         .map(|()| value)
 }
 
+/// Reads a private field from a receiver.
+///
+/// # Errors
+/// Returns an abrupt completion when the brand is invalid or storage is corrupt.
 pub fn private_field_get(
     agent: &mut Agent,
     receiver: ObjectRef,
@@ -144,6 +181,10 @@ pub fn private_field_get(
         .map_err(|error| internal_method_error(agent, error))
 }
 
+/// Stores a private field on a receiver.
+///
+/// # Errors
+/// Returns an abrupt completion when the brand is invalid or storage update fails.
 pub fn private_field_set(
     agent: &mut Agent,
     receiver: ObjectRef,
@@ -160,6 +201,10 @@ pub fn private_field_set(
         .map(|()| value)
 }
 
+/// Tests whether a receiver has a private brand.
+///
+/// # Errors
+/// Returns an abrupt completion when the class record or descriptor is missing.
 pub fn private_has(
     agent: &mut Agent,
     receiver: ObjectRef,

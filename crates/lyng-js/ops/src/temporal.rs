@@ -255,7 +255,7 @@ pub fn round_duration_exact(
         rounding_mode,
     )?;
     let [days, hours, minutes, seconds, milliseconds, microseconds, nanoseconds] =
-        distribute_duration_nanoseconds_for_exact_largest_unit(rounded, largest_unit)?;
+        distribute_duration_nanoseconds_for_exact_largest_unit(rounded, largest_unit);
     Some(TemporalDurationObjectData::new(
         0,
         0,
@@ -394,7 +394,7 @@ fn combine_durations(
         .checked_add(duration_time_nanoseconds(left))?
         .checked_add(duration_time_nanoseconds(right).checked_mul(right_sign)?)?;
     let [days, hours, minutes, seconds, milliseconds, microseconds, nanoseconds] =
-        distribute_additive_duration_nanoseconds(day_time_nanoseconds, largest_unit)?;
+        distribute_additive_duration_nanoseconds(day_time_nanoseconds, largest_unit);
     Some(TemporalDurationObjectData::new(
         years,
         months,
@@ -411,7 +411,7 @@ fn combine_durations(
 
 fn combine_component(left: i128, right: i128, right_sign: i128) -> Option<i128> {
     let value = left.checked_add(right.checked_mul(right_sign)?)?;
-    duration_component_from_integer(value)
+    Some(duration_component_from_integer(value))
 }
 
 #[allow(
@@ -419,10 +419,14 @@ fn combine_component(left: i128, right: i128, right_sign: i128) -> Option<i128> 
     clippy::cast_precision_loss,
     reason = "Temporal Duration fields are stored as float64-representable integer values."
 )]
-const fn duration_component_from_integer(value: i128) -> Option<i128> {
-    Some((value as f64) as i128)
+const fn duration_component_from_integer(value: i128) -> i128 {
+    (value as f64) as i128
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Temporal duration parsing follows the single ECMA-262 duration grammar scanner"
+)]
 pub fn parse_duration(text: &str) -> Option<TemporalDurationObjectData> {
     let bytes = text.as_bytes();
     let mut index = 0;
@@ -664,10 +668,7 @@ fn round_duration_to_fractional_digits(
         .checked_add(duration_time_nanoseconds(data))?;
     let rounded = round_i128_to_increment(day_time_nanoseconds, increment, rounding_mode)?;
     let [days, hours, minutes, seconds, milliseconds, microseconds, nanoseconds] =
-        distribute_duration_nanoseconds_for_largest_unit(
-            rounded,
-            duration_largest_time_unit(data),
-        )?;
+        distribute_duration_nanoseconds_for_largest_unit(rounded, duration_largest_time_unit(data));
     Some(TemporalDurationObjectData::new(
         data.years(),
         data.months(),
@@ -881,7 +882,7 @@ pub fn duration_largest_exact_unit_for_addition(
 fn distribute_duration_nanoseconds_for_largest_unit(
     nanoseconds: i128,
     largest_unit: DurationLargestTimeUnit,
-) -> Option<[i128; 7]> {
+) -> [i128; 7] {
     let units: &[(usize, i128)] = match largest_unit {
         DurationLargestTimeUnit::Day => &[
             (0, NANOS_PER_DAY),
@@ -917,16 +918,16 @@ fn distribute_duration_nanoseconds_for_largest_unit(
     let mut parts = [0_i128; 7];
     let mut remainder = nanoseconds;
     for (index, unit) in units {
-        parts[*index] = duration_component_from_integer(remainder / *unit)?;
+        parts[*index] = duration_component_from_integer(remainder / *unit);
         remainder %= *unit;
     }
-    Some(parts)
+    parts
 }
 
 fn distribute_additive_duration_nanoseconds(
     nanoseconds: i128,
     largest_unit: TemporalDurationExactUnit,
-) -> Option<[i128; 7]> {
+) -> [i128; 7] {
     const UNITS: [(TemporalDurationExactUnit, usize, i128); 7] = [
         (TemporalDurationExactUnit::Day, 0, NANOS_PER_DAY),
         (TemporalDurationExactUnit::Hour, 1, NANOS_PER_HOUR),
@@ -948,16 +949,16 @@ fn distribute_additive_duration_nanoseconds(
     let mut remainder = nanoseconds;
     let start = usize::from(largest_unit.order());
     for (_, index, unit) in &UNITS[start..] {
-        parts[*index] = duration_component_from_integer(remainder / *unit)?;
+        parts[*index] = duration_component_from_integer(remainder / *unit);
         remainder %= *unit;
     }
-    Some(parts)
+    parts
 }
 
 fn distribute_duration_nanoseconds_for_exact_largest_unit(
     nanoseconds: i128,
     largest_unit: TemporalDurationExactUnit,
-) -> Option<[i128; 7]> {
+) -> [i128; 7] {
     const UNITS: [(TemporalDurationExactUnit, usize, i128); 7] = [
         (TemporalDurationExactUnit::Day, 0, NANOS_PER_DAY),
         (TemporalDurationExactUnit::Hour, 1, NANOS_PER_HOUR),
@@ -979,10 +980,10 @@ fn distribute_duration_nanoseconds_for_exact_largest_unit(
     let mut remainder = nanoseconds;
     let start = usize::from(largest_unit.order());
     for (_, index, unit) in &UNITS[start..] {
-        parts[*index] = duration_component_from_integer(remainder / *unit)?;
+        parts[*index] = duration_component_from_integer(remainder / *unit);
         remainder %= *unit;
     }
-    Some(parts)
+    parts
 }
 
 fn format_duration_parts(
@@ -1137,6 +1138,10 @@ pub fn iso_days_before_year(year: i32) -> i64 {
     year * 365 + year.div_euclid(4) - year.div_euclid(100) + year.div_euclid(400)
 }
 
+/// Returns the ISO weekday in the range `1..=7`.
+///
+/// # Panics
+/// Panics if the internal modulo computation falls outside the known `1..=7` range.
 pub fn iso_day_of_week(year: i32, month: u8, day: u8) -> i32 {
     let days_since_iso_epoch =
         iso_days_before_year(year) + i64::from(iso_day_of_year(year, month, day)) - 1;
@@ -1251,7 +1256,7 @@ pub fn format_plain_time(data: TemporalPlainTimeObjectData) -> String {
 }
 
 pub fn format_plain_date_time(data: TemporalPlainDateTimeObjectData) -> String {
-    let date =
+    let plain_date =
         TemporalPlainDateObjectData::new(data.year(), data.month(), data.day(), data.calendar());
     let time = TemporalPlainTimeObjectData::new(
         data.hour(),
@@ -1261,7 +1266,11 @@ pub fn format_plain_date_time(data: TemporalPlainDateTimeObjectData) -> String {
         data.microsecond(),
         data.nanosecond(),
     );
-    format!("{}T{}", format_plain_date(date), format_plain_time(time))
+    format!(
+        "{}T{}",
+        format_plain_date(plain_date),
+        format_plain_time(time)
+    )
 }
 
 pub fn format_plain_year_month(data: TemporalPlainYearMonthObjectData) -> String {
@@ -1309,7 +1318,7 @@ mod tests {
     #[test]
     fn duration_limit_check_balances_day_time_units() {
         assert!(duration_is_within_limits(TemporalDurationObjectData::new(
-            DURATION_DATE_UNIT_MAX as i64,
+            i64::try_from(DURATION_DATE_UNIT_MAX).expect("test limit should fit i64"),
             0,
             0,
             0,
@@ -1321,7 +1330,7 @@ mod tests {
             0,
         )));
         assert!(!duration_is_within_limits(TemporalDurationObjectData::new(
-            DURATION_DATE_UNIT_MAX as i64 + 1,
+            i64::try_from(DURATION_DATE_UNIT_MAX).expect("test limit should fit i64") + 1,
             0,
             0,
             0,
@@ -1363,7 +1372,7 @@ mod tests {
             0,
             0,
             0,
-            SAFE_INTEGER_MAX as i64,
+            i64::try_from(SAFE_INTEGER_MAX).expect("safe integer max should fit i64"),
             999,
             999,
             999,
@@ -1375,7 +1384,7 @@ mod tests {
             0,
             0,
             0,
-            SAFE_INTEGER_MAX as i64,
+            i64::try_from(SAFE_INTEGER_MAX).expect("safe integer max should fit i64"),
             1_000,
             0,
             0,

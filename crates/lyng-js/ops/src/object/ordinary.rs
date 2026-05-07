@@ -61,7 +61,7 @@ pub fn ordinary_get_with_receiver(
     if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
         return match numeric_key {
             TypedArrayNumericKey::Valid(index) => {
-                Ok(typed_array_index_descriptor(agent, object, index)?
+                Ok(typed_array_index_descriptor(agent, object, index)
                     .and_then(lyng_js_types::PropertyDescriptor::value)
                     .unwrap_or(Value::undefined()))
             }
@@ -158,7 +158,7 @@ pub fn ordinary_get_own_property(
     if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
         return match numeric_key {
             TypedArrayNumericKey::Valid(index) => {
-                typed_array_index_descriptor(agent, object, index)
+                Ok(typed_array_index_descriptor(agent, object, index))
             }
             TypedArrayNumericKey::Invalid => Ok(None),
         };

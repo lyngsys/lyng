@@ -173,6 +173,10 @@ impl TraceHeapEdges for IteratorRecord {
     }
 }
 
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "iterator context methods abstract completion plumbing supplied by each caller"
+)]
 pub trait IteratorOpsContext {
     type Error;
 
@@ -253,6 +257,11 @@ fn get_iterator_from_method<Cx: IteratorOpsContext>(
     })
 }
 
+/// Creates an iterator result object with `value` and `done` properties.
+///
+/// # Errors
+/// Returns the caller-provided error when object allocation or property definition completes
+/// abruptly.
 pub fn create_iterator_result_object(
     agent: &mut Agent,
     realm: RealmRef,
@@ -297,6 +306,11 @@ pub fn create_iterator_result_object(
     Ok(object_ref)
 }
 
+/// Resolves the sync iterator record for `value`.
+///
+/// # Errors
+/// Returns the caller-provided error when method lookup, call, or iterator validation completes
+/// abruptly.
 pub fn get_iterator<Cx: IteratorOpsContext>(
     cx: &mut Cx,
     value: Value,
@@ -311,6 +325,11 @@ pub fn get_iterator<Cx: IteratorOpsContext>(
     get_iterator_from_method(cx, value, method, IteratorKind::Sync)
 }
 
+/// Resolves the async iterator record for `value`.
+///
+/// # Errors
+/// Returns the caller-provided error when async/sync method lookup, call, or iterator validation
+/// completes abruptly.
 pub fn get_async_iterator<Cx: IteratorOpsContext>(
     cx: &mut Cx,
     value: Value,
@@ -334,6 +353,10 @@ pub fn get_async_iterator<Cx: IteratorOpsContext>(
     get_iterator_from_method(cx, value, method, IteratorKind::AsyncFromSync)
 }
 
+/// Calls an iterator record's `next` method.
+///
+/// # Errors
+/// Returns the caller-provided error when the call or object validation completes abruptly.
 pub fn iterator_next<Cx: IteratorOpsContext>(
     cx: &mut Cx,
     iterator_record: &IteratorRecord,
@@ -355,6 +378,10 @@ pub fn iterator_next<Cx: IteratorOpsContext>(
     result.as_object_ref().ok_or_else(|| cx.type_error())
 }
 
+/// Reads and coerces an iterator result object's `done` property.
+///
+/// # Errors
+/// Returns the caller-provided error when property lookup completes abruptly.
 pub fn iterator_complete<Cx: IteratorOpsContext>(
     cx: &mut Cx,
     iter_result: ObjectRef,
@@ -371,6 +398,10 @@ pub fn iterator_complete<Cx: IteratorOpsContext>(
     map_completion(cx, completion)
 }
 
+/// Reads an iterator result object's `value` property.
+///
+/// # Errors
+/// Returns the caller-provided error when property lookup completes abruptly.
 pub fn iterator_value<Cx: IteratorOpsContext>(
     cx: &mut Cx,
     iter_result: ObjectRef,
@@ -381,6 +412,11 @@ pub fn iterator_value<Cx: IteratorOpsContext>(
     )
 }
 
+/// Performs one `IteratorStep`.
+///
+/// # Errors
+/// Returns the caller-provided error when `next`, result validation, or `done` lookup completes
+/// abruptly.
 pub fn iterator_step<Cx: IteratorOpsContext>(
     cx: &mut Cx,
     iterator_record: &mut IteratorRecord,
@@ -396,6 +432,11 @@ pub fn iterator_step<Cx: IteratorOpsContext>(
     Ok(Some(result))
 }
 
+/// Closes an iterator and preserves the caller's completion.
+///
+/// # Errors
+/// Returns the caller-provided error when `return` lookup or call completes abruptly, or when the
+/// close result violates iterator invariants.
 pub fn iterator_close<Cx: IteratorOpsContext, T>(
     cx: &mut Cx,
     iterator_record: &mut IteratorRecord,

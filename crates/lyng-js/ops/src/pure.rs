@@ -210,30 +210,27 @@ pub fn is_finite_number(value: Value) -> bool {
 #[inline]
 #[allow(clippy::float_cmp)]
 pub fn is_integral_number(value: Value) -> bool {
-    match value.as_f64() {
-        Some(number) => number.is_finite() && number.trunc() == number,
-        None => false,
-    }
+    value
+        .as_f64()
+        .is_some_and(|number| number.is_finite() && number.trunc() == number)
 }
 
 /// Returns whether the numeric value is positive zero.
 #[inline]
 #[allow(clippy::float_cmp)]
 pub fn is_positive_zero(value: Value) -> bool {
-    match value.as_f64() {
-        Some(number) => number == 0.0 && !number.is_sign_negative(),
-        None => false,
-    }
+    value
+        .as_f64()
+        .is_some_and(|number| number == 0.0 && !number.is_sign_negative())
 }
 
 /// Returns whether the numeric value is negative zero.
 #[inline]
 #[allow(clippy::float_cmp)]
 pub fn is_negative_zero(value: Value) -> bool {
-    match value.as_f64() {
-        Some(number) => number == 0.0 && number.is_sign_negative(),
-        None => false,
-    }
+    value
+        .as_f64()
+        .is_some_and(|number| number == 0.0 && number.is_sign_negative())
 }
 
 /// Heap-free `ToBoolean` fast path.

@@ -32,6 +32,18 @@ fn typed_array_bigint64_value(agent: &mut Agent, bits: u64) -> Value {
     Value::from_bigint_ref(bigint)
 }
 
+fn low_u8(bits: u64) -> u8 {
+    u8::try_from(bits & u64::from(u8::MAX)).expect("masked typed-array byte should fit u8")
+}
+
+fn low_u16(bits: u64) -> u16 {
+    u16::try_from(bits & u64::from(u16::MAX)).expect("masked typed-array bits should fit u16")
+}
+
+fn low_u32(bits: u64) -> u32 {
+    u32::try_from(bits & u64::from(u32::MAX)).expect("masked typed-array bits should fit u32")
+}
+
 fn typed_array_storage_bits_to_value(
     agent: &mut Agent,
     kind: TypedArrayElementKind,
@@ -40,19 +52,19 @@ fn typed_array_storage_bits_to_value(
     match kind {
         TypedArrayElementKind::BigInt64 => typed_array_bigint64_value(agent, bits),
         TypedArrayElementKind::BigUint64 => typed_array_biguint64_value(agent, bits),
-        TypedArrayElementKind::Int8 => Value::from_smi(i32::from((bits as u8) as i8)),
-        TypedArrayElementKind::Int16 => Value::from_smi(i32::from((bits as u16) as i16)),
-        TypedArrayElementKind::Int32 => Value::from_smi(bits as u32 as i32),
-        TypedArrayElementKind::Float16 => Value::from_f64(float16_bits_to_f64(bits as u16)),
-        TypedArrayElementKind::Float32 => Value::from_f64(f64::from(f32::from_bits(bits as u32))),
+        TypedArrayElementKind::Int8 => Value::from_smi(i32::from(low_u8(bits).cast_signed())),
+        TypedArrayElementKind::Int16 => Value::from_smi(i32::from(low_u16(bits).cast_signed())),
+        TypedArrayElementKind::Int32 => Value::from_smi(low_u32(bits).cast_signed()),
+        TypedArrayElementKind::Float16 => Value::from_f64(float16_bits_to_f64(low_u16(bits))),
+        TypedArrayElementKind::Float32 => Value::from_f64(f64::from(f32::from_bits(low_u32(bits)))),
         TypedArrayElementKind::Float64 => Value::from_f64(f64::from_bits(bits)),
         TypedArrayElementKind::Uint32 => {
-            let value = bits as u32;
+            let value = low_u32(bits);
             i32::try_from(value).map_or_else(|_| Value::from_f64(f64::from(value)), Value::from_smi)
         }
-        TypedArrayElementKind::Uint16 => Value::from_smi(i32::from(bits as u16)),
+        TypedArrayElementKind::Uint16 => Value::from_smi(i32::from(low_u16(bits))),
         TypedArrayElementKind::Uint8Clamped | TypedArrayElementKind::Uint8 => {
-            Value::from_smi(i32::from(bits as u8))
+            Value::from_smi(i32::from(low_u8(bits)))
         }
     }
 }
@@ -61,32 +73,23 @@ fn typed_array_read_storage_bits(
     agent: &Agent,
     object: ObjectRef,
     index: u32,
-) -> Completion<Option<(TypedArrayElementKind, u64)>> {
-    let Some(record) = agent.objects().typed_array(object) else {
-        return Ok(None);
-    };
+) -> Option<(TypedArrayElementKind, u64)> {
+    let record = agent.objects().typed_array(object)?;
     let index = usize::try_from(index).unwrap_or(usize::MAX);
     if !typed_array_index_is_valid(agent, record, index) {
-        return Ok(None);
+        return None;
     }
     let element_size = record.kind().bytes_per_element();
-    let Some(start) = index
+    let start = index
         .checked_mul(element_size)
-        .and_then(|relative| record.byte_offset().checked_add(relative))
-    else {
-        return Ok(None);
-    };
+        .and_then(|relative| record.byte_offset().checked_add(relative))?;
     let mut bits = 0_u64;
     for offset in 0..element_size {
-        let Some(byte_index) = start.checked_add(offset) else {
-            return Ok(None);
-        };
-        let Some(byte) = agent.backing_store_get_byte(record.backing_store(), byte_index) else {
-            return Ok(None);
-        };
+        let byte_index = start.checked_add(offset)?;
+        let byte = agent.backing_store_get_byte(record.backing_store(), byte_index)?;
         bits |= u64::from(byte) << (offset * 8);
     }
-    Ok(Some((record.kind(), bits)))
+    Some((record.kind(), bits))
 }
 
 fn typed_array_index_is_valid(
@@ -163,6 +166,11 @@ fn canonical_numeric_index_string(text: &str) -> Option<f64> {
     (number_to_string(number) == text).then_some(number)
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "typed-array numeric indices are finite, integral, non-negative, and u32 range checked"
+)]
 fn valid_numeric_index(agent: &Agent, object: ObjectRef, index: f64) -> Option<u32> {
     if !index.is_finite()
         || index.fract() != 0.0
@@ -207,16 +215,14 @@ pub(super) fn typed_array_index_descriptor(
     agent: &mut Agent,
     object: ObjectRef,
     index: u32,
-) -> Completion<Option<PropertyDescriptor>> {
-    let Some((kind, bits)) = typed_array_read_storage_bits(agent, object, index)? else {
-        return Ok(None);
-    };
+) -> Option<PropertyDescriptor> {
+    let (kind, bits) = typed_array_read_storage_bits(agent, object, index)?;
     let mut descriptor = PropertyDescriptor::new();
     descriptor.set_value(typed_array_storage_bits_to_value(agent, kind, bits));
     descriptor.set_writable(true);
     descriptor.set_enumerable(true);
     descriptor.set_configurable(true);
-    Ok(Some(descriptor))
+    Some(descriptor)
 }
 
 pub(super) fn typed_array_own_property_keys(

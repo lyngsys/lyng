@@ -34,6 +34,10 @@ impl ToPrimitiveHint {
     }
 }
 
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "conversion context methods abstract completion plumbing supplied by each caller"
+)]
 pub trait ToPrimitiveContext {
     type Error;
 
@@ -118,6 +122,10 @@ pub fn to_primitive<Cx: ToPrimitiveContext>(
 /// # Errors
 /// Returns the caller-provided error type when `ToPrimitive` or the underlying
 /// numeric conversion fails.
+/// Converts a value with ECMAScript `ToNumber`.
+///
+/// # Errors
+/// Returns the caller-provided error when object-to-primitive conversion completes abruptly.
 pub fn to_number<Cx: ToPrimitiveContext>(cx: &mut Cx, value: Value) -> Result<Value, Cx::Error> {
     let primitive = to_primitive(cx, value, ToPrimitiveHint::Number)?;
     let number = {
@@ -132,6 +140,10 @@ pub fn to_number<Cx: ToPrimitiveContext>(cx: &mut Cx, value: Value) -> Result<Va
 /// # Errors
 /// Returns the caller-provided error type when `ToPrimitive` or the underlying
 /// numeric conversion fails.
+/// Converts a value with ECMAScript `ToNumeric`.
+///
+/// # Errors
+/// Returns the caller-provided error when object-to-primitive conversion completes abruptly.
 pub fn to_numeric<Cx: ToPrimitiveContext>(cx: &mut Cx, value: Value) -> Result<Value, Cx::Error> {
     let primitive = to_primitive(cx, value, ToPrimitiveHint::Number)?;
     let numeric = {
