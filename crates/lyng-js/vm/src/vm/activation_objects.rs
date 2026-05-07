@@ -124,7 +124,7 @@ impl Vm {
         .map_err(VmError::Abrupt)?
         .and_then(|descriptor| descriptor.getter().zip(descriptor.setter()))
         .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        let callee = agent.atoms_mut().intern_collectible("callee");
+        let callee_atom = agent.atoms_mut().intern_collectible("callee");
         let mut descriptor = PropertyDescriptor::new();
         descriptor.set_getter(thrower.0);
         descriptor.set_setter(thrower.1);
@@ -135,7 +135,7 @@ impl Vm {
             objects.define_own_property(
                 &mut mutator,
                 object,
-                PropertyKey::from_atom(callee),
+                PropertyKey::from_atom(callee_atom),
                 descriptor,
                 AllocationLifetime::Default,
             )

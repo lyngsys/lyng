@@ -678,12 +678,13 @@ impl Vm {
     }
 
     pub(super) fn pop_async_generator_front_request(&mut self, generator: ObjectRef) {
-        let remove_queue = if let Some(queue) = self.async_generator_queues.get_mut(&generator) {
-            let _ = queue.pop_front();
-            queue.is_empty()
-        } else {
-            false
-        };
+        let remove_queue = self
+            .async_generator_queues
+            .get_mut(&generator)
+            .is_some_and(|queue| {
+                let _ = queue.pop_front();
+                queue.is_empty()
+            });
         if remove_queue {
             let _ = self.async_generator_queues.remove(&generator);
         }

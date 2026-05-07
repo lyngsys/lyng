@@ -62,10 +62,10 @@ impl Vm {
             let home_object = arguments
                 .get(2)
                 .and_then(|value| value.as_object_ref())
-                .map(Ok)
-                .unwrap_or_else(|| {
-                    Self::resolve_super_home_object(agent, caller.lexical_env(), caller)
-                })?;
+                .map_or_else(
+                    || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
+                    Ok,
+                )?;
             object::super_base(agent, home_object).map_err(VmError::Abrupt)?
         };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
@@ -90,10 +90,10 @@ impl Vm {
             let home_object = arguments
                 .get(3)
                 .and_then(|value| value.as_object_ref())
-                .map(Ok)
-                .unwrap_or_else(|| {
-                    Self::resolve_super_home_object(agent, caller.lexical_env(), caller)
-                })?;
+                .map_or_else(
+                    || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
+                    Ok,
+                )?;
             object::super_base(agent, home_object).map_err(VmError::Abrupt)?
         };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
@@ -115,10 +115,10 @@ impl Vm {
         let home_object = arguments
             .first()
             .and_then(|value| value.as_object_ref())
-            .map(Ok)
-            .unwrap_or_else(|| {
-                Self::resolve_super_home_object(agent, caller.lexical_env(), caller)
-            })?;
+            .map_or_else(
+                || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
+                Ok,
+            )?;
         let base = object::ordinary_get_prototype_of(agent, home_object)
             .map_err(VmError::Abrupt)?
             .map_or_else(Value::null, Value::from_object_ref);

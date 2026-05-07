@@ -1724,11 +1724,8 @@ impl Vm {
                 let left = number_to_uint32(left);
                 let right = number_to_uint32(right) & 0x1f;
                 let result = left >> right;
-                if let Ok(result) = i32::try_from(result) {
-                    Value::from_smi(result)
-                } else {
-                    Value::from_f64(f64::from(result))
-                }
+                i32::try_from(result)
+                    .map_or_else(|_| Value::from_f64(f64::from(result)), Value::from_smi)
             }
             Opcode::Equal | Opcode::StrictEqual => Value::from_bool(left == right),
             Opcode::LessThan => Value::from_bool(
@@ -2039,11 +2036,8 @@ impl Vm {
         let left = number_to_uint32(numeric_value_to_f64(left));
         let right = number_to_uint32(numeric_value_to_f64(right)) & 0x1f;
         let result = left >> right;
-        if let Ok(result) = i32::try_from(result) {
-            Ok(Value::from_smi(result))
-        } else {
-            Ok(Value::from_f64(f64::from(result)))
-        }
+        Ok(i32::try_from(result)
+            .map_or_else(|_| Value::from_f64(f64::from(result)), Value::from_smi))
     }
 }
 

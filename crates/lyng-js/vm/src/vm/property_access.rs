@@ -620,11 +620,8 @@ impl Vm {
             }
         } else if key.as_atom() == Some(WellKnownAtom::length.id()) {
             let length = primitive_string_code_unit_len(agent, string)?;
-            return Ok(if let Ok(length) = i32::try_from(length) {
-                Value::from_smi(length)
-            } else {
-                Value::from_f64(f64::from(length))
-            });
+            return Ok(i32::try_from(length)
+                .map_or_else(|_| Value::from_f64(f64::from(length)), Value::from_smi));
         }
 
         let prototype = agent

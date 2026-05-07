@@ -352,7 +352,7 @@ impl Vm {
         function: ObjectRef,
         name_value: Value,
     ) -> VmResult<()> {
-        let name_value = if let Some(symbol) = name_value.as_symbol_ref() {
+        let name_value = name_value.as_symbol_ref().map_or(name_value, |symbol| {
             let name =
                 function_name_text_from_property_key(agent, PropertyKey::from_symbol(symbol), None);
             Value::from_string_ref(agent.alloc_runtime_string(
@@ -360,9 +360,7 @@ impl Vm {
                 None,
                 AllocationLifetime::Default,
             ))
-        } else {
-            name_value
-        };
+        });
         let key = PropertyKey::from_atom(WellKnownAtom::name.id());
         let existing =
             object::ordinary_get_own_property(agent, function, key).map_err(VmError::Abrupt)?;

@@ -13,23 +13,25 @@ impl Vm {
         mirrored_slot: Option<u32>,
     ) -> VmResult<()> {
         let source_environment = frame.lexical_env();
-        let (iteration_slots, shared_slots, detached_slots) = match site {
-            Some(site) => (
-                site.iteration_slots()
-                    .iter()
-                    .map(|slot| u32::from(*slot))
-                    .collect::<Vec<_>>(),
-                site.shared_slots()
-                    .iter()
-                    .map(|slot| u32::from(*slot))
-                    .collect::<Vec<_>>(),
-                site.detached_slots()
-                    .iter()
-                    .map(|slot| u32::from(*slot))
-                    .collect::<Vec<_>>(),
-            ),
-            None => (mirrored_slot.into_iter().collect(), Vec::new(), Vec::new()),
-        };
+        let (iteration_slots, shared_slots, detached_slots) = site.map_or_else(
+            || (mirrored_slot.into_iter().collect(), Vec::new(), Vec::new()),
+            |site| {
+                (
+                    site.iteration_slots()
+                        .iter()
+                        .map(|slot| u32::from(*slot))
+                        .collect::<Vec<_>>(),
+                    site.shared_slots()
+                        .iter()
+                        .map(|slot| u32::from(*slot))
+                        .collect::<Vec<_>>(),
+                    site.detached_slots()
+                        .iter()
+                        .map(|slot| u32::from(*slot))
+                        .collect::<Vec<_>>(),
+                )
+            },
+        );
         let iteration_environment =
             self.create_loop_iteration_environment(agent, source_environment, &iteration_slots)?;
         self.loop_iteration_envs.push(LoopIterationEnvironment {

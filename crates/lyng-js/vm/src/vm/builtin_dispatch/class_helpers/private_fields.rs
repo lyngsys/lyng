@@ -120,8 +120,8 @@ impl Vm {
         }
 
         let mut remaining = class_depth;
-        let callee = caller.callee();
-        if let Some(home_object) = callee.and_then(|callee| {
+        let callee_object = caller.callee();
+        if let Some(home_object) = callee_object.and_then(|callee| {
             agent
                 .objects()
                 .function_data(callee)
@@ -141,7 +141,7 @@ impl Vm {
             };
             match record {
                 lyng_js_env::EnvironmentRecord::Function(record) => {
-                    if callee.is_some_and(|callee| record.function_object() == callee) {
+                    if callee_object.is_some_and(|callee| record.function_object() == callee) {
                         current = record.declarative().outer();
                         continue;
                     }

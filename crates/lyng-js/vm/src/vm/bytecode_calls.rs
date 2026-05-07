@@ -618,7 +618,7 @@ mod tests {
                 AllocationLifetime::Default,
             )
         });
-        let caller = FrameRecord::new(
+        let caller_frame = FrameRecord::new(
             installed.code(),
             0,
             RegisterWindow::new(0, 0),
@@ -630,7 +630,7 @@ mod tests {
         );
 
         let prepared = vm
-            .prepare_bytecode_call(agent, caller, callee, Value::undefined(), None)
+            .prepare_bytecode_call(agent, caller_frame, callee, Value::undefined(), None)
             .expect("bytecode call should prepare");
         assert_eq!(prepared.private_env, Some(private_env));
         vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
@@ -698,7 +698,7 @@ mod tests {
                 AllocationLifetime::Default,
             )
         });
-        let caller = FrameRecord::new(
+        let caller_frame = FrameRecord::new(
             installed.code(),
             0,
             RegisterWindow::new(0, 0),
@@ -710,7 +710,7 @@ mod tests {
         );
 
         let prepared = vm
-            .prepare_bytecode_call(agent, caller, callee, Value::undefined(), None)
+            .prepare_bytecode_call(agent, caller_frame, callee, Value::undefined(), None)
             .expect("bytecode call should prepare");
         vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
             .expect("bytecode call should install");
