@@ -1012,12 +1012,12 @@ impl TraceHeapEdges for BuiltinCache {
         self.internal.trace_heap_edges(tracer);
         for (realm, builtins) in &self.public {
             realm.trace_heap_edges(tracer);
-            trace_public_realm_builtins(*builtins, tracer);
+            trace_public_realm_builtins(builtins, tracer);
         }
     }
 }
 
-fn trace_public_realm_builtins(builtins: PublicRealmBuiltins, tracer: &mut PrimitiveTracer<'_>) {
+fn trace_public_realm_builtins(builtins: &PublicRealmBuiltins, tracer: &mut PrimitiveTracer<'_>) {
     for raw in CORE_BUILTIN_NAMESPACE_START..=CORE_BUILTIN_NAMESPACE_END {
         trace_public_builtin(raw, builtins, tracer);
     }
@@ -1026,7 +1026,11 @@ fn trace_public_realm_builtins(builtins: PublicRealmBuiltins, tracer: &mut Primi
     }
 }
 
-fn trace_public_builtin(raw: u32, builtins: PublicRealmBuiltins, tracer: &mut PrimitiveTracer<'_>) {
+fn trace_public_builtin(
+    raw: u32,
+    builtins: &PublicRealmBuiltins,
+    tracer: &mut PrimitiveTracer<'_>,
+) {
     let Some(entry) = BuiltinFunctionId::from_raw(raw) else {
         return;
     };
@@ -1167,6 +1171,10 @@ pub(in crate::public) fn reparent_builtin_object(
     });
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "builtin function allocation mirrors the fixed VM object/bootstrap fields"
+)]
 pub fn allocate_builtin_function_object(
     agent: &mut Agent,
     realm: RealmRef,

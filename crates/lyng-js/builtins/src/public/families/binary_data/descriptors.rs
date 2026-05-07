@@ -84,14 +84,14 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
     let get_uint16_atom = agent.atoms_mut().intern("getUint16");
     let get_uint32_atom = agent.atoms_mut().intern("getUint32");
     let get_uint8_atom = agent.atoms_mut().intern("getUint8");
-    let add_atom = agent.atoms_mut().intern("add");
-    let and_atom = agent.atoms_mut().intern("and");
+    let addition_method_atom = agent.atoms_mut().intern("add");
+    let bitwise_and_method_atom = agent.atoms_mut().intern("and");
     let compare_exchange_atom = agent.atoms_mut().intern("compareExchange");
     let exchange_atom = agent.atoms_mut().intern("exchange");
     let is_lock_free_atom = agent.atoms_mut().intern("isLockFree");
     let load_atom = agent.atoms_mut().intern("load");
     let notify_atom = agent.atoms_mut().intern("notify");
-    let or_atom = agent.atoms_mut().intern("or");
+    let bitwise_or_method_atom = agent.atoms_mut().intern("or");
     let set_atom = agent.atoms_mut().intern("set");
     let set_big_int64_atom = agent.atoms_mut().intern("setBigInt64");
     let set_big_uint64_atom = agent.atoms_mut().intern("setBigUint64");
@@ -119,7 +119,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
     let to_hex_atom = agent.atoms_mut().intern("toHex");
     let buffer_descriptor_sets = buffers::descriptor_sets(
         builtins,
-        buffers::BufferDescriptorAtoms {
+        &buffers::BufferDescriptorAtoms {
             is_view: is_view_atom,
             byte_length: byte_length_atom,
             detached: agent.atoms_mut().intern("detached"),
@@ -132,21 +132,21 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
             grow: agent.atoms_mut().intern("grow"),
             growable: agent.atoms_mut().intern("growable"),
         },
-        buffers::BufferDescriptorTags {
+        &buffers::BufferDescriptorTags {
             array_buffer: array_buffer_tag,
             shared_array_buffer: shared_array_buffer_tag,
         },
     );
     let atomics_descriptors = atomics::descriptors(
-        atomics::AtomicsDescriptorAtoms {
-            add: add_atom,
-            and: and_atom,
+        &atomics::AtomicsDescriptorAtoms {
+            add: addition_method_atom,
+            and: bitwise_and_method_atom,
             compare_exchange: compare_exchange_atom,
             exchange: exchange_atom,
             is_lock_free: is_lock_free_atom,
             load: load_atom,
             notify: notify_atom,
-            or: or_atom,
+            or: bitwise_or_method_atom,
             pause: pause_atom,
             store: store_atom,
             sub: sub_atom,
@@ -158,7 +158,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
     );
     let data_view_descriptor_sets = data_view::descriptor_sets(
         builtins,
-        data_view::DataViewDescriptorAtoms {
+        &data_view::DataViewDescriptorAtoms {
             buffer: buffer_atom,
             byte_length: byte_length_atom,
             byte_offset: byte_offset_atom,
@@ -189,7 +189,7 @@ pub(in crate::public) fn install_binary_data_family_descriptors(
     );
     let typed_array_descriptor_sets = typed_arrays::descriptor_sets(
         builtins,
-        typed_arrays::TypedArrayDescriptorAtoms {
+        &typed_arrays::TypedArrayDescriptorAtoms {
             last_index_of: last_index_of_atom,
             copy_within: copy_within_atom,
             entries: entries_atom,

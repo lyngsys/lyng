@@ -69,6 +69,10 @@ pub(super) struct TypedArrayDescriptorAtoms {
     pub(super) to_hex: AtomId,
 }
 
+#[allow(
+    clippy::struct_field_names,
+    reason = "typed array bootstrap tables are named by installed descriptor target"
+)]
 pub(super) struct TypedArrayDescriptorSets {
     pub(super) typed_array_descriptors: [BuiltinPropertyDescriptor; 3],
     pub(super) typed_array_prototype_descriptors: [BuiltinPropertyDescriptor; 38],
@@ -159,12 +163,15 @@ const fn uint8_array_prototype_descriptors(
     ]
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "typed array descriptor installation is an ordered ECMA bootstrap table"
+)]
 pub(super) const fn descriptor_sets(
     builtins: &PublicRealmBuiltins,
-    atoms: TypedArrayDescriptorAtoms,
+    atoms: &TypedArrayDescriptorAtoms,
 ) -> TypedArrayDescriptorSets {
-    let TypedArrayDescriptorAtoms {
+    let &TypedArrayDescriptorAtoms {
         last_index_of: last_index_of_atom,
         copy_within: copy_within_atom,
         entries: entries_atom,

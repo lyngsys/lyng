@@ -2,9 +2,9 @@ mod iteration;
 
 use super::{
     close_iterator_after_error, create_array_from_values, get_property_from_object,
-    iterators::ArrayIterationKind, length_value_u64, map_completion, property_key_from_text,
-    to_number_for_builtin, type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
-    MAX_SAFE_INTEGER_U64,
+    iterators::ArrayIterationKind, length_u64_as_number, length_value_u64, map_completion,
+    property_key_from_text, to_number_for_builtin, type_error, BuiltinIteratorBridge,
+    PublicBuiltinDispatchContext, MAX_SAFE_INTEGER_U64,
 };
 use crate::BuiltinInvocation;
 use iteration::{
@@ -782,8 +782,7 @@ fn map_group_by_builtin<Cx: PublicBuiltinDispatchContext>(
     });
     match installed {
         Some(true) => Ok(Value::from_object_ref(map)),
-        Some(false) => Err(type_error(cx)),
-        None => Err(type_error(cx)),
+        Some(false) | None => Err(type_error(cx)),
     }
 }
 
@@ -1268,6 +1267,12 @@ struct SetRecord {
     keys: ObjectRef,
 }
 
+enum SetEntryState {
+    Occupied(Value),
+    Empty,
+    End,
+}
+
 fn get_set_record<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
@@ -1355,7 +1360,7 @@ fn set_entry_at<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object: ObjectRef,
     index: usize,
-) -> Result<Option<Option<Value>>, Cx::Error> {
+) -> Result<SetEntryState, Cx::Error> {
     let entry = {
         let agent = cx.agent();
         let Some(set) = agent.objects().set_object_data(object) else {
@@ -1363,7 +1368,11 @@ fn set_entry_at<Cx: PublicBuiltinDispatchContext>(
         };
         set.entries().get(index).copied()
     };
-    Ok(entry)
+    Ok(match entry {
+        Some(Some(value)) => SetEntryState::Occupied(value),
+        Some(None) => SetEntryState::Empty,
+        None => SetEntryState::End,
+    })
 }
 
 fn allocate_result_set<Cx: PublicBuiltinDispatchContext>(
@@ -1476,16 +1485,16 @@ fn set_intersection_builtin<Cx: PublicBuiltinDispatchContext>(
             .ok_or_else(|| type_error(cx))?,
     )
     .unwrap_or(u64::MAX);
-    let this_size_f = this_size as f64;
+    let this_size_f = length_u64_as_number(this_size);
     if this_size_f <= record.size {
         let mut index = 0_usize;
         loop {
-            let Some(entry) = set_entry_at(cx, object, index)? else {
-                break;
-            };
+            let entry = set_entry_at(cx, object, index)?;
             index = index.saturating_add(1);
-            let Some(value) = entry else {
-                continue;
+            let value = match entry {
+                SetEntryState::Occupied(value) => value,
+                SetEntryState::Empty => continue,
+                SetEntryState::End => break,
             };
             if set_record_has(cx, &record, value)? {
                 let canonical = canonical_set_value(value);
@@ -1554,7 +1563,7 @@ fn set_difference_builtin<Cx: PublicBuiltinDispatchContext>(
             .ok_or_else(|| type_error(cx))?,
     )
     .unwrap_or(u64::MAX);
-    let this_size_f = this_size as f64;
+    let this_size_f = length_u64_as_number(this_size);
     let this_values = collect_set_values(cx, object)?;
     if this_size_f <= record.size {
         for value in this_values {
@@ -1693,7 +1702,7 @@ fn set_is_subset_of_builtin<Cx: PublicBuiltinDispatchContext>(
             .ok_or_else(|| type_error(cx))?,
     )
     .unwrap_or(u64::MAX);
-    if (this_size as f64) > record.size {
+    if length_u64_as_number(this_size) > record.size {
         return Ok(Value::from_bool(false));
     }
     let mut index = 0_usize;
@@ -1738,7 +1747,7 @@ fn set_is_superset_of_builtin<Cx: PublicBuiltinDispatchContext>(
             .ok_or_else(|| type_error(cx))?,
     )
     .unwrap_or(u64::MAX);
-    if (this_size as f64) < record.size {
+    if length_u64_as_number(this_size) < record.size {
         return Ok(Value::from_bool(false));
     }
     let mut iterator_record = set_record_iterator(cx, &record)?;
@@ -1804,7 +1813,7 @@ fn set_is_disjoint_from_builtin<Cx: PublicBuiltinDispatchContext>(
             .ok_or_else(|| type_error(cx))?,
     )
     .unwrap_or(u64::MAX);
-    let this_size_f = this_size as f64;
+    let this_size_f = length_u64_as_number(this_size);
     if this_size_f <= record.size {
         let mut index = 0_usize;
         loop {

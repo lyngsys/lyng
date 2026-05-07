@@ -115,29 +115,35 @@ pub(super) fn regexp_source_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     let source = {
         let agent = cx.agent();
         agent.objects().regexp_payload(object_ref).map(|payload| {
-            if let Some(units) = payload.source_units() {
-                if units.is_empty() {
-                    RegExpSource::Text("(?:)".to_owned())
-                } else {
-                    RegExpSource::Units(escape_regexp_pattern_units(units))
-                }
-            } else if payload.source().is_empty() {
-                RegExpSource::Text("(?:)".to_owned())
-            } else {
-                escape_regexp_pattern_text(payload.source())
-            }
+            payload.source_units().map_or_else(
+                || {
+                    if payload.source().is_empty() {
+                        RegExpSource::Text("(?:)".to_owned())
+                    } else {
+                        escape_regexp_pattern_text(payload.source())
+                    }
+                },
+                |units| {
+                    if units.is_empty() {
+                        RegExpSource::Text("(?:)".to_owned())
+                    } else {
+                        RegExpSource::Units(escape_regexp_pattern_units(units))
+                    }
+                },
+            )
         })
     };
-    if let Some(source) = source {
-        return Ok(match source {
-            RegExpSource::Text(source) => string_value(cx, &source),
-            RegExpSource::Units(units) => string_from_code_units(cx, &units),
-        });
-    }
-    if current_intrinsic_regexp_prototype(cx) == Some(object_ref) {
-        return Ok(string_value(cx, "(?:)"));
-    }
-    Err(type_error(cx))
+    let Some(source) = source else {
+        return if current_intrinsic_regexp_prototype(cx) == Some(object_ref) {
+            Ok(string_value(cx, "(?:)"))
+        } else {
+            Err(type_error(cx))
+        };
+    };
+    Ok(match source {
+        RegExpSource::Text(source) => string_value(cx, &source),
+        RegExpSource::Units(units) => string_from_code_units(cx, &units),
+    })
 }
 
 pub(super) fn regexp_flags_getter_builtin<Cx: PublicBuiltinDispatchContext>(

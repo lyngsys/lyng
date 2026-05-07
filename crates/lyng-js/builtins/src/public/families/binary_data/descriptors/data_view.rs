@@ -49,9 +49,13 @@ pub(super) struct DataViewDescriptorSets {
     pub(super) data_view_prototype: [BuiltinPropertyDescriptor; 27],
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "DataView accessors and get/set descriptors are kept as one ordered bootstrap table"
+)]
 pub(super) const fn descriptor_sets(
     builtins: &PublicRealmBuiltins,
-    atoms: DataViewDescriptorAtoms,
+    atoms: &DataViewDescriptorAtoms,
     data_view_tag: Value,
 ) -> DataViewDescriptorSets {
     DataViewDescriptorSets {

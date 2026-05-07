@@ -40,10 +40,14 @@ pub(super) struct BufferDescriptorSets {
     pub(super) shared_array_buffer_prototype: [BuiltinPropertyDescriptor; 7],
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "ArrayBuffer and SharedArrayBuffer descriptors stay colocated for bootstrap auditability"
+)]
 pub(super) const fn descriptor_sets(
     builtins: &PublicRealmBuiltins,
-    atoms: BufferDescriptorAtoms,
-    tags: BufferDescriptorTags,
+    atoms: &BufferDescriptorAtoms,
+    tags: &BufferDescriptorTags,
 ) -> BufferDescriptorSets {
     BufferDescriptorSets {
         array_buffer: [

@@ -67,14 +67,14 @@ fn regexp_symbol_match_builtin<Cx: PublicBuiltinDispatchContext>(
         };
         set_property_on_object_or_throw(cx, object_ref, last_index_key, Value::from_smi(0))?;
 
-        let mut matches = Vec::new();
+        let mut matched_values = Vec::new();
         loop {
             match regexp_exec_result(cx, object_ref, input_ref, input_units, false)? {
                 RegExpExecResult::Builtin(Some(state)) => {
-                    let matched_range = state.matched.range();
-                    let matched = code_unit_range_value(cx, input_units, matched_range.clone());
-                    matches.push(matched);
-                    if matched_range.start == matched_range.end {
+                    let match_range = state.matched.range();
+                    let match_value = code_unit_range_value(cx, input_units, match_range.clone());
+                    matched_values.push(match_value);
+                    if match_range.start == match_range.end {
                         let this_index = cx.get_property_value(receiver, last_index_key)?;
                         let this_index = to_length_for_builtin(cx, this_index)?;
                         let next_index =
@@ -92,11 +92,11 @@ fn regexp_symbol_match_builtin<Cx: PublicBuiltinDispatchContext>(
                     if result.is_null() {
                         break;
                     }
-                    let matched = cx.get_property_value(result, PropertyKey::Index(0))?;
-                    let matched_ref = to_string_string_ref(cx, matched)?;
-                    let matched_units = string_ref_code_units(cx, matched_ref)?;
-                    matches.push(Value::from_string_ref(matched_ref));
-                    if matched_units.is_empty() {
+                    let match_value = cx.get_property_value(result, PropertyKey::Index(0))?;
+                    let match_ref = to_string_string_ref(cx, match_value)?;
+                    let match_units = string_ref_code_units(cx, match_ref)?;
+                    matched_values.push(Value::from_string_ref(match_ref));
+                    if match_units.is_empty() {
                         let this_index = cx.get_property_value(receiver, last_index_key)?;
                         let this_index = to_length_for_builtin(cx, this_index)?;
                         let next_index =
@@ -111,10 +111,10 @@ fn regexp_symbol_match_builtin<Cx: PublicBuiltinDispatchContext>(
                 }
             }
         }
-        if matches.is_empty() {
+        if matched_values.is_empty() {
             return Ok(Value::null());
         }
-        let array = create_array_from_values(cx, &matches)?;
+        let array = create_array_from_values(cx, &matched_values)?;
         Ok(Value::from_object_ref(array))
     })
 }

@@ -28,20 +28,16 @@ pub(super) fn normalize_regexp_constructor_pattern_text(
     let mut normalized = String::with_capacity(pattern.len());
     let mut trailing_backslashes = 0usize;
     for ch in pattern.chars() {
-        match ch {
-            '\n' if trailing_backslashes.is_multiple_of(2) => normalized.push_str("\\n"),
-            '\n' if !unicode_aware => normalized.push('n'),
-            '\n' => normalized.push(ch),
-            '\r' if trailing_backslashes.is_multiple_of(2) => normalized.push_str("\\r"),
-            '\r' if !unicode_aware => normalized.push('r'),
-            '\r' => normalized.push(ch),
-            '\u{2028}' if trailing_backslashes.is_multiple_of(2) => normalized.push_str("\\u2028"),
-            '\u{2028}' if !unicode_aware => normalized.push_str("u2028"),
-            '\u{2028}' => normalized.push(ch),
-            '\u{2029}' if trailing_backslashes.is_multiple_of(2) => normalized.push_str("\\u2029"),
-            '\u{2029}' if !unicode_aware => normalized.push_str("u2029"),
-            '\u{2029}' => normalized.push(ch),
-            _ => normalized.push(ch),
+        if let Some(terminator) = line_terminator_replacement(ch) {
+            if trailing_backslashes.is_multiple_of(2) {
+                normalized.push_str(terminator.escaped);
+            } else if unicode_aware {
+                normalized.push(ch);
+            } else {
+                normalized.push_str(terminator.legacy_escaped);
+            }
+        } else {
+            normalized.push(ch);
         }
         if ch == '\\' {
             trailing_backslashes += 1;
@@ -50,6 +46,33 @@ pub(super) fn normalize_regexp_constructor_pattern_text(
         }
     }
     normalized
+}
+
+struct LineTerminatorReplacement {
+    escaped: &'static str,
+    legacy_escaped: &'static str,
+}
+
+const fn line_terminator_replacement(ch: char) -> Option<LineTerminatorReplacement> {
+    match ch {
+        '\n' => Some(LineTerminatorReplacement {
+            escaped: "\\n",
+            legacy_escaped: "n",
+        }),
+        '\r' => Some(LineTerminatorReplacement {
+            escaped: "\\r",
+            legacy_escaped: "r",
+        }),
+        '\u{2028}' => Some(LineTerminatorReplacement {
+            escaped: "\\u2028",
+            legacy_escaped: "u2028",
+        }),
+        '\u{2029}' => Some(LineTerminatorReplacement {
+            escaped: "\\u2029",
+            legacy_escaped: "u2029",
+        }),
+        _ => None,
+    }
 }
 
 fn regexp_pattern_seed_text<Cx: PublicBuiltinDispatchContext>(

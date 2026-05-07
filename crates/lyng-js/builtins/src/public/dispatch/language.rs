@@ -1,8 +1,8 @@
 use super::strings::push_code_point_units;
 use super::{
-    number_value, string_from_code_units, string_ref_code_units, string_value,
-    to_number_for_builtin, to_number_value_for_builtin, to_string_string_ref, uri_error,
-    PublicBuiltinDispatchContext,
+    number_to_i32_after_range_check, number_value, string_from_code_units, string_ref_code_units,
+    string_value, to_number_for_builtin, to_number_value_for_builtin, to_string_string_ref,
+    uri_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use lyng_js_types::{BuiltinFunctionId, Value};
@@ -79,9 +79,9 @@ fn to_int32(number: f64) -> i32 {
     let truncated = number.trunc();
     let modulo = truncated.rem_euclid(4_294_967_296.0);
     if modulo >= 2_147_483_648.0 {
-        (modulo - 4_294_967_296.0) as i32
+        number_to_i32_after_range_check(modulo - 4_294_967_296.0)
     } else {
-        modulo as i32
+        number_to_i32_after_range_check(modulo)
     }
 }
 
@@ -142,7 +142,7 @@ fn parse_int_string(text: &str, radix_number: f64) -> f64 {
     let mut value: f64 = 0.0;
     let mut consumed = 0_usize;
     for byte in input.bytes() {
-        let Some(digit) = parse_ascii_digit(byte, radix as u32) else {
+        let Some(digit) = parse_ascii_digit(byte, radix.cast_unsigned()) else {
             break;
         };
         value = value.mul_add(f64::from(radix), f64::from(digit));
@@ -274,14 +274,13 @@ fn push_legacy_escape_unit(output: &mut String, unit: u16) {
     output.push('%');
     if unit <= 0x00FF {
         output.push(char::from(HEX[usize::from(unit >> 4)]));
-        output.push(char::from(HEX[usize::from(unit & 0x000F)]));
     } else {
         output.push('u');
         output.push(char::from(HEX[usize::from((unit >> 12) & 0x000F)]));
         output.push(char::from(HEX[usize::from((unit >> 8) & 0x000F)]));
         output.push(char::from(HEX[usize::from((unit >> 4) & 0x000F)]));
-        output.push(char::from(HEX[usize::from(unit & 0x000F)]));
     }
+    output.push(char::from(HEX[usize::from(unit & 0x000F)]));
 }
 
 const fn is_legacy_escape_unescaped(unit: u16) -> bool {
@@ -463,12 +462,12 @@ fn decode_utf8_percent_sequence(
     }
     let mut bytes = [0_u8; 4];
     bytes[0] = first;
-    for offset in 1..length {
+    for (offset, slot) in bytes.iter_mut().enumerate().take(length).skip(1) {
         let byte = decode_percent_byte(units, index + offset * 3)?;
         if !is_utf8_continuation(byte) {
             return Err(());
         }
-        bytes[offset] = byte;
+        *slot = byte;
     }
     let code_point = match length {
         2 => u32::from(first & 0x1F) << 6 | u32::from(bytes[1] & 0x3F),

@@ -1,12 +1,13 @@
 use super::{
     allocate_json_raw_object, array_like_index_property_key, array_like_length,
     callable_object_from_value, create_array_result, create_data_property_or_throw,
-    get_property_from_object, is_array_for_species, number_value, property_key_from_text,
-    property_key_string_value, proxy_get_own_property, proxy_own_property_keys,
-    string_from_code_units, string_ref_code_units, string_ref_text, string_value, syntax_error,
-    to_integer_or_infinity_for_builtin, to_number_for_builtin, to_number_value_for_builtin,
-    to_string_string_ref, try_create_data_property, try_delete_property_from_object, type_error,
-    BuiltinFunctionId, BuiltinInvocation, PropertyKey, PublicBuiltinDispatchContext, Value,
+    get_property_from_object, is_array_for_species, number_to_usize_after_range_check,
+    number_value, property_key_from_text, property_key_string_value, proxy_get_own_property,
+    proxy_own_property_keys, string_from_code_units, string_ref_code_units, string_ref_text,
+    string_value, syntax_error, to_integer_or_infinity_for_builtin, to_number_for_builtin,
+    to_number_value_for_builtin, to_string_string_ref, try_create_data_property,
+    try_delete_property_from_object, type_error, BuiltinFunctionId, BuiltinInvocation, PropertyKey,
+    PublicBuiltinDispatchContext, Value,
 };
 use lyng_js_objects::{ObjectKind, PrimitiveWrapperKind};
 use lyng_js_types::{ObjectRef, StringRef};
@@ -27,7 +28,7 @@ pub(super) fn dispatch_json_builtin<Cx: PublicBuiltinDispatchContext>(
         return json_raw_json_builtin(context, invocation).map(Some);
     }
     if entry == super::json_is_raw_json_builtin() {
-        return json_is_raw_json_builtin(context, invocation).map(Some);
+        return Ok(Some(json_is_raw_json_value(context, invocation)));
     }
     Ok(None)
 }
@@ -54,10 +55,10 @@ fn json_raw_json_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_object_ref(object))
 }
 
-fn json_is_raw_json_builtin<Cx: PublicBuiltinDispatchContext>(
+fn json_is_raw_json_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
+) -> Value {
     let value = invocation
         .arguments()
         .first()
@@ -66,7 +67,7 @@ fn json_is_raw_json_builtin<Cx: PublicBuiltinDispatchContext>(
     let is_raw = value
         .as_object_ref()
         .is_some_and(|object| cx.agent().objects().is_json_raw_object(object));
-    Ok(Value::from_bool(is_raw))
+    Value::from_bool(is_raw)
 }
 
 fn json_raw_text_is_valid(text: &str) -> bool {
@@ -810,7 +811,7 @@ fn json_gap_from_value<Cx: PublicBuiltinDispatchContext>(
         let count = if count <= 0.0 {
             0
         } else {
-            usize::try_from(count.min(10.0) as u64).unwrap_or(10)
+            number_to_usize_after_range_check(count.min(10.0))
         };
         return Ok(" ".repeat(count));
     }
@@ -965,7 +966,7 @@ fn json_serialize_array<Cx: PublicBuiltinDispatchContext>(
             json_serialize_property(cx, object, key, state)?.unwrap_or_else(|| "null".to_owned()),
         );
     }
-    state.indent = stepback.clone();
+    state.indent.clone_from(&stepback);
     if parts.is_empty() {
         return Ok("[]".to_owned());
     }
@@ -1008,7 +1009,7 @@ fn json_serialize_object<Cx: PublicBuiltinDispatchContext>(
             serialized
         ));
     }
-    state.indent = stepback.clone();
+    state.indent.clone_from(&stepback);
     if parts.is_empty() {
         return Ok("{}".to_owned());
     }

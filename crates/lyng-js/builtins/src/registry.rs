@@ -157,6 +157,10 @@ mod tests {
 
     struct DummyContext;
 
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "test handler must satisfy the builtin handler function-pointer signature"
+    )]
     fn handler(
         _: &mut DummyContext,
         _: Value,

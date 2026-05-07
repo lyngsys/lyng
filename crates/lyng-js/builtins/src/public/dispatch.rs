@@ -43,7 +43,7 @@ use support::{
     define_data_property_with_attrs, delete_property_from_object, format_to_exponential,
     format_to_precision, get_property_from_object, get_property_from_object_with_receiver,
     has_property_on_object, is_array_for_species, is_concat_spreadable, is_integral_number,
-    iterable_to_values_list, length_value, length_value_u64, map_completion,
+    iterable_to_values_list, length_u64_as_number, length_value, length_value_u64, map_completion,
     normalize_relative_index_u64, number_to_i32_after_range_check, number_to_u32_after_range_check,
     number_to_u64_after_range_check, number_to_usize_after_range_check, number_value,
     numbers_are_equal, primitive_wrapper_constructor, property_key_from_text,

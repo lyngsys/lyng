@@ -28,7 +28,7 @@ pub(super) struct AtomicsDescriptorAtoms {
 }
 
 pub(super) const fn descriptors(
-    atoms: AtomicsDescriptorAtoms,
+    atoms: &AtomicsDescriptorAtoms,
     atomics_tag: Value,
 ) -> [BuiltinPropertyDescriptor; 15] {
     [

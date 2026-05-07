@@ -505,7 +505,7 @@ enum StringRangePayload {
     Utf16(Vec<u8>),
 }
 
-const fn length_u64_as_number(length: u64) -> f64 {
+pub(super) const fn length_u64_as_number(length: u64) -> f64 {
     #[allow(
         clippy::cast_precision_loss,
         reason = "ECMAScript length/index values are exposed through the Number type"

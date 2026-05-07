@@ -6,9 +6,10 @@ mod symbols;
 use super::{
     allocate_array_like_result, append_string_ref_code_units, builtin_function_entry,
     callable_object_from_value, code_unit_range_value, define_data_property_with_attrs, iterators,
-    range_error, set_data_property_value, string_from_code_units, string_from_string_ref_range,
-    string_ref_code_units, string_value, syntax_error, to_boolean_for_builtin,
-    to_integer_or_infinity_for_builtin, to_length_for_builtin, to_string_string_ref, type_error,
+    number_to_usize_after_range_check, range_error, set_data_property_value,
+    string_from_code_units, string_from_string_ref_range, string_ref_code_units, string_value,
+    syntax_error, to_boolean_for_builtin, to_integer_or_infinity_for_builtin,
+    to_length_for_builtin, to_string_string_ref, type_error, usize_index_as_number,
     usize_index_value, with_string_ref_code_units, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
@@ -1003,35 +1004,35 @@ fn regexp_replacement_template_length_without_named(
             index += 1;
             continue;
         };
-        match code_unit_ascii(next).map(char::from) {
-            Some('$') => {
+        match code_unit_ascii(next) {
+            Some(b'$') => {
                 length = length.checked_add(1)?;
                 index += 2;
             }
-            Some('&') => {
+            Some(b'&') => {
                 length = length.checked_add(matched_units.len())?;
                 index += 2;
             }
-            Some('`') => {
+            Some(b'`') => {
                 length = length.checked_add(position)?;
                 index += 2;
             }
-            Some('\'') => {
+            Some(b'\'') => {
                 let end = position
                     .saturating_add(matched_units.len())
                     .min(source_units.len());
                 length = length.checked_add(source_units.len().saturating_sub(end))?;
                 index += 2;
             }
-            Some('<') => {
+            Some(b'<') => {
                 if !named_captures.is_undefined() {
                     return None;
                 }
                 length = length.checked_add(2)?;
                 index += 2;
             }
-            Some(digit @ '0'..='9') => {
-                let first = usize::from((digit as u8) - b'0');
+            Some(digit @ b'0'..=b'9') => {
+                let first = usize::from(digit - b'0');
                 let mut capture_index = first;
                 let mut digit_count = 1;
                 if let Some(second) = template_units
@@ -1087,27 +1088,27 @@ fn expand_regexp_replacement_template<Cx: PublicBuiltinDispatchContext>(
             index += 1;
             continue;
         };
-        match code_unit_ascii(next).map(char::from) {
-            Some('$') => {
+        match code_unit_ascii(next) {
+            Some(b'$') => {
                 result.push(u16::from(b'$'));
                 index += 2;
             }
-            Some('&') => {
+            Some(b'&') => {
                 result.extend_from_slice(matched_units);
                 index += 2;
             }
-            Some('`') => {
+            Some(b'`') => {
                 result.extend_from_slice(&source_units[..position]);
                 index += 2;
             }
-            Some('\'') => {
+            Some(b'\'') => {
                 let end = position
                     .saturating_add(matched_units.len())
                     .min(source_units.len());
                 result.extend_from_slice(&source_units[end..]);
                 index += 2;
             }
-            Some('<') => {
+            Some(b'<') => {
                 if named_captures.is_undefined() {
                     result.extend_from_slice(&[u16::from(b'$'), u16::from(b'<')]);
                     index += 2;
@@ -1138,8 +1139,8 @@ fn expand_regexp_replacement_template<Cx: PublicBuiltinDispatchContext>(
                 }
                 index = end + 1;
             }
-            Some(digit @ '0'..='9') => {
-                let first = usize::from((digit as u8) - b'0');
+            Some(digit @ b'0'..=b'9') => {
+                let first = usize::from(digit - b'0');
                 let mut capture_index = first;
                 let mut digit_count = 1;
                 if let Some(second) = template_units
@@ -1159,12 +1160,11 @@ fn expand_regexp_replacement_template<Cx: PublicBuiltinDispatchContext>(
                     if let Some(capture) = &captures[capture_index - 1] {
                         result.extend_from_slice(capture);
                     }
-                    index += 1 + digit_count;
                 } else {
                     result.push(u16::from(b'$'));
                     result.extend_from_slice(&template_units[index + 1..index + 1 + digit_count]);
-                    index += 1 + digit_count;
                 }
+                index += 1 + digit_count;
             }
             _ => {
                 result.push(u16::from(b'$'));
@@ -1192,7 +1192,9 @@ fn regexp_result_position<Cx: PublicBuiltinDispatchContext>(
     if !integer.is_finite() {
         return Ok(source_len);
     }
-    Ok((integer as usize).min(source_len))
+    Ok(number_to_usize_after_range_check(
+        integer.min(usize_index_as_number(source_len)),
+    ))
 }
 
 fn regexp_result_capture_count<Cx: PublicBuiltinDispatchContext>(
@@ -1343,6 +1345,10 @@ fn regexp_string_iterator_next_builtin<Cx: PublicBuiltinDispatchContext>(
     })
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "String replacement follows the RegExp replace algorithm with shared close-over state"
+)]
 pub(super) fn regexp_replace_with_string<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     regexp_value: Value,
