@@ -5,6 +5,7 @@ use super::super::{
     normalize_relative_index_u64, to_boolean_for_builtin, to_integer_or_infinity_for_builtin,
     type_error, PublicBuiltinDispatchContext, MAX_SAFE_INTEGER_U64,
 };
+use super::{array_index_from_number, array_length_as_number};
 use crate::BuiltinInvocation;
 use lyng_js_ops::read;
 use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
@@ -360,23 +361,23 @@ fn array_last_index_of_builtin<Cx: PublicBuiltinDispatchContext>(
     }
     let from_index = match invocation.arguments().get(1).copied() {
         Some(value) => to_integer_or_infinity_for_builtin(cx, value)?,
-        None => (length - 1) as f64,
+        None => array_length_as_number(length - 1),
     };
     if from_index == f64::NEG_INFINITY {
         return Ok(Value::from_smi(-1));
     }
     let mut index = if from_index >= 0.0 {
         if from_index.is_finite() {
-            (from_index as u64).min(length - 1)
+            array_index_from_number(from_index).min(length - 1)
         } else {
             length - 1
         }
     } else {
-        let computed = (length as f64) + from_index;
+        let computed = array_length_as_number(length) + from_index;
         if computed < 0.0 {
             return Ok(Value::from_smi(-1));
         }
-        computed as u64
+        array_index_from_number(computed)
     };
     let search_element = invocation
         .arguments()
@@ -642,7 +643,7 @@ fn array_flat_depth<Cx: PublicBuiltinDispatchContext>(
     } else if depth.is_infinite() {
         Ok(u64::MAX)
     } else {
-        Ok(depth as u64)
+        Ok(array_index_from_number(depth))
     }
 }
 

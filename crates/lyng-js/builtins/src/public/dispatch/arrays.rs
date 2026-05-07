@@ -21,6 +21,25 @@ use lyng_js_common::WellKnownAtom;
 use lyng_js_ops::iterator;
 use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value, WellKnownSymbolId};
 
+const fn array_length_as_number(length: u64) -> f64 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "array lengths are exposed to ECMAScript algorithms as Number values"
+    )]
+    let number = length as f64;
+    number
+}
+
+const fn array_index_from_number(index: f64) -> u64 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "array index Number values are checked by the caller before narrowing"
+    )]
+    let index = index as u64;
+    index
+}
+
 pub(super) fn dispatch_array_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
     entry: BuiltinFunctionId,
@@ -59,7 +78,7 @@ fn dispatch_array_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
         return array_is_array_builtin(context, invocation).map(Some);
     }
     if entry == super::array_species_getter_builtin() {
-        return array_species_getter_builtin(context, invocation).map(Some);
+        return Ok(Some(array_species_getter_value(invocation)));
     }
     Ok(None)
 }
@@ -262,16 +281,16 @@ fn array_from_iterable_builtin<Cx: PublicBuiltinDispatchContext>(
             let error = type_error(cx);
             return close_iterator_after_error(cx, &mut iterator_record, error);
         }
-        let mapped = if let Some(mapper) = mapper {
+        let mapped_value = if let Some(mapper) = mapper {
             match cx.call_to_completion(mapper, this_arg, &[next_value, length_value_u64(index)]) {
-                Ok(mapped) => mapped,
+                Ok(value) => value,
                 Err(error) => return close_iterator_after_error(cx, &mut iterator_record, error),
             }
         } else {
             next_value
         };
         let key = array_like_index_property_key(cx, index);
-        if let Err(error) = create_data_property_or_throw(cx, array, key, mapped) {
+        if let Err(error) = create_data_property_or_throw(cx, array, key, mapped_value) {
             return close_iterator_after_error(cx, &mut iterator_record, error);
         }
         index += 1;
@@ -335,12 +354,12 @@ fn array_from_builtin<Cx: PublicBuiltinDispatchContext>(
     for index in 0..length {
         let key = array_like_index_property_key(cx, index);
         let value = get_property_from_object(cx, source_object, key)?;
-        let mapped = if let Some(mapper) = mapper {
+        let mapped_value = if let Some(mapper) = mapper {
             cx.call_to_completion(mapper, this_arg, &[value, length_value_u64(index)])?
         } else {
             value
         };
-        create_data_property_or_throw(cx, array, key, mapped)?;
+        create_data_property_or_throw(cx, array, key, mapped_value)?;
     }
     set_length_property(cx, array, length)?;
     Ok(Value::from_object_ref(array))
@@ -539,30 +558,25 @@ fn array_from_async_builtin<Cx: PublicBuiltinDispatchContext>(
         .agent()
         .well_known_symbol(WellKnownSymbolId::AsyncIterator)
         .ok_or_else(|| type_error(cx))?;
-    let mut arguments = Vec::with_capacity(5);
-    arguments.push(
+    let arguments = vec![
         invocation
             .arguments()
             .first()
             .copied()
             .unwrap_or(Value::undefined()),
-    );
-    arguments.push(
         invocation
             .arguments()
             .get(1)
             .copied()
             .unwrap_or(Value::undefined()),
-    );
-    arguments.push(
         invocation
             .arguments()
             .get(2)
             .copied()
             .unwrap_or(Value::undefined()),
-    );
-    arguments.push(Value::from_symbol_ref(iterator_symbol));
-    arguments.push(Value::from_symbol_ref(async_iterator_symbol));
+        Value::from_symbol_ref(iterator_symbol),
+        Value::from_symbol_ref(async_iterator_symbol),
+    ];
     cx.call_to_completion(function, invocation.this_value(), &arguments)
 }
 
@@ -585,11 +599,8 @@ fn array_of_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(Value::from_object_ref(array))
 }
 
-const fn array_species_getter_builtin<Cx: PublicBuiltinDispatchContext>(
-    _cx: &mut Cx,
-    invocation: BuiltinInvocation<'_>,
-) -> Result<Value, Cx::Error> {
-    Ok(invocation.this_value())
+const fn array_species_getter_value(invocation: BuiltinInvocation<'_>) -> Value {
+    invocation.this_value()
 }
 
 fn array_at_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -606,15 +617,16 @@ fn array_at_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
+    let length_number = array_length_as_number(length);
     let actual_index = if relative_index < 0.0 {
-        length as f64 + relative_index
+        length_number + relative_index
     } else {
         relative_index
     };
-    if !actual_index.is_finite() || actual_index < 0.0 || actual_index >= length as f64 {
+    if !actual_index.is_finite() || actual_index < 0.0 || actual_index >= length_number {
         return Ok(Value::undefined());
     }
-    let key = array_like_index_property_key(cx, actual_index as u64);
+    let key = array_like_index_property_key(cx, array_index_from_number(actual_index));
     get_property_from_object(cx, object_ref, key)
 }
 
@@ -691,9 +703,9 @@ fn array_copy_within_builtin<Cx: PublicBuiltinDispatchContext>(
     let end = normalize_relative_index_u64(
         length,
         match invocation.arguments().get(2).copied() {
-            Some(value) if value.is_undefined() => length as f64,
+            Some(value) if value.is_undefined() => array_length_as_number(length),
             Some(value) => to_integer_or_infinity_for_builtin(cx, value)?,
-            None => length as f64,
+            None => array_length_as_number(length),
         },
     );
     let count = end.saturating_sub(start).min(length.saturating_sub(target));
@@ -833,9 +845,9 @@ fn array_slice_builtin<Cx: PublicBuiltinDispatchContext>(
     let end = normalize_relative_index_u64(
         length,
         match invocation.arguments().get(1).copied() {
-            Some(value) if value.is_undefined() => length as f64,
+            Some(value) if value.is_undefined() => array_length_as_number(length),
             Some(value) => to_integer_or_infinity_for_builtin(cx, value)?,
-            None => length as f64,
+            None => array_length_as_number(length),
         },
     );
     let count = end.saturating_sub(start);
@@ -976,7 +988,8 @@ fn array_splice_builtin<Cx: PublicBuiltinDispatchContext>(
         if requested <= 0.0 {
             0
         } else {
-            requested.min(length.saturating_sub(start) as f64) as u64
+            let max_delete_count = length.saturating_sub(start);
+            array_index_from_number(requested.min(array_length_as_number(max_delete_count)))
         }
     };
     let items = if arguments.len() > 2 {
@@ -1134,7 +1147,7 @@ fn array_to_spliced_builtin<Cx: PublicBuiltinDispatchContext>(
         if delete_count <= 0.0 || delete_count.is_nan() {
             0
         } else {
-            (delete_count as u64).min(length.saturating_sub(actual_start))
+            array_index_from_number(delete_count).min(length.saturating_sub(actual_start))
         }
     };
     let items = if arguments.len() > 2 {
@@ -1192,15 +1205,16 @@ fn array_with_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
+    let length_number = array_length_as_number(length);
     let actual_index = if relative_index < 0.0 {
-        length as f64 + relative_index
+        length_number + relative_index
     } else {
         relative_index
     };
-    if !actual_index.is_finite() || actual_index < 0.0 || actual_index >= length as f64 {
+    if !actual_index.is_finite() || actual_index < 0.0 || actual_index >= length_number {
         return Err(range_error(cx));
     }
-    let actual_index = actual_index as u64;
+    let actual_index = array_index_from_number(actual_index);
     let replacement = invocation
         .arguments()
         .get(1)
@@ -1226,15 +1240,10 @@ fn array_to_string_builtin<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<Value, Cx::Error> {
     let join_key = property_key_from_text(cx, "join");
     let join_value = cx.get_property_value(invocation.this_value(), join_key)?;
-    let join = if let Some(object) = join_value.as_object_ref() {
-        let is_callable = {
-            let agent = cx.agent();
-            agent.objects().is_callable(object)
-        };
-        is_callable.then_some(object)
-    } else {
-        None
-    };
+    let join = join_value.as_object_ref().filter(|object| {
+        let agent = cx.agent();
+        agent.objects().is_callable(*object)
+    });
     if let Some(join) = join {
         return cx.call_to_completion(join, invocation.this_value(), &[]);
     }
@@ -1332,11 +1341,7 @@ fn array_shift_builtin<Cx: PublicBuiltinDispatchContext>(
     let last = array_like_index_property_key(cx, length - 1);
     delete_property_from_object(cx, object_ref, last)?;
     let new_length = length - 1;
-    let length_value = if new_length <= u64::from(i32::MAX as u32) {
-        Value::from_smi(i32::try_from(new_length).unwrap_or(i32::MAX))
-    } else {
-        Value::from_f64(new_length as f64)
-    };
+    let length_value = length_value_u64(new_length);
     set_property_on_object(
         cx,
         object_ref,
