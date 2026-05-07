@@ -420,7 +420,7 @@ impl Vm {
                     return Ok(DynamicImportEvaluationOutcome::Rejected {
                         key: None,
                         reason: self.dynamic_import_module_error_value(agent, error),
-                    })
+                    });
                 }
             };
         let key = loaded.key().clone();
@@ -430,7 +430,7 @@ impl Vm {
                 return Ok(DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key.clone()),
                     reason: self.dynamic_import_error_value(agent, error),
-                })
+                });
             }
         };
         if request.phase == DynamicImportPhase::Defer {
@@ -489,7 +489,7 @@ impl Vm {
                 return Ok(DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key.clone()),
                     reason: self.dynamic_import_error_value(agent, error),
-                })
+                });
             }
         };
         if self.dynamic_import_evaluate_depth > 1
@@ -525,7 +525,7 @@ impl Vm {
                 return Ok(DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key),
                     reason: self.dynamic_import_error_value(agent, error),
-                })
+                });
             }
         };
         for dependency_key in dependencies {
@@ -536,7 +536,7 @@ impl Vm {
                     return Ok(DynamicImportEvaluationOutcome::Rejected {
                         key: Some(key),
                         reason: self.dynamic_import_error_value(agent, error),
-                    })
+                    });
                 }
             };
             if let Err(error) = self.evaluate_module_graph(
@@ -562,7 +562,7 @@ impl Vm {
                     return Ok(DynamicImportEvaluationOutcome::Rejected {
                         key: Some(key),
                         reason: self.dynamic_import_error_value(agent, error),
-                    })
+                    });
                 }
             };
         Ok(DynamicImportEvaluationOutcome::Fulfilled {

@@ -420,7 +420,7 @@ fn parse_manifest_line(line: &str) -> Result<Option<ExclusionRule>, String> {
         other => {
             return Err(format!(
                 "unknown manifest kind `{other}` in line: {trimmed}"
-            ))
+            ));
         }
     };
 

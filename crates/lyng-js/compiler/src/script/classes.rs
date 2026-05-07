@@ -386,7 +386,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         _ => {
                             return Err(LoweringError::UnsupportedDeclaration {
                                 decl: DeclId::new(0),
-                            })
+                            });
                         }
                     };
                     let method = self.alloc_temp()?;
@@ -572,7 +572,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                             _ => {
                                 return Err(LoweringError::UnsupportedDeclaration {
                                     decl: DeclId::new(0),
-                                })
+                                });
                             }
                         };
                         self.emit_define_private_element_with_scratch(
@@ -614,7 +614,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         _ => {
                             return Err(LoweringError::UnsupportedDeclaration {
                                 decl: DeclId::new(0),
-                            })
+                            });
                         }
                     };
                     self.emit_define_private_element_with_scratch(

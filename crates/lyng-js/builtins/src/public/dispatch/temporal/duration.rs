@@ -2671,7 +2671,7 @@ pub(super) fn temporal_duration_rounding_increment_is_valid(
 ) -> bool {
     let maximum = match smallest_unit {
         TemporalBuiltinDurationExactUnit::Day => {
-            return (1..=1_000_000_000).contains(&rounding_increment)
+            return (1..=1_000_000_000).contains(&rounding_increment);
         }
         TemporalBuiltinDurationExactUnit::Hour => 24,
         TemporalBuiltinDurationExactUnit::Minute | TemporalBuiltinDurationExactUnit::Second => 60,

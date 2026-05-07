@@ -1251,7 +1251,7 @@ fn run_script(
             return Err(ScriptExecutionError::Vm(format!(
                 "PANIC compile: {}",
                 panic_message(&panic)
-            )))
+            )));
         }
     };
 

@@ -160,14 +160,14 @@ fn execute_module(invocation: &CliInvocation, host: CliHost) -> Result<ScriptOut
         Err(ModuleLoadError::Host(error)) => return Err(CliError::host(error)),
         Err(ModuleLoadError::Lowering) => return Err(CliError::lowering("module lowering failed")),
         Err(ModuleLoadError::Vm(error)) => {
-            return Err(CliError::vm(format!("module loading failed: {error:?}")))
+            return Err(CliError::vm(format!("module loading failed: {error:?}")));
         }
         Err(ModuleLoadError::Parse | ModuleLoadError::Sema) => {
             return Ok(ScriptOutcome {
                 exit_code: 1,
                 display_name: invocation.script_path().display().to_string(),
                 snapshot: host.snapshot(),
-            })
+            });
         }
     };
 

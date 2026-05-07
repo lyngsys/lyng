@@ -40,7 +40,7 @@ mod tests {
     use std::num::NonZeroU32;
 
     macro_rules! assert_runtime_id_contract {
-        ($name:ident, $raw:expr) => {{
+        ($name:ident, $raw:expr_2021) => {{
             let raw = $raw;
             let id = $name::from_raw(raw).expect("non-zero runtime ID");
             assert_eq!(id.get(), raw);

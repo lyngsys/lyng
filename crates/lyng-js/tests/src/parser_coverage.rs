@@ -816,12 +816,16 @@ fn complex_fibonacci() {
 
 #[test]
 fn complex_class_hierarchy() {
-    ok("class Animal { constructor(name) { this.name = name; } speak() { return this.name; } } class Dog extends Animal { speak() { return super.speak() + ' barks'; } }");
+    ok(
+        "class Animal { constructor(name) { this.name = name; } speak() { return this.name; } } class Dog extends Animal { speak() { return super.speak() + ' barks'; } }",
+    );
 }
 
 #[test]
 fn complex_async_iteration() {
-    ok("async function* gen() { yield 1; yield 2; } async function main() { for await (const x of gen()) { console.log(x); } }");
+    ok(
+        "async function* gen() { yield 1; yield 2; } async function main() { for await (const x of gen()) { console.log(x); } }",
+    );
 }
 
 #[test]

@@ -1994,10 +1994,11 @@ fn compile_script_marks_nested_direct_eval_catch_parameter_scope_for_annex_b() {
         .expect("entry script should lower");
     let err = atoms.intern("err");
 
-    assert!(entry.direct_eval_lexical_sites().iter().any(|site| site
-        .scopes()
-        .iter()
-        .any(|scope| scope.annex_b_catch_name() == Some(err))));
+    assert!(entry.direct_eval_lexical_sites().iter().any(|site| {
+        site.scopes()
+            .iter()
+            .any(|scope| scope.annex_b_catch_name() == Some(err))
+    }));
 }
 
 #[test]
