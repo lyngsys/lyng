@@ -21,7 +21,7 @@ use lyng_js_env::{
     ModuleRequestPhase, ModuleRequestRecord, ModuleResolvedExport, ModuleResolvedExportTarget,
     ModuleStarExportEntry, ModuleStatus, RealmRecord, ThisBindingStatus, ThisState,
 };
-use lyng_js_gc::{AllocationLifetime, PrimitiveCollectionReport, PrimitiveTracer, TraceHeapEdges};
+use lyng_js_gc::{AllocationLifetime, PrimitiveCollectionReport};
 use lyng_js_host::{
     DiagnosticReportRequest, HostHooks, ImportMetaRequest, ModuleKey, ModuleSourceRequest,
     NoopHostHooks,
@@ -41,7 +41,7 @@ use crate::activation::ActivationSideTables;
 use crate::enumeration::{ForInStateTable, IteratorStateTable};
 use crate::error::{ModuleLoadError, VmResult};
 use crate::extensions::{RealmExtensionInstallation, SharedRealmExtensionProvider};
-use crate::name_refs::{CapturedNameReference, CapturedNameReferenceTable};
+use crate::name_refs::CapturedNameReferenceTable;
 use crate::{FrameFlags, FrameRecord, InstalledCode, RegisterWindow, VmError};
 
 mod activation_objects;
@@ -64,6 +64,7 @@ mod names;
 mod property_access;
 mod registers;
 mod runtime_objects;
+mod state;
 mod tiering;
 mod values;
 mod with_env;
@@ -71,6 +72,12 @@ mod with_env;
 use call::RejectingNativeRegistry;
 use feedback::FeedbackVector;
 use install::InstalledFunction;
+use state::{
+    ActiveEnvScopeRange, ActiveVmRoots, AsyncFrameState, AsyncGeneratorFrameState,
+    AsyncGeneratorRequest, DirectEvalEnvironmentState, DynamicImportPhase, DynamicImportRequest,
+    EntryExecutionOverride, LoopIterationEnvironment, PendingDynamicImport,
+    SuspendedExecutionSideState, TemplateCacheKey, WithEnvironmentState,
+};
 use tiering::TieringState;
 use values::{bytecode_index, code_index, decode_env_operand, string_text_array_index};
 
@@ -140,296 +147,6 @@ impl LoadedModuleRoot {
     #[inline]
     pub fn display_name(&self) -> &str {
         &self.display_name
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct TemplateCacheKey {
-    realm: RealmRef,
-    code: CodeRef,
-    site: u32,
-}
-
-/// Runtime state for one compiler-planned loop-iteration lexical environment.
-///
-/// `iteration_slots` mirror per-iteration bindings while the loop body is
-/// active unless they are detached normal-for copies. `shared_slots` continue
-/// to alias the source environment after the per-iteration environment is
-/// retained by a closure.
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct LoopIterationEnvironment {
-    frame_depth: usize,
-    source_environment: EnvironmentRef,
-    iteration_environment: EnvironmentRef,
-    iteration_slots: Vec<u32>,
-    shared_slots: Vec<u32>,
-    detached_slots: Vec<u32>,
-    active: bool,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct WithEnvironmentState {
-    frame_depth: usize,
-    previous_lexical_env: EnvironmentRef,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct DirectEvalEnvironmentState {
-    frame_depth: usize,
-    environment: EnvironmentRef,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct AsyncFrameState {
-    capability: lyng_js_env::PromiseCapabilityId,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct AsyncGeneratorRequest {
-    kind: crate::frame::GeneratorResumeKind,
-    value: Value,
-    capability: lyng_js_env::PromiseCapabilityId,
-    realm: RealmRef,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct AsyncGeneratorFrameState {
-    generator: ObjectRef,
-    capability: lyng_js_env::PromiseCapabilityId,
-    realm: RealmRef,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct EntryExecutionOverride {
-    this_value: Value,
-    new_target: Option<ObjectRef>,
-    home_object: Option<ObjectRef>,
-    active_function: Option<ObjectRef>,
-    private_env: Option<EnvironmentRef>,
-    lexical_this: bool,
-}
-
-struct ActiveVmRoots<'a> {
-    vm: &'a Vm,
-    caller_frame: FrameRecord,
-}
-
-impl TraceHeapEdges for TemplateCacheKey {
-    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        self.realm.trace_heap_edges(tracer);
-        self.code.trace_heap_edges(tracer);
-    }
-}
-
-impl TraceHeapEdges for LoopIterationEnvironment {
-    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        self.source_environment.trace_heap_edges(tracer);
-        self.iteration_environment.trace_heap_edges(tracer);
-    }
-}
-
-impl TraceHeapEdges for WithEnvironmentState {
-    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        self.previous_lexical_env.trace_heap_edges(tracer);
-    }
-}
-
-impl TraceHeapEdges for DirectEvalEnvironmentState {
-    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        self.environment.trace_heap_edges(tracer);
-    }
-}
-
-impl TraceHeapEdges for AsyncGeneratorRequest {
-    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        self.value.trace_heap_edges(tracer);
-        self.realm.trace_heap_edges(tracer);
-    }
-}
-
-impl TraceHeapEdges for AsyncGeneratorFrameState {
-    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        self.generator.trace_heap_edges(tracer);
-        self.realm.trace_heap_edges(tracer);
-    }
-}
-
-impl TraceHeapEdges for EntryExecutionOverride {
-    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        self.this_value.trace_heap_edges(tracer);
-        self.new_target.trace_heap_edges(tracer);
-        self.home_object.trace_heap_edges(tracer);
-        self.active_function.trace_heap_edges(tracer);
-        self.private_env.trace_heap_edges(tracer);
-    }
-}
-
-impl TraceHeapEdges for ActiveVmRoots<'_> {
-    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        trace_frame_record(self.caller_frame, tracer);
-
-        for value in &self.vm.register_stack {
-            value.trace_heap_edges(tracer);
-        }
-        for frame in &self.vm.frames {
-            trace_frame_record(*frame, tracer);
-        }
-        self.vm.current_exception.trace_heap_edges(tracer);
-
-        for installed in self.vm.installed.iter().flatten() {
-            for code in &installed.child_codes {
-                code.trace_heap_edges(tracer);
-            }
-        }
-        self.vm.builtin_cache.trace_heap_edges(tracer);
-        for (key, value) in &self.vm.template_cache {
-            key.trace_heap_edges(tracer);
-            value.trace_heap_edges(tracer);
-        }
-        for code in self.vm.dynamic_function_cache.values() {
-            code.code().trace_heap_edges(tracer);
-        }
-        for state in self.vm.suspended_side_states.values() {
-            for (_, iterator) in &state.iterator_states {
-                iterator.trace_heap_edges(tracer);
-            }
-            for (_, enumerator) in &state.for_in_states {
-                enumerator.trace_heap_edges(tracer);
-            }
-            for state in &state.loop_iteration_envs {
-                state.trace_heap_edges(tracer);
-            }
-            for state in &state.with_environment_states {
-                state.trace_heap_edges(tracer);
-            }
-            for state in &state.direct_eval_environment_states {
-                state.trace_heap_edges(tracer);
-            }
-            for state in &state.active_env_scopes {
-                state.environment.trace_heap_edges(tracer);
-            }
-            state.async_generator_frame_state.trace_heap_edges(tracer);
-        }
-        for state in self.vm.async_generator_frame_states.values() {
-            state.trace_heap_edges(tracer);
-        }
-        for object in &self.vm.async_generator_objects {
-            object.trace_heap_edges(tracer);
-        }
-        for (object, queue) in &self.vm.async_generator_queues {
-            object.trace_heap_edges(tracer);
-            for request in queue {
-                request.trace_heap_edges(tracer);
-            }
-        }
-        for object in self.vm.deferred_module_namespaces.keys() {
-            object.trace_heap_edges(tracer);
-        }
-        for state in &self.vm.loop_iteration_envs {
-            state.trace_heap_edges(tracer);
-        }
-        for environment in &self.vm.loop_iteration_source_scratch {
-            environment.trace_heap_edges(tracer);
-        }
-        for environment in &self.vm.loop_iteration_target_scratch {
-            environment.trace_heap_edges(tracer);
-        }
-        for state in &self.vm.with_environment_states {
-            state.trace_heap_edges(tracer);
-        }
-        for state in &self.vm.direct_eval_environment_states {
-            state.trace_heap_edges(tracer);
-        }
-        for state in &self.vm.active_env_scopes {
-            state.environment.trace_heap_edges(tracer);
-        }
-        for (overlay, source) in &self.vm.direct_eval_environment_overlays {
-            overlay.trace_heap_edges(tracer);
-            source.trace_heap_edges(tracer);
-        }
-        for value in &self.vm.argument_scratch {
-            value.trace_heap_edges(tracer);
-        }
-    }
-}
-
-fn trace_frame_record(frame: FrameRecord, tracer: &mut PrimitiveTracer<'_>) {
-    frame.code().trace_heap_edges(tracer);
-    frame.realm().trace_heap_edges(tracer);
-    frame.lexical_env().trace_heap_edges(tracer);
-    frame.variable_env().trace_heap_edges(tracer);
-    frame.this_value().trace_heap_edges(tracer);
-    frame.construct_this().trace_heap_edges(tracer);
-    frame.new_target().trace_heap_edges(tracer);
-    frame.callee().trace_heap_edges(tracer);
-    frame.tail_caller().trace_heap_edges(tracer);
-    frame.resume_value().trace_heap_edges(tracer);
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct DynamicImportRequest {
-    capability: lyng_js_env::PromiseCapabilityId,
-    request: ModuleSourceRequest,
-    phase: DynamicImportPhase,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::vm) enum DynamicImportPhase {
-    Evaluation,
-    Source,
-    Defer,
-}
-
-impl DynamicImportPhase {
-    pub(in crate::vm) fn from_value(value: Option<Value>) -> Self {
-        match value.and_then(Value::as_smi) {
-            Some(1) => Self::Source,
-            Some(2) => Self::Defer,
-            _ => Self::Evaluation,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct PendingDynamicImport {
-    capability: lyng_js_env::PromiseCapabilityId,
-    realm: RealmRef,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-struct SuspendedExecutionSideState {
-    iterator_states: Vec<(u16, lyng_js_ops::iterator::IteratorRecord)>,
-    for_in_states: Vec<(u16, lyng_js_ops::enumeration::ForInEnumerator)>,
-    captured_name_references: Vec<(u16, CapturedNameReference)>,
-    loop_iteration_envs: Vec<LoopIterationEnvironment>,
-    with_environment_states: Vec<WithEnvironmentState>,
-    direct_eval_environment_states: Vec<DirectEvalEnvironmentState>,
-    active_env_scopes: Vec<ActiveEnvScopeRange>,
-    async_frame_state: Option<AsyncFrameState>,
-    async_generator_frame_state: Option<AsyncGeneratorFrameState>,
-    script_or_module_referrer: Option<AtomId>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ActiveEnvScopeRange {
-    frame_depth: usize,
-    environment: EnvironmentRef,
-    start: u32,
-    end: u32,
-}
-
-impl ActiveEnvScopeRange {
-    const fn new(frame_depth: usize, environment: EnvironmentRef, start: u32, count: u32) -> Self {
-        Self {
-            frame_depth,
-            environment,
-            start,
-            end: start.saturating_add(count),
-        }
-    }
-
-    fn contains(self, environment: EnvironmentRef, slot: u32) -> bool {
-        self.environment == environment && self.start <= slot && slot < self.end
     }
 }
 
