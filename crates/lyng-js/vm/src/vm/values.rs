@@ -126,8 +126,8 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_numeric_value(agent, host, registry, frame, left_register)?;
-        let right = self.to_numeric_value(agent, host, registry, frame, right_register)?;
+        let left = self.numeric_value(agent, host, registry, frame, left_register)?;
+        let right = self.numeric_value(agent, host, registry, frame, right_register)?;
         if left.is_bigint() || right.is_bigint() {
             if !left.is_bigint() || !right.is_bigint() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
@@ -170,7 +170,7 @@ impl Vm {
         frame: FrameRecord,
         register: u16,
     ) -> VmResult<Value> {
-        let value = self.to_numeric_value(agent, host, registry, frame, register)?;
+        let value = self.numeric_value(agent, host, registry, frame, register)?;
         if value.is_bigint() {
             return bigint_bitwise_not_value(agent, value);
         }
@@ -218,8 +218,8 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_numeric_value(agent, host, registry, frame, left_register)?;
-        let right = self.to_numeric_value(agent, host, registry, frame, right_register)?;
+        let left = self.numeric_value(agent, host, registry, frame, left_register)?;
+        let right = self.numeric_value(agent, host, registry, frame, right_register)?;
         if left.is_bigint() || right.is_bigint() {
             if !left.is_bigint() || !right.is_bigint() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
@@ -240,8 +240,8 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_numeric_value(agent, host, registry, frame, left_register)?;
-        let right = self.to_numeric_value(agent, host, registry, frame, right_register)?;
+        let left = self.numeric_value(agent, host, registry, frame, left_register)?;
+        let right = self.numeric_value(agent, host, registry, frame, right_register)?;
         if left.is_bigint() || right.is_bigint() {
             if !left.is_bigint() || !right.is_bigint() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
@@ -262,8 +262,8 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_numeric_value(agent, host, registry, frame, left_register)?;
-        let right = self.to_numeric_value(agent, host, registry, frame, right_register)?;
+        let left = self.numeric_value(agent, host, registry, frame, left_register)?;
+        let right = self.numeric_value(agent, host, registry, frame, right_register)?;
         if left.is_bigint() || right.is_bigint() {
             if !left.is_bigint() || !right.is_bigint() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
@@ -275,6 +275,10 @@ impl Vm {
         Ok(encode_number(left % right))
     }
 
+    #[allow(
+        clippy::float_cmp,
+        reason = "ECMAScript exponentiation has an exact ±1 and infinity special case"
+    )]
     pub(super) fn exp_values(
         &mut self,
         agent: &mut Agent,
@@ -284,8 +288,8 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_numeric_value(agent, host, registry, frame, left_register)?;
-        let right = self.to_numeric_value(agent, host, registry, frame, right_register)?;
+        let left = self.numeric_value(agent, host, registry, frame, left_register)?;
+        let right = self.numeric_value(agent, host, registry, frame, right_register)?;
         if left.is_bigint() || right.is_bigint() {
             if !left.is_bigint() || !right.is_bigint() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
@@ -300,7 +304,7 @@ impl Vm {
         Ok(encode_number(left.powf(right)))
     }
 
-    fn to_numeric_value(
+    fn numeric_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -990,14 +994,16 @@ pub(super) fn alloc_code_unit_string(
     atom: Option<AtomId>,
 ) -> lyng_js_types::StringRef {
     if atom.is_none() && units.len() == 1 && units[0] <= 0x00ff {
-        return agent.latin1_single_code_unit_string(units[0] as u8);
+        return agent.latin1_single_code_unit_string(
+            u8::try_from(units[0]).expect("Latin-1 code unit should fit into u8"),
+        );
     }
     if units.len() <= 4 {
         let mut latin1 = [0_u8; 4];
         let mut is_latin1 = true;
         for (index, unit) in units.iter().copied().enumerate() {
             if unit <= 0x00ff {
-                latin1[index] = unit as u8;
+                latin1[index] = u8::try_from(unit).expect("Latin-1 code unit should fit into u8");
             } else {
                 is_latin1 = false;
                 break;
@@ -1027,7 +1033,10 @@ pub(super) fn alloc_code_unit_string(
         );
     }
     if units.iter().all(|unit| *unit <= 0x00ff) {
-        let bytes: Vec<u8> = units.iter().map(|unit| *unit as u8).collect();
+        let bytes: Vec<u8> = units
+            .iter()
+            .map(|unit| u8::try_from(*unit).expect("Latin-1 code unit should fit into u8"))
+            .collect();
         return agent.heap_mut().mutator().alloc_string(
             StringEncoding::Latin1,
             u32::try_from(bytes.len()).expect("latin1 string length should fit into u32"),
@@ -1130,10 +1139,29 @@ fn number_to_int32(number: f64) -> i32 {
     let truncated = number.trunc();
     let modulo = truncated.rem_euclid(4_294_967_296.0);
     if modulo >= 2_147_483_648.0 {
-        (modulo - 4_294_967_296.0) as i32
+        number_to_i32_after_range_check(modulo - 4_294_967_296.0)
     } else {
-        modulo as i32
+        number_to_i32_after_range_check(modulo)
     }
+}
+
+const fn number_to_i32_after_range_check(number: f64) -> i32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "caller validates the ECMAScript Number range before narrowing to i32"
+    )]
+    let integer = number as i32;
+    integer
+}
+
+const fn number_to_u32_after_range_check(number: f64) -> u32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller validates the ECMAScript Number range before narrowing to u32"
+    )]
+    let integer = number as u32;
+    integer
 }
 
 #[inline]
@@ -1146,7 +1174,7 @@ pub(super) fn encode_number(number: f64) -> Value {
         && number >= f64::from(i32::MIN)
         && number <= f64::from(i32::MAX)
     {
-        return Value::from_smi(number as i32);
+        return Value::from_smi(number_to_i32_after_range_check(number));
     }
     Value::from_f64(number)
 }
@@ -1156,8 +1184,10 @@ fn number_to_array_index(number: f64) -> Option<u32> {
     if !number.is_finite() || number < 0.0 || number.fract() != 0.0 {
         return None;
     }
-    let index = number as u64;
-    PropertyKey::from_array_index(index).and_then(PropertyKey::as_index)
+    if number > f64::from(PropertyKey::MAX_ARRAY_INDEX) {
+        return None;
+    }
+    Some(number_to_u32_after_range_check(number))
 }
 
 #[inline]
@@ -1530,7 +1560,7 @@ fn bigint_shift_count(limbs: &[u64]) -> Option<usize> {
             return (limb == 0).then_some(shift);
         }
         let limb_value = usize::try_from(limb).ok()?;
-        shift |= limb_value.checked_shl(bit_offset as u32)?;
+        shift |= limb_value.checked_shl(u32::try_from(bit_offset).ok()?)?;
     }
     Some(shift)
 }
@@ -1755,7 +1785,7 @@ fn bigint_compare_limbs(left: &[u64], right: &[u64]) -> std::cmp::Ordering {
         std::cmp::Ordering::Equal => {
             for index in (0..left_len).rev() {
                 match left[index].cmp(&right[index]) {
-                    std::cmp::Ordering::Equal => continue,
+                    std::cmp::Ordering::Equal => {}
                     ordering => return ordering,
                 }
             }
@@ -1773,11 +1803,11 @@ fn bigint_add_limbs(left: &[u64], right: &[u64]) -> Vec<u64> {
         let left_limb = u128::from(*left.get(index).unwrap_or(&0));
         let right_limb = u128::from(*right.get(index).unwrap_or(&0));
         let total = left_limb + right_limb + carry;
-        result.push(total as u64);
+        result.push(low_u64(total));
         carry = total >> 64;
     }
     if carry != 0 {
-        result.push(carry as u64);
+        result.push(u64::try_from(carry).expect("BigInt addition carry should fit into u64"));
     }
     normalize_bigint_limbs(&mut result);
     result
@@ -1790,10 +1820,16 @@ fn bigint_subtract_limbs(left: &[u64], right: &[u64]) -> Vec<u64> {
         let minuend = u128::from(left_limb);
         let subtrahend = u128::from(*right.get(index).unwrap_or(&0)) + borrow;
         if minuend >= subtrahend {
-            result.push((minuend - subtrahend) as u64);
+            result.push(
+                u64::try_from(minuend - subtrahend)
+                    .expect("BigInt subtraction limb should fit into u64"),
+            );
             borrow = 0;
         } else {
-            result.push(((1_u128 << 64) + minuend - subtrahend) as u64);
+            result.push(
+                u64::try_from((1_u128 << 64) + minuend - subtrahend)
+                    .expect("BigInt borrowed subtraction limb should fit into u64"),
+            );
             borrow = 1;
         }
     }
@@ -1814,19 +1850,23 @@ fn bigint_multiply_limbs(left: &[u64], right: &[u64]) -> Vec<u64> {
             let total = u128::from(left_limb) * u128::from(right_limb)
                 + u128::from(result[slot_index])
                 + carry;
-            result[slot_index] = total as u64;
+            result[slot_index] = low_u64(total);
             carry = total >> 64;
         }
         let mut slot_index = left_index + right.len();
         while carry != 0 {
             let total = u128::from(result[slot_index]) + carry;
-            result[slot_index] = total as u64;
+            result[slot_index] = low_u64(total);
             carry = total >> 64;
             slot_index += 1;
         }
     }
     normalize_bigint_limbs(&mut result);
     result
+}
+
+fn low_u64(value: u128) -> u64 {
+    u64::try_from(value & u128::from(u64::MAX)).expect("masked u128 limb should fit into u64")
 }
 
 fn bigint_divide_unsigned(dividend: &[u64], divisor: &[u64]) -> Option<(Vec<u64>, Vec<u64>)> {

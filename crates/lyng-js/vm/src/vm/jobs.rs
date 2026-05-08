@@ -124,8 +124,10 @@ impl Vm {
                 script_or_module_referrer,
                 ..
             } => script_or_module_referrer,
-            RuntimeJobPayload::AtomicsWaitAsyncTimeout { .. } => None,
-            _ => None,
+            RuntimeJobPayload::Executable
+            | RuntimeJobPayload::PromiseThenableResolve { .. }
+            | RuntimeJobPayload::AtomicsWaitAsyncTimeout { .. }
+            | RuntimeJobPayload::FinalizationCleanup { .. } => None,
         };
         agent.push_execution_context(
             lyng_js_env::ExecutionContext::job(realm, job.executable(), lexical_env, variable_env)

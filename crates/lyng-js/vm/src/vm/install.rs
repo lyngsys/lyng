@@ -502,13 +502,14 @@ impl Vm {
             return None;
         }
 
-        let mut mutator = agent.heap_mut().mutator();
-        let slots = mutator.alloc_code_slots(
-            constants.len(),
-            Value::empty_internal_slot(),
-            AllocationLifetime::Default,
-        );
-        drop(mutator);
+        let slots = {
+            let mut mutator = agent.heap_mut().mutator();
+            mutator.alloc_code_slots(
+                constants.len(),
+                Value::empty_internal_slot(),
+                AllocationLifetime::Default,
+            )
+        };
 
         for (index, constant) in constants.iter().copied().enumerate() {
             if let Some(value) =

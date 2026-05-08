@@ -27,17 +27,18 @@ fn bigint_to_uint64_bits(agent: &Agent, value: Value) -> Option<u64> {
 }
 
 fn array_length_to_uint32(number: f64) -> u32 {
+    const TWO_32: f64 = 4_294_967_296.0;
     if !number.is_finite() || number == 0.0 {
         return 0;
     }
-    const TWO_32: f64 = 4_294_967_296.0;
-    number.trunc().rem_euclid(TWO_32) as u32
+    number_to_u32_after_range_check(number.trunc().rem_euclid(TWO_32))
 }
 
 fn vm_typed_array_storage_bits(kind: TypedArrayElementKind, number: f64) -> u64 {
     match kind {
-        TypedArrayElementKind::BigInt64 => number as u64,
-        TypedArrayElementKind::BigUint64 => number as u64,
+        TypedArrayElementKind::BigInt64 | TypedArrayElementKind::BigUint64 => {
+            unreachable!("BigInt typed array elements are handled before Number conversion")
+        }
         TypedArrayElementKind::Int8 | TypedArrayElementKind::Uint8 => {
             u64::from(vm_to_uint8(number))
         }
@@ -46,7 +47,7 @@ fn vm_typed_array_storage_bits(kind: TypedArrayElementKind, number: f64) -> u64 
             u64::from(vm_to_uint16(number))
         }
         TypedArrayElementKind::Float16 => u64::from(f64_to_float16_bits(number)),
-        TypedArrayElementKind::Float32 => u64::from(f32::to_bits(number as f32)),
+        TypedArrayElementKind::Float32 => u64::from(f32::to_bits(number_to_f32_storage(number))),
         TypedArrayElementKind::Float64 => number.to_bits(),
         TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => {
             u64::from(vm_to_uint32(number))
@@ -98,11 +99,11 @@ fn vm_typed_array_numeric_index_usize(index: f64) -> Option<usize> {
         || index.fract() != 0.0
         || index < 0.0
         || (index == 0.0 && index.is_sign_negative())
-        || index > (usize::MAX as f64)
+        || index > max_usize_as_f64()
     {
         return None;
     }
-    Some(index as usize)
+    Some(number_to_usize_after_range_check(index))
 }
 
 fn vm_typed_array_numeric_index_is_valid(
@@ -374,7 +375,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
 
     fn to_property_key(&mut self, value: Value) -> Result<PropertyKey, Self::Error> {
         self.vm
-            .to_property_key_from_value(self.agent, self.host, self.registry, self.frame, value)
+            .property_key_from_value(self.agent, self.host, self.registry, self.frame, value)
     }
 
     fn to_property_descriptor(
@@ -560,7 +561,7 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
 }
 
 impl Vm {
-    pub(super) fn to_property_key_from_value(
+    pub(super) fn property_key_from_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -665,7 +666,7 @@ impl Vm {
         index: u32,
         value: Value,
     ) -> VmResult<Option<bool>> {
-        if !Self::engine_array_index_prototype_chain_is_clear(agent, object)? {
+        if !Self::engine_array_index_prototype_chain_is_clear(agent, object) {
             return Ok(None);
         }
         agent
@@ -685,7 +686,7 @@ impl Vm {
     pub(super) fn engine_array_index_prototype_chain_is_clear(
         agent: &Agent,
         object: ObjectRef,
-    ) -> VmResult<bool> {
+    ) -> bool {
         let mut current = agent
             .objects()
             .object_header(agent.heap().view(), object)
@@ -695,14 +696,14 @@ impl Vm {
                 || agent.objects().is_typed_array_object(prototype)
                 || agent.objects().element_logical_len(prototype).unwrap_or(0) != 0
             {
-                return Ok(false);
+                return false;
             }
             current = agent
                 .objects()
                 .object_header(agent.heap().view(), prototype)
                 .and_then(lyng_js_objects::ObjectHeader::prototype);
         }
-        Ok(true)
+        true
     }
 
     pub(super) fn prototype_chain_has_proxy(agent: &Agent, object: ObjectRef) -> bool {
@@ -724,21 +725,17 @@ impl Vm {
         agent: &Agent,
         object: ObjectRef,
         key: PropertyKey,
-    ) -> VmResult<Option<Value>> {
+    ) -> Option<Value> {
         let PropertyKey::Atom(atom) = key else {
-            return Ok(None);
+            return None;
         };
         if agent.atoms().resolve(atom) != "caller" {
-            return Ok(None);
+            return None;
         }
-        let Some(code) = Self::bytecode_entry(agent, object) else {
-            return Ok(None);
-        };
-        let Some(function) = self.installed_function(code) else {
-            return Ok(None);
-        };
+        let code = Self::bytecode_entry(agent, object)?;
+        let function = self.installed_function(code)?;
         if !Self::legacy_function_allows_caller_arguments(function) {
-            return Ok(None);
+            return None;
         }
 
         let Some(active_index) = self
@@ -746,30 +743,30 @@ impl Vm {
             .iter()
             .rposition(|frame| frame.callee() == Some(object))
         else {
-            return Ok(Some(Value::null()));
+            return Some(Value::null());
         };
         let Some(active_frame) = self.frames.get(active_index).copied() else {
-            return Ok(Some(Value::null()));
+            return Some(Value::null());
         };
         if let Some(caller) = active_frame.tail_caller() {
             if active_frame.tail_caller_strict()
                 || self.legacy_function_caller_is_restricted(agent, caller)
             {
-                return Ok(Some(Value::null()));
+                return Some(Value::null());
             }
-            return Ok(Some(Value::from_object_ref(caller)));
+            return Some(Value::from_object_ref(caller));
         }
         let Some(caller) = self.frames[..active_index]
             .iter()
             .rev()
             .find_map(|frame| frame.callee())
         else {
-            return Ok(Some(Value::null()));
+            return Some(Value::null());
         };
         if self.legacy_function_caller_is_restricted(agent, caller) {
-            return Ok(Some(Value::null()));
+            return Some(Value::null());
         }
-        Ok(Some(Value::from_object_ref(caller)))
+        Some(Value::from_object_ref(caller))
     }
 
     fn legacy_function_allows_caller_arguments(
@@ -881,7 +878,7 @@ impl Vm {
                     Value::from_object_ref(excluded_object),
                     excluded_index,
                 )?;
-                excluded.insert(self.to_property_key_from_value(
+                excluded.insert(self.property_key_from_value(
                     agent,
                     host,
                     registry,
@@ -1016,7 +1013,7 @@ impl Vm {
             }
             return Ok(Value::undefined());
         }
-        if let Some(value) = self.legacy_function_caller(agent, object, key)? {
+        if let Some(value) = self.legacy_function_caller(agent, object, key) {
             return Ok(value);
         }
         if let Some(value) = self.legacy_function_arguments(agent, object, key)? {
@@ -1136,8 +1133,10 @@ impl Vm {
         };
         match status {
             ModuleStatus::Evaluated | ModuleStatus::Errored => return Ok(true),
-            ModuleStatus::Evaluating => return Ok(false),
-            ModuleStatus::New | ModuleStatus::Unlinked | ModuleStatus::Linking => return Ok(false),
+            ModuleStatus::Evaluating
+            | ModuleStatus::New
+            | ModuleStatus::Unlinked
+            | ModuleStatus::Linking => return Ok(false),
             ModuleStatus::Linked => {}
         }
         if self.module_has_top_level_await(agent, key)? {
@@ -1287,7 +1286,7 @@ impl Vm {
         {
             return Ok(Some(false));
         }
-        let index = numeric_index as usize;
+        let index = number_to_usize_after_range_check(numeric_index);
         if !vm_typed_array_index_is_valid(agent, typed_array, index) {
             return Ok(Some(false));
         }
@@ -1446,6 +1445,10 @@ impl Vm {
             .as_f64()
             .expect("ToNumber must always produce a numeric Value");
         let length = array_length_to_uint32(number);
+        #[allow(
+            clippy::float_cmp,
+            reason = "array length assignment requires exact ECMA-262 ToUint32 equality"
+        )]
         if number != f64::from(length) {
             return Err(VmError::Abrupt(errors::throw_range_error(agent)));
         }
@@ -1595,9 +1598,8 @@ impl Vm {
             bigint_to_uint64_bits(agent, bigint)
                 .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?
         } else {
-            let number = match read::to_number(agent.heap().view(), primitive) {
-                Ok(number) => number,
-                Err(_) => return Err(VmError::Abrupt(errors::throw_type_error(agent))),
+            let Ok(number) = read::to_number(agent.heap().view(), primitive) else {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             };
             vm_typed_array_storage_bits(
                 typed_array.kind(),
@@ -1637,6 +1639,10 @@ impl Vm {
         Ok(true)
     }
 
+    #[allow(
+        clippy::wrong_self_convention,
+        reason = "method name intentionally mirrors the ECMA-262 ToPrimitive abstract operation"
+    )]
     pub(super) fn to_primitive(
         &mut self,
         agent: &mut Agent,
@@ -1678,7 +1684,7 @@ fn vm_to_uint8(number: f64) -> u8 {
     if modulo < 0.0 {
         modulo += 256.0;
     }
-    modulo as u8
+    number_to_u8_after_range_check(modulo)
 }
 
 fn vm_to_uint8_clamp(number: f64) -> u8 {
@@ -1690,12 +1696,12 @@ fn vm_to_uint8_clamp(number: f64) -> u8 {
     }
     let floor = number.floor();
     if floor + 0.5 < number {
-        return (floor as u8).saturating_add(1);
+        return number_to_u8_after_range_check(floor).saturating_add(1);
     }
     if number < floor + 0.5 {
-        return floor as u8;
+        return number_to_u8_after_range_check(floor);
     }
-    let floor_u8 = floor as u8;
+    let floor_u8 = number_to_u8_after_range_check(floor);
     if floor_u8 % 2 == 1 {
         floor_u8.saturating_add(1)
     } else {
@@ -1712,7 +1718,7 @@ fn vm_to_uint16(number: f64) -> u16 {
     if modulo < 0.0 {
         modulo += 65_536.0;
     }
-    modulo as u16
+    number_to_u16_after_range_check(modulo)
 }
 
 fn vm_to_uint32(number: f64) -> u32 {
@@ -1724,5 +1730,63 @@ fn vm_to_uint32(number: f64) -> u32 {
     if modulo < 0.0 {
         modulo += 4_294_967_296.0;
     }
-    modulo as u32
+    number_to_u32_after_range_check(modulo)
+}
+
+const fn number_to_u8_after_range_check(number: f64) -> u8 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller applies the ECMAScript modulo/range rules before narrowing to u8"
+    )]
+    let integer = number as u8;
+    integer
+}
+
+const fn number_to_u16_after_range_check(number: f64) -> u16 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller applies the ECMAScript modulo/range rules before narrowing to u16"
+    )]
+    let integer = number as u16;
+    integer
+}
+
+const fn number_to_u32_after_range_check(number: f64) -> u32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller applies the ECMAScript modulo/range rules before narrowing to u32"
+    )]
+    let integer = number as u32;
+    integer
+}
+
+const fn number_to_usize_after_range_check(number: f64) -> usize {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller validates a finite non-negative integer that fits in usize"
+    )]
+    let integer = number as usize;
+    integer
+}
+
+const fn number_to_f32_storage(number: f64) -> f32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Float32Array storage uses ECMA-262 NumberToRawBytes f64-to-f32 rounding"
+    )]
+    let narrowed = number as f32;
+    narrowed
+}
+
+const fn max_usize_as_f64() -> f64 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "upper-bound guard only rejects values beyond the host pointer width"
+    )]
+    let max = usize::MAX as f64;
+    max
 }

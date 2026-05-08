@@ -164,7 +164,7 @@ impl Vm {
                 return Err(VmError::Abrupt(AbruptCompletion::Throw(resume_value)));
             }
             self.write_register(frame, register, resume_value)?;
-            self.advance_instruction()?;
+            self.advance_instruction();
             return Ok(());
         }
 

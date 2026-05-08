@@ -623,6 +623,7 @@ impl Vm {
         not(test),
         expect(
             clippy::unused_self,
+            clippy::missing_const_for_fn,
             reason = "non-test builds keep the frame-depth instrumentation hook as a no-op"
         )
     )]
@@ -2089,12 +2090,11 @@ impl Vm {
             )
         };
         match status {
-            ModuleStatus::Evaluated => return Ok(Value::undefined()),
             ModuleStatus::Evaluating if self.async_dependency_blocked_modules.contains(key) => {}
             ModuleStatus::Evaluating if self.async_body_suspended_modules.contains(key) => {
                 return Err(VmError::AsyncSuspend);
             }
-            ModuleStatus::Evaluating => return Ok(Value::undefined()),
+            ModuleStatus::Evaluated | ModuleStatus::Evaluating => return Ok(Value::undefined()),
             ModuleStatus::Errored => {
                 if let Some(thrown) = evaluation_error {
                     return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::throw(

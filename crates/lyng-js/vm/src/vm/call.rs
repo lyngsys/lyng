@@ -28,7 +28,7 @@ impl Vm {
         arguments: &[Value],
     ) -> VmResult<()> {
         if Self::bytecode_entry(agent, callee).is_some() {
-            self.advance_instruction()?;
+            self.advance_instruction();
             return self.enter_bytecode_call(
                 agent,
                 host,
@@ -64,7 +64,8 @@ impl Vm {
             object::call(agent, callee, this_value, arguments, registry).map_err(VmError::Abrupt)?
         };
         self.write_register(frame, result_register, result)?;
-        self.advance_instruction()
+        self.advance_instruction();
+        Ok(())
     }
 
     #[expect(
@@ -300,7 +301,7 @@ impl Vm {
                     Some(new_target),
                 )?;
                 self.write_register(frame, result_register, Value::from_object_ref(result))?;
-                self.advance_instruction()?;
+                self.advance_instruction();
                 return Ok(());
             }
 
@@ -320,7 +321,7 @@ impl Vm {
                         new_target,
                     )?)
                 };
-                self.advance_instruction()?;
+                self.advance_instruction();
                 return self.enter_bytecode_call(
                     agent,
                     host,
@@ -363,7 +364,8 @@ impl Vm {
                 .map_err(VmError::Abrupt)?
             };
             self.write_register(frame, result_register, Value::from_object_ref(result))?;
-            self.advance_instruction()
+            self.advance_instruction();
+            Ok(())
         })();
         self.argument_scratch = collected_arguments;
         result

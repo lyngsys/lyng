@@ -34,7 +34,7 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
 
-        let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
+        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
         if let Some(accessor) = accessor.as_object_ref() {
             Self::set_function_name_from_property_key(
                 agent,
@@ -83,7 +83,7 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
         let value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
+        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
         if let Some(function) = value.as_object_ref() {
             Self::set_function_name_from_property_key(agent, function, key, None)?;
         }

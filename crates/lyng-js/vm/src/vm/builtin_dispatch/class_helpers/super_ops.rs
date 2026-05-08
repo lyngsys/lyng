@@ -68,7 +68,7 @@ impl Vm {
             object::super_base(agent, home_object).map_err(VmError::Abrupt)?
         };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
-        let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
+        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
         self.get_property_from_object(agent, host, registry, caller, base, receiver, key)
     }
 
@@ -96,7 +96,7 @@ impl Vm {
             object::super_base(agent, home_object).map_err(VmError::Abrupt)?
         };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
-        let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
+        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
         let updated =
             self.set_property_on_object(agent, host, registry, caller, base, receiver, key, value)?;
         if !updated && self.caller_is_strict(caller) {

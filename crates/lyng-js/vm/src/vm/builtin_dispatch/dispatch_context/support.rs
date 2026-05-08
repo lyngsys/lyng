@@ -395,7 +395,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
             object,
             PropertyKey::from_atom(WellKnownAtom::length.id()),
         )?;
-        let length = to_f64_number(self.agent, length)?.max(0.0) as u32;
+        let length = nonnegative_number_to_u32_length(to_f64_number(self.agent, length)?);
         let mut units = Vec::new();
         for index in 0..length {
             if index != 0 {
@@ -412,4 +412,14 @@ impl VmBuiltinDispatch<'_, '_, '_> {
             self.agent, &units, None,
         )))
     }
+}
+
+const fn nonnegative_number_to_u32_length(number: f64) -> u32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "engine array fallback length is clamped to the non-negative u32 element range"
+    )]
+    let length = number.max(0.0) as u32;
+    length
 }

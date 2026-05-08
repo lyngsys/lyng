@@ -365,8 +365,7 @@ impl Vm {
         let data = agent.objects().function_data(callee_object)?;
         match data.entry()? {
             FunctionEntryIdentity::Bytecode(code) => Some(code),
-            FunctionEntryIdentity::Native(_) => None,
-            FunctionEntryIdentity::Bound => None,
+            FunctionEntryIdentity::Native(_) | FunctionEntryIdentity::Bound => None,
         }
     }
 

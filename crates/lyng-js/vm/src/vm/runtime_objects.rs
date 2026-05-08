@@ -598,8 +598,8 @@ impl Vm {
             );
         }
         if preserve_completion {
-            return self
-                .close_iterator_state_preserving_completion(agent, host, registry, frame, record);
+            self.close_iterator_state_preserving_completion(agent, host, registry, frame, record);
+            return Ok(());
         }
         let mut bridge = VmIteratorBridge {
             vm: self,
@@ -1050,44 +1050,34 @@ impl Vm {
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
         mut record: iterator::IteratorRecord,
-    ) -> VmResult<()> {
+    ) {
         if record.done() {
-            return Ok(());
+            return;
         }
         record.set_done(true);
         let receiver = Value::from_object_ref(record.iterator());
-        let return_value = match self.get_property_from_value(
+        let Ok(return_value) = self.get_property_from_value(
             agent,
             host,
             registry,
             frame,
             receiver,
             PropertyKey::from_atom(WellKnownAtom::r#return.id()),
-        ) {
-            Ok(return_value) => return_value,
-            Err(_) => return Ok(()),
+        ) else {
+            return;
         };
         if return_value.is_undefined() || return_value.is_null() {
-            return Ok(());
+            return;
         }
-        let return_method = match Self::require_callable_object(agent, frame, return_value) {
-            Ok(return_method) => return_method,
-            Err(_) => return Ok(()),
+        let Ok(return_method) = Self::require_callable_object(agent, frame, return_value) else {
+            return;
         };
-        let result = match self.call_to_completion(
-            agent,
-            host,
-            registry,
-            frame,
-            return_method,
-            receiver,
-            &[],
-        ) {
-            Ok(result) => result,
-            Err(_) => return Ok(()),
+        let Ok(result) =
+            self.call_to_completion(agent, host, registry, frame, return_method, receiver, &[])
+        else {
+            return;
         };
         let _ = result.as_object_ref();
-        Ok(())
     }
 }
 

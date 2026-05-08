@@ -373,7 +373,6 @@ impl Vm {
         let outcome =
             self.evaluate_dynamic_import_request(agent, realm_record, host, registry, &request);
         self.dynamic_import_evaluate_depth = self.dynamic_import_evaluate_depth.saturating_sub(1);
-        let outcome = outcome?;
         match outcome {
             DynamicImportEvaluationOutcome::Fulfilled { key, value } => {
                 self.settle_promise_capability(
@@ -414,25 +413,25 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         request: &DynamicImportRequest,
-    ) -> VmResult<DynamicImportEvaluationOutcome> {
+    ) -> DynamicImportEvaluationOutcome {
         let loaded =
             match self.load_module_graph_from_host(agent, realm_record, host, &request.request) {
                 Ok(loaded) => loaded,
                 Err(error) => {
-                    return Ok(DynamicImportEvaluationOutcome::Rejected {
+                    return DynamicImportEvaluationOutcome::Rejected {
                         key: None,
                         reason: Self::dynamic_import_module_error_value(agent, error),
-                    });
+                    };
                 }
             };
         let key = loaded.key().clone();
         let module_env = match self.link_module_graph(agent, realm_record, &key) {
             Ok(module_env) => module_env,
             Err(error) => {
-                return Ok(DynamicImportEvaluationOutcome::Rejected {
+                return DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key.clone()),
                     reason: Self::dynamic_import_error_value(agent, error),
-                });
+                };
             }
         };
         if request.phase == DynamicImportPhase::Defer {
@@ -455,7 +454,7 @@ impl Vm {
                     capability: request.capability,
                     realm: realm_record.id(),
                 });
-            return Ok(DynamicImportEvaluationOutcome::Pending);
+            return DynamicImportEvaluationOutcome::Pending;
         }
         if let Err(error) = self.evaluate_module_graph(
             agent,
@@ -477,21 +476,21 @@ impl Vm {
                         capability: request.capability,
                         realm: realm_record.id(),
                     });
-                return Ok(DynamicImportEvaluationOutcome::Pending);
+                return DynamicImportEvaluationOutcome::Pending;
             }
             self.async_dependency_completed_modules.remove(&key);
-            return Ok(DynamicImportEvaluationOutcome::Rejected {
+            return DynamicImportEvaluationOutcome::Rejected {
                 key: Some(key.clone()),
                 reason: Self::dynamic_import_error_value(agent, error),
-            });
+            };
         }
         let namespace = match self.module_namespace_object(agent, realm_record, &key) {
             Ok(namespace) => namespace,
             Err(error) => {
-                return Ok(DynamicImportEvaluationOutcome::Rejected {
+                return DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key.clone()),
                     reason: Self::dynamic_import_error_value(agent, error),
-                });
+                };
             }
         };
         if self.dynamic_import_evaluate_depth > 1
@@ -504,13 +503,13 @@ impl Vm {
                     capability: request.capability,
                     realm: realm_record.id(),
                 });
-            return Ok(DynamicImportEvaluationOutcome::Pending);
+            return DynamicImportEvaluationOutcome::Pending;
         }
         self.async_dependency_completed_modules.remove(&key);
-        Ok(DynamicImportEvaluationOutcome::Fulfilled {
+        DynamicImportEvaluationOutcome::Fulfilled {
             key,
             value: Value::from_object_ref(namespace),
-        })
+        }
     }
 
     fn evaluate_deferred_dynamic_import_request(
@@ -520,14 +519,14 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         key: ModuleKey,
-    ) -> VmResult<DynamicImportEvaluationOutcome> {
+    ) -> DynamicImportEvaluationOutcome {
         let dependencies = match self.gather_asynchronous_transitive_dependencies(agent, &key) {
             Ok(dependencies) => dependencies,
             Err(error) => {
-                return Ok(DynamicImportEvaluationOutcome::Rejected {
+                return DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key),
                     reason: Self::dynamic_import_error_value(agent, error),
-                });
+                };
             }
         };
         for dependency_key in dependencies {
@@ -535,10 +534,10 @@ impl Vm {
             {
                 Ok(module_env) => module_env,
                 Err(error) => {
-                    return Ok(DynamicImportEvaluationOutcome::Rejected {
+                    return DynamicImportEvaluationOutcome::Rejected {
                         key: Some(key),
                         reason: Self::dynamic_import_error_value(agent, error),
-                    });
+                    };
                 }
             };
             if let Err(error) = self.evaluate_module_graph(
@@ -551,26 +550,26 @@ impl Vm {
                 None,
                 true,
             ) {
-                return Ok(DynamicImportEvaluationOutcome::Rejected {
+                return DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key),
                     reason: Self::dynamic_import_error_value(agent, error),
-                });
+                };
             }
         }
         let namespace =
             match self.module_namespace_object_with_phase(agent, realm_record, &key, true) {
                 Ok(namespace) => namespace,
                 Err(error) => {
-                    return Ok(DynamicImportEvaluationOutcome::Rejected {
+                    return DynamicImportEvaluationOutcome::Rejected {
                         key: Some(key),
                         reason: Self::dynamic_import_error_value(agent, error),
-                    });
+                    };
                 }
             };
-        Ok(DynamicImportEvaluationOutcome::Fulfilled {
+        DynamicImportEvaluationOutcome::Fulfilled {
             key,
             value: Value::from_object_ref(namespace),
-        })
+        }
     }
 
     pub(in crate::vm) fn gather_asynchronous_transitive_dependencies(
@@ -668,13 +667,6 @@ impl Vm {
             (record.status(), record.evaluation_error())
         };
         match status {
-            ModuleStatus::Evaluating => {
-                self.dynamic_import_waiting_modules
-                    .entry(key.clone())
-                    .or_default()
-                    .extend(waiters);
-                Ok(())
-            }
             ModuleStatus::Evaluated => {
                 for waiter in waiters {
                     let realm = agent
@@ -711,7 +703,8 @@ impl Vm {
                 }
                 Ok(())
             }
-            ModuleStatus::New
+            ModuleStatus::Evaluating
+            | ModuleStatus::New
             | ModuleStatus::Unlinked
             | ModuleStatus::Linking
             | ModuleStatus::Linked => {
@@ -758,7 +751,7 @@ impl Vm {
                 Self::dynamic_import_error_value(agent, error)
             }
             crate::error::ModuleLoadError::Host(error) => {
-                Self::dynamic_import_host_error_value(agent, error)
+                Self::dynamic_import_host_error_value(agent, &error)
             }
             crate::error::ModuleLoadError::Parse | crate::error::ModuleLoadError::Sema => {
                 errors::syntax_error_value(agent)
@@ -772,7 +765,7 @@ impl Vm {
     fn dynamic_import_error_value(agent: &mut Agent, error: VmError) -> Value {
         match error {
             VmError::Abrupt(completion) => completion.thrown_value().unwrap_or(Value::undefined()),
-            VmError::Host(error) => Self::dynamic_import_host_error_value(agent, error),
+            VmError::Host(error) => Self::dynamic_import_host_error_value(agent, &error),
             VmError::AmbiguousModuleExport | VmError::MissingModuleResolution => {
                 errors::syntax_error_value(agent)
             }
@@ -780,7 +773,10 @@ impl Vm {
         }
     }
 
-    fn dynamic_import_host_error_value(agent: &mut Agent, error: lyng_js_host::HostError) -> Value {
+    fn dynamic_import_host_error_value(
+        agent: &mut Agent,
+        error: &lyng_js_host::HostError,
+    ) -> Value {
         Value::from_string_ref(alloc_string(agent, &error.to_string(), None))
     }
 }

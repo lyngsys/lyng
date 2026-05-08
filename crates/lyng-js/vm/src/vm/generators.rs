@@ -18,6 +18,7 @@ const THIS_STATE_UNINITIALIZED_RAW: u8 = 1;
 const THIS_STATE_VALUE_RAW: u8 = 2;
 const MAX_GENERATOR_RESUME_DEPTH: usize = if cfg!(debug_assertions) { 8 } else { 128 };
 
+#[derive(Clone, Copy)]
 enum GeneratorExecutionOutcome {
     Complete(Value),
     Yield {
@@ -28,6 +29,7 @@ enum GeneratorExecutionOutcome {
     AsyncSuspend,
 }
 
+#[derive(Clone, Copy)]
 enum DelegateYieldOutcome {
     Suspend {
         value: Value,
@@ -116,13 +118,13 @@ impl Vm {
                 Self::generator_completion_result(agent, caller_frame.realm(), resume_kind, value)
             }
             GeneratorState::SuspendedStart if resume_kind == GeneratorResumeKind::Throw => {
-                Self::complete_generator_object(agent, generator)?;
+                Self::complete_generator_object(agent, generator);
                 Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::throw(
                     value,
                 )))
             }
             GeneratorState::SuspendedStart if resume_kind == GeneratorResumeKind::Return => {
-                Self::complete_generator_object(agent, generator)?;
+                Self::complete_generator_object(agent, generator);
                 Self::generator_result_object(agent, caller_frame.realm(), value, true)
             }
             GeneratorState::SuspendedStart | GeneratorState::SuspendedYield => {
@@ -144,7 +146,7 @@ impl Vm {
                     self.restore_suspended_execution(agent, suspended, resume_kind, effective_value)
                 {
                     self.generator_resume_depth -= 1;
-                    let _ = Self::complete_generator_object(agent, generator);
+                    Self::complete_generator_object(agent, generator);
                     return Err(error);
                 }
                 if state == GeneratorState::SuspendedStart
@@ -172,7 +174,7 @@ impl Vm {
                         lyng_js_types::AbruptCompletion::throw(thrown),
                     )),
                     GeneratorExecutionOutcome::AsyncSuspend => {
-                        let _ = Self::complete_generator_object(agent, generator);
+                        Self::complete_generator_object(agent, generator);
                         Err(VmError::AsyncSuspend)
                     }
                 }
@@ -336,7 +338,7 @@ impl Vm {
             host,
             registry,
             frame_state.generator,
-            outcome,
+            &outcome,
         )?;
         self.drain_async_generator_queue(agent, host, registry, frame_state.generator)
     }
@@ -381,7 +383,7 @@ impl Vm {
         if matches!(outcome, GeneratorExecutionOutcome::AsyncSuspend) {
             return Ok(());
         }
-        self.finish_async_generator_front_request(agent, host, registry, generator, outcome)?;
+        self.finish_async_generator_front_request(agent, host, registry, generator, &outcome)?;
         self.drain_async_generator_queue(agent, host, registry, generator)
     }
 
@@ -397,13 +399,12 @@ impl Vm {
         generator: ObjectRef,
     ) -> VmResult<()> {
         loop {
-            let request = match self
+            let Some(request) = self
                 .async_generator_queues
                 .get(&generator)
                 .and_then(|queue| queue.front().copied())
-            {
-                Some(request) => request,
-                None => return Ok(()),
+            else {
+                return Ok(());
             };
             let (state, suspended) = {
                 let objects = agent.objects();
@@ -437,7 +438,7 @@ impl Vm {
                     )?;
                 }
                 GeneratorState::SuspendedStart if request.kind != GeneratorResumeKind::Next => {
-                    Self::complete_generator_object(agent, generator)?;
+                    Self::complete_generator_object(agent, generator);
                     if request.kind == GeneratorResumeKind::Return {
                         self.await_async_generator_return_completion(
                             agent, host, registry, generator, request,
@@ -480,7 +481,7 @@ impl Vm {
                         request.kind,
                         effective_value,
                     ) {
-                        let _ = Self::complete_generator_object(agent, generator);
+                        Self::complete_generator_object(agent, generator);
                         return Err(error);
                     }
                     if state == GeneratorState::SuspendedStart
@@ -504,7 +505,7 @@ impl Vm {
                         return Ok(());
                     }
                     self.finish_async_generator_front_request(
-                        agent, host, registry, generator, outcome,
+                        agent, host, registry, generator, &outcome,
                     )?;
                 }
             }
@@ -517,14 +518,14 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         generator: ObjectRef,
-        outcome: GeneratorExecutionOutcome,
+        outcome: &GeneratorExecutionOutcome,
     ) -> VmResult<()> {
         let request = self
             .async_generator_queues
             .get(&generator)
             .and_then(|queue| queue.front().copied())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        match outcome {
+        match *outcome {
             GeneratorExecutionOutcome::Complete(value) => {
                 let result = Self::generator_result_object(agent, request.realm, value, true);
                 self.settle_async_generator_request_completion(
@@ -745,7 +746,7 @@ impl Vm {
 
         match result {
             Ok(value) => {
-                Self::complete_generator_object(agent, generator)?;
+                Self::complete_generator_object(agent, generator);
                 Ok(GeneratorExecutionOutcome::Complete(value))
             }
             Err(VmError::GeneratorYield {
@@ -766,11 +767,11 @@ impl Vm {
             }
             Err(VmError::AsyncSuspend) => Ok(GeneratorExecutionOutcome::AsyncSuspend),
             Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::Throw(thrown))) => {
-                Self::complete_generator_object(agent, generator)?;
+                Self::complete_generator_object(agent, generator);
                 Ok(GeneratorExecutionOutcome::Throw(thrown))
             }
             Err(error) => {
-                let _ = Self::complete_generator_object(agent, generator);
+                Self::complete_generator_object(agent, generator);
                 Err(error)
             }
         }
@@ -1035,7 +1036,7 @@ impl Vm {
             done_register,
             register_base,
             iterator_register,
-            outcome,
+            &outcome,
         )
     }
 
@@ -1135,7 +1136,7 @@ impl Vm {
             done_register,
             frame.registers().base(),
             iterator_register,
-            outcome,
+            &outcome,
         )
     }
 
@@ -1151,9 +1152,9 @@ impl Vm {
         done_register: u16,
         register_base: u32,
         iterator_register: u16,
-        outcome: DelegateYieldOutcome,
+        outcome: &DelegateYieldOutcome,
     ) -> VmResult<()> {
-        match outcome {
+        match *outcome {
             DelegateYieldOutcome::Suspend {
                 value,
                 record,
@@ -1174,7 +1175,7 @@ impl Vm {
             DelegateYieldOutcome::Complete { value } => {
                 self.write_register(frame, result_register, value)?;
                 self.write_register(frame, done_register, Value::from_bool(true))?;
-                self.advance_instruction()?;
+                self.advance_instruction();
                 Ok(())
             }
         }
@@ -1437,7 +1438,7 @@ impl Vm {
                     done_register,
                     frame.registers().base(),
                     iterator_register,
-                    outcome,
+                    &outcome,
                 )
             }
             iterator::DelegateYieldAwaitState::Value {
@@ -1456,7 +1457,7 @@ impl Vm {
                         done_register,
                         frame.registers().base(),
                         iterator_register,
-                        DelegateYieldOutcome::Complete {
+                        &DelegateYieldOutcome::Complete {
                             value: resume_value,
                         },
                     )
@@ -1468,7 +1469,7 @@ impl Vm {
                         done_register,
                         frame.registers().base(),
                         iterator_register,
-                        DelegateYieldOutcome::Suspend {
+                        &DelegateYieldOutcome::Suspend {
                             value: resume_value,
                             record,
                             raw_iterator_result: false,
@@ -1780,7 +1781,7 @@ impl Vm {
         }
     }
 
-    fn complete_generator_object(agent: &mut Agent, generator: ObjectRef) -> VmResult<()> {
+    fn complete_generator_object(agent: &mut Agent, generator: ObjectRef) {
         agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
             if let Some(suspended) = objects.generator_suspended(mutator.view(), generator) {
@@ -1789,7 +1790,6 @@ impl Vm {
             let _ = objects.set_generator_suspended(&mut mutator, generator, None);
             let _ = objects.set_generator_state(generator, GeneratorState::Completed);
         });
-        Ok(())
     }
 
     fn generator_result_object(
@@ -1856,7 +1856,6 @@ const fn decode_this_state(kind: u8, value: Value) -> ThisState {
     match kind {
         THIS_STATE_LEXICAL_RAW => ThisState::Lexical,
         THIS_STATE_UNINITIALIZED_RAW => ThisState::Uninitialized,
-        THIS_STATE_VALUE_RAW => ThisState::Value(value),
         _ => ThisState::Value(value),
     }
 }

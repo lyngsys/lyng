@@ -1315,7 +1315,7 @@ fn run_module(
         let loaded = vm
             .load_module_graph_from_host_and_extensions(
                 agent,
-                realm,
+                &realm,
                 &host,
                 &ModuleSourceRequest {
                     specifier: path.display().to_string(),

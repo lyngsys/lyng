@@ -100,7 +100,7 @@ impl NamedPropertyFeedbackSnapshot {
     }
 
     #[inline]
-    fn from_feedback(feedback: NamedPropertyFeedback) -> Self {
+    fn from_feedback(feedback: &NamedPropertyFeedback) -> Self {
         Self {
             execution_count: feedback.execution_count,
             state: feedback.cache_state.into(),
@@ -173,7 +173,7 @@ impl KeyedPropertyFeedbackSnapshot {
     }
 
     #[inline]
-    fn from_feedback(feedback: KeyedPropertyFeedback) -> Self {
+    fn from_feedback(feedback: &KeyedPropertyFeedback) -> Self {
         Self {
             execution_count: feedback.execution_count,
             state: feedback.cache_state.into(),
@@ -731,7 +731,7 @@ impl FeedbackSiteState {
     }
 
     #[inline]
-    fn snapshot(self, descriptor: FeedbackSiteDescriptor) -> FeedbackSiteSnapshot {
+    fn snapshot(&self, descriptor: FeedbackSiteDescriptor) -> FeedbackSiteSnapshot {
         match self {
             Self::Arithmetic(feedback) => FeedbackSiteSnapshot::new(
                 descriptor,

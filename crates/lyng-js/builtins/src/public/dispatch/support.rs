@@ -480,6 +480,9 @@ pub(super) fn normalize_engine_array_length_descriptor<Cx: PublicBuiltinDispatch
         return Ok(descriptor);
     }
     let value = descriptor.value().unwrap_or(Value::undefined());
+    // Array length definition observes the first coercion's side effects, then
+    // validates against a fresh coercion of the same descriptor value.
+    let _ = to_number_for_builtin(cx, value)?;
     let number_len = to_number_for_builtin(cx, value)?;
     let new_len = to_uint32_length(number_len);
     if !numbers_are_equal(number_len, f64::from(new_len)) {

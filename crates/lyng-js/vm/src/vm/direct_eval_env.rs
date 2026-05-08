@@ -7,6 +7,15 @@ use lyng_js_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
 };
 
+type DirectEvalCaptureBinding = (EnvironmentRef, u32, EnvironmentRef, u32, AtomId);
+type CallerDirectEvalLexicalEnvironment = (
+    EnvironmentRef,
+    DirectEvalSiteFlags,
+    Vec<DirectEvalCaptureBinding>,
+    Vec<AtomId>,
+    Vec<AtomId>,
+);
+
 impl Vm {
     fn direct_eval_lexical_layout(
         &mut self,
@@ -117,13 +126,7 @@ impl Vm {
         agent: &mut Agent,
         caller: FrameRecord,
         lexical_env: EnvironmentRef,
-    ) -> VmResult<(
-        EnvironmentRef,
-        DirectEvalSiteFlags,
-        Vec<(EnvironmentRef, u32, EnvironmentRef, u32, AtomId)>,
-        Vec<AtomId>,
-        Vec<AtomId>,
-    )> {
+    ) -> VmResult<CallerDirectEvalLexicalEnvironment> {
         let Some(installed) = self
             .installed
             .get(code_index(caller.code()))

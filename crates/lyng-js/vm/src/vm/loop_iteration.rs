@@ -444,7 +444,7 @@ impl Vm {
                 let slot = u32::from(slot);
                 active.iteration_slots.contains(&slot) || active.shared_slots.contains(&slot)
             }
-            _ => false,
+            CaptureSource::ParentCapture { .. } => false,
         });
         uses_loop_environment.then_some(active.iteration_environment)
     }

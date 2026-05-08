@@ -34,6 +34,7 @@ use lyng_js_types::{
     function_builtin, internal_function_call_builtin, symbol_builtin, CodeRef, EmbeddingFunctionId,
     EnvironmentRef, FeedbackSlotId, NativeFunctionId, ObjectRef, PropertyKey, RealmRef, Value,
 };
+use std::fmt::Write as _;
 use std::mem::size_of;
 use std::num::NonZeroU32;
 use std::sync::Arc;
@@ -11111,7 +11112,7 @@ fn global_script_instantiation_precreates_non_configurable_var_bindings() {
 fn global_script_instantiation_uses_dictionary_storage_for_bulk_var_bindings() {
     let mut source = String::new();
     for index in 0..96 {
-        source.push_str(&format!("var binding_{index};\n"));
+        writeln!(&mut source, "var binding_{index}").expect("writing to String should not fail");
     }
     let unit = compile_test_unit(5_301, &source);
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -11159,7 +11160,7 @@ fn vm_executes_wide_register_and_constant_operands() {
     let mut last_constant = 0;
     for index in 0..70_000u32 {
         last_constant = builder
-            .add_constant(ConstantValue::Smi(index as i32))
+            .add_constant(ConstantValue::Smi(index.cast_signed()))
             .expect("test bytecode constant should build");
     }
     builder
@@ -12077,7 +12078,7 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
                 agent,
                 object,
                 PropertyKey::from_atom(AtomId::from_raw(21_000 + extra)),
-                Value::from_smi(extra as i32),
+                Value::from_smi(extra.cast_signed()),
                 AllocationLifetime::Default,
             )
             .unwrap());
@@ -12086,7 +12087,7 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
             agent,
             object,
             PropertyKey::from_atom(value_name),
-            Value::from_smi(index as i32),
+            Value::from_smi(index.cast_signed()),
             AllocationLifetime::Default,
         )
         .unwrap());
@@ -12100,7 +12101,7 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
         assert_eq!(
             vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
                 .unwrap(),
-            Value::from_smi(index as i32)
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
         );
 
         let snapshot = vm
@@ -12976,7 +12977,7 @@ fn named_property_load_ic_grows_polymorphic_and_then_megamorphic() {
                 agent,
                 object,
                 PropertyKey::from_atom(AtomId::from_raw(20_000 + extra)),
-                Value::from_smi(extra as i32),
+                Value::from_smi(extra.cast_signed()),
                 AllocationLifetime::Default,
             )
             .unwrap());
@@ -12985,7 +12986,7 @@ fn named_property_load_ic_grows_polymorphic_and_then_megamorphic() {
             agent,
             object,
             PropertyKey::from_atom(value_name),
-            Value::from_smi(index as i32),
+            Value::from_smi(index.cast_signed()),
             AllocationLifetime::Default,
         )
         .unwrap());
@@ -12999,7 +13000,7 @@ fn named_property_load_ic_grows_polymorphic_and_then_megamorphic() {
         assert_eq!(
             vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
                 .unwrap(),
-            Value::from_smi(index as i32)
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
         );
     }
 

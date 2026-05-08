@@ -32,7 +32,7 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn advance_instruction(&mut self) -> VmResult<()> {
+    pub(super) fn advance_instruction(&mut self) {
         let frame = self
             .frames
             .last_mut()
@@ -42,7 +42,6 @@ impl Vm {
             .checked_add(1)
             .expect("instruction offset should stay within u32");
         frame.set_instruction_offset(next);
-        Ok(())
     }
 
     pub(super) fn clear_active_resume(&mut self) {

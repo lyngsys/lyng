@@ -175,7 +175,7 @@ impl Vm {
             PropertyKey::from_atom(WellKnownAtom::length.id()),
         )?;
         let length =
-            self.to_length_for_array_like_arguments(agent, host, registry, caller_frame, length)?;
+            self.array_like_arguments_length(agent, host, registry, caller_frame, length)?;
         let mut arguments = Vec::with_capacity(usize::try_from(length).unwrap_or(usize::MAX));
         for index in 0..length {
             arguments.push(self.get_property_from_object(
@@ -191,7 +191,7 @@ impl Vm {
         Ok(arguments)
     }
 
-    fn to_length_for_array_like_arguments(
+    fn array_like_arguments_length(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -217,7 +217,9 @@ impl Vm {
         if !number.is_finite() {
             return Ok(u32::MAX);
         }
-        Ok(number.trunc().min(MAX_SAFE_LENGTH).min(f64::from(u32::MAX)) as u32)
+        Ok(number_to_u32_after_range_check(
+            number.trunc().min(MAX_SAFE_LENGTH).min(f64::from(u32::MAX)),
+        ))
     }
 
     fn try_collect_fast_engine_array_arguments(
@@ -228,7 +230,7 @@ impl Vm {
             .objects()
             .object_header(agent.heap().view(), object)
             .is_some_and(|header| header.flags().is_engine_array())
-            || !Self::engine_array_index_prototype_chain_is_clear(agent, object)?
+            || !Self::engine_array_index_prototype_chain_is_clear(agent, object)
             || agent.objects().element_mode(object) == Some(lyng_js_objects::ElementMode::Sparse)
         {
             return Ok(None);
@@ -286,7 +288,7 @@ impl Vm {
             .objects()
             .object_header(agent.heap().view(), object)
             .is_some_and(|header| header.flags().is_engine_array())
-            || !Self::engine_array_index_prototype_chain_is_clear(agent, object)?
+            || !Self::engine_array_index_prototype_chain_is_clear(agent, object)
             || agent.objects().element_mode(object) == Some(lyng_js_objects::ElementMode::Sparse)
         {
             return Ok(None);
@@ -493,13 +495,15 @@ impl Vm {
 
 fn append_code_point_units(units: &mut Vec<u16>, code_point: u32) {
     if code_point <= 0xFFFF {
-        units.push(code_point as u16);
+        units.push(u16::try_from(code_point).expect("BMP code point should fit into u16"));
         return;
     }
 
     let adjusted = code_point - 0x1_0000;
-    units.push(0xD800 | ((adjusted >> 10) as u16));
-    units.push(0xDC00 | ((adjusted as u16) & 0x03FF));
+    let high = u16::try_from(adjusted >> 10).expect("high surrogate payload should fit into u16");
+    let low = u16::try_from(adjusted & 0x03FF).expect("low surrogate payload should fit into u16");
+    units.push(0xD800_u16 | high);
+    units.push(0xDC00_u16 | low);
 }
 
 fn bound_target_function_data(
@@ -524,10 +528,14 @@ fn bound_target_function_data(
 }
 
 fn number_to_u32_length(value: f64) -> Option<u32> {
+    #[allow(
+        clippy::float_cmp,
+        reason = "array-like fast path accepts only exactly integral Number lengths"
+    )]
     if !value.is_finite() || value < 0.0 || value.trunc() != value || value > f64::from(u32::MAX) {
         return None;
     }
-    Some(value as u32)
+    Some(number_to_u32_after_range_check(value))
 }
 
 fn number_value_to_f64(value: Value) -> f64 {
@@ -552,16 +560,48 @@ fn bound_function_length_value(target_length: Value, bound_argument_count: usize
             0.0
         }
     } else {
-        (number.trunc() - bound_argument_count as f64).max(0.0)
+        (number.trunc() - usize_to_f64_count(bound_argument_count)).max(0.0)
     };
 
     if length.is_infinite() {
         return Value::from_f64(length);
     }
-    if let Ok(integer) = i32::try_from(length as i64)
-        && f64::from(integer) == length
-    {
-        return Value::from_smi(integer);
+    if let Ok(integer) = i32::try_from(number_to_i64_after_range_check(length)) {
+        #[allow(
+            clippy::float_cmp,
+            reason = "Smi encoding is used only when the computed length is exactly representable"
+        )]
+        if f64::from(integer) == length {
+            return Value::from_smi(integer);
+        }
     }
     Value::from_f64(length)
+}
+
+const fn number_to_u32_after_range_check(number: f64) -> u32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "caller validates the ECMAScript Number range before narrowing to u32"
+    )]
+    let integer = number as u32;
+    integer
+}
+
+const fn number_to_i64_after_range_check(number: f64) -> i64 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "finite length is narrowed only to probe Smi fit; out-of-range values fail the following i32 check"
+    )]
+    let integer = number as i64;
+    integer
+}
+
+const fn usize_to_f64_count(value: usize) -> f64 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "bound argument counts are represented as ECMAScript Number lengths"
+    )]
+    let number = value as f64;
+    number
 }

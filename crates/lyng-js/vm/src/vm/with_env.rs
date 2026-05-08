@@ -29,21 +29,20 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn pop_with_environment(&mut self) -> VmResult<()> {
+    pub(super) fn pop_with_environment(&mut self) {
         let frame_depth = self.frames.len();
         let Some(index) = self
             .with_environment_states
             .iter()
             .rposition(|state| state.frame_depth == frame_depth)
         else {
-            return Ok(());
+            return;
         };
         let state = self.with_environment_states.remove(index);
         self.frames
             .last_mut()
             .expect("popping a with environment requires one active frame")
             .set_lexical_env(state.previous_lexical_env);
-        Ok(())
     }
 
     pub(super) fn close_with_environment_frames(&mut self, frame_depth: usize) {

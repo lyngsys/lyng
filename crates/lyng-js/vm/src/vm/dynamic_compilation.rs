@@ -408,7 +408,7 @@ impl Vm {
             global_env,
             analysis.parsed().strict,
             analysis.sema_mut(),
-        )?;
+        );
         if analysis.sema().diagnostics.has_errors() {
             return Err(Self::syntax_error(
                 agent,
@@ -1105,7 +1105,7 @@ impl Vm {
         variable_env: lyng_js_types::EnvironmentRef,
         always_host: bool,
         sema: &mut ScriptSema,
-    ) -> VmResult<Vec<AtomId>> {
+    ) -> Vec<AtomId> {
         let root_scope = ScopeId::new(0);
         let bindings = sema.scope_table.get(root_scope).bindings.clone();
         let mut hosted_names = Vec::new();
@@ -1134,7 +1134,7 @@ impl Vm {
             binding.needs_environment = false;
             binding.slot_index = None;
         }
-        Ok(hosted_names)
+        hosted_names
     }
 
     fn force_host_annex_b_direct_eval_catch_bindings(
@@ -1579,7 +1579,7 @@ impl Vm {
             caller_variable_env,
             host_root_bindings,
             analysis.sema_mut(),
-        )?;
+        );
         Self::force_host_annex_b_direct_eval_catch_bindings(
             analysis.sema_mut(),
             &annex_b_catch_names,

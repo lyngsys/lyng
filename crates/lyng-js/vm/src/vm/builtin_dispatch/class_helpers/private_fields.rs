@@ -80,7 +80,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let key_value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
+        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
         let canonical_key = self.property_key_to_enumeration_value(agent, key);
         object::install_instance_public_field_key(agent, class_object, field_index, canonical_key)
             .map_err(VmError::Abrupt)

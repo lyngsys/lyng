@@ -207,7 +207,7 @@ impl Vm {
                     .or_else(|| {
                         descriptor
                             .value()
-                            .and_then(|value| value.as_f64().map(|value| value.max(0.0) as u32))
+                            .and_then(|value| value.as_f64().map(nonnegative_number_to_u32_length))
                     })
                     .unwrap_or(logical_len);
                 (current_len, descriptor.writable().unwrap_or(true))
@@ -327,6 +327,16 @@ impl Vm {
         }
         Ok(())
     }
+}
+
+const fn nonnegative_number_to_u32_length(number: f64) -> u32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "activation object length fallback mirrors existing non-negative JS length narrowing"
+    )]
+    let length = number.max(0.0) as u32;
+    length
 }
 
 #[derive(Clone, Copy)]
