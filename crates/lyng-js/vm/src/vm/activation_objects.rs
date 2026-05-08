@@ -8,6 +8,10 @@ use lyng_js_ops::{errors, object};
 use lyng_js_types::{PropertyDescriptor, PropertyKey, WellKnownSymbolId};
 
 impl Vm {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn create_arguments_object(
         &mut self,
         agent: &mut Agent,

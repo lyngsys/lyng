@@ -46,6 +46,10 @@ impl Vm {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn call_to_completion(
         &mut self,
         agent: &mut Agent,
@@ -149,6 +153,10 @@ impl Vm {
         result
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn construct_to_completion(
         &mut self,
         agent: &mut Agent,
@@ -264,6 +272,10 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn call_optional_callback(
         &mut self,
         agent: &mut Agent,
@@ -290,6 +302,10 @@ impl Vm {
         .map(Some)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn call_if_callable_object(
         &mut self,
         agent: &mut Agent,
@@ -328,6 +344,10 @@ impl Vm {
         self.call_optional_callback(agent, host, registry, caller_frame, getter, receiver, &[])
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn call_property_setter(
         &mut self,
         agent: &mut Agent,

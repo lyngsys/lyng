@@ -31,6 +31,10 @@ impl Vm {
         }
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     pub(super) fn run(
         &mut self,
         agent: &mut Agent,
@@ -1583,6 +1587,10 @@ impl Vm {
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn execute_abc_value_opcode(
         &mut self,
         agent: &mut Agent,
@@ -1850,6 +1858,10 @@ impl Vm {
         Ok((numeric, updated))
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn relational_compare(
         &mut self,
         agent: &mut Agent,

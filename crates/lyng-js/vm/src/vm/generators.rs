@@ -84,6 +84,10 @@ impl Vm {
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn resume_generator(
         &mut self,
         agent: &mut Agent,
@@ -176,6 +180,10 @@ impl Vm {
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn resume_async_generator(
         &mut self,
         agent: &mut Agent,
@@ -204,6 +212,10 @@ impl Vm {
         Ok(Value::from_object_ref(promise))
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn resume_async_generator_from_value(
         &mut self,
         agent: &mut Agent,
@@ -373,6 +385,10 @@ impl Vm {
         self.drain_async_generator_queue(agent, host, registry, generator)
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     pub(super) fn drain_async_generator_queue(
         &mut self,
         agent: &mut Agent,
@@ -808,6 +824,14 @@ impl Vm {
         Err(VmError::GeneratorStart { suspended })
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     pub(super) fn delegate_yield(
         &mut self,
         agent: &mut Agent,
@@ -1015,6 +1039,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn finish_delegate_return_resume(
         &mut self,
         agent: &mut Agent,
@@ -1111,6 +1139,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn finish_delegate_yield_outcome(
         &mut self,
         agent: &mut Agent,
@@ -1148,6 +1180,10 @@ impl Vm {
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn start_async_delegate_next(
         &mut self,
         agent: &mut Agent,
@@ -1230,6 +1266,10 @@ impl Vm {
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn start_async_delegate_iterator_result_await(
         &mut self,
         agent: &mut Agent,
@@ -1251,6 +1291,10 @@ impl Vm {
         self.suspend_for_await_promise(agent, frame, promise)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn start_async_delegate_value_await(
         &mut self,
         agent: &mut Agent,
@@ -1296,6 +1340,14 @@ impl Vm {
         self.suspend_for_await_promise(agent, frame, promise)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     fn resume_async_delegate_yield(
         &mut self,
         agent: &mut Agent,

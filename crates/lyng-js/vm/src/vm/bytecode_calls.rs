@@ -11,6 +11,10 @@ use lyng_js_types::PropertyKey;
 const MAX_BYTECODE_CALL_DEPTH: usize = 8_192;
 
 impl Vm {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn enter_bytecode_call(
         &mut self,
         agent: &mut Agent,
@@ -104,6 +108,10 @@ impl Vm {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     pub(super) fn prepare_bytecode_call(
         &self,
         agent: &mut Agent,
@@ -233,6 +241,10 @@ impl Vm {
         })
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn install_prepared_bytecode_call(
         &mut self,
         agent: &mut Agent,

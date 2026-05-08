@@ -600,6 +600,10 @@ impl Vm {
         self.get_property_from_object(agent, host, registry, frame, object, receiver, key)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn get_property_from_string_primitive(
         &mut self,
         agent: &mut Agent,
@@ -628,6 +632,10 @@ impl Vm {
         self.get_property_from_object(agent, host, registry, frame, prototype, receiver, key)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn set_property_on_value(
         &mut self,
         agent: &mut Agent,
@@ -828,6 +836,10 @@ impl Vm {
         )?))
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn copy_data_properties(
         &mut self,
         agent: &mut Agent,
@@ -936,6 +948,10 @@ impl Vm {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn get_property_from_object(
         &mut self,
         agent: &mut Agent,
@@ -961,6 +977,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn get_property_from_object_ordinary(
         &mut self,
         agent: &mut Agent,
@@ -1227,6 +1247,10 @@ impl Vm {
         Ok(true)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn define_typed_array_numeric_property(
         &mut self,
         agent: &mut Agent,
@@ -1297,6 +1321,10 @@ impl Vm {
         Ok(deleted)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn set_property_on_object(
         &mut self,
         agent: &mut Agent,
@@ -1324,6 +1352,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn set_property_on_object_ordinary(
         &mut self,
         agent: &mut Agent,
@@ -1420,6 +1452,10 @@ impl Vm {
         Ok(encode_number(f64::from(length)))
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn set_property_from_descriptor(
         &mut self,
         agent: &mut Agent,
@@ -1444,6 +1480,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn create_or_update_receiver_data_property(
         &mut self,
         agent: &mut Agent,
@@ -1519,6 +1559,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn set_typed_array_numeric_index(
         &mut self,
         agent: &mut Agent,

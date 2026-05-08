@@ -186,6 +186,10 @@ impl Vm {
         Ok(!read::to_boolean_agent(agent, blocked).map_err(VmError::Abrupt)?)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn object_environment_get_binding_value_with_context(
         &mut self,
         agent: &mut Agent,
@@ -225,6 +229,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn object_environment_set_mutable_binding_with_context(
         &mut self,
         agent: &mut Agent,
@@ -291,6 +299,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn probe_identifier_value_with_context(
         &mut self,
         agent: &mut Agent,
@@ -502,6 +514,10 @@ impl Vm {
         })
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn load_global_with_feedback(
         &mut self,
         agent: &mut Agent,
@@ -552,6 +568,10 @@ impl Vm {
         Ok(value)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn store_global_with_feedback(
         &mut self,
         agent: &mut Agent,
@@ -603,6 +623,10 @@ impl Vm {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn assign_global_with_feedback(
         &mut self,
         agent: &mut Agent,
@@ -692,6 +716,10 @@ impl Vm {
         Ok(CapturedNameReference::new(name, target))
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn load_global_property_binding(
         &mut self,
         agent: &mut Agent,
@@ -716,6 +744,10 @@ impl Vm {
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn assign_global_property_binding(
         &mut self,
         agent: &mut Agent,
@@ -755,6 +787,10 @@ impl Vm {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn assign_unresolvable_name(
         &mut self,
         agent: &mut Agent,
@@ -1380,6 +1416,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn set_global_property_with_context(
         &mut self,
         agent: &mut Agent,
@@ -1401,6 +1441,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn set_global_property_with_key(
         &mut self,
         agent: &mut Agent,

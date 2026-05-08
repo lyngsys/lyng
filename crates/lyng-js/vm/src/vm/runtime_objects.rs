@@ -612,6 +612,10 @@ impl Vm {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn async_from_sync_iterator_continuation(
         &mut self,
         agent: &mut Agent,
@@ -695,6 +699,10 @@ impl Vm {
         Ok(promise)
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     fn advance_async_iterator_state(
         &mut self,
         agent: &mut Agent,
@@ -844,6 +852,14 @@ impl Vm {
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     fn close_async_iterator_state(
         &mut self,
         agent: &mut Agent,

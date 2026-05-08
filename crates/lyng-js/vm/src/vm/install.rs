@@ -27,6 +27,10 @@ pub(super) struct InstalledFunction {
 
 impl InstalledFunction {
     #[inline]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     pub(super) fn new(
         function: BytecodeFunction,
         child_codes: Vec<CodeRef>,
@@ -304,6 +308,10 @@ impl InstalledFunction {
 }
 
 impl Vm {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     pub(super) fn install_functions(
         &mut self,
         agent: &mut Agent,

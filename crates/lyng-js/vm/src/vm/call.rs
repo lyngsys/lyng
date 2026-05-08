@@ -12,6 +12,10 @@ use lyng_js_objects::{
 use lyng_js_ops::{errors, object, proxy};
 
 impl Vm {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn invoke_call_target(
         &mut self,
         agent: &mut Agent,
@@ -63,6 +67,10 @@ impl Vm {
         self.advance_instruction()
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn invoke_tail_call_target(
         &mut self,
         agent: &mut Agent,
@@ -124,6 +132,10 @@ impl Vm {
         self.finish_frame(agent, result)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn call_value(
         &mut self,
         agent: &mut Agent,
@@ -175,6 +187,10 @@ impl Vm {
         result
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn tail_call_value(
         &mut self,
         agent: &mut Agent,
@@ -224,6 +240,14 @@ impl Vm {
         result
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     pub(super) fn construct_value(
         &mut self,
         agent: &mut Agent,
@@ -426,6 +450,10 @@ impl Vm {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn collect_arguments_into(
         &mut self,
         agent: &mut Agent,

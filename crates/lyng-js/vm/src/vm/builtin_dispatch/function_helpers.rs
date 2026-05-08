@@ -9,6 +9,14 @@ use super::{
 const MAX_FAST_APPLY_STRING_CODE_UNITS: usize = 1 << 20;
 
 impl Vm {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     pub(super) fn create_bound_function(
         &mut self,
         agent: &mut Agent,

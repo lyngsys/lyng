@@ -708,6 +708,10 @@ fn linked_module_graph_keeps_named_default_function_exports_live() {
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "semantic regression scenario stays contiguous until VM tests are split by domain"
+)]
 fn host_module_loader_recurses_through_attributes_and_import_meta() {
     let host = TestHost::new();
     host.define_module_source(
@@ -1979,6 +1983,10 @@ fn linked_module_graph_treats_mixed_shared_namespace_star_exports_as_unambiguous
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "semantic regression scenario stays contiguous until VM tests are split by domain"
+)]
 fn linked_module_graph_imports_self_importing_namespace_module_through_mixed_star_exports() {
     let empty = compile_test_module(344, "");
     let export_star_as = compile_test_module(345, "export * as foo from './empty.mjs';");
@@ -3335,6 +3343,10 @@ fn static_import_defer_sync_module_evaluates_on_namespace_access() {
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "semantic regression scenario stays contiguous until VM tests are split by domain"
+)]
 fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
     let host = TestHost::new();
     host.define_module_source(
@@ -12118,6 +12130,10 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "semantic regression scenario stays contiguous until VM tests are split by domain"
+)]
 fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
     let named_unit = compile_test_unit(41, "source[\"value\"];");
     let named_entry = named_unit.function(named_unit.entry()).unwrap();
@@ -12244,6 +12260,10 @@ fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "semantic regression scenario stays contiguous until VM tests are split by domain"
+)]
 fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
     let unit = compile_test_unit(43, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();

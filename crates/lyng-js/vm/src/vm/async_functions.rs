@@ -174,6 +174,10 @@ impl Vm {
         self.suspend_for_await_promise(agent, frame, promise)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(super) fn resume_async_function(
         &mut self,
         agent: &mut Agent,

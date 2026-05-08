@@ -888,6 +888,10 @@ impl Vm {
     ///
     /// Returns a VM error if script installation, instantiation, extension setup, evaluation, or job
     /// checkpointing fails.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub fn evaluate_script_with_registry_and_host_referrer_and_extensions(
         &mut self,
         agent: &mut Agent,
@@ -982,6 +986,10 @@ impl Vm {
     ///
     /// Returns a VM error if module bootstrap, extension setup, installation, linking, evaluation, or
     /// job checkpointing fails.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub fn evaluate_module_with_registry_and_host_and_extensions(
         &mut self,
         agent: &mut Agent,
@@ -1284,6 +1292,10 @@ impl Vm {
     ///
     /// Returns a VM error if module bootstrap, installation, linking, evaluation, or job
     /// checkpointing fails.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub fn evaluate_module_with_registry_and_host(
         &mut self,
         agent: &mut Agent,
@@ -1412,6 +1424,10 @@ impl Vm {
     /// # Errors
     ///
     /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub fn evaluate_installed_with_registry_and_host(
         &mut self,
         agent: &mut Agent,
@@ -1435,6 +1451,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(crate) fn evaluate_installed_with_registry_and_host_with_entry_override(
         &mut self,
         agent: &mut Agent,
@@ -1471,6 +1491,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn evaluate_entry_with_registry_and_checkpoint(
         &mut self,
         agent: &mut Agent,
@@ -1563,6 +1587,10 @@ impl Vm {
         Ok(LoadedModuleRoot::new(loaded.key, loaded.display_name))
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn evaluate_entry_with_registry(
         &mut self,
         agent: &mut Agent,
@@ -1590,6 +1618,10 @@ impl Vm {
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     fn evaluate_entry_with_registry_from_offset(
         &mut self,
         agent: &mut Agent,
@@ -1720,6 +1752,10 @@ impl Vm {
         result
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn prepare_entry_execution(
         agent: &mut Agent,
         code: CodeRef,
@@ -2022,6 +2058,14 @@ impl Vm {
         (depth == 0).then_some((slot, create_operands.bx()))
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     fn evaluate_module_graph(
         &mut self,
         agent: &mut Agent,
@@ -2499,6 +2543,10 @@ impl Vm {
         Ok(export_names)
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     fn resolve_module_export(
         &mut self,
         agent: &mut Agent,
@@ -2699,6 +2747,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     fn module_namespace_object_with_phase(
         &mut self,
         agent: &mut Agent,

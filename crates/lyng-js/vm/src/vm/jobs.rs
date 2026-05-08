@@ -286,6 +286,10 @@ impl Vm {
         result
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     fn execute_promise_reaction(
         &mut self,
         agent: &mut Agent,
@@ -442,6 +446,10 @@ impl Vm {
         result
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn execute_promise_finally_reaction(
         &mut self,
         agent: &mut Agent,
@@ -579,6 +587,10 @@ impl Vm {
         );
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     pub(in crate::vm) fn settle_promise_capability(
         &mut self,
         agent: &mut Agent,
@@ -611,6 +623,10 @@ impl Vm {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn execute_promise_thenable_job(
         &mut self,
         agent: &mut Agent,
@@ -690,6 +706,10 @@ impl Vm {
         Ok((resolve, reject))
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn execute_dynamic_import_settle_job(
         &mut self,
         agent: &mut Agent,

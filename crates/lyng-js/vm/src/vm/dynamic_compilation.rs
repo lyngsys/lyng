@@ -333,6 +333,10 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     pub(crate) fn evaluate_indirect_eval_source(
         &mut self,
         agent: &mut Agent,
@@ -1422,6 +1426,10 @@ impl Vm {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+    )]
     pub(crate) fn evaluate_direct_eval_source(
         &mut self,
         agent: &mut Agent,
