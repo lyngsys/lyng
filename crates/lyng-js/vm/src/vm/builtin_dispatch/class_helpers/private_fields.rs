@@ -87,7 +87,6 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn get_instance_field_key_builtin(
-        &self,
         agent: &mut Agent,
         arguments: &[Value],
     ) -> VmResult<Value> {
@@ -106,7 +105,6 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn private_context_class_key(
-        &self,
         agent: &Agent,
         caller: FrameRecord,
         receiver: ObjectRef,
@@ -237,7 +235,6 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn private_field_init_builtin(
-        &self,
         agent: &mut Agent,
         caller: FrameRecord,
         arguments: &[Value],
@@ -261,7 +258,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .unwrap_or(0);
         let class_key =
-            self.private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
+            Self::private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
         object::private_field_init(agent, receiver, class_key, descriptor_index, value)
             .map_err(VmError::Abrupt)
     }
@@ -292,7 +289,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .unwrap_or(0);
         let class_key =
-            self.private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
+            Self::private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
         let kind = object::private_element_kind(agent, class_key, descriptor_index)
             .map_err(VmError::Abrupt)?;
         match kind {
@@ -362,7 +359,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .unwrap_or(0);
         let class_key =
-            self.private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
+            Self::private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
         let kind = object::private_element_kind(agent, class_key, descriptor_index)
             .map_err(VmError::Abrupt)?;
         match kind {
@@ -398,7 +395,6 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn private_has_builtin(
-        &self,
         agent: &mut Agent,
         caller: FrameRecord,
         arguments: &[Value],
@@ -421,7 +417,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .unwrap_or(0);
         let class_key =
-            self.private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
+            Self::private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
         let has = object::private_has(agent, receiver, class_key, descriptor_index)
             .map_err(VmError::Abrupt)?;
         Ok(Value::from_bool(has))

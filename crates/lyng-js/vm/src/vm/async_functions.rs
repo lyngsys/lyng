@@ -80,7 +80,7 @@ impl Vm {
         arguments: &[Value],
     ) -> VmResult<ObjectRef> {
         let capability = self.create_intrinsic_promise_capability(agent, prepared.realm)?;
-        let promise = self.promise_capability_promise(agent, capability)?;
+        let promise = Self::promise_capability_promise(agent, capability)?;
         let prior_frame_depth = self.frames.len();
         let prior_context_depth = agent.execution_contexts().len();
         let prior_register_len = self.register_stack.len();
@@ -270,7 +270,7 @@ impl Vm {
         }
 
         let capability = self.create_intrinsic_promise_capability(agent, realm)?;
-        let promise = self.promise_capability_promise(agent, capability)?;
+        let promise = Self::promise_capability_promise(agent, capability)?;
         let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
         self.settle_promise_capability(
             agent,
@@ -319,7 +319,6 @@ impl Vm {
     }
 
     pub(super) fn promise_capability_promise(
-        &self,
         agent: &mut Agent,
         capability: PromiseCapabilityId,
     ) -> VmResult<ObjectRef> {

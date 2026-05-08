@@ -532,7 +532,7 @@ impl Vm {
                                         };
                                     }
                                     if !used_index_fast_path {
-                                        self.sync_engine_array_length(agent, object)?;
+                                        Self::sync_engine_array_length(agent, object)?;
                                         self.observe_keyed_index_slow_path(
                                             frame.code(),
                                             frame.instruction_offset(),
@@ -689,7 +689,7 @@ impl Vm {
                                 };
                             }
                             if key.as_index().is_some() {
-                                self.sync_engine_array_length(agent, object)?;
+                                Self::sync_engine_array_length(agent, object)?;
                             }
                             self.advance_instruction()?;
                         }

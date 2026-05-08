@@ -13,7 +13,6 @@ struct SuperConstructContext {
 
 impl Vm {
     fn super_constructor_this_environment_record(
-        &self,
         agent: &Agent,
         start: lyng_js_types::EnvironmentRef,
     ) -> VmResult<Option<lyng_js_env::FunctionEnvironmentRecord>> {
@@ -107,7 +106,6 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn super_base_builtin(
-        &self,
         agent: &mut Agent,
         caller: FrameRecord,
         arguments: &[Value],
@@ -142,7 +140,7 @@ impl Vm {
         agent: &mut Agent,
         caller: FrameRecord,
     ) -> VmResult<SuperConstructContext> {
-        let record = self.super_constructor_this_environment_record(agent, caller.lexical_env())?;
+        let record = Self::super_constructor_this_environment_record(agent, caller.lexical_env())?;
         let function_env = record.map(|record| record.declarative().id());
         let active_function = record
             .map(lyng_js_env::FunctionEnvironmentRecord::function_object)

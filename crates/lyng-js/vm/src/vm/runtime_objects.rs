@@ -631,7 +631,7 @@ impl Vm {
         close_on_rejection: Option<(ObjectRef, ObjectRef)>,
     ) -> VmResult<ObjectRef> {
         let capability = self.create_intrinsic_promise_capability(agent, frame.realm())?;
-        let promise = self.promise_capability_promise(agent, capability)?;
+        let promise = Self::promise_capability_promise(agent, capability)?;
         let value_wrapper =
             match self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)
             {

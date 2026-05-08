@@ -152,7 +152,7 @@ impl Vm {
             )?;
             let mut callee = Self::require_callable_object(agent, frame, callee_value)?;
             let mut effective_this = this_value;
-            self.resolve_bound_call_chain(
+            Self::resolve_bound_call_chain(
                 agent,
                 &mut callee,
                 &mut effective_this,
@@ -202,7 +202,7 @@ impl Vm {
             )?;
             let mut callee = Self::require_callable_object(agent, frame, callee_value)?;
             let mut effective_this = this_value;
-            self.resolve_bound_call_chain(
+            Self::resolve_bound_call_chain(
                 agent,
                 &mut callee,
                 &mut effective_this,
@@ -252,7 +252,7 @@ impl Vm {
                 .as_object_ref()
                 .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
             let mut new_target = callee;
-            self.resolve_bound_construct_chain(
+            Self::resolve_bound_construct_chain(
                 agent,
                 &mut callee,
                 &mut new_target,
@@ -397,7 +397,6 @@ impl Vm {
     }
 
     pub(super) fn resolve_bound_call_chain(
-        &self,
         agent: &mut Agent,
         callee: &mut ObjectRef,
         this_value: &mut Value,
@@ -412,7 +411,6 @@ impl Vm {
     }
 
     pub(super) fn resolve_bound_construct_chain(
-        &self,
         agent: &mut Agent,
         callee: &mut ObjectRef,
         new_target: &mut ObjectRef,

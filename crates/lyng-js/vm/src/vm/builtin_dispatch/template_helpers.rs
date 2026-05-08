@@ -123,8 +123,8 @@ impl Vm {
                 );
             });
         }
-        self.sync_engine_array_length(agent, cooked)?;
-        self.sync_engine_array_length(agent, raw)?;
+        Self::sync_engine_array_length(agent, cooked)?;
+        Self::sync_engine_array_length(agent, raw)?;
         if !self.set_integrity_level(agent, host, registry, caller, raw, true)? {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }

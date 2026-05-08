@@ -107,7 +107,6 @@ impl Vm {
     }
 
     pub(super) fn set_function_home_object_builtin(
-        &self,
         agent: &mut Agent,
         arguments: &[Value],
     ) -> VmResult<Value> {
@@ -137,7 +136,6 @@ impl Vm {
     }
 
     pub(super) fn capture_arrow_context_builtin(
-        &self,
         agent: &mut Agent,
         caller: FrameRecord,
         arguments: &[Value],
@@ -202,7 +200,6 @@ impl Vm {
     }
 
     pub(super) fn object_literal_set_prototype_builtin(
-        &self,
         agent: &mut Agent,
         arguments: &[Value],
     ) -> VmResult<Value> {

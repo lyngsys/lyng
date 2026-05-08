@@ -45,7 +45,6 @@ impl Vm {
     }
 
     fn environment_outer(
-        &self,
         agent: &Agent,
         environment: EnvironmentRef,
     ) -> Option<EnvironmentRef> {
@@ -61,7 +60,6 @@ impl Vm {
     }
 
     fn environment_matches_direct_eval_scope(
-        &self,
         agent: &Agent,
         environment: EnvironmentRef,
         scope: &lyng_js_bytecode::DirectEvalLexicalScope,
@@ -103,17 +101,16 @@ impl Vm {
     }
 
     fn direct_eval_scope_source_environment(
-        &self,
         agent: &Agent,
         start: EnvironmentRef,
         scope: &lyng_js_bytecode::DirectEvalLexicalScope,
     ) -> Option<EnvironmentRef> {
         let mut current = Some(start);
         while let Some(environment) = current {
-            if self.environment_matches_direct_eval_scope(agent, environment, scope) {
+            if Self::environment_matches_direct_eval_scope(agent, environment, scope) {
                 return Some(environment);
             }
-            current = self.environment_outer(agent, environment);
+            current = Self::environment_outer(agent, environment);
         }
         None
     }
@@ -162,8 +159,8 @@ impl Vm {
         let annex_b_catch_names = site.annex_b_catch_names().to_vec();
         let parameter_names = site.parameter_names().to_vec();
         for scope in site.scopes() {
-            let source_environment = self
-                .direct_eval_scope_source_environment(agent, source_start, scope)
+            let source_environment =
+                Self::direct_eval_scope_source_environment(agent, source_start, scope)
                 .ok_or(VmError::MissingEnvironment(lexical_env))?;
             let layout = self.direct_eval_lexical_layout(agent, scope.bindings());
             let environment = agent

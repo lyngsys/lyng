@@ -88,7 +88,7 @@ impl Vm {
         }
 
         if restricted_callee {
-            self.define_strict_arguments_callee(agent, realm, object)?;
+            Self::define_strict_arguments_callee(agent, realm, object)?;
         } else {
             let callee_key = agent.atoms_mut().intern_collectible("callee");
             self.define_data_property_with_attrs(
@@ -106,7 +106,6 @@ impl Vm {
     }
 
     fn define_strict_arguments_callee(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         object: ObjectRef,
@@ -180,7 +179,6 @@ impl Vm {
     }
 
     pub(super) fn sync_engine_array_length(
-        &self,
         agent: &mut Agent,
         object: ObjectRef,
     ) -> VmResult<()> {
@@ -250,7 +248,7 @@ impl Vm {
                     )
                 });
             }
-            self.sync_engine_array_length(agent, rest_array)?;
+            Self::sync_engine_array_length(agent, rest_array)?;
             self.initialize_environment_slot(
                 agent,
                 init.lexical_env,

@@ -213,8 +213,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .private_field_init_builtin(self.agent, self.caller_frame, invocation.arguments())
+        Vm::private_field_init_builtin(self.agent, self.caller_frame, invocation.arguments())
     }
 
     fn private_field_get_builtin(
@@ -247,8 +246,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .private_has_builtin(self.agent, self.caller_frame, invocation.arguments())
+        Vm::private_has_builtin(self.agent, self.caller_frame, invocation.arguments())
     }
 
     fn super_property_get_builtin(
@@ -281,8 +279,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .super_base_builtin(self.agent, self.caller_frame, invocation.arguments())
+        Vm::super_base_builtin(self.agent, self.caller_frame, invocation.arguments())
     }
 
     fn super_constructor_builtin(
@@ -336,16 +333,14 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .set_function_home_object_builtin(self.agent, invocation.arguments())
+        Vm::set_function_home_object_builtin(self.agent, invocation.arguments())
     }
 
     fn object_literal_set_prototype_builtin(
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .object_literal_set_prototype_builtin(self.agent, invocation.arguments())
+        Vm::object_literal_set_prototype_builtin(self.agent, invocation.arguments())
     }
 
     fn bind_function_private_env_builtin(
@@ -360,8 +355,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .capture_arrow_context_builtin(self.agent, self.caller_frame, invocation.arguments())
+        Vm::capture_arrow_context_builtin(self.agent, self.caller_frame, invocation.arguments())
     }
 
     fn install_instance_field_key_builtin(
@@ -381,8 +375,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .get_instance_field_key_builtin(self.agent, invocation.arguments())
+        Vm::get_instance_field_key_builtin(self.agent, invocation.arguments())
     }
 
     fn throw_type_error_builtin(

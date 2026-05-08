@@ -6,7 +6,7 @@ use lyng_js_ops::{errors, object, proxy};
 use lyng_js_types::PropertyDescriptor;
 
 impl Vm {
-    fn callback_object(&self, agent: &Agent, value: Value) -> Option<ObjectRef> {
+    fn callback_object(agent: &Agent, value: Value) -> Option<ObjectRef> {
         value
             .as_object_ref()
             .filter(|object| agent.objects().is_callable(*object))
@@ -162,7 +162,7 @@ impl Vm {
         let mut callee = callee_object;
         let mut effective_new_target = new_target.unwrap_or(callee_object);
         let mut combined_arguments = arguments.to_vec();
-        self.resolve_bound_construct_chain(
+        Self::resolve_bound_construct_chain(
             agent,
             &mut callee,
             &mut effective_new_target,
@@ -300,7 +300,7 @@ impl Vm {
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<Option<Value>> {
-        let Some(callback) = self.callback_object(agent, callback) else {
+        let Some(callback) = Self::callback_object(agent, callback) else {
             return Ok(None);
         };
         self.call_to_completion(

@@ -44,13 +44,12 @@ impl Vm {
             .installed
             .get(code_index(frame.code()))
             .and_then(Option::as_ref)?;
-        self.suspended_call_instruction_offset(frame, installed)
-            .and_then(|offset| self.handler_covering_offset(installed, offset))
-            .or_else(|| self.handler_covering_offset(installed, frame.instruction_offset()))
+        Self::suspended_call_instruction_offset(frame, installed)
+            .and_then(|offset| Self::handler_covering_offset(installed, offset))
+            .or_else(|| Self::handler_covering_offset(installed, frame.instruction_offset()))
     }
 
     fn handler_covering_offset(
-        &self,
         installed: &InstalledFunction,
         instruction_offset: u32,
     ) -> Option<(usize, ExceptionHandler)> {
@@ -67,7 +66,6 @@ impl Vm {
     }
 
     fn suspended_call_instruction_offset(
-        &self,
         frame: FrameRecord,
         installed: &InstalledFunction,
     ) -> Option<u32> {
