@@ -2050,6 +2050,20 @@ fn script_core_date_constructor_balances_local_components_and_timezone_offset() 
 }
 
 #[test]
+fn script_core_date_utc_uses_ecmascript_floating_point_operation_order() {
+    let result = compile_and_run(
+        r"
+        let total = 0;
+        total += (Date.UTC(1970, 0, 1, 80063993375, 29, 1, -288230376151711740) === 29312 ? 1 : 0);
+        total += (Date.UTC(1970, 0, 213503982336, 0, 0, 0, -18446744073709552000) === 34447360 ? 2 : 0);
+        total;
+        ",
+    );
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
 fn script_core_date_constructor_has_function_prototype_shape() {
     let result = compile_and_run(
         r"

@@ -543,21 +543,24 @@ fn date_make_day(year: f64, month: f64, date: f64) -> Option<i64> {
     date_days_from_civil(year, month, 1).checked_add(date - 1)
 }
 
+#[allow(
+    clippy::suboptimal_flops,
+    reason = "ECMA-262 MakeTime requires ordinary Number multiplication and addition order, not fused arithmetic"
+)]
 fn date_make_time(hour: f64, minute: f64, second: f64, millisecond: f64) -> Option<f64> {
     if !hour.is_finite() || !minute.is_finite() || !second.is_finite() || !millisecond.is_finite() {
         return None;
     }
-    Some(
-        second.trunc().mul_add(
-            date_i64_as_number(DATE_MS_PER_SECOND),
-            hour.trunc().mul_add(
-                date_i64_as_number(DATE_MS_PER_HOUR),
-                minute.trunc() * date_i64_as_number(DATE_MS_PER_MINUTE),
-            ),
-        ) + millisecond.trunc(),
-    )
+    let hour_millis = hour.trunc() * date_i64_as_number(DATE_MS_PER_HOUR);
+    let minute_millis = minute.trunc() * date_i64_as_number(DATE_MS_PER_MINUTE);
+    let second_millis = second.trunc() * date_i64_as_number(DATE_MS_PER_SECOND);
+    Some(((hour_millis + minute_millis) + second_millis) + millisecond.trunc())
 }
 
+#[allow(
+    clippy::suboptimal_flops,
+    reason = "ECMA-262 MakeDate requires ordinary Number multiplication and addition order, not fused arithmetic"
+)]
 fn date_make_utc_value(
     year: f64,
     month: f64,
@@ -573,7 +576,7 @@ fn date_make_utc_value(
     let Some(time) = date_make_time(hour, minute, second, millisecond) else {
         return Value::from_f64(f64::NAN);
     };
-    date_time_clip_value(date_i64_as_number(day).mul_add(date_i64_as_number(DATE_MS_PER_DAY), time))
+    date_time_clip_value(date_i64_as_number(day) * date_i64_as_number(DATE_MS_PER_DAY) + time)
 }
 
 #[allow(
