@@ -1,29 +1,12 @@
 //! Compile-smoke coverage for the runtime primitive crate DAG.
 
-use lyng_js_common::{AtomId, AtomTable, SourceId};
-use lyng_js_gc::{AllocationLifetime, PrimitiveHeap, PrimitiveHeapMarker, StringEncoding};
-use lyng_js_ops::{allocating, pure, read, PrimitiveContext, PrimitiveOpsMarker};
+use lyng_js_common::{AtomId, AtomTable};
+use lyng_js_gc::{AllocationLifetime, PrimitiveHeap, StringEncoding};
+use lyng_js_ops::{allocating, pure, read, PrimitiveContext};
 use lyng_js_types::{
     AbruptCompletion, BigIntRef, Completion, PropertyDescriptor, PropertyKey, StringRef, SymbolRef,
-    TypeOwnershipMarker, Value,
+    Value,
 };
-
-#[test]
-fn phase2_runtime_crates_form_expected_dependency_chain() {
-    let property_name = AtomId::from_raw(1);
-    let type_marker = TypeOwnershipMarker::new(property_name);
-    let heap_marker = PrimitiveHeapMarker::new(type_marker, SourceId::new(7));
-    let ops_marker = PrimitiveOpsMarker::new(heap_marker, property_name);
-
-    assert_eq!(ops_marker.property_name(), property_name);
-    assert_eq!(ops_marker.heap(), heap_marker);
-    assert_eq!(ops_marker.heap().type_marker(), type_marker);
-    assert_eq!(ops_marker.heap().source(), SourceId::new(7));
-    assert_eq!(
-        ops_marker.heap().type_marker().property_name(),
-        property_name
-    );
-}
 
 #[test]
 fn property_key_and_descriptor_surface_is_reexported() {

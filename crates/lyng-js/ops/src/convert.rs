@@ -43,8 +43,8 @@ pub fn same_logical_type(left: Value, right: Value) -> bool {
 }
 
 #[inline]
-pub const fn phase2_type_error() -> AbruptCompletion {
-    // Phase 2 keeps the stable Throw(Value) shape without realm-aware error allocation yet.
+pub const fn primitive_type_error() -> AbruptCompletion {
+    // Primitive operations keep a stable Throw(Value) shape until realm-aware error allocation.
     AbruptCompletion::throw(Value::undefined())
 }
 

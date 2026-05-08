@@ -24,7 +24,7 @@ pub const MIN_DENSE_ELEMENT_CAPACITY: usize = 4;
 const PROXY_TARGET_SLOT_INDEX: u32 = 0;
 const PROXY_HANDLER_SLOT_INDEX: u32 = 1;
 
-/// Object and shape allocation owner for the Phase 3 substrate.
+/// Object and shape allocation owner for the runtime substrate.
 #[derive(Default)]
 pub struct ObjectRuntime {
     pub(crate) object_metadata: Vec<Option<ObjectMetadata>>,

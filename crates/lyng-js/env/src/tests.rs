@@ -1,16 +1,15 @@
 #![allow(clippy::too_many_lines)]
 
 use super::*;
-use lyng_js_common::{AtomId, SourceId};
-use lyng_js_gc::{AllocationLifetime, PrimitiveHeapMarker};
+use lyng_js_common::AtomId;
+use lyng_js_gc::AllocationLifetime;
 use lyng_js_host::{
     AgentSpawnKind, AgentThreadStartKind, HostCall, HostSharedBufferId, HostThreadId,
     ImportMetaProperties, ImportMetaProperty, ImportMetaValue, ModuleKey, NoopHostHooks, TestHost,
 };
-use lyng_js_objects::{ObjectAllocation, ObjectFlags, ObjectKind, ObjectSubstrateMarker};
+use lyng_js_objects::ObjectAllocation;
 use lyng_js_types::{
-    BackingStoreRef, CodeRef, ObjectRef, PropertyKey, StringRef, TypeOwnershipMarker, Value,
-    WellKnownSymbolId,
+    BackingStoreRef, CodeRef, ObjectRef, PropertyKey, StringRef, Value, WellKnownSymbolId,
 };
 use std::mem::size_of;
 
@@ -65,7 +64,7 @@ fn environment_layout_preserves_binding_order_flags_and_optional_atoms() {
 }
 
 #[test]
-fn declarative_environment_record_stays_within_phase3_size_budget() {
+fn declarative_environment_record_stays_within_runtime_size_budget() {
     assert!(size_of::<DeclarativeEnvironmentRecord>() <= 32);
 }
 
@@ -365,7 +364,7 @@ fn default_realm_shell_allocates_placeholders_and_typed_intrinsics() {
 }
 
 #[test]
-fn intrinsics_expose_phase5_constructor_and_error_slots() {
+fn intrinsics_expose_builtin_constructor_and_error_slots() {
     let object = ObjectRef::from_raw(1).unwrap();
     let function = ObjectRef::from_raw(2).unwrap();
     let number = ObjectRef::from_raw(3).unwrap();
@@ -405,7 +404,7 @@ fn intrinsics_expose_phase5_constructor_and_error_slots() {
 }
 
 #[test]
-fn agent_bootstraps_phase5_symbol_state_and_global_symbol_registry() {
+fn agent_bootstraps_builtin_symbol_state_and_global_symbol_registry() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let bootstrap_atoms = agent.bootstrap_atoms();
@@ -455,7 +454,7 @@ fn agent_bootstraps_phase5_symbol_state_and_global_symbol_registry() {
     for id in WellKnownSymbolId::ALL {
         let symbol = agent
             .well_known_symbol(id)
-            .expect("Phase 5 well-known symbols should allocate during agent bootstrap");
+            .expect("well-known symbols should allocate during agent bootstrap");
         let symbol_view = agent
             .heap()
             .view()
@@ -476,7 +475,7 @@ fn agent_bootstraps_phase5_symbol_state_and_global_symbol_registry() {
         );
     }
 
-    let registry_key = agent.atoms_mut().intern_collectible("phase5.registry");
+    let registry_key = agent.atoms_mut().intern_collectible("builtin.registry");
     let first = agent.global_symbol_for(registry_key, AllocationLifetime::Default);
     let second = agent.global_symbol_for(registry_key, AllocationLifetime::Default);
     let description = agent
@@ -1424,40 +1423,4 @@ fn shared_wait_queue_wakes_waiters_across_os_threads() {
             .waiter_count(location),
         0
     );
-}
-
-#[test]
-fn runtime_marker_round_trips_phase3_dependencies() {
-    let property_name = AtomId::from_raw(19);
-    let type_marker = TypeOwnershipMarker::new(property_name);
-    let host = lyng_js_host::HostMarker::new(type_marker, property_name);
-    let heap = PrimitiveHeapMarker::new(type_marker, SourceId::new(7));
-    let objects = ObjectSubstrateMarker::new(
-        heap,
-        property_name,
-        ObjectKind::Ordinary,
-        ObjectFlags::extensible(),
-    );
-    let layout = EnvironmentLayout::new(
-        EnvironmentLayoutKind::Declarative,
-        [EnvironmentBindingLayout::new(
-            Some(property_name),
-            EnvironmentSlotFlags::mutable_lexical(),
-        )],
-        true,
-    );
-    let marker = RuntimeSubstrateMarker::new(
-        objects,
-        host,
-        ExecutableId::Bytecode(CodeRef::from_raw(23).unwrap()),
-        layout.clone(),
-    );
-
-    assert_eq!(marker.objects(), objects);
-    assert_eq!(marker.host(), host);
-    assert_eq!(
-        marker.executable(),
-        ExecutableId::Bytecode(CodeRef::from_raw(23).unwrap())
-    );
-    assert_eq!(marker.layout(), &layout);
 }

@@ -77,19 +77,19 @@ pub const fn descriptor_kind(descriptor: PropertyDescriptor) -> DescriptorKind {
     }
 }
 
-/// ECMAScript `IsDataDescriptor` over the Phase 2 property-descriptor surface.
+/// ECMAScript `IsDataDescriptor` over the property-descriptor surface.
 #[inline]
 pub const fn is_data_descriptor(descriptor: PropertyDescriptor) -> bool {
     descriptor_kind(descriptor).is_data()
 }
 
-/// ECMAScript `IsAccessorDescriptor` over the Phase 2 property-descriptor surface.
+/// ECMAScript `IsAccessorDescriptor` over the property-descriptor surface.
 #[inline]
 pub const fn is_accessor_descriptor(descriptor: PropertyDescriptor) -> bool {
     descriptor_kind(descriptor).is_accessor()
 }
 
-/// ECMAScript `IsGenericDescriptor` over the Phase 2 property-descriptor surface.
+/// ECMAScript `IsGenericDescriptor` over the property-descriptor surface.
 #[inline]
 pub const fn is_generic_descriptor(descriptor: PropertyDescriptor) -> bool {
     descriptor_kind(descriptor).is_generic()
@@ -101,7 +101,7 @@ pub const fn is_mixed_descriptor(descriptor: PropertyDescriptor) -> bool {
     descriptor_kind(descriptor).is_mixed()
 }
 
-/// ECMAScript `CompletePropertyDescriptor` over the Phase 2 property-descriptor surface.
+/// ECMAScript `CompletePropertyDescriptor` over the property-descriptor surface.
 ///
 /// The returned descriptor is a normalized copy. Callers that need the raw
 /// presence bits can keep the original descriptor alongside the completed one.
@@ -314,7 +314,7 @@ mod tests {
     };
 
     #[test]
-    fn pure_predicates_cover_the_phase2_value_classes() {
+    fn pure_predicates_cover_the_primitive_value_classes() {
         let undefined = Value::undefined();
         let null = Value::null();
         let boolean = Value::from_bool(false);

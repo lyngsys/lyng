@@ -38,7 +38,7 @@ impl fmt::Debug for EnvironmentLayoutId {
     }
 }
 
-/// Frozen runtime layout categories reserved by the Phase 3 environment model.
+/// Frozen runtime layout categories reserved by the environment model.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EnvironmentLayoutKind {
     Declarative,

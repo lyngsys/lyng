@@ -192,7 +192,7 @@ impl Agent {
             next_job_id: 1,
             thread_affinity: PhantomData,
         };
-        agent.seed_phase5_symbol_state(AllocationLifetime::LongLived);
+        agent.seed_builtin_symbol_state(AllocationLifetime::LongLived);
         let default_realm = agent.create_default_realm_shell(AllocationLifetime::LongLived);
         agent.default_realm = Some(default_realm);
         agent

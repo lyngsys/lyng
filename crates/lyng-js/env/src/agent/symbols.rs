@@ -135,7 +135,7 @@ impl Agent {
         string
     }
 
-    pub(super) fn seed_phase5_symbol_state(&mut self, lifetime: AllocationLifetime) {
+    pub(super) fn seed_builtin_symbol_state(&mut self, lifetime: AllocationLifetime) {
         for id in WellKnownSymbolId::ALL {
             let _ = self.ensure_well_known_symbol(id, lifetime);
         }

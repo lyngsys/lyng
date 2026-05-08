@@ -354,7 +354,7 @@ fn call_and_construct_wrappers_delegate_to_function_runtime() {
 }
 
 #[test]
-fn to_object_wraps_phase5_and_6a1_primitive_families() {
+fn to_object_wraps_primitive_and_completion_builtin_families() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let realm = install_test_wrapper_prototypes(agent);

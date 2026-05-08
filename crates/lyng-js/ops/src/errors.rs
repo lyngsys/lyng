@@ -5,7 +5,7 @@ use lyng_js_types::{
     AbruptCompletion, Completion, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value,
 };
 
-/// Error families that can be materialized through the shared Phase 5 error path.
+/// Error families that can be materialized through the shared runtime error path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ErrorKind {
     Error,

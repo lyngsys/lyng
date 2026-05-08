@@ -1,6 +1,6 @@
 use lyng_js_gc::ObjectSlotsRef;
 
-/// Coarse object kinds frozen by the Phase 3 runtime-substrate design.
+/// Coarse object kinds frozen by the runtime-substrate design.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ObjectKind {
     Ordinary,
@@ -150,5 +150,5 @@ pub enum InternalMethodError {
     BytecodeDispatchPending,
 }
 
-/// Result type used by Phase 3 internal-method entrypoints.
+/// Result type used by internal-method entrypoints.
 pub type InternalMethodResult<T> = Result<T, InternalMethodError>;

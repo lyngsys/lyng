@@ -3,7 +3,7 @@ use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
 use lyng_js_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, ShapeId, StringRef, Value};
 use std::ops::Range;
 
-/// Execution identity categories reserved by the Phase 3 runtime substrate.
+/// Execution identity categories reserved by the runtime substrate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExecutableId {
     Script,
@@ -16,7 +16,7 @@ mod intrinsics;
 
 pub use intrinsics::Intrinsics;
 
-/// Stable execution-context classification frozen by Phase 3.
+/// Stable execution-context classification frozen by the runtime.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ExecutionContextKind {
     Script,

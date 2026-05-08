@@ -1,4 +1,4 @@
-//! Copyable runtime-facing data types for the lyng-js Phase 2 primitive runtime.
+//! Copyable runtime-facing data types for the lyng-js runtime.
 //!
 //! Ownership: `lyng_js_types` owns representation-only runtime data. Allocation,
 //! rooting, tracing, and heap dereference remain in `lyng_js_gc`.
@@ -12,7 +12,6 @@
 mod builtin_ids;
 mod completion;
 mod ids;
-mod marker;
 mod property;
 mod value;
 
@@ -23,7 +22,6 @@ pub use ids::{
     FeedbackSlotId, NativeFunctionId, ObjectRef, RealmRef, ShapeId, StringRef,
     SuspendedExecutionRef, SymbolRef, WellKnownSymbolId,
 };
-pub use marker::TypeOwnershipMarker;
 pub use property::{DescriptorAttributes, DescriptorPresent, PropertyDescriptor, PropertyKey};
 pub use value::{InternalSentinel, Value};
 
@@ -33,7 +31,6 @@ const _: [(); 16] = [(); std::mem::size_of::<AbruptCompletion>()];
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_common::AtomId;
     use std::any::TypeId;
     use std::collections::HashSet;
     use std::mem::size_of;
@@ -54,36 +51,6 @@ mod tests {
             seen.insert(id);
             assert!(seen.contains(&$name::from_raw(raw).unwrap()));
         }};
-    }
-
-    #[test]
-    fn type_marker_round_trips_property_name() {
-        let property_name = AtomId::from_raw(17);
-        let marker = TypeOwnershipMarker::new(property_name);
-
-        assert_eq!(marker.property_name(), property_name);
-    }
-
-    #[test]
-    fn type_marker_stays_compact_and_copyable() {
-        let property_name = AtomId::from_raw(23);
-        let marker = TypeOwnershipMarker::new(property_name);
-        let copy = marker;
-
-        assert_eq!(size_of::<TypeOwnershipMarker>(), size_of::<AtomId>());
-        assert_eq!(copy, marker);
-    }
-
-    #[test]
-    fn type_marker_hashes_by_value() {
-        let property_name = AtomId::from_raw(29);
-        let marker = TypeOwnershipMarker::new(property_name);
-
-        let mut seen = HashSet::new();
-        seen.insert(marker);
-
-        assert!(seen.contains(&marker));
-        assert!(seen.contains(&TypeOwnershipMarker::new(property_name)));
     }
 
     #[test]
@@ -163,7 +130,7 @@ mod tests {
         let require_constructor = internal_require_constructor_builtin();
         let construct_super_array_like = internal_construct_super_array_like_builtin();
         let public = boolean_builtin();
-        let phase6 = promise_builtin();
+        let promise = promise_builtin();
 
         assert!(is_internal_builtin(internal));
         assert!(is_internal_builtin(dynamic_import));
@@ -171,10 +138,10 @@ mod tests {
         assert!(is_internal_builtin(require_constructor));
         assert!(is_internal_builtin(construct_super_array_like));
         assert!(!is_internal_builtin(public));
-        assert!(!is_internal_builtin(phase6));
+        assert!(!is_internal_builtin(promise));
         assert!(is_core_builtin(public));
-        assert!(!is_core_builtin(phase6));
-        assert!(is_completion_builtin(phase6));
+        assert!(!is_core_builtin(promise));
+        assert!(is_completion_builtin(promise));
         assert_eq!(INTERNAL_BUILTIN_NAMESPACE_START, 1_001);
         assert_eq!(INTERNAL_BUILTIN_NAMESPACE_END, 1_041);
         assert_eq!(CORE_BUILTIN_NAMESPACE_START, 2_001);

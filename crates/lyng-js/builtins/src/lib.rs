@@ -1,4 +1,4 @@
-//! Phase 5 builtin bootstrap scaffolding for lyng-js.
+//! Builtin bootstrap and native builtin dispatch for lyng-js.
 //!
 //! Ownership: `lyng_js_builtins` owns builtin registration tables, descriptor
 //! table shapes, bootstrap entrypoint surfaces, and builtin call contracts. It
@@ -19,11 +19,6 @@ mod descriptors;
 mod internal;
 mod public;
 mod registry;
-
-use lyng_js_common::AtomId;
-use lyng_js_env::RuntimeSubstrateMarker;
-use lyng_js_ops::PrimitiveOpsMarker;
-use lyng_js_types::BuiltinFunctionId;
 
 pub use bootstrap::{
     bootstrap_default_realm, bootstrap_realm, BootstrapArtifacts, BootstrapMode, BootstrapRequest,
@@ -48,49 +43,3 @@ pub use public::{
 pub use registry::{
     BuiltinEntryMetadata, BuiltinRegistry, BuiltinRegistryEntry, BuiltinRegistryError,
 };
-
-/// Minimal marker proving Phase 5 builtin scaffolding layers on the runtime substrate.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BuiltinsMarker {
-    runtime: RuntimeSubstrateMarker,
-    ops: PrimitiveOpsMarker,
-    builtin: BuiltinFunctionId,
-    property_name: AtomId,
-}
-
-impl BuiltinsMarker {
-    #[inline]
-    pub const fn new(
-        runtime: RuntimeSubstrateMarker,
-        ops: PrimitiveOpsMarker,
-        builtin: BuiltinFunctionId,
-        property_name: AtomId,
-    ) -> Self {
-        Self {
-            runtime,
-            ops,
-            builtin,
-            property_name,
-        }
-    }
-
-    #[inline]
-    pub const fn runtime(&self) -> &RuntimeSubstrateMarker {
-        &self.runtime
-    }
-
-    #[inline]
-    pub const fn builtin(&self) -> BuiltinFunctionId {
-        self.builtin
-    }
-
-    #[inline]
-    pub const fn property_name(&self) -> AtomId {
-        self.property_name
-    }
-
-    #[inline]
-    pub const fn ops(&self) -> &PrimitiveOpsMarker {
-        &self.ops
-    }
-}

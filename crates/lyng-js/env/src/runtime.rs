@@ -1,67 +1,17 @@
 use super::{
-    merge_primitive_heap_accounting, total_live_bytes, Agent, AgentCluster, AgentId,
-    EnvironmentLayout, ExecutableId, HostHooks, HostJobKind, HostJobPhase, HostResult,
-    HostThreadId, JobId, JobObservation, RealmRef, RuntimeDomainAccounting,
-    RuntimePhase6Accounting,
+    merge_primitive_heap_accounting, total_live_bytes, Agent, AgentCluster, AgentId, ExecutableId,
+    HostHooks, HostJobKind, HostJobPhase, HostResult, HostThreadId, JobId, JobObservation,
+    RealmRef, RuntimeDomainAccounting, RuntimePhase6Accounting,
 };
 use lyng_js_gc::PrimitiveHeapAccounting;
 use lyng_js_host::{
-    AgentSpawnKind, AgentThreadStartKind, CreateAgentRequest, HostError, HostMarker,
-    StartAgentThreadRequest,
+    AgentSpawnKind, AgentThreadStartKind, CreateAgentRequest, HostError, StartAgentThreadRequest,
 };
-use lyng_js_objects::ObjectSubstrateMarker;
 
-/// Public embedding entrypoint for the Phase 3 runtime substrate.
+/// Public embedding entrypoint for the Lyng JS runtime substrate.
 pub struct Runtime {
     host: Box<dyn HostHooks>,
     root_cluster: AgentCluster,
-}
-
-/// Minimal placeholder proving `lyng_js_env` composes the Phase 3 object and
-/// host crates on top of the Phase 2 heap substrate.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RuntimeSubstrateMarker {
-    objects: ObjectSubstrateMarker,
-    host: HostMarker,
-    executable: ExecutableId,
-    layout: EnvironmentLayout,
-}
-
-impl RuntimeSubstrateMarker {
-    #[inline]
-    pub const fn new(
-        objects: ObjectSubstrateMarker,
-        host: HostMarker,
-        executable: ExecutableId,
-        layout: EnvironmentLayout,
-    ) -> Self {
-        Self {
-            objects,
-            host,
-            executable,
-            layout,
-        }
-    }
-
-    #[inline]
-    pub const fn objects(&self) -> ObjectSubstrateMarker {
-        self.objects
-    }
-
-    #[inline]
-    pub const fn host(&self) -> HostMarker {
-        self.host
-    }
-
-    #[inline]
-    pub const fn executable(&self) -> ExecutableId {
-        self.executable
-    }
-
-    #[inline]
-    pub const fn layout(&self) -> &EnvironmentLayout {
-        &self.layout
-    }
 }
 
 impl Runtime {

@@ -82,7 +82,7 @@ enum PropertyKey {
 ## Heap And Rooting
 
 `lyng-js-gc` owns typed allocation domains, explicit rooting, tracing support, and weak
-state scaffolding. Runtime storage is separated by record family rather than placed in a
+state management. Runtime storage is separated by record family rather than placed in a
 single untyped arena.
 
 Rooting is explicit. The collector does not rely on conservative Rust stack scanning.

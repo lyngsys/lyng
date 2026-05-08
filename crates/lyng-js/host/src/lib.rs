@@ -1,4 +1,4 @@
-//! Cold-path host integration boundary for the lyng-js Phase 3 runtime substrate.
+//! Cold-path host integration boundary for the lyng-js runtime substrate.
 //!
 //! Ownership: `lyng_js_host` owns host-facing traits, typed request and response
 //! shells, host errors, and default host test doubles only. It does not own
@@ -9,9 +9,6 @@
     clippy::must_use_candidate,
     clippy::return_self_not_must_use
 )]
-
-use lyng_js_common::AtomId;
-use lyng_js_types::TypeOwnershipMarker;
 
 mod error;
 mod hooks;
@@ -35,56 +32,13 @@ pub use hooks::{
 pub use ids::{HostAgentId, HostJobId, HostSharedBufferId, HostThreadId, HostTransferredBufferId};
 pub use test_host::{HostCall, NoopHostHooks, TestHost, TestHostSnapshot};
 
-/// Minimal placeholder proving `lyng_js_host` layers on `lyng_js_common` and
-/// `lyng_js_types` only.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct HostMarker {
-    type_marker: TypeOwnershipMarker,
-    hook_name: AtomId,
-}
-
-impl HostMarker {
-    #[inline]
-    pub const fn new(type_marker: TypeOwnershipMarker, hook_name: AtomId) -> Self {
-        Self {
-            type_marker,
-            hook_name,
-        }
-    }
-
-    #[inline]
-    pub const fn type_marker(self) -> TypeOwnershipMarker {
-        self.type_marker
-    }
-
-    #[inline]
-    pub const fn hook_name(self) -> AtomId {
-        self.hook_name
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use lyng_js_common::{Severity, SourceId, Span};
     use lyng_js_types::{BackingStoreRef, BuiltinFunctionId, RealmRef, Value};
-    use std::mem::size_of;
 
     fn assert_host_hooks<T: HostHooks>() {}
-
-    #[test]
-    fn host_marker_round_trips_layering_inputs() {
-        let hook_name = AtomId::from_raw(7);
-        let type_marker = TypeOwnershipMarker::new(hook_name);
-        let marker = HostMarker::new(type_marker, hook_name);
-
-        assert_eq!(marker.type_marker(), type_marker);
-        assert_eq!(marker.hook_name(), hook_name);
-        assert_eq!(
-            size_of::<HostMarker>(),
-            size_of::<TypeOwnershipMarker>() + size_of::<AtomId>()
-        );
-    }
 
     #[test]
     fn noop_host_hooks_satisfies_host_hooks_trait() {

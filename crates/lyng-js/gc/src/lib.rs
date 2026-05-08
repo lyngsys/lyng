@@ -9,8 +9,7 @@
     clippy::return_self_not_must_use
 )]
 
-use lyng_js_common::{AtomCollection, AtomId, AtomSweepStats, AtomTable, SourceId};
-use lyng_js_types::TypeOwnershipMarker;
+use lyng_js_common::{AtomCollection, AtomId, AtomSweepStats, AtomTable};
 
 mod arena;
 mod collection;
@@ -42,19 +41,12 @@ pub use rooting::{
 };
 pub use weak::WeakHeapRef;
 
-/// Minimal placeholder proving `lyng_js_gc` composes `lyng_js_common` and `lyng_js_types`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PrimitiveHeapMarker {
-    type_marker: TypeOwnershipMarker,
-    source: SourceId,
-}
-
 /// GC-side driver for the shared atom-table collection contract.
 pub struct AtomGcSweep<'a> {
     collection: AtomCollection<'a>,
 }
 
-/// Minimal string encoding marker for Phase 2 primitive-record scaffolding.
+/// String encoding used by immutable runtime string records.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StringEncoding {
     Latin1,
@@ -87,26 +79,6 @@ pub struct PrimitiveStringView<'a> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PrimitiveAtomMetadata {
     retained_atom: Option<AtomId>,
-}
-
-impl PrimitiveHeapMarker {
-    #[inline]
-    pub const fn new(type_marker: TypeOwnershipMarker, source: SourceId) -> Self {
-        Self {
-            type_marker,
-            source,
-        }
-    }
-
-    #[inline]
-    pub const fn type_marker(self) -> TypeOwnershipMarker {
-        self.type_marker
-    }
-
-    #[inline]
-    pub const fn source(self) -> SourceId {
-        self.source
-    }
 }
 
 impl<'a> AtomGcSweep<'a> {
@@ -310,18 +282,6 @@ impl TraceAtomEdges for AtomId {
     }
 }
 
-impl TraceAtomEdges for TypeOwnershipMarker {
-    fn trace_atom_edges(&self, sweep: &mut AtomGcSweep<'_>) {
-        self.property_name().trace_atom_edges(sweep);
-    }
-}
-
-impl TraceAtomEdges for PrimitiveHeapMarker {
-    fn trace_atom_edges(&self, sweep: &mut AtomGcSweep<'_>) {
-        self.type_marker.trace_atom_edges(sweep);
-    }
-}
-
 impl TraceAtomEdges for PrimitiveStringRecord {
     fn trace_atom_edges(&self, sweep: &mut AtomGcSweep<'_>) {
         self.cached_atom.trace_atom_edges(sweep);
@@ -418,26 +378,6 @@ mod tests {
         assert_eq!(stats.retained_collectible, 1);
         assert_eq!(atoms.resolve(cached), "cache-key");
         assert_eq!(atoms.lifetime(cached), Some(AtomLifetime::Collectible));
-    }
-
-    #[test]
-    fn heap_marker_traces_embedded_type_atom_edge() {
-        let mut atoms = AtomTable::new();
-        let type_atom = atoms.intern_collectible("type-edge");
-        let dead_atom = atoms.intern_collectible("dead-edge");
-        let heap_marker =
-            PrimitiveHeapMarker::new(TypeOwnershipMarker::new(type_atom), SourceId::new(3));
-
-        let mut sweep = AtomGcSweep::new(&mut atoms);
-        heap_marker.trace_atom_edges(&mut sweep);
-        let stats = sweep.sweep();
-
-        assert_eq!(heap_marker.type_marker().property_name(), type_atom);
-        assert_eq!(heap_marker.source(), SourceId::new(3));
-        assert_eq!(stats.reclaimed_collectible, 1);
-        assert_eq!(stats.retained_collectible, 1);
-        assert_eq!(atoms.resolve(type_atom), "type-edge");
-        assert_eq!(atoms.get(dead_atom), None);
     }
 
     #[test]

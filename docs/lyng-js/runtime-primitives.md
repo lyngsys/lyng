@@ -8,7 +8,7 @@ primitive abstract operations used by the rest of the engine.
 - `lyng-js-types` owns representation-only runtime data: `Value`, typed handles, builtin
   IDs, property keys, descriptors, and completion types.
 - `lyng-js-gc` owns allocation domains, mutator access helpers, tracing, rooting, weak
-  state, and collection scaffolding.
+  state, and collection bookkeeping.
 - `lyng-js-ops` owns ECMA-262 abstract operations and semantic helpers over runtime values,
   objects, property keys, descriptors, promises, Temporal records, shared memory, and
   conversions.

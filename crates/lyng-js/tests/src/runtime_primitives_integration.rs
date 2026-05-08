@@ -1,67 +1,37 @@
 //! Cross-crate integration coverage for the runtime primitive layer.
 
-use std::mem::size_of;
-
-use lyng_js_common::{AtomId, AtomLifetime, AtomTable, SourceId, WellKnownAtom};
+use lyng_js_common::{AtomId, AtomLifetime, AtomTable};
 use lyng_js_gc::{
     AllocationLifetime, AtomGcSweep, BigIntSign, PrimitiveAtomMetadata, PrimitiveCollectionTrigger,
-    PrimitiveHeap, PrimitiveHeapMarker, PrimitiveRoots, PrimitiveStringRecord,
-    PrimitiveSymbolClass, StringEncoding, StringHandleStoreTarget, SymbolFlags, TraceAtomEdges,
-    ValueStoreTarget, PRIMITIVE_SLOTS_PER_PAGE,
+    PrimitiveHeap, PrimitiveRoots, PrimitiveStringRecord, PrimitiveSymbolClass, StringEncoding,
+    StringHandleStoreTarget, SymbolFlags, TraceAtomEdges, ValueStoreTarget,
+    PRIMITIVE_SLOTS_PER_PAGE,
 };
-use lyng_js_ops::PrimitiveOpsMarker;
-use lyng_js_types::{TypeOwnershipMarker, Value};
+use lyng_js_types::Value;
 
 #[test]
-fn phase2_markers_stay_compact_and_round_trip() {
-    let property_name = WellKnownAtom::name.id();
-    let type_marker = TypeOwnershipMarker::new(property_name);
-    let heap_marker = PrimitiveHeapMarker::new(type_marker, SourceId::new(11));
-    let ops_marker = PrimitiveOpsMarker::new(heap_marker, property_name);
-
-    assert_eq!(size_of::<TypeOwnershipMarker>(), size_of::<AtomId>());
-    assert_eq!(
-        size_of::<PrimitiveHeapMarker>(),
-        size_of::<TypeOwnershipMarker>() + size_of::<SourceId>()
-    );
-    assert_eq!(
-        size_of::<PrimitiveOpsMarker>(),
-        size_of::<PrimitiveHeapMarker>() + size_of::<AtomId>()
-    );
-    assert_eq!(type_marker.property_name(), property_name);
-    assert_eq!(heap_marker.type_marker(), type_marker);
-    assert_eq!(heap_marker.source(), SourceId::new(11));
-    assert_eq!(ops_marker.heap(), heap_marker);
-    assert_eq!(ops_marker.property_name(), property_name);
-}
-
-#[test]
-fn nested_phase2_edges_keep_live_atoms_across_types_gc_and_ops() {
+fn nested_runtime_atom_edges_keep_live_atoms_across_heap_records() {
     let mut atoms = AtomTable::new();
-    let type_atom = atoms.intern_collectible("type-edge");
-    let ops_atom = atoms.intern_collectible("ops-edge");
     let cached_atom = atoms.intern_collectible("cached-edge");
+    let metadata_atom = atoms.intern_collectible("metadata-edge");
     let dead_atom = atoms.intern_collectible("dead-edge");
     let permanent_atom = atoms.intern("permanent-edge");
 
-    let type_marker = TypeOwnershipMarker::new(type_atom);
-    let heap_marker = PrimitiveHeapMarker::new(type_marker, SourceId::new(19));
-    let ops_marker = PrimitiveOpsMarker::new(heap_marker, ops_atom);
     let string_record =
         PrimitiveStringRecord::with_cached_atom(StringEncoding::Utf16, 12, cached_atom);
+    let collectible_metadata = PrimitiveAtomMetadata::new(Some(metadata_atom));
     let metadata = PrimitiveAtomMetadata::new(Some(permanent_atom));
 
     let mut sweep = AtomGcSweep::new(&mut atoms);
-    ops_marker.trace_atom_edges(&mut sweep);
     string_record.trace_atom_edges(&mut sweep);
+    collectible_metadata.trace_atom_edges(&mut sweep);
     metadata.trace_atom_edges(&mut sweep);
     let stats = sweep.sweep();
 
     assert_eq!(stats.reclaimed_collectible, 1);
-    assert_eq!(stats.retained_collectible, 3);
-    assert_eq!(atoms.resolve(type_atom), "type-edge");
-    assert_eq!(atoms.resolve(ops_atom), "ops-edge");
+    assert_eq!(stats.retained_collectible, 2);
     assert_eq!(atoms.resolve(cached_atom), "cached-edge");
+    assert_eq!(atoms.resolve(metadata_atom), "metadata-edge");
     assert_eq!(
         atoms.lifetime(permanent_atom),
         Some(AtomLifetime::Permanent)
@@ -72,30 +42,28 @@ fn nested_phase2_edges_keep_live_atoms_across_types_gc_and_ops() {
 #[test]
 fn post_sweep_reuse_preserves_live_cross_crate_state() {
     let mut atoms = AtomTable::new();
-    let type_atom = atoms.intern_collectible("type-edge");
-    let ops_atom = atoms.intern_collectible("ops-edge");
+    let cached_atom = atoms.intern_collectible("cached-edge");
+    let metadata_atom = atoms.intern_collectible("metadata-edge");
     let dead_atom = atoms.intern_collectible("dead-edge");
 
-    let ops_marker = PrimitiveOpsMarker::new(
-        PrimitiveHeapMarker::new(TypeOwnershipMarker::new(type_atom), SourceId::new(23)),
-        ops_atom,
-    );
-    let string_record = PrimitiveStringRecord::new(StringEncoding::Latin1, 0);
+    let string_record =
+        PrimitiveStringRecord::with_cached_atom(StringEncoding::Latin1, 10, cached_atom);
+    let metadata = PrimitiveAtomMetadata::new(Some(metadata_atom));
 
     let mut sweep = AtomGcSweep::new(&mut atoms);
-    ops_marker.trace_atom_edges(&mut sweep);
     string_record.trace_atom_edges(&mut sweep);
+    metadata.trace_atom_edges(&mut sweep);
     let stats = sweep.sweep();
 
     assert_eq!(stats.reclaimed_collectible, 1);
-    assert_eq!(atoms.resolve(type_atom), "type-edge");
-    assert_eq!(atoms.resolve(ops_atom), "ops-edge");
+    assert_eq!(atoms.resolve(cached_atom), "cached-edge");
+    assert_eq!(atoms.resolve(metadata_atom), "metadata-edge");
 
     let replacement = atoms.intern_collectible("replacement-edge");
     assert_eq!(replacement, dead_atom);
     assert_eq!(atoms.resolve(replacement), "replacement-edge");
-    assert_eq!(ops_marker.heap().type_marker().property_name(), type_atom);
-    assert_eq!(ops_marker.property_name(), ops_atom);
+    assert_eq!(string_record.cached_atom(), Some(cached_atom));
+    assert_eq!(metadata.retained_atom(), Some(metadata_atom));
 }
 
 #[test]

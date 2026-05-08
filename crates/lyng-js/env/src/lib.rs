@@ -1,8 +1,8 @@
-//! Runtime-wide environment substrate for lyng-js Phase 3.
+//! Runtime-wide environment substrate for lyng-js.
 //!
 //! Ownership: `lyng_js_env` owns the runtime topology above primitive values:
 //! runtime, agents, cluster-owned shared coordination, job queues, and the
-//! later realm and execution-context owners layered on top of that topology.
+//! realm and execution-context owners layered on top of that topology.
 
 #![allow(
     clippy::module_name_repetitions,
@@ -78,7 +78,7 @@ pub use promise::{
     PromiseReactionRecord, PromiseRecord, PromiseResolvingFunctionKind,
     PromiseResolvingFunctionRecord, PromiseState,
 };
-pub use runtime::{Runtime, RuntimeSubstrateMarker};
+pub use runtime::Runtime;
 pub use shared_memory::{
     AsyncWaiterRecord, ParkedAgentRecord, SharedBackingStoreRecord, WaiterKind, WaiterRecord,
     WaiterToken,

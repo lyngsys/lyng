@@ -1,12 +1,12 @@
 #![allow(clippy::too_many_lines)]
 
 use super::*;
-use lyng_js_common::{AtomId, AtomLifetime, AtomTable, SourceId, WellKnownAtom};
+use lyng_js_common::{AtomId, WellKnownAtom};
 use lyng_js_gc::{
-    AtomGcSweep, PrimitiveHeap, PrimitiveHeapMarker, PrimitiveRoots, RuntimeCodeRecord,
-    RuntimeEnvironmentRecord, RuntimeRealmRecord, TraceAtomEdges, ValueStoreTarget,
+    PrimitiveHeap, PrimitiveRoots, RuntimeCodeRecord, RuntimeEnvironmentRecord, RuntimeRealmRecord,
+    ValueStoreTarget,
 };
-use lyng_js_types::{BuiltinFunctionId, NativeFunctionId, SymbolRef, TypeOwnershipMarker, Value};
+use lyng_js_types::{BuiltinFunctionId, NativeFunctionId, SymbolRef, Value};
 use std::collections::HashMap;
 use std::mem::size_of;
 
@@ -75,7 +75,7 @@ fn array_length_descriptor(
 }
 
 #[test]
-fn object_header_stays_within_phase3_size_budget() {
+fn object_header_stays_within_runtime_size_budget() {
     assert!(size_of::<ObjectHeader>() <= 32);
 }
 
@@ -3452,47 +3452,4 @@ fn freeing_objects_removes_runtime_metadata_and_releases_object_records() {
     assert!(!freed.header().flags().is_extensible());
     assert!(matches!(freed.cold(), ObjectColdData::Function(_)));
     assert_eq!(runtime.object(mutator.view(), object), None);
-}
-
-#[test]
-fn object_marker_round_trips_heap_and_kind() {
-    let property_name = AtomId::from_raw(11);
-    let heap = PrimitiveHeapMarker::new(TypeOwnershipMarker::new(property_name), SourceId::new(5));
-    let marker = ObjectSubstrateMarker::new(
-        heap,
-        property_name,
-        ObjectKind::Ordinary,
-        ObjectFlags::extensible(),
-    );
-
-    assert_eq!(marker.heap(), heap);
-    assert_eq!(marker.property_name(), property_name);
-    assert_eq!(marker.kind(), ObjectKind::Ordinary);
-    assert!(marker.flags().contains(ObjectFlags::EXTENSIBLE));
-    assert!(size_of::<ObjectSubstrateMarker>() <= 16);
-}
-
-#[test]
-fn object_marker_traces_nested_atom_edges() {
-    let mut atoms = AtomTable::new();
-    let property_name = atoms.intern_collectible("property");
-    let dead = atoms.intern_collectible("dead");
-    let heap = PrimitiveHeapMarker::new(TypeOwnershipMarker::new(property_name), SourceId::new(9));
-    let marker = ObjectSubstrateMarker::new(
-        heap,
-        property_name,
-        ObjectKind::Function,
-        ObjectFlags::extensible(),
-    );
-
-    let mut sweep = AtomGcSweep::new(&mut atoms);
-    marker.trace_atom_edges(&mut sweep);
-    let stats = sweep.sweep();
-
-    assert_eq!(stats.reclaimed_collectible, 1);
-    assert_eq!(
-        atoms.lifetime(property_name),
-        Some(AtomLifetime::Collectible)
-    );
-    assert_eq!(atoms.get(dead), None);
 }

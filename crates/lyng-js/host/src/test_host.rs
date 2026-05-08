@@ -59,7 +59,7 @@ pub struct TestHostSnapshot {
     pub calls: Vec<HostCall>,
 }
 
-/// Default test host for Phase 3 runtime-boundary tests.
+/// Default test host for runtime-boundary tests.
 #[derive(Clone, Default)]
 pub struct TestHost {
     state: Arc<Mutex<TestHostState>>,

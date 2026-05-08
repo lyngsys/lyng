@@ -22,10 +22,13 @@ mod runtime_primitives_integration;
 mod runtime_primitives;
 
 #[cfg(test)]
-mod runtime_substrate_scaffolding;
+mod runtime_substrate_surface;
 
 #[cfg(test)]
 mod runtime_substrate_integration;
+
+#[cfg(test)]
+mod api_surface;
 
 #[cfg(test)]
 mod execution_semantics;

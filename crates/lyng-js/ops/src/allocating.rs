@@ -1,5 +1,5 @@
 use crate::{
-    convert::{bigint_view_to_string, number_to_string, phase2_type_error},
+    convert::{bigint_view_to_string, number_to_string, primitive_type_error},
     PrimitiveContext,
 };
 use lyng_js_common::AtomId;
@@ -36,14 +36,14 @@ pub fn memoize_string_atom(
     context.mutator().memoize_string_atom(string, atom)
 }
 
-/// ECMAScript `ToString` over the Phase 2 primitive-runtime surface.
+/// ECMAScript `ToString` over the primitive-runtime surface.
 ///
-/// This covers primitive values only. Object coercion remains a later-phase
+/// This covers primitive values only. Object coercion remains an object-aware
 /// operation layered on top of the same entrypoint.
 ///
 /// # Errors
 ///
-/// Returns a Phase 2 type error for symbols, objects, internal sentinels, and
+/// Returns a primitive type error for symbols, objects, internal sentinels, and
 /// invalid bigint handles.
 ///
 /// # Panics
@@ -85,14 +85,14 @@ pub fn to_string(context: &mut PrimitiveContext<'_>, value: Value) -> Completion
         return Ok(string);
     }
     if value.is_symbol() {
-        return Err(phase2_type_error());
+        return Err(primitive_type_error());
     }
     if let Some(bigint) = value.as_bigint_ref() {
         let text = {
             let view = context
                 .heap()
                 .bigint_view(bigint)
-                .ok_or_else(phase2_type_error)?;
+                .ok_or_else(primitive_type_error)?;
             bigint_view_to_string(view)
         };
         return Ok(alloc_latin1_string(
@@ -102,10 +102,10 @@ pub fn to_string(context: &mut PrimitiveContext<'_>, value: Value) -> Completion
         ));
     }
     if value.is_object() || value.is_sentinel() {
-        return Err(phase2_type_error());
+        return Err(primitive_type_error());
     }
 
-    Err(phase2_type_error())
+    Err(primitive_type_error())
 }
 
 /// Converts a heap-backed runtime string into a property key.
@@ -336,7 +336,7 @@ mod tests {
     }
 
     #[test]
-    fn to_string_covers_phase2_primitive_cases() {
+    fn to_string_covers_primitive_cases() {
         let mut heap = PrimitiveHeap::new();
         let mut atoms = AtomTable::new();
         let mut context = PrimitiveContext::new(&mut heap, &mut atoms);

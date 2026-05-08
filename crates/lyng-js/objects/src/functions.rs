@@ -711,7 +711,7 @@ impl OrdinaryObjectData {
     }
 }
 
-/// Function `this` binding strategy frozen by the Phase 3 substrate.
+/// Function `this` binding strategy frozen by the runtime substrate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum FunctionThisMode {
     Lexical,
@@ -1330,7 +1330,7 @@ impl<'a> NativeConstructRequest<'a> {
     }
 }
 
-/// Injected substrate-native call/construct registry used by Phase 3 tests and harnesses.
+/// Injected substrate-native call/construct registry used by runtime tests and harnesses.
 pub trait NativeFunctionRegistry {
     /// Dispatches one native call.
     ///

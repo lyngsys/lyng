@@ -916,7 +916,7 @@ const fn expected_string_payload_len(encoding: StringEncoding, code_unit_len: u3
         StringEncoding::Latin1 => code_unit_len as usize,
         StringEncoding::Utf16 => (code_unit_len as usize)
             .checked_mul(2)
-            .expect("Phase 2 UTF-16 strings must fit in addressable side storage"),
+            .expect("UTF-16 strings must fit in addressable side storage"),
     }
 }
 

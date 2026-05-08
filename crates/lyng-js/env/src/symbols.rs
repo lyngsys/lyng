@@ -2,7 +2,7 @@ use lyng_js_common::{AtomId, AtomTable, WellKnownAtom};
 use lyng_js_gc::{AtomGcSweep, PrimitiveTracer, TraceAtomEdges, TraceHeapEdges};
 use lyng_js_types::{SymbolRef, WellKnownSymbolId};
 
-/// Agent-owned atom set used by the Phase 5 default-realm bootstrap.
+/// Agent-owned atom set used by the default-realm bootstrap.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BootstrapAtoms {
     boolean: AtomId,
@@ -858,7 +858,7 @@ impl TraceAtomEdges for BootstrapAtoms {
     }
 }
 
-/// Agent-owned well-known symbol table used by the Phase 5 builtin bootstrap.
+/// Agent-owned well-known symbol table used by the builtin bootstrap.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct WellKnownSymbols {
     has_instance: Option<SymbolRef>,

@@ -1,68 +1,21 @@
-//! Compile-smoke coverage for the runtime-substrate crate DAG.
+//! Compile-smoke coverage for the runtime substrate crate DAG.
 
 use lyng_js_ast::FunctionId;
-use lyng_js_common::{AtomId, SourceId};
+use lyng_js_common::AtomId;
 use lyng_js_compiler::{derive_environment_layout_plan, EnvironmentLayoutPlanError};
 use lyng_js_env::{
-    EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
-    EnvironmentSlotFlags, ExecutableId, ExecutionContext, ExecutionContextKind, Intrinsics,
-    JobQueueKind, Runtime, RuntimeSubstrateMarker, ThisState,
+    EnvironmentLayoutKind, ExecutableId, ExecutionContext, ExecutionContextKind, Intrinsics,
+    JobQueueKind, Runtime, ThisState,
 };
-use lyng_js_gc::PrimitiveHeapMarker;
-use lyng_js_host::{HostHooks, HostMarker, NoopHostHooks};
-use lyng_js_objects::{ObjectFlags, ObjectKind, ObjectSubstrateMarker};
+use lyng_js_host::NoopHostHooks;
 use lyng_js_sema::{
     BindingRecord, BindingTable, DeclarationKind, FunctionSemaId, FunctionSemaRecord,
     FunctionSemaTable, ScopeKind, ScopeRecord, ScopeTable, StorageClass,
 };
-use lyng_js_types::{CodeRef, TypeOwnershipMarker, Value};
-use std::mem::size_of;
-
-fn assert_host_hooks<T: HostHooks>() {}
+use lyng_js_types::{CodeRef, Value};
 
 #[test]
-fn phase3_runtime_crates_form_expected_dependency_chain() {
-    let property_name = AtomId::from_raw(41);
-    let type_marker = TypeOwnershipMarker::new(property_name);
-    let host = HostMarker::new(type_marker, property_name);
-    let heap = PrimitiveHeapMarker::new(type_marker, SourceId::new(13));
-    let objects = ObjectSubstrateMarker::new(
-        heap,
-        property_name,
-        ObjectKind::Ordinary,
-        ObjectFlags::extensible(),
-    );
-    let layout_id = EnvironmentLayoutId::from_raw(5).expect("non-zero layout id");
-    let layout = EnvironmentLayout::new(
-        EnvironmentLayoutKind::Declarative,
-        [EnvironmentBindingLayout::new(
-            Some(property_name),
-            EnvironmentSlotFlags::mutable_lexical(),
-        )],
-        true,
-    );
-    let runtime = RuntimeSubstrateMarker::new(
-        objects,
-        host,
-        ExecutableId::Bytecode(CodeRef::from_raw(7).unwrap()),
-        layout.clone(),
-    );
-
-    assert_host_hooks::<NoopHostHooks>();
-    assert_eq!(runtime.host(), host);
-    assert_eq!(runtime.objects(), objects);
-    assert_eq!(runtime.layout(), &layout);
-    assert_eq!(
-        runtime.executable(),
-        ExecutableId::Bytecode(CodeRef::from_raw(7).unwrap())
-    );
-    assert_eq!(layout_id.get(), 5);
-    assert_eq!(size_of::<EnvironmentLayoutId>(), size_of::<u32>());
-    assert_eq!(size_of::<Option<EnvironmentLayoutId>>(), size_of::<u32>());
-}
-
-#[test]
-fn phase3_runtime_topology_boots_through_public_env_surface() {
+fn runtime_topology_boots_through_public_env_surface() {
     let runtime = Runtime::new(NoopHostHooks);
     let default_realm = runtime
         .root_agent()
@@ -97,7 +50,7 @@ fn phase3_runtime_topology_boots_through_public_env_surface() {
 }
 
 #[test]
-fn phase3_sema_bridge_stays_outside_the_runtime_surface() {
+fn sema_bridge_stays_outside_the_runtime_surface() {
     let function_id = FunctionSemaId::new(0);
     let mut scopes = ScopeTable::new();
     let global_scope = scopes.alloc(ScopeRecord {
@@ -184,7 +137,7 @@ fn phase3_sema_bridge_stays_outside_the_runtime_surface() {
 }
 
 #[test]
-fn phase3_integration_layout_bridge_rejects_out_of_order_slot_indices() {
+fn integration_layout_bridge_rejects_out_of_order_slot_indices() {
     let function_id = FunctionSemaId::new(0);
     let mut scopes = ScopeTable::new();
     let global_scope = scopes.alloc(ScopeRecord {

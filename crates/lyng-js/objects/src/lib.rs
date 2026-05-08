@@ -1,4 +1,4 @@
-//! Object-model substrate for the lyng-js Phase 3 runtime layer.
+//! Object-model substrate for the lyng-js runtime layer.
 //!
 //! Ownership: `lyng_js_objects` owns object allocation, canonical shapes,
 //! named-property metadata, indexed-element and named-slot storage references,
@@ -26,7 +26,6 @@ mod descriptors;
 mod function_dispatch;
 mod functions;
 mod internal_methods;
-mod marker;
 mod module_namespace;
 mod object_metadata;
 mod object_records;
@@ -55,7 +54,6 @@ pub use self::functions::{
     PrimitiveWrapperKind, ProxyObjectData, SetObjectData, TypedArrayElementKind,
     TypedArrayObjectData,
 };
-pub use self::marker::ObjectSubstrateMarker;
 use self::module_namespace::ModuleNamespaceObject;
 pub use self::module_namespace::{ModuleNamespaceExport, ModuleNamespaceExportTarget};
 pub use self::object_metadata::{ClassPrivateElementKind, PrivateDescriptorSummary};

@@ -1,6 +1,6 @@
 use crate::convert::{
     bigint_equals_integral_number, bigint_view_equals_parts, encode_number, logical_type,
-    lossy_string_from_view, parse_string_to_bigint, phase2_type_error, same_logical_type,
+    lossy_string_from_view, parse_string_to_bigint, primitive_type_error, same_logical_type,
     string_to_number, LogicalType,
 };
 use crate::pure;
@@ -15,8 +15,8 @@ fn borrowed_strings_equal(
     left: StringRef,
     right: StringRef,
 ) -> Completion<bool> {
-    let left = heap.string_view(left).ok_or_else(phase2_type_error)?;
-    let right = heap.string_view(right).ok_or_else(phase2_type_error)?;
+    let left = heap.string_view(left).ok_or_else(primitive_type_error)?;
+    let right = heap.string_view(right).ok_or_else(primitive_type_error)?;
     Ok(left.equals(right))
 }
 
@@ -26,8 +26,8 @@ fn borrowed_bigint_equal(
     left: BigIntRef,
     right: BigIntRef,
 ) -> Completion<bool> {
-    let left = heap.bigint_view(left).ok_or_else(phase2_type_error)?;
-    let right = heap.bigint_view(right).ok_or_else(phase2_type_error)?;
+    let left = heap.bigint_view(left).ok_or_else(primitive_type_error)?;
+    let right = heap.bigint_view(right).ok_or_else(primitive_type_error)?;
     Ok(left.sign() == right.sign()
         && left.limb_count() == right.limb_count()
         && left.limb_bytes_le() == right.limb_bytes_le())
@@ -110,11 +110,11 @@ pub fn bigint_limb_bytes_le(heap: PrimitiveHeapView<'_>, value: BigIntRef) -> Op
     Some(heap.bigint_view(value)?.limb_bytes_le())
 }
 
-/// ECMAScript `ToBoolean` over the Phase 2 primitive-runtime surface.
+/// ECMAScript `ToBoolean` over the primitive-runtime surface.
 ///
 /// # Errors
 ///
-/// Returns a Phase 2 type error if a string or bigint handle does not resolve
+/// Returns a primitive type error if a string or bigint handle does not resolve
 /// in the shared primitive heap.
 pub fn to_boolean(heap: PrimitiveHeapView<'_>, value: Value) -> Completion<bool> {
     if let Some(result) = pure::to_boolean(value) {
@@ -123,14 +123,14 @@ pub fn to_boolean(heap: PrimitiveHeapView<'_>, value: Value) -> Completion<bool>
     if let Some(string) = value.as_string_ref() {
         return Ok(heap
             .string_view(string)
-            .ok_or_else(phase2_type_error)?
+            .ok_or_else(primitive_type_error)?
             .code_unit_len()
             != 0);
     }
     if let Some(bigint) = value.as_bigint_ref() {
         return Ok(!heap
             .bigint_view(bigint)
-            .ok_or_else(phase2_type_error)?
+            .ok_or_else(primitive_type_error)?
             .is_zero());
     }
     Ok(true)
@@ -140,7 +140,7 @@ pub fn to_boolean(heap: PrimitiveHeapView<'_>, value: Value) -> Completion<bool>
 ///
 /// # Errors
 ///
-/// Returns a Phase 2 type error if a string or bigint handle does not resolve
+/// Returns a primitive type error if a string or bigint handle does not resolve
 /// in the shared primitive heap.
 pub fn to_boolean_agent(agent: &Agent, value: Value) -> Completion<bool> {
     if value
@@ -156,7 +156,7 @@ pub fn to_boolean_agent(agent: &Agent, value: Value) -> Completion<bool> {
 ///
 /// # Errors
 ///
-/// Returns a Phase 2 type error if a string or bigint handle does not resolve
+/// Returns a primitive type error if a string or bigint handle does not resolve
 /// in the shared primitive heap.
 ///
 /// # Panics
@@ -191,7 +191,7 @@ pub fn is_strictly_equal(
 ///
 /// # Errors
 ///
-/// Returns a Phase 2 type error if a string or bigint handle does not resolve
+/// Returns a primitive type error if a string or bigint handle does not resolve
 /// in the shared primitive heap.
 ///
 /// # Panics
@@ -222,7 +222,7 @@ pub fn same_value(heap: PrimitiveHeapView<'_>, left: Value, right: Value) -> Com
 ///
 /// # Errors
 ///
-/// Returns a Phase 2 type error if a string or bigint handle does not resolve
+/// Returns a primitive type error if a string or bigint handle does not resolve
 /// in the shared primitive heap.
 ///
 /// # Panics
@@ -249,14 +249,14 @@ pub fn same_value_zero(heap: PrimitiveHeapView<'_>, left: Value, right: Value) -
     }
 }
 
-/// ECMAScript `ToNumber` over the Phase 2 primitive-runtime surface.
+/// ECMAScript `ToNumber` over the primitive-runtime surface.
 ///
-/// This covers primitive values only. Object coercion remains a later-phase
+/// This covers primitive values only. Object coercion remains an object-aware
 /// operation layered on top of the same entrypoint.
 ///
 /// # Errors
 ///
-/// Returns a Phase 2 type error for symbols, bigints, objects, and internal
+/// Returns a primitive type error for symbols, bigints, objects, and internal
 /// sentinels, or if a string handle does not resolve in the shared primitive
 /// heap.
 pub fn to_number(heap: PrimitiveHeapView<'_>, value: Value) -> Completion<Value> {
@@ -273,29 +273,29 @@ pub fn to_number(heap: PrimitiveHeapView<'_>, value: Value) -> Completion<Value>
         return Ok(value);
     }
     if let Some(string) = value.as_string_ref() {
-        let view = heap.string_view(string).ok_or_else(phase2_type_error)?;
+        let view = heap.string_view(string).ok_or_else(primitive_type_error)?;
         return Ok(encode_number(string_to_number(&lossy_string_from_view(
             view,
         ))));
     }
     if value.is_symbol() || value.is_bigint() {
-        return Err(phase2_type_error());
+        return Err(primitive_type_error());
     }
     if value.is_object() || value.is_sentinel() {
-        return Err(phase2_type_error());
+        return Err(primitive_type_error());
     }
 
-    Err(phase2_type_error())
+    Err(primitive_type_error())
 }
 
-/// ECMAScript `ToNumeric` over the Phase 2 primitive-runtime surface.
+/// ECMAScript `ToNumeric` over the primitive-runtime surface.
 ///
 /// # Errors
 ///
-/// Returns a Phase 2 type error for objects and internal sentinels.
+/// Returns a primitive type error for objects and internal sentinels.
 pub fn to_numeric(heap: PrimitiveHeapView<'_>, value: Value) -> Completion<Value> {
     if value.is_object() || value.is_sentinel() {
-        return Err(phase2_type_error());
+        return Err(primitive_type_error());
     }
     if value.is_bigint() {
         return Ok(value);
@@ -311,7 +311,7 @@ pub fn to_numeric(heap: PrimitiveHeapView<'_>, value: Value) -> Completion<Value
 ///
 /// # Errors
 ///
-/// Returns a Phase 2 type error for objects, internal sentinels, and invalid
+/// Returns a primitive type error for objects, internal sentinels, and invalid
 /// runtime handles.
 ///
 /// # Panics
@@ -343,14 +343,14 @@ pub fn is_loosely_equal(
     if left.is_bigint() && right.is_string() {
         let right_text = lossy_string_from_view(
             heap.string_view(right.as_string_ref().unwrap())
-                .ok_or_else(phase2_type_error)?,
+                .ok_or_else(primitive_type_error)?,
         );
         let Some((sign, limbs)) = parse_string_to_bigint(&right_text) else {
             return Ok(false);
         };
         let left_view = heap
             .bigint_view(left.as_bigint_ref().unwrap())
-            .ok_or_else(phase2_type_error)?;
+            .ok_or_else(primitive_type_error)?;
         return Ok(bigint_view_equals_parts(left_view, sign, &limbs));
     }
     if left.is_string() && right.is_bigint() {
@@ -367,7 +367,7 @@ pub fn is_loosely_equal(
     if left.is_bigint() && right.is_number() {
         let left_view = heap
             .bigint_view(left.as_bigint_ref().unwrap())
-            .ok_or_else(phase2_type_error)?;
+            .ok_or_else(primitive_type_error)?;
         return Ok(bigint_equals_integral_number(
             left_view,
             right.as_f64().unwrap(),
@@ -378,7 +378,7 @@ pub fn is_loosely_equal(
     }
 
     if left.is_object() || right.is_object() || left.is_sentinel() || right.is_sentinel() {
-        return Err(phase2_type_error());
+        return Err(primitive_type_error());
     }
 
     Ok(false)
@@ -558,7 +558,7 @@ mod tests {
     }
 
     #[test]
-    fn to_number_and_to_numeric_cover_phase2_primitive_cases() {
+    fn to_number_and_to_numeric_cover_primitive_cases() {
         let mut heap = PrimitiveHeap::new();
         let (decimal, negative_zero, invalid, large_hex, bigint) = {
             let mut mutator = heap.mutator();
