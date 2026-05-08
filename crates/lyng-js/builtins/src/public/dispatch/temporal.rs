@@ -89,7 +89,7 @@ use super::{
 };
 use crate::BuiltinInvocation;
 use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::{Agent, RealmRecord};
+use lyng_js_env::Agent;
 use lyng_js_gc::{AllocationLifetime, BigIntSign};
 use lyng_js_host::{
     TemporalCivilDateTime, TemporalCivilTime, TemporalCivilToInstantRequest,

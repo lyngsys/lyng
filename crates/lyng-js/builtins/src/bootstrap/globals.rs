@@ -12,7 +12,7 @@ use super::{
     uint16_array_builtin, uint32_array_builtin, uint8_array_builtin, uint8_clamped_array_builtin,
     unescape_builtin, uri_error_builtin, weak_map_builtin, weak_ref_builtin, weak_set_builtin,
     Agent, BootstrapArtifacts, BuiltinAttributes, BuiltinPropertyDescriptor,
-    BuiltinPropertyKeySpec, BuiltinPropertyValueSpec, RealmRecord, Value, WellKnownAtom,
+    BuiltinPropertyKeySpec, BuiltinPropertyValueSpec, Value, WellKnownAtom,
 };
 
 #[allow(
@@ -32,7 +32,7 @@ pub(super) fn default_global_descriptors(
     let iterator_atom = agent.atoms_mut().intern("Iterator");
     let intrinsics = agent
         .realm(artifacts.realm())
-        .map(RealmRecord::intrinsics)
+        .map(|realm| realm.intrinsics())
         .unwrap_or_default();
 
     [

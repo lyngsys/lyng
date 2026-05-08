@@ -210,11 +210,7 @@ fn typed_array_to_locale_string_builtin_dispatch<Cx: PublicBuiltinDispatchContex
     let to_locale_string_key = property_key_from_text(cx, "toLocaleString");
     let intl_key = property_key_from_text(cx, "Intl");
     let realm = cx.builtin_realm();
-    let Some(global_object) = cx
-        .agent()
-        .realm(realm)
-        .map(lyng_js_env::RealmRecord::global_object)
-    else {
+    let Some(global_object) = cx.agent().realm(realm).map(|realm| realm.global_object()) else {
         return Err(type_error(cx));
     };
     let intl_value = cx.get_property_value(Value::from_object_ref(global_object), intl_key)?;

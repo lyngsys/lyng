@@ -252,9 +252,7 @@ pub(super) fn allocate_typed_array_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
@@ -362,7 +360,7 @@ pub(super) fn typed_array_default_prototype<Cx: PublicBuiltinDispatchContext>(
         let agent = cx.agent();
         agent
             .realm(realm)
-            .map(lyng_js_env::RealmRecord::intrinsics)
+            .map(|realm| realm.intrinsics())
             .and_then(getter)
     };
     prototype.ok_or_else(|| type_error(cx))
@@ -391,7 +389,7 @@ fn typed_array_default_constructor<Cx: PublicBuiltinDispatchContext>(
         let agent = cx.agent();
         agent
             .realm(realm)
-            .map(lyng_js_env::RealmRecord::intrinsics)
+            .map(|realm| realm.intrinsics())
             .and_then(getter)
     };
     constructor.ok_or_else(|| type_error(cx))

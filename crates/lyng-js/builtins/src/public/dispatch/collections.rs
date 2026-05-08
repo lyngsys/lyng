@@ -227,9 +227,7 @@ fn allocate_map_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
@@ -254,9 +252,7 @@ fn allocate_set_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
@@ -281,9 +277,7 @@ fn allocate_weak_map_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
@@ -311,9 +305,7 @@ fn allocate_weak_set_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
@@ -342,9 +334,7 @@ fn allocate_weak_ref_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {
@@ -373,9 +363,7 @@ fn allocate_finalization_registry_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     Ok(cx.agent().with_heap_and_objects(|heap, objects| {

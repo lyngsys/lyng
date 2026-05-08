@@ -10,7 +10,7 @@ const BULK_GLOBAL_BINDING_DICTIONARY_THRESHOLD: usize = 64;
 impl Vm {
     pub(crate) fn instantiate_global_script(
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         plan: &GlobalScriptInstantiationPlan,
     ) -> VmResult<()> {
         if plan.lexical_names().is_empty()

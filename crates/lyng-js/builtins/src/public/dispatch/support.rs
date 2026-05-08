@@ -183,9 +183,7 @@ pub(super) fn allocate_json_raw_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     let object = cx.agent().with_heap_and_objects(|heap, objects| {
@@ -212,9 +210,7 @@ pub(super) fn allocate_proxy_object<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     let prototype = {
@@ -1107,9 +1103,7 @@ pub(super) fn create_array_result_with_prototype<Cx: PublicBuiltinDispatchContex
 ) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     let array = cx.agent().with_heap_and_objects(|heap, objects| {
@@ -1984,7 +1978,7 @@ pub(super) fn primitive_wrapper_constructor<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(lyng_js_env::RealmRecord::root_shape)
+        .and_then(|realm| realm.root_shape())
         .ok_or_else(|| type_error(cx))?;
     let wrapper = {
         let agent = cx.agent();

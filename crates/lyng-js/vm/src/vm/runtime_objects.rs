@@ -92,7 +92,7 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         let root_shape = agent
             .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+            .and_then(|realm| realm.root_shape())
             .ok_or(VmError::MissingRootShape(realm))?;
         let prototype = agent
             .realm(realm)
@@ -150,7 +150,7 @@ impl Vm {
         let kind_flags = bytecode_kind_flags(child);
         let root_shape = agent
             .realm(frame.realm())
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+            .and_then(|realm| realm.root_shape())
             .ok_or_else(|| VmError::MissingRootShape(frame.realm()))?;
         let home_object = if child.flags().has_prototype_property() {
             Some(Self::create_function_prototype(
@@ -254,7 +254,7 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         let root_shape = agent
             .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+            .and_then(|realm| realm.root_shape())
             .ok_or(VmError::MissingRootShape(realm))?;
         Ok(agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
@@ -660,7 +660,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        realm,
+                        &realm,
                         capability,
                         true,
                         completion.thrown_value().unwrap_or(Value::undefined()),
@@ -674,7 +674,7 @@ impl Vm {
             .ok_or_else(|| VmError::MissingRootShape(frame.realm()))?;
         Self::enqueue_promise_then(
             agent,
-            realm,
+            &realm,
             value_wrapper,
             lyng_js_env::PromiseReactionHandler::AsyncFromSyncIteratorValue { done },
             if done {
@@ -1122,7 +1122,7 @@ fn callable_prototype_for_function(
 ) -> VmResult<Option<ObjectRef>> {
     let intrinsics = agent
         .realm(realm)
-        .map(lyng_js_env::RealmRecord::intrinsics)
+        .map(|realm| realm.intrinsics())
         .ok_or(VmError::MissingRootShape(realm))?;
     Ok(if kind_flags.is_async_generator() {
         intrinsics.async_generator_function_prototype()
@@ -1142,7 +1142,7 @@ fn prototype_parent_for_function(
 ) -> VmResult<ObjectRef> {
     let intrinsics = agent
         .realm(realm)
-        .map(lyng_js_env::RealmRecord::intrinsics)
+        .map(|realm| realm.intrinsics())
         .ok_or(VmError::MissingRootShape(realm))?;
     if kind_flags.is_async_generator() {
         intrinsics

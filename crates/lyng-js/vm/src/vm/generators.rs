@@ -161,12 +161,7 @@ impl Vm {
                         if raw_iterator_result {
                             Ok(value)
                         } else {
-                            Self::generator_result_object(
-                                agent,
-                                caller_frame.realm(),
-                                value,
-                                false,
-                            )
+                            Self::generator_result_object(agent, caller_frame.realm(), value, false)
                         }
                     }
                     GeneratorExecutionOutcome::Throw(thrown) => Err(VmError::Abrupt(
@@ -232,7 +227,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                realm,
+                &realm,
                 capability,
                 true,
                 type_error_value,
@@ -247,7 +242,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                realm,
+                &realm,
                 capability,
                 true,
                 type_error_value,
@@ -563,7 +558,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    realm,
+                    &realm,
                     request.capability,
                     false,
                     value,
@@ -574,7 +569,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    realm,
+                    &realm,
                     request.capability,
                     true,
                     thrown,
@@ -597,7 +592,7 @@ impl Vm {
         let realm = agent
             .realm(request.realm)
             .ok_or(VmError::MissingRootShape(request.realm))?;
-        let caller = self.synthetic_job_caller_frame(realm);
+        let caller = self.synthetic_job_caller_frame(&realm);
         let promise = match self.promise_resolve_in_realm(
             agent,
             host,
@@ -622,7 +617,7 @@ impl Vm {
         };
         Self::enqueue_promise_then(
             agent,
-            realm,
+            &realm,
             promise,
             lyng_js_env::PromiseReactionHandler::AsyncGeneratorReturn {
                 generator,
@@ -647,7 +642,7 @@ impl Vm {
         let realm = agent
             .realm(request.realm)
             .ok_or(VmError::MissingRootShape(request.realm))?;
-        let caller = self.synthetic_job_caller_frame(realm);
+        let caller = self.synthetic_job_caller_frame(&realm);
         let promise = match self.promise_resolve_in_realm(
             agent,
             host,
@@ -668,7 +663,7 @@ impl Vm {
         };
         Self::enqueue_promise_then(
             agent,
-            realm,
+            &realm,
             promise,
             lyng_js_env::PromiseReactionHandler::AsyncGeneratorReturnResume {
                 suspended,

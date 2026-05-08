@@ -4,7 +4,7 @@ use crate::{
     BuiltinPropertyValueSpec,
 };
 use lyng_js_common::WellKnownAtom;
-use lyng_js_env::{Agent, RealmRecord};
+use lyng_js_env::Agent;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_types::{
     aggregate_error_builtin, array_buffer_builtin, array_builtin, big_int64_array_builtin,

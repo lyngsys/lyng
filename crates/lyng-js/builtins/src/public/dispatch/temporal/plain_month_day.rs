@@ -12,9 +12,9 @@ use super::{
     temporal_validate_optional_iso_calendar_identifier_argument,
     temporal_validate_optional_iso_calendar_property, type_error, AllocationLifetime,
     BuiltinFunctionId, BuiltinInvocation, ObjectAllocation, ObjectColdData, ObjectRef,
-    OrdinaryObjectData, PublicBuiltinDispatchContext, RealmRecord, TemporalObjectData,
-    TemporalObjectKind, TemporalOverflow, TemporalPlainDateObjectData,
-    TemporalPlainMonthDayObjectData, TemporalZonedDateTimeCalendarNameOption, Value,
+    OrdinaryObjectData, PublicBuiltinDispatchContext, TemporalObjectData, TemporalObjectKind,
+    TemporalOverflow, TemporalPlainDateObjectData, TemporalPlainMonthDayObjectData,
+    TemporalZonedDateTimeCalendarNameOption, Value,
     TEMPORAL_DEFAULT_PLAIN_MONTH_DAY_REFERENCE_YEAR,
 };
 
@@ -189,7 +189,7 @@ pub(super) fn allocate_temporal_plain_month_day_object<Cx: PublicBuiltinDispatch
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(RealmRecord::root_shape)
+        .and_then(|realm| realm.root_shape())
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();

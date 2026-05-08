@@ -359,7 +359,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        realm_record: RealmRecord,
+        realm_record: &RealmRecord,
         request_id: u32,
     ) -> VmResult<()> {
         let Some(request) = self
@@ -410,7 +410,7 @@ impl Vm {
     fn evaluate_dynamic_import_request(
         &mut self,
         agent: &mut Agent,
-        realm_record: RealmRecord,
+        realm_record: &RealmRecord,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         request: &DynamicImportRequest,
@@ -516,7 +516,7 @@ impl Vm {
     fn evaluate_deferred_dynamic_import_request(
         &mut self,
         agent: &mut Agent,
-        realm_record: RealmRecord,
+        realm_record: &RealmRecord,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         key: ModuleKey,
@@ -680,12 +680,12 @@ impl Vm {
                     let realm = agent
                         .realm(waiter.realm)
                         .ok_or(VmError::MissingRootShape(waiter.realm))?;
-                    let namespace = self.module_namespace_object(agent, realm, key)?;
+                    let namespace = self.module_namespace_object(agent, &realm, key)?;
                     self.settle_promise_capability(
                         agent,
                         host,
                         registry,
-                        realm,
+                        &realm,
                         waiter.capability,
                         false,
                         Value::from_object_ref(namespace),
@@ -703,7 +703,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        realm,
+                        &realm,
                         waiter.capability,
                         true,
                         reason,
@@ -780,10 +780,7 @@ impl Vm {
         }
     }
 
-    fn dynamic_import_host_error_value(
-        agent: &mut Agent,
-        error: lyng_js_host::HostError,
-    ) -> Value {
+    fn dynamic_import_host_error_value(agent: &mut Agent, error: lyng_js_host::HostError) -> Value {
         Value::from_string_ref(alloc_string(agent, &error.to_string(), None))
     }
 }

@@ -604,7 +604,7 @@ impl Vm {
             Some(lyng_js_bytecode::BytecodeFunctionKind::Arrow) => {
                 let global_object = agent
                     .realm(caller.realm())
-                    .map(lyng_js_env::RealmRecord::global_object);
+                    .map(|realm| realm.global_object());
                 Self::this_environment_record(agent, caller.lexical_env()).is_ok_and(|record| {
                     record.is_some_and(|record| Some(record.function_object()) != global_object)
                 })
@@ -954,8 +954,7 @@ impl Vm {
             for &name in function_names.iter().chain(var_names) {
                 if Self::direct_eval_variable_environment_has_own_lexical_binding(
                     agent, var_env, name,
-                )
-                {
+                ) {
                     return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
                 }
             }

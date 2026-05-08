@@ -8,7 +8,7 @@ use super::{
     reference_error, type_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_env::{DisposalCapabilityKind, RealmRecord};
+use lyng_js_env::DisposalCapabilityKind;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::ObjectAllocation;
 use lyng_js_ops::errors;
@@ -126,10 +126,7 @@ fn disposal_stack_default_prototype<Cx: PublicBuiltinDispatchContext>(
     realm: RealmRef,
     kind: lyng_js_env::DisposalCapabilityKind,
 ) -> Result<ObjectRef, Cx::Error> {
-    let intrinsics = cx
-        .agent()
-        .realm(realm)
-        .map(lyng_js_env::RealmRecord::intrinsics);
+    let intrinsics = cx.agent().realm(realm).map(|realm| realm.intrinsics());
     let prototype = match kind {
         lyng_js_env::DisposalCapabilityKind::Sync => {
             intrinsics.and_then(lyng_js_env::Intrinsics::disposable_stack_prototype)
@@ -150,7 +147,7 @@ fn create_disposal_stack_object<Cx: PublicBuiltinDispatchContext>(
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(RealmRecord::root_shape)
+        .and_then(|realm| realm.root_shape())
         .ok_or_else(|| type_error(cx))?;
     let payload = disposal_capability_payload_value(capability);
     let object = cx.agent().with_heap_and_objects(|heap, objects| {

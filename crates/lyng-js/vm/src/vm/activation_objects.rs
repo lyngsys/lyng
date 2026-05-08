@@ -20,7 +20,7 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         let root_shape = agent
             .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+            .and_then(|realm| realm.root_shape())
             .ok_or(VmError::MissingRootShape(realm))?;
         let object_prototype = agent
             .realm(realm)
@@ -178,10 +178,7 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn sync_engine_array_length(
-        agent: &mut Agent,
-        object: ObjectRef,
-    ) -> VmResult<()> {
+    pub(super) fn sync_engine_array_length(agent: &mut Agent, object: ObjectRef) -> VmResult<()> {
         let is_engine_array = agent
             .objects()
             .object_header(agent.heap().view(), object)

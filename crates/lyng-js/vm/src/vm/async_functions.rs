@@ -121,7 +121,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    realm_record,
+                    &realm_record,
                     capability,
                     false,
                     value,
@@ -133,7 +133,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    realm_record,
+                    &realm_record,
                     capability,
                     true,
                     thrown,
@@ -179,7 +179,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         suspended: SuspendedExecutionRef,
         rejected: bool,
         argument: Value,
@@ -276,7 +276,7 @@ impl Vm {
             agent,
             host,
             registry,
-            realm_record,
+            &realm_record,
             capability,
             false,
             value,
@@ -292,11 +292,8 @@ impl Vm {
             .realm(realm)
             .and_then(|record| record.intrinsics().promise_prototype())
             .ok_or(VmError::MissingRootShape(realm))?;
-        let promise = Self::allocate_ordinary_object_with_prototype(
-            agent,
-            realm,
-            Some(promise_prototype),
-        )?;
+        let promise =
+            Self::allocate_ordinary_object_with_prototype(agent, realm, Some(promise_prototype))?;
         let _ = agent.alloc_promise(promise, realm);
         let capability = agent.alloc_promise_capability();
         let _ = agent.set_promise_capability_promise(capability, promise);
@@ -305,8 +302,11 @@ impl Vm {
             realm,
             promise_resolve_function_builtin(),
         )?;
-        let reject =
-            Self::allocate_builtin_function_object(agent, realm, promise_reject_function_builtin())?;
+        let reject = Self::allocate_builtin_function_object(
+            agent,
+            realm,
+            promise_reject_function_builtin(),
+        )?;
         let _ = agent.set_promise_capability_resolve(capability, resolve);
         let _ = agent.set_promise_capability_reject(capability, reject);
         let _ = agent.alloc_promise_resolving_function(
@@ -395,13 +395,18 @@ impl Vm {
                 let realm = agent
                     .realm(record.realm())
                     .ok_or_else(|| VmError::MissingRootShape(record.realm()))?;
-                Self::enqueue_promise_reaction_job(agent, realm, fulfill_reaction, record.result());
+                Self::enqueue_promise_reaction_job(
+                    agent,
+                    &realm,
+                    fulfill_reaction,
+                    record.result(),
+                );
             }
             lyng_js_env::PromiseState::Rejected => {
                 let realm = agent
                     .realm(record.realm())
                     .ok_or_else(|| VmError::MissingRootShape(record.realm()))?;
-                Self::enqueue_promise_reaction_job(agent, realm, reject_reaction, record.result());
+                Self::enqueue_promise_reaction_job(agent, &realm, reject_reaction, record.result());
             }
         }
         Ok(())

@@ -1080,12 +1080,12 @@ impl Vm {
                 let realm = agent
                     .realm(caller.realm())
                     .ok_or_else(|| VmError::MissingRootShape(caller.realm()))?;
-                let module_env = self.link_module_graph(agent, realm, &key)?;
+                let module_env = self.link_module_graph(agent, &realm, &key)?;
                 if !self.ready_for_sync_module_execution(agent, &key, &mut Vec::new())? {
                     return Err(VmError::Abrupt(errors::throw_type_error(agent)));
                 }
                 let result = self.evaluate_module_graph(
-                    agent, realm, &key, module_env, host, registry, None, true,
+                    agent, &realm, &key, module_env, host, registry, None, true,
                 );
                 if agent
                     .module_record(&key)

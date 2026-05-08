@@ -401,7 +401,7 @@ pub(super) fn allocate_temporal_zoned_date_time_object<Cx: PublicBuiltinDispatch
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(RealmRecord::root_shape)
+        .and_then(|realm| realm.root_shape())
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();

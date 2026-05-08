@@ -36,14 +36,14 @@ use super::{
     temporal_zoned_date_time_civil, temporal_zoned_date_time_from_parts, to_string_string_ref,
     type_error, validate_temporal_duration, AllocationLifetime, BuiltinFunctionId,
     BuiltinInvocation, ObjectAllocation, ObjectColdData, ObjectRef, OrdinaryObjectData,
-    PublicBuiltinDispatchContext, RealmRecord, TemporalBuiltinDurationExactUnit,
-    TemporalBuiltinRoundingMode, TemporalCivilToInstantRequest, TemporalDateDifferenceUnit,
-    TemporalDisambiguation, TemporalDurationObjectData, TemporalDurationRelativeTo,
-    TemporalInstantStringPrecision, TemporalObjectData, TemporalObjectKind, TemporalOverflow,
-    TemporalPlainDateObjectData, TemporalPlainDateTimeBagFields, TemporalPlainDateTimeObjectData,
-    TemporalPlainTimeObjectData, TemporalZonedDateTimeCalendarNameOption, Value,
-    TEMPORAL_NANOS_PER_DAY, TEMPORAL_NANOS_PER_HOUR, TEMPORAL_NANOS_PER_MICROSECOND,
-    TEMPORAL_NANOS_PER_MILLISECOND, TEMPORAL_NANOS_PER_MINUTE, TEMPORAL_NANOS_PER_SECOND,
+    PublicBuiltinDispatchContext, TemporalBuiltinDurationExactUnit, TemporalBuiltinRoundingMode,
+    TemporalCivilToInstantRequest, TemporalDateDifferenceUnit, TemporalDisambiguation,
+    TemporalDurationObjectData, TemporalDurationRelativeTo, TemporalInstantStringPrecision,
+    TemporalObjectData, TemporalObjectKind, TemporalOverflow, TemporalPlainDateObjectData,
+    TemporalPlainDateTimeBagFields, TemporalPlainDateTimeObjectData, TemporalPlainTimeObjectData,
+    TemporalZonedDateTimeCalendarNameOption, Value, TEMPORAL_NANOS_PER_DAY,
+    TEMPORAL_NANOS_PER_HOUR, TEMPORAL_NANOS_PER_MICROSECOND, TEMPORAL_NANOS_PER_MILLISECOND,
+    TEMPORAL_NANOS_PER_MINUTE, TEMPORAL_NANOS_PER_SECOND,
 };
 
 #[allow(
@@ -273,7 +273,7 @@ pub(super) fn allocate_temporal_plain_date_time_object<Cx: PublicBuiltinDispatch
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(RealmRecord::root_shape)
+        .and_then(|realm| realm.root_shape())
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();

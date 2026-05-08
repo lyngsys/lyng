@@ -849,7 +849,7 @@ impl Vm {
     pub fn load_module_graph_from_host(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         host: &dyn HostHooks,
         request: &ModuleSourceRequest,
     ) -> Result<LoadedModuleRoot, ModuleLoadError> {
@@ -871,7 +871,7 @@ impl Vm {
     pub fn load_module_graph_from_host_and_extensions(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         host: &dyn HostHooks,
         request: &ModuleSourceRequest,
         provider: Option<&SharedRealmExtensionProvider>,
@@ -962,7 +962,7 @@ impl Vm {
             Some(provider) => self.with_extension_provider(provider, |vm| {
                 vm.evaluate_script_with_host_referrer_retaining_installed(
                     agent,
-                    realm,
+                    &realm,
                     unit,
                     script_referrer,
                     host,
@@ -970,7 +970,7 @@ impl Vm {
             }),
             None => self.evaluate_script_with_host_referrer_retaining_installed(
                 agent,
-                realm,
+                &realm,
                 unit,
                 script_referrer,
                 host,
@@ -1095,7 +1095,7 @@ impl Vm {
         let installed = self.install_script(agent, realm.id(), unit)?;
         let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
         self.install_active_realm_extensions(agent, realm.id())?;
-        Self::instantiate_global_script(agent, realm, unit.instantiation_plan())?;
+        Self::instantiate_global_script(agent, &realm, unit.instantiation_plan())?;
         let mut registry = RejectingNativeRegistry;
         self.evaluate_entry_with_registry_and_checkpoint(
             agent,
@@ -1195,7 +1195,7 @@ impl Vm {
         let installed = self.install_script(agent, realm.id(), unit)?;
         let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
         self.install_active_realm_extensions(agent, realm.id())?;
-        Self::instantiate_global_script(agent, realm, unit.instantiation_plan())?;
+        Self::instantiate_global_script(agent, &realm, unit.instantiation_plan())?;
         let script_referrer =
             script_referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         self.evaluate_entry_with_registry_and_checkpoint(
@@ -1214,7 +1214,7 @@ impl Vm {
     fn evaluate_script_with_host_referrer_retaining_installed(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         unit: &CompiledScriptUnit,
         script_referrer: Option<&ModuleKey>,
         host: &dyn HostHooks,
@@ -1311,7 +1311,7 @@ impl Vm {
     ) -> VmResult<EnvironmentRef> {
         let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
         self.install_active_realm_extensions(agent, realm.id())?;
-        self.link_module_graph(agent, realm, key)
+        self.link_module_graph(agent, &realm, key)
     }
 
     /// # Errors
@@ -1373,9 +1373,9 @@ impl Vm {
     ) -> VmResult<Value> {
         let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
         self.install_active_realm_extensions(agent, realm.id())?;
-        let module_env = self.link_module_graph(agent, realm, key)?;
+        let module_env = self.link_module_graph(agent, &realm, key)?;
         let result =
-            self.evaluate_module_graph(agent, realm, key, module_env, host, registry, None, true);
+            self.evaluate_module_graph(agent, &realm, key, module_env, host, registry, None, true);
         let result = match result {
             Ok(value) => {
                 self.checkpoint_promise_jobs(agent, host, registry)?;
@@ -1508,7 +1508,7 @@ impl Vm {
     fn ensure_module_loaded_from_host(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         host: &dyn HostHooks,
         loaded: lyng_js_host::LoadedModuleSource,
     ) -> Result<LoadedModuleRoot, ModuleLoadError> {
@@ -1812,7 +1812,7 @@ impl Vm {
     fn allocate_module_entry_environment(
         &self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         installed: InstalledCode,
     ) -> VmResult<EnvironmentRef> {
         let function = self
@@ -1838,7 +1838,7 @@ impl Vm {
     fn link_module_graph(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         key: &ModuleKey,
     ) -> VmResult<EnvironmentRef> {
         let (status, environment, code, requested_modules, import_entries) = {
@@ -1905,7 +1905,7 @@ impl Vm {
     fn initialize_module_hoisted_functions(
         &self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         code: CodeRef,
         module_env: EnvironmentRef,
     ) -> VmResult<()> {
@@ -2025,7 +2025,7 @@ impl Vm {
     fn evaluate_module_graph(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         key: &ModuleKey,
         module_env: EnvironmentRef,
         host: &dyn HostHooks,
@@ -2288,7 +2288,7 @@ impl Vm {
     fn drain_async_dependency_blocked_modules(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         defer_waiter_flush_for: Option<&ModuleKey>,
@@ -2320,7 +2320,7 @@ impl Vm {
     fn bind_module_imports(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         module_env: EnvironmentRef,
         requested_modules: &[ModuleRequestRecord],
         import_entries: &[ModuleImportEntry],
@@ -2398,7 +2398,7 @@ impl Vm {
     fn compute_module_resolved_exports(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         key: &ModuleKey,
     ) -> VmResult<Vec<ModuleResolvedExport>> {
         let (local_exports, indirect_exports) = {
@@ -2444,7 +2444,7 @@ impl Vm {
     fn collect_module_exported_names(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         key: &ModuleKey,
         export_star_set: &mut Vec<ModuleKey>,
     ) -> VmResult<Vec<AtomId>> {
@@ -2502,7 +2502,7 @@ impl Vm {
     fn resolve_module_export(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         key: &ModuleKey,
         export_name: AtomId,
         resolve_set: &mut Vec<(ModuleKey, AtomId)>,
@@ -2678,7 +2678,7 @@ impl Vm {
     fn module_namespace_object(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         key: &ModuleKey,
     ) -> VmResult<ObjectRef> {
         self.module_namespace_object_with_phase(agent, realm, key, false)
@@ -2687,7 +2687,7 @@ impl Vm {
     fn module_namespace_object_for_request(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         key: &ModuleKey,
         phase: ModuleRequestPhase,
     ) -> VmResult<ObjectRef> {
@@ -2702,7 +2702,7 @@ impl Vm {
     fn module_namespace_object_with_phase(
         &mut self,
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         key: &ModuleKey,
         deferred: bool,
     ) -> VmResult<ObjectRef> {

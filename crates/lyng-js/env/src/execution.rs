@@ -248,42 +248,42 @@ pub struct RealmRecord {
 
 impl RealmRecord {
     #[inline]
-    pub const fn id(self) -> RealmRef {
+    pub const fn id(&self) -> RealmRef {
         self.id
     }
 
     #[inline]
-    pub const fn global_object(self) -> ObjectRef {
+    pub const fn global_object(&self) -> ObjectRef {
         self.global_object
     }
 
     #[inline]
-    pub const fn global_env(self) -> EnvironmentRef {
+    pub const fn global_env(&self) -> EnvironmentRef {
         self.global_env
     }
 
     #[inline]
-    pub const fn bootstrap_code(self) -> Option<CodeRef> {
+    pub const fn bootstrap_code(&self) -> Option<CodeRef> {
         self.bootstrap_code
     }
 
     #[inline]
-    pub const fn root_shape(self) -> Option<ShapeId> {
+    pub const fn root_shape(&self) -> Option<ShapeId> {
         self.root_shape
     }
 
     #[inline]
-    pub const fn intrinsics(self) -> Intrinsics {
+    pub const fn intrinsics(&self) -> Intrinsics {
         self.intrinsics
     }
 
     #[inline]
-    pub const fn bootstrap_state(self) -> RealmBootstrapState {
+    pub const fn bootstrap_state(&self) -> RealmBootstrapState {
         self.bootstrap_state
     }
 
     #[inline]
-    pub const fn is_default(self) -> bool {
+    pub const fn is_default(&self) -> bool {
         self.is_default
     }
 }

@@ -133,14 +133,14 @@ impl Vm {
         );
         let result = match job.payload() {
             RuntimeJobPayload::Executable => {
-                self.execute_executable_job(agent, host, registry, job, realm_record)
+                self.execute_executable_job(agent, host, registry, job, &realm_record)
             }
             RuntimeJobPayload::PromiseReaction { reaction, argument } => self
                 .execute_promise_reaction_job(
                     agent,
                     host,
                     registry,
-                    realm_record,
+                    &realm_record,
                     reaction,
                     argument,
                 ),
@@ -152,13 +152,13 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                realm_record,
+                &realm_record,
                 promise,
                 thenable,
                 then,
             ),
             RuntimeJobPayload::DynamicImportEvaluate { request, .. } => self
-                .execute_dynamic_import_evaluate_job(agent, host, registry, realm_record, request),
+                .execute_dynamic_import_evaluate_job(agent, host, registry, &realm_record, request),
             RuntimeJobPayload::DynamicImportSettle {
                 capability,
                 value,
@@ -168,7 +168,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                realm_record,
+                &realm_record,
                 capability,
                 value,
                 rejected,
@@ -184,7 +184,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                realm_record,
+                &realm_record,
                 registry_object,
             ),
         };
@@ -219,7 +219,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         job: &RuntimeJob,
-        realm: RealmRecord,
+        realm: &RealmRecord,
     ) -> VmResult<()> {
         let ExecutableId::Bytecode(code) = job.executable() else {
             return Err(VmError::Host(HostError::unsupported(
@@ -252,7 +252,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         reaction_id: lyng_js_env::PromiseReactionId,
         argument: Value,
     ) -> VmResult<()> {
@@ -291,7 +291,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         reaction: lyng_js_env::PromiseReactionRecord,
         argument: Value,
     ) -> VmResult<PromiseReactionOutcome> {
@@ -412,7 +412,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         registry_object: ObjectRef,
     ) -> VmResult<()> {
         let cleanup_callback = agent
@@ -447,7 +447,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         capability: Option<PromiseCapabilityId>,
         on_finally: ObjectRef,
         constructor: ObjectRef,
@@ -519,7 +519,7 @@ impl Vm {
 
     pub(in crate::vm) fn enqueue_promise_then(
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         promise: ObjectRef,
         on_fulfilled: PromiseReactionHandler,
         on_rejected: PromiseReactionHandler,
@@ -566,7 +566,7 @@ impl Vm {
 
     pub(super) fn enqueue_promise_reaction_job(
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         reaction: lyng_js_env::PromiseReactionId,
         argument: Value,
     ) {
@@ -584,7 +584,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         capability: PromiseCapabilityId,
         rejected: bool,
         value: Value,
@@ -616,7 +616,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         promise: ObjectRef,
         thenable: ObjectRef,
         then: ObjectRef,
@@ -656,7 +656,7 @@ impl Vm {
 
     fn create_promise_job_resolving_functions(
         agent: &mut Agent,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         promise: ObjectRef,
     ) -> VmResult<(ObjectRef, ObjectRef)> {
         let capability = agent.alloc_promise_capability();
@@ -695,7 +695,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        realm: RealmRecord,
+        realm: &RealmRecord,
         capability: PromiseCapabilityId,
         value: Value,
         rejected: bool,
@@ -703,7 +703,7 @@ impl Vm {
         self.settle_promise_capability(agent, host, registry, realm, capability, rejected, value)
     }
 
-    pub(super) fn synthetic_job_caller_frame(&self, realm: RealmRecord) -> FrameRecord {
+    pub(super) fn synthetic_job_caller_frame(&self, realm: &RealmRecord) -> FrameRecord {
         FrameRecord::new(
             self.job_caller_code(),
             0,

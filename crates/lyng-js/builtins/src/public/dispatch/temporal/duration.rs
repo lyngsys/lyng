@@ -26,7 +26,7 @@ use super::{
     temporal_zoned_date_time_from_parts, temporal_zoned_date_time_from_value,
     temporal_zoned_date_time_zone_annotation, to_number_for_builtin, to_string_string_ref,
     type_error, AllocationLifetime, BuiltinFunctionId, BuiltinInvocation, ObjectAllocation,
-    ObjectColdData, ObjectRef, OrdinaryObjectData, PublicBuiltinDispatchContext, RealmRecord,
+    ObjectColdData, ObjectRef, OrdinaryObjectData, PublicBuiltinDispatchContext,
     TemporalBuiltinDurationExactUnit, TemporalBuiltinRoundingMode, TemporalCivilDateTime,
     TemporalCivilToInstantRequest, TemporalDateDifferenceUnit, TemporalDateTimeDifferenceUnit,
     TemporalDisambiguation, TemporalDurationObjectData, TemporalObjectData, TemporalObjectKind,
@@ -1154,7 +1154,7 @@ pub(super) fn allocate_temporal_duration_object<Cx: PublicBuiltinDispatchContext
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(RealmRecord::root_shape)
+        .and_then(|realm| realm.root_shape())
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();

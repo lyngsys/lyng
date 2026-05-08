@@ -520,7 +520,7 @@ impl Vm {
         };
         let root_shape = agent
             .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+            .and_then(|realm| realm.root_shape())
             .ok_or(VmError::MissingRootShape(realm))?;
         Ok(agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();

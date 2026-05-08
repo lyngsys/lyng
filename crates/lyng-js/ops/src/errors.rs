@@ -121,7 +121,7 @@ pub fn create_intrinsic_error_object(
 /// Returns the current realm-aware throw value for one common error kind.
 pub fn error_value(agent: &mut Agent, kind: ErrorKind) -> Value {
     current_realm(agent)
-        .map(RealmRecord::id)
+        .map(|realm| realm.id())
         .map(|realm| create_intrinsic_error_object(agent, realm, kind, None))
         .transpose()
         .ok()

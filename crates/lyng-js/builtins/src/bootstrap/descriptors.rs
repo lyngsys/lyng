@@ -1,8 +1,7 @@
 use super::{
     Agent, AllocationLifetime, BuiltinBootstrapError, BuiltinCache, BuiltinDescriptorTable,
     BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor, BuiltinPropertyKeySpec,
-    BuiltinPropertyValueSpec, ObjectRef, PropertyDescriptor, PropertyKey, RealmRecord, RealmRef,
-    Value,
+    BuiltinPropertyValueSpec, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value,
 };
 
 pub fn install_descriptor_tables(
@@ -28,7 +27,7 @@ fn resolve_install_target(
     match target {
         BuiltinInstallTarget::GlobalObject => agent
             .realm(realm)
-            .map(RealmRecord::global_object)
+            .map(|realm| realm.global_object())
             .ok_or(BuiltinBootstrapError::MissingRealm(realm)),
         BuiltinInstallTarget::Intrinsic(intrinsic) => resolve_intrinsic(agent, realm, intrinsic),
         BuiltinInstallTarget::Object(object) => Ok(object),

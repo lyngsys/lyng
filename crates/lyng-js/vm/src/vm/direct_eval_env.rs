@@ -44,10 +44,7 @@ impl Vm {
         layout
     }
 
-    fn environment_outer(
-        agent: &Agent,
-        environment: EnvironmentRef,
-    ) -> Option<EnvironmentRef> {
+    fn environment_outer(agent: &Agent, environment: EnvironmentRef) -> Option<EnvironmentRef> {
         let record = agent.environment(environment)?;
         Some(match record {
             lyng_js_env::EnvironmentRecord::Declarative(record) => record.outer()?,
@@ -161,7 +158,7 @@ impl Vm {
         for scope in site.scopes() {
             let source_environment =
                 Self::direct_eval_scope_source_environment(agent, source_start, scope)
-                .ok_or(VmError::MissingEnvironment(lexical_env))?;
+                    .ok_or(VmError::MissingEnvironment(lexical_env))?;
             let layout = self.direct_eval_lexical_layout(agent, scope.bindings());
             let environment = agent
                 .alloc_declarative_environment(

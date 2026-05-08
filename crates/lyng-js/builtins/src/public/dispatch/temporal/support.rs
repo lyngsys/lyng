@@ -67,7 +67,7 @@ pub(super) fn current_temporal_constructor_prototype<Cx: PublicBuiltinDispatchCo
     let global_object = cx
         .agent()
         .realm(realm)
-        .map(RealmRecord::global_object)
+        .map(|realm| realm.global_object())
         .ok_or_else(|| type_error(cx))?;
     let (temporal_key, instant_key) = {
         let agent = cx.agent();

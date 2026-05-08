@@ -258,9 +258,7 @@ pub(super) fn allocate_iterator_object<Cx: PublicBuiltinDispatchContext>(
     let realm = cx.builtin_realm();
     let root_shape = {
         let agent = cx.agent();
-        agent
-            .realm(realm)
-            .and_then(lyng_js_env::RealmRecord::root_shape)
+        agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     let iterator_object = cx
@@ -627,7 +625,7 @@ fn iterator_to_string_tag_value<Cx: PublicBuiltinDispatchContext>(cx: &mut Cx) -
     let agent = cx.agent();
     let intrinsics = agent
         .realm(realm)
-        .map(lyng_js_env::RealmRecord::intrinsics)
+        .map(|realm| realm.intrinsics())
         .unwrap_or_default();
     let _ = intrinsics; // suppress unused warning; reserved for future custom-tag logic
     super::string_value(cx, "Iterator")

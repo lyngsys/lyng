@@ -21,9 +21,9 @@ use super::{
     temporal_round_epoch_nanoseconds_to_increment, temporal_time_part_from_argument, type_error,
     validate_temporal_duration, AllocationLifetime, BuiltinFunctionId, BuiltinInvocation,
     ObjectAllocation, ObjectColdData, ObjectRef, OrdinaryObjectData, PublicBuiltinDispatchContext,
-    RealmRecord, TemporalBuiltinDurationExactUnit, TemporalBuiltinRoundingMode,
-    TemporalDurationObjectData, TemporalObjectData, TemporalObjectKind, TemporalOverflow,
-    TemporalPlainDateTimeObjectData, TemporalPlainTimeObjectData, Value, TEMPORAL_NANOS_PER_DAY,
+    TemporalBuiltinDurationExactUnit, TemporalBuiltinRoundingMode, TemporalDurationObjectData,
+    TemporalObjectData, TemporalObjectKind, TemporalOverflow, TemporalPlainDateTimeObjectData,
+    TemporalPlainTimeObjectData, Value, TEMPORAL_NANOS_PER_DAY,
 };
 
 pub(super) fn dispatch_temporal_plain_time_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -106,7 +106,7 @@ pub(super) fn allocate_temporal_plain_time_object<Cx: PublicBuiltinDispatchConte
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(RealmRecord::root_shape)
+        .and_then(|realm| realm.root_shape())
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();

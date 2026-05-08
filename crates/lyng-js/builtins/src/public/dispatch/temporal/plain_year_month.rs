@@ -17,10 +17,10 @@ use super::{
     temporal_validate_optional_iso_calendar_identifier_argument,
     temporal_validate_optional_iso_calendar_property, type_error, validate_temporal_duration,
     AllocationLifetime, BuiltinFunctionId, BuiltinInvocation, ObjectAllocation, ObjectColdData,
-    ObjectRef, OrdinaryObjectData, PublicBuiltinDispatchContext, RealmRecord,
-    TemporalBuiltinRoundingMode, TemporalDateDifferenceUnit, TemporalDurationObjectData,
-    TemporalObjectData, TemporalObjectKind, TemporalOverflow, TemporalPlainDateObjectData,
-    TemporalPlainYearMonthObjectData, TemporalZonedDateTimeCalendarNameOption, Value,
+    ObjectRef, OrdinaryObjectData, PublicBuiltinDispatchContext, TemporalBuiltinRoundingMode,
+    TemporalDateDifferenceUnit, TemporalDurationObjectData, TemporalObjectData, TemporalObjectKind,
+    TemporalOverflow, TemporalPlainDateObjectData, TemporalPlainYearMonthObjectData,
+    TemporalZonedDateTimeCalendarNameOption, Value,
 };
 
 pub(super) fn dispatch_temporal_plain_year_month_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -220,7 +220,7 @@ pub(super) fn allocate_temporal_plain_year_month_object<Cx: PublicBuiltinDispatc
     let root_shape = cx
         .agent()
         .realm(realm)
-        .and_then(RealmRecord::root_shape)
+        .and_then(|realm| realm.root_shape())
         .ok_or_else(|| type_error(cx))?;
     let object = {
         let agent = cx.agent();

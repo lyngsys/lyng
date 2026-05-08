@@ -161,7 +161,7 @@ fn unit_runtime_atom(
 
 fn install_global_value(
     agent: &mut lyng_js_env::Agent,
-    realm: lyng_js_env::RealmRecord,
+    realm: &lyng_js_env::RealmRecord,
     name: AtomId,
     value: Value,
 ) {
@@ -191,7 +191,7 @@ fn decode_string(view: PrimitiveStringView<'_>) -> String {
 
 fn global_value(
     agent: &mut lyng_js_env::Agent,
-    realm: lyng_js_env::RealmRecord,
+    realm: &lyng_js_env::RealmRecord,
     name: &str,
 ) -> Value {
     let atom = agent.atoms_mut().intern_collectible(name);
@@ -749,7 +749,7 @@ fn host_module_loader_recurses_through_attributes_and_import_meta() {
     let loaded = vm
         .load_module_graph_from_host(
             agent,
-            realm,
+            &realm,
             &host,
             &ModuleSourceRequest {
                 specifier: "entry.mjs".into(),
@@ -847,7 +847,7 @@ fn host_module_loader_keeps_named_default_function_exports_live() {
     let loaded = vm
         .load_module_graph_from_host(
             agent,
-            realm,
+            &realm,
             &host,
             &ModuleSourceRequest {
                 specifier: "entry.mjs".into(),
@@ -1148,7 +1148,7 @@ fn module_namespace_reads_initialized_local_renamed_indirect_and_default_exports
     let loaded = vm
         .load_module_graph_from_host(
             agent,
-            realm,
+            &realm,
             &host,
             &ModuleSourceRequest {
                 specifier: "main.mjs".into(),
@@ -1201,7 +1201,7 @@ fn module_namespace_numeric_export_names_match_array_index_keys() {
     let loaded = vm
         .load_module_graph_from_host(
             agent,
-            realm,
+            &realm,
             &host,
             &ModuleSourceRequest {
                 specifier: "main.mjs".into(),
@@ -1254,7 +1254,7 @@ fn module_namespace_get_own_property_reports_initialized_exports() {
     let loaded = vm
         .load_module_graph_from_host(
             agent,
-            realm,
+            &realm,
             &host,
             &ModuleSourceRequest {
                 specifier: "main.mjs".into(),
@@ -2743,7 +2743,7 @@ fn dynamic_import_does_not_preempt_static_module_dfs_evaluation() {
     let loaded = vm
         .load_module_graph_from_host(
             agent,
-            realm,
+            &realm,
             &host,
             &ModuleSourceRequest {
                 specifier: "main.mjs".into(),
@@ -3238,12 +3238,12 @@ fn dynamic_import_defer_sync_module_evaluates_on_namespace_access() {
         )
         .expect("import.defer sync regression should evaluate");
 
-    let before = global_value(agent, realm, "beforeDeferredAccess")
+    let before = global_value(agent, &realm, "beforeDeferredAccess")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
         .map(decode_string)
         .expect("beforeDeferredAccess should be a string");
-    let after = global_value(agent, realm, "afterDeferredAccess")
+    let after = global_value(agent, &realm, "afterDeferredAccess")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
         .map(decode_string)
@@ -3302,7 +3302,7 @@ fn static_import_defer_sync_module_evaluates_on_namespace_access() {
     let loaded = vm
         .load_module_graph_from_host(
             agent,
-            realm,
+            &realm,
             &host,
             &ModuleSourceRequest {
                 specifier: "main.mjs".into(),
@@ -3320,12 +3320,12 @@ fn static_import_defer_sync_module_evaluates_on_namespace_access() {
     )
     .expect("static import defer sync regression should evaluate");
 
-    let before = global_value(agent, realm, "beforeDeferredAccess")
+    let before = global_value(agent, &realm, "beforeDeferredAccess")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
         .map(decode_string)
         .expect("beforeDeferredAccess should be a string");
-    let after = global_value(agent, realm, "afterDeferredAccess")
+    let after = global_value(agent, &realm, "afterDeferredAccess")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
         .map(decode_string)
@@ -3435,7 +3435,7 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
     let loaded = vm
         .load_module_graph_from_host(
             agent,
-            realm,
+            &realm,
             &host,
             &ModuleSourceRequest {
                 specifier: "./main.mjs".into(),
@@ -3454,30 +3454,30 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
     )
     .expect("static import defer async graph should evaluate");
 
-    assert!(global_value(agent, realm, "beforeDeferredAsyncReady")
+    assert!(global_value(agent, &realm, "beforeDeferredAsyncReady")
         .as_object_ref()
         .is_some());
-    assert!(global_value(agent, realm, "duringDeferredAsyncReady")
+    assert!(global_value(agent, &realm, "duringDeferredAsyncReady")
         .as_object_ref()
         .is_some());
     assert_eq!(
-        global_value(agent, realm, "afterDeferredAsyncReadyError"),
+        global_value(agent, &realm, "afterDeferredAsyncReadyError"),
         Value::undefined()
     );
     assert_eq!(
-        global_value(agent, realm, "afterDeferredAsyncReady"),
+        global_value(agent, &realm, "afterDeferredAsyncReady"),
         Value::from_smi(1)
     );
     assert_eq!(
-        global_value(agent, realm, "doneBeforeDeferredAsyncReady"),
+        global_value(agent, &realm, "doneBeforeDeferredAsyncReady"),
         Value::from_bool(true)
     );
     assert_eq!(
-        global_value(agent, realm, "doneDuringDeferredAsyncReady"),
+        global_value(agent, &realm, "doneDuringDeferredAsyncReady"),
         Value::from_bool(true)
     );
     assert_eq!(
-        global_value(agent, realm, "doneAfterDeferredAsyncReady"),
+        global_value(agent, &realm, "doneAfterDeferredAsyncReady"),
         Value::from_smi(1)
     );
 }
@@ -3542,12 +3542,12 @@ fn static_import_defer_preserves_prior_evaluation_error_identity() {
         .expect("script result promise should stay tracked");
     assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
     assert_eq!(
-        global_value(agent, realm, "deferredErrorIdentity"),
+        global_value(agent, &realm, "deferredErrorIdentity"),
         Value::from_bool(true)
     );
     assert_eq!(
-        global_value(agent, realm, "firstDeferredError"),
-        global_value(agent, realm, "secondDeferredError")
+        global_value(agent, &realm, "firstDeferredError"),
+        global_value(agent, &realm, "secondDeferredError")
     );
 }
 
@@ -3578,7 +3578,7 @@ fn static_source_phase_import_rejects_source_text_modules_with_syntax_error() {
     let loaded = vm
         .load_module_graph_from_host(
             agent,
-            realm,
+            &realm,
             &host,
             &ModuleSourceRequest {
                 specifier: "entry.mjs".into(),
@@ -8129,7 +8129,7 @@ fn generator_call_returns_a_generator_without_running_the_body() {
     let mut vm = Vm::new();
 
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
-    let iter = global_value(agent, realm, "iter")
+    let iter = global_value(agent, &realm, "iter")
         .as_object_ref()
         .expect("generator call should return an object");
 
@@ -9282,7 +9282,7 @@ fn generator_call_runs_parameter_instantiation_before_suspending_start() {
     let mut vm = Vm::new();
 
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
-    let iter = global_value(agent, realm, "iter")
+    let iter = global_value(agent, &realm, "iter")
         .as_object_ref()
         .expect("generator call should return an object");
 
@@ -9361,13 +9361,13 @@ fn generator_instances_use_the_function_prototype_chain() {
     let _ = vm.evaluate_script(agent, realm, &unit).unwrap();
 
     assert_eq!(
-        global_value(agent, realm, "directProtoMatches"),
+        global_value(agent, &realm, "directProtoMatches"),
         Value::from_bool(true)
     );
-    let shared_next = global_value(agent, realm, "sharedNext")
+    let shared_next = global_value(agent, &realm, "sharedNext")
         .as_string_ref()
         .expect("typeof shared prototype next should be a string");
-    let shared_tag = global_value(agent, realm, "sharedTag")
+    let shared_tag = global_value(agent, &realm, "sharedTag")
         .as_string_ref()
         .expect("shared prototype tag should be a string");
 
@@ -10278,8 +10278,8 @@ fn generator_next_resumes_with_the_sent_value() {
     let mut vm = Vm::new();
 
     let _ = vm.evaluate_script(agent, realm, &unit).unwrap();
-    let first = global_value(agent, realm, "first");
-    let second = global_value(agent, realm, "second");
+    let first = global_value(agent, &realm, "first");
+    let second = global_value(agent, &realm, "second");
     let (first_value, first_done) = iterator_result_fields(agent, first);
     let (second_value, second_done) = iterator_result_fields(agent, second);
 
@@ -10314,7 +10314,7 @@ fn generator_return_runs_finally_before_completing() {
     let mut vm = Vm::new();
 
     let final_state = vm.evaluate_script(agent, realm, &unit).unwrap();
-    let result = global_value(agent, realm, "result");
+    let result = global_value(agent, &realm, "result");
     let (value, done) = iterator_result_fields(agent, result);
 
     assert_eq!(final_state, Value::from_smi(7));
@@ -10380,10 +10380,13 @@ fn for_of_destructuring_assignment_defaults_only_for_undefined_values() {
 
     let _ = vm.evaluate_script(agent, realm, &unit).unwrap();
 
-    assert_eq!(global_value(agent, realm, "counter"), Value::from_smi(1));
-    assert_eq!(global_value(agent, realm, "flag1"), Value::from_bool(true));
-    assert_eq!(global_value(agent, realm, "flag2"), Value::from_bool(false));
-    assert_eq!(global_value(agent, realm, "y"), Value::from_smi(1));
+    assert_eq!(global_value(agent, &realm, "counter"), Value::from_smi(1));
+    assert_eq!(global_value(agent, &realm, "flag1"), Value::from_bool(true));
+    assert_eq!(
+        global_value(agent, &realm, "flag2"),
+        Value::from_bool(false)
+    );
+    assert_eq!(global_value(agent, &realm, "y"), Value::from_smi(1));
 }
 
 #[test]
@@ -10445,8 +10448,8 @@ fn yield_star_delegates_generator_values_and_final_completion() {
     let mut vm = Vm::new();
 
     let _ = vm.evaluate_script(agent, realm, &unit).unwrap();
-    let first = global_value(agent, realm, "first");
-    let second = global_value(agent, realm, "second");
+    let first = global_value(agent, &realm, "first");
+    let second = global_value(agent, &realm, "second");
     let (first_value, first_done) = iterator_result_fields(agent, first);
     let (second_value, second_done) = iterator_result_fields(agent, second);
 
@@ -10616,8 +10619,8 @@ fn generator_methods_on_classes_lower_through_the_shared_class_path() {
     let mut vm = Vm::new();
 
     let _ = vm.evaluate_script(agent, realm, &unit).unwrap();
-    let first = global_value(agent, realm, "first");
-    let second = global_value(agent, realm, "second");
+    let first = global_value(agent, &realm, "first");
+    let second = global_value(agent, &realm, "second");
     let (first_value, first_done) = iterator_result_fields(agent, first);
     let (second_value, second_done) = iterator_result_fields(agent, second);
 
@@ -11073,8 +11076,7 @@ fn global_script_instantiation_precreates_non_configurable_var_bindings() {
         .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
         .expect("bootstrap should succeed");
     let _ = vm.install_script(agent, realm.id(), &unit).unwrap();
-    Vm::instantiate_global_script(agent, realm, unit.instantiation_plan())
-        .unwrap();
+    Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan()).unwrap();
 
     let x_atom = unit_runtime_atom(agent, &unit, unit_atom(&unit, "x"));
     let descriptor = agent
@@ -11109,8 +11111,7 @@ fn global_script_instantiation_uses_dictionary_storage_for_bulk_var_bindings() {
         .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
         .expect("bootstrap should succeed");
     let _ = vm.install_script(agent, realm.id(), &unit).unwrap();
-    Vm::instantiate_global_script(agent, realm, unit.instantiation_plan())
-        .unwrap();
+    Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan()).unwrap();
 
     assert_eq!(
         agent
@@ -11232,7 +11233,7 @@ fn global_load_matches_runtime_atom_text_when_ids_differ() {
     let realm = agent.default_realm().expect("default realm should exist");
     let _ = agent.atoms_mut().intern_collectible("padding");
     let runtime_name = agent.atoms_mut().intern_collectible("runtimeOnly");
-    install_global_value(agent, realm, runtime_name, Value::from_smi(13));
+    install_global_value(agent, &realm, runtime_name, Value::from_smi(13));
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
@@ -11252,7 +11253,7 @@ fn typeof_name_resolution_matches_runtime_atom_text_when_ids_differ() {
     let realm = agent.default_realm().expect("default realm should exist");
     let _ = agent.atoms_mut().intern_collectible("padding");
     let runtime_name = agent.atoms_mut().intern_collectible("runtimeOnly");
-    install_global_value(agent, realm, runtime_name, Value::from_smi(13));
+    install_global_value(agent, &realm, runtime_name, Value::from_smi(13));
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
@@ -12083,7 +12084,7 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     for (index, object) in sources.into_iter().enumerate() {
-        install_global_value(agent, realm, source_name, Value::from_object_ref(object));
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
         assert_eq!(
             vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
                 .unwrap(),
@@ -12151,7 +12152,7 @@ fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
         AllocationLifetime::Default,
     )
     .unwrap());
-    install_global_value(agent, realm, source_name, Value::from_object_ref(object));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
 
     let mut vm = Vm::new();
     let named_installed = vm.install_script(agent, realm.id(), &named_unit).unwrap();
@@ -12209,7 +12210,7 @@ fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
     });
     install_global_value(
         agent,
-        realm,
+        &realm,
         dense_source_name,
         Value::from_object_ref(dense_object),
     );
@@ -12292,7 +12293,7 @@ fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
         AllocationLifetime::Default,
     )
     .unwrap());
-    install_global_value(agent, realm, source_name, Value::from_object_ref(receiver));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(receiver));
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
@@ -12811,7 +12812,7 @@ fn named_property_load_ic_becomes_monomorphic_for_one_shape() {
         AllocationLifetime::Default,
     )
     .unwrap());
-    install_global_value(agent, realm, source_name, Value::from_object_ref(object));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
@@ -12850,7 +12851,7 @@ fn global_property_load_ic_becomes_monomorphic_for_global_object_data_property()
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let global_value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "globalValue"));
-    install_global_value(agent, realm, global_value_name, Value::from_smi(11));
+    install_global_value(agent, &realm, global_value_name, Value::from_smi(11));
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
@@ -12892,7 +12893,7 @@ fn global_property_store_ic_caches_global_object_data_property() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let global_value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "globalValue"));
-    install_global_value(agent, realm, global_value_name, Value::from_smi(0));
+    install_global_value(agent, &realm, global_value_name, Value::from_smi(0));
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
@@ -12974,7 +12975,7 @@ fn named_property_load_ic_grows_polymorphic_and_then_megamorphic() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     for (index, object) in sources.into_iter().enumerate() {
-        install_global_value(agent, realm, source_name, Value::from_object_ref(object));
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
         assert_eq!(
             vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
                 .unwrap(),
@@ -13023,7 +13024,7 @@ fn named_property_store_ic_caches_own_data_paths() {
         AllocationLifetime::Default,
     )
     .unwrap());
-    install_global_value(agent, realm, source_name, Value::from_object_ref(object));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
@@ -13082,7 +13083,7 @@ fn keyed_named_atom_ic_becomes_monomorphic() {
         AllocationLifetime::Default,
     )
     .unwrap());
-    install_global_value(agent, realm, source_name, Value::from_object_ref(object));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
@@ -13136,7 +13137,7 @@ fn keyed_dense_index_sites_fall_back_to_megamorphic_classification() {
         ));
         object
     });
-    install_global_value(agent, realm, source_name, Value::from_object_ref(object));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();

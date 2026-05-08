@@ -144,13 +144,13 @@ fn execute_module(invocation: &CliInvocation, host: &CliHost) -> Result<ScriptOu
     let load_result = if let Some(provider) = provider.as_ref() {
         vm.load_module_graph_from_host_and_extensions(
             agent,
-            realm,
+            &realm,
             host,
             &module_request,
             Some(provider),
         )
     } else {
-        vm.load_module_graph_from_host(agent, realm, host, &module_request)
+        vm.load_module_graph_from_host(agent, &realm, host, &module_request)
     };
     let loaded = match load_result {
         Ok(loaded) => loaded,
