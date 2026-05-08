@@ -311,8 +311,10 @@ impl Vm {
 
     #[inline]
     fn reserve_register_window(&mut self, register_base: u32, register_len: u16) {
-        let start =
-            usize::try_from(register_base).expect("register stack base should fit into usize");
+        let Ok(start) = usize::try_from(register_base) else {
+            debug_assert!(false, "register stack base should fit into usize");
+            return;
+        };
         debug_assert_eq!(self.register_stack.len(), start);
         self.register_stack
             .resize(start + usize::from(register_len), Value::undefined());

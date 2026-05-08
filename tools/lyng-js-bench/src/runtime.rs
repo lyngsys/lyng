@@ -26,6 +26,8 @@ const DEFAULT_WARMUP_RUNS: usize = 2;
 const DEFAULT_LOOP_TRIPS: usize = 2_048;
 const DEFAULT_FRONTEND_REPETITIONS: usize = 24;
 
+type BenchResult<T> = Result<T, String>;
+
 struct Options {
     report_path: String,
     samples: usize,
@@ -118,10 +120,6 @@ struct RuntimeSnapshot {
 ///
 /// Returns an error if the command-line arguments are invalid.
 ///
-/// # Panics
-///
-/// Panics if a benchmark fixture fails to compile or execute, or if the report
-/// file cannot be written.
 pub fn run(args: &[String]) -> Result<(), String> {
     let options = parse_options(args)?;
 
@@ -133,17 +131,19 @@ pub fn run(args: &[String]) -> Result<(), String> {
         .into_iter()
         .enumerate()
         .map(|(index, workload)| {
-            let source_id =
-                SourceId::new(u32::try_from(index + 1).expect("workload count should fit u32"));
+            let source_id = SourceId::new(
+                u32::try_from(index + 1)
+                    .map_err(|_| "runtime workload count exceeds SourceId range".to_string())?,
+            );
             measure_workload(source_id, workload, &options)
         })
-        .collect::<Vec<_>>();
+        .collect::<BenchResult<Vec<_>>>()?;
     reports.sort_by(|left, right| left.workload.name.cmp(right.workload.name));
 
-    let snapshots = capture_runtime_snapshots();
-    let report = render_report(&options, &reports, &snapshots);
-    write_report(&options.report_path, &report);
-    print_summary(&options.report_path, &reports, &snapshots);
+    let snapshots = capture_runtime_snapshots()?;
+    let report = render_report(&options, &reports, &snapshots)?;
+    write_report(&options.report_path, &report)?;
+    print_summary(&options.report_path, &reports, &snapshots)?;
     Ok(())
 }
 
@@ -308,36 +308,48 @@ fn build_workloads(loop_trip_count: usize, frontend_repetitions: usize) -> Vec<W
     ]
 }
 
-fn measure_workload(source_id: SourceId, workload: Workload, options: &Options) -> WorkloadReport {
-    let throughput = measure_throughput(source_id, &workload, options);
-    let memory = capture_memory(source_id, &workload, options);
-    WorkloadReport {
+fn measure_workload(
+    source_id: SourceId,
+    workload: Workload,
+    options: &Options,
+) -> BenchResult<WorkloadReport> {
+    let throughput = measure_throughput(source_id, &workload, options)?;
+    let memory = capture_memory(source_id, &workload, options)?;
+    Ok(WorkloadReport {
         workload,
         throughput,
         memory,
-    }
+    })
 }
 
 fn measure_throughput(
     source_id: SourceId,
     workload: &Workload,
     options: &Options,
-) -> ThroughputResult {
+) -> BenchResult<ThroughputResult> {
     let mut samples = Vec::with_capacity(options.samples);
 
     match workload.pipeline {
         WorkloadPipeline::ScriptRuntime => {
             let mut atoms = AtomTable::new();
-            let unit = compile_script_unit(source_id, &workload.source, &mut atoms);
+            let unit = compile_script_unit(source_id, &workload.source, &mut atoms)?;
             for _ in 0..options.samples {
                 let mut runtime = Runtime::new(NoopHostHooks);
                 let agent = runtime.root_agent_mut();
-                let realm = agent.default_realm().expect("default realm should exist");
+                let realm = agent.default_realm().ok_or_else(|| {
+                    "default realm should exist for runtime benchmark".to_string()
+                })?;
                 let mut vm = Vm::new();
                 let _ = vm
                     .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
-                    .expect("spec bootstrap should succeed for runtime benchmarks");
-                let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+                    .map_err(|error| {
+                        format!("spec bootstrap failed for runtime benchmark: {error:?}")
+                    })?;
+                let installed = vm
+                    .install_script(agent, realm.id(), &unit)
+                    .map_err(|error| {
+                        format!("script install failed for {}: {error:?}", workload.name)
+                    })?;
 
                 for _ in 0..options.warmup_runs {
                     let value = vm
@@ -347,7 +359,9 @@ fn measure_throughput(
                             realm.global_env(),
                             realm.global_env(),
                         )
-                        .unwrap();
+                        .map_err(|error| {
+                            format!("warmup execution failed for {}: {error:?}", workload.name)
+                        })?;
                     black_box(value.bits());
                 }
 
@@ -361,7 +375,9 @@ fn measure_throughput(
                             realm.global_env(),
                             realm.global_env(),
                         )
-                        .unwrap(),
+                        .map_err(|error| {
+                            format!("timed execution failed for {}: {error:?}", workload.name)
+                        })?,
                     );
                     checksum = checksum.wrapping_add(black_box(value.bits()));
                 }
@@ -376,19 +392,21 @@ fn measure_throughput(
                 for _ in 0..options.warmup_runs {
                     let mut atoms = AtomTable::new();
                     let parsed = parse_script(&mut atoms, source_id, &workload.source);
-                    assert!(
-                        !parsed.diagnostics.has_errors(),
-                        "unexpected parse errors in {}: {:?}",
-                        workload.name,
-                        parsed.diagnostics.as_slice()
-                    );
+                    if parsed.diagnostics.has_errors() {
+                        return Err(format!(
+                            "parse errors in {}: {:?}",
+                            workload.name,
+                            parsed.diagnostics.as_slice()
+                        ));
+                    }
                     let sema = analyze_script(&parsed, &atoms);
-                    assert!(
-                        !sema.diagnostics.has_errors(),
-                        "unexpected sema errors in {}: {:?}",
-                        workload.name,
-                        sema.diagnostics.as_slice()
-                    );
+                    if sema.diagnostics.has_errors() {
+                        return Err(format!(
+                            "sema errors in {}: {:?}",
+                            workload.name,
+                            sema.diagnostics.as_slice()
+                        ));
+                    }
                     black_box(parsed.root.raw());
                 }
 
@@ -396,19 +414,21 @@ fn measure_throughput(
                 for _ in 0..options.runs_per_sample {
                     let mut atoms = AtomTable::new();
                     let parsed = parse_script(&mut atoms, source_id, &workload.source);
-                    assert!(
-                        !parsed.diagnostics.has_errors(),
-                        "unexpected parse errors in {}: {:?}",
-                        workload.name,
-                        parsed.diagnostics.as_slice()
-                    );
+                    if parsed.diagnostics.has_errors() {
+                        return Err(format!(
+                            "parse errors in {}: {:?}",
+                            workload.name,
+                            parsed.diagnostics.as_slice()
+                        ));
+                    }
                     let sema = analyze_script(&parsed, &atoms);
-                    assert!(
-                        !sema.diagnostics.has_errors(),
-                        "unexpected sema errors in {}: {:?}",
-                        workload.name,
-                        sema.diagnostics.as_slice()
-                    );
+                    if sema.diagnostics.has_errors() {
+                        return Err(format!(
+                            "sema errors in {}: {:?}",
+                            workload.name,
+                            sema.diagnostics.as_slice()
+                        ));
+                    }
                     black_box(parsed.root.raw());
                 }
                 samples.push(SampleResult {
@@ -420,13 +440,13 @@ fn measure_throughput(
             for _ in 0..options.samples {
                 for _ in 0..options.warmup_runs {
                     let mut atoms = AtomTable::new();
-                    let _ = compile_module_unit(source_id, &workload.source, &mut atoms);
+                    let _ = compile_module_unit(source_id, &workload.source, &mut atoms)?;
                 }
 
                 let start = Instant::now();
                 for _ in 0..options.runs_per_sample {
                     let mut atoms = AtomTable::new();
-                    let unit = compile_module_unit(source_id, &workload.source, &mut atoms);
+                    let unit = compile_module_unit(source_id, &workload.source, &mut atoms)?;
                     black_box(unit.entry());
                 }
                 samples.push(SampleResult {
@@ -437,49 +457,68 @@ fn measure_throughput(
     }
 
     let median_total = median_duration(samples.iter().map(|sample| sample.elapsed).collect());
-    let median_us_per_run = duration_seconds(median_total) * 1_000_000.0
-        / f64::from(u32::try_from(options.runs_per_sample).expect("run count should fit u32"));
+    let runs_per_sample = u32::try_from(options.runs_per_sample)
+        .map_err(|_| "--runs exceeds runtime benchmark reporting range".to_string())?;
+    let median_us_per_run =
+        duration_seconds(median_total) * 1_000_000.0 / f64::from(runs_per_sample);
     let total_operations = options
         .runs_per_sample
         .checked_mul(workload.operations_per_run)
-        .expect("bench operation count should fit usize");
-    let median_ns_per_operation = duration_seconds(median_total) * 1_000_000_000.0
-        / f64::from(u32::try_from(total_operations).expect("bench operation count should fit u32"));
+        .ok_or_else(|| "runtime benchmark operation count overflowed".to_string())?;
+    let total_operations_for_report = u32::try_from(total_operations)
+        .map_err(|_| "runtime benchmark operation count exceeds reporting range".to_string())?;
+    let median_ns_per_operation =
+        duration_seconds(median_total) * 1_000_000_000.0 / f64::from(total_operations_for_report);
 
-    ThroughputResult {
+    Ok(ThroughputResult {
         samples: options.samples,
         runs_per_sample: options.runs_per_sample,
         operations_per_run: workload.operations_per_run,
         median_total,
         median_us_per_run,
         median_ns_per_operation,
-    }
+    })
 }
 
-fn capture_memory(source_id: SourceId, workload: &Workload, options: &Options) -> MemoryResult {
+fn capture_memory(
+    source_id: SourceId,
+    workload: &Workload,
+    options: &Options,
+) -> BenchResult<MemoryResult> {
     match workload.pipeline {
         WorkloadPipeline::ScriptRuntime => {
             let mut atoms = AtomTable::new();
-            let unit = compile_script_unit(source_id, &workload.source, &mut atoms);
+            let unit = compile_script_unit(source_id, &workload.source, &mut atoms)?;
             let atom_payload_bytes = compiled_unit_atom_payload_bytes(&unit);
 
             let mut runtime = Runtime::new(NoopHostHooks);
             let agent = runtime.root_agent_mut();
-            let realm = agent.default_realm().expect("default realm should exist");
+            let realm = agent
+                .default_realm()
+                .ok_or_else(|| "default realm should exist for memory capture".to_string())?;
             let mut vm = Vm::new();
             let _ = vm
                 .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
-                .expect("spec bootstrap should succeed for memory capture");
-            let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+                .map_err(|error| format!("spec bootstrap failed for memory capture: {error:?}"))?;
+            let installed = vm
+                .install_script(agent, realm.id(), &unit)
+                .map_err(|error| {
+                    format!("script install failed for {}: {error:?}", workload.name)
+                })?;
             for _ in 0..options.warmup_runs {
                 let value = vm
                     .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
-                    .unwrap();
+                    .map_err(|error| {
+                        format!(
+                            "memory warmup execution failed for {}: {error:?}",
+                            workload.name
+                        )
+                    })?;
                 black_box(value.bits());
             }
-            let feedback = collect_feedback_totals(&vm, installed.code());
+            let feedback = collect_feedback_totals(&vm, installed.code())?;
 
-            MemoryResult {
+            Ok(MemoryResult {
                 functions: Some(unit.functions().len()),
                 encoded_bytes: Some(compiled_unit_encoded_bytes(&unit)),
                 metadata_records: Some(compiled_unit_metadata_records(&unit)),
@@ -490,48 +529,50 @@ fn capture_memory(source_id: SourceId, workload: &Workload, options: &Options) -
                 allocated_feedback_code_count: Some(feedback.allocated_code_count),
                 allocated_feedback_bytes: Some(feedback.allocated_bytes),
                 note: "Warmed script-template and feedback-vector footprint.",
-            }
+            })
         }
         WorkloadPipeline::ScriptFrontend => {
             let mut atoms = AtomTable::new();
             let parsed = parse_script(&mut atoms, source_id, &workload.source);
-            assert!(
-                !parsed.diagnostics.has_errors(),
-                "unexpected parse errors in {}: {:?}",
-                workload.name,
-                parsed.diagnostics.as_slice()
-            );
+            if parsed.diagnostics.has_errors() {
+                return Err(format!(
+                    "parse errors in {}: {:?}",
+                    workload.name,
+                    parsed.diagnostics.as_slice()
+                ));
+            }
             let sema = analyze_script(&parsed, &atoms);
-            assert!(
-                !sema.diagnostics.has_errors(),
-                "unexpected sema errors in {}: {:?}",
-                workload.name,
-                sema.diagnostics.as_slice()
-            );
+            if sema.diagnostics.has_errors() {
+                return Err(format!(
+                    "sema errors in {}: {:?}",
+                    workload.name,
+                    sema.diagnostics.as_slice()
+                ));
+            }
             black_box(parsed.root.raw());
-            MemoryResult {
+            Ok(MemoryResult {
                 atom_payload_bytes: atom_payload_bytes(&atoms),
                 note: "Frontend-only source and atom surface for the current async benchmark row.",
                 ..MemoryResult::default()
-            }
+            })
         }
         WorkloadPipeline::ModuleCompile => {
             let mut atoms = AtomTable::new();
-            let unit = compile_module_unit(source_id, &workload.source, &mut atoms);
+            let unit = compile_module_unit(source_id, &workload.source, &mut atoms)?;
             black_box(unit.entry());
-            MemoryResult {
+            Ok(MemoryResult {
                 encoded_bytes: Some(0),
                 metadata_records: Some(0),
                 template_bytes: Some(size_of::<CompiledModuleUnit>()),
                 atom_payload_bytes: atom_payload_bytes(&atoms),
                 note: "Placeholder module compile unit plus atom payload bytes.",
                 ..MemoryResult::default()
-            }
+            })
         }
     }
 }
 
-fn capture_runtime_snapshots() -> Vec<RuntimeSnapshot> {
+fn capture_runtime_snapshots() -> BenchResult<Vec<RuntimeSnapshot>> {
     let empty_runtime = Runtime::new(NoopHostHooks);
     let empty = RuntimeSnapshot {
         label: "runtime.empty",
@@ -542,11 +583,13 @@ fn capture_runtime_snapshots() -> Vec<RuntimeSnapshot> {
     let spec_bootstrapped = {
         let mut runtime = Runtime::new(NoopHostHooks);
         let agent = runtime.root_agent_mut();
-        let realm = agent.default_realm().expect("default realm should exist");
+        let realm = agent
+            .default_realm()
+            .ok_or_else(|| "default realm should exist for spec-bootstrap snapshot".to_string())?;
         let mut vm = Vm::new();
         let _ = vm
             .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
-            .expect("spec bootstrap should succeed");
+            .map_err(|error| format!("spec bootstrap snapshot failed: {error:?}"))?;
         RuntimeSnapshot {
             label: "runtime.spec-bootstrap",
             accounting: runtime.phase6_accounting(),
@@ -567,15 +610,17 @@ fn capture_runtime_snapshots() -> Vec<RuntimeSnapshot> {
             make();
             ",
             &mut atoms,
-        );
+        )?;
         let mut runtime = Runtime::new(NoopHostHooks);
         {
             let agent = runtime.root_agent_mut();
-            let realm = agent.default_realm().expect("default realm should exist");
+            let realm = agent.default_realm().ok_or_else(|| {
+                "default realm should exist for RegExp literal-cache snapshot".to_string()
+            })?;
             let mut vm = Vm::new();
-            let value = vm
-                .evaluate_script(agent, realm, &unit)
-                .expect("RegExp literal cache fixture should execute");
+            let value = vm.evaluate_script(agent, realm, &unit).map_err(|error| {
+                format!("RegExp literal-cache snapshot execution failed: {error:?}")
+            })?;
             black_box(value.bits());
         }
         RuntimeSnapshot {
@@ -591,18 +636,25 @@ fn capture_runtime_snapshots() -> Vec<RuntimeSnapshot> {
         let worker = runtime
             .root_cluster_mut()
             .add_agent(None, Some("bench-worker".into()));
-        let shared_buffer = HostSharedBufferId::from_raw(19).unwrap();
+        let shared_buffer = HostSharedBufferId::from_raw(19)
+            .ok_or_else(|| "shared buffer fixture id must be non-zero".to_string())?;
         let backing_store = runtime
             .root_cluster_mut()
             .register_shared_backing_store(root, 4096)
-            .expect("shared backing-store fixture should register");
+            .ok_or_else(|| "shared backing-store fixture failed to register".to_string())?;
 
-        assert!(runtime
+        if !runtime
             .root_cluster_mut()
-            .cache_shared_backing_store_handle(backing_store, shared_buffer));
-        assert!(runtime
+            .cache_shared_backing_store_handle(backing_store, shared_buffer)
+        {
+            return Err("shared backing-store fixture failed to cache host handle".to_string());
+        }
+        if !runtime
             .root_cluster_mut()
-            .share_shared_backing_store(backing_store, worker));
+            .share_shared_backing_store(backing_store, worker)
+        {
+            return Err("shared backing-store fixture failed to share with worker".to_string());
+        }
         runtime
             .enqueue_job(
                 root,
@@ -611,7 +663,7 @@ fn capture_runtime_snapshots() -> Vec<RuntimeSnapshot> {
                 None,
                 Some("bench-promise-job".into()),
             )
-            .expect("promise job fixture should enqueue");
+            .map_err(|error| format!("promise job fixture failed to enqueue: {error:?}"))?;
 
         RuntimeSnapshot {
             label: "runtime.promise-and-backing-store",
@@ -620,55 +672,61 @@ fn capture_runtime_snapshots() -> Vec<RuntimeSnapshot> {
         }
     };
 
-    vec![
+    Ok(vec![
         empty,
         spec_bootstrapped,
         regexp_literal_cache,
         promise_and_backing_store,
-    ]
+    ])
 }
 
 fn compile_script_unit(
     source_id: SourceId,
     source: &str,
     atoms: &mut AtomTable,
-) -> CompiledScriptUnit {
+) -> BenchResult<CompiledScriptUnit> {
     let parsed = parse_script(atoms, source_id, source);
-    assert!(
-        !parsed.diagnostics.has_errors(),
-        "unexpected parse errors in benchmark workload: {:?}",
-        parsed.diagnostics.as_slice()
-    );
+    if parsed.diagnostics.has_errors() {
+        return Err(format!(
+            "parse errors in benchmark workload: {:?}",
+            parsed.diagnostics.as_slice()
+        ));
+    }
     let sema = analyze_script(&parsed, atoms);
-    assert!(
-        !sema.diagnostics.has_errors(),
-        "unexpected sema errors in benchmark workload: {:?}",
-        sema.diagnostics.as_slice()
-    );
-    compile_script(&parsed, &sema, atoms).expect("benchmark workload should lower")
+    if sema.diagnostics.has_errors() {
+        return Err(format!(
+            "sema errors in benchmark workload: {:?}",
+            sema.diagnostics.as_slice()
+        ));
+    }
+    compile_script(&parsed, &sema, atoms)
+        .map_err(|error| format!("benchmark workload failed to lower: {error:?}"))
 }
 
 fn compile_module_unit(
     source_id: SourceId,
     source: &str,
     atoms: &mut AtomTable,
-) -> CompiledModuleUnit {
+) -> BenchResult<CompiledModuleUnit> {
     let parsed = parse_module(atoms, source_id, source);
-    assert!(
-        !parsed.diagnostics.has_errors(),
-        "unexpected parse errors in benchmark workload: {:?}",
-        parsed.diagnostics.as_slice()
-    );
+    if parsed.diagnostics.has_errors() {
+        return Err(format!(
+            "parse errors in module benchmark workload: {:?}",
+            parsed.diagnostics.as_slice()
+        ));
+    }
     let sema = analyze_module(&parsed, atoms);
-    assert!(
-        !sema.diagnostics.has_errors(),
-        "unexpected sema errors in benchmark workload: {:?}",
-        sema.diagnostics.as_slice()
-    );
-    compile_module(&parsed, &sema, atoms).expect("module benchmark workload should compile")
+    if sema.diagnostics.has_errors() {
+        return Err(format!(
+            "sema errors in module benchmark workload: {:?}",
+            sema.diagnostics.as_slice()
+        ));
+    }
+    compile_module(&parsed, &sema, atoms)
+        .map_err(|error| format!("module benchmark workload failed to compile: {error:?}"))
 }
 
-fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> FeedbackTotals {
+fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> BenchResult<FeedbackTotals> {
     let mut totals = FeedbackTotals::default();
     let mut stack = vec![root];
 
@@ -689,15 +747,15 @@ fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> FeedbackTotals {
             }
         }
         for child_index in 0..function.child_functions().len() {
-            let child_index =
-                u32::try_from(child_index).expect("child function count should fit u32");
+            let child_index = u32::try_from(child_index)
+                .map_err(|_| "child function count exceeds installed-code range".to_string())?;
             if let Some(child_code) = vm.installed_child_code(code, child_index) {
                 stack.push(child_code);
             }
         }
     }
 
-    totals
+    Ok(totals)
 }
 
 fn compiled_unit_encoded_bytes(unit: &CompiledScriptUnit) -> usize {
@@ -767,94 +825,68 @@ fn render_report(
     options: &Options,
     reports: &[WorkloadReport],
     snapshots: &[RuntimeSnapshot],
-) -> String {
+) -> BenchResult<String> {
     let mut output = String::new();
     let command = format!(
         "cargo run --release -p lyng-js-bench -- runtime --report {}",
         options.report_path
     );
-    let dense_array_runtime = report_by_name(reports, "array-heavy.literal-indexed-runtime");
-    let iterator_array_runtime = report_by_name(reports, "array-heavy.iterator-runtime");
-    let string_runtime = report_by_name(reports, "string-heavy.concat-runtime");
-    let regexp_runtime = report_by_name(reports, "regexp-heavy.runtime");
-    let regexp_constructor_runtime = report_by_name(reports, "regexp-constructor-compile.runtime");
-    let regexp_replace_runtime = report_by_name(reports, "regexp-named-replace.runtime");
-    let regexp_legacy_static_runtime = report_by_name(reports, "regexp-legacy-statics.runtime");
-    let regexp_stable_exec_runtime = report_by_name(reports, "regexp-stable-exec.runtime");
-    let class_runtime = report_by_name(reports, "class-heavy.runtime");
-    let typed_array_runtime = report_by_name(reports, "typed-array-heavy.runtime");
+    let dense_array_runtime = report_by_name(reports, "array-heavy.literal-indexed-runtime")?;
+    let iterator_array_runtime = report_by_name(reports, "array-heavy.iterator-runtime")?;
+    let string_runtime = report_by_name(reports, "string-heavy.concat-runtime")?;
+    let regexp_runtime = report_by_name(reports, "regexp-heavy.runtime")?;
+    let regexp_constructor_runtime = report_by_name(reports, "regexp-constructor-compile.runtime")?;
+    let regexp_replace_runtime = report_by_name(reports, "regexp-named-replace.runtime")?;
+    let regexp_legacy_static_runtime = report_by_name(reports, "regexp-legacy-statics.runtime")?;
+    let regexp_stable_exec_runtime = report_by_name(reports, "regexp-stable-exec.runtime")?;
+    let class_runtime = report_by_name(reports, "class-heavy.runtime")?;
+    let typed_array_runtime = report_by_name(reports, "typed-array-heavy.runtime")?;
     let seeded_snapshot = snapshots
         .iter()
         .find(|snapshot| snapshot.label == "runtime.promise-and-backing-store")
-        .expect("seeded snapshot should exist");
+        .ok_or_else(|| "runtime.promise-and-backing-store snapshot is missing".to_string())?;
 
-    writeln!(&mut output, "# Lyng JS Benchmarks and Memory Report").unwrap();
-    writeln!(&mut output).unwrap();
-    writeln!(&mut output, "This report is generated by `{command}`.").unwrap();
-    writeln!(
-        &mut output,
+    // `String` formatting is infallible for this report writer; missing required
+    // benchmark data is validated above and reported through `BenchResult`.
+    macro_rules! line {
+        () => {{
+            output.push('\n');
+        }};
+        ($($arg:tt)*) => {{
+            let _ = writeln!(&mut output, $($arg)*);
+        }};
+    }
+
+    line!("# Lyng JS Benchmarks and Memory Report");
+    line!();
+    line!("This report is generated by `{command}`.");
+    line!(
         "It covers the current Lyng JS runtime, frontend, and memory benchmark surface with dense-indexed, iterator-driven, string-heavy, RegExp-heavy, class-heavy, and typed-array-heavy runtime baselines, plus the remaining async-heavy and module-heavy non-runtime rows. Executable workload rows sit alongside retained runtime-accounting snapshots."
-    )
-    .unwrap();
-    writeln!(&mut output).unwrap();
+    );
+    line!();
 
-    writeln!(&mut output, "## Settings").unwrap();
-    writeln!(&mut output).unwrap();
-    writeln!(&mut output, "- Profile: `release`").unwrap();
-    writeln!(&mut output, "- Target OS: `{}`", env::consts::OS).unwrap();
-    writeln!(
-        &mut output,
-        "- Target architecture: `{}`",
-        env::consts::ARCH
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- Samples per benchmark: `{}`",
-        options.samples
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- Warmup runs per sample: `{}`",
-        options.warmup_runs
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- Timed runs per sample: `{}`",
-        options.runs_per_sample
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- Runtime loop trips: `{}`",
-        options.loop_trip_count
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
+    line!("## Settings");
+    line!();
+    line!("- Profile: `release`");
+    line!("- Target OS: `{}`", env::consts::OS);
+    line!("- Target architecture: `{}`", env::consts::ARCH);
+    line!("- Samples per benchmark: `{}`", options.samples);
+    line!("- Warmup runs per sample: `{}`", options.warmup_runs);
+    line!("- Timed runs per sample: `{}`", options.runs_per_sample);
+    line!("- Runtime loop trips: `{}`", options.loop_trip_count);
+    line!(
         "- Frontend repetition count: `{}`",
         options.frontend_repetitions
-    )
-    .unwrap();
-    writeln!(&mut output).unwrap();
+    );
+    line!();
 
-    writeln!(&mut output, "## Workload Throughput").unwrap();
-    writeln!(&mut output).unwrap();
-    writeln!(
-        &mut output,
-        "| Benchmark | Pipeline | Samples | Runs/sample | Work units/run | Median total | Median us/run | Median ns/work-unit | Note |"
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
-    )
-    .unwrap();
+    line!("## Workload Throughput");
+    line!();
+    line!("| Benchmark | Pipeline | Samples | Runs/sample | Work units/run | Median total | Median us/run | Median ns/work-unit | Note |"
+    );
+    line!("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
     for report in reports {
-        writeln!(
-            &mut output,
+        line!(
             "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{:.2}` | `{:.2}` | {} |",
             report.workload.name,
             report.workload.pipeline.label(),
@@ -865,26 +897,17 @@ fn render_report(
             report.throughput.median_us_per_run,
             report.throughput.median_ns_per_operation,
             report.workload.note,
-        )
-        .unwrap();
+        );
     }
-    writeln!(&mut output).unwrap();
+    line!();
 
-    writeln!(&mut output, "## Template and Feedback Memory").unwrap();
-    writeln!(&mut output).unwrap();
-    writeln!(
-        &mut output,
-        "| Benchmark | Pipeline | Functions | Encoded bytes | Metadata records | Template bytes | Atom payload bytes | Feedback slots | Live sites | Feedback codes | Allocated feedback bytes | Memory note |"
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
-    )
-    .unwrap();
+    line!("## Template and Feedback Memory");
+    line!();
+    line!("| Benchmark | Pipeline | Functions | Encoded bytes | Metadata records | Template bytes | Atom payload bytes | Feedback slots | Live sites | Feedback codes | Allocated feedback bytes | Memory note |"
+    );
+    line!("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
     for report in reports {
-        writeln!(
-            &mut output,
+        line!(
             "| `{}` | `{}` | {} | {} | {} | {} | `{}` | {} | {} | {} | {} | {} |",
             report.workload.name,
             report.workload.pipeline.label(),
@@ -898,26 +921,17 @@ fn render_report(
             opt_usize_cell(report.memory.allocated_feedback_code_count),
             opt_usize_cell(report.memory.allocated_feedback_bytes),
             report.memory.note,
-        )
-        .unwrap();
+        );
     }
-    writeln!(&mut output).unwrap();
+    line!();
 
-    writeln!(&mut output, "## Runtime Accounting Snapshots").unwrap();
-    writeln!(&mut output).unwrap();
-    writeln!(
-        &mut output,
-        "| Snapshot | Heap live bytes | Heap reserved bytes | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "| --- | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
-    )
-    .unwrap();
+    line!("## Runtime Accounting Snapshots");
+    line!();
+    line!("| Snapshot | Heap live bytes | Heap reserved bytes | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
+    );
+    line!("| --- | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |");
     for snapshot in snapshots {
-        writeln!(
-            &mut output,
+        line!(
             "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
             snapshot.label,
             snapshot.accounting.heap.live_bytes,
@@ -930,43 +944,28 @@ fn render_report(
             domain_cell(snapshot.accounting.backing_stores),
             snapshot.accounting.live_bytes,
             snapshot.note,
-        )
-        .unwrap();
+        );
     }
-    writeln!(&mut output).unwrap();
+    line!();
 
-    writeln!(&mut output, "## Watch Items").unwrap();
-    writeln!(&mut output).unwrap();
-    writeln!(
-        &mut output,
-        "- The executable array runtime baselines now include both dense-indexed and iterator-driven rows. On this run, `array-heavy.literal-indexed-runtime` measured `{:.2}` ns/work-unit and `array-heavy.iterator-runtime` measured `{:.2}` ns/work-unit.",
+    line!("## Watch Items");
+    line!();
+    line!("- The executable array runtime baselines now include both dense-indexed and iterator-driven rows. On this run, `array-heavy.literal-indexed-runtime` measured `{:.2}` ns/work-unit and `array-heavy.iterator-runtime` measured `{:.2}` ns/work-unit.",
         dense_array_runtime.throughput.median_ns_per_operation,
         iterator_array_runtime.throughput.median_ns_per_operation,
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- The iterator-driven row warmed `{}` feedback slots across `{}` live sites with `{}` template bytes, so the benchmark captures real iterator lowering and VM state rather than only the older dense-element hot path.",
+    );
+    line!("- The iterator-driven row warmed `{}` feedback slots across `{}` live sites with `{}` template bytes, so the benchmark captures real iterator lowering and VM state rather than only the older dense-element hot path.",
         opt_usize_text(iterator_array_runtime.memory.feedback_slots),
         opt_usize_text(iterator_array_runtime.memory.live_feedback_sites),
         opt_usize_text(iterator_array_runtime.memory.template_bytes),
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- `string-heavy.concat-runtime` remains the lower-level string/runtime proxy at `{:.2}` ns/work-unit.",
+    );
+    line!("- `string-heavy.concat-runtime` remains the lower-level string/runtime proxy at `{:.2}` ns/work-unit.",
         string_runtime.throughput.median_ns_per_operation,
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- `regexp-heavy.runtime` measured `{:.2}` ns/work-unit while exercising global iteration, sticky state, match indices, and named-capture replacement through the shared matcher path.",
+    );
+    line!("- `regexp-heavy.runtime` measured `{:.2}` ns/work-unit while exercising global iteration, sticky state, match indices, and named-capture replacement through the shared matcher path.",
         regexp_runtime.throughput.median_ns_per_operation,
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- RegExp observability rows separate constructor compilation (`{:.2}` ns/work-unit), stable default exec/test (`{:.2}` ns/work-unit), named replacement (`{:.2}` ns/work-unit), and legacy static accessor reads (`{:.2}` ns/work-unit).",
+    );
+    line!("- RegExp observability rows separate constructor compilation (`{:.2}` ns/work-unit), stable default exec/test (`{:.2}` ns/work-unit), named replacement (`{:.2}` ns/work-unit), and legacy static accessor reads (`{:.2}` ns/work-unit).",
         regexp_constructor_runtime
             .throughput
             .median_ns_per_operation,
@@ -977,71 +976,49 @@ fn render_report(
         regexp_legacy_static_runtime
             .throughput
             .median_ns_per_operation,
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- `class-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering private fields, static blocks, and `super` dispatch on the executable runtime path.",
+    );
+    line!("- `class-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering private fields, static blocks, and `super` dispatch on the executable runtime path.",
         class_runtime.throughput.median_ns_per_operation,
         opt_usize_text(class_runtime.memory.feedback_slots),
         opt_usize_text(class_runtime.memory.live_feedback_sites),
         opt_usize_text(class_runtime.memory.template_bytes),
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- `async-heavy.frontend` remains the only frontend-only async workload in the current benchmark surface. That is now a benchmark-shape gap rather than a known lowering/runtime hole, so follow-up work should add an executable async runtime row."
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- `typed-array-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering ArrayBuffer-backed views and DataView byte traffic on the executable runtime path.",
+    );
+    line!("- `async-heavy.frontend` remains the only frontend-only async workload in the current benchmark surface. That is now a benchmark-shape gap rather than a known lowering/runtime hole, so follow-up work should add an executable async runtime row."
+    );
+    line!("- `typed-array-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering ArrayBuffer-backed views and DataView byte traffic on the executable runtime path.",
         typed_array_runtime.throughput.median_ns_per_operation,
         opt_usize_text(typed_array_runtime.memory.feedback_slots),
         opt_usize_text(typed_array_runtime.memory.live_feedback_sites),
         opt_usize_text(typed_array_runtime.memory.template_bytes),
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- The seeded accounting snapshot reports `{}` promise job and `{}` backing store so the retained runtime-accounting surface is exercised by real data. Retained RegExp payloads report as a distinct runtime domain, with payload bytes treated as a lower-bound estimate because the current regex backend does not expose all internally owned tables. Iterator-heavy evidence still lives in the executable array/iterator workload rows because iterator state is transient VM execution state rather than a retained post-run runtime record.",
+    );
+    line!("- The seeded accounting snapshot reports `{}` promise job and `{}` backing store so the retained runtime-accounting surface is exercised by real data. Retained RegExp payloads report as a distinct runtime domain, with payload bytes treated as a lower-bound estimate because the current regex backend does not expose all internally owned tables. Iterator-heavy evidence still lives in the executable array/iterator workload rows because iterator state is transient VM execution state rather than a retained post-run runtime record.",
         seeded_snapshot.accounting.promise_jobs.records,
         seeded_snapshot.accounting.backing_stores.records,
-    )
-    .unwrap();
-    writeln!(&mut output).unwrap();
+    );
+    line!();
 
-    writeln!(&mut output, "## Known Gaps").unwrap();
-    writeln!(&mut output).unwrap();
-    writeln!(
-        &mut output,
-        "- This report complements the dedicated bytecode-density suite rather than replacing it. The density run remains the finer-grained instruction-shape view."
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- The remaining frontend-only row does not report AST or sema heap residency. Its current memory row is limited to atom payload and the explicit absence of code-template or feedback state."
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- Module-cache accounting remains a future retained-runtime domain. Post-run iterator-record rows are still zero because the current iterator state is transient to active VM execution, so the benchmarked array/iterator runtime rows are the authoritative memory/perf signal for that surface."
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- RegExp payload accounting is currently a lower bound: it includes source text, retained UTF-16 source units, flag text, and the `regress::Regex` struct, but not the backend's private instruction vectors, class tables, and capture metadata allocations."
-    )
-    .unwrap();
+    line!("## Known Gaps");
+    line!();
+    line!("- This report complements the dedicated bytecode-density suite rather than replacing it. The density run remains the finer-grained instruction-shape view."
+    );
+    line!("- The remaining frontend-only row does not report AST or sema heap residency. Its current memory row is limited to atom payload and the explicit absence of code-template or feedback state."
+    );
+    line!("- Module-cache accounting remains a future retained-runtime domain. Post-run iterator-record rows are still zero because the current iterator state is transient to active VM execution, so the benchmarked array/iterator runtime rows are the authoritative memory/perf signal for that surface."
+    );
+    line!("- RegExp payload accounting is currently a lower bound: it includes source text, retained UTF-16 source units, flag text, and the `regress::Regex` struct, but not the backend's private instruction vectors, class tables, and capture metadata allocations."
+    );
 
-    output
+    Ok(output)
 }
 
-fn report_by_name<'a>(reports: &'a [WorkloadReport], name: &str) -> &'a WorkloadReport {
+fn report_by_name<'a>(
+    reports: &'a [WorkloadReport],
+    name: &str,
+) -> BenchResult<&'a WorkloadReport> {
     reports
         .iter()
         .find(|report| report.workload.name == name)
-        .expect("required benchmark row should exist")
+        .ok_or_else(|| format!("required runtime benchmark row `{name}` is missing"))
 }
 
 fn opt_usize_cell(value: Option<usize>) -> String {
@@ -1083,15 +1060,29 @@ fn format_duration(duration: Duration) -> String {
     }
 }
 
-fn write_report(path: &str, report: &str) {
+fn write_report(path: &str, report: &str) -> BenchResult<()> {
     let report_path = Path::new(path);
     if let Some(parent) = report_path.parent() {
-        fs::create_dir_all(parent).expect("report parent directory should exist");
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "failed to create runtime benchmark report directory {}: {error}",
+                parent.display()
+            )
+        })?;
     }
-    fs::write(report_path, report).expect("benchmark report should write successfully");
+    fs::write(report_path, report).map_err(|error| {
+        format!(
+            "failed to write runtime benchmark report {}: {error}",
+            report_path.display()
+        )
+    })
 }
 
-fn print_summary(path: &str, reports: &[WorkloadReport], snapshots: &[RuntimeSnapshot]) {
+fn print_summary(
+    path: &str,
+    reports: &[WorkloadReport],
+    snapshots: &[RuntimeSnapshot],
+) -> BenchResult<()> {
     let slowest = reports
         .iter()
         .max_by(|left, right| {
@@ -1099,16 +1090,16 @@ fn print_summary(path: &str, reports: &[WorkloadReport], snapshots: &[RuntimeSna
                 .median_ns_per_operation
                 .total_cmp(&right.throughput.median_ns_per_operation)
         })
-        .expect("at least one workload should exist");
+        .ok_or_else(|| "runtime benchmark produced no workload rows".to_string())?;
     let largest_template = reports
         .iter()
         .filter_map(|report| report.memory.template_bytes.map(|bytes| (report, bytes)))
         .max_by_key(|(_, bytes)| *bytes)
-        .expect("at least one workload should report template bytes");
+        .ok_or_else(|| "runtime benchmark produced no template memory rows".to_string())?;
     let heaviest_snapshot = snapshots
         .iter()
         .max_by_key(|snapshot| snapshot.accounting.live_bytes)
-        .expect("at least one runtime snapshot should exist");
+        .ok_or_else(|| "runtime benchmark produced no accounting snapshots".to_string())?;
 
     println!("Wrote {path}");
     println!(
@@ -1123,6 +1114,7 @@ fn print_summary(path: &str, reports: &[WorkloadReport], snapshots: &[RuntimeSna
         "Heaviest runtime snapshot: {} at {} live bytes",
         heaviest_snapshot.label, heaviest_snapshot.accounting.live_bytes
     );
+    Ok(())
 }
 
 fn string_heavy_runtime_workload(loop_trip_count: usize) -> String {
@@ -1474,7 +1466,8 @@ mod tests {
 
         for (index, workload) in build_workloads(16, 4).into_iter().enumerate() {
             let source_id = SourceId::new(u32::try_from(index + 1).unwrap());
-            let report = measure_workload(source_id, workload.clone(), &options);
+            let report = measure_workload(source_id, workload.clone(), &options)
+                .expect("generated workload should measure successfully");
             assert_eq!(report.workload.name, workload.name);
             assert!(report.throughput.median_total >= Duration::ZERO);
             assert!(
@@ -1556,7 +1549,8 @@ mod tests {
 
     #[test]
     fn runtime_snapshots_seed_promise_jobs_and_backing_stores() {
-        let snapshots = capture_runtime_snapshots();
+        let snapshots =
+            capture_runtime_snapshots().expect("runtime snapshots should capture successfully");
         let seeded = snapshots
             .iter()
             .find(|snapshot| snapshot.label == "runtime.promise-and-backing-store")
@@ -1573,7 +1567,8 @@ mod tests {
 
     #[test]
     fn runtime_snapshots_report_regexp_literal_cache_accounting() {
-        let snapshots = capture_runtime_snapshots();
+        let snapshots =
+            capture_runtime_snapshots().expect("runtime snapshots should capture successfully");
         let seeded = snapshots
             .iter()
             .find(|snapshot| snapshot.label == "runtime.regexp-literal-cache")
@@ -1587,5 +1582,34 @@ mod tests {
     #[test]
     fn runtime_report_path_drops_phase_naming() {
         assert_eq!(DEFAULT_REPORT_PATH, "reports/js/lyng-js/bench.md");
+    }
+
+    #[test]
+    fn write_report_returns_filesystem_errors() {
+        let path = env::temp_dir().join(format!(
+            "lyng-js-bench-runtime-report-dir-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&path);
+        fs::create_dir_all(&path).expect("test report directory should be created");
+
+        let error = write_report(
+            path.to_str()
+                .expect("temporary report path should be valid UTF-8"),
+            "report",
+        )
+        .expect_err("writing a report to a directory should return an error");
+
+        assert!(error.contains("failed to write runtime benchmark report"));
+        let _ = fs::remove_dir_all(&path);
+    }
+
+    #[test]
+    fn compile_script_unit_returns_parse_errors() {
+        let mut atoms = AtomTable::new();
+        let error = compile_script_unit(SourceId::new(1), "function", &mut atoms)
+            .expect_err("invalid benchmark source should return a compile error");
+
+        assert!(error.contains("parse errors in benchmark workload"));
     }
 }

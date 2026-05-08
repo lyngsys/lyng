@@ -30,8 +30,8 @@ impl Vm {
     ) -> VmResult<()> {
         let prepared =
             self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, new_target)?;
-        let register_base =
-            u32::try_from(self.register_stack.len()).expect("register stack length should fit u32");
+        let register_base = u32::try_from(self.register_stack.len())
+            .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
         if self
             .installed_function(prepared.code)
             .is_some_and(|function| function.flags().generator())
@@ -261,7 +261,7 @@ impl Vm {
         let register_len = prepared
             .register_count
             .checked_add(prepared.hidden_register_count)
-            .expect("frame register span should fit within u16");
+            .ok_or_else(|| VmError::Abrupt(errors::throw_range_error(agent)))?;
         self.reserve_register_window(register_base, register_len);
         self.copy_arguments_into_frame(register_base, prepared.parameter_count, arguments);
 
@@ -290,9 +290,9 @@ impl Vm {
                 callee: Value::from_object_ref(prepared.callee),
             },
         ) {
-            self.register_stack.truncate(
-                usize::try_from(register_base).expect("register base should fit into usize"),
-            );
+            let register_base = usize::try_from(register_base)
+                .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
+            self.register_stack.truncate(register_base);
             return Err(error);
         }
         let frame = FrameRecord::new(
@@ -326,10 +326,10 @@ impl Vm {
     }
 
     fn teardown_tail_frame(&mut self, agent: &mut Agent, frame: FrameRecord) -> VmResult<()> {
-        let active = self
-            .frames
-            .pop()
-            .expect("tail-call recycling requires one active frame");
+        let Some(active) = self.frames.pop() else {
+            debug_assert!(false, "tail-call recycling requires one active frame");
+            return Err(VmError::MissingActiveFrame);
+        };
         debug_assert_eq!(active, frame);
         self.close_loop_iteration_frames(self.frames.len());
         self.close_env_scope_frames(self.frames.len());
@@ -338,9 +338,9 @@ impl Vm {
         self.captured_name_references
             .clear_window(frame.registers());
         self.finalize_mapped_arguments(agent, frame.lexical_env())?;
-        self.register_stack.truncate(
-            usize::try_from(frame.registers().base()).expect("base should fit into usize"),
-        );
+        let register_base = usize::try_from(frame.registers().base())
+            .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
+        self.register_stack.truncate(register_base);
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
         Ok(())
@@ -352,9 +352,12 @@ impl Vm {
         parameter_count: u16,
         arguments: &[Value],
     ) {
+        let Ok(register_base) = usize::try_from(register_base) else {
+            debug_assert!(false, "register base should fit usize");
+            return;
+        };
         for index in 0..usize::from(parameter_count) {
-            let absolute =
-                usize::try_from(register_base).expect("register base should fit usize") + index;
+            let absolute = register_base + index;
             if let Some(slot) = self.register_stack.get_mut(absolute) {
                 *slot = arguments.get(index).copied().unwrap_or(Value::undefined());
             }
@@ -426,7 +429,10 @@ impl Vm {
             ThisBindingStatus::Uninitialized => {
                 Err(VmError::Abrupt(errors::throw_reference_error(agent)))
             }
-            ThisBindingStatus::Lexical => unreachable!("lexical this environments are skipped"),
+            ThisBindingStatus::Lexical => {
+                debug_assert!(false, "lexical this environments are skipped");
+                Ok(caller_frame.this_value())
+            }
         }
     }
 

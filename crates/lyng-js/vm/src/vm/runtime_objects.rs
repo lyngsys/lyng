@@ -1,8 +1,7 @@
 use super::property_access::VmProxyBridge;
 use super::{
-    Agent, AllocationLifetime, BytecodeFunction, CodeRef, FrameRecord, HostHooks,
-    NativeFunctionRegistry, ObjectAllocation, ObjectRef, RealmRef, Value, Vm, VmError, VmResult,
-    WellKnownAtom,
+    Agent, AllocationLifetime, BytecodeFunction, FrameRecord, HostHooks, NativeFunctionRegistry,
+    ObjectAllocation, ObjectRef, RealmRef, Value, Vm, VmError, VmResult, WellKnownAtom,
 };
 use lyng_js_objects::{
     FunctionConstructorFlags, FunctionKindFlags, FunctionObjectData, FunctionThisMode,
@@ -112,9 +111,7 @@ impl Vm {
         realm: RealmRef,
         element_capacity: usize,
     ) -> VmResult<ObjectRef> {
-        let realm_record = agent
-            .realm(realm)
-            .ok_or(VmError::MissingRealm(CodeRef::from_raw(1).unwrap()))?;
+        let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
         let root_shape = realm_record
             .root_shape()
             .ok_or(VmError::MissingRootShape(realm))?;

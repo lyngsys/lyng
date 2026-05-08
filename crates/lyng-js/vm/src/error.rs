@@ -25,6 +25,7 @@ pub enum VmError {
     InvalidEnvironmentLayout(BytecodeFunctionId),
     MissingInstalledCode(CodeRef),
     MissingCodeRecord(CodeRef),
+    MissingActiveFrame,
     MissingRealm(CodeRef),
     MissingRootShape(RealmRef),
     MissingEnvironment(EnvironmentRef),

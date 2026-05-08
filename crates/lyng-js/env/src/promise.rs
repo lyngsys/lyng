@@ -547,6 +547,11 @@ impl TraceHeapEdges for AgentPromiseTables {
     }
 }
 
+// Promise side tables use the same non-zero `u32` handle space as the runtime's
+// typed heap references. The checked conversions in this impl are capacity
+// invariants: exhausting them would mean the table has more records than its
+// public handle type can represent, so there is no guest-observable recovery
+// path until the handle representation itself changes.
 impl AgentPromiseTables {
     pub(crate) fn promise_id_for_object(&self, object: ObjectRef) -> Option<PromiseId> {
         self.promise_by_object
