@@ -189,6 +189,9 @@ pub fn ordinary_define_property(
         let TypedArrayNumericKey::Valid(index) = numeric_key else {
             return Ok(false);
         };
+        let Ok(index) = u32::try_from(index) else {
+            return Ok(false);
+        };
         let result = agent.with_heap_and_objects(|heap, objects| {
             objects.define_own_property(
                 &mut heap.mutator(),

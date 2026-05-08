@@ -1,7 +1,7 @@
+use crate::typed_array;
 use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, BigIntSign};
 use lyng_js_host::WaitLocation;
-use lyng_js_objects::{float16_bits_to_f64, TypedArrayElementKind, TypedArrayObjectData};
+use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
 use lyng_js_types::{ObjectRef, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -215,56 +215,8 @@ pub fn atomic_rmw_bits(
     }
 }
 
-fn low_u8(bits: u64) -> u8 {
-    u8::try_from(bits & u64::from(u8::MAX)).expect("masked typed-array byte should fit u8")
-}
-
-fn low_u16(bits: u64) -> u16 {
-    u16::try_from(bits & u64::from(u16::MAX)).expect("masked typed-array bits should fit u16")
-}
-
-fn low_u32(bits: u64) -> u32 {
-    u32::try_from(bits & u64::from(u32::MAX)).expect("masked typed-array bits should fit u32")
-}
-
 pub fn atomic_value_from_bits(agent: &mut Agent, kind: TypedArrayElementKind, bits: u64) -> Value {
-    match kind {
-        TypedArrayElementKind::BigInt64 => {
-            let (sign, limbs) = if bits >> 63 == 0 {
-                (BigIntSign::NonNegative, [bits])
-            } else {
-                (BigIntSign::Negative, [bits.wrapping_neg()])
-            };
-            let bigint =
-                agent
-                    .heap_mut()
-                    .mutator()
-                    .alloc_bigint(sign, &limbs, AllocationLifetime::Default);
-            Value::from_bigint_ref(bigint)
-        }
-        TypedArrayElementKind::BigUint64 => {
-            let bigint = agent.heap_mut().mutator().alloc_bigint(
-                BigIntSign::NonNegative,
-                &[bits],
-                AllocationLifetime::Default,
-            );
-            Value::from_bigint_ref(bigint)
-        }
-        TypedArrayElementKind::Int8 => Value::from_smi(i32::from(low_u8(bits).cast_signed())),
-        TypedArrayElementKind::Int16 => Value::from_smi(i32::from(low_u16(bits).cast_signed())),
-        TypedArrayElementKind::Int32 => Value::from_smi(low_u32(bits).cast_signed()),
-        TypedArrayElementKind::Uint32 => {
-            let value = low_u32(bits);
-            i32::try_from(value).map_or_else(|_| Value::from_f64(f64::from(value)), Value::from_smi)
-        }
-        TypedArrayElementKind::Uint16 => Value::from_smi(i32::from(low_u16(bits))),
-        TypedArrayElementKind::Uint8 | TypedArrayElementKind::Uint8Clamped => {
-            Value::from_smi(i32::from(low_u8(bits)))
-        }
-        TypedArrayElementKind::Float16 => Value::from_f64(float16_bits_to_f64(low_u16(bits))),
-        TypedArrayElementKind::Float32 => Value::from_f64(f64::from(f32::from_bits(low_u32(bits)))),
-        TypedArrayElementKind::Float64 => Value::from_f64(f64::from_bits(bits)),
-    }
+    typed_array::value_from_storage_bits(agent, kind, bits)
 }
 
 #[inline]
@@ -311,8 +263,12 @@ fn normalize_integer_bits(kind: TypedArrayElementKind, bits: u64) -> u64 {
         | TypedArrayElementKind::Float64 => bits,
         TypedArrayElementKind::Int8
         | TypedArrayElementKind::Uint8
-        | TypedArrayElementKind::Uint8Clamped => u64::from(low_u8(bits)),
-        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => u64::from(low_u16(bits)),
-        TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => u64::from(low_u32(bits)),
+        | TypedArrayElementKind::Uint8Clamped => u64::from(typed_array::storage_u8_bits(bits)),
+        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => {
+            u64::from(typed_array::storage_u16_bits(bits))
+        }
+        TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => {
+            u64::from(typed_array::storage_u32_bits(bits))
+        }
     }
 }

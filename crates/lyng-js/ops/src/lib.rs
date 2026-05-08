@@ -24,6 +24,7 @@ pub mod pure;
 pub mod read;
 pub mod shared_memory;
 pub mod temporal;
+pub mod typed_array;
 
 pub use context::PrimitiveContext;
 pub use convert::number_to_string;

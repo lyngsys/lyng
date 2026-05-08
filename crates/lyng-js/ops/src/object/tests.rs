@@ -198,6 +198,47 @@ impl NativeFunctionRegistry for RecordingRegistry {
     }
 }
 
+struct PrimitiveOnlyConversionContext<'a> {
+    agent: &'a mut Agent,
+}
+
+impl crate::object::ToPrimitiveContext for PrimitiveOnlyConversionContext<'_> {
+    type Error = AbruptCompletion;
+
+    fn agent(&mut self) -> &mut Agent {
+        self.agent
+    }
+
+    fn abrupt(&mut self, completion: AbruptCompletion) -> Self::Error {
+        completion
+    }
+
+    fn type_error(&mut self) -> Self::Error {
+        throw_type_error(self.agent)
+    }
+
+    fn get_property_value(
+        &mut self,
+        _object: ObjectRef,
+        _key: PropertyKey,
+    ) -> Result<Value, Self::Error> {
+        panic!("typed-array storage conversion test should use primitive inputs");
+    }
+
+    fn require_callable_object(&mut self, _value: Value) -> Result<ObjectRef, Self::Error> {
+        panic!("typed-array storage conversion test should use primitive inputs");
+    }
+
+    fn call_to_completion(
+        &mut self,
+        _callee_object: ObjectRef,
+        _this_value: Value,
+        _arguments: &[Value],
+    ) -> Result<Value, Self::Error> {
+        panic!("typed-array storage conversion test should use primitive inputs");
+    }
+}
+
 #[test]
 fn ordinary_only_object_helpers_delegate_to_internal_methods() {
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -246,6 +287,46 @@ fn ordinary_only_object_helpers_delegate_to_internal_methods() {
 }
 
 #[test]
+fn typed_array_shared_numeric_keys_classify_canonical_integer_indices() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let typed_array = install_test_uint8_array(agent, &[7]);
+    let zero_atom = agent.atoms_mut().intern_collectible("0");
+    let negative_zero_atom = agent.atoms_mut().intern_collectible("-0");
+    let noncanonical_atom = agent.atoms_mut().intern_collectible("1.0");
+    let nan_atom = agent.atoms_mut().intern_collectible("NaN");
+
+    assert_eq!(
+        crate::typed_array::numeric_key(agent, typed_array, PropertyKey::Index(0)),
+        Some(crate::typed_array::NumericKey::Valid(0))
+    );
+    assert_eq!(
+        crate::typed_array::numeric_key(agent, typed_array, PropertyKey::from_atom(zero_atom)),
+        Some(crate::typed_array::NumericKey::Valid(0))
+    );
+    assert_eq!(
+        crate::typed_array::numeric_key(
+            agent,
+            typed_array,
+            PropertyKey::from_atom(negative_zero_atom),
+        ),
+        Some(crate::typed_array::NumericKey::Invalid)
+    );
+    assert_eq!(
+        crate::typed_array::numeric_key(agent, typed_array, PropertyKey::from_atom(nan_atom)),
+        Some(crate::typed_array::NumericKey::Invalid)
+    );
+    assert_eq!(
+        crate::typed_array::numeric_key(
+            agent,
+            typed_array,
+            PropertyKey::from_atom(noncanonical_atom),
+        ),
+        None
+    );
+}
+
+#[test]
 fn typed_array_index_reads_observe_live_backing_store_bytes() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -264,6 +345,79 @@ fn typed_array_index_reads_observe_live_backing_store_bytes() {
 
     assert_eq!(descriptor.value(), Some(Value::from_smi(7)));
     assert_eq!(value, Value::from_smi(7));
+}
+
+#[test]
+fn typed_array_shared_storage_helpers_convert_and_validate_live_views() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let typed_array = install_test_uint8_array(agent, &[1, 2]);
+    let record = agent
+        .objects()
+        .typed_array(typed_array)
+        .expect("test typed array should install its view record");
+
+    let clamped_bits = {
+        let mut cx = PrimitiveOnlyConversionContext { agent };
+        crate::typed_array::storage_bits_from_value(
+            &mut cx,
+            TypedArrayElementKind::Uint8Clamped,
+            Value::from_f64(2.5),
+        )
+        .expect("primitive number should convert for Uint8ClampedArray")
+    };
+    assert_eq!(clamped_bits, 2);
+
+    let int8_bits = {
+        let mut cx = PrimitiveOnlyConversionContext { agent };
+        crate::typed_array::storage_bits_from_value(
+            &mut cx,
+            TypedArrayElementKind::Int8,
+            Value::from_smi(255),
+        )
+        .expect("primitive number should convert for Int8Array")
+    };
+    assert_eq!(
+        crate::typed_array::value_from_storage_bits(agent, TypedArrayElementKind::Int8, int8_bits),
+        Value::from_smi(-1)
+    );
+
+    let negative_bigint = agent.heap_mut().mutator().alloc_bigint(
+        BigIntSign::Negative,
+        &[1],
+        AllocationLifetime::Default,
+    );
+    let bigint_bits = {
+        let mut cx = PrimitiveOnlyConversionContext { agent };
+        crate::typed_array::storage_bits_from_value(
+            &mut cx,
+            TypedArrayElementKind::BigInt64,
+            Value::from_bigint_ref(negative_bigint),
+        )
+        .expect("primitive BigInt should convert for BigInt64Array")
+    };
+    assert_eq!(bigint_bits, u64::MAX);
+    let bigint_value = crate::typed_array::value_from_storage_bits(
+        agent,
+        TypedArrayElementKind::BigInt64,
+        u64::MAX,
+    );
+    assert_eq!(bigint_to_string(agent, bigint_value, 10).unwrap(), "-1");
+
+    assert_eq!(crate::typed_array::current_length(agent, record), Some(2));
+    assert!(crate::typed_array::write_storage_bits(
+        agent, record, 1, 255
+    ));
+    assert_eq!(
+        crate::typed_array::read_storage_bits(agent, record, 1),
+        Some(255)
+    );
+
+    assert!(agent.backing_store_resize(record.backing_store(), 1));
+    assert_eq!(crate::typed_array::current_length(agent, record), None);
+    assert!(!crate::typed_array::is_valid_integer_index(
+        agent, record, 0
+    ));
 }
 
 #[test]

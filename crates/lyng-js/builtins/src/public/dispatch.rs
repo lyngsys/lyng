@@ -57,11 +57,10 @@ use support::{
     string_value, symbol_descriptive_string, syntax_error, to_bigint_for_builtin,
     to_boolean_for_builtin, to_index_for_builtin, to_integer_or_infinity_for_builtin,
     to_length_for_builtin, to_number_for_builtin, to_number_value_for_builtin,
-    to_string_string_ref, to_uint32_for_builtin, to_uint8_clamp_for_builtin, to_uint8_for_builtin,
-    try_create_data_property, try_delete_property_from_object, type_error,
-    typed_array_index_is_valid, uri_error, usize_index_as_number, usize_index_value,
-    valid_array_length, with_string_ref_code_units, BuiltinIteratorBridge, BuiltinProxyBridge,
-    BuiltinToPrimitiveBridge, MAX_SAFE_INTEGER_U64,
+    to_string_string_ref, to_uint32_for_builtin, to_uint8_for_builtin, try_create_data_property,
+    try_delete_property_from_object, type_error, typed_array_index_is_valid, uri_error,
+    usize_index_as_number, usize_index_value, valid_array_length, with_string_ref_code_units,
+    BuiltinIteratorBridge, BuiltinProxyBridge, BuiltinToPrimitiveBridge, MAX_SAFE_INTEGER_U64,
 };
 
 use super::{

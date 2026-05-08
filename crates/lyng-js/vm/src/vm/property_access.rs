@@ -5,26 +5,15 @@ use super::{
 };
 use crate::vm::values::alloc_code_unit_string;
 use crate::vm::values::encode_number;
-use lyng_js_objects::{f64_to_float16_bits, TypedArrayElementKind, TypedArrayObjectData};
 use lyng_js_ops::{
-    errors, number_to_string,
+    errors,
     object::{self, ToPrimitiveContext},
-    proxy, read,
+    proxy, read, typed_array,
 };
 use lyng_js_types::{PropertyDescriptor, PropertyKey, StringRef};
 use std::collections::HashSet;
 
 pub(super) use lyng_js_ops::object::ToPrimitiveHint;
-
-fn bigint_to_uint64_bits(agent: &Agent, value: Value) -> Option<u64> {
-    let bigint = value.as_bigint_ref()?;
-    let view = agent.heap().view().bigint_view(bigint)?;
-    let low = view.limb_at(0).unwrap_or(0);
-    Some(match view.sign() {
-        lyng_js_gc::BigIntSign::NonNegative => low,
-        lyng_js_gc::BigIntSign::Negative => 0_u64.wrapping_sub(low),
-    })
-}
 
 fn array_length_to_uint32(number: f64) -> u32 {
     const TWO_32: f64 = 4_294_967_296.0;
@@ -32,110 +21,6 @@ fn array_length_to_uint32(number: f64) -> u32 {
         return 0;
     }
     number_to_u32_after_range_check(number.trunc().rem_euclid(TWO_32))
-}
-
-fn vm_typed_array_storage_bits(kind: TypedArrayElementKind, number: f64) -> u64 {
-    match kind {
-        TypedArrayElementKind::BigInt64 | TypedArrayElementKind::BigUint64 => {
-            unreachable!("BigInt typed array elements are handled before Number conversion")
-        }
-        TypedArrayElementKind::Int8 | TypedArrayElementKind::Uint8 => {
-            u64::from(vm_to_uint8(number))
-        }
-        TypedArrayElementKind::Uint8Clamped => u64::from(vm_to_uint8_clamp(number)),
-        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => {
-            u64::from(vm_to_uint16(number))
-        }
-        TypedArrayElementKind::Float16 => u64::from(f64_to_float16_bits(number)),
-        TypedArrayElementKind::Float32 => u64::from(f32::to_bits(number_to_f32_storage(number))),
-        TypedArrayElementKind::Float64 => number.to_bits(),
-        TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => {
-            u64::from(vm_to_uint32(number))
-        }
-    }
-}
-
-fn vm_typed_array_index_is_valid(
-    agent: &Agent,
-    typed_array: TypedArrayObjectData,
-    index: usize,
-) -> bool {
-    if index >= typed_array.length() {
-        return false;
-    }
-    if agent
-        .backing_store_is_detached(typed_array.backing_store())
-        .unwrap_or(false)
-    {
-        return false;
-    }
-    let Some(byte_length) = agent.backing_store_byte_length(typed_array.backing_store()) else {
-        return false;
-    };
-    if typed_array.is_length_tracking() {
-        if typed_array.byte_offset() > byte_length {
-            return false;
-        }
-    } else if typed_array
-        .byte_offset()
-        .saturating_add(typed_array.byte_length())
-        > byte_length
-    {
-        return false;
-    }
-    let element_size = typed_array.kind().bytes_per_element();
-    let Some(element_end) = index
-        .checked_add(1)
-        .and_then(|end| end.checked_mul(element_size))
-        .and_then(|byte_count| typed_array.byte_offset().checked_add(byte_count))
-    else {
-        return false;
-    };
-    element_end <= byte_length
-}
-
-fn vm_typed_array_numeric_index_usize(index: f64) -> Option<usize> {
-    if !index.is_finite()
-        || index.fract() != 0.0
-        || index < 0.0
-        || (index == 0.0 && index.is_sign_negative())
-        || index > max_usize_as_f64()
-    {
-        return None;
-    }
-    Some(number_to_usize_after_range_check(index))
-}
-
-fn vm_typed_array_numeric_index_is_valid(
-    agent: &Agent,
-    typed_array: TypedArrayObjectData,
-    index: f64,
-) -> Option<usize> {
-    let index = vm_typed_array_numeric_index_usize(index)?;
-    vm_typed_array_index_is_valid(agent, typed_array, index).then_some(index)
-}
-
-fn canonical_numeric_index_string(text: &str) -> Option<f64> {
-    if text == "-0" {
-        return Some(-0.0);
-    }
-    let number = match text {
-        "NaN" => f64::NAN,
-        "Infinity" => f64::INFINITY,
-        "-Infinity" => f64::NEG_INFINITY,
-        _ => text.parse::<f64>().ok()?,
-    };
-    (number_to_string(number) == text).then_some(number)
-}
-
-fn typed_array_numeric_atom_index(agent: &Agent, key: PropertyKey) -> Option<f64> {
-    canonical_numeric_index_string(agent.atoms().resolve(key.as_atom()?))
-}
-
-fn typed_array_numeric_property_index(agent: &Agent, key: PropertyKey) -> Option<f64> {
-    key.as_index()
-        .map(f64::from)
-        .or_else(|| typed_array_numeric_atom_index(agent, key))
 }
 
 fn primitive_string_code_unit_len(agent: &mut Agent, string: StringRef) -> VmResult<u32> {
@@ -994,9 +879,7 @@ impl Vm {
         {
             return result;
         }
-        if agent.objects().typed_array(object).is_some()
-            && (key.as_index().is_some() || typed_array_numeric_atom_index(agent, key).is_some())
-        {
+        if typed_array::is_numeric_key(agent, object, key) {
             return object::ordinary_get_with_receiver(agent, object, key, receiver)
                 .map_err(VmError::Abrupt);
         }
@@ -1260,14 +1143,13 @@ impl Vm {
         key: PropertyKey,
         descriptor: PropertyDescriptor,
     ) -> VmResult<Option<bool>> {
-        let Some(typed_array) = agent.objects().typed_array(object) else {
+        if agent.objects().typed_array(object).is_none() {
+            return Ok(None);
+        }
+        let Some(numeric_index) = typed_array::numeric_property_index(agent, key) else {
             return Ok(None);
         };
-        let Some(numeric_index) = key
-            .as_index()
-            .map(f64::from)
-            .or_else(|| typed_array_numeric_atom_index(agent, key))
-        else {
+        let Some(numeric_key) = typed_array::numeric_key(agent, object, key) else {
             return Ok(None);
         };
         if descriptor.has_get()
@@ -1278,18 +1160,9 @@ impl Vm {
         {
             return Ok(Some(false));
         }
-        if !numeric_index.is_finite()
-            || numeric_index.fract() != 0.0
-            || numeric_index < 0.0
-            || (numeric_index == 0.0 && numeric_index.is_sign_negative())
-            || numeric_index > f64::from(u32::MAX)
-        {
+        let typed_array::NumericKey::Valid(_) = numeric_key else {
             return Ok(Some(false));
-        }
-        let index = number_to_usize_after_range_check(numeric_index);
-        if !vm_typed_array_index_is_valid(agent, typed_array, index) {
-            return Ok(Some(false));
-        }
+        };
         if let Some(value) = descriptor.value() {
             return self
                 .set_typed_array_numeric_index(
@@ -1369,15 +1242,18 @@ impl Vm {
         if agent.objects().is_module_namespace_object(object) {
             return Ok(false);
         }
-        if let Some(typed_array) = agent.objects().typed_array(object)
-            && let Some(index) = typed_array_numeric_property_index(agent, key)
+        if agent.objects().typed_array(object).is_some()
+            && let Some(index) = typed_array::numeric_property_index(agent, key)
         {
             if receiver.as_object_ref() == Some(object) {
                 return self.set_typed_array_numeric_index(
                     agent, host, registry, caller, object, index, value,
                 );
             }
-            if vm_typed_array_numeric_index_is_valid(agent, typed_array, index).is_none() {
+            if !matches!(
+                typed_array::numeric_key(agent, object, key),
+                Some(typed_array::NumericKey::Valid(_))
+            ) {
                 return Ok(true);
             }
         }
@@ -1579,61 +1455,27 @@ impl Vm {
         let Some(typed_array) = agent.objects().typed_array(object) else {
             return Ok(false);
         };
-        let primitive = self.to_primitive(
-            agent,
-            host,
-            registry,
-            caller,
-            value,
-            ToPrimitiveHint::Number,
-        )?;
-        let bits = if matches!(
-            typed_array.kind(),
-            TypedArrayElementKind::BigInt64 | TypedArrayElementKind::BigUint64
-        ) {
-            if primitive.is_number() {
-                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
-            }
-            let bigint = object::primitive_to_bigint(agent, primitive).map_err(VmError::Abrupt)?;
-            bigint_to_uint64_bits(agent, bigint)
-                .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?
-        } else {
-            let Ok(number) = read::to_number(agent.heap().view(), primitive) else {
-                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        let bits = {
+            let mut bridge = VmToPrimitiveBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame: caller,
             };
-            vm_typed_array_storage_bits(
-                typed_array.kind(),
-                number
-                    .as_f64()
-                    .expect("ToNumber must always produce a numeric Value"),
-            )
+            typed_array::storage_bits_from_value(&mut bridge, typed_array.kind(), value)?
         };
         let Some(typed_array) = agent.objects().typed_array(object) else {
             return Ok(false);
         };
-        if agent
-            .backing_store_is_detached(typed_array.backing_store())
-            .unwrap_or(true)
-        {
-            return Ok(true);
-        }
-        let Some(index) = vm_typed_array_numeric_index_usize(numeric_index) else {
+        let Some(element_index) = typed_array::element_index_from_numeric_index(numeric_index)
+        else {
             return Ok(true);
         };
-        if !vm_typed_array_index_is_valid(agent, typed_array, index) {
+        if !typed_array::is_valid_integer_index(agent, typed_array, element_index) {
             return Ok(true);
         }
-        let element_size = typed_array.kind().bytes_per_element();
-        let absolute_index = typed_array
-            .byte_offset()
-            .checked_add(index.saturating_mul(element_size))
-            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        if !agent.backing_store_store_bits(
-            typed_array.backing_store(),
-            absolute_index,
-            element_size,
-            bits,
-        ) {
+        if !typed_array::write_storage_bits(agent, typed_array, element_index, bits) {
             return Ok(false);
         }
         Ok(true)
@@ -1675,84 +1517,6 @@ fn legacy_function_arguments_slot(
     }
 }
 
-fn vm_to_uint8(number: f64) -> u8 {
-    if number.is_nan() || number == 0.0 || !number.is_finite() {
-        return 0;
-    }
-    let integer = number.trunc();
-    let mut modulo = integer % 256.0;
-    if modulo < 0.0 {
-        modulo += 256.0;
-    }
-    number_to_u8_after_range_check(modulo)
-}
-
-fn vm_to_uint8_clamp(number: f64) -> u8 {
-    if number.is_nan() || number <= 0.0 {
-        return 0;
-    }
-    if number >= 255.0 {
-        return 255;
-    }
-    let floor = number.floor();
-    if floor + 0.5 < number {
-        return number_to_u8_after_range_check(floor).saturating_add(1);
-    }
-    if number < floor + 0.5 {
-        return number_to_u8_after_range_check(floor);
-    }
-    let floor_u8 = number_to_u8_after_range_check(floor);
-    if floor_u8 % 2 == 1 {
-        floor_u8.saturating_add(1)
-    } else {
-        floor_u8
-    }
-}
-
-fn vm_to_uint16(number: f64) -> u16 {
-    if number.is_nan() || number == 0.0 || !number.is_finite() {
-        return 0;
-    }
-    let integer = number.trunc();
-    let mut modulo = integer % 65_536.0;
-    if modulo < 0.0 {
-        modulo += 65_536.0;
-    }
-    number_to_u16_after_range_check(modulo)
-}
-
-fn vm_to_uint32(number: f64) -> u32 {
-    if number.is_nan() || number == 0.0 || !number.is_finite() {
-        return 0;
-    }
-    let integer = number.trunc();
-    let mut modulo = integer % 4_294_967_296.0;
-    if modulo < 0.0 {
-        modulo += 4_294_967_296.0;
-    }
-    number_to_u32_after_range_check(modulo)
-}
-
-const fn number_to_u8_after_range_check(number: f64) -> u8 {
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "caller applies the ECMAScript modulo/range rules before narrowing to u8"
-    )]
-    let integer = number as u8;
-    integer
-}
-
-const fn number_to_u16_after_range_check(number: f64) -> u16 {
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "caller applies the ECMAScript modulo/range rules before narrowing to u16"
-    )]
-    let integer = number as u16;
-    integer
-}
-
 const fn number_to_u32_after_range_check(number: f64) -> u32 {
     #[allow(
         clippy::cast_possible_truncation,
@@ -1761,32 +1525,4 @@ const fn number_to_u32_after_range_check(number: f64) -> u32 {
     )]
     let integer = number as u32;
     integer
-}
-
-const fn number_to_usize_after_range_check(number: f64) -> usize {
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "caller validates a finite non-negative integer that fits in usize"
-    )]
-    let integer = number as usize;
-    integer
-}
-
-const fn number_to_f32_storage(number: f64) -> f32 {
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Float32Array storage uses ECMA-262 NumberToRawBytes f64-to-f32 rounding"
-    )]
-    let narrowed = number as f32;
-    narrowed
-}
-
-const fn max_usize_as_f64() -> f64 {
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "upper-bound guard only rejects values beyond the host pointer width"
-    )]
-    let max = usize::MAX as f64;
-    max
 }

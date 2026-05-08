@@ -12,56 +12,28 @@ pub(super) use iteration::dispatch_typed_array_iteration_builtin;
 pub(super) use mutation::dispatch_typed_array_mutation_builtin;
 pub(super) use search::dispatch_typed_array_search_builtin;
 
-use super::{
-    length_value_u64, range_error, to_bigint_for_builtin, to_number_for_builtin,
-    to_uint32_for_builtin, to_uint8_clamp_for_builtin, to_uint8_for_builtin, type_error,
-    PublicBuiltinDispatchContext,
-};
+use super::{length_value_u64, range_error, type_error, PublicBuiltinDispatchContext};
+use crate::public::dispatch::BuiltinToPrimitiveBridge;
 use lyng_js_common::WellKnownAtom;
 use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, BigIntSign};
+use lyng_js_gc::AllocationLifetime;
 use lyng_js_objects::{
-    f64_to_float16_bits, float16_bits_to_f64, ObjectAllocation, ObjectColdData, OrdinaryObjectData,
-    TypedArrayElementKind, TypedArrayObjectData,
+    ObjectAllocation, ObjectColdData, OrdinaryObjectData, TypedArrayElementKind,
+    TypedArrayObjectData,
 };
+use lyng_js_ops::typed_array;
 use lyng_js_types::{ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId};
 
-fn typed_array_biguint64_value(agent: &mut Agent, bits: u64) -> Value {
-    let bigint = agent.heap_mut().mutator().alloc_bigint(
-        BigIntSign::NonNegative,
-        &[bits],
-        AllocationLifetime::Default,
-    );
-    Value::from_bigint_ref(bigint)
+pub(super) const fn typed_array_storage_u8_bits(bits: u64) -> u8 {
+    typed_array::storage_u8_bits(bits)
 }
 
-fn typed_array_bigint64_value(agent: &mut Agent, bits: u64) -> Value {
-    let (sign, limbs) = if bits >> 63 == 0 {
-        (BigIntSign::NonNegative, [bits])
-    } else {
-        (BigIntSign::Negative, [bits.wrapping_neg()])
-    };
-    let bigint = agent
-        .heap_mut()
-        .mutator()
-        .alloc_bigint(sign, &limbs, AllocationLifetime::Default);
-    Value::from_bigint_ref(bigint)
+pub(super) const fn typed_array_storage_u16_bits(bits: u64) -> u16 {
+    typed_array::storage_u16_bits(bits)
 }
 
-pub(super) fn typed_array_storage_u8_bits(bits: u64) -> u8 {
-    u8::try_from(bits & u64::from(u8::MAX)).expect("typed-array u8 storage bits should fit u8")
-}
-
-pub(super) fn typed_array_storage_u16_bits(bits: u64) -> u16 {
-    u16::try_from(bits & u64::from(u16::MAX)).expect("typed-array u16 storage bits should fit u16")
-}
-
-pub(super) fn typed_array_storage_u32_bits(bits: u64) -> u32 {
-    u32::try_from(bits & u64::from(u32::MAX)).expect("typed-array u32 storage bits should fit u32")
-}
-
-fn typed_array_storage_u16_bits_from_u32(bits: u32) -> u16 {
-    u16::try_from(bits & u32::from(u16::MAX)).expect("typed-array u16 source bits should fit u16")
+pub(super) const fn typed_array_storage_u32_bits(bits: u64) -> u32 {
+    typed_array::storage_u32_bits(bits)
 }
 
 pub(super) fn typed_array_storage_bits_to_value(
@@ -69,46 +41,7 @@ pub(super) fn typed_array_storage_bits_to_value(
     kind: TypedArrayElementKind,
     bits: u64,
 ) -> Value {
-    match kind {
-        TypedArrayElementKind::BigInt64 => typed_array_bigint64_value(agent, bits),
-        TypedArrayElementKind::BigUint64 => typed_array_biguint64_value(agent, bits),
-        TypedArrayElementKind::Int8 => {
-            Value::from_smi(i32::from(typed_array_storage_u8_bits(bits).cast_signed()))
-        }
-        TypedArrayElementKind::Int16 => {
-            Value::from_smi(i32::from(typed_array_storage_u16_bits(bits).cast_signed()))
-        }
-        TypedArrayElementKind::Int32 => {
-            Value::from_smi(typed_array_storage_u32_bits(bits).cast_signed())
-        }
-        TypedArrayElementKind::Float16 => {
-            Value::from_f64(float16_bits_to_f64(typed_array_storage_u16_bits(bits)))
-        }
-        TypedArrayElementKind::Float32 => Value::from_f64(f64::from(f32::from_bits(
-            typed_array_storage_u32_bits(bits),
-        ))),
-        TypedArrayElementKind::Float64 => Value::from_f64(f64::from_bits(bits)),
-        TypedArrayElementKind::Uint32 => {
-            let value = typed_array_storage_u32_bits(bits);
-            i32::try_from(value).map_or_else(|_| Value::from_f64(f64::from(value)), Value::from_smi)
-        }
-        TypedArrayElementKind::Uint16 => {
-            Value::from_smi(i32::from(typed_array_storage_u16_bits(bits)))
-        }
-        TypedArrayElementKind::Uint8Clamped | TypedArrayElementKind::Uint8 => {
-            Value::from_smi(i32::from(typed_array_storage_u8_bits(bits)))
-        }
-    }
-}
-
-fn bigint_to_uint64_bits(agent: &Agent, value: Value) -> Option<u64> {
-    let bigint = value.as_bigint_ref()?;
-    let view = agent.heap().view().bigint_view(bigint)?;
-    let low = view.limb_at(0).unwrap_or(0);
-    Some(match view.sign() {
-        BigIntSign::NonNegative => low,
-        BigIntSign::Negative => 0_u64.wrapping_sub(low),
-    })
+    typed_array::value_from_storage_bits(agent, kind, bits)
 }
 
 pub(in crate::public::dispatch) fn typed_array_storage_bits_from_builtin_value<
@@ -118,55 +51,16 @@ pub(in crate::public::dispatch) fn typed_array_storage_bits_from_builtin_value<
     kind: TypedArrayElementKind,
     value: Value,
 ) -> Result<u64, Cx::Error> {
-    match kind {
-        TypedArrayElementKind::BigInt64 => {
-            let bigint = to_bigint_for_builtin(cx, value)?;
-            bigint_to_uint64_bits(cx.agent(), bigint).ok_or_else(|| type_error(cx))
-        }
-        TypedArrayElementKind::BigUint64 => {
-            let bigint = to_bigint_for_builtin(cx, value)?;
-            bigint_to_uint64_bits(cx.agent(), bigint).ok_or_else(|| type_error(cx))
-        }
-        TypedArrayElementKind::Int8 | TypedArrayElementKind::Uint8 => {
-            Ok(u64::from(to_uint8_for_builtin(cx, value)?))
-        }
-        TypedArrayElementKind::Uint8Clamped => {
-            Ok(u64::from(to_uint8_clamp_for_builtin(cx, value)?))
-        }
-        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => Ok(u64::from(
-            typed_array_storage_u16_bits_from_u32(to_uint32_for_builtin(cx, value)?),
-        )),
-        TypedArrayElementKind::Float16 => Ok(u64::from(f64_to_float16_bits(
-            to_number_for_builtin(cx, value)?,
-        ))),
-        TypedArrayElementKind::Float32 => {
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "Float32 typed arrays intentionally round Number values to binary32"
-            )]
-            let rounded = to_number_for_builtin(cx, value)? as f32;
-            Ok(u64::from(f32::to_bits(rounded)))
-        }
-        TypedArrayElementKind::Float64 => Ok(to_number_for_builtin(cx, value)?.to_bits()),
-        TypedArrayElementKind::Int32 | TypedArrayElementKind::Uint32 => {
-            Ok(u64::from(to_uint32_for_builtin(cx, value)?))
-        }
-    }
+    let mut bridge = BuiltinToPrimitiveBridge { cx };
+    typed_array::storage_bits_from_value(&mut bridge, kind, value)
 }
 
 pub(super) fn typed_array_read_storage_bits(
     agent: &Agent,
-    typed_array: TypedArrayObjectData,
+    record: TypedArrayObjectData,
     element_index: usize,
 ) -> Option<u64> {
-    if element_index >= typed_array_current_length(agent, typed_array)? {
-        return None;
-    }
-    let element_size = typed_array.kind().bytes_per_element();
-    let start = typed_array
-        .byte_offset()
-        .checked_add(element_index.checked_mul(element_size)?)?;
-    agent.backing_store_load_bits(typed_array.backing_store(), start, element_size)
+    typed_array::read_storage_bits(agent, record, element_index)
 }
 
 pub(in crate::public::dispatch) fn typed_array_write_storage_bits<
@@ -177,19 +71,7 @@ pub(in crate::public::dispatch) fn typed_array_write_storage_bits<
     element_index: usize,
     bits: u64,
 ) -> Result<(), Cx::Error> {
-    let element_size = record.kind().bytes_per_element();
-    let start = record
-        .byte_offset()
-        .checked_add(
-            element_index
-                .checked_mul(element_size)
-                .ok_or_else(|| range_error(cx))?,
-        )
-        .ok_or_else(|| range_error(cx))?;
-    if !cx
-        .agent()
-        .backing_store_store_bits(record.backing_store(), start, element_size, bits)
-    {
+    if !typed_array::write_storage_bits(cx.agent(), record, element_index, bits) {
         return Err(range_error(cx));
     }
     Ok(())
@@ -209,39 +91,21 @@ pub(super) fn typed_array_read_element_value(
     record: TypedArrayObjectData,
     index: usize,
 ) -> Value {
-    typed_array_read_storage_bits(agent, record, index).map_or(Value::undefined(), |bits| {
-        typed_array_storage_bits_to_value(agent, record.kind(), bits)
-    })
+    typed_array::read_element_value(agent, record, index)
 }
 
 pub(in crate::public::dispatch) fn typed_array_is_out_of_bounds(
     agent: &Agent,
     record: TypedArrayObjectData,
 ) -> bool {
-    typed_array_current_length(agent, record).is_none()
+    typed_array::is_out_of_bounds(agent, record)
 }
 
 pub(in crate::public::dispatch) fn typed_array_current_length(
     agent: &Agent,
     record: TypedArrayObjectData,
 ) -> Option<usize> {
-    if agent.backing_store_is_detached(record.backing_store())? {
-        return None;
-    }
-    let byte_length = agent.backing_store_byte_length(record.backing_store())?;
-    if record.is_length_tracking() {
-        return byte_length
-            .checked_sub(record.byte_offset())
-            .map(|remaining| remaining / record.kind().bytes_per_element());
-    }
-    if record
-        .byte_offset()
-        .checked_add(record.byte_length())
-        .is_none_or(|end| end > byte_length)
-    {
-        return None;
-    }
-    Some(record.length())
+    typed_array::current_length(agent, record)
 }
 
 pub(super) fn allocate_typed_array_object<Cx: PublicBuiltinDispatchContext>(

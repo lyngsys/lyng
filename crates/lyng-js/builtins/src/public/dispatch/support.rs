@@ -7,7 +7,7 @@ use lyng_js_objects::{
     FunctionEntryIdentity, ObjectAllocation, ObjectColdData, ObjectFlags, ObjectKind,
     OrdinaryObjectData, PrimitiveWrapperKind, ProxyObjectData, TypedArrayObjectData,
 };
-use lyng_js_ops::{errors, iterator, object, proxy, read};
+use lyng_js_ops::{errors, iterator, object, proxy, read, typed_array};
 use lyng_js_types::{
     object_to_string_builtin, AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyDescriptor,
     PropertyKey, RealmRef, StringRef, Value, WellKnownSymbolId,
@@ -886,7 +886,7 @@ pub(super) fn set_property_on_object<Cx: PublicBuiltinDispatchContext>(
                 .objects()
                 .typed_array(object_ref)
                 .ok_or_else(|| type_error(cx))?;
-            if !typed_array_index_is_valid(cx, record, element_index)? {
+            if !typed_array_index_is_valid(cx, record, element_index) {
                 return Ok(());
             }
             binary_data::typed_array_write_storage_bits(cx, record, element_index, bits)?;
@@ -909,36 +909,8 @@ pub(super) fn typed_array_index_is_valid<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     record: TypedArrayObjectData,
     element_index: usize,
-) -> Result<bool, Cx::Error> {
-    if element_index >= record.length() {
-        return Ok(false);
-    }
-    if cx
-        .agent()
-        .backing_store_is_detached(record.backing_store())
-        .ok_or_else(|| type_error(cx))?
-    {
-        return Ok(false);
-    }
-    let Some(byte_length) = cx.agent().backing_store_byte_length(record.backing_store()) else {
-        return Err(type_error(cx));
-    };
-    if record.is_length_tracking() {
-        if record.byte_offset() > byte_length {
-            return Ok(false);
-        }
-    } else if record.byte_offset().saturating_add(record.byte_length()) > byte_length {
-        return Ok(false);
-    }
-    let element_size = record.kind().bytes_per_element();
-    let Some(element_end) = element_index
-        .checked_add(1)
-        .and_then(|end| end.checked_mul(element_size))
-        .and_then(|byte_count| record.byte_offset().checked_add(byte_count))
-    else {
-        return Ok(false);
-    };
-    Ok(element_end <= byte_length)
+) -> bool {
+    typed_array::is_valid_integer_index(cx.agent(), record, element_index)
 }
 
 pub(super) fn set_property_on_object_with_receiver<Cx: PublicBuiltinDispatchContext>(
@@ -1872,32 +1844,6 @@ pub(super) fn to_uint8_for_builtin<Cx: PublicBuiltinDispatchContext>(
         modulo += TWO_8;
     }
     Ok(number_to_u8_after_range_check(modulo))
-}
-
-pub(super) fn to_uint8_clamp_for_builtin<Cx: PublicBuiltinDispatchContext>(
-    cx: &mut Cx,
-    value: Value,
-) -> Result<u8, Cx::Error> {
-    let number = to_number_for_builtin(cx, value)?;
-    if number.is_nan() || number <= 0.0 {
-        return Ok(0);
-    }
-    if number >= 255.0 {
-        return Ok(255);
-    }
-    let floor = number.floor();
-    if floor + 0.5 < number {
-        return Ok(number_to_u8_after_range_check(floor).saturating_add(1));
-    }
-    if number < floor + 0.5 {
-        return Ok(number_to_u8_after_range_check(floor));
-    }
-    let floor_u8 = number_to_u8_after_range_check(floor);
-    if floor_u8 % 2 == 1 {
-        Ok(floor_u8.saturating_add(1))
-    } else {
-        Ok(floor_u8)
-    }
 }
 
 pub(super) fn to_length_for_builtin<Cx: PublicBuiltinDispatchContext>(
