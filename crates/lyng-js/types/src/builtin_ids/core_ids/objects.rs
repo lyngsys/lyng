@@ -1,181 +1,40 @@
 use super::super::{builtin_id, BuiltinFunctionId};
 
-#[inline]
-pub const fn object_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_RAW)
-}
-
-#[inline]
-pub const fn object_create_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_CREATE_RAW)
-}
-
-#[inline]
-pub const fn object_get_prototype_of_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_GET_PROTOTYPE_OF_RAW)
-}
-
-#[inline]
-pub const fn object_set_prototype_of_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_SET_PROTOTYPE_OF_RAW)
-}
-
-#[inline]
-pub const fn object_get_own_property_descriptor_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_GET_OWN_PROPERTY_DESCRIPTOR_RAW)
-}
-
-#[inline]
-pub const fn object_get_own_property_descriptors_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_GET_OWN_PROPERTY_DESCRIPTORS_RAW)
-}
-
-#[inline]
-pub const fn object_define_property_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_DEFINE_PROPERTY_RAW)
-}
-
-#[inline]
-pub const fn object_define_properties_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_DEFINE_PROPERTIES_RAW)
-}
-
-#[inline]
-pub const fn object_prevent_extensions_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_PREVENT_EXTENSIONS_RAW)
-}
-
-#[inline]
-pub const fn object_is_extensible_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_IS_EXTENSIBLE_RAW)
-}
-
-#[inline]
-pub const fn object_is_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_IS_RAW)
-}
-
-#[inline]
-pub const fn object_seal_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_SEAL_RAW)
-}
-
-#[inline]
-pub const fn object_freeze_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_FREEZE_RAW)
-}
-
-#[inline]
-pub const fn object_is_sealed_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_IS_SEALED_RAW)
-}
-
-#[inline]
-pub const fn object_is_frozen_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_IS_FROZEN_RAW)
-}
-
-#[inline]
-pub const fn object_to_string_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_TO_STRING_RAW)
-}
-
-#[inline]
-pub const fn object_to_locale_string_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_TO_LOCALE_STRING_RAW)
-}
-
-#[inline]
-pub const fn object_value_of_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_VALUE_OF_RAW)
-}
-
-#[inline]
-pub const fn object_has_own_property_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_HAS_OWN_PROPERTY_RAW)
-}
-
-#[inline]
-pub const fn object_is_prototype_of_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_IS_PROTOTYPE_OF_RAW)
-}
-
-#[inline]
-pub const fn object_property_is_enumerable_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_PROPERTY_IS_ENUMERABLE_RAW)
-}
-
-#[inline]
-pub const fn object_assign_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_ASSIGN_RAW)
-}
-
-#[inline]
-pub const fn object_keys_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_KEYS_RAW)
-}
-
-#[inline]
-pub const fn object_entries_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_ENTRIES_RAW)
-}
-
-#[inline]
-pub const fn object_values_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_VALUES_RAW)
-}
-
-#[inline]
-pub const fn object_has_own_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_HAS_OWN_RAW)
-}
-
-#[inline]
-pub const fn object_from_entries_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_FROM_ENTRIES_RAW)
-}
-
-#[inline]
-pub const fn object_group_by_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_GROUP_BY_RAW)
-}
-
-#[inline]
-pub const fn object_define_getter_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_DEFINE_GETTER_RAW)
-}
-
-#[inline]
-pub const fn object_define_setter_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_DEFINE_SETTER_RAW)
-}
-
-#[inline]
-pub const fn object_lookup_getter_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_LOOKUP_GETTER_RAW)
-}
-
-#[inline]
-pub const fn object_lookup_setter_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_LOOKUP_SETTER_RAW)
-}
-
-#[inline]
-pub const fn object_proto_getter_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_PROTO_GETTER_RAW)
-}
-
-#[inline]
-pub const fn object_proto_setter_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_PROTO_SETTER_RAW)
-}
-
-#[inline]
-pub const fn object_get_own_property_names_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_GET_OWN_PROPERTY_NAMES_RAW)
-}
-
-#[inline]
-pub const fn object_get_own_property_symbols_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::OBJECT_GET_OWN_PROPERTY_SYMBOLS_RAW)
+builtin_id_accessors! {
+    object_builtin => super::super::OBJECT_RAW;
+    object_create_builtin => super::super::OBJECT_CREATE_RAW;
+    object_get_prototype_of_builtin => super::super::OBJECT_GET_PROTOTYPE_OF_RAW;
+    object_set_prototype_of_builtin => super::super::OBJECT_SET_PROTOTYPE_OF_RAW;
+    object_get_own_property_descriptor_builtin => super::super::OBJECT_GET_OWN_PROPERTY_DESCRIPTOR_RAW;
+    object_get_own_property_descriptors_builtin => super::super::OBJECT_GET_OWN_PROPERTY_DESCRIPTORS_RAW;
+    object_define_property_builtin => super::super::OBJECT_DEFINE_PROPERTY_RAW;
+    object_define_properties_builtin => super::super::OBJECT_DEFINE_PROPERTIES_RAW;
+    object_prevent_extensions_builtin => super::super::OBJECT_PREVENT_EXTENSIONS_RAW;
+    object_is_extensible_builtin => super::super::OBJECT_IS_EXTENSIBLE_RAW;
+    object_is_builtin => super::super::OBJECT_IS_RAW;
+    object_seal_builtin => super::super::OBJECT_SEAL_RAW;
+    object_freeze_builtin => super::super::OBJECT_FREEZE_RAW;
+    object_is_sealed_builtin => super::super::OBJECT_IS_SEALED_RAW;
+    object_is_frozen_builtin => super::super::OBJECT_IS_FROZEN_RAW;
+    object_to_string_builtin => super::super::OBJECT_TO_STRING_RAW;
+    object_to_locale_string_builtin => super::super::OBJECT_TO_LOCALE_STRING_RAW;
+    object_value_of_builtin => super::super::OBJECT_VALUE_OF_RAW;
+    object_has_own_property_builtin => super::super::OBJECT_HAS_OWN_PROPERTY_RAW;
+    object_is_prototype_of_builtin => super::super::OBJECT_IS_PROTOTYPE_OF_RAW;
+    object_property_is_enumerable_builtin => super::super::OBJECT_PROPERTY_IS_ENUMERABLE_RAW;
+    object_assign_builtin => super::super::OBJECT_ASSIGN_RAW;
+    object_keys_builtin => super::super::OBJECT_KEYS_RAW;
+    object_entries_builtin => super::super::OBJECT_ENTRIES_RAW;
+    object_values_builtin => super::super::OBJECT_VALUES_RAW;
+    object_has_own_builtin => super::super::OBJECT_HAS_OWN_RAW;
+    object_from_entries_builtin => super::super::OBJECT_FROM_ENTRIES_RAW;
+    object_group_by_builtin => super::super::OBJECT_GROUP_BY_RAW;
+    object_define_getter_builtin => super::super::OBJECT_DEFINE_GETTER_RAW;
+    object_define_setter_builtin => super::super::OBJECT_DEFINE_SETTER_RAW;
+    object_lookup_getter_builtin => super::super::OBJECT_LOOKUP_GETTER_RAW;
+    object_lookup_setter_builtin => super::super::OBJECT_LOOKUP_SETTER_RAW;
+    object_proto_getter_builtin => super::super::OBJECT_PROTO_GETTER_RAW;
+    object_proto_setter_builtin => super::super::OBJECT_PROTO_SETTER_RAW;
+    object_get_own_property_names_builtin => super::super::OBJECT_GET_OWN_PROPERTY_NAMES_RAW;
+    object_get_own_property_symbols_builtin => super::super::OBJECT_GET_OWN_PROPERTY_SYMBOLS_RAW;
 }

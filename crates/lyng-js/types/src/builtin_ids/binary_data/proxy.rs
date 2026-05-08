@@ -1,16 +1,7 @@
 use super::super::{builtin_id, BuiltinFunctionId};
 
-#[inline]
-pub const fn proxy_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::PROXY_RAW)
-}
-
-#[inline]
-pub const fn proxy_revocable_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::PROXY_REVOCABLE_RAW)
-}
-
-#[inline]
-pub const fn proxy_revoke_builtin() -> BuiltinFunctionId {
-    builtin_id(super::super::PROXY_REVOKE_RAW)
+builtin_id_accessors! {
+    proxy_builtin => super::super::PROXY_RAW;
+    proxy_revocable_builtin => super::super::PROXY_REVOCABLE_RAW;
+    proxy_revoke_builtin => super::super::PROXY_REVOKE_RAW;
 }

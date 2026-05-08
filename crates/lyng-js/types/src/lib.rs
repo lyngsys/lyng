@@ -151,6 +151,47 @@ mod tests {
     }
 
     #[test]
+    fn builtin_id_registry_entries_are_unique_and_match_classifiers() {
+        let mut seen = HashSet::new();
+
+        for entry in BUILTIN_ID_REGISTRY {
+            assert!(
+                seen.insert(entry.id()),
+                "duplicate builtin id {} for {}",
+                entry.raw(),
+                entry.accessor_name()
+            );
+            assert_eq!(builtin_id_registry_entry(entry.id()), Some(*entry));
+
+            match entry.namespace() {
+                BuiltinIdNamespace::Internal => {
+                    assert!(is_internal_builtin(entry.id()));
+                    assert!(!is_core_builtin(entry.id()));
+                    assert!(!is_completion_builtin(entry.id()));
+                }
+                BuiltinIdNamespace::Core => {
+                    assert!(!is_internal_builtin(entry.id()));
+                    assert!(is_core_builtin(entry.id()));
+                    assert!(!is_completion_builtin(entry.id()));
+                }
+                BuiltinIdNamespace::Completion => {
+                    assert!(!is_internal_builtin(entry.id()));
+                    assert!(!is_core_builtin(entry.id()));
+                    assert!(is_completion_builtin(entry.id()));
+                }
+            }
+        }
+
+        assert_eq!(BUILTIN_ID_REGISTRY.len(), 852);
+        let boolean_entry =
+            builtin_id_registry_entry(boolean_builtin()).expect("Boolean builtin must be indexed");
+        let promise_entry =
+            builtin_id_registry_entry(promise_builtin()).expect("Promise builtin must be indexed");
+        assert_eq!(boolean_entry.accessor_name(), "boolean_builtin");
+        assert_eq!(promise_entry.namespace(), BuiltinIdNamespace::Completion);
+    }
+
+    #[test]
     fn builtin_ids_do_not_alias_temporal_plain_datetime_with_plain_time() {
         assert_ne!(
             array_buffer_resize_builtin(),

@@ -8,38 +8,12 @@ mod plain_time;
 mod plain_year_month;
 mod zoned_date_time;
 
-use crate::BuiltinEntryMetadata;
-use lyng_js_types::BuiltinFunctionId;
-
-pub(super) fn temporal_public_builtin_metadata(
-    entry: BuiltinFunctionId,
-) -> Option<BuiltinEntryMetadata> {
-    if let Some(metadata) = instant::instant_public_builtin_metadata(entry) {
-        return Some(metadata);
-    }
-    if let Some(metadata) = now::now_public_builtin_metadata(entry) {
-        return Some(metadata);
-    }
-    if let Some(metadata) = duration::duration_public_builtin_metadata(entry) {
-        return Some(metadata);
-    }
-    if let Some(metadata) = plain_date::plain_date_public_builtin_metadata(entry) {
-        return Some(metadata);
-    }
-    if let Some(metadata) = plain_time::plain_time_public_builtin_metadata(entry) {
-        return Some(metadata);
-    }
-    if let Some(metadata) = plain_date_time::plain_date_time_public_builtin_metadata(entry) {
-        return Some(metadata);
-    }
-    if let Some(metadata) = plain_year_month::plain_year_month_public_builtin_metadata(entry) {
-        return Some(metadata);
-    }
-    if let Some(metadata) = plain_month_day::plain_month_day_public_builtin_metadata(entry) {
-        return Some(metadata);
-    }
-    if let Some(metadata) = zoned_date_time::zoned_date_time_public_builtin_metadata(entry) {
-        return Some(metadata);
-    }
-    None
-}
+pub(in crate::public::metadata) use duration::PUBLIC_TEMPORAL_DURATION_BUILTIN_METADATA;
+pub(in crate::public::metadata) use instant::PUBLIC_TEMPORAL_INSTANT_BUILTIN_METADATA;
+pub(in crate::public::metadata) use now::PUBLIC_TEMPORAL_NOW_BUILTIN_METADATA;
+pub(in crate::public::metadata) use plain_date::PUBLIC_TEMPORAL_PLAIN_DATE_BUILTIN_METADATA;
+pub(in crate::public::metadata) use plain_date_time::PUBLIC_TEMPORAL_PLAIN_DATE_TIME_BUILTIN_METADATA;
+pub(in crate::public::metadata) use plain_month_day::PUBLIC_TEMPORAL_PLAIN_MONTH_DAY_BUILTIN_METADATA;
+pub(in crate::public::metadata) use plain_time::PUBLIC_TEMPORAL_PLAIN_TIME_BUILTIN_METADATA;
+pub(in crate::public::metadata) use plain_year_month::PUBLIC_TEMPORAL_PLAIN_YEAR_MONTH_BUILTIN_METADATA;
+pub(in crate::public::metadata) use zoned_date_time::PUBLIC_TEMPORAL_ZONED_DATE_TIME_BUILTIN_METADATA;
