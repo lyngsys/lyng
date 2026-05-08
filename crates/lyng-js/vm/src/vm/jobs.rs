@@ -70,13 +70,13 @@ impl Vm {
         let Some(job) = agent.dequeue_job(queue_kind) else {
             return Ok(false);
         };
-        self.observe_job_phase(agent, host, &job, HostJobPhase::Enqueued)?;
-        self.observe_job_phase(agent, host, &job, HostJobPhase::Started)?;
+        Self::observe_job_phase(agent, host, &job, HostJobPhase::Enqueued)?;
+        Self::observe_job_phase(agent, host, &job, HostJobPhase::Started)?;
         let result = self.execute_runtime_job(agent, host, registry, &job);
         match result {
-            Ok(()) => self.observe_job_phase(agent, host, &job, HostJobPhase::Completed)?,
+            Ok(()) => Self::observe_job_phase(agent, host, &job, HostJobPhase::Completed)?,
             Err(error) => {
-                self.observe_job_phase(agent, host, &job, HostJobPhase::Failed)?;
+                Self::observe_job_phase(agent, host, &job, HostJobPhase::Failed)?;
                 return Err(error);
             }
         }
@@ -84,7 +84,6 @@ impl Vm {
     }
 
     fn observe_job_phase(
-        &self,
         agent: &Agent,
         host: &dyn HostHooks,
         job: &RuntimeJob,
@@ -178,7 +177,7 @@ impl Vm {
                 location,
                 token,
                 promise,
-            } => self.execute_atomics_wait_async_timeout_job(agent, location, token, promise),
+            } => Self::execute_atomics_wait_async_timeout_job(agent, location, token, promise),
             RuntimeJobPayload::FinalizationCleanup {
                 registry: registry_object,
             } => self.execute_finalization_cleanup_job(
@@ -195,7 +194,6 @@ impl Vm {
     }
 
     fn execute_atomics_wait_async_timeout_job(
-        &self,
         agent: &mut Agent,
         location: WaitLocation,
         token: WaiterToken,
@@ -508,7 +506,7 @@ impl Vm {
         } else {
             PromiseReactionHandler::PassThrough(argument)
         };
-        self.enqueue_promise_then(
+        Self::enqueue_promise_then(
             agent,
             realm,
             promise,
@@ -520,7 +518,6 @@ impl Vm {
     }
 
     pub(in crate::vm) fn enqueue_promise_then(
-        &self,
         agent: &mut Agent,
         realm: RealmRecord,
         promise: ObjectRef,
@@ -558,17 +555,16 @@ impl Vm {
                 );
             }
             lyng_js_env::PromiseState::Fulfilled => {
-                self.enqueue_promise_reaction_job(agent, realm, fulfill_reaction, record.result());
+                Self::enqueue_promise_reaction_job(agent, realm, fulfill_reaction, record.result());
             }
             lyng_js_env::PromiseState::Rejected => {
-                self.enqueue_promise_reaction_job(agent, realm, reject_reaction, record.result());
+                Self::enqueue_promise_reaction_job(agent, realm, reject_reaction, record.result());
             }
         }
         Ok(())
     }
 
     pub(super) fn enqueue_promise_reaction_job(
-        &self,
         agent: &mut Agent,
         realm: RealmRecord,
         reaction: lyng_js_env::PromiseReactionId,
@@ -626,7 +622,7 @@ impl Vm {
         then: ObjectRef,
     ) -> VmResult<()> {
         let (resolve, reject) =
-            self.create_promise_job_resolving_functions(agent, realm, promise)?;
+            Self::create_promise_job_resolving_functions(agent, realm, promise)?;
         let caller = self.synthetic_job_caller_frame(realm);
         match self.call_to_completion(
             agent,
@@ -659,19 +655,18 @@ impl Vm {
     }
 
     fn create_promise_job_resolving_functions(
-        &self,
         agent: &mut Agent,
         realm: RealmRecord,
         promise: ObjectRef,
     ) -> VmResult<(ObjectRef, ObjectRef)> {
         let capability = agent.alloc_promise_capability();
         let _ = agent.set_promise_capability_promise(capability, promise);
-        let resolve = self.allocate_builtin_function_object(
+        let resolve = Self::allocate_builtin_function_object(
             agent,
             realm.id(),
             promise_resolve_function_builtin(),
         )?;
-        let reject = self.allocate_builtin_function_object(
+        let reject = Self::allocate_builtin_function_object(
             agent,
             realm.id(),
             promise_reject_function_builtin(),

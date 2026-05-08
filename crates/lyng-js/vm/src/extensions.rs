@@ -167,8 +167,7 @@ impl<'a> RealmExtensionInstallation<'a> {
     ///
     /// Returns a VM error if the embedding function object cannot be allocated for this realm.
     pub fn allocate_function(&mut self, entry: EmbeddingFunctionId) -> Result<ObjectRef, VmError> {
-        self.vm
-            .allocate_embedding_function_object(self.agent, self.realm(), entry, self.provider)
+        Vm::allocate_embedding_function_object(self.agent, self.realm(), entry, self.provider)
     }
 
     /// # Errors
@@ -335,11 +334,11 @@ impl<'a> EmbeddingFunctionContext<'a> {
     ///
     /// Returns a VM error if JavaScript `ToString` produces an abrupt completion.
     pub fn value_to_string_text(&mut self, value: Value) -> Result<String, VmError> {
-        self.vm.value_to_string_text(self.agent, value)
+        Vm::value_to_string_text(self.agent, value)
     }
 
     pub fn alloc_code_unit_string(&mut self, units: &[u16]) -> Value {
-        self.vm.alloc_code_unit_string_value(self.agent, units)
+        Vm::alloc_code_unit_string_value(self.agent, units)
     }
 
     /// # Errors

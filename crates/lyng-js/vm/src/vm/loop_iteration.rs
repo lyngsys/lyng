@@ -152,7 +152,7 @@ impl Vm {
                 if iteration_slots.contains(&slot) {
                     continue;
                 }
-                self.copy_environment_slot(agent, environment, iteration_environment, slot)?;
+                Self::copy_environment_slot(agent, environment, iteration_environment, slot)?;
             }
         }
         Ok(iteration_environment)
@@ -312,7 +312,7 @@ impl Vm {
             if target == environment {
                 continue;
             }
-            if let Err(error) = self.mirror_environment_slot(agent, target, slot, value) {
+            if let Err(error) = Self::mirror_environment_slot(agent, target, slot, value) {
                 result = Err(error);
                 break;
             }
@@ -346,7 +346,7 @@ impl Vm {
             }
 
             if source != environment {
-                self.mirror_environment_slot(agent, source, slot, value)?;
+                Self::mirror_environment_slot(agent, source, slot, value)?;
             }
 
             for target_index in 0..self.loop_iteration_envs.len() {
@@ -358,7 +358,7 @@ impl Vm {
                 if target == environment {
                     continue;
                 }
-                self.mirror_environment_slot(agent, target, slot, value)?;
+                Self::mirror_environment_slot(agent, target, slot, value)?;
             }
         }
         Ok(())
@@ -456,7 +456,7 @@ impl Vm {
         depth: u8,
         slot: u32,
     ) -> VmResult<EnvironmentRef> {
-        let environment = self.environment_at_depth(agent, start, depth)?;
+        let environment = Self::environment_at_depth(agent, start, depth)?;
         if depth != 0 {
             return Ok(environment);
         }

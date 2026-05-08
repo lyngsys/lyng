@@ -112,11 +112,11 @@ impl Vm {
             PropertyKey::from_atom(WellKnownAtom::name.id()),
         )?;
         let target_name = if target_name.as_string_ref().is_some() {
-            self.value_to_string_text(agent, target_name)?
+            Self::value_to_string_text(agent, target_name)?
         } else {
             String::new()
         };
-        self.define_data_property_with_attrs(
+        Self::define_data_property_with_attrs(
             agent,
             function,
             PropertyKey::from_atom(WellKnownAtom::length.id()),
@@ -127,7 +127,7 @@ impl Vm {
         )?;
         let bound_name =
             Value::from_string_ref(alloc_string(agent, &format!("bound {target_name}"), None));
-        self.define_data_property_with_attrs(
+        Self::define_data_property_with_attrs(
             agent,
             function,
             PropertyKey::from_atom(WellKnownAtom::name.id()),
@@ -356,8 +356,7 @@ impl Vm {
         } else {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         };
-        let script_referrer = self
-            .active_script_or_module_referrer(agent)
+        let script_referrer = Self::active_script_or_module_referrer(agent)
             .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         let function = self
             .evaluate_entry_with_registry(
@@ -380,11 +379,10 @@ impl Vm {
     }
 
     pub(super) fn native_function_source_text(
-        &self,
         agent: &mut Agent,
         function: ObjectRef,
     ) -> VmResult<String> {
-        let name = self.function_name_text(agent, function)?;
+        let name = Self::function_name_text(agent, function)?;
         Ok(if name.is_empty() {
             "function () { [native code] }".to_owned()
         } else {
@@ -399,7 +397,7 @@ impl Vm {
         function: ObjectRef,
     ) -> VmResult<String> {
         let Some(installed) = self.installed_function(code) else {
-            return self.native_function_source_text(agent, function);
+            return Self::native_function_source_text(agent, function);
         };
         if let Some(span) = installed.source_span()
             && let Some(source_text) = self.source_text(span.source)
@@ -414,7 +412,7 @@ impl Vm {
                 return Ok(candidate.to_owned());
             }
         }
-        let name = self.function_name_text(agent, function)?;
+        let name = Self::function_name_text(agent, function)?;
         Ok(if name.is_empty() {
             "function () { [source unavailable] }".to_owned()
         } else {
@@ -422,14 +420,14 @@ impl Vm {
         })
     }
 
-    fn function_name_text(&self, agent: &mut Agent, function: ObjectRef) -> VmResult<String> {
+    fn function_name_text(agent: &mut Agent, function: ObjectRef) -> VmResult<String> {
         let name = object::ordinary_get(
             agent,
             function,
             PropertyKey::from_atom(WellKnownAtom::name.id()),
         )
         .map_err(VmError::Abrupt)?;
-        self.value_to_string_text(agent, name)
+        Self::value_to_string_text(agent, name)
     }
 
     fn trim_function_source_prefix(

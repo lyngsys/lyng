@@ -7,7 +7,6 @@ use super::{
 
 impl Vm {
     pub(in crate::vm) fn allocate_builtin_function_object(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         entry: BuiltinFunctionId,
@@ -99,7 +98,6 @@ impl Vm {
     }
 
     pub(crate) fn allocate_embedding_function_object(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         entry: EmbeddingFunctionId,

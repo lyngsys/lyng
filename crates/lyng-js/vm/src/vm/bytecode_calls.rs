@@ -182,7 +182,7 @@ impl Vm {
                     new_target,
                 ),
                 FunctionThisMode::Global => {
-                    let resolved = self.resolve_global_this(agent, realm, this_value)?;
+                    let resolved = Self::resolve_global_this(agent, realm, this_value)?;
                     (
                         resolved,
                         ThisState::Value(resolved),
@@ -475,7 +475,6 @@ impl Vm {
     }
 
     pub(super) fn resolve_global_this(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         this_value: Value,
@@ -487,7 +486,7 @@ impl Vm {
             return Ok(Value::from_object_ref(global));
         }
         if this_value.as_object_ref().is_none() {
-            let object = self.to_object_for_value(agent, realm, this_value)?;
+            let object = Self::to_object_for_value(agent, realm, this_value)?;
             return Ok(Value::from_object_ref(object));
         }
         Ok(this_value)

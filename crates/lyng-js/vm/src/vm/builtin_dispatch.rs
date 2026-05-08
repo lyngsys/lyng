@@ -119,7 +119,7 @@ impl Vm {
             return Ok(None);
         };
         if entry == internal_import_meta_builtin() {
-            return self.import_meta_builtin(agent, caller_frame).map(Some);
+            return Self::import_meta_builtin(agent, caller_frame).map(Some);
         }
         if entry == internal_dynamic_import_builtin() {
             return self
@@ -127,9 +127,7 @@ impl Vm {
                 .map(Some);
         }
         if entry == internal_regexp_literal_builtin() {
-            return self
-                .regexp_literal_builtin(agent, caller_frame, arguments)
-                .map(Some);
+            return Self::regexp_literal_builtin(agent, caller_frame, arguments).map(Some);
         }
         let mut bridge = VmBuiltinDispatch {
             vm: self,

@@ -4,7 +4,6 @@ use lyng_js_parser::validate_regexp_literal;
 
 impl Vm {
     pub(super) fn regexp_literal_builtin(
-        &self,
         agent: &mut Agent,
         caller: FrameRecord,
         arguments: &[Value],
@@ -17,8 +16,8 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let pattern_value = arguments.get(1).copied().unwrap_or(Value::undefined());
         let flags_value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let pattern_text = self.value_to_string_text(agent, pattern_value)?;
-        let flags_text = self.value_to_string_text(agent, flags_value)?;
+        let pattern_text = Self::value_to_string_text(agent, pattern_value)?;
+        let flags_text = Self::value_to_string_text(agent, flags_value)?;
         let realm = caller.realm();
 
         if validate_regexp_literal(&pattern_text, &flags_text).is_err() {
@@ -42,7 +41,7 @@ impl Vm {
             payload
         };
 
-        let object = self.allocate_regexp_object_with_payload(agent, realm, payload)?;
+        let object = Self::allocate_regexp_object_with_payload(agent, realm, payload)?;
         Ok(Value::from_object_ref(object))
     }
 }

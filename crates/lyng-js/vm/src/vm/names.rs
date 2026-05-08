@@ -322,9 +322,7 @@ impl Vm {
                     {
                         let environment =
                             self.environment_for_slot_access(agent, record.id(), 0, slot)?;
-                        return self
-                            .read_environment_slot(agent, environment, slot)
-                            .map(Some);
+                        return Self::read_environment_slot(agent, environment, slot).map(Some);
                     }
                     current = record.outer();
                 }
@@ -339,9 +337,7 @@ impl Vm {
                     ) {
                         let environment =
                             self.environment_for_slot_access(agent, declarative.id(), 0, slot)?;
-                        return self
-                            .read_environment_slot(agent, environment, slot)
-                            .map(Some);
+                        return Self::read_environment_slot(agent, environment, slot).map(Some);
                     }
                     current = declarative.outer();
                 }
@@ -351,14 +347,12 @@ impl Vm {
                     {
                         let environment =
                             self.environment_for_slot_access(agent, record.id(), 0, slot)?;
-                        return self
-                            .read_environment_slot(agent, environment, slot)
-                            .map(Some);
+                        return Self::read_environment_slot(agent, environment, slot).map(Some);
                     }
                     current = record.outer();
                 }
                 EnvironmentRecord::Global(record) => {
-                    if let Some(binding) = self.lookup_global_lexical_binding(agent, &record, name)
+                    if let Some(binding) = Self::lookup_global_lexical_binding(agent, &record, name)
                     {
                         let environment = self.environment_for_slot_access(
                             agent,
@@ -366,8 +360,7 @@ impl Vm {
                             0,
                             binding.slot(),
                         )?;
-                        return self
-                            .read_environment_slot(agent, environment, binding.slot())
+                        return Self::read_environment_slot(agent, environment, binding.slot())
                             .map(Some);
                     }
                     if let Some(slot) =
@@ -375,9 +368,7 @@ impl Vm {
                     {
                         let environment =
                             self.environment_for_slot_access(agent, record.id(), 0, slot)?;
-                        return self
-                            .read_environment_slot(agent, environment, slot)
-                            .map(Some);
+                        return Self::read_environment_slot(agent, environment, slot).map(Some);
                     }
                     if let Some(value) = self.get_global_property_binding_with_context(
                         agent,
@@ -467,7 +458,7 @@ impl Vm {
                     current = record.outer();
                 }
                 EnvironmentRecord::Global(record) => {
-                    if let Some(binding) = self.lookup_global_lexical_binding(agent, &record, name)
+                    if let Some(binding) = Self::lookup_global_lexical_binding(agent, &record, name)
                     {
                         let environment = self.environment_for_slot_access(
                             agent,
@@ -505,7 +496,7 @@ impl Vm {
                 }
             }
         }
-        let global = self.find_global_environment(agent, frame.variable_env())?;
+        let global = Self::find_global_environment(agent, frame.variable_env())?;
         Ok(CapturedNameTarget::Unresolvable {
             global_environment: global.id(),
         })
@@ -521,11 +512,11 @@ impl Vm {
         code: CodeRef,
         instruction_offset: u32,
     ) -> VmResult<Value> {
-        let global = self.find_global_environment_ref(agent, frame.variable_env())?;
-        if let Some(binding) = self.lookup_global_lexical_binding_ref(agent, global, name) {
+        let global = Self::find_global_environment_ref(agent, frame.variable_env())?;
+        if let Some(binding) = Self::lookup_global_lexical_binding_ref(agent, global, name) {
             let environment =
                 self.environment_for_slot_access(agent, binding.environment(), 0, binding.slot())?;
-            return self.read_environment_slot(agent, environment, binding.slot());
+            return Self::read_environment_slot(agent, environment, binding.slot());
         }
 
         let global_object = agent
@@ -572,8 +563,8 @@ impl Vm {
         code: CodeRef,
         instruction_offset: u32,
     ) -> VmResult<()> {
-        let global = self.find_global_environment(agent, frame.variable_env())?;
-        if let Some(binding) = self.lookup_global_lexical_binding(agent, &global, name) {
+        let global = Self::find_global_environment(agent, frame.variable_env())?;
+        if let Some(binding) = Self::lookup_global_lexical_binding(agent, &global, name) {
             let environment =
                 self.environment_for_slot_access(agent, binding.environment(), 0, binding.slot())?;
             return self.write_environment_slot(agent, environment, binding.slot(), value);
@@ -623,8 +614,8 @@ impl Vm {
         code: CodeRef,
         instruction_offset: u32,
     ) -> VmResult<()> {
-        let global = self.find_global_environment(agent, frame.variable_env())?;
-        if let Some(binding) = self.lookup_global_lexical_binding(agent, &global, name) {
+        let global = Self::find_global_environment(agent, frame.variable_env())?;
+        if let Some(binding) = Self::lookup_global_lexical_binding(agent, &global, name) {
             let environment =
                 self.environment_for_slot_access(agent, binding.environment(), 0, binding.slot())?;
             return self.assign_environment_slot(
@@ -736,7 +727,7 @@ impl Vm {
         value: Value,
         strict: bool,
     ) -> VmResult<()> {
-        let global = self.find_global_environment(agent, environment)?;
+        let global = Self::find_global_environment(agent, environment)?;
         let key = PropertyKey::from_atom(name);
         let has_property = self.global_has_property_with_key(
             agent,
@@ -778,7 +769,7 @@ impl Vm {
         if strict {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
-        let global = self.find_global_environment(agent, global_environment)?;
+        let global = Self::find_global_environment(agent, global_environment)?;
         let _ = self.set_global_property_with_context(
             agent,
             host,
@@ -808,7 +799,7 @@ impl Vm {
             })?;
         match reference.target() {
             CapturedNameTarget::EnvironmentSlot { environment, slot } => {
-                self.read_environment_slot(agent, environment, slot)
+                Self::read_environment_slot(agent, environment, slot)
             }
             CapturedNameTarget::ObjectProperty { record } => self
                 .object_environment_get_binding_value_with_context(
@@ -1181,7 +1172,7 @@ impl Vm {
                 .object_environment_delete_binding_with_context(
                     agent, host, registry, frame, record, name,
                 ),
-            CapturedNameTarget::GlobalProperty { .. } => self.delete_global(agent, frame, name),
+            CapturedNameTarget::GlobalProperty { .. } => Self::delete_global(agent, frame, name),
             CapturedNameTarget::Unresolvable { .. } => Ok(true),
         }
     }
@@ -1199,14 +1190,13 @@ impl Vm {
     }
 
     pub(super) fn delete_global(
-        &self,
         agent: &mut Agent,
         frame: FrameRecord,
         name: AtomId,
     ) -> VmResult<bool> {
-        let global = self.find_global_environment(agent, frame.variable_env())?;
-        if self.global_chain_has_lexical_binding(agent, global.id(), name)
-            || self.global_chain_has_var_name(agent, global.id(), name)
+        let global = Self::find_global_environment(agent, frame.variable_env())?;
+        if Self::global_chain_has_lexical_binding(agent, global.id(), name)
+            || Self::global_chain_has_var_name(agent, global.id(), name)
         {
             return Ok(false);
         }
@@ -1219,7 +1209,6 @@ impl Vm {
     }
 
     pub(super) fn global_has_lexical_binding(
-        &self,
         agent: &Agent,
         global: &GlobalEnvironmentRecord,
         name: AtomId,
@@ -1236,18 +1225,16 @@ impl Vm {
     }
 
     pub(super) fn lookup_global_lexical_binding(
-        &self,
         agent: &Agent,
         global: &GlobalEnvironmentRecord,
         name: AtomId,
     ) -> Option<GlobalLexicalBindingRecord> {
         global
             .lexical_binding(name)
-            .or_else(|| self.lookup_global_layout_binding(agent, global, name))
+            .or_else(|| Self::lookup_global_layout_binding(agent, global, name))
     }
 
     pub(super) fn global_chain_has_lexical_binding(
-        &self,
         agent: &Agent,
         start: EnvironmentRef,
         name: AtomId,
@@ -1259,7 +1246,7 @@ impl Vm {
             };
             match record {
                 EnvironmentRecord::Global(global) => {
-                    if self.global_has_lexical_binding(agent, &global, name) {
+                    if Self::global_has_lexical_binding(agent, &global, name) {
                         return true;
                     }
                     current = global.outer();
@@ -1275,7 +1262,6 @@ impl Vm {
     }
 
     pub(super) fn global_chain_has_var_name(
-        &self,
         agent: &Agent,
         start: EnvironmentRef,
         name: AtomId,
@@ -1302,7 +1288,7 @@ impl Vm {
         false
     }
 
-    pub(super) fn type_of_value(&self, agent: &mut Agent, value: Value) -> Value {
+    pub(super) fn type_of_value(agent: &mut Agent, value: Value) -> Value {
         let text = if value.is_undefined() {
             "undefined"
         } else if value.is_null() {
@@ -1333,7 +1319,6 @@ impl Vm {
     }
 
     pub(super) fn find_global_environment(
-        &self,
         agent: &Agent,
         start: EnvironmentRef,
     ) -> VmResult<GlobalEnvironmentRecord> {
@@ -1447,7 +1432,7 @@ impl Vm {
         start: EnvironmentRef,
         name: AtomId,
     ) -> VmResult<Option<Value>> {
-        let (_, global_object) = self.find_global_environment_object(agent, start)?;
+        let (_, global_object) = Self::find_global_environment_object(agent, start)?;
         let key = PropertyKey::from_atom(name);
         if !self.global_has_property_with_key(agent, host, registry, frame, global_object, key)? {
             return Ok(None);
@@ -1465,7 +1450,6 @@ impl Vm {
     }
 
     fn find_global_environment_ref(
-        &self,
         agent: &Agent,
         start: EnvironmentRef,
     ) -> VmResult<EnvironmentRef> {
@@ -1482,11 +1466,10 @@ impl Vm {
     }
 
     fn find_global_environment_object(
-        &self,
         agent: &Agent,
         start: EnvironmentRef,
     ) -> VmResult<(EnvironmentRef, ObjectRef)> {
-        let global = self.find_global_environment_ref(agent, start)?;
+        let global = Self::find_global_environment_ref(agent, start)?;
         let object = agent
             .global_environment_object(global)
             .ok_or(VmError::MissingEnvironment(global))?;
@@ -1494,18 +1477,16 @@ impl Vm {
     }
 
     fn lookup_global_lexical_binding_ref(
-        &self,
         agent: &Agent,
         global: EnvironmentRef,
         name: AtomId,
     ) -> Option<GlobalLexicalBindingRecord> {
         agent
             .global_lexical_binding(global, name)
-            .or_else(|| self.lookup_global_layout_binding_ref(agent, global, name))
+            .or_else(|| Self::lookup_global_layout_binding_ref(agent, global, name))
     }
 
     fn lookup_global_layout_binding_ref(
-        &self,
         agent: &Agent,
         global: EnvironmentRef,
         name: AtomId,
@@ -1520,7 +1501,6 @@ impl Vm {
     }
 
     fn lookup_global_layout_binding(
-        &self,
         agent: &Agent,
         global: &GlobalEnvironmentRecord,
         name: AtomId,
@@ -1540,7 +1520,6 @@ impl Vm {
     }
 
     pub(super) fn environment_at_depth(
-        &self,
         agent: &Agent,
         start: EnvironmentRef,
         depth: u8,

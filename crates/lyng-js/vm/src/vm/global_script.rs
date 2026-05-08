@@ -9,7 +9,6 @@ const BULK_GLOBAL_BINDING_DICTIONARY_THRESHOLD: usize = 64;
 
 impl Vm {
     pub(crate) fn instantiate_global_script(
-        &self,
         agent: &mut Agent,
         realm: RealmRecord,
         plan: &GlobalScriptInstantiationPlan,
@@ -26,7 +25,7 @@ impl Vm {
 
         for name in plan.lexical_names() {
             let name = agent.atoms_mut().intern_collectible(name);
-            if self.global_chain_has_lexical_binding(agent, global_env, name) {
+            if Self::global_chain_has_lexical_binding(agent, global_env, name) {
                 return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
             }
             if has_restricted_global_property(agent, global_object, name)? {
@@ -36,7 +35,7 @@ impl Vm {
 
         for name in plan.function_names() {
             let name = agent.atoms_mut().intern_collectible(name);
-            if self.global_chain_has_lexical_binding(agent, global_env, name) {
+            if Self::global_chain_has_lexical_binding(agent, global_env, name) {
                 return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
             }
             if !can_declare_global_function(agent, global_object, name)? {
@@ -46,7 +45,7 @@ impl Vm {
 
         for name in plan.var_names() {
             let name = agent.atoms_mut().intern_collectible(name);
-            if self.global_chain_has_lexical_binding(agent, global_env, name) {
+            if Self::global_chain_has_lexical_binding(agent, global_env, name) {
                 return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
             }
             if !can_declare_global_var(agent, global_object, name)? {

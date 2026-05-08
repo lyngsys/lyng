@@ -222,7 +222,6 @@ impl Vm {
     }
 
     fn try_evaluate_regexp_literal_eval_source(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         source_text: &str,
@@ -233,12 +232,11 @@ impl Vm {
         if validate_regexp_literal(pattern, flags).is_err() {
             return Err(Self::syntax_error(agent, realm, "evalScript parse failure"));
         }
-        let regexp = self.allocate_eval_regexp_literal(agent, realm, pattern, flags)?;
+        let regexp = Self::allocate_eval_regexp_literal(agent, realm, pattern, flags)?;
         Ok(Some(Value::from_object_ref(regexp)))
     }
 
     pub(super) fn try_evaluate_regexp_literal_eval_string_ref(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         source: StringRef,
@@ -251,7 +249,7 @@ impl Vm {
         if validate_regexp_literal(&pattern, &flags).is_err() {
             return Err(Self::syntax_error(agent, realm, "evalScript parse failure"));
         }
-        let regexp = self.allocate_eval_regexp_literal_with_source_units(
+        let regexp = Self::allocate_eval_regexp_literal_with_source_units(
             agent,
             realm,
             &pattern,
@@ -262,7 +260,6 @@ impl Vm {
     }
 
     fn allocate_eval_regexp_literal(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         pattern: &str,
@@ -270,11 +267,10 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         let payload = RegExpPayload::compile(pattern, flags)
             .map_err(|_| Self::syntax_error(agent, realm, "evalScript parse failure"))?;
-        self.allocate_eval_regexp_literal_with_payload(agent, realm, payload)
+        Self::allocate_eval_regexp_literal_with_payload(agent, realm, payload)
     }
 
     fn allocate_eval_regexp_literal_with_source_units(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         pattern: &str,
@@ -283,16 +279,15 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         let payload = RegExpPayload::compile_with_source_units(pattern, source_units, flags)
             .map_err(|_| Self::syntax_error(agent, realm, "evalScript parse failure"))?;
-        self.allocate_eval_regexp_literal_with_payload(agent, realm, payload)
+        Self::allocate_eval_regexp_literal_with_payload(agent, realm, payload)
     }
 
     fn allocate_eval_regexp_literal_with_payload(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         payload: RegExpPayload,
     ) -> VmResult<ObjectRef> {
-        self.allocate_regexp_object_with_payload(agent, realm, payload)
+        Self::allocate_regexp_object_with_payload(agent, realm, payload)
     }
 
     pub(crate) fn evaluate_script_source(
@@ -327,7 +322,7 @@ impl Vm {
             )
         })?;
         let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
-        let script_referrer = self.active_script_or_module_referrer(agent);
+        let script_referrer = Self::active_script_or_module_referrer(agent);
         self.evaluate_script_with_registry_and_host_referrer(
             agent,
             realm_record,
@@ -351,7 +346,7 @@ impl Vm {
         }
 
         if let Some(value) =
-            self.try_evaluate_regexp_literal_eval_source(agent, realm, source_text)?
+            Self::try_evaluate_regexp_literal_eval_source(agent, realm, source_text)?
         {
             return Ok(value);
         }
@@ -395,7 +390,7 @@ impl Vm {
             && let Some(lyng_js_env::EnvironmentRecord::Global(record)) =
                 agent.environment(global_env)
         {
-            self.validate_direct_eval_global_declarations(
+            Self::validate_direct_eval_global_declarations(
                 agent,
                 global_env,
                 record.global_object(),
@@ -404,7 +399,7 @@ impl Vm {
             )?;
         }
 
-        let hosted_names = self.rewrite_direct_eval_root_bindings(
+        let hosted_names = Self::rewrite_direct_eval_root_bindings(
             agent,
             global_env,
             analysis.parsed().strict,
@@ -425,7 +420,7 @@ impl Vm {
 
         let (lexical_env, variable_env) = if analysis.parsed().strict {
             let indirect_eval_env =
-                self.create_direct_eval_var_environment(agent, global_env, &hosted_names)?;
+                Self::create_direct_eval_var_environment(agent, global_env, &hosted_names)?;
             indirect_eval_env.map_or((global_env, global_env), |environment| {
                 (environment, environment)
             })
@@ -433,7 +428,7 @@ impl Vm {
             if let Some(lyng_js_env::EnvironmentRecord::Global(record)) =
                 agent.environment(global_env)
             {
-                self.seed_direct_eval_global_var_bindings(
+                Self::seed_direct_eval_global_var_bindings(
                     agent,
                     global_env,
                     record.global_object(),
@@ -443,8 +438,7 @@ impl Vm {
             }
             (global_env, global_env)
         };
-        let script_referrer = self
-            .active_script_or_module_referrer(agent)
+        let script_referrer = Self::active_script_or_module_referrer(agent)
             .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         self.push_direct_eval_environment(self.frames.len() + 1, lexical_env);
         self.evaluate_installed_with_registry_and_host(
@@ -663,7 +657,6 @@ impl Vm {
     }
 
     fn caller_direct_eval_private_env(
-        &self,
         agent: &Agent,
         caller: FrameRecord,
     ) -> Option<lyng_js_types::EnvironmentRef> {
@@ -681,7 +674,6 @@ impl Vm {
     }
 
     fn caller_direct_eval_call_state(
-        &self,
         agent: &Agent,
         lexical_env: lyng_js_types::EnvironmentRef,
         caller: FrameRecord,
@@ -706,13 +698,12 @@ impl Vm {
     }
 
     fn direct_eval_ambient_private_layouts(
-        &self,
         agent: &mut Agent,
         caller: FrameRecord,
         source: SourceId,
     ) -> VmResult<Vec<Vec<ClassPrivateElementRecord>>> {
         let mut layouts = Vec::new();
-        let mut current = self.caller_direct_eval_private_env(agent, caller);
+        let mut current = Self::caller_direct_eval_private_env(agent, caller);
         let imported_span = Span::from_offsets(source, 0, 0);
 
         while let Some(environment) = current {
@@ -747,7 +738,6 @@ impl Vm {
     }
 
     fn filter_direct_eval_function_code_diagnostics(
-        &self,
         allow_new_target: bool,
         allow_super: bool,
         sema: &mut ScriptSema,
@@ -850,7 +840,6 @@ impl Vm {
     }
 
     fn direct_eval_lexical_names_before_var_env(
-        &self,
         agent: &Agent,
         start: lyng_js_types::EnvironmentRef,
         var_env: lyng_js_types::EnvironmentRef,
@@ -893,7 +882,6 @@ impl Vm {
     }
 
     fn direct_eval_chain_lexical_binding_before_var_env(
-        &self,
         agent: &Agent,
         start: lyng_js_types::EnvironmentRef,
         var_env: lyng_js_types::EnvironmentRef,
@@ -934,7 +922,7 @@ impl Vm {
                     current = record.outer();
                 }
                 lyng_js_env::EnvironmentRecord::Global(record) => {
-                    if let Some(binding) = self.lookup_global_lexical_binding(agent, &record, name)
+                    if let Some(binding) = Self::lookup_global_lexical_binding(agent, &record, name)
                     {
                         return Some((binding.environment(), true));
                     }
@@ -948,7 +936,6 @@ impl Vm {
     }
 
     fn validate_direct_eval_lower_lexical_conflicts(
-        &self,
         agent: &mut Agent,
         lexical_env: lyng_js_types::EnvironmentRef,
         var_env: lyng_js_types::EnvironmentRef,
@@ -965,8 +952,9 @@ impl Vm {
     ) -> VmResult<()> {
         if lexical_env == var_env {
             for &name in function_names.iter().chain(var_names) {
-                if self
-                    .direct_eval_variable_environment_has_own_lexical_binding(agent, var_env, name)
+                if Self::direct_eval_variable_environment_has_own_lexical_binding(
+                    agent, var_env, name,
+                )
                 {
                     return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
                 }
@@ -975,8 +963,13 @@ impl Vm {
         }
 
         for &name in function_names {
-            if let Some((environment, is_lexical)) = self
-                .direct_eval_chain_lexical_binding_before_var_env(agent, lexical_env, var_env, name)
+            if let Some((environment, is_lexical)) =
+                Self::direct_eval_chain_lexical_binding_before_var_env(
+                    agent,
+                    lexical_env,
+                    var_env,
+                    name,
+                )
                 && !annex_b_catch_environments
                     .iter()
                     .any(|&(_, _, catch_env, _, catch_name)| {
@@ -989,8 +982,13 @@ impl Vm {
         }
 
         for &name in var_names {
-            if let Some((environment, is_lexical)) = self
-                .direct_eval_chain_lexical_binding_before_var_env(agent, lexical_env, var_env, name)
+            if let Some((environment, is_lexical)) =
+                Self::direct_eval_chain_lexical_binding_before_var_env(
+                    agent,
+                    lexical_env,
+                    var_env,
+                    name,
+                )
                 && !annex_b_catch_environments
                     .iter()
                     .any(|&(_, _, catch_env, _, catch_name)| {
@@ -1006,7 +1004,6 @@ impl Vm {
     }
 
     fn validate_direct_eval_global_declarations(
-        &self,
         agent: &mut Agent,
         global_env: lyng_js_types::EnvironmentRef,
         global_object: ObjectRef,
@@ -1014,7 +1011,7 @@ impl Vm {
         var_names: &[AtomId],
     ) -> VmResult<()> {
         for &name in function_names {
-            if self.global_chain_has_lexical_binding(agent, global_env, name) {
+            if Self::global_chain_has_lexical_binding(agent, global_env, name) {
                 return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
             }
             if !Self::can_declare_direct_eval_global_function(agent, global_object, name)? {
@@ -1023,7 +1020,7 @@ impl Vm {
         }
 
         for &name in var_names {
-            if self.global_chain_has_lexical_binding(agent, global_env, name) {
+            if Self::global_chain_has_lexical_binding(agent, global_env, name) {
                 return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
             }
             if !Self::can_declare_direct_eval_global_var(agent, global_object, name)? {
@@ -1035,7 +1032,6 @@ impl Vm {
     }
 
     fn direct_eval_variable_environment_has_own_binding(
-        &self,
         agent: &Agent,
         variable_env: lyng_js_types::EnvironmentRef,
         name: AtomId,
@@ -1075,7 +1071,6 @@ impl Vm {
     }
 
     fn direct_eval_variable_environment_has_own_lexical_binding(
-        &self,
         agent: &Agent,
         variable_env: lyng_js_types::EnvironmentRef,
         name: AtomId,
@@ -1094,16 +1089,15 @@ impl Vm {
             lyng_js_env::EnvironmentRecord::Module(record) => {
                 Self::layout_binding_is_lexical(agent, record.layout(), name) == Some(true)
             }
-            lyng_js_env::EnvironmentRecord::Global(record) => self
-                .lookup_global_lexical_binding(agent, &record, name)
-                .is_some(),
+            lyng_js_env::EnvironmentRecord::Global(record) => {
+                Self::lookup_global_lexical_binding(agent, &record, name).is_some()
+            }
             lyng_js_env::EnvironmentRecord::Private(_)
             | lyng_js_env::EnvironmentRecord::Object(_) => false,
         }
     }
 
     fn rewrite_direct_eval_root_bindings(
-        &self,
         agent: &Agent,
         variable_env: lyng_js_types::EnvironmentRef,
         always_host: bool,
@@ -1123,7 +1117,7 @@ impl Vm {
                 continue;
             }
             let binding_exists =
-                self.direct_eval_variable_environment_has_own_binding(agent, variable_env, name);
+                Self::direct_eval_variable_environment_has_own_binding(agent, variable_env, name);
             if (always_host || !binding_exists) && !hosted_names.contains(&name) {
                 hosted_names.push(name);
             }
@@ -1171,7 +1165,6 @@ impl Vm {
     }
 
     fn create_direct_eval_var_environment(
-        &self,
         agent: &mut Agent,
         outer: lyng_js_types::EnvironmentRef,
         hosted_names: &[AtomId],
@@ -1234,7 +1227,6 @@ impl Vm {
     }
 
     fn direct_eval_chain_named_environment_slot(
-        &self,
         agent: &Agent,
         start: lyng_js_types::EnvironmentRef,
         stop: lyng_js_types::EnvironmentRef,
@@ -1288,7 +1280,6 @@ impl Vm {
     }
 
     fn sync_direct_eval_annex_b_catch_var_bindings(
-        &self,
         agent: &mut Agent,
         source_start: lyng_js_types::EnvironmentRef,
         var_environment: lyng_js_types::EnvironmentRef,
@@ -1300,8 +1291,8 @@ impl Vm {
             if !hosted_names.contains(&name) || !sync_names.contains(&name) {
                 continue;
             }
-            let Some((source_environment, source_slot)) = self
-                .direct_eval_chain_named_environment_slot(
+            let Some((source_environment, source_slot)) =
+                Self::direct_eval_chain_named_environment_slot(
                     agent,
                     source_start,
                     var_environment,
@@ -1326,7 +1317,6 @@ impl Vm {
     }
 
     fn seed_direct_eval_annex_b_catch_var_bindings(
-        &self,
         agent: &mut Agent,
         source_start: lyng_js_types::EnvironmentRef,
         var_environment: lyng_js_types::EnvironmentRef,
@@ -1337,8 +1327,8 @@ impl Vm {
             if !hosted_names.contains(&name) {
                 continue;
             }
-            let Some((source_environment, source_slot)) = self
-                .direct_eval_chain_named_environment_slot(
+            let Some((source_environment, source_slot)) =
+                Self::direct_eval_chain_named_environment_slot(
                     agent,
                     source_start,
                     var_environment,
@@ -1363,7 +1353,6 @@ impl Vm {
     }
 
     fn seed_direct_eval_global_var_bindings(
-        &self,
         agent: &mut Agent,
         global_env: lyng_js_types::EnvironmentRef,
         global_object: ObjectRef,
@@ -1397,7 +1386,7 @@ impl Vm {
         }
 
         for &name in var_names {
-            if self.global_chain_has_lexical_binding(agent, global_env, name) {
+            if Self::global_chain_has_lexical_binding(agent, global_env, name) {
                 return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
             }
 
@@ -1449,7 +1438,7 @@ impl Vm {
         }
 
         if let Some(value) =
-            self.try_evaluate_regexp_literal_eval_source(agent, realm, source_text)?
+            Self::try_evaluate_regexp_literal_eval_source(agent, realm, source_text)?
         {
             return Ok(value);
         }
@@ -1474,7 +1463,7 @@ impl Vm {
         let allow_super_call = allow_super
             && caller_active_function
                 .is_some_and(|function| agent.objects().is_constructor(function));
-        let mut annex_b_blocked_var_names = self.direct_eval_lexical_names_before_var_env(
+        let mut annex_b_blocked_var_names = Self::direct_eval_lexical_names_before_var_env(
             agent,
             caller_lexical_env,
             caller_variable_env,
@@ -1482,7 +1471,7 @@ impl Vm {
         annex_b_blocked_var_names.retain(|name| !annex_b_catch_names.contains(name));
         let source_id = self.allocate_dynamic_source_id();
         let direct_eval_private_layouts =
-            self.direct_eval_ambient_private_layouts(agent, caller, source_id)?;
+            Self::direct_eval_ambient_private_layouts(agent, caller, source_id)?;
         let mut analysis = dynamic::analyze_dynamic_script_with_diagnostics(
             agent.atoms_mut(),
             source_id,
@@ -1517,7 +1506,7 @@ impl Vm {
         })?;
         Self::rewrite_direct_eval_use_sites(analysis.sema_mut());
         Self::rewrite_direct_eval_root_lexical_uses(analysis.sema_mut());
-        self.filter_direct_eval_function_code_diagnostics(
+        Self::filter_direct_eval_function_code_diagnostics(
             allow_new_target,
             allow_super,
             analysis.sema_mut(),
@@ -1546,7 +1535,7 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_syntax_error(agent)));
         }
         if !analysis.parsed().strict {
-            self.validate_direct_eval_lower_lexical_conflicts(
+            Self::validate_direct_eval_lower_lexical_conflicts(
                 agent,
                 caller_lexical_env,
                 caller_variable_env,
@@ -1558,7 +1547,7 @@ impl Vm {
             if let Some(lyng_js_env::EnvironmentRecord::Global(record)) =
                 agent.environment(caller_variable_env)
             {
-                self.validate_direct_eval_global_declarations(
+                Self::validate_direct_eval_global_declarations(
                     agent,
                     caller_variable_env,
                     record.global_object(),
@@ -1578,7 +1567,7 @@ impl Vm {
         );
         let host_root_bindings =
             analysis.parsed().strict || (caller_variable_env_is_global && !caller_is_script);
-        let mut hosted_names = self.rewrite_direct_eval_root_bindings(
+        let mut hosted_names = Self::rewrite_direct_eval_root_bindings(
             agent,
             caller_variable_env,
             host_root_bindings,
@@ -1604,7 +1593,7 @@ impl Vm {
         let mut persistent_direct_eval_env = None;
         let (lexical_env, variable_env) = if strict_eval {
             let direct_eval_env =
-                self.create_direct_eval_var_environment(agent, caller_lexical_env, &hosted_names)?;
+                Self::create_direct_eval_var_environment(agent, caller_lexical_env, &hosted_names)?;
             direct_eval_env.map_or((caller_lexical_env, caller_variable_env), |environment| {
                 (environment, environment)
             })
@@ -1614,7 +1603,7 @@ impl Vm {
                 _ => None,
             }
         }) {
-            self.seed_direct_eval_global_var_bindings(
+            Self::seed_direct_eval_global_var_bindings(
                 agent,
                 caller_variable_env,
                 record.global_object(),
@@ -1627,9 +1616,9 @@ impl Vm {
                 self.direct_eval_environment_overlay(caller_lexical_env);
             let direct_eval_outer = inherited_direct_eval_env.unwrap_or(caller_lexical_env);
             let direct_eval_env =
-                self.create_direct_eval_var_environment(agent, direct_eval_outer, &hosted_names)?;
+                Self::create_direct_eval_var_environment(agent, direct_eval_outer, &hosted_names)?;
             if let Some(environment) = direct_eval_env {
-                self.seed_direct_eval_annex_b_catch_var_bindings(
+                Self::seed_direct_eval_annex_b_catch_var_bindings(
                     agent,
                     caller_lexical_env,
                     environment,
@@ -1646,17 +1635,16 @@ impl Vm {
                 )
             }
         };
-        let script_referrer = self
-            .active_script_or_module_referrer(agent)
+        let script_referrer = Self::active_script_or_module_referrer(agent)
             .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         let (entry_this_value, entry_new_target) = if let Some(this_override) = this_override {
             (this_override, None)
         } else {
-            self.caller_direct_eval_call_state(agent, caller_name_env_start, caller)?
+            Self::caller_direct_eval_call_state(agent, caller_name_env_start, caller)?
         };
         let entry_home_object = caller_home_object;
         let entry_active_function = allow_super.then_some(caller_active_function).flatten();
-        let entry_private_env = self.caller_direct_eval_private_env(agent, caller);
+        let entry_private_env = Self::caller_direct_eval_private_env(agent, caller);
         let entry_lexical_this = this_override.is_none() && entry_active_function.is_some();
         if let Some(environment) = persistent_direct_eval_env {
             self.push_direct_eval_environment(self.frames.len(), environment);
@@ -1678,7 +1666,7 @@ impl Vm {
             registry,
         );
         if let Some(environment) = persistent_direct_eval_env {
-            self.sync_direct_eval_annex_b_catch_var_bindings(
+            Self::sync_direct_eval_annex_b_catch_var_bindings(
                 agent,
                 caller_lexical_env,
                 environment,

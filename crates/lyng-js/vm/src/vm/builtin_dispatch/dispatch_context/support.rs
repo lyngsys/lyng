@@ -373,7 +373,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
 
     pub(super) fn builtin_value_to_string_text(&mut self, value: Value) -> VmResult<String> {
         let primitive = object::to_primitive(self, value, object::ToPrimitiveHint::String)?;
-        self.vm.value_to_string_text(self.agent, primitive)
+        Vm::value_to_string_text(self.agent, primitive)
     }
 
     pub(super) fn builtin_to_property_key(&mut self, value: Value) -> VmResult<PropertyKey> {
@@ -406,8 +406,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
             if element.is_undefined() || element.is_null() {
                 continue;
             }
-            self.vm
-                .append_value_string_code_units(self.agent, element, &mut units)?;
+            Vm::append_value_string_code_units(self.agent, element, &mut units)?;
         }
         Ok(Value::from_string_ref(alloc_code_unit_string(
             self.agent, &units, None,

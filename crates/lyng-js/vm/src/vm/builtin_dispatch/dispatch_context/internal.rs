@@ -64,7 +64,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         let Some(source_ref) = source.as_string_ref() else {
             return Ok(source);
         };
-        if let Some(value) = self.vm.try_evaluate_regexp_literal_eval_string_ref(
+        if let Some(value) = Vm::try_evaluate_regexp_literal_eval_string_ref(
             self.agent,
             self.caller_frame.realm(),
             source_ref,
@@ -205,8 +205,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .define_private_field_builtin(self.agent, self.caller_frame, invocation.arguments())
+        Vm::define_private_field_builtin(self.agent, self.caller_frame, invocation.arguments())
     }
 
     fn private_field_init_builtin(

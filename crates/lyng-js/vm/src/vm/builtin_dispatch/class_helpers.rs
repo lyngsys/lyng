@@ -32,7 +32,7 @@ impl Vm {
 
         let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
         if let Some(accessor) = accessor.as_object_ref() {
-            self.set_function_name_from_property_key(
+            Self::set_function_name_from_property_key(
                 agent,
                 accessor,
                 key,
@@ -81,7 +81,7 @@ impl Vm {
         let value = arguments.get(2).copied().unwrap_or(Value::undefined());
         let key = self.to_property_key_from_value(agent, host, registry, caller, key_value)?;
         if let Some(function) = value.as_object_ref() {
-            self.set_function_name_from_property_key(agent, function, key, None)?;
+            Self::set_function_name_from_property_key(agent, function, key, None)?;
         }
 
         let mut descriptor = PropertyDescriptor::new();

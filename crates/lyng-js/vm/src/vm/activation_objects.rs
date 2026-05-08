@@ -68,7 +68,7 @@ impl Vm {
             )
             .map_err(VmError::Abrupt)?;
             if !iterator_method.is_undefined() {
-                self.define_data_property_with_attrs(
+                Self::define_data_property_with_attrs(
                     agent,
                     object,
                     PropertyKey::from_symbol(iterator_symbol),
@@ -91,7 +91,7 @@ impl Vm {
             Self::define_strict_arguments_callee(agent, realm, object)?;
         } else {
             let callee_key = agent.atoms_mut().intern_collectible("callee");
-            self.define_data_property_with_attrs(
+            Self::define_data_property_with_attrs(
                 agent,
                 object,
                 PropertyKey::from_atom(callee_key),
@@ -231,7 +231,7 @@ impl Vm {
 
         if let Some(rest_slot) = function_rest_slot(init.has_rest_parameter) {
             let rest_start = usize::from(init.parameter_count).min(init.arguments.len());
-            let rest_array = self.create_array(
+            let rest_array = Self::create_array(
                 agent,
                 init.realm,
                 init.arguments.len().saturating_sub(rest_start),
@@ -249,7 +249,7 @@ impl Vm {
                 });
             }
             Self::sync_engine_array_length(agent, rest_array)?;
-            self.initialize_environment_slot(
+            Self::initialize_environment_slot(
                 agent,
                 init.lexical_env,
                 rest_slot,
@@ -285,7 +285,7 @@ impl Vm {
             init.lexical_env,
             init.arguments_mode == ArgumentsMode::Unmapped,
         )?;
-        self.initialize_environment_slot(
+        Self::initialize_environment_slot(
             agent,
             init.lexical_env,
             arguments_slot,

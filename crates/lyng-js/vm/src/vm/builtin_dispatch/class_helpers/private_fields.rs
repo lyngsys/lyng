@@ -190,7 +190,6 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn define_private_field_builtin(
-        &self,
         agent: &mut Agent,
         _caller: FrameRecord,
         arguments: &[Value],
@@ -206,7 +205,7 @@ impl Vm {
             .and_then(Value::as_object_ref)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let name_value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let name_text = self.value_to_string_text(agent, name_value)?;
+        let name_text = Self::value_to_string_text(agent, name_value)?;
         let name = agent.atoms_mut().intern_collectible(&name_text);
         let is_static = arguments
             .get(3)

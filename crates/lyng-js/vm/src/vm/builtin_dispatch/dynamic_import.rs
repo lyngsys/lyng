@@ -23,7 +23,6 @@ enum DynamicImportEvaluationOutcome {
 
 impl Vm {
     pub(super) fn import_meta_builtin(
-        &self,
         agent: &mut Agent,
         caller_frame: FrameRecord,
     ) -> VmResult<Value> {
@@ -131,19 +130,18 @@ impl Vm {
                     specifier,
                     ToPrimitiveHint::String,
                 )
-                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
-            let specifier = self
-                .value_to_string_text(agent, specifier)
-                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+                .map_err(|error| Self::dynamic_import_error_value(agent, error))?;
+            let specifier = Self::value_to_string_text(agent, specifier)
+                .map_err(|error| Self::dynamic_import_error_value(agent, error))?;
             let attributes = self
                 .normalize_dynamic_import_attributes(agent, host, registry, caller_frame, options)
-                .map_err(|error| self.dynamic_import_error_value(agent, error))?;
+                .map_err(|error| Self::dynamic_import_error_value(agent, error))?;
             if phase == DynamicImportPhase::Source {
                 return Err(errors::syntax_error_value(agent));
             }
             let request = ModuleSourceRequest {
                 specifier,
-                referrer: self.active_script_or_module_referrer(agent),
+                referrer: Self::active_script_or_module_referrer(agent),
                 attributes,
             };
             Ok(request)
@@ -154,7 +152,7 @@ impl Vm {
                 self.enqueue_dynamic_import_evaluate_job(agent, realm, capability, request, phase);
             }
             Err(reason) => {
-                self.enqueue_dynamic_import_settle_job(agent, realm, capability, reason, true);
+                Self::enqueue_dynamic_import_settle_job(agent, realm, capability, reason, true);
             }
         }
         Ok(Value::from_object_ref(promise))
@@ -169,7 +167,7 @@ impl Vm {
         constructor: ObjectRef,
     ) -> VmResult<lyng_js_env::PromiseCapabilityId> {
         let capability = agent.alloc_promise_capability();
-        let executor = self.allocate_builtin_function_object(
+        let executor = Self::allocate_builtin_function_object(
             agent,
             caller_frame.realm(),
             promise_capability_executor_builtin(),
@@ -257,7 +255,7 @@ impl Vm {
             if !enumerable {
                 continue;
             }
-            let Some(attribute_key) = self.dynamic_import_attribute_key(agent, key) else {
+            let Some(attribute_key) = Self::dynamic_import_attribute_key(agent, key) else {
                 continue;
             };
             let attribute_value = self.get_property_from_object(
@@ -272,7 +270,7 @@ impl Vm {
             if attribute_value.as_string_ref().is_none() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             }
-            let attribute_value = self.value_to_string_text(agent, attribute_value)?;
+            let attribute_value = Self::value_to_string_text(agent, attribute_value)?;
             attributes.push(ModuleImportAttribute {
                 key: attribute_key,
                 value: attribute_value,
@@ -281,7 +279,7 @@ impl Vm {
         Ok(attributes)
     }
 
-    fn dynamic_import_attribute_key(&self, agent: &Agent, key: PropertyKey) -> Option<String> {
+    fn dynamic_import_attribute_key(agent: &Agent, key: PropertyKey) -> Option<String> {
         if let Some(index) = key.as_index() {
             return Some(index.to_string());
         }
@@ -289,7 +287,7 @@ impl Vm {
             .map(|atom| agent.atoms().resolve(atom).to_owned())
     }
 
-    pub(crate) fn active_script_or_module_referrer(&self, agent: &Agent) -> Option<ModuleKey> {
+    pub(crate) fn active_script_or_module_referrer(agent: &Agent) -> Option<ModuleKey> {
         agent
             .current_execution_context()
             .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer)
@@ -297,7 +295,6 @@ impl Vm {
     }
 
     fn enqueue_dynamic_import_settle_job(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         capability: lyng_js_env::PromiseCapabilityId,
@@ -424,7 +421,7 @@ impl Vm {
                 Err(error) => {
                     return Ok(DynamicImportEvaluationOutcome::Rejected {
                         key: None,
-                        reason: self.dynamic_import_module_error_value(agent, error),
+                        reason: Self::dynamic_import_module_error_value(agent, error),
                     });
                 }
             };
@@ -434,7 +431,7 @@ impl Vm {
             Err(error) => {
                 return Ok(DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key.clone()),
-                    reason: self.dynamic_import_error_value(agent, error),
+                    reason: Self::dynamic_import_error_value(agent, error),
                 });
             }
         };
@@ -485,7 +482,7 @@ impl Vm {
             self.async_dependency_completed_modules.remove(&key);
             return Ok(DynamicImportEvaluationOutcome::Rejected {
                 key: Some(key.clone()),
-                reason: self.dynamic_import_error_value(agent, error),
+                reason: Self::dynamic_import_error_value(agent, error),
             });
         }
         let namespace = match self.module_namespace_object(agent, realm_record, &key) {
@@ -493,7 +490,7 @@ impl Vm {
             Err(error) => {
                 return Ok(DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key.clone()),
-                    reason: self.dynamic_import_error_value(agent, error),
+                    reason: Self::dynamic_import_error_value(agent, error),
                 });
             }
         };
@@ -529,7 +526,7 @@ impl Vm {
             Err(error) => {
                 return Ok(DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key),
-                    reason: self.dynamic_import_error_value(agent, error),
+                    reason: Self::dynamic_import_error_value(agent, error),
                 });
             }
         };
@@ -540,7 +537,7 @@ impl Vm {
                 Err(error) => {
                     return Ok(DynamicImportEvaluationOutcome::Rejected {
                         key: Some(key),
-                        reason: self.dynamic_import_error_value(agent, error),
+                        reason: Self::dynamic_import_error_value(agent, error),
                     });
                 }
             };
@@ -556,7 +553,7 @@ impl Vm {
             ) {
                 return Ok(DynamicImportEvaluationOutcome::Rejected {
                     key: Some(key),
-                    reason: self.dynamic_import_error_value(agent, error),
+                    reason: Self::dynamic_import_error_value(agent, error),
                 });
             }
         }
@@ -566,7 +563,7 @@ impl Vm {
                 Err(error) => {
                     return Ok(DynamicImportEvaluationOutcome::Rejected {
                         key: Some(key),
-                        reason: self.dynamic_import_error_value(agent, error),
+                        reason: Self::dynamic_import_error_value(agent, error),
                     });
                 }
             };
@@ -753,16 +750,15 @@ impl Vm {
     }
 
     fn dynamic_import_module_error_value(
-        &self,
         agent: &mut Agent,
         error: crate::error::ModuleLoadError,
     ) -> Value {
         match error {
             crate::error::ModuleLoadError::Vm(error) => {
-                self.dynamic_import_error_value(agent, error)
+                Self::dynamic_import_error_value(agent, error)
             }
             crate::error::ModuleLoadError::Host(error) => {
-                self.dynamic_import_host_error_value(agent, error)
+                Self::dynamic_import_host_error_value(agent, error)
             }
             crate::error::ModuleLoadError::Parse | crate::error::ModuleLoadError::Sema => {
                 errors::syntax_error_value(agent)
@@ -773,10 +769,10 @@ impl Vm {
         }
     }
 
-    fn dynamic_import_error_value(&self, agent: &mut Agent, error: VmError) -> Value {
+    fn dynamic_import_error_value(agent: &mut Agent, error: VmError) -> Value {
         match error {
             VmError::Abrupt(completion) => completion.thrown_value().unwrap_or(Value::undefined()),
-            VmError::Host(error) => self.dynamic_import_host_error_value(agent, error),
+            VmError::Host(error) => Self::dynamic_import_host_error_value(agent, error),
             VmError::AmbiguousModuleExport | VmError::MissingModuleResolution => {
                 errors::syntax_error_value(agent)
             }
@@ -785,7 +781,6 @@ impl Vm {
     }
 
     fn dynamic_import_host_error_value(
-        &self,
         agent: &mut Agent,
         error: lyng_js_host::HostError,
     ) -> Value {

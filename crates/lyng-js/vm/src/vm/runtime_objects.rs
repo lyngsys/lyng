@@ -86,7 +86,6 @@ impl iterator::IteratorOpsContext for VmIteratorBridge<'_> {
 
 impl Vm {
     pub(super) fn create_object(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         _named_slot_count: usize,
@@ -109,7 +108,6 @@ impl Vm {
     }
 
     pub(super) fn create_array(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         element_capacity: usize,
@@ -155,7 +153,7 @@ impl Vm {
             .and_then(lyng_js_env::RealmRecord::root_shape)
             .ok_or_else(|| VmError::MissingRootShape(frame.realm()))?;
         let home_object = if child.flags().has_prototype_property() {
-            Some(self.create_function_prototype(
+            Some(Self::create_function_prototype(
                 agent,
                 frame.realm(),
                 prototype_parent_for_function(agent, frame.realm(), kind_flags)?,
@@ -205,7 +203,7 @@ impl Vm {
         if let Some(prototype) = home_object
             && !kind_flags.is_generator()
         {
-            self.define_data_property_with_attrs(
+            Self::define_data_property_with_attrs(
                 agent,
                 prototype,
                 PropertyKey::from_atom(WellKnownAtom::constructor.id()),
@@ -216,7 +214,7 @@ impl Vm {
             )?;
         }
 
-        self.define_data_property_with_attrs(
+        Self::define_data_property_with_attrs(
             agent,
             function,
             PropertyKey::from_atom(WellKnownAtom::length.id()),
@@ -231,11 +229,11 @@ impl Vm {
             let name_text = agent.atoms().resolve(name).to_owned();
             let name_value =
                 Value::from_string_ref(super::values::alloc_atom_string(agent, name, &name_text));
-            self.set_function_name(agent, function, name_value)?;
+            Self::set_function_name(agent, function, name_value)?;
         }
 
         if let Some(prototype) = home_object {
-            self.define_data_property_with_attrs(
+            Self::define_data_property_with_attrs(
                 agent,
                 function,
                 PropertyKey::from_atom(WellKnownAtom::prototype.id()),
@@ -250,7 +248,6 @@ impl Vm {
     }
 
     pub(super) fn create_function_prototype(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         prototype_parent: ObjectRef,
@@ -270,7 +267,6 @@ impl Vm {
     }
 
     pub(super) fn allocate_regexp_object_with_payload(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         payload: RegExpPayload,
@@ -318,7 +314,6 @@ impl Vm {
     }
 
     pub(super) fn define_data_property_with_attrs(
-        &self,
         agent: &mut Agent,
         object: ObjectRef,
         key: PropertyKey,
@@ -347,7 +342,6 @@ impl Vm {
     }
 
     pub(super) fn set_function_name(
-        &self,
         agent: &mut Agent,
         function: ObjectRef,
         name_value: Value,
@@ -376,11 +370,10 @@ impl Vm {
                 return Ok(());
             }
         }
-        self.define_data_property_with_attrs(agent, function, key, name_value, false, false, true)
+        Self::define_data_property_with_attrs(agent, function, key, name_value, false, false, true)
     }
 
     pub(super) fn set_function_name_from_property_key(
-        &self,
         agent: &mut Agent,
         function: ObjectRef,
         key: PropertyKey,
@@ -401,11 +394,10 @@ impl Vm {
                 AllocationLifetime::Default,
             ))
         };
-        self.set_function_name(agent, function, name_value)
+        Self::set_function_name(agent, function, name_value)
     }
 
     pub(super) fn to_object_for_value(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         value: Value,
@@ -413,7 +405,7 @@ impl Vm {
         object::to_object(agent, realm, value).map_err(VmError::Abrupt)
     }
 
-    pub(super) fn check_object_coercible(&self, agent: &mut Agent, value: Value) -> VmResult<()> {
+    pub(super) fn check_object_coercible(agent: &mut Agent, value: Value) -> VmResult<()> {
         if value.is_null() || value.is_undefined() {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
@@ -429,7 +421,7 @@ impl Vm {
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<bool> {
-        let object = self.to_object_for_value(agent, frame.realm(), receiver)?;
+        let object = Self::to_object_for_value(agent, frame.realm(), receiver)?;
         if agent.objects().is_proxy_object(object) {
             let mut bridge = VmProxyBridge {
                 vm: self,
@@ -455,7 +447,7 @@ impl Vm {
         if receiver.is_null() || receiver.is_undefined() {
             return Ok(ForInEnumerator::new(Vec::new()));
         }
-        let object = self.to_object_for_value(agent, frame.realm(), receiver)?;
+        let object = Self::to_object_for_value(agent, frame.realm(), receiver)?;
         let mut visited = std::collections::HashSet::new();
         let mut keys = Vec::new();
         let mut current = Some(object);
@@ -630,7 +622,7 @@ impl Vm {
         done: bool,
         close_on_rejection: Option<(ObjectRef, ObjectRef)>,
     ) -> VmResult<ObjectRef> {
-        let capability = self.create_intrinsic_promise_capability(agent, frame.realm())?;
+        let capability = Self::create_intrinsic_promise_capability(agent, frame.realm())?;
         let promise = Self::promise_capability_promise(agent, capability)?;
         let value_wrapper =
             match self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)
@@ -680,7 +672,7 @@ impl Vm {
         let realm = agent
             .realm(frame.realm())
             .ok_or_else(|| VmError::MissingRootShape(frame.realm()))?;
-        self.enqueue_promise_then(
+        Self::enqueue_promise_then(
             agent,
             realm,
             value_wrapper,
@@ -1403,7 +1395,7 @@ mod tests {
             Some(name_atom),
             AllocationLifetime::Default,
         ));
-        vm.set_function_name(agent, closure, function_name)
+        Vm::set_function_name(agent, closure, function_name)
             .expect("setting function name should succeed");
 
         let prototype_descriptor = object::ordinary_get_own_property(

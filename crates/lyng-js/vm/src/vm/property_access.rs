@@ -483,14 +483,11 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         &mut self,
         descriptor: PropertyDescriptor,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .descriptor_object_from_descriptor(self.agent, self.frame.realm(), descriptor)
+        Vm::descriptor_object_from_descriptor(self.agent, self.frame.realm(), descriptor)
     }
 
     fn create_array_from_values(&mut self, values: &[Value]) -> Result<ObjectRef, Self::Error> {
-        let array = self
-            .vm
-            .create_array(self.agent, self.frame.realm(), values.len())?;
+        let array = Vm::create_array(self.agent, self.frame.realm(), values.len())?;
         for (index, value) in values.iter().copied().enumerate() {
             let key = PropertyKey::Index(u32::try_from(index).unwrap_or(u32::MAX));
             let created = object::ordinary_create_data_property(
@@ -599,7 +596,7 @@ impl Vm {
                 agent, host, registry, frame, string, receiver, key,
             );
         }
-        let object = self.to_object_for_value(agent, frame.realm(), receiver)?;
+        let object = Self::to_object_for_value(agent, frame.realm(), receiver)?;
         self.get_property_from_object(agent, host, registry, frame, object, receiver, key)
     }
 
@@ -644,7 +641,7 @@ impl Vm {
         if receiver.is_null() || receiver.is_undefined() {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
-        let object = self.to_object_for_value(agent, frame.realm(), receiver)?;
+        let object = Self::to_object_for_value(agent, frame.realm(), receiver)?;
         if let Some(index) = key.as_index()
             && let Some(result) = self.mapped_arguments_set(agent, object, index, value)
         {
@@ -655,7 +652,6 @@ impl Vm {
     }
 
     pub(super) fn try_fast_set_engine_array_index(
-        &self,
         agent: &mut Agent,
         object: ObjectRef,
         index: u32,
@@ -845,11 +841,11 @@ impl Vm {
         if source.is_null() || source.is_undefined() {
             return Ok(());
         }
-        let source = self.to_object_for_value(agent, frame.realm(), source)?;
+        let source = Self::to_object_for_value(agent, frame.realm(), source)?;
         let mut excluded = HashSet::new();
 
         if !excluded_keys.is_undefined() {
-            let excluded_object = self.to_object_for_value(agent, frame.realm(), excluded_keys)?;
+            let excluded_object = Self::to_object_for_value(agent, frame.realm(), excluded_keys)?;
             let excluded_values = object::own_property_keys_in_context(
                 &mut VmProxyBridge {
                     vm: self,
@@ -1161,13 +1157,12 @@ impl Vm {
             return Ok(None);
         };
         if !mapped_descriptor.has_get() && !mapped_descriptor.has_set() {
-            mapped_descriptor.set_value(self.read_environment_slot(agent, environment, slot)?);
+            mapped_descriptor.set_value(Self::read_environment_slot(agent, environment, slot)?);
         }
         Ok(descriptor)
     }
 
     pub(super) fn try_fast_own_index_value(
-        &self,
         agent: &mut Agent,
         object: ObjectRef,
         index: u32,
@@ -1204,7 +1199,7 @@ impl Vm {
             && !descriptor.has_value()
             && descriptor.writable() == Some(false)
         {
-            define_descriptor.set_value(self.read_environment_slot(agent, environment, slot)?);
+            define_descriptor.set_value(Self::read_environment_slot(agent, environment, slot)?);
         }
 
         let defined =

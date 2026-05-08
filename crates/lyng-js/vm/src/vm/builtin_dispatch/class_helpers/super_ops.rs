@@ -56,7 +56,7 @@ impl Vm {
         let receiver = arguments.first().copied().unwrap_or(Value::undefined());
         let base = if arguments.get(3).and_then(|value| value.as_bool()) == Some(true) {
             let base_value = arguments.get(2).copied().unwrap_or(Value::undefined());
-            self.to_object_for_value(agent, caller.realm(), base_value)?
+            Self::to_object_for_value(agent, caller.realm(), base_value)?
         } else {
             let home_object = arguments
                 .get(2)
@@ -84,7 +84,7 @@ impl Vm {
         let value = arguments.get(2).copied().unwrap_or(Value::undefined());
         let base = if arguments.get(4).and_then(|value| value.as_bool()) == Some(true) {
             let base_value = arguments.get(3).copied().unwrap_or(Value::undefined());
-            self.to_object_for_value(agent, caller.realm(), base_value)?
+            Self::to_object_for_value(agent, caller.realm(), base_value)?
         } else {
             let home_object = arguments
                 .get(3)

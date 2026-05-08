@@ -194,7 +194,7 @@ impl Vm {
         if !self.is_async_generator_object(generator) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
-        let capability = self.create_intrinsic_promise_capability(agent, caller_frame.realm())?;
+        let capability = Self::create_intrinsic_promise_capability(agent, caller_frame.realm())?;
         let promise = Self::promise_capability_promise(agent, capability)?;
         self.async_generator_queues
             .entry(generator)
@@ -219,7 +219,7 @@ impl Vm {
         resume_kind: GeneratorResumeKind,
         value: Value,
     ) -> VmResult<Value> {
-        let capability = self.create_intrinsic_promise_capability(agent, caller_frame.realm())?;
+        let capability = Self::create_intrinsic_promise_capability(agent, caller_frame.realm())?;
         let promise = Self::promise_capability_promise(agent, capability)?;
         let realm = agent
             .realm(caller_frame.realm())
@@ -620,7 +620,7 @@ impl Vm {
             }
             Err(error) => return Err(error),
         };
-        self.enqueue_promise_then(
+        Self::enqueue_promise_then(
             agent,
             realm,
             promise,
@@ -666,7 +666,7 @@ impl Vm {
             }
             Err(error) => return Err(error),
         };
-        self.enqueue_promise_then(
+        Self::enqueue_promise_then(
             agent,
             realm,
             promise,

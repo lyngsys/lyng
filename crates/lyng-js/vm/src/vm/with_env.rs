@@ -11,7 +11,7 @@ impl Vm {
         let outer = self
             .active_loop_iteration_environment(previous_lexical_env)
             .unwrap_or(previous_lexical_env);
-        let binding_object = self.to_object_for_value(agent, frame.realm(), value)?;
+        let binding_object = Self::to_object_for_value(agent, frame.realm(), value)?;
         let with_environment = agent.alloc_object_environment(
             Some(outer),
             binding_object,

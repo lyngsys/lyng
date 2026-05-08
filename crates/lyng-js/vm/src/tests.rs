@@ -11073,7 +11073,7 @@ fn global_script_instantiation_precreates_non_configurable_var_bindings() {
         .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
         .expect("bootstrap should succeed");
     let _ = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.instantiate_global_script(agent, realm, unit.instantiation_plan())
+    Vm::instantiate_global_script(agent, realm, unit.instantiation_plan())
         .unwrap();
 
     let x_atom = unit_runtime_atom(agent, &unit, unit_atom(&unit, "x"));
@@ -11109,7 +11109,7 @@ fn global_script_instantiation_uses_dictionary_storage_for_bulk_var_bindings() {
         .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
         .expect("bootstrap should succeed");
     let _ = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.instantiate_global_script(agent, realm, unit.instantiation_plan())
+    Vm::instantiate_global_script(agent, realm, unit.instantiation_plan())
         .unwrap();
 
     assert_eq!(

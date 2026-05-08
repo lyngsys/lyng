@@ -14,7 +14,7 @@ impl Vm {
         value: Value,
     ) -> VmResult<Value> {
         if !value.is_object() {
-            let text = self.value_to_string_text(agent, value)?;
+            let text = Self::value_to_string_text(agent, value)?;
             return Ok(Value::from_string_ref(alloc_string(agent, &text, None)));
         }
 
@@ -40,7 +40,7 @@ impl Vm {
             &[],
         )? && !result.is_object()
         {
-            let text = self.value_to_string_text(agent, result)?;
+            let text = Self::value_to_string_text(agent, result)?;
             return Ok(Value::from_string_ref(alloc_string(agent, &text, None)));
         }
 
@@ -63,7 +63,7 @@ impl Vm {
             &[],
         )? && !result.is_object()
         {
-            let text = self.value_to_string_text(agent, result)?;
+            let text = Self::value_to_string_text(agent, result)?;
             return Ok(Value::from_string_ref(alloc_string(agent, &text, None)));
         }
 
@@ -94,8 +94,8 @@ impl Vm {
         }
 
         let string_count = arguments.len().saturating_sub(1) / 2;
-        let cooked = self.create_array(agent, caller.realm(), string_count)?;
-        let raw = self.create_array(agent, caller.realm(), string_count)?;
+        let cooked = Self::create_array(agent, caller.realm(), string_count)?;
+        let raw = Self::create_array(agent, caller.realm(), string_count)?;
         for index in 0..string_count {
             let cooked_value = arguments
                 .get(1 + index * 2)
@@ -130,7 +130,7 @@ impl Vm {
         }
 
         let raw_name = agent.atoms_mut().intern_collectible("raw");
-        self.define_data_property_with_attrs(
+        Self::define_data_property_with_attrs(
             agent,
             cooked,
             PropertyKey::from_atom(raw_name),

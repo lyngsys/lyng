@@ -619,6 +619,13 @@ impl Vm {
 
     #[inline]
     #[allow(clippy::needless_pass_by_ref_mut)]
+    #[cfg_attr(
+        not(test),
+        expect(
+            clippy::unused_self,
+            reason = "non-test builds keep the frame-depth instrumentation hook as a no-op"
+        )
+    )]
     fn note_frame_depth(&mut self) {
         #[cfg(test)]
         {
@@ -1088,7 +1095,7 @@ impl Vm {
         let installed = self.install_script(agent, realm.id(), unit)?;
         let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
         self.install_active_realm_extensions(agent, realm.id())?;
-        self.instantiate_global_script(agent, realm, unit.instantiation_plan())?;
+        Self::instantiate_global_script(agent, realm, unit.instantiation_plan())?;
         let mut registry = RejectingNativeRegistry;
         self.evaluate_entry_with_registry_and_checkpoint(
             agent,
@@ -1188,7 +1195,7 @@ impl Vm {
         let installed = self.install_script(agent, realm.id(), unit)?;
         let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
         self.install_active_realm_extensions(agent, realm.id())?;
-        self.instantiate_global_script(agent, realm, unit.instantiation_plan())?;
+        Self::instantiate_global_script(agent, realm, unit.instantiation_plan())?;
         let script_referrer =
             script_referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         self.evaluate_entry_with_registry_and_checkpoint(
@@ -1215,7 +1222,7 @@ impl Vm {
         let installed = self.install_script(agent, realm.id(), unit)?;
         let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
         self.install_active_realm_extensions(agent, realm.id())?;
-        self.instantiate_global_script(agent, realm, unit.instantiation_plan())?;
+        Self::instantiate_global_script(agent, realm, unit.instantiation_plan())?;
         let script_referrer =
             script_referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         let mut registry = RejectingNativeRegistry;
@@ -1508,13 +1515,13 @@ impl Vm {
         if agent.module_record(&loaded.key).is_none() {
             let source = self.allocate_dynamic_source_id();
             let parsed = parse_module(agent.atoms_mut(), source, &loaded.source_text);
-            self.report_module_diagnostics(host, parsed.diagnostics.as_slice())?;
+            Self::report_module_diagnostics(host, parsed.diagnostics.as_slice())?;
             if parsed.diagnostics.has_errors() {
                 return Err(ModuleLoadError::Parse);
             }
 
             let sema = analyze_module(&parsed, agent.atoms());
-            self.report_module_diagnostics(host, sema.diagnostics.as_slice())?;
+            Self::report_module_diagnostics(host, sema.diagnostics.as_slice())?;
             if sema.diagnostics.has_errors() {
                 return Err(ModuleLoadError::Sema);
             }
@@ -1622,7 +1629,7 @@ impl Vm {
         let entry_lexical_this = entry_override.is_some_and(|override_state| {
             override_state.active_function.is_some() && override_state.lexical_this
         });
-        let (lexical_env, variable_env, this_value, new_target) = self.prepare_entry_execution(
+        let (lexical_env, variable_env, this_value, new_target) = Self::prepare_entry_execution(
             agent,
             code,
             realm,
@@ -1714,7 +1721,6 @@ impl Vm {
     }
 
     fn prepare_entry_execution(
-        &self,
         agent: &mut Agent,
         code: CodeRef,
         realm: RealmRef,
@@ -1753,7 +1759,7 @@ impl Vm {
                 )
             } else {
                 (
-                    self.resolve_global_this(agent, realm, Value::undefined())?,
+                    Self::resolve_global_this(agent, realm, Value::undefined())?,
                     None,
                     None,
                     None,
@@ -1793,7 +1799,7 @@ impl Vm {
         if function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Script
             && let Some(global_script_plan) = global_script_plan
         {
-            self.bind_global_script_lexical_bindings(
+            Self::bind_global_script_lexical_bindings(
                 agent,
                 variable_env,
                 lexical_env,
@@ -1919,7 +1925,7 @@ impl Vm {
                 lyng_js_env::ExecutionContextKind::Module,
             );
             let closure = self.create_closure(agent, frame, child_index)?;
-            self.initialize_environment_slot(
+            Self::initialize_environment_slot(
                 agent,
                 module_env,
                 slot,
@@ -2351,7 +2357,7 @@ impl Vm {
                             {
                                 return Err(VmError::MissingModuleEnvironment);
                             }
-                            self.initialize_environment_slot(
+                            Self::initialize_environment_slot(
                                 agent,
                                 module_env,
                                 entry.local_slot(),
@@ -2372,7 +2378,7 @@ impl Vm {
                     if !agent.set_module_binding_alias(module_env, entry.local_slot(), None) {
                         return Err(VmError::MissingModuleEnvironment);
                     }
-                    self.initialize_environment_slot(
+                    Self::initialize_environment_slot(
                         agent,
                         module_env,
                         entry.local_slot(),
@@ -2822,7 +2828,6 @@ impl Vm {
     }
 
     fn report_module_diagnostics(
-        &self,
         host: &dyn HostHooks,
         diagnostics: &[Diagnostic],
     ) -> Result<(), ModuleLoadError> {
@@ -2839,7 +2844,6 @@ impl Vm {
     }
 
     fn bind_global_script_lexical_bindings(
-        &self,
         agent: &mut Agent,
         global_env: EnvironmentRef,
         lexical_env: EnvironmentRef,

@@ -91,11 +91,11 @@ impl Vm {
             }
 
             let mut units = Vec::with_capacity(
-                self.value_string_code_unit_len(agent, left)?
-                    + self.value_string_code_unit_len(agent, right)?,
+                Self::value_string_code_unit_len(agent, left)?
+                    + Self::value_string_code_unit_len(agent, right)?,
             );
-            self.append_value_string_code_units(agent, left, &mut units)?;
-            self.append_value_string_code_units(agent, right, &mut units)?;
+            Self::append_value_string_code_units(agent, left, &mut units)?;
+            Self::append_value_string_code_units(agent, right, &mut units)?;
             return Ok(Value::from_string_ref(alloc_code_unit_string(
                 agent, &units, None,
             )));
@@ -113,7 +113,7 @@ impl Vm {
     }
 
     #[inline]
-    pub(crate) fn alloc_code_unit_string_value(&self, agent: &mut Agent, units: &[u16]) -> Value {
+    pub(crate) fn alloc_code_unit_string_value(agent: &mut Agent, units: &[u16]) -> Value {
         Value::from_string_ref(alloc_code_unit_string(agent, units, None))
     }
 
@@ -183,7 +183,6 @@ impl Vm {
     }
 
     pub(super) fn update_numeric_value(
-        &self,
         agent: &mut Agent,
         value: Value,
         increment: bool,
@@ -321,7 +320,7 @@ impl Vm {
             .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
     }
 
-    pub(crate) fn value_to_string_text(&self, agent: &mut Agent, value: Value) -> VmResult<String> {
+    pub(crate) fn value_to_string_text(agent: &mut Agent, value: Value) -> VmResult<String> {
         if value.is_undefined() {
             return Ok("undefined".to_owned());
         }
@@ -357,7 +356,6 @@ impl Vm {
     }
 
     pub(super) fn value_to_string_code_units(
-        &self,
         agent: &mut Agent,
         value: Value,
     ) -> VmResult<Vec<u16>> {
@@ -370,13 +368,12 @@ impl Vm {
                 .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)));
         }
 
-        Ok(self
-            .value_to_string_text(agent, value)?
+        Ok(Self::value_to_string_text(agent, value)?
             .encode_utf16()
             .collect())
     }
 
-    fn value_string_code_unit_len(&self, agent: &mut Agent, value: Value) -> VmResult<usize> {
+    fn value_string_code_unit_len(agent: &mut Agent, value: Value) -> VmResult<usize> {
         if let Some(string) = value.as_string_ref() {
             let heap_view = agent.heap().view();
             let Some(view) = heap_view.string_view(string) else {
@@ -385,14 +382,12 @@ impl Vm {
             return Ok(view.code_unit_len() as usize);
         }
 
-        Ok(self
-            .value_to_string_text(agent, value)?
+        Ok(Self::value_to_string_text(agent, value)?
             .encode_utf16()
             .count())
     }
 
     pub(super) fn append_value_string_code_units(
-        &self,
         agent: &mut Agent,
         value: Value,
         output: &mut Vec<u16>,
@@ -401,12 +396,11 @@ impl Vm {
             return append_string_ref_code_units(agent, string, output);
         }
 
-        output.extend(self.value_to_string_text(agent, value)?.encode_utf16());
+        output.extend(Self::value_to_string_text(agent, value)?.encode_utf16());
         Ok(())
     }
 
     pub(super) fn decode_abc_operands(
-        &self,
         installed: &InstalledFunction,
         frame: FrameRecord,
         opcode: Opcode,
@@ -427,7 +421,6 @@ impl Vm {
     }
 
     pub(super) fn decode_abx_operands(
-        &self,
         installed: &InstalledFunction,
         frame: FrameRecord,
         a: u8,
@@ -444,10 +437,10 @@ impl Vm {
 
     pub(super) fn object_register(&self, frame: FrameRecord, register: u16) -> VmResult<ObjectRef> {
         let value = self.read_register(frame, register)?;
-        self.require_object(frame, value)
+        Self::require_object(frame, value)
     }
 
-    pub(super) fn require_object(&self, frame: FrameRecord, value: Value) -> VmResult<ObjectRef> {
+    pub(super) fn require_object(frame: FrameRecord, value: Value) -> VmResult<ObjectRef> {
         value
             .as_object_ref()
             .ok_or_else(|| VmError::ExpectedObject {
@@ -504,7 +497,7 @@ impl Vm {
         index: u32,
     ) -> Option<VmResult<Value>> {
         let (environment, slot) = self.activation_tables.mapped_argument_slot(object, index)?;
-        Some(self.read_environment_slot(agent, environment, slot))
+        Some(Self::read_environment_slot(agent, environment, slot))
     }
 
     pub(super) fn mapped_arguments_set(
@@ -541,7 +534,6 @@ impl Vm {
     }
 
     pub(super) fn read_environment_slot(
-        &self,
         agent: &mut Agent,
         environment: EnvironmentRef,
         slot: u32,
@@ -554,7 +546,6 @@ impl Vm {
     }
 
     pub(super) fn initialize_environment_slot(
-        &self,
         agent: &mut Agent,
         environment: EnvironmentRef,
         slot: u32,
@@ -564,7 +555,6 @@ impl Vm {
     }
 
     pub(super) fn copy_environment_slot(
-        &self,
         agent: &mut Agent,
         source_environment: EnvironmentRef,
         target_environment: EnvironmentRef,
@@ -575,7 +565,6 @@ impl Vm {
     }
 
     pub(super) fn mirror_environment_slot(
-        &self,
         agent: &mut Agent,
         environment: EnvironmentRef,
         slot: u32,
@@ -592,8 +581,7 @@ impl Vm {
         value: Value,
     ) -> VmResult<()> {
         let current = Self::read_environment_slot_raw(agent, environment, slot)?;
-        if self
-            .environment_slot_flags(agent, environment, slot)
+        if Self::environment_slot_flags(agent, environment, slot)
             .is_some_and(|flags| !flags.is_mutable() && current != Value::uninitialized_lexical())
         {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
@@ -614,7 +602,7 @@ impl Vm {
         if current == Value::uninitialized_lexical() {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
-        if let Some(flags) = self.environment_slot_flags(agent, environment, slot)
+        if let Some(flags) = Self::environment_slot_flags(agent, environment, slot)
             && !flags.is_mutable()
         {
             if flags.sloppy_immutable_assign_silent() && !strict {
@@ -627,7 +615,6 @@ impl Vm {
     }
 
     fn environment_slot_flags(
-        &self,
         agent: &Agent,
         environment: EnvironmentRef,
         slot: u32,

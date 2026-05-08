@@ -79,7 +79,7 @@ impl Vm {
         prepared: PreparedBytecodeCall,
         arguments: &[Value],
     ) -> VmResult<ObjectRef> {
-        let capability = self.create_intrinsic_promise_capability(agent, prepared.realm)?;
+        let capability = Self::create_intrinsic_promise_capability(agent, prepared.realm)?;
         let promise = Self::promise_capability_promise(agent, capability)?;
         let prior_frame_depth = self.frames.len();
         let prior_context_depth = agent.execution_contexts().len();
@@ -269,7 +269,7 @@ impl Vm {
             }
         }
 
-        let capability = self.create_intrinsic_promise_capability(agent, realm)?;
+        let capability = Self::create_intrinsic_promise_capability(agent, realm)?;
         let promise = Self::promise_capability_promise(agent, capability)?;
         let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
         self.settle_promise_capability(
@@ -285,7 +285,6 @@ impl Vm {
     }
 
     pub(super) fn create_intrinsic_promise_capability(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
     ) -> VmResult<PromiseCapabilityId> {
@@ -293,18 +292,21 @@ impl Vm {
             .realm(realm)
             .and_then(|record| record.intrinsics().promise_prototype())
             .ok_or(VmError::MissingRootShape(realm))?;
-        let promise =
-            self.allocate_ordinary_object_with_prototype(agent, realm, Some(promise_prototype))?;
+        let promise = Self::allocate_ordinary_object_with_prototype(
+            agent,
+            realm,
+            Some(promise_prototype),
+        )?;
         let _ = agent.alloc_promise(promise, realm);
         let capability = agent.alloc_promise_capability();
         let _ = agent.set_promise_capability_promise(capability, promise);
-        let resolve = self.allocate_builtin_function_object(
+        let resolve = Self::allocate_builtin_function_object(
             agent,
             realm,
             promise_resolve_function_builtin(),
         )?;
         let reject =
-            self.allocate_builtin_function_object(agent, realm, promise_reject_function_builtin())?;
+            Self::allocate_builtin_function_object(agent, realm, promise_reject_function_builtin())?;
         let _ = agent.set_promise_capability_resolve(capability, resolve);
         let _ = agent.set_promise_capability_reject(capability, reject);
         let _ = agent.alloc_promise_resolving_function(
@@ -346,12 +348,11 @@ impl Vm {
         );
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
-        self.enqueue_await_resume(agent, promise, suspended)?;
+        Self::enqueue_await_resume(agent, promise, suspended)?;
         Err(VmError::AsyncSuspend)
     }
 
     fn enqueue_await_resume(
-        &self,
         agent: &mut Agent,
         promise: ObjectRef,
         suspended: SuspendedExecutionRef,
@@ -394,13 +395,13 @@ impl Vm {
                 let realm = agent
                     .realm(record.realm())
                     .ok_or_else(|| VmError::MissingRootShape(record.realm()))?;
-                self.enqueue_promise_reaction_job(agent, realm, fulfill_reaction, record.result());
+                Self::enqueue_promise_reaction_job(agent, realm, fulfill_reaction, record.result());
             }
             lyng_js_env::PromiseState::Rejected => {
                 let realm = agent
                     .realm(record.realm())
                     .ok_or_else(|| VmError::MissingRootShape(record.realm()))?;
-                self.enqueue_promise_reaction_job(agent, realm, reject_reaction, record.result());
+                Self::enqueue_promise_reaction_job(agent, realm, reject_reaction, record.result());
             }
         }
         Ok(())

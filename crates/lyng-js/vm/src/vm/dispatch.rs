@@ -61,7 +61,7 @@ impl Vm {
 
             match instruction {
                 Instruction::Abc { opcode, a, b, c } => {
-                    let (a, b, c) = self.decode_abc_operands(installed, frame, opcode, a, b, c);
+                    let (a, b, c) = Self::decode_abc_operands(installed, frame, opcode, a, b, c);
                     match opcode {
                         Opcode::Move => {
                             let value = self.read_register(frame, b)?;
@@ -360,7 +360,7 @@ impl Vm {
                         Opcode::GetKeyedProperty => {
                             let receiver = self.read_register(frame, b)?;
                             let key_value = self.read_register(frame, c)?;
-                            let coercible_result = self.check_object_coercible(agent, receiver);
+                            let coercible_result = Self::check_object_coercible(agent, receiver);
                             let Some(()) = self.handle_vm_result(agent, coercible_result)? else {
                                 continue;
                             };
@@ -381,7 +381,7 @@ impl Vm {
                                         };
                                         value
                                     } else if let Some(value) =
-                                        self.try_fast_own_index_value(agent, object, index)?
+                                        Self::try_fast_own_index_value(agent, object, index)?
                                     {
                                         value
                                     } else {
@@ -473,7 +473,7 @@ impl Vm {
                             let receiver = self.read_register(frame, a)?;
                             let value = self.read_register(frame, b)?;
                             let key_value = self.read_register(frame, c)?;
-                            let coercible_result = self.check_object_coercible(agent, receiver);
+                            let coercible_result = Self::check_object_coercible(agent, receiver);
                             let Some(()) = self.handle_vm_result(agent, coercible_result)? else {
                                 continue;
                             };
@@ -494,7 +494,7 @@ impl Vm {
                                         };
                                         true
                                     } else {
-                                        let fast_result = self.try_fast_set_engine_array_index(
+                                        let fast_result = Self::try_fast_set_engine_array_index(
                                             agent, object, index, value,
                                         );
                                         let Some(fast_result) =
@@ -696,7 +696,7 @@ impl Vm {
                         Opcode::SetFunctionName => {
                             let function = self.object_register(frame, a)?;
                             let name_value = self.read_register(frame, b)?;
-                            let set_result = self.set_function_name(agent, function, name_value);
+                            let set_result = Self::set_function_name(agent, function, name_value);
                             let Some(()) = self.handle_vm_result(agent, set_result)? else {
                                 continue;
                             };
@@ -717,7 +717,7 @@ impl Vm {
                         Opcode::DeleteProperty => {
                             let receiver = self.read_register(frame, b)?;
                             let key_value = self.read_register(frame, c)?;
-                            let coercible_result = self.check_object_coercible(agent, receiver);
+                            let coercible_result = Self::check_object_coercible(agent, receiver);
                             let Some(()) = self.handle_vm_result(agent, coercible_result)? else {
                                 continue;
                             };
@@ -807,7 +807,7 @@ impl Vm {
                                     };
                                     value
                                 } else if let Some(value) =
-                                    self.try_fast_own_index_value(agent, object, u32::from(c))?
+                                    Self::try_fast_own_index_value(agent, object, u32::from(c))?
                                 {
                                     value
                                 } else if Self::prototype_chain_has_proxy(agent, object) {
@@ -1015,7 +1015,7 @@ impl Vm {
                     }
                 }
                 Instruction::Abx { opcode, a, bx } => {
-                    let (a, bx) = self.decode_abx_operands(installed, frame, a, bx);
+                    let (a, bx) = Self::decode_abx_operands(installed, frame, a, bx);
                     match opcode {
                         Opcode::LoadUndefined => {
                             self.write_register(frame, a, Value::undefined())?;
@@ -1055,7 +1055,7 @@ impl Vm {
                                 depth,
                                 slot,
                             )?;
-                            let slot_value = self.read_environment_slot(agent, environment, slot);
+                            let slot_value = Self::read_environment_slot(agent, environment, slot);
                             let Some(value) = self.handle_vm_result(agent, slot_value)? else {
                                 continue;
                             };
@@ -1286,7 +1286,7 @@ impl Vm {
                         }
                         Opcode::DeleteGlobal => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
-                            let delete_result = self.delete_global(agent, frame, atom);
+                            let delete_result = Self::delete_global(agent, frame, atom);
                             let Some(deleted) = self.handle_vm_result(agent, delete_result)? else {
                                 continue;
                             };
@@ -1348,7 +1348,7 @@ impl Vm {
                             }
                         }
                         Opcode::CreateObject => {
-                            let object = self.create_object(
+                            let object = Self::create_object(
                                 agent,
                                 frame.realm(),
                                 usize::try_from(bx).unwrap_or(usize::MAX),
@@ -1358,7 +1358,7 @@ impl Vm {
                         }
                         Opcode::CreateArray => {
                             let length = usize::try_from(bx).unwrap_or(usize::MAX);
-                            let object = self.create_array(agent, frame.realm(), length)?;
+                            let object = Self::create_array(agent, frame.realm(), length)?;
                             let length = u32::try_from(length).unwrap_or(u32::MAX);
                             if length != 0 {
                                 Self::define_length_property(agent, object, length, false)?;
@@ -1368,7 +1368,7 @@ impl Vm {
                         }
                         Opcode::CheckObjectCoercible => {
                             let value = self.read_register(frame, a)?;
-                            let coercible = self.check_object_coercible(agent, value);
+                            let coercible = Self::check_object_coercible(agent, value);
                             let Some(()) = self.handle_vm_result(agent, coercible)? else {
                                 continue;
                             };
@@ -1473,7 +1473,7 @@ impl Vm {
                                 register: 0,
                             })?;
                         let value = self.read_register(frame, register)?;
-                        let type_string = self.type_of_value(agent, value);
+                        let type_string = Self::type_of_value(agent, value);
                         self.write_register(frame, register, type_string)?;
                         self.advance_instruction()?;
                     }
@@ -1828,10 +1828,10 @@ impl Vm {
             self.read_register(frame, register)?,
             ToPrimitiveHint::Number,
         )?;
-        self.to_numeric_primitive(agent, primitive)
+        Self::to_numeric_primitive(agent, primitive)
     }
 
-    fn to_numeric_primitive(&self, agent: &mut Agent, value: Value) -> VmResult<Value> {
+    fn to_numeric_primitive(agent: &mut Agent, value: Value) -> VmResult<Value> {
         read::to_numeric(agent.heap().view(), value)
             .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
     }
@@ -1846,7 +1846,7 @@ impl Vm {
         increment: bool,
     ) -> VmResult<(Value, Value)> {
         let numeric = self.to_numeric_register(agent, host, registry, frame, register)?;
-        let updated = self.update_numeric_value(agent, numeric, increment)?;
+        let updated = Self::update_numeric_value(agent, numeric, increment)?;
         Ok((numeric, updated))
     }
 
@@ -1877,8 +1877,8 @@ impl Vm {
             ToPrimitiveHint::Number,
         )?;
         if left.is_string() && right.is_string() {
-            let left_units = self.value_to_string_code_units(agent, left)?;
-            let right_units = self.value_to_string_code_units(agent, right)?;
+            let left_units = Self::value_to_string_code_units(agent, left)?;
+            let right_units = Self::value_to_string_code_units(agent, right)?;
             return Ok(Value::from_bool(compare_op(left_units.cmp(&right_units))));
         }
         if left.is_bigint() && right.is_string() {
@@ -1901,8 +1901,8 @@ impl Vm {
                 .expect("StringToBigInt/BigInt comparison must be ordered");
             return Ok(Value::from_bool(compare_op(ordering)));
         }
-        let left = self.to_numeric_primitive(agent, left)?;
-        let right = self.to_numeric_primitive(agent, right)?;
+        let left = Self::to_numeric_primitive(agent, left)?;
+        let right = Self::to_numeric_primitive(agent, right)?;
         let Some(ordering) = compare_numeric_values(agent, left, right)? else {
             return Ok(Value::from_bool(false));
         };

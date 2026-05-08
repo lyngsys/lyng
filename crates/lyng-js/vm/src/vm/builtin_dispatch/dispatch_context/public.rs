@@ -235,7 +235,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         realm: RealmRef,
         value: Value,
     ) -> Result<ObjectRef, Self::Error> {
-        self.vm.to_object_for_value(self.agent, realm, value)
+        Vm::to_object_for_value(self.agent, realm, value)
     }
 
     fn allocate_ordinary_object_with_prototype(
@@ -243,16 +243,14 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         realm: RealmRef,
         prototype: Option<ObjectRef>,
     ) -> Result<ObjectRef, Self::Error> {
-        self.vm
-            .allocate_ordinary_object_with_prototype(self.agent, realm, prototype)
+        Vm::allocate_ordinary_object_with_prototype(self.agent, realm, prototype)
     }
 
     fn allocate_builtin_function(
         &mut self,
         entry: BuiltinFunctionId,
     ) -> Result<ObjectRef, Self::Error> {
-        self.vm
-            .allocate_builtin_function_object(self.agent, self.builtin_realm(), entry)
+        Vm::allocate_builtin_function_object(self.agent, self.builtin_realm(), entry)
     }
 
     fn create_array_object(
@@ -260,7 +258,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         realm: RealmRef,
         element_capacity: usize,
     ) -> Result<ObjectRef, Self::Error> {
-        self.vm.create_array(self.agent, realm, element_capacity)
+        Vm::create_array(self.agent, realm, element_capacity)
     }
 
     fn ordinary_constructor_prototype(
@@ -277,8 +275,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         realm: RealmRef,
         descriptor: PropertyDescriptor,
     ) -> Result<Value, Self::Error> {
-        self.vm
-            .descriptor_object_from_descriptor(self.agent, realm, descriptor)
+        Vm::descriptor_object_from_descriptor(self.agent, realm, descriptor)
     }
 
     fn to_property_descriptor(
@@ -649,14 +646,14 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .function_data(function)
             .and_then(lyng_js_objects::FunctionObjectData::entry)
         else {
-            return self.vm.native_function_source_text(self.agent, function);
+            return Vm::native_function_source_text(self.agent, function);
         };
         match entry {
             lyng_js_objects::FunctionEntryIdentity::Bytecode(code) => self
                 .vm
                 .source_function_source_text(self.agent, code, function),
             lyng_js_objects::FunctionEntryIdentity::Native(_) => {
-                self.vm.native_function_source_text(self.agent, function)
+                Vm::native_function_source_text(self.agent, function)
             }
             lyng_js_objects::FunctionEntryIdentity::Bound => {
                 Ok("function () { [native code] }".to_owned())

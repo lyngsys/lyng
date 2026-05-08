@@ -6,7 +6,6 @@ use super::{
 
 impl Vm {
     pub(in crate::vm) fn allocate_ordinary_object_with_prototype(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         prototype: Option<ObjectRef>,
@@ -26,12 +25,11 @@ impl Vm {
     }
 
     pub(in crate::vm) fn descriptor_object_from_descriptor(
-        &self,
         agent: &mut Agent,
         realm: RealmRef,
         descriptor: PropertyDescriptor,
     ) -> VmResult<Value> {
-        let object = self.allocate_ordinary_object_with_prototype(
+        let object = Self::allocate_ordinary_object_with_prototype(
             agent,
             realm,
             agent
@@ -39,7 +37,7 @@ impl Vm {
                 .and_then(|record| record.intrinsics().object_prototype()),
         )?;
         if let Some(value) = descriptor.value() {
-            self.define_data_property_with_attrs(
+            Self::define_data_property_with_attrs(
                 agent,
                 object,
                 PropertyKey::from_atom(WellKnownAtom::value.id()),
@@ -50,7 +48,7 @@ impl Vm {
             )?;
         }
         if let Some(getter) = descriptor.getter() {
-            self.define_data_property_with_attrs(
+            Self::define_data_property_with_attrs(
                 agent,
                 object,
                 PropertyKey::from_atom(WellKnownAtom::get.id()),
@@ -61,7 +59,7 @@ impl Vm {
             )?;
         }
         if let Some(setter) = descriptor.setter() {
-            self.define_data_property_with_attrs(
+            Self::define_data_property_with_attrs(
                 agent,
                 object,
                 PropertyKey::from_atom(WellKnownAtom::set.id()),
@@ -72,7 +70,7 @@ impl Vm {
             )?;
         }
         if let Some(writable) = descriptor.writable() {
-            self.define_data_property_with_attrs(
+            Self::define_data_property_with_attrs(
                 agent,
                 object,
                 PropertyKey::from_atom(WellKnownAtom::writable.id()),
@@ -83,7 +81,7 @@ impl Vm {
             )?;
         }
         if let Some(enumerable) = descriptor.enumerable() {
-            self.define_data_property_with_attrs(
+            Self::define_data_property_with_attrs(
                 agent,
                 object,
                 PropertyKey::from_atom(WellKnownAtom::enumerable.id()),
@@ -94,7 +92,7 @@ impl Vm {
             )?;
         }
         if let Some(configurable) = descriptor.configurable() {
-            self.define_data_property_with_attrs(
+            Self::define_data_property_with_attrs(
                 agent,
                 object,
                 PropertyKey::from_atom(WellKnownAtom::configurable.id()),
