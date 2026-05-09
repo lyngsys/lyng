@@ -11,7 +11,8 @@
     clippy::cast_precision_loss,
     clippy::too_many_lines,
     clippy::match_same_arms,
-    clippy::doc_markdown
+    clippy::doc_markdown,
+    reason = "hand-written lexical grammar keeps spec-shaped token routines and numeric literal casts together"
 )]
 
 mod lexer;

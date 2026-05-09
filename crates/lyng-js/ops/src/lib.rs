@@ -7,7 +7,8 @@
 #![allow(
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
-    clippy::return_self_not_must_use
+    clippy::return_self_not_must_use,
+    reason = "abstract-operation APIs keep ECMA-262 domain names and cheap helper accessors visible to runtime crates"
 )]
 
 pub mod allocating;

@@ -7,7 +7,8 @@
 #![allow(
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
-    clippy::return_self_not_must_use
+    clippy::return_self_not_must_use,
+    reason = "crate root exports stable bytecode API types; domain prefixes and cheap accessors stay explicit for callers"
 )]
 
 mod builder;

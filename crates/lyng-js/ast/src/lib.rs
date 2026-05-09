@@ -2,7 +2,8 @@
     clippy::must_use_candidate,
     clippy::return_self_not_must_use,
     clippy::cast_possible_truncation,
-    clippy::module_name_repetitions
+    clippy::module_name_repetitions,
+    reason = "AST arenas intentionally use compact u32 typed IDs and public node accessors without per-method noise"
 )]
 
 //! Compiler-oriented, arena-backed AST for ECMA-262 Edition 16.

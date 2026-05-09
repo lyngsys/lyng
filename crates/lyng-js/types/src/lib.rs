@@ -6,7 +6,8 @@
 #![allow(
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
-    clippy::return_self_not_must_use
+    clippy::return_self_not_must_use,
+    reason = "runtime representation types use explicit domain names and lightweight handle/value accessors by design"
 )]
 
 mod builtin_ids;

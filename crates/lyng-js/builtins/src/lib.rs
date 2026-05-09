@@ -10,7 +10,8 @@
 #![allow(
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
-    clippy::return_self_not_must_use
+    clippy::return_self_not_must_use,
+    reason = "builtin bootstrap APIs expose domain-specific descriptors and cheap registry accessors across crates"
 )]
 
 mod bootstrap;

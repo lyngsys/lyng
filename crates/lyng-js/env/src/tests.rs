@@ -1,4 +1,7 @@
-#![allow(clippy::too_many_lines)]
+#![allow(
+    clippy::too_many_lines,
+    reason = "environment substrate tests use long setup scenarios in test-only code"
+)]
 
 use super::*;
 use lyng_js_common::AtomId;

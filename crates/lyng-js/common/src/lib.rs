@@ -8,7 +8,8 @@
     clippy::doc_markdown,
     clippy::must_use_candidate,
     clippy::redundant_closure_for_method_calls,
-    clippy::return_self_not_must_use
+    clippy::return_self_not_must_use,
+    reason = "shared atom and source primitives use compact u32 IDs, ECMA-262 wording, and cheap public accessors"
 )]
 
 mod atom;

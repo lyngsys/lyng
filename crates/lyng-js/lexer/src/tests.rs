@@ -1,5 +1,10 @@
 //! Comprehensive tests for the lyng-js lexer.
-#![allow(clippy::cast_lossless, clippy::float_cmp, clippy::manual_let_else)]
+#![allow(
+    clippy::cast_lossless,
+    clippy::float_cmp,
+    clippy::manual_let_else,
+    reason = "lexer tests compare literal edge cases and intentionally use compact table assertions"
+)]
 
 use lyng_js_common::{AtomTable, SourceId};
 

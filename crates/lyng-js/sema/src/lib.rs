@@ -15,7 +15,8 @@
     clippy::too_many_lines,
     clippy::trivially_copy_pass_by_ref,
     clippy::unnecessary_map_or,
-    clippy::unused_self
+    clippy::unused_self,
+    reason = "semantic analysis is a side-table-driven spec pass with tracked frontend cleanup debt"
 )]
 
 //! Semantic analysis pass for the lyng-js JavaScript engine.

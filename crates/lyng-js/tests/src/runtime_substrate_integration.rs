@@ -1,5 +1,8 @@
 //! Cross-crate integration coverage for the runtime substrate.
-#![allow(clippy::too_many_lines)]
+#![allow(
+    clippy::too_many_lines,
+    reason = "cross-crate runtime integration tests keep long scenario coverage in test-only code"
+)]
 
 use lyng_js_ast::FunctionId;
 use lyng_js_common::{AtomId, Severity, SourceId, Span};

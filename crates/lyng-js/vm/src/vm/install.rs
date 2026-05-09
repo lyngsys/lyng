@@ -29,7 +29,7 @@ impl InstalledFunction {
     #[inline]
     #[expect(
         clippy::too_many_lines,
-        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+        reason = "installed bytecode side tables are built in one pass per metadata family for locality"
     )]
     pub(super) fn new(
         function: BytecodeFunction,
@@ -310,7 +310,7 @@ impl InstalledFunction {
 impl Vm {
     #[expect(
         clippy::too_many_lines,
-        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+        reason = "recursive installation keeps code allocation, canonical atoms, and child references in one pass"
     )]
     pub(super) fn install_functions(
         &mut self,

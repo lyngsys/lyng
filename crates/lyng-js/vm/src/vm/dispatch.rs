@@ -30,7 +30,7 @@ impl Vm {
 
     #[expect(
         clippy::too_many_lines,
-        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+        reason = "main interpreter dispatch keeps opcode fetch and branch handling in one profiler-friendly loop"
     )]
     pub(super) fn run(
         &mut self,

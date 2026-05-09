@@ -6,7 +6,8 @@
 #![allow(
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
-    clippy::return_self_not_must_use
+    clippy::return_self_not_must_use,
+    reason = "GC substrate APIs expose compact handles and reporting accessors where names must stay domain-specific"
 )]
 
 use lyng_js_common::{AtomCollection, AtomId, AtomSweepStats, AtomTable};

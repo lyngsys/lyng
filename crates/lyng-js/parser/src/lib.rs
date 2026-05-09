@@ -19,7 +19,8 @@
     clippy::struct_excessive_bools,
     clippy::too_many_lines,
     clippy::unnested_or_patterns,
-    clippy::unreadable_literal
+    clippy::unreadable_literal,
+    reason = "recursive-descent grammar code keeps ECMA-262-shaped branches and compact parser indices explicit"
 )]
 
 mod decl;

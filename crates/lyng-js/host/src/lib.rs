@@ -7,7 +7,8 @@
 #![allow(
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
-    clippy::return_self_not_must_use
+    clippy::return_self_not_must_use,
+    reason = "host-boundary request and response types keep explicit domain names and cheap accessors for embeddings"
 )]
 
 mod error;

@@ -389,7 +389,7 @@ impl Vm {
 
     #[expect(
         clippy::too_many_lines,
-        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+        reason = "spec-shaped VM routine stays contiguous to preserve completion ordering and cleanup invariants"
     )]
     pub(super) fn drain_async_generator_queue(
         &mut self,
@@ -831,7 +831,7 @@ impl Vm {
     )]
     #[expect(
         clippy::too_many_lines,
-        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+        reason = "spec-shaped VM routine stays contiguous to preserve completion ordering and cleanup invariants"
     )]
     pub(super) fn delegate_yield(
         &mut self,
@@ -1347,7 +1347,7 @@ impl Vm {
     )]
     #[expect(
         clippy::too_many_lines,
-        reason = "spec-shaped VM algorithm stays contiguous until the VM module split issue extracts it"
+        reason = "spec-shaped VM routine stays contiguous to preserve completion ordering and cleanup invariants"
     )]
     fn resume_async_delegate_yield(
         &mut self,

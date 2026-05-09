@@ -1,4 +1,7 @@
-#![allow(clippy::wildcard_imports)]
+#![allow(
+    clippy::wildcard_imports,
+    reason = "internal method dispatch keeps object-operation imports local to this narrow module"
+)]
 
 use super::*;
 use lyng_js_common::WellKnownAtom;
