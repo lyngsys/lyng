@@ -19,10 +19,6 @@ pub(super) struct InstalledFunction {
     loop_iteration_sites_by_offset: Vec<Option<lyng_js_bytecode::LoopIterationEnvironmentSite>>,
     feedback_sites_by_offset: Vec<Option<lyng_js_bytecode::FeedbackSiteDescriptor>>,
     feedback_sites_by_slot: Vec<Option<lyng_js_bytecode::FeedbackSiteDescriptor>>,
-    source_maps_by_offset: Vec<Option<lyng_js_bytecode::SourceMapEntry>>,
-    safepoints_by_offset: Vec<Option<lyng_js_bytecode::SafepointDescriptor>>,
-    safepoints_by_id: Vec<Option<lyng_js_bytecode::SafepointDescriptor>>,
-    deopt_by_safepoint_id: Vec<Option<lyng_js_bytecode::DeoptSnapshot>>,
 }
 
 impl InstalledFunction {
@@ -45,7 +41,15 @@ impl InstalledFunction {
                 *slot = Some(operand.payload());
             }
         }
-        let mut direct_eval_lexical_sites_by_offset = vec![None; function.instructions().len()];
+        let mut direct_eval_lexical_sites_by_offset = vec![
+            None;
+            offset_table_len(
+                function
+                    .direct_eval_lexical_sites()
+                    .iter()
+                    .map(lyng_js_bytecode::DirectEvalLexicalSite::instruction_offset),
+            )
+        ];
         for site in function.direct_eval_lexical_sites() {
             if let Some(slot) = direct_eval_lexical_sites_by_offset.get_mut(
                 usize::try_from(site.instruction_offset())
@@ -124,7 +128,15 @@ impl InstalledFunction {
                 ));
             }
         }
-        let mut loop_iteration_sites_by_offset = vec![None; function.instructions().len()];
+        let mut loop_iteration_sites_by_offset = vec![
+            None;
+            offset_table_len(
+                function
+                    .loop_iteration_environment_sites()
+                    .iter()
+                    .map(lyng_js_bytecode::LoopIterationEnvironmentSite::instruction_offset),
+            )
+        ];
         for site in function.loop_iteration_environment_sites() {
             if let Some(slot) = loop_iteration_sites_by_offset.get_mut(
                 usize::try_from(site.instruction_offset())
@@ -136,18 +148,6 @@ impl InstalledFunction {
         let mut feedback_sites_by_offset = vec![None; function.instructions().len()];
         let mut feedback_sites_by_slot =
             vec![None; usize::try_from(function.feedback_slot_count()).unwrap_or(usize::MAX)];
-        let mut source_maps_by_offset = vec![None; function.instructions().len()];
-        let mut safepoints_by_offset = vec![None; function.instructions().len()];
-        let max_safepoint_id = function
-            .safepoints()
-            .iter()
-            .map(|descriptor| descriptor.id())
-            .max()
-            .unwrap_or(0);
-        let mut safepoints_by_id =
-            vec![None; usize::try_from(max_safepoint_id).unwrap_or(usize::MAX)];
-        let mut deopt_by_safepoint_id =
-            vec![None; usize::try_from(max_safepoint_id).unwrap_or(usize::MAX)];
         for descriptor in function.feedback_sites() {
             if let Some(slot) = feedback_sites_by_offset.get_mut(
                 usize::try_from(descriptor.instruction_offset())
@@ -162,36 +162,6 @@ impl InstalledFunction {
                 *slot = Some(*descriptor);
             }
         }
-        for entry in function.source_map() {
-            if let Some(slot) = source_maps_by_offset.get_mut(
-                usize::try_from(entry.instruction_offset())
-                    .expect("instruction offset should fit usize"),
-            ) {
-                *slot = Some(*entry);
-            }
-        }
-        for descriptor in function.safepoints() {
-            if let Some(slot) = safepoints_by_offset.get_mut(
-                usize::try_from(descriptor.instruction_offset())
-                    .expect("instruction offset should fit usize"),
-            ) {
-                *slot = Some(*descriptor);
-            }
-            if let Some(slot) = safepoints_by_id.get_mut(
-                usize::try_from(descriptor.id().saturating_sub(1))
-                    .expect("safepoint id should fit usize"),
-            ) {
-                *slot = Some(*descriptor);
-            }
-        }
-        for snapshot in function.deopt_snapshots() {
-            if let Some(slot) = deopt_by_safepoint_id.get_mut(
-                usize::try_from(snapshot.safepoint_id().saturating_sub(1))
-                    .expect("safepoint id should fit usize"),
-            ) {
-                *slot = Some(snapshot.clone());
-            }
-        }
         Self {
             function,
             child_codes,
@@ -201,10 +171,6 @@ impl InstalledFunction {
             loop_iteration_sites_by_offset,
             feedback_sites_by_offset,
             feedback_sites_by_slot,
-            source_maps_by_offset,
-            safepoints_by_offset,
-            safepoints_by_id,
-            deopt_by_safepoint_id,
         }
     }
 
@@ -259,10 +225,7 @@ impl InstalledFunction {
         &self,
         instruction_offset: u32,
     ) -> Option<lyng_js_bytecode::SourceMapEntry> {
-        self.source_maps_by_offset
-            .get(usize::try_from(instruction_offset).ok()?)
-            .copied()
-            .flatten()
+        self.function.source_map_entry_at(instruction_offset)
     }
 
     #[inline]
@@ -270,10 +233,7 @@ impl InstalledFunction {
         &self,
         instruction_offset: u32,
     ) -> Option<lyng_js_bytecode::SafepointDescriptor> {
-        self.safepoints_by_offset
-            .get(usize::try_from(instruction_offset).ok()?)
-            .copied()
-            .flatten()
+        self.function.safepoint_at(instruction_offset)
     }
 
     #[inline]
@@ -281,10 +241,7 @@ impl InstalledFunction {
         &self,
         safepoint_id: u32,
     ) -> Option<lyng_js_bytecode::SafepointDescriptor> {
-        self.safepoints_by_id
-            .get(usize::try_from(safepoint_id.saturating_sub(1)).ok()?)
-            .copied()
-            .flatten()
+        self.function.safepoint_by_id(safepoint_id)
     }
 
     #[inline]
@@ -292,9 +249,7 @@ impl InstalledFunction {
         &self,
         safepoint_id: u32,
     ) -> Option<&lyng_js_bytecode::DeoptSnapshot> {
-        self.deopt_by_safepoint_id
-            .get(usize::try_from(safepoint_id.saturating_sub(1)).ok()?)?
-            .as_ref()
+        self.function.deopt_snapshot_for_safepoint(safepoint_id)
     }
 
     #[inline]
@@ -305,6 +260,20 @@ impl InstalledFunction {
             .flatten()
             .unwrap_or(atom)
     }
+
+    #[cfg(test)]
+    const fn cold_metadata_index_footprint(&self) -> usize {
+        self.direct_eval_lexical_sites_by_offset.len() + self.loop_iteration_sites_by_offset.len()
+    }
+}
+
+#[inline]
+fn offset_table_len(offsets: impl Iterator<Item = u32>) -> usize {
+    offsets.max().map_or(0, |offset| {
+        usize::try_from(offset)
+            .unwrap_or(usize::MAX)
+            .saturating_add(1)
+    })
 }
 
 impl Vm {
@@ -347,6 +316,7 @@ impl Vm {
                 .expect("atom id should fit into usize")
                 .saturating_add(1)
         ];
+        let mut compiled_atoms_by_id = vec![None; canonical_atoms.len()];
         for (atom, text) in atom_texts {
             let runtime_atom = match text {
                 CompiledAtom::Utf8(text) => {
@@ -365,8 +335,9 @@ impl Vm {
                 }
                 CompiledAtom::Utf16(units) => agent.atoms_mut().intern_collectible_utf16(units),
             };
-            canonical_atoms[usize::try_from(atom.raw()).expect("atom id should fit into usize")] =
-                Some(runtime_atom);
+            let atom_index = usize::try_from(atom.raw()).expect("atom id should fit into usize");
+            canonical_atoms[atom_index] = Some(runtime_atom);
+            compiled_atoms_by_id[atom_index] = Some(text);
         }
         let canonical_atoms: Arc<[Option<AtomId>]> = canonical_atoms.into();
 
@@ -434,7 +405,7 @@ impl Vm {
                 agent,
                 realm,
                 installed_function.constants(),
-                atom_texts,
+                &compiled_atoms_by_id,
                 canonical_atoms.as_ref(),
             );
             let code = agent.heap_mut().mutator().alloc_code(
@@ -449,7 +420,7 @@ impl Vm {
             let parent_code = codes_by_function[bytecode_index(function.id())]
                 .expect("allocated code should exist for every installed function");
             let installed_function = installed_templates[bytecode_index(function.id())]
-                .clone()
+                .take()
                 .expect("template should be installed alongside its runtime code");
             let child_codes = function
                 .child_functions()
@@ -495,7 +466,7 @@ impl Vm {
         agent: &mut Agent,
         realm: RealmRef,
         constants: &[ConstantValue],
-        atom_texts: &[(AtomId, CompiledAtom)],
+        compiled_atoms_by_id: &[Option<&CompiledAtom>],
         canonical_atoms: &[Option<AtomId>],
     ) -> Option<lyng_js_gc::CodeSlotsRef> {
         if constants.is_empty() {
@@ -512,9 +483,13 @@ impl Vm {
         };
 
         for (index, constant) in constants.iter().copied().enumerate() {
-            if let Some(value) =
-                self.constant_value(agent, realm, constant, atom_texts, canonical_atoms)
-            {
+            if let Some(value) = self.constant_value(
+                agent,
+                realm,
+                constant,
+                compiled_atoms_by_id,
+                canonical_atoms,
+            ) {
                 assert!(agent.heap_mut().mutator().init_store_value(
                     ValueStoreTarget::CodeSlot(
                         slots,
@@ -541,5 +516,53 @@ impl Vm {
         self.ensure_tiering_capacity(code);
         self.tiering[index] = Some(TieringState::default());
         self.installed[index] = Some(Arc::new(installed));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lyng_js_bytecode::{
+        ArgumentsMode, DeoptFrameValue, DeoptSnapshot, DeoptValueSource, Instruction, Opcode,
+        SafepointDescriptor, SafepointKind, SourceMapEntry,
+    };
+    use lyng_js_common::SourceId;
+
+    #[test]
+    fn sparse_cold_metadata_indexes_do_not_scale_with_instruction_count() {
+        let instruction_count = 1_024;
+        let metadata_offset = u32::try_from(instruction_count - 1).unwrap();
+        let source_map = SourceMapEntry::new(SourceId::new(7), metadata_offset, 11, 13);
+        let safepoint = SafepointDescriptor::new(1, metadata_offset, SafepointKind::Allocation, 3);
+        let deopt = DeoptSnapshot::new(
+            1,
+            vec![DeoptValueSource::FrameValue(DeoptFrameValue::ThisValue)],
+        );
+        let function = BytecodeFunction::new(
+            BytecodeFunctionId::from_raw(1).unwrap(),
+            None,
+            ArgumentsMode::None,
+        )
+        .with_instructions(vec![Instruction::ax(Opcode::Nop, 0); instruction_count])
+        .with_source_map(vec![source_map])
+        .with_safepoints(vec![safepoint])
+        .with_deopt_snapshots(vec![deopt]);
+
+        let installed = InstalledFunction::new(function, Vec::new(), Arc::from([]));
+
+        assert_eq!(
+            installed.source_map_entry(metadata_offset),
+            Some(source_map)
+        );
+        assert_eq!(installed.safepoint(metadata_offset), Some(safepoint));
+        assert_eq!(installed.safepoint_by_id(1), Some(safepoint));
+        assert_eq!(
+            installed.deopt_snapshot(1).map(DeoptSnapshot::values),
+            Some([DeoptValueSource::FrameValue(DeoptFrameValue::ThisValue)].as_slice())
+        );
+        assert!(
+            installed.cold_metadata_index_footprint() < instruction_count,
+            "cold metadata indexes should be sparse, not instruction-length"
+        );
     }
 }

@@ -30,7 +30,7 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Pass rate (selected files) | `93.73%` |
 | Selected variant executions | `101813` |
 | Runnable variant executions | `95167` |
-| Time | `69.7s` |
+| Time | `73.9s` |
 
 ## Delta From Previous Report
 
@@ -95,86 +95,86 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Test file | Variants | Total time | Slowest variant |
 | --- | ---: | ---: | ---: |
-| `staging/sm/Array/toSpliced-dense.js` | `2` | `12.960s` | `6.481s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `9.074s` | `4.563s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `8.982s` | `4.532s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js` | `2` | `4.278s` | `2.142s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js` | `2` | `3.136s` | `1.576s` |
-| `staging/sm/String/string-upper-lower-mapping.js` | `2` | `2.727s` | `1.513s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Space_Separator.js` | `2` | `2.104s` | `1.060s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Paragraph_Separator.js` | `2` | `1.971s` | `1.001s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Phags_Pa.js` | `2` | `1.920s` | `0.965s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Phoenician.js` | `2` | `1.899s` | `0.963s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js` | `2` | `1.898s` | `0.973s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Old_Persian.js` | `2` | `1.888s` | `0.970s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Separator.js` | `2` | `1.869s` | `1.018s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js` | `2` | `1.860s` | `0.931s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js` | `2` | `1.859s` | `0.943s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js` | `2` | `1.839s` | `0.932s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js` | `2` | `1.829s` | `0.922s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js` | `2` | `1.818s` | `0.929s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Vai.js` | `2` | `1.798s` | `0.931s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Nko.js` | `2` | `1.794s` | `0.920s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js` | `2` | `1.793s` | `0.917s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Carian.js` | `2` | `1.784s` | `0.911s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mandaic.js` | `2` | `1.763s` | `0.895s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Deseret.js` | `2` | `1.762s` | `0.916s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Nag_Mundari.js` | `2` | `1.760s` | `0.939s` |
+| `staging/sm/Array/toSpliced-dense.js` | `2` | `13.779s` | `6.962s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `9.664s` | `4.858s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `9.461s` | `4.805s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js` | `2` | `4.320s` | `2.169s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js` | `2` | `3.068s` | `1.555s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Vai.js` | `2` | `2.146s` | `1.076s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Warang_Citi.js` | `2` | `2.140s` | `1.071s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Control.js` | `2` | `2.088s` | `1.075s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Zanabazar_Square.js` | `2` | `2.071s` | `1.063s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Titlecase_Letter.js` | `2` | `2.070s` | `1.040s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Space_Separator.js` | `2` | `2.064s` | `1.070s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Surrogate.js` | `2` | `2.027s` | `1.033s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Yi.js` | `2` | `2.012s` | `1.019s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Currency_Symbol.js` | `2` | `2.001s` | `1.001s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Wancho.js` | `2` | `1.992s` | `1.004s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Connector_Punctuation.js` | `2` | `1.984s` | `1.009s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Old_Persian.js` | `2` | `1.968s` | `1.012s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Bamum.js` | `2` | `1.966s` | `1.002s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Dogra.js` | `2` | `1.962s` | `0.996s` |
+| `built-ins/RegExp/property-escapes/generated/IDS_Binary_Operator.js` | `2` | `1.956s` | `1.015s` |
+| `built-ins/RegExp/property-escapes/generated/Hex_Digit.js` | `2` | `1.952s` | `1.021s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Ahom.js` | `2` | `1.949s` | `1.028s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Old_Sogdian.js` | `2` | `1.944s` | `0.987s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Old_South_Arabian.js` | `2` | `1.939s` | `1.024s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Armenian.js` | `2` | `1.938s` | `1.018s` |
 
 ### Slowest Variants
 
 | Test variant | Outcome | Time |
 | --- | --- | ---: |
-| `staging/sm/Array/toSpliced-dense.js [strict]` | `pass` | `6.481s` |
-| `staging/sm/Array/toSpliced-dense.js [non-strict]` | `pass` | `6.479s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `4.563s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `4.532s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `4.511s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `4.450s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js [non-strict]` | `pass` | `2.142s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js [strict]` | `pass` | `2.136s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]` | `pass` | `1.576s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]` | `pass` | `1.560s` |
-| `staging/sm/String/string-upper-lower-mapping.js [non-strict]` | `pass` | `1.513s` |
-| `staging/sm/String/string-upper-lower-mapping.js [strict]` | `pass` | `1.214s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Space_Separator.js [non-strict]` | `pass` | `1.060s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Space_Separator.js [strict]` | `pass` | `1.044s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Separator.js [non-strict]` | `pass` | `1.018s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Paragraph_Separator.js [strict]` | `pass` | `1.001s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js [strict]` | `pass` | `0.973s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Old_Persian.js [non-strict]` | `pass` | `0.970s` |
-| `built-ins/RegExp/property-escapes/generated/General_Category_-_Paragraph_Separator.js [non-strict]` | `pass` | `0.970s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Phags_Pa.js [strict]` | `pass` | `0.965s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Phoenician.js [strict]` | `pass` | `0.963s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Phags_Pa.js [non-strict]` | `pass` | `0.956s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Rejang.js [non-strict]` | `pass` | `0.947s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js [non-strict]` | `pass` | `0.943s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Nag_Mundari.js [strict]` | `pass` | `0.939s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Phoenician.js [non-strict]` | `pass` | `0.935s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js [strict]` | `pass` | `0.932s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js [non-strict]` | `pass` | `0.931s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Vai.js [non-strict]` | `pass` | `0.931s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js [non-strict]` | `pass` | `0.929s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js [strict]` | `pass` | `0.929s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js [non-strict]` | `pass` | `0.925s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js [strict]` | `pass` | `0.922s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Toto.js [strict]` | `pass` | `0.921s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Nko.js [non-strict]` | `pass` | `0.920s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Old_Persian.js [strict]` | `pass` | `0.918s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js [strict]` | `pass` | `0.917s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Deseret.js [strict]` | `pass` | `0.916s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js [strict]` | `pass` | `0.916s` |
-| `staging/sm/RegExp/unicode-braced.js [non-strict]` | `pass` | `0.913s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Carian.js [strict]` | `pass` | `0.911s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Linear_A.js [non-strict]` | `pass` | `0.910s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js [non-strict]` | `pass` | `0.907s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js [non-strict]` | `pass` | `0.907s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Cypro_Minoan.js [non-strict]` | `pass` | `0.904s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Manichaean.js [non-strict]` | `pass` | `0.903s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Myanmar.js [strict]` | `pass` | `0.903s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Old_Hungarian.js [strict]` | `pass` | `0.902s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Cyrillic.js [strict]` | `pass` | `0.901s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Caucasian_Albanian.js [non-strict]` | `pass` | `0.898s` |
+| `staging/sm/Array/toSpliced-dense.js [non-strict]` | `pass` | `6.962s` |
+| `staging/sm/Array/toSpliced-dense.js [strict]` | `pass` | `6.817s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `4.858s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `4.806s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `4.805s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `4.656s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js [strict]` | `pass` | `2.169s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js [non-strict]` | `pass` | `2.151s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]` | `pass` | `1.555s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]` | `pass` | `1.513s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Vai.js [strict]` | `pass` | `1.076s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Control.js [strict]` | `pass` | `1.075s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Warang_Citi.js [strict]` | `pass` | `1.071s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Vai.js [non-strict]` | `pass` | `1.070s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Space_Separator.js [non-strict]` | `pass` | `1.070s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Warang_Citi.js [non-strict]` | `pass` | `1.069s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Zanabazar_Square.js [strict]` | `pass` | `1.063s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Private_Use.js [non-strict]` | `pass` | `1.041s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Titlecase_Letter.js [non-strict]` | `pass` | `1.040s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Surrogate.js [strict]` | `pass` | `1.033s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Titlecase_Letter.js [strict]` | `pass` | `1.030s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Ahom.js [non-strict]` | `pass` | `1.028s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Old_South_Arabian.js [non-strict]` | `pass` | `1.024s` |
+| `built-ins/RegExp/property-escapes/generated/Hex_Digit.js [strict]` | `pass` | `1.021s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Yi.js [non-strict]` | `pass` | `1.019s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Armenian.js [strict]` | `pass` | `1.018s` |
+| `built-ins/RegExp/property-escapes/generated/IDS_Binary_Operator.js [non-strict]` | `pass` | `1.015s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Control.js [non-strict]` | `pass` | `1.013s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Old_Persian.js [non-strict]` | `pass` | `1.012s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Connector_Punctuation.js [strict]` | `pass` | `1.009s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Zanabazar_Square.js [non-strict]` | `pass` | `1.008s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Avestan.js [non-strict]` | `pass` | `1.006s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Wancho.js [non-strict]` | `pass` | `1.004s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Bamum.js [non-strict]` | `pass` | `1.002s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Currency_Symbol.js [non-strict]` | `pass` | `1.001s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Currency_Symbol.js [strict]` | `pass` | `1.000s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Dogra.js [non-strict]` | `pass` | `0.996s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Surrogate.js [non-strict]` | `pass` | `0.994s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Space_Separator.js [strict]` | `pass` | `0.994s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Yi.js [strict]` | `pass` | `0.994s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Wancho.js [strict]` | `pass` | `0.988s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Old_Sogdian.js [non-strict]` | `pass` | `0.987s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Decimal_Number.js [non-strict]` | `pass` | `0.983s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Nandinagari.js [non-strict]` | `pass` | `0.981s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Anatolian_Hieroglyphs.js [non-strict]` | `pass` | `0.980s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Bassa_Vah.js [non-strict]` | `pass` | `0.979s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Connector_Punctuation.js [non-strict]` | `pass` | `0.976s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mandaic.js [strict]` | `pass` | `0.975s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Carian.js [strict]` | `pass` | `0.972s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Cham.js [non-strict]` | `pass` | `0.966s` |
 
 ## Skip Breakdown
 

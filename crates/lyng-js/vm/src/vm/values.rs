@@ -667,14 +667,17 @@ impl Vm {
         agent: &mut Agent,
         realm: RealmRef,
         constant: ConstantValue,
-        atom_texts: &[(AtomId, CompiledAtom)],
+        compiled_atoms_by_id: &[Option<&CompiledAtom>],
         canonical_atoms: &[Option<AtomId>],
     ) -> Option<Value> {
         match constant {
             ConstantValue::Smi(value) => Some(Value::from_smi(value)),
             ConstantValue::Float64Bits(bits) => Some(Value::from_f64(f64::from_bits(bits))),
             ConstantValue::Atom(atom) => {
-                let compiled_atom = lookup_compiled_atom(atom_texts, atom)?;
+                let compiled_atom = compiled_atoms_by_id
+                    .get(usize::try_from(atom.raw()).unwrap_or(usize::MAX))
+                    .copied()
+                    .flatten()?;
                 let atom = canonical_atoms
                     .get(usize::try_from(atom.raw()).unwrap_or(usize::MAX))
                     .copied()
@@ -1066,16 +1069,6 @@ fn alloc_utf16_string(
         atom,
         AllocationLifetime::Default,
     )
-}
-
-#[inline]
-fn lookup_compiled_atom(
-    atom_texts: &[(AtomId, CompiledAtom)],
-    atom: AtomId,
-) -> Option<&CompiledAtom> {
-    atom_texts
-        .iter()
-        .find_map(|(candidate, text)| (*candidate == atom).then_some(text))
 }
 
 #[inline]
