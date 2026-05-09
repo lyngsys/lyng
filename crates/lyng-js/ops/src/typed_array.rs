@@ -115,23 +115,33 @@ pub fn is_valid_integer_index(
     record: TypedArrayObjectData,
     element_index: usize,
 ) -> bool {
-    let Some(length) = current_length(agent, record) else {
-        return false;
-    };
-    if element_index >= length {
-        return false;
-    }
+    valid_integer_index_byte_start(agent, record, element_index).is_some()
+}
+
+pub fn valid_integer_index_byte_start(
+    agent: &Agent,
+    record: TypedArrayObjectData,
+    element_index: usize,
+) -> Option<usize> {
     let element_size = record.kind().bytes_per_element();
-    let Some(element_end) = element_index
-        .checked_add(1)
-        .and_then(|end| end.checked_mul(element_size))
-        .and_then(|byte_count| record.byte_offset().checked_add(byte_count))
-    else {
-        return false;
-    };
-    agent
-        .backing_store_byte_length(record.backing_store())
-        .is_some_and(|byte_length| element_end <= byte_length)
+    let relative_start = element_index.checked_mul(element_size)?;
+    let start = record.byte_offset().checked_add(relative_start)?;
+    let element_end = start.checked_add(element_size)?;
+    let byte_length = agent.backing_store_byte_length(record.backing_store())?;
+    if record.is_length_tracking() {
+        if record.byte_offset() > byte_length || element_end > byte_length {
+            return None;
+        }
+        return Some(start);
+    }
+    if element_index >= record.length() {
+        return None;
+    }
+    let view_end = record.byte_offset().checked_add(record.byte_length())?;
+    if view_end > byte_length || element_end > byte_length {
+        return None;
+    }
+    Some(start)
 }
 
 pub fn read_storage_bits(
@@ -139,13 +149,8 @@ pub fn read_storage_bits(
     record: TypedArrayObjectData,
     element_index: usize,
 ) -> Option<u64> {
-    if !is_valid_integer_index(agent, record, element_index) {
-        return None;
-    }
     let element_size = record.kind().bytes_per_element();
-    let start = record
-        .byte_offset()
-        .checked_add(element_index.checked_mul(element_size)?)?;
+    let start = valid_integer_index_byte_start(agent, record, element_index)?;
     agent.backing_store_load_bits(record.backing_store(), start, element_size)
 }
 
@@ -155,14 +160,8 @@ pub fn write_storage_bits(
     element_index: usize,
     bits: u64,
 ) -> bool {
-    if !is_valid_integer_index(agent, record, element_index) {
-        return false;
-    }
     let element_size = record.kind().bytes_per_element();
-    let Some(start) = element_index
-        .checked_mul(element_size)
-        .and_then(|relative| record.byte_offset().checked_add(relative))
-    else {
+    let Some(start) = valid_integer_index_byte_start(agent, record, element_index) else {
         return false;
     };
     agent.backing_store_store_bits(record.backing_store(), start, element_size, bits)

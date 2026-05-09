@@ -230,6 +230,7 @@ impl Vm {
 
     #[expect(
         clippy::too_many_arguments,
+        clippy::too_many_lines,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
     pub(super) fn execute_get_keyed_property_opcode(
@@ -248,6 +249,29 @@ impl Vm {
         let Some(()) = self.handle_vm_result(agent, coercible_result)? else {
             return Ok(());
         };
+        if let Some(object) = receiver.as_object_ref()
+            && let Some(index) = key_value
+                .as_smi()
+                .and_then(|index| u32::try_from(index).ok())
+        {
+            let value = if let Some(result) = self.mapped_arguments_get(agent, object, index) {
+                let Some(value) = self.handle_vm_result(agent, result)? else {
+                    return Ok(());
+                };
+                Some(value)
+            } else if let Some(value) = Self::try_fast_typed_array_index_value(agent, object, index)
+            {
+                Some(value)
+            } else {
+                Self::try_fast_own_index_value(agent, object, index)?
+            };
+            if let Some(value) = value {
+                self.observe_keyed_index_slow_path(frame.code(), frame.instruction_offset());
+                self.write_register(frame, target, value)?;
+                self.advance_instruction();
+                return Ok(());
+            }
+        }
         let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
         let Some(key) = self.handle_vm_result(agent, key_result)? else {
             return Ok(());
@@ -258,6 +282,10 @@ impl Vm {
                     let Some(value) = self.handle_vm_result(agent, result)? else {
                         return Ok(());
                     };
+                    value
+                } else if let Some(value) =
+                    Self::try_fast_typed_array_index_value(agent, object, index)
+                {
                     value
                 } else if let Some(value) = Self::try_fast_own_index_value(agent, object, index)? {
                     value
@@ -348,6 +376,59 @@ impl Vm {
         let Some(()) = self.handle_vm_result(agent, coercible_result)? else {
             return Ok(());
         };
+        if let Some(object) = receiver.as_object_ref()
+            && let Some(index) = key_value
+                .as_smi()
+                .and_then(|index| u32::try_from(index).ok())
+        {
+            let mut used_index_fast_path = false;
+            let stored =
+                if let Some(result) = self.mapped_arguments_set(agent, object, index, value) {
+                    let Some(()) = self.handle_vm_result(agent, result)? else {
+                        return Ok(());
+                    };
+                    Some(true)
+                } else {
+                    let fast_result = self.try_fast_set_typed_array_index(
+                        agent, host, registry, frame, object, index, value,
+                    );
+                    let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
+                        return Ok(());
+                    };
+                    if let Some(stored) = fast_result {
+                        used_index_fast_path = true;
+                        Some(stored)
+                    } else {
+                        let fast_result =
+                            Self::try_fast_set_engine_array_index(agent, object, index, value);
+                        let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
+                            return Ok(());
+                        };
+                        fast_result.inspect(|_| {
+                            used_index_fast_path = true;
+                        })
+                    }
+                };
+            if let Some(stored) = stored {
+                if assignment {
+                    let assignment_result = self.check_property_assignment_result(
+                        agent,
+                        frame,
+                        stored,
+                        strict_assignment,
+                    );
+                    let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                        return Ok(());
+                    };
+                }
+                if !used_index_fast_path {
+                    Self::sync_engine_array_length(agent, object)?;
+                    self.observe_keyed_index_slow_path(frame.code(), frame.instruction_offset());
+                }
+                self.advance_instruction();
+                return Ok(());
+            }
+        }
         let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
         let Some(key) = self.handle_vm_result(agent, key_result)? else {
             return Ok(());
@@ -355,12 +436,23 @@ impl Vm {
         if let Some(object) = receiver.as_object_ref() {
             if let Some(index) = key.as_index() {
                 let mut used_index_fast_path = false;
-                let stored =
-                    if let Some(result) = self.mapped_arguments_set(agent, object, index, value) {
-                        let Some(()) = self.handle_vm_result(agent, result)? else {
-                            return Ok(());
-                        };
-                        true
+                let stored = if let Some(result) =
+                    self.mapped_arguments_set(agent, object, index, value)
+                {
+                    let Some(()) = self.handle_vm_result(agent, result)? else {
+                        return Ok(());
+                    };
+                    true
+                } else {
+                    let fast_result = self.try_fast_set_typed_array_index(
+                        agent, host, registry, frame, object, index, value,
+                    );
+                    let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
+                        return Ok(());
+                    };
+                    if let Some(stored) = fast_result {
+                        used_index_fast_path = true;
+                        stored
                     } else {
                         let fast_result =
                             Self::try_fast_set_engine_array_index(agent, object, index, value);
@@ -379,7 +471,8 @@ impl Vm {
                             };
                             stored
                         }
-                    };
+                    }
+                };
                 if assignment {
                     let assignment_result = self.check_property_assignment_result(
                         agent,

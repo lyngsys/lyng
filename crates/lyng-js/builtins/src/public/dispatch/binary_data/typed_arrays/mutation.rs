@@ -197,6 +197,80 @@ fn counting_sort_typed_array_default_elements(
     true
 }
 
+fn counting_sort_typed_array_default_record<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    record: lyng_js_objects::TypedArrayObjectData,
+) -> Result<bool, Cx::Error> {
+    let range = match record.kind() {
+        TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => 1_usize << 16,
+        _ => return Ok(false),
+    };
+    let Some(length) = typed_array_current_length(cx.agent(), record) else {
+        return Ok(true);
+    };
+    let mut counts = vec![0_usize; range];
+    let element_size = record.kind().bytes_per_element();
+    let mut read_byte_start = if length == 0 {
+        0
+    } else {
+        typed_array_element_byte_start(cx, record, 0)?
+    };
+    for _ in 0..length {
+        let bits = cx
+            .agent()
+            .backing_store_load_bits(record.backing_store(), read_byte_start, element_size)
+            .unwrap_or(0);
+        counts[usize::from(typed_array_storage_u16_bits(bits))] += 1;
+        read_byte_start = read_byte_start
+            .checked_add(element_size)
+            .ok_or_else(|| range_error(cx))?;
+    }
+
+    let mut write_byte_start = if length == 0 {
+        0
+    } else {
+        typed_array_element_byte_start(cx, record, 0)?
+    };
+    match record.kind() {
+        TypedArrayElementKind::Int16 => {
+            for (key, count) in counts.iter().copied().enumerate().skip(1_usize << 15) {
+                for _ in 0..count {
+                    typed_array_write_next_storage_bits(
+                        cx,
+                        record,
+                        &mut write_byte_start,
+                        u64::try_from(key).expect("16-bit counting-sort key should fit u64"),
+                    )?;
+                }
+            }
+            for (key, count) in counts.iter().copied().enumerate().take(1_usize << 15) {
+                for _ in 0..count {
+                    typed_array_write_next_storage_bits(
+                        cx,
+                        record,
+                        &mut write_byte_start,
+                        u64::try_from(key).expect("16-bit counting-sort key should fit u64"),
+                    )?;
+                }
+            }
+        }
+        TypedArrayElementKind::Uint16 => {
+            for (key, count) in counts.iter().copied().enumerate() {
+                for _ in 0..count {
+                    typed_array_write_next_storage_bits(
+                        cx,
+                        record,
+                        &mut write_byte_start,
+                        u64::try_from(key).expect("16-bit counting-sort key should fit u64"),
+                    )?;
+                }
+            }
+        }
+        _ => unreachable!("counting sort range should only be selected for 16-bit integer arrays"),
+    }
+    Ok(true)
+}
+
 fn sort_typed_array_compare_elements<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     kind: TypedArrayElementKind,
@@ -296,6 +370,9 @@ fn typed_array_sort_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         value if value.is_undefined() => None,
         value => Some(cx.require_callable_object(value)?),
     };
+    if compare_fn.is_none() && counting_sort_typed_array_default_record(cx, record)? {
+        return Ok(invocation.this_value());
+    }
     let mut elements = typed_array_snapshot_storage_bits(cx.agent(), record);
     if let Some(compare_fn) = compare_fn {
         sort_typed_array_compare_elements(cx, record.kind(), compare_fn, &mut elements)?;
@@ -444,9 +521,14 @@ fn typed_array_fill_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
     let current_length =
         typed_array_current_length(cx.agent(), record).ok_or_else(|| type_error(cx))?;
     let end = end.min(u64::try_from(current_length).unwrap_or(u64::MAX));
-    for index in start..end {
-        let index = usize::try_from(index).map_err(|_| range_error(cx))?;
-        typed_array_write_storage_bits(cx, record, index, fill_bits)?;
+    let start = usize::try_from(start).map_err(|_| range_error(cx))?;
+    let end = usize::try_from(end).map_err(|_| range_error(cx))?;
+    if start >= end {
+        return Ok(invocation.this_value());
+    }
+    let mut byte_start = typed_array_element_byte_start(cx, record, start)?;
+    for _ in start..end {
+        typed_array_write_next_storage_bits(cx, record, &mut byte_start, fill_bits)?;
     }
     Ok(invocation.this_value())
 }
@@ -517,6 +599,47 @@ fn typed_array_copy_within_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         }
     }
     Ok(invocation.this_value())
+}
+
+fn typed_array_element_byte_start<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    record: lyng_js_objects::TypedArrayObjectData,
+    index: usize,
+) -> Result<usize, Cx::Error> {
+    index
+        .checked_mul(record.kind().bytes_per_element())
+        .and_then(|offset| record.byte_offset().checked_add(offset))
+        .ok_or_else(|| range_error(cx))
+}
+
+fn typed_array_write_storage_bits_at_byte_start<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    record: lyng_js_objects::TypedArrayObjectData,
+    byte_start: usize,
+    bits: u64,
+) -> Result<(), Cx::Error> {
+    if !cx.agent().backing_store_store_bits(
+        record.backing_store(),
+        byte_start,
+        record.kind().bytes_per_element(),
+        bits,
+    ) {
+        return Err(range_error(cx));
+    }
+    Ok(())
+}
+
+fn typed_array_write_next_storage_bits<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    record: lyng_js_objects::TypedArrayObjectData,
+    byte_start: &mut usize,
+    bits: u64,
+) -> Result<(), Cx::Error> {
+    typed_array_write_storage_bits_at_byte_start(cx, record, *byte_start, bits)?;
+    *byte_start = byte_start
+        .checked_add(record.kind().bytes_per_element())
+        .ok_or_else(|| range_error(cx))?;
+    Ok(())
 }
 
 fn uint8_array_set_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(

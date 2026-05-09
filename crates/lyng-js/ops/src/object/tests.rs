@@ -421,6 +421,61 @@ fn typed_array_shared_storage_helpers_convert_and_validate_live_views() {
 }
 
 #[test]
+fn typed_array_valid_integer_index_byte_start_reuses_view_bounds() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let typed_array = install_test_uint8_array(agent, &[1, 2, 3, 4]);
+    let record = agent
+        .objects()
+        .typed_array(typed_array)
+        .expect("test typed array should install its view record");
+
+    assert_eq!(
+        crate::typed_array::valid_integer_index_byte_start(agent, record, 2),
+        Some(2)
+    );
+
+    assert!(agent.backing_store_resize(record.backing_store(), 2));
+    assert_eq!(
+        crate::typed_array::valid_integer_index_byte_start(agent, record, 0),
+        None
+    );
+}
+
+#[test]
+fn typed_array_valid_integer_index_byte_start_tracks_resizable_views() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let typed_array = install_test_uint8_array(agent, &[1, 2, 3, 4]);
+    let record = agent
+        .objects()
+        .typed_array(typed_array)
+        .expect("test typed array should install its view record");
+    let tracking_record = TypedArrayObjectData::new_length_tracking(
+        record.viewed_array_buffer(),
+        record.backing_store(),
+        1,
+        0,
+        TypedArrayElementKind::Uint8,
+    );
+
+    assert_eq!(
+        crate::typed_array::valid_integer_index_byte_start(agent, tracking_record, 2),
+        Some(3)
+    );
+    assert_eq!(
+        crate::typed_array::valid_integer_index_byte_start(agent, tracking_record, 3),
+        None
+    );
+
+    assert!(agent.backing_store_resize(record.backing_store(), 2));
+    assert_eq!(
+        crate::typed_array::valid_integer_index_byte_start(agent, tracking_record, 1),
+        None
+    );
+}
+
+#[test]
 fn typed_array_index_reads_hide_fixed_length_view_after_backing_store_shrink() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();

@@ -1075,6 +1075,45 @@ impl Vm {
             .map_err(|_| VmError::Abrupt(errors::throw_type_error(agent)))
     }
 
+    pub(super) fn try_fast_typed_array_index_value(
+        agent: &mut Agent,
+        object: ObjectRef,
+        index: u32,
+    ) -> Option<Value> {
+        let record = agent.objects().typed_array(object)?;
+        let index = usize::try_from(index).expect("u32 index should fit into usize");
+        Some(typed_array::read_element_value(agent, record, index))
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    pub(super) fn try_fast_set_typed_array_index(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        object: ObjectRef,
+        index: u32,
+        value: Value,
+    ) -> VmResult<Option<bool>> {
+        if agent.objects().typed_array(object).is_none() {
+            return Ok(None);
+        }
+        self.set_typed_array_numeric_index(
+            agent,
+            host,
+            registry,
+            caller,
+            object,
+            f64::from(index),
+            value,
+        )
+        .map(Some)
+    }
+
     pub(super) fn define_property_on_object(
         &mut self,
         agent: &mut Agent,
@@ -1472,10 +1511,17 @@ impl Vm {
         else {
             return Ok(true);
         };
-        if !typed_array::is_valid_integer_index(agent, typed_array, element_index) {
+        let Some(start) =
+            typed_array::valid_integer_index_byte_start(agent, typed_array, element_index)
+        else {
             return Ok(true);
-        }
-        if !typed_array::write_storage_bits(agent, typed_array, element_index, bits) {
+        };
+        if !agent.backing_store_store_bits(
+            typed_array.backing_store(),
+            start,
+            typed_array.kind().bytes_per_element(),
+            bits,
+        ) {
             return Ok(false);
         }
         Ok(true)
