@@ -2,8 +2,9 @@ use std::time::Duration;
 
 use lyng_js_bench::test262::{
     aggregate_sampled_variants, cause_hints_for_aggregate, parse_options_for_test,
-    render_json_report, render_markdown_report, Test262Aggregate, Test262Mode, Test262Options,
-    Test262PhaseTimings, Test262Sample, Test262VariantDiagnostics, Test262VariantIdentity,
+    render_json_report, render_markdown_report, render_profile_counter_summary, Test262Aggregate,
+    Test262Mode, Test262Options, Test262PhaseTimings, Test262Sample, Test262VariantDiagnostics,
+    Test262VariantIdentity,
 };
 use serde_json::json;
 
@@ -240,4 +241,94 @@ fn test262_options_support_named_smoke_preset() {
         options.filter.as_deref(),
         Some("staging/sm/Date/dst-offset-caching-2-of-8")
     );
+}
+
+#[test]
+fn test262_profile_target_preset_enables_single_target_profiler_loop() {
+    let options = parse_options_for_test(&[
+        "--preset".to_string(),
+        "profile-target".to_string(),
+        "--filter".to_string(),
+        "staging/sm/Date/dst-offset-caching-2-of-8".to_string(),
+    ])
+    .expect("test262 profile-target preset should parse");
+
+    assert_eq!(options.mode, Test262Mode::Sample);
+    assert_eq!(options.samples, 1);
+    assert_eq!(options.warmup_samples, 0);
+    assert_eq!(options.sample_files, 1);
+    assert_eq!(options.jobs, 1);
+    assert_eq!(options.timeout_ms, 10_000);
+    assert_eq!(options.profile_loop_ms, Some(30_000));
+    assert!(!options.print_counters);
+}
+
+#[test]
+fn test262_profile_flags_render_settings_and_available_counters() {
+    let options = parse_options_for_test(&[
+        "--preset".to_string(),
+        "smoke".to_string(),
+        "--profile-loop-ms".to_string(),
+        "1500".to_string(),
+        "--print-counters".to_string(),
+    ])
+    .expect("test262 profile flags should parse");
+    let aggregate = Test262Aggregate {
+        identity: Test262VariantIdentity {
+            file: "staging/sm/Date/dst-offset-caching-2-of-8.js".to_string(),
+            variant: Some("non-strict".to_string()),
+            category: "staging".to_string(),
+            flags: Vec::new(),
+            features: Vec::new(),
+            includes: Vec::new(),
+            negative_phase: None,
+            async_test: false,
+            module_goal: false,
+            timeout_ms: 10_000,
+        },
+        samples: vec![Test262Sample {
+            outcome: "pass".to_string(),
+            timings: Test262PhaseTimings {
+                script_install: Duration::from_millis(12),
+                bytecode_execution: Duration::from_millis(34),
+                job_checkpoint: Duration::from_millis(1),
+                evaluation: Duration::from_millis(47),
+                total: Duration::from_millis(55),
+                ..Test262PhaseTimings::default()
+            },
+            diagnostics: Some(Test262VariantDiagnostics {
+                function_count: 7,
+                instruction_words: 321,
+                feedback_slots: 19,
+                live_feedback_sites: 13,
+                megamorphic_sites: 3,
+                tier_hotness: 99,
+                runtime_live_bytes_delta: 2048,
+                ..Test262VariantDiagnostics::default()
+            }),
+        }],
+        median_total: Duration::from_millis(55),
+        min_total: Duration::from_millis(55),
+        max_total: Duration::from_millis(55),
+        median_evaluation: Duration::from_millis(47),
+        dominant_phase: "bytecode_execution".to_string(),
+        cause_hints: vec!["bytecode execution dominated".to_string()],
+    };
+
+    let markdown = render_markdown_report(&options, std::slice::from_ref(&aggregate), None);
+    assert!(markdown.contains("- Profile loop: `1500ms`"));
+    assert!(markdown.contains("- Print counters: `true`"));
+
+    let json = render_json_report(&options, std::slice::from_ref(&aggregate), None);
+    assert_eq!(json["settings"]["profile_loop_ms"], 1500.0);
+    assert_eq!(json["settings"]["print_counters"], true);
+
+    let counters = render_profile_counter_summary(&aggregate);
+    assert!(counters.contains("staging/sm/Date/dst-offset-caching-2-of-8.js [non-strict]"));
+    assert!(counters.contains("bytecode_execution_ms=34.000"));
+    assert!(counters.contains("function_count=7"));
+    assert!(counters.contains("instruction_words=321"));
+    assert!(counters.contains("feedback_slots=19"));
+    assert!(counters.contains("megamorphic_sites=3"));
+    assert!(counters.contains("runtime_live_bytes_delta=2048"));
 }

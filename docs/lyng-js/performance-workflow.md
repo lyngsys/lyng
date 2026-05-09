@@ -95,6 +95,88 @@ cargo run --release -p lyng-js-bench -- test262 \
 Use one JSON path per target group. Keep the path stable across before and after runs.
 If timing variance is high, increase samples before drawing conclusions.
 
+## Profiler Targets
+
+Use `profile-target` when a target needs stable wall-clock time for profiler attachment.
+The preset keeps the sampled target count to one and then runs the selected slowest
+variant in a separate profile loop. That loop is intentionally not folded back into the
+Markdown or JSON medians.
+
+```sh
+cargo build --release -p lyng-js-bench
+
+target/release/lyng-js-bench test262 \
+  --preset profile-target \
+  --filter staging/sm/Date/dst-offset-caching-2-of-8 \
+  --report /tmp/lyng-js-test262-profile.md \
+  --json /tmp/lyng-js-test262-profile.json \
+  --profile-loop-ms 30000 \
+  --print-counters
+```
+
+For macOS `sample`, launch the workload directly from the release binary, then attach to
+the profile loop:
+
+```sh
+target/release/lyng-js-bench test262 \
+  --preset profile-target \
+  --filter staging/sm/Date/dst-offset-caching-2-of-8 \
+  --report /tmp/lyng-js-test262-profile.md \
+  --json /tmp/lyng-js-test262-profile.json \
+  --profile-loop-ms 30000 \
+  --print-counters &
+bench_pid=$!
+sample "$bench_pid" 10 -file /tmp/lyng-js-test262-profile.sample.txt
+wait "$bench_pid"
+```
+
+For macOS `xctrace`, record the same release binary command under the Time Profiler
+template:
+
+```sh
+xcrun xctrace record \
+  --template 'Time Profiler' \
+  --output /tmp/lyng-js-test262-profile.trace \
+  --launch -- \
+  target/release/lyng-js-bench test262 \
+    --preset profile-target \
+    --filter staging/sm/Date/dst-offset-caching-2-of-8 \
+    --report /tmp/lyng-js-test262-profile.md \
+    --json /tmp/lyng-js-test262-profile.json \
+    --profile-loop-ms 30000 \
+    --print-counters
+```
+
+Use the runtime and density profile presets when Test262 is too broad or the suspected
+path is already represented by an in-repo workload:
+
+```sh
+target/release/lyng-js-bench runtime \
+  --preset profile-target \
+  --report /tmp/lyng-js-runtime-profile.md \
+  --json /tmp/lyng-js-runtime-profile.json
+
+target/release/lyng-js-bench density \
+  --preset profile-target \
+  --report /tmp/lyng-js-density-profile.md \
+  --json /tmp/lyng-js-density-profile.json
+```
+
+When profiler tooling is unavailable, use a plain release timing loop and compare the
+stable JSON report path before and after the change:
+
+```sh
+for run in 1 2 3 4 5; do
+  time target/release/lyng-js-bench test262 \
+    --preset inner-loop \
+    --filter staging/sm/Date/dst-offset-caching-2-of-8 \
+    --report /tmp/lyng-js-test262-profile.md \
+    --json /tmp/lyng-js-test262-profile.json \
+    --sample-files 1 \
+    -j 1
+done
+```
+
 ## Wider Sweep
 
 Use a filtered sweep when one family has many candidate files:
@@ -164,6 +246,8 @@ The JSON report is the handoff and regression source. Useful fields are:
 - `aggregates[].samples[].diagnostics.live_feedback_sites`
 - `aggregates[].samples[].diagnostics.megamorphic_sites`
 - `aggregates[].samples[].diagnostics.runtime_live_bytes_delta`
+- `settings.profile_loop_ms`
+- `settings.print_counters`
 
 The broad `install_or_load_ms` and `evaluation_ms` fields remain for compatibility with
 existing report consumers. For runtime bottleneck selection, prefer the refined setup and

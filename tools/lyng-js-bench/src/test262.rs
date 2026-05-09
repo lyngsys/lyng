@@ -1,9 +1,10 @@
 use std::fmt::Write as _;
 use std::fs;
+use std::hint::black_box;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use lyng_js_test262::{
     prepare_diagnostic_suite, Test262DiagnosticConfig, Test262DiagnosticOutcome,
@@ -28,6 +29,8 @@ pub struct Test262Options {
     pub sample_files: usize,
     pub jobs: usize,
     pub timeout_ms: u64,
+    pub profile_loop_ms: Option<u64>,
+    pub print_counters: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,6 +66,8 @@ impl Test262Options {
             sample_files: 25,
             jobs: 1,
             timeout_ms: 1_000,
+            profile_loop_ms: None,
+            print_counters: false,
         }
     }
 }
@@ -183,11 +188,11 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let scan = run_scan(&suite, options.jobs)?;
     let sampled = match options.mode {
         Test262Mode::Scan => scan
-            .into_iter()
+            .iter()
             .map(|outcome| {
                 (
-                    identity_from_outcome(&outcome),
-                    vec![sample_from_outcome(&outcome)],
+                    identity_from_outcome(outcome),
+                    vec![sample_from_outcome(outcome)],
                 )
             })
             .collect::<Vec<_>>(),
@@ -204,6 +209,21 @@ pub fn run(args: &[String]) -> Result<(), String> {
             .map_err(|error| format!("failed to render JSON report: {error}"))?,
     )?;
     print_summary(&options, &aggregates);
+    if options.print_counters {
+        if let Some(aggregate) = aggregates.first() {
+            eprintln!("{}", render_profile_counter_summary(aggregate));
+        } else {
+            eprintln!("Profile counters: no sampled Test262 variant available");
+        }
+    }
+    if let Some(profile_loop_ms) = options.profile_loop_ms {
+        run_profile_loop(
+            &suite,
+            &scan,
+            &aggregates,
+            Duration::from_millis(profile_loop_ms),
+        )?;
+    }
     Ok(())
 }
 
@@ -249,6 +269,12 @@ fn parse_options(args: &[String]) -> Result<Test262Options, String> {
             "--timeout-ms" => {
                 options.timeout_ms = parse_u64("--timeout-ms", args.next())?.max(1);
             }
+            "--profile-loop-ms" => {
+                options.profile_loop_ms = Some(parse_u64("--profile-loop-ms", args.next())?);
+            }
+            "--print-counters" => {
+                options.print_counters = true;
+            }
             "--jobs" | "-j" => {
                 options.jobs = parse_usize(arg, args.next())?.max(1);
             }
@@ -268,6 +294,9 @@ fn parse_options(args: &[String]) -> Result<Test262Options, String> {
     if options.sample_files == 0 {
         return Err("--sample-files must be greater than zero".to_string());
     }
+    if matches!(options.profile_loop_ms, Some(0)) {
+        return Err("--profile-loop-ms must be greater than zero".to_string());
+    }
     Ok(options)
 }
 
@@ -282,7 +311,7 @@ pub fn parse_options_for_test(args: &[String]) -> Result<Test262Options, String>
 
 fn usage() -> String {
     [
-        "Usage: lyng-js-bench test262 [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--filter <path-or-fragment>] [--report <path>] [--json <path>] [--mode hybrid|scan|sample] [--samples <n>] [--warmup-samples <n>] [--sample-files <n>] [--manifest <path>] [--proposal-stage <4|3|2.7>] [--no-skip] [--timeout-ms <N>] [-j <N>]",
+        "Usage: lyng-js-bench test262 [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--filter <path-or-fragment>] [--report <path>] [--json <path>] [--mode hybrid|scan|sample] [--samples <n>] [--warmup-samples <n>] [--sample-files <n>] [--manifest <path>] [--proposal-stage <4|3|2.7>] [--no-skip] [--timeout-ms <N>] [--profile-loop-ms <N>] [--print-counters] [-j <N>]",
         "",
         "Runs Test262 performance diagnostics for agent triage.",
     ]
@@ -325,7 +354,9 @@ fn apply_preset(options: &mut Test262Options, preset: &str) -> Result<(), String
             options.samples = 1;
             options.warmup_samples = 0;
             options.sample_files = 1;
+            options.jobs = 1;
             options.timeout_ms = 10_000;
+            options.profile_loop_ms = Some(30_000);
         }
         _ => {
             return Err(format!(
@@ -446,6 +477,47 @@ fn run_sampled_variants(
     Ok(selected)
 }
 
+fn run_profile_loop(
+    suite: &Test262DiagnosticSuite,
+    scan: &[Test262DiagnosticOutcome],
+    aggregates: &[Test262Aggregate],
+    minimum_duration: Duration,
+) -> Result<(), String> {
+    let Some((target_index, target_name)) = profile_target(scan, aggregates) else {
+        eprintln!("Profile loop skipped: no sampled Test262 variant available");
+        return Ok(());
+    };
+
+    eprintln!(
+        "Profile loop target: `{target_name}` for at least {}",
+        format_duration(minimum_duration)
+    );
+    let started = Instant::now();
+    let mut iterations = 0usize;
+    while iterations == 0 || started.elapsed() < minimum_duration {
+        let outcome = suite.run_diagnostic(target_index)?;
+        black_box(outcome);
+        iterations += 1;
+    }
+    eprintln!(
+        "Profile loop completed: target=`{target_name}` iterations={iterations} elapsed={}",
+        format_duration(started.elapsed())
+    );
+    Ok(())
+}
+
+fn profile_target(
+    scan: &[Test262DiagnosticOutcome],
+    aggregates: &[Test262Aggregate],
+) -> Option<(usize, String)> {
+    let aggregate_identity = &aggregates.first()?.identity;
+    let outcome = scan.iter().find(|outcome| {
+        outcome.identity.file == aggregate_identity.file
+            && outcome.identity.variant == aggregate_identity.variant
+    })?;
+    Some((outcome.identity.index, aggregate_identity.display_name()))
+}
+
 fn identity_from_outcome(outcome: &Test262DiagnosticOutcome) -> Test262VariantIdentity {
     Test262VariantIdentity {
         file: outcome.identity.file.clone(),
@@ -538,6 +610,13 @@ fn print_summary(options: &Test262Options, aggregates: &[Test262Aggregate]) {
     }
     println!("Markdown report:      {}", options.report_path);
     println!("JSON report:          {}", options.json_path);
+    println!(
+        "Profile loop:         {}",
+        options.profile_loop_ms.map_or_else(
+            || "disabled".to_string(),
+            |ms| format_duration(Duration::from_millis(ms)),
+        )
+    );
 }
 
 #[must_use]
@@ -691,13 +770,7 @@ pub fn render_markdown_report(
     );
     let _ = writeln!(out);
     let _ = writeln!(out, "## Settings");
-    let _ = writeln!(out);
-    let _ = writeln!(out, "- Filter: `{filter}`");
-    let _ = writeln!(out, "- Samples: `{}`", options.samples);
-    let _ = writeln!(out, "- Warmup samples: `{}`", options.warmup_samples);
-    let _ = writeln!(out, "- Sample files: `{}`", options.sample_files);
-    let _ = writeln!(out, "- Jobs: `{}`", options.jobs);
-    let _ = writeln!(out, "- JSON: `{}`", options.json_path);
+    write_markdown_settings(&mut out, options, filter);
     let _ = writeln!(out);
     let _ = writeln!(out, "## Sampled Bottlenecks");
     let _ = writeln!(out);
@@ -774,6 +847,21 @@ pub fn render_markdown_report(
     out
 }
 
+fn write_markdown_settings(out: &mut String, options: &Test262Options, filter: &str) {
+    let _ = writeln!(out);
+    let _ = writeln!(out, "- Filter: `{filter}`");
+    let _ = writeln!(out, "- Samples: `{}`", options.samples);
+    let _ = writeln!(out, "- Warmup samples: `{}`", options.warmup_samples);
+    let _ = writeln!(out, "- Sample files: `{}`", options.sample_files);
+    let _ = writeln!(out, "- Jobs: `{}`", options.jobs);
+    let profile_loop = options
+        .profile_loop_ms
+        .map_or_else(|| "disabled".to_string(), |ms| format!("{ms}ms"));
+    let _ = writeln!(out, "- Profile loop: `{profile_loop}`");
+    let _ = writeln!(out, "- Print counters: `{}`", options.print_counters);
+    let _ = writeln!(out, "- JSON: `{}`", options.json_path);
+}
+
 #[must_use]
 pub fn render_json_report(
     options: &Test262Options,
@@ -790,6 +878,8 @@ pub fn render_json_report(
             "sample_files": options.sample_files,
             "jobs": options.jobs,
             "timeout_ms": options.timeout_ms,
+            "profile_loop_ms": options.profile_loop_ms,
+            "print_counters": options.print_counters,
             "report_path": options.report_path,
             "json_path": options.json_path,
         },
@@ -881,6 +971,55 @@ fn diagnostics_json(diagnostics: &Test262VariantDiagnostics) -> Value {
         "runtime_live_bytes_after": diagnostics.runtime_live_bytes_after,
         "runtime_live_bytes_delta": diagnostics.runtime_live_bytes_delta,
     })
+}
+
+#[must_use]
+pub fn render_profile_counter_summary(aggregate: &Test262Aggregate) -> String {
+    let mut out = String::new();
+    let _ = write!(
+        out,
+        "Profile counters: target=\"{}\" dominant_phase={} median_total_ms={:.3} median_evaluation_ms={:.3}",
+        aggregate.identity.display_name(),
+        aggregate.dominant_phase,
+        duration_ms(aggregate.median_total),
+        duration_ms(aggregate.median_evaluation),
+    );
+    if let Some(sample) = aggregate
+        .samples
+        .iter()
+        .rev()
+        .find(|sample| sample.diagnostics.is_some())
+        .or_else(|| aggregate.samples.last())
+    {
+        let timings = &sample.timings;
+        let _ = write!(
+            out,
+            " script_install_ms={:.3} bytecode_execution_ms={:.3} job_checkpoint_ms={:.3} evaluation_ms={:.3} total_ms={:.3}",
+            duration_ms(timings.script_install),
+            duration_ms(timings.bytecode_execution),
+            duration_ms(timings.job_checkpoint),
+            duration_ms(timings.evaluation),
+            duration_ms(timings.total),
+        );
+        if let Some(diagnostics) = sample.diagnostics.as_ref() {
+            let _ = write!(
+                out,
+                " function_count={} instruction_words={} feedback_slots={} live_feedback_sites={} megamorphic_sites={} tier_hotness={} runtime_live_bytes_delta={}",
+                diagnostics.function_count,
+                diagnostics.instruction_words,
+                diagnostics.feedback_slots,
+                diagnostics.live_feedback_sites,
+                diagnostics.megamorphic_sites,
+                diagnostics.tier_hotness,
+                diagnostics.runtime_live_bytes_delta,
+            );
+        } else {
+            out.push_str(" counters=unavailable");
+        }
+    } else {
+        out.push_str(" samples=none counters=unavailable");
+    }
+    out
 }
 
 fn dominant_phase(samples: &[Test262Sample]) -> String {
