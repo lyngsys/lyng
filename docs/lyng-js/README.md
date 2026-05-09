@@ -22,6 +22,7 @@ top-level architecture note and the subsystem note for the area being changed.
 - [Bytecode And VM](bytecode-and-vm.md)
 - [Builtin Bootstrap](builtin-bootstrap.md)
 - [Dynamic Scope And Eval](dynamic-scope-and-eval.md)
+- [Performance Workflow](performance-workflow.md)
 
 ## Reports
 
