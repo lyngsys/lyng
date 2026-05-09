@@ -165,6 +165,63 @@ fn reports_deltas_from_previous_agent_json() {
 }
 
 #[test]
+fn refined_runtime_phases_drive_dominant_phase_and_reports() {
+    let options = Test262Options::default_for_test();
+    let identity = Test262VariantIdentity {
+        file: "staging/sm/Date/dst-offset-caching-2-of-8.js".to_string(),
+        variant: None,
+        category: "staging".to_string(),
+        flags: Vec::new(),
+        features: Vec::new(),
+        includes: Vec::new(),
+        negative_phase: None,
+        async_test: false,
+        module_goal: false,
+        timeout_ms: 3_000,
+    };
+    let aggregate = aggregate_sampled_variants(vec![(
+        identity,
+        vec![Test262Sample {
+            outcome: "pass".to_string(),
+            timings: Test262PhaseTimings {
+                script_install: Duration::from_millis(4),
+                realm_bootstrap: Duration::from_millis(6),
+                extension_install: Duration::from_millis(8),
+                global_instantiation: Duration::from_millis(10),
+                bytecode_execution: Duration::from_millis(120),
+                job_checkpoint: Duration::from_millis(12),
+                evaluation: Duration::from_millis(160),
+                total: Duration::from_millis(190),
+                ..Test262PhaseTimings::default()
+            },
+            diagnostics: None,
+        }],
+    )]);
+
+    assert_eq!(aggregate[0].dominant_phase, "bytecode_execution");
+    assert!(aggregate[0]
+        .cause_hints
+        .contains(&"bytecode execution dominated".to_string()));
+
+    let markdown = render_markdown_report(&options, &aggregate, None);
+    assert!(markdown.contains("bytecode_execution"));
+
+    let json = render_json_report(&options, &aggregate, None);
+    assert_eq!(
+        json["aggregates"][0]["samples"][0]["timings"]["bytecode_execution_ms"],
+        120.0
+    );
+    assert_eq!(
+        json["aggregates"][0]["samples"][0]["timings"]["job_checkpoint_ms"],
+        12.0
+    );
+    assert_eq!(
+        json["aggregates"][0]["samples"][0]["timings"]["evaluation_ms"],
+        160.0
+    );
+}
+
+#[test]
 fn test262_options_support_named_smoke_preset() {
     let options = parse_options_for_test(&[
         "--preset".to_string(),

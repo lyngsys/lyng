@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use lyng_js_builtins::BootstrapMode;
 use lyng_js_bytecode::CompiledScriptUnit;
 use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_compiler::compile_script;
@@ -21,7 +22,7 @@ use lyng_js_sema::{analyze_module, analyze_script};
 use lyng_js_types::{AbruptCompletion, CodeRef, ObjectRef, PropertyKey, Value};
 use lyng_js_vm::{
     FeedbackInlineCacheState, FeedbackSiteDetail, ModuleLoadError, SharedRealmExtensionProvider,
-    Vm, VmError,
+    Vm, VmError, VmEvaluationObserver,
 };
 
 use crate::diagnostics::{Test262DiagnosticTimings, Test262RuntimeDiagnostics};
@@ -159,6 +160,44 @@ enum ModuleExecutionError {
     Abrupt { actual_type: Option<String> },
     FrontendSyntax { stage: &'static str },
     Other(String),
+}
+
+struct DiagnosticVmTimingObserver<'a> {
+    timings: &'a mut Test262DiagnosticTimings,
+    bytecode_start: Option<Instant>,
+    checkpoint_start: Option<Instant>,
+}
+
+impl<'a> DiagnosticVmTimingObserver<'a> {
+    const fn new(timings: &'a mut Test262DiagnosticTimings) -> Self {
+        Self {
+            timings,
+            bytecode_start: None,
+            checkpoint_start: None,
+        }
+    }
+}
+
+impl VmEvaluationObserver for DiagnosticVmTimingObserver<'_> {
+    fn before_bytecode_execution(&mut self) {
+        self.bytecode_start = Some(Instant::now());
+    }
+
+    fn after_bytecode_execution(&mut self) {
+        if let Some(start) = self.bytecode_start.take() {
+            self.timings.bytecode_execution += start.elapsed();
+        }
+    }
+
+    fn before_job_checkpoint(&mut self) {
+        self.checkpoint_start = Some(Instant::now());
+    }
+
+    fn after_job_checkpoint(&mut self) {
+        if let Some(start) = self.checkpoint_start.take() {
+            self.timings.job_checkpoint += start.elapsed();
+        }
+    }
 }
 
 pub fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> RunOutcome {
@@ -340,6 +379,12 @@ pub fn run_test_with_diagnostics(
     timings.parse += script_timings.parse;
     timings.sema += script_timings.sema;
     timings.lowering += script_timings.lowering;
+    timings.script_install += script_timings.script_install;
+    timings.realm_bootstrap += script_timings.realm_bootstrap;
+    timings.extension_install += script_timings.extension_install;
+    timings.global_instantiation += script_timings.global_instantiation;
+    timings.bytecode_execution += script_timings.bytecode_execution;
+    timings.job_checkpoint += script_timings.job_checkpoint;
     timings.install_or_load += script_timings.install_or_load;
     timings.evaluation += script_timings.evaluation;
 
@@ -592,32 +637,15 @@ fn run_script_with_diagnostics(
         );
         let mut runtime = Runtime::new(host.clone());
         diagnostics.runtime_live_bytes_before = runtime.phase6_accounting().live_bytes;
-        let result = {
-            let agent = runtime.root_agent_mut();
-            let realm = agent.default_realm().expect("default realm should exist");
-            let global_object = realm.global_object();
-            let mut vm = Vm::new();
-            let install_start = Instant::now();
-            let result = vm.evaluate_script_with_host_referrer_and_extensions_retaining_installed(
-                agent,
-                realm,
-                &unit,
-                Some(&script_referrer),
-                &host,
-                Some(provider),
-            );
-            timings.install_or_load = install_start.elapsed();
-            match result {
-                Ok((_, installed)) => {
-                    collect_vm_diagnostics(&vm, installed.code(), &mut diagnostics);
-                    Ok(())
-                }
-                Err(VmError::Abrupt(completion)) => Err(ScriptExecutionError::Abrupt {
-                    actual_type: thrown_error_type(agent, global_object, completion),
-                }),
-                Err(error) => Err(ScriptExecutionError::Vm(format!("{error:?}"))),
-            }
-        };
+        let result = run_compiled_script_with_diagnostics(
+            &mut runtime,
+            &unit,
+            &host,
+            provider,
+            &script_referrer,
+            &mut timings,
+            &mut diagnostics,
+        );
         diagnostics.runtime_live_bytes_after = runtime.phase6_accounting().live_bytes;
         diagnostics.runtime_live_bytes_delta = diagnostics
             .runtime_live_bytes_after
@@ -644,8 +672,102 @@ fn run_script_with_diagnostics(
         Ok(Err(error)) => script_error_outcome(error, expectation),
         Err(panic) => RunOutcome::Fail(format!("PANIC runtime: {}", panic_message(&panic))),
     };
-    timings.evaluation = timings.install_or_load;
     (outcome, timings, Some(diagnostics))
+}
+
+fn run_compiled_script_with_diagnostics(
+    runtime: &mut Runtime,
+    unit: &CompiledScriptUnit,
+    host: &Test262Host,
+    provider: &SharedRealmExtensionProvider,
+    script_referrer: &ModuleKey,
+    timings: &mut Test262DiagnosticTimings,
+    diagnostics: &mut Test262RuntimeDiagnostics,
+) -> Result<(), ScriptExecutionError> {
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_object = realm.global_object();
+    let mut vm = Vm::new();
+    let runtime_start = Instant::now();
+
+    let phase_start = Instant::now();
+    let installed = vm.install_script(agent, realm.id(), unit);
+    timings.script_install = phase_start.elapsed();
+    let installed = match installed {
+        Ok(installed) => installed,
+        Err(error) => {
+            finish_runtime_timing(timings, runtime_start);
+            return Err(script_vm_error(agent, global_object, error));
+        }
+    };
+
+    let phase_start = Instant::now();
+    let bootstrap = vm.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly);
+    timings.realm_bootstrap = phase_start.elapsed();
+    if let Err(error) = bootstrap {
+        finish_runtime_timing(timings, runtime_start);
+        return Err(script_vm_error(agent, global_object, error));
+    }
+
+    let phase_start = Instant::now();
+    let extensions = vm.install_realm_extensions(agent, realm.id(), provider);
+    timings.extension_install = phase_start.elapsed();
+    if let Err(error) = extensions {
+        finish_runtime_timing(timings, runtime_start);
+        return Err(script_vm_error(agent, global_object, error));
+    }
+
+    let phase_start = Instant::now();
+    let instantiation = Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan());
+    timings.global_instantiation = phase_start.elapsed();
+    if let Err(error) = instantiation {
+        finish_runtime_timing(timings, runtime_start);
+        return Err(script_vm_error(agent, global_object, error));
+    }
+
+    let script_referrer = Some(
+        agent
+            .atoms_mut()
+            .intern_collectible(script_referrer.as_str()),
+    );
+    let result = {
+        let mut observer = DiagnosticVmTimingObserver::new(timings);
+        vm.evaluate_installed_with_host_observed(
+            agent,
+            installed,
+            realm.global_env(),
+            realm.global_env(),
+            script_referrer,
+            host,
+            &mut observer,
+        )
+    };
+    finish_runtime_timing(timings, runtime_start);
+    match result {
+        Ok(_) => {
+            collect_vm_diagnostics(&vm, installed.code(), diagnostics);
+            Ok(())
+        }
+        Err(error) => Err(script_vm_error(agent, global_object, error)),
+    }
+}
+
+fn finish_runtime_timing(timings: &mut Test262DiagnosticTimings, start: Instant) {
+    timings.install_or_load = start.elapsed();
+    timings.evaluation = timings.install_or_load;
+}
+
+fn script_vm_error(
+    agent: &mut Agent,
+    global_object: ObjectRef,
+    error: VmError,
+) -> ScriptExecutionError {
+    match error {
+        VmError::Abrupt(completion) => ScriptExecutionError::Abrupt {
+            actual_type: thrown_error_type(agent, global_object, completion),
+        },
+        error => ScriptExecutionError::Vm(format!("{error:?}")),
+    }
 }
 
 fn script_error_outcome(error: ScriptExecutionError, expectation: &TestExpectation) -> RunOutcome {

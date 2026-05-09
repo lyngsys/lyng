@@ -8,7 +8,10 @@ use lyng_js_types::{PropertyDescriptor, PropertyKey};
 const BULK_GLOBAL_BINDING_DICTIONARY_THRESHOLD: usize = 64;
 
 impl Vm {
-    pub(crate) fn instantiate_global_script(
+    /// # Errors
+    ///
+    /// Returns a VM error if global declaration instantiation fails.
+    pub fn instantiate_global_script(
         agent: &mut Agent,
         realm: &RealmRecord,
         plan: &GlobalScriptInstantiationPlan,

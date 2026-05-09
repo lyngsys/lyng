@@ -152,6 +152,12 @@ The JSON report is the handoff and regression source. Useful fields are:
 - `aggregates[].median_total_ms`
 - `aggregates[].delta.median_total_ms`
 - `aggregates[].samples[].timings`
+- `aggregates[].samples[].timings.script_install_ms`
+- `aggregates[].samples[].timings.realm_bootstrap_ms`
+- `aggregates[].samples[].timings.extension_install_ms`
+- `aggregates[].samples[].timings.global_instantiation_ms`
+- `aggregates[].samples[].timings.bytecode_execution_ms`
+- `aggregates[].samples[].timings.job_checkpoint_ms`
 - `aggregates[].samples[].diagnostics.function_count`
 - `aggregates[].samples[].diagnostics.instruction_words`
 - `aggregates[].samples[].diagnostics.feedback_slots`
@@ -159,10 +165,9 @@ The JSON report is the handoff and regression source. Useful fields are:
 - `aggregates[].samples[].diagnostics.megamorphic_sites`
 - `aggregates[].samples[].diagnostics.runtime_live_bytes_delta`
 
-Current limitation: Test262 diagnostics expose broad timing buckets. In particular,
-`install_or_load` and `evaluation` are not yet separated into install, bootstrap, global
-instantiation, bytecode execution, and job checkpoint phases. Treat the dominant phase as
-the first subsystem pointer, then use issue `lyng-24ry` to improve timing precision.
+The broad `install_or_load_ms` and `evaluation_ms` fields remain for compatibility with
+existing report consumers. For runtime bottleneck selection, prefer the refined setup and
+execution fields above plus the rendered dominant phase.
 
 ## Dcat Handoff Evidence
 

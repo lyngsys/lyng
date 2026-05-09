@@ -78,6 +78,22 @@ pub use feedback::{
 };
 pub use tiering::{TierStatus, TieringSnapshot};
 
+/// Observer for coarse VM evaluation phases around one installed entry execution.
+///
+/// The observer is intentionally timing-agnostic. Embedders that need diagnostics can
+/// record wall-clock data at the phase boundaries without making the VM depend on a
+/// clock source.
+pub trait VmEvaluationObserver {
+    fn before_bytecode_execution(&mut self) {}
+    fn after_bytecode_execution(&mut self) {}
+    fn before_job_checkpoint(&mut self) {}
+    fn after_job_checkpoint(&mut self) {}
+}
+
+struct NoopVmEvaluationObserver;
+
+impl VmEvaluationObserver for NoopVmEvaluationObserver {}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FeedbackVectorFootprint {
     allocated: bool,
@@ -641,6 +657,7 @@ impl Vm {
         self.install_active_realm_extensions(agent, realm.id())?;
         Self::instantiate_global_script(agent, &realm, unit.instantiation_plan())?;
         let mut registry = RejectingNativeRegistry;
+        let mut observer = NoopVmEvaluationObserver;
         self.evaluate_entry_with_registry_and_checkpoint(
             agent,
             installed,
@@ -651,6 +668,7 @@ impl Vm {
             &mut registry,
             Some(unit.instantiation_plan()),
             None,
+            &mut observer,
         )
     }
 
@@ -742,6 +760,7 @@ impl Vm {
         Self::instantiate_global_script(agent, &realm, unit.instantiation_plan())?;
         let script_referrer =
             script_referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
+        let mut observer = NoopVmEvaluationObserver;
         self.evaluate_entry_with_registry_and_checkpoint(
             agent,
             installed,
@@ -752,6 +771,7 @@ impl Vm {
             registry,
             Some(unit.instantiation_plan()),
             None,
+            &mut observer,
         )
     }
 
@@ -770,6 +790,7 @@ impl Vm {
         let script_referrer =
             script_referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         let mut registry = RejectingNativeRegistry;
+        let mut observer = NoopVmEvaluationObserver;
         let value = self.evaluate_entry_with_registry_and_checkpoint(
             agent,
             installed,
@@ -780,6 +801,7 @@ impl Vm {
             &mut registry,
             Some(unit.instantiation_plan()),
             None,
+            &mut observer,
         )?;
         Ok((value, installed))
     }
@@ -823,6 +845,67 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
+        let mut observer = NoopVmEvaluationObserver;
+        self.evaluate_installed_with_registry_and_host_observed(
+            agent,
+            installed,
+            lexical_env,
+            variable_env,
+            script_or_module_referrer,
+            host,
+            registry,
+            &mut observer,
+        )
+    }
+
+    /// # Errors
+    ///
+    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, observer, and spec state explicitly at call sites"
+    )]
+    pub fn evaluate_installed_with_host_observed(
+        &mut self,
+        agent: &mut Agent,
+        installed: InstalledCode,
+        lexical_env: EnvironmentRef,
+        variable_env: EnvironmentRef,
+        script_or_module_referrer: Option<AtomId>,
+        host: &dyn HostHooks,
+        observer: &mut dyn VmEvaluationObserver,
+    ) -> VmResult<Value> {
+        let mut registry = RejectingNativeRegistry;
+        self.evaluate_installed_with_registry_and_host_observed(
+            agent,
+            installed,
+            lexical_env,
+            variable_env,
+            script_or_module_referrer,
+            host,
+            &mut registry,
+            observer,
+        )
+    }
+
+    /// # Errors
+    ///
+    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, observer, and spec state explicitly at call sites"
+    )]
+    pub fn evaluate_installed_with_registry_and_host_observed(
+        &mut self,
+        agent: &mut Agent,
+        installed: InstalledCode,
+        lexical_env: EnvironmentRef,
+        variable_env: EnvironmentRef,
+        script_or_module_referrer: Option<AtomId>,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        observer: &mut dyn VmEvaluationObserver,
+    ) -> VmResult<Value> {
         self.evaluate_entry_with_registry_and_checkpoint(
             agent,
             installed,
@@ -833,6 +916,7 @@ impl Vm {
             registry,
             None,
             None,
+            observer,
         )
     }
 
@@ -856,6 +940,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
+        let mut observer = NoopVmEvaluationObserver;
         self.evaluate_entry_with_registry_and_checkpoint(
             agent,
             installed,
@@ -873,6 +958,7 @@ impl Vm {
                 private_env: entry_private_env,
                 lexical_this: entry_lexical_this,
             }),
+            &mut observer,
         )
     }
 
@@ -891,7 +977,9 @@ impl Vm {
         registry: &mut dyn NativeFunctionRegistry,
         global_script_plan: Option<&GlobalScriptInstantiationPlan>,
         entry_override: Option<EntryExecutionOverride>,
+        observer: &mut dyn VmEvaluationObserver,
     ) -> VmResult<Value> {
+        observer.before_bytecode_execution();
         let result = self.evaluate_entry_with_registry(
             agent,
             installed,
@@ -903,10 +991,13 @@ impl Vm {
             global_script_plan,
             entry_override,
         );
+        observer.after_bytecode_execution();
         let result = match result {
             Ok(value) => {
-                self.checkpoint_promise_jobs(agent, host, registry)?;
-                Ok(value)
+                observer.before_job_checkpoint();
+                let checkpoint = self.checkpoint_promise_jobs(agent, host, registry);
+                observer.after_job_checkpoint();
+                checkpoint.map(|()| value)
             }
             Err(error) => Err(error),
         };

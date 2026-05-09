@@ -81,6 +81,12 @@ pub struct Test262PhaseTimings {
     pub parse: Duration,
     pub sema: Duration,
     pub lowering: Duration,
+    pub script_install: Duration,
+    pub realm_bootstrap: Duration,
+    pub extension_install: Duration,
+    pub global_instantiation: Duration,
+    pub bytecode_execution: Duration,
+    pub job_checkpoint: Duration,
     pub install_or_load: Duration,
     pub evaluation: Duration,
     pub total: Duration,
@@ -465,6 +471,12 @@ fn sample_from_outcome(outcome: &Test262DiagnosticOutcome) -> Test262Sample {
             parse: outcome.timings.parse,
             sema: outcome.timings.sema,
             lowering: outcome.timings.lowering,
+            script_install: outcome.timings.script_install,
+            realm_bootstrap: outcome.timings.realm_bootstrap,
+            extension_install: outcome.timings.extension_install,
+            global_instantiation: outcome.timings.global_instantiation,
+            bytecode_execution: outcome.timings.bytecode_execution,
+            job_checkpoint: outcome.timings.job_checkpoint,
             install_or_load: outcome.timings.install_or_load,
             evaluation: outcome.timings.evaluation,
             total: outcome.timings.total,
@@ -599,6 +611,18 @@ pub fn cause_hints_for_aggregate(
     let mut hints = Vec::new();
     if dominant_phase == "evaluation" {
         hints.push("evaluation dominated".to_string());
+    }
+    if dominant_phase == "bytecode_execution" {
+        hints.push("bytecode execution dominated".to_string());
+    }
+    if dominant_phase == "job_checkpoint" {
+        hints.push("job checkpoint dominated".to_string());
+    }
+    if matches!(
+        dominant_phase,
+        "script_install" | "realm_bootstrap" | "extension_install" | "global_instantiation"
+    ) {
+        hints.push("runtime setup dominated".to_string());
     }
     if matches!(
         dominant_phase,
@@ -825,6 +849,12 @@ fn phase_json(timings: &Test262PhaseTimings) -> Value {
         "parse_ms": duration_ms(timings.parse),
         "sema_ms": duration_ms(timings.sema),
         "lowering_ms": duration_ms(timings.lowering),
+        "script_install_ms": duration_ms(timings.script_install),
+        "realm_bootstrap_ms": duration_ms(timings.realm_bootstrap),
+        "extension_install_ms": duration_ms(timings.extension_install),
+        "global_instantiation_ms": duration_ms(timings.global_instantiation),
+        "bytecode_execution_ms": duration_ms(timings.bytecode_execution),
+        "job_checkpoint_ms": duration_ms(timings.job_checkpoint),
         "install_or_load_ms": duration_ms(timings.install_or_load),
         "evaluation_ms": duration_ms(timings.evaluation),
         "total_ms": duration_ms(timings.total),
@@ -854,6 +884,52 @@ fn diagnostics_json(diagnostics: &Test262VariantDiagnostics) -> Value {
 }
 
 fn dominant_phase(samples: &[Test262Sample]) -> String {
+    let refined_runtime_total: Duration = samples
+        .iter()
+        .map(|sample| {
+            sample.timings.script_install
+                + sample.timings.realm_bootstrap
+                + sample.timings.extension_install
+                + sample.timings.global_instantiation
+                + sample.timings.bytecode_execution
+                + sample.timings.job_checkpoint
+        })
+        .sum();
+    if refined_runtime_total > Duration::ZERO {
+        let mut totals = [
+            ("read_source", Duration::ZERO),
+            ("runtime_assembly", Duration::ZERO),
+            ("frontend_check", Duration::ZERO),
+            ("parse", Duration::ZERO),
+            ("sema", Duration::ZERO),
+            ("lowering", Duration::ZERO),
+            ("script_install", Duration::ZERO),
+            ("realm_bootstrap", Duration::ZERO),
+            ("extension_install", Duration::ZERO),
+            ("global_instantiation", Duration::ZERO),
+            ("bytecode_execution", Duration::ZERO),
+            ("job_checkpoint", Duration::ZERO),
+        ];
+        for sample in samples {
+            totals[0].1 += sample.timings.read_source;
+            totals[1].1 += sample.timings.runtime_assembly;
+            totals[2].1 += sample.timings.frontend_check;
+            totals[3].1 += sample.timings.parse;
+            totals[4].1 += sample.timings.sema;
+            totals[5].1 += sample.timings.lowering;
+            totals[6].1 += sample.timings.script_install;
+            totals[7].1 += sample.timings.realm_bootstrap;
+            totals[8].1 += sample.timings.extension_install;
+            totals[9].1 += sample.timings.global_instantiation;
+            totals[10].1 += sample.timings.bytecode_execution;
+            totals[11].1 += sample.timings.job_checkpoint;
+        }
+        return totals
+            .into_iter()
+            .max_by_key(|(_, duration)| *duration)
+            .map_or_else(|| "unknown".to_string(), |(name, _)| name.to_string());
+    }
+
     let mut totals = [
         ("read_source", Duration::ZERO),
         ("runtime_assembly", Duration::ZERO),
