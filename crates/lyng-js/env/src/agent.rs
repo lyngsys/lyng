@@ -42,6 +42,8 @@ struct AgentCollectionSnapshot {
     job_queues: AgentJobQueues,
     kept_objects: Vec<WeakHeapRef>,
     latin1_single_code_unit_strings: [Option<StringRef>; 256],
+    recent_short_latin1_strings: [Option<RecentShortLatin1String>; 256],
+    recent_two_code_unit_string: Option<RecentTwoCodeUnitString>,
 }
 
 impl AgentCollectionSnapshot {
@@ -71,6 +73,8 @@ impl AgentCollectionSnapshot {
             job_queues: agent.job_queues.clone(),
             kept_objects: agent.kept_objects.clone(),
             latin1_single_code_unit_strings: agent.latin1_single_code_unit_strings,
+            recent_short_latin1_strings: agent.recent_short_latin1_strings,
+            recent_two_code_unit_string: agent.recent_two_code_unit_string,
         }
     }
 }
@@ -97,6 +101,12 @@ impl TraceHeapEdges for AgentCollectionSnapshot {
         for string in self.latin1_single_code_unit_strings {
             string.trace_heap_edges(tracer);
         }
+        for cached in self.recent_short_latin1_strings.into_iter().flatten() {
+            cached.string.trace_heap_edges(tracer);
+        }
+        if let Some(cached) = self.recent_two_code_unit_string {
+            cached.string.trace_heap_edges(tracer);
+        }
         for record in &self.modules {
             record.trace_heap_edges(tracer);
         }
@@ -118,6 +128,19 @@ impl RegExpLiteralCacheKey {
     const fn new(realm: RealmRef, code: CodeRef, site: u32) -> Self {
         Self { realm, code, site }
     }
+}
+
+#[derive(Clone, Copy)]
+struct RecentShortLatin1String {
+    bytes: [u8; 3],
+    len: u8,
+    string: StringRef,
+}
+
+#[derive(Clone, Copy)]
+struct RecentTwoCodeUnitString {
+    units: [u16; 2],
+    string: StringRef,
 }
 
 /// Agent-local runtime state. The `Rc` marker keeps the agent thread-affine.
@@ -148,6 +171,8 @@ pub struct Agent {
     regexp_literal_cache: HashMap<RegExpLiteralCacheKey, RegExpPayload>,
     kept_objects: Vec<WeakHeapRef>,
     latin1_single_code_unit_strings: [Option<StringRef>; 256],
+    recent_short_latin1_strings: [Option<RecentShortLatin1String>; 256],
+    recent_two_code_unit_string: Option<RecentTwoCodeUnitString>,
     next_job_id: u32,
     thread_affinity: PhantomData<Rc<()>>,
 }
@@ -189,6 +214,8 @@ impl Agent {
             regexp_literal_cache: HashMap::new(),
             kept_objects: Vec::new(),
             latin1_single_code_unit_strings: [None; 256],
+            recent_short_latin1_strings: [None; 256],
+            recent_two_code_unit_string: None,
             next_job_id: 1,
             thread_affinity: PhantomData,
         };

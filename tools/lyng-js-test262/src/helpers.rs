@@ -5,44 +5,6 @@ use std::path::{Path, PathBuf};
 use crate::metadata::{has_async_flag, variants_for_metadata, TestMetadata, TestVariant};
 
 const LOCAL_TEMPORAL_HELPERS_SOURCE: &str = include_str!("temporal_helpers.js");
-const DECIMAL_TO_HEX_STRING_ADAPTER_SOURCE: &str = r#"
-function toUint32DecimalHelper(value) {
-  var number = Number(value);
-  if (!(number >= 0 || number < 0) || number === 0 || number === Infinity || number === -Infinity) {
-    return 0;
-  }
-  // JS3 does not lower unsigned right shift yet, so keep the helper upstream-shaped
-  // while expressing ToUint32 in terms of arithmetic the runtime already supports.
-  var integer = number - (number % 1);
-  var modulo = integer % 4294967296;
-  if (modulo < 0) {
-    modulo += 4294967296;
-  }
-  return modulo;
-}
-
-function decimalToHexString(n) {
-  var hex = "0123456789ABCDEF";
-  n = toUint32DecimalHelper(n);
-  var s = "";
-  while (n > 0) {
-    var digit = n % 16;
-    s = hex.charAt(digit) + s;
-    n = (n - digit) / 16;
-  }
-  while (s.length < 4) {
-    s = "0" + s;
-  }
-  return s;
-}
-
-function decimalToPercentHexString(n) {
-  var hex = "0123456789ABCDEF";
-  n = toUint32DecimalHelper(n) % 256;
-  var low = n % 16;
-  return "%" + hex.charAt((n - low) / 16) + hex.charAt(low);
-}
-"#;
 const ASYNC_DONE_GLOBAL_BRIDGE_SOURCE: &str = r"
 globalThis.$DONE = $DONE;
 ";
@@ -772,7 +734,6 @@ fn adapt_helper_source(name: &str, source: String) -> String {
             adapted.push_str(SINGLE_PROCESS_AGENT_TIMEOUTS_SOURCE);
             adapted
         }
-        "decimalToHexString.js" => DECIMAL_TO_HEX_STRING_ADAPTER_SOURCE.to_string(),
         "regExpUtils.js" => adapt_regexp_helper_source(&source),
         "sm/non262-Date-shell.js" => source
             .replace(
@@ -933,7 +894,7 @@ mod tests {
     }
 
     #[test]
-    fn build_runtime_source_adapts_decimal_helper_without_forking_behavior() {
+    fn build_runtime_source_uses_upstream_decimal_helper_when_shift_is_supported() {
         let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
         let metadata = parse_metadata(
             r"
@@ -945,10 +906,10 @@ mod tests {
         let source = catalog
             .build_runtime_source(&metadata, "decimalToHexString(100);")
             .expect("decimal helper harness source");
-        assert!(source.contains("toUint32DecimalHelper"));
-        assert!(source.contains("var integer = number - (number % 1);"));
-        assert!(source.contains("return \"%\" + hex.charAt((n - low) / 16) + hex.charAt(low);"));
-        assert!(!source.contains("Math.floor"));
+        assert!(source.contains("n >>>= 0;"));
+        assert!(source.contains("return \"%\" + hex[(n >> 4) & 0xf] + hex[n & 0xf];"));
+        assert!(!source.contains("toUint32DecimalHelper"));
+        assert!(!source.contains("hex.charAt"));
     }
 
     #[test]

@@ -15,9 +15,12 @@ fn borrowed_strings_equal(
     left: StringRef,
     right: StringRef,
 ) -> Completion<bool> {
-    let left = heap.string_view(left).ok_or_else(primitive_type_error)?;
-    let right = heap.string_view(right).ok_or_else(primitive_type_error)?;
-    Ok(left.equals(right))
+    let left_view = heap.string_view(left).ok_or_else(primitive_type_error)?;
+    if left == right {
+        return Ok(true);
+    }
+    let right_view = heap.string_view(right).ok_or_else(primitive_type_error)?;
+    Ok(left_view.equals(right_view))
 }
 
 #[inline]
@@ -26,11 +29,14 @@ fn borrowed_bigint_equal(
     left: BigIntRef,
     right: BigIntRef,
 ) -> Completion<bool> {
-    let left = heap.bigint_view(left).ok_or_else(primitive_type_error)?;
-    let right = heap.bigint_view(right).ok_or_else(primitive_type_error)?;
-    Ok(left.sign() == right.sign()
-        && left.limb_count() == right.limb_count()
-        && left.limb_bytes_le() == right.limb_bytes_le())
+    let left_view = heap.bigint_view(left).ok_or_else(primitive_type_error)?;
+    if left == right {
+        return Ok(true);
+    }
+    let right_view = heap.bigint_view(right).ok_or_else(primitive_type_error)?;
+    Ok(left_view.sign() == right_view.sign()
+        && left_view.limb_count() == right_view.limb_count()
+        && left_view.limb_bytes_le() == right_view.limb_bytes_le())
 }
 
 fn loosely_equal_same_type(
@@ -168,6 +174,12 @@ pub fn is_strictly_equal(
     left: Value,
     right: Value,
 ) -> Completion<bool> {
+    if let (Some(left), Some(right)) = (left.as_string_ref(), right.as_string_ref()) {
+        return borrowed_strings_equal(heap, left, right);
+    }
+    if let (Some(left), Some(right)) = (left.as_bigint_ref(), right.as_bigint_ref()) {
+        return borrowed_bigint_equal(heap, left, right);
+    }
     if let Some(result) = pure::is_strictly_equal(left, right) {
         return Ok(result);
     }
@@ -199,6 +211,12 @@ pub fn is_strictly_equal(
 /// Panics if a value classified as a number, string, or bigint fails to expose
 /// the matching payload, which indicates a corrupted internal `Value`.
 pub fn same_value(heap: PrimitiveHeapView<'_>, left: Value, right: Value) -> Completion<bool> {
+    if let (Some(left), Some(right)) = (left.as_string_ref(), right.as_string_ref()) {
+        return borrowed_strings_equal(heap, left, right);
+    }
+    if let (Some(left), Some(right)) = (left.as_bigint_ref(), right.as_bigint_ref()) {
+        return borrowed_bigint_equal(heap, left, right);
+    }
     if let Some(result) = pure::same_value(left, right) {
         return Ok(result);
     }
@@ -230,6 +248,12 @@ pub fn same_value(heap: PrimitiveHeapView<'_>, left: Value, right: Value) -> Com
 /// Panics if a value classified as a number, string, or bigint fails to expose
 /// the matching payload, which indicates a corrupted internal `Value`.
 pub fn same_value_zero(heap: PrimitiveHeapView<'_>, left: Value, right: Value) -> Completion<bool> {
+    if let (Some(left), Some(right)) = (left.as_string_ref(), right.as_string_ref()) {
+        return borrowed_strings_equal(heap, left, right);
+    }
+    if let (Some(left), Some(right)) = (left.as_bigint_ref(), right.as_bigint_ref()) {
+        return borrowed_bigint_equal(heap, left, right);
+    }
     if let Some(result) = pure::same_value_zero(left, right) {
         return Ok(result);
     }

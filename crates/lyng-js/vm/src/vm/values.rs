@@ -844,6 +844,7 @@ struct ConcatStringPayload {
 }
 
 fn concat_string_refs(agent: &mut Agent, left: StringRef, right: StringRef) -> VmResult<StringRef> {
+    let mut short_latin1_concat = None;
     let can_use_latin1_concat = {
         let heap_view = agent.heap().view();
         let Some(left_view) = heap_view.string_view(left) else {
@@ -858,10 +859,25 @@ fn concat_string_refs(agent: &mut Agent, left: StringRef, right: StringRef) -> V
         if right_view.code_unit_len() == 0 {
             return Ok(left);
         }
-        left_view.encoding() == StringEncoding::Latin1
-            && right_view.encoding() == StringEncoding::Latin1
+        if let (Some(left_bytes), Some(right_bytes)) =
+            (left_view.latin1_bytes(), right_view.latin1_bytes())
+        {
+            let len = left_bytes.len() + right_bytes.len();
+            if (2..=3).contains(&len) {
+                let mut bytes = [0_u8; 3];
+                bytes[..left_bytes.len()].copy_from_slice(left_bytes);
+                bytes[left_bytes.len()..len].copy_from_slice(right_bytes);
+                short_latin1_concat = Some((bytes, len));
+            }
+            true
+        } else {
+            false
+        }
     };
 
+    if let Some((bytes, len)) = short_latin1_concat {
+        return Ok(agent.cached_short_latin1_string(&bytes[..len], AllocationLifetime::Default));
+    }
     if can_use_latin1_concat
         && let Some(string) = agent.heap_mut().mutator().alloc_latin1_concat_string(
             left,
@@ -1000,6 +1016,21 @@ pub(super) fn alloc_code_unit_string(
         return agent.latin1_single_code_unit_string(
             u8::try_from(units[0]).expect("Latin-1 code unit should fit into u8"),
         );
+    }
+    if atom.is_none()
+        && let [left, right] = units
+        && (*left > 0x00ff || *right > 0x00ff)
+    {
+        return agent.cached_two_code_unit_string([*left, *right], AllocationLifetime::Default);
+    }
+    if atom.is_none() && (2..=3).contains(&units.len()) && units.iter().all(|unit| *unit <= 0x00ff)
+    {
+        let mut bytes = [0_u8; 3];
+        for (index, unit) in units.iter().copied().enumerate() {
+            bytes[index] = u8::try_from(unit).expect("Latin-1 code unit should fit into u8");
+        }
+        return agent
+            .cached_short_latin1_string(&bytes[..units.len()], AllocationLifetime::Default);
     }
     if units.len() <= 4 {
         let mut latin1 = [0_u8; 4];

@@ -2,7 +2,7 @@ use super::strings::push_code_point_units;
 use super::{
     number_to_i32_after_range_check, number_value, string_from_code_units, string_ref_code_units,
     string_value, to_number_for_builtin, to_number_value_for_builtin, to_string_string_ref,
-    uri_error, PublicBuiltinDispatchContext,
+    type_error, uri_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
 use lyng_js_types::{BuiltinFunctionId, Value};
@@ -12,6 +12,12 @@ pub(super) fn dispatch_language_support_builtin<Cx: PublicBuiltinDispatchContext
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
+    if entry == super::decode_uri_builtin() {
+        return decode_uri_builtin(context, invocation, false).map(Some);
+    }
+    if entry == super::decode_uri_component_builtin() {
+        return decode_uri_builtin(context, invocation, true).map(Some);
+    }
     if let Some(result) = dispatch_module_source_builtin(context, entry)? {
         return Ok(Some(result));
     }
@@ -429,12 +435,45 @@ fn encode_uri_units(units: &[u16], component: bool) -> Result<String, ()> {
     Ok(encoded)
 }
 
-fn decode_percent_byte(units: &[u16], index: usize) -> Result<u8, ()> {
-    if index + 2 >= units.len() || units[index] != u16::from(b'%') {
+#[derive(Clone, Copy)]
+enum UriCodeUnits<'a> {
+    Latin1(&'a [u8]),
+    Utf16(&'a [u8]),
+}
+
+impl UriCodeUnits<'_> {
+    const fn len(self) -> usize {
+        match self {
+            Self::Latin1(bytes) => bytes.len(),
+            Self::Utf16(bytes) => bytes.len() / 2,
+        }
+    }
+
+    fn unit(self, index: usize) -> Option<u16> {
+        match self {
+            Self::Latin1(bytes) => bytes.get(index).copied().map(u16::from),
+            Self::Utf16(bytes) => {
+                let offset = index.checked_mul(2)?;
+                let chunk = bytes.get(offset..offset + 2)?;
+                Some(u16::from_le_bytes([chunk[0], chunk[1]]))
+            }
+        }
+    }
+
+    fn extend_units(self, output: &mut Vec<u16>, start: usize, end: usize) -> Result<(), ()> {
+        for index in start..end {
+            output.push(self.unit(index).ok_or(())?);
+        }
+        Ok(())
+    }
+}
+
+fn decode_percent_byte(units: UriCodeUnits<'_>, index: usize) -> Result<u8, ()> {
+    if index + 2 >= units.len() || units.unit(index) != Some(u16::from(b'%')) {
         return Err(());
     }
-    let high = uri_hex_value_unit(units[index + 1]).ok_or(())?;
-    let low = uri_hex_value_unit(units[index + 2]).ok_or(())?;
+    let high = uri_hex_value_unit(units.unit(index + 1).ok_or(())?).ok_or(())?;
+    let low = uri_hex_value_unit(units.unit(index + 2).ok_or(())?).ok_or(())?;
     Ok((high << 4) | low)
 }
 
@@ -443,7 +482,7 @@ fn is_utf8_continuation(byte: u8) -> bool {
 }
 
 fn decode_utf8_percent_sequence(
-    units: &[u16],
+    units: UriCodeUnits<'_>,
     index: usize,
     first: u8,
 ) -> Result<(u32, usize), ()> {
@@ -496,12 +535,66 @@ fn decode_utf8_percent_sequence(
     Ok((code_point, end))
 }
 
-fn decode_uri_units(units: &[u16], component: bool) -> Result<Vec<u16>, ()> {
+fn decode_latin1_percent_hex_byte(bytes: &[u8], index: usize) -> Result<u8, ()> {
+    let high = uri_hex_value(bytes[index + 1]).ok_or(())?;
+    let low = uri_hex_value(bytes[index + 2]).ok_or(())?;
+    Ok((high << 4) | low)
+}
+
+fn decode_exact_four_byte_percent_sequence(bytes: &[u8]) -> Option<Result<[u16; 2], ()>> {
+    if bytes.len() != 12
+        || bytes[0] != b'%'
+        || bytes[3] != b'%'
+        || bytes[6] != b'%'
+        || bytes[9] != b'%'
+    {
+        return None;
+    }
+
+    let first = match decode_latin1_percent_hex_byte(bytes, 0) {
+        Ok(first) if (0xF0..=0xF4).contains(&first) => first,
+        Ok(_) => return None,
+        Err(()) => return Some(Err(())),
+    };
+    let second = match decode_latin1_percent_hex_byte(bytes, 3) {
+        Ok(second) if is_utf8_continuation(second) => second,
+        Ok(_) | Err(()) => return Some(Err(())),
+    };
+    let third = match decode_latin1_percent_hex_byte(bytes, 6) {
+        Ok(third) if is_utf8_continuation(third) => third,
+        Ok(_) | Err(()) => return Some(Err(())),
+    };
+    let fourth = match decode_latin1_percent_hex_byte(bytes, 9) {
+        Ok(fourth) if is_utf8_continuation(fourth) => fourth,
+        Ok(_) | Err(()) => return Some(Err(())),
+    };
+    if (first == 0xF0 && second < 0x90) || (first == 0xF4 && second > 0x8F) {
+        return Some(Err(()));
+    }
+
+    let code_point = u32::from(first & 0x07) << 18
+        | u32::from(second & 0x3F) << 12
+        | u32::from(third & 0x3F) << 6
+        | u32::from(fourth & 0x3F);
+    let adjusted = code_point - 0x1_0000;
+    let high =
+        0xD800 | u16::try_from(adjusted >> 10).expect("high surrogate payload should fit into u16");
+    let low = 0xDC00
+        | u16::try_from(adjusted & 0x03FF).expect("low surrogate payload should fit into u16");
+    Some(Ok([high, low]))
+}
+
+fn decode_uri_code_units_to_units(
+    units: UriCodeUnits<'_>,
+    component: bool,
+    decoded: &mut Vec<u16>,
+) -> Result<(), ()> {
     let mut index = 0_usize;
-    let mut decoded = Vec::with_capacity(units.len());
+    decoded.clear();
+    decoded.reserve(units.len());
     while index < units.len() {
-        if units[index] != u16::from(b'%') {
-            decoded.push(units[index]);
+        if units.unit(index) != Some(u16::from(b'%')) {
+            decoded.push(units.unit(index).ok_or(())?);
             index += 1;
             continue;
         }
@@ -510,7 +603,7 @@ fn decode_uri_units(units: &[u16], component: bool) -> Result<Vec<u16>, ()> {
         if first < 0x80 {
             let ch = char::from(first);
             if !component && is_uri_reserved(ch) {
-                decoded.extend_from_slice(&units[index..index + 3]);
+                units.extend_units(decoded, index, index + 3)?;
             } else {
                 decoded.push(u16::from(first));
             }
@@ -519,10 +612,10 @@ fn decode_uri_units(units: &[u16], component: bool) -> Result<Vec<u16>, ()> {
         }
 
         let (code_point, end) = decode_utf8_percent_sequence(units, index, first)?;
-        push_code_point_units(&mut decoded, code_point);
+        push_code_point_units(decoded, code_point);
         index = end;
     }
-    Ok(decoded)
+    Ok(())
 }
 
 fn eval_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -638,9 +731,49 @@ fn decode_uri_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let input_units = string_ref_code_units(cx, input_ref)?;
-    let decoded = decode_uri_units(&input_units, component).map_err(|()| uri_error(cx))?;
-    Ok(string_from_code_units(cx, &decoded))
+    let exact_four_byte_result = {
+        let Some(view) = ({
+            let agent = cx.agent();
+            agent.heap().view().string_view(input_ref)
+        }) else {
+            return Err(type_error(cx));
+        };
+        view.latin1_bytes()
+            .and_then(decode_exact_four_byte_percent_sequence)
+    };
+    match exact_four_byte_result {
+        Some(Ok(units)) => return Ok(string_from_code_units(cx, &units)),
+        Some(Err(())) => return Err(uri_error(cx)),
+        None => {}
+    }
+
+    let mut decoded = cx.take_string_code_units_scratch();
+    let decode_result = {
+        let Some(view) = ({
+            let agent = cx.agent();
+            agent.heap().view().string_view(input_ref)
+        }) else {
+            cx.recycle_string_code_units_scratch(decoded);
+            return Err(type_error(cx));
+        };
+        let units = view.latin1_bytes().map_or_else(
+            || {
+                UriCodeUnits::Utf16(
+                    view.utf16_bytes()
+                        .expect("runtime string view should expose payload bytes"),
+                )
+            },
+            UriCodeUnits::Latin1,
+        );
+        decode_uri_code_units_to_units(units, component, &mut decoded)
+    };
+    if decode_result.is_err() {
+        cx.recycle_string_code_units_scratch(decoded);
+        return Err(uri_error(cx));
+    }
+    let value = string_from_code_units(cx, &decoded);
+    cx.recycle_string_code_units_scratch(decoded);
+    Ok(value)
 }
 
 fn escape_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -675,4 +808,59 @@ fn unescape_builtin<Cx: PublicBuiltinDispatchContext>(
     let input_units = string_ref_code_units(cx, input_ref)?;
     let unescaped = legacy_unescape_units(&input_units);
     Ok(string_from_code_units(cx, &unescaped))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_uri_code_units_preserves_reserved_and_decodes_four_byte_utf8() {
+        let mut decoded = Vec::new();
+
+        decode_uri_code_units_to_units(
+            UriCodeUnits::Latin1(b"%2F%F0%9F%98%80"),
+            false,
+            &mut decoded,
+        )
+        .expect("valid URI escape sequence should decode");
+
+        assert_eq!(
+            decoded,
+            vec![
+                u16::from(b'%'),
+                u16::from(b'2'),
+                u16::from(b'F'),
+                0xD83D,
+                0xDE00
+            ]
+        );
+    }
+
+    #[test]
+    fn decode_uri_component_code_units_decodes_reserved_escapes() {
+        let mut decoded = Vec::new();
+
+        decode_uri_code_units_to_units(UriCodeUnits::Latin1(b"%2F"), true, &mut decoded)
+            .expect("valid URI component escape sequence should decode");
+
+        assert_eq!(decoded, vec![u16::from(b'/')]);
+    }
+
+    #[test]
+    fn exact_four_byte_percent_sequence_decodes_to_surrogate_pair() {
+        let decoded = decode_exact_four_byte_percent_sequence(b"%F0%9F%98%80")
+            .expect("exact four-byte sequence should use the fast path")
+            .expect("valid four-byte UTF-8 sequence should decode");
+
+        assert_eq!(decoded, [0xD83D, 0xDE00]);
+    }
+
+    #[test]
+    fn exact_four_byte_percent_sequence_rejects_overlong_encoding() {
+        let decoded = decode_exact_four_byte_percent_sequence(b"%F0%80%80%80")
+            .expect("exact malformed four-byte sequence should use the fast path");
+
+        assert_eq!(decoded, Err(()));
+    }
 }

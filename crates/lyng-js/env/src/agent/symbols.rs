@@ -1,4 +1,4 @@
-use super::Agent;
+use super::{Agent, RecentShortLatin1String, RecentTwoCodeUnitString};
 use crate::{AllocationLifetime, AtomTable, BootstrapAtoms, GlobalSymbolRegistryEntry};
 use lyng_js_common::AtomId;
 use lyng_js_gc::{StringEncoding, SymbolFlags};
@@ -135,6 +135,79 @@ impl Agent {
         string
     }
 
+    /// Returns a cached two- or three-byte Latin-1 primitive string when available.
+    ///
+    /// # Panics
+    /// Panics when `bytes` does not contain exactly two or three bytes.
+    pub fn cached_short_latin1_string(
+        &mut self,
+        bytes: &[u8],
+        lifetime: AllocationLifetime,
+    ) -> StringRef {
+        assert!(
+            (2..=3).contains(&bytes.len()),
+            "short Latin-1 string cache only supports two or three bytes"
+        );
+        let mut key = [0_u8; 3];
+        key[..bytes.len()].copy_from_slice(bytes);
+        let len = u8::try_from(bytes.len()).expect("short Latin-1 cache length should fit in u8");
+        let index = short_latin1_cache_index(key, len);
+
+        if let Some(cached) = self.recent_short_latin1_strings[index]
+            && cached.len == len
+            && cached.bytes == key
+        {
+            return cached.string;
+        }
+
+        let string = self.heap.mutator().alloc_string(
+            StringEncoding::Latin1,
+            u32::from(len),
+            bytes,
+            None,
+            lifetime,
+        );
+        self.recent_short_latin1_strings[index] = Some(RecentShortLatin1String {
+            bytes: key,
+            len,
+            string,
+        });
+        string
+    }
+
+    pub fn cached_two_code_unit_string(
+        &mut self,
+        units: [u16; 2],
+        lifetime: AllocationLifetime,
+    ) -> StringRef {
+        if let Some(cached) = self.recent_two_code_unit_string
+            && cached.units == units
+        {
+            return cached.string;
+        }
+
+        let string = if let (Ok(left), Ok(right)) = (u8::try_from(units[0]), u8::try_from(units[1]))
+        {
+            self.heap.mutator().alloc_string(
+                StringEncoding::Latin1,
+                2,
+                &[left, right],
+                None,
+                lifetime,
+            )
+        } else {
+            let mut bytes = [0_u8; 4];
+            bytes[..2].copy_from_slice(&units[0].to_le_bytes());
+            bytes[2..].copy_from_slice(&units[1].to_le_bytes());
+            self.heap
+                .mutator()
+                .alloc_string(StringEncoding::Utf16, 2, &bytes, None, lifetime)
+        };
+
+        self.recent_two_code_unit_string = Some(RecentTwoCodeUnitString { units, string });
+        string
+    }
+
     pub(super) fn seed_builtin_symbol_state(&mut self, lifetime: AllocationLifetime) {
         for id in WellKnownSymbolId::ALL {
             let _ = self.ensure_well_known_symbol(id, lifetime);
@@ -191,4 +264,12 @@ impl Agent {
             lifetime,
         )
     }
+}
+
+fn short_latin1_cache_index(bytes: [u8; 3], len: u8) -> usize {
+    let hash = usize::from(len).wrapping_mul(0x45D9)
+        ^ usize::from(bytes[0]).wrapping_mul(0x9E37)
+        ^ usize::from(bytes[1]).wrapping_mul(0x85EB)
+        ^ usize::from(bytes[2]).wrapping_mul(0xC2B2);
+    hash & 0xFF
 }

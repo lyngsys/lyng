@@ -1659,6 +1659,21 @@ pub(super) fn string_ref_code_unit_len<Cx: PublicBuiltinDispatchContext>(
     Ok(view.code_unit_len() as usize)
 }
 
+pub(super) fn string_ref_code_unit_at<Cx: PublicBuiltinDispatchContext>(
+    cx: &mut Cx,
+    string: StringRef,
+    index: usize,
+) -> Result<u16, Cx::Error> {
+    let Some(view) = ({
+        let agent = cx.agent();
+        agent.heap().view().string_view(string)
+    }) else {
+        return Err(type_error(cx));
+    };
+
+    view.code_unit_at(index).ok_or_else(|| type_error(cx))
+}
+
 pub(super) fn append_string_ref_code_units<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     string: StringRef,
@@ -1738,6 +1753,18 @@ pub(super) fn string_from_code_units<Cx: PublicBuiltinDispatchContext>(
             && let Ok(unit) = u8::try_from(units[0])
         {
             agent.latin1_single_code_unit_string(unit)
+        } else if let [left, right] = units
+            && (*left > 0x00ff || *right > 0x00ff)
+        {
+            agent.cached_two_code_unit_string([*left, *right], AllocationLifetime::Default)
+        } else if (2..=3).contains(&units.len())
+            && units.iter().all(|unit| u8::try_from(*unit).is_ok())
+        {
+            let mut bytes = [0_u8; 3];
+            for (index, unit) in units.iter().copied().enumerate() {
+                bytes[index] = u8::try_from(unit).expect("Latin-1 unit should fit into u8");
+            }
+            agent.cached_short_latin1_string(&bytes[..units.len()], AllocationLifetime::Default)
         } else if units.len() <= 4 {
             let mut latin1 = [0_u8; 4];
             let mut is_latin1 = true;

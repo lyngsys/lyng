@@ -9,7 +9,7 @@ use lyng_js_bytecode::Opcode;
 use lyng_js_env::Agent;
 use lyng_js_host::HostHooks;
 use lyng_js_objects::NativeFunctionRegistry;
-use lyng_js_ops::{errors, object, read};
+use lyng_js_ops::{errors, object, pure, read};
 use lyng_js_types::{AbruptCompletion, Value};
 
 impl Vm {
@@ -55,6 +55,9 @@ impl Vm {
             Opcode::StrictEqual => {
                 let left = self.read_register(frame, left)?;
                 let right = self.read_register(frame, right)?;
+                if let Some(result) = pure::is_strictly_equal(left, right) {
+                    return Ok(Value::from_bool(result));
+                }
                 Ok(Value::from_bool(
                     read::is_strictly_equal(agent.heap().view(), left, right)
                         .map_err(VmError::Abrupt)?,

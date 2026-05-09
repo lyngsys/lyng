@@ -243,6 +243,37 @@ fn evaluate_script_string_index_reads_do_not_allocate_primitive_wrappers() {
 }
 
 #[test]
+fn evaluate_script_repeated_short_latin1_concat_reuses_strings() {
+    let warmup = compile_test_unit(23931, "0;");
+    let unit = compile_test_unit(
+        23932,
+        r#"
+            var total = 0;
+            for (var i = 0; i < 64; i++) {
+                total += ("%" + "8" + "F").length;
+            }
+            total;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let _ = vm.evaluate_script(agent, realm, &warmup).unwrap();
+    let before_strings = agent.heap().view().string_stats().occupied_slots;
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let after_strings = agent.heap().view().string_stats().occupied_slots;
+
+    assert_eq!(result, Value::from_smi(192));
+    assert!(
+        after_strings - before_strings < 16,
+        "short Latin-1 concat allocated {} string slots",
+        after_strings - before_strings
+    );
+}
+
+#[test]
 fn evaluate_script_string_search_uses_regexp_payloads() {
     let unit = compile_test_unit(
         2393,

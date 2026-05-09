@@ -53,8 +53,8 @@ use support::{
     require_constructor_object, require_object_argument, require_proxy_argument_object,
     set_data_property_value, set_length_property, set_property_on_object,
     set_property_on_object_with_receiver, string_from_code_units, string_from_string_ref_range,
-    string_ref_code_unit_len, string_ref_code_units, string_ref_text, string_this_ref,
-    string_value, symbol_descriptive_string, syntax_error, to_bigint_for_builtin,
+    string_ref_code_unit_at, string_ref_code_unit_len, string_ref_code_units, string_ref_text,
+    string_this_ref, string_value, symbol_descriptive_string, syntax_error, to_bigint_for_builtin,
     to_boolean_for_builtin, to_index_for_builtin, to_integer_or_infinity_for_builtin,
     to_length_for_builtin, to_number_for_builtin, to_number_value_for_builtin,
     to_string_string_ref, to_uint32_for_builtin, to_uint8_for_builtin, try_create_data_property,
@@ -568,6 +568,22 @@ pub fn dispatch_internal_spec_like_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(None)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FastPublicBuiltinFamily {
+    Language,
+    Strings,
+}
+
+fn fast_public_builtin_family(entry: BuiltinFunctionId) -> Option<FastPublicBuiltinFamily> {
+    if entry == decode_uri_builtin() || entry == decode_uri_component_builtin() {
+        return Some(FastPublicBuiltinFamily::Language);
+    }
+    if entry == string_from_char_code_builtin() {
+        return Some(FastPublicBuiltinFamily::Strings);
+    }
+    None
+}
+
 /// Dispatches a public builtin by builtin ID.
 ///
 /// Returns `Ok(None)` when `entry` is not owned by the public builtin dispatcher.
@@ -582,6 +598,16 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
+    match fast_public_builtin_family(entry) {
+        Some(FastPublicBuiltinFamily::Language) => {
+            return language::dispatch_language_support_builtin(context, entry, invocation);
+        }
+        Some(FastPublicBuiltinFamily::Strings) => {
+            return strings::dispatch_string_builtin(context, entry, invocation);
+        }
+        None => {}
+    }
+
     if is_date_builtin(entry) {
         return date::dispatch_date_builtin(context, entry, invocation);
     }
@@ -639,4 +665,26 @@ pub fn dispatch_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Some(result));
     }
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fast_public_builtin_family_routes_uri_decode_and_from_char_code() {
+        assert_eq!(
+            fast_public_builtin_family(decode_uri_builtin()),
+            Some(FastPublicBuiltinFamily::Language)
+        );
+        assert_eq!(
+            fast_public_builtin_family(decode_uri_component_builtin()),
+            Some(FastPublicBuiltinFamily::Language)
+        );
+        assert_eq!(
+            fast_public_builtin_family(string_from_char_code_builtin()),
+            Some(FastPublicBuiltinFamily::Strings)
+        );
+        assert_eq!(fast_public_builtin_family(array_builtin()), None);
+    }
 }

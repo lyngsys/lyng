@@ -257,12 +257,13 @@ pub fn to_boolean(value: Value) -> Option<bool> {
 
 /// Heap-free `IsStrictlyEqual` fast path.
 ///
-/// Returns `None` when both values are heap-backed strings or bigints, which
-/// require content comparison through the shared primitive heap.
+/// Returns `None` when both values are distinct heap-backed strings or bigints,
+/// which require content comparison through the shared primitive heap.
 #[inline]
 pub fn is_strictly_equal(left: Value, right: Value) -> Option<bool> {
     match numeric_pair(left, right) {
         Some((left, right)) => Some(numeric_strictly_equal(left, right)),
+        None if left == right => Some(true),
         None if (left.is_string() && right.is_string())
             || (left.is_bigint() && right.is_bigint()) =>
         {
@@ -274,12 +275,13 @@ pub fn is_strictly_equal(left: Value, right: Value) -> Option<bool> {
 
 /// Heap-free `SameValue` fast path.
 ///
-/// Returns `None` when both values are heap-backed strings or bigints, which
-/// require content comparison through the shared primitive heap.
+/// Returns `None` when both values are distinct heap-backed strings or bigints,
+/// which require content comparison through the shared primitive heap.
 #[inline]
 pub fn same_value(left: Value, right: Value) -> Option<bool> {
     match numeric_pair(left, right) {
         Some((left, right)) => Some(numeric_same_value(left, right)),
+        None if left == right => Some(true),
         None if (left.is_string() && right.is_string())
             || (left.is_bigint() && right.is_bigint()) =>
         {
@@ -291,12 +293,13 @@ pub fn same_value(left: Value, right: Value) -> Option<bool> {
 
 /// Heap-free `SameValueZero` fast path.
 ///
-/// Returns `None` when both values are heap-backed strings or bigints, which
-/// require content comparison through the shared primitive heap.
+/// Returns `None` when both values are distinct heap-backed strings or bigints,
+/// which require content comparison through the shared primitive heap.
 #[inline]
 pub fn same_value_zero(left: Value, right: Value) -> Option<bool> {
     match numeric_pair(left, right) {
         Some((left, right)) => Some(numeric_same_value_zero(left, right)),
+        None if left == right => Some(true),
         None if (left.is_string() && right.is_string())
             || (left.is_bigint() && right.is_bigint()) =>
         {
@@ -451,6 +454,13 @@ mod tests {
         assert_eq!(
             is_strictly_equal(
                 Value::from_string_ref(string),
+                Value::from_string_ref(string)
+            ),
+            Some(true)
+        );
+        assert_eq!(
+            is_strictly_equal(
+                Value::from_string_ref(string),
                 Value::from_string_ref(StringRef::from_raw(15).unwrap())
             ),
             None
@@ -467,7 +477,7 @@ mod tests {
                 Value::from_bigint_ref(bigint),
                 Value::from_bigint_ref(bigint)
             ),
-            None
+            Some(true)
         );
         assert_eq!(
             is_strictly_equal(
@@ -508,14 +518,14 @@ mod tests {
                 Value::from_string_ref(shared_string),
                 Value::from_string_ref(shared_string)
             ),
-            None
+            Some(true)
         );
         assert_eq!(
             same_value(
                 Value::from_bigint_ref(shared_bigint),
                 Value::from_bigint_ref(shared_bigint)
             ),
-            None
+            Some(true)
         );
         assert_eq!(
             same_value(
@@ -528,6 +538,9 @@ mod tests {
 
     #[test]
     fn same_value_zero_exposes_heap_free_fast_paths() {
+        let shared_string = StringRef::from_raw(18).unwrap();
+        let shared_bigint = BigIntRef::from_raw(19).unwrap();
+
         assert_eq!(
             same_value_zero(Value::from_f64(f64::NAN), Value::from_f64(f64::NAN)),
             Some(true)
@@ -547,6 +560,20 @@ mod tests {
         assert_eq!(
             same_value_zero(Value::null(), Value::undefined()),
             Some(false)
+        );
+        assert_eq!(
+            same_value_zero(
+                Value::from_string_ref(shared_string),
+                Value::from_string_ref(shared_string)
+            ),
+            Some(true)
+        );
+        assert_eq!(
+            same_value_zero(
+                Value::from_bigint_ref(shared_bigint),
+                Value::from_bigint_ref(shared_bigint)
+            ),
+            Some(true)
         );
     }
 

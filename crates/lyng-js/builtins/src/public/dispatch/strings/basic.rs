@@ -3,7 +3,7 @@ use super::super::{
     iterators::{string_iterator_builtin, string_iterator_next_builtin},
     map_completion, number_to_u32_after_range_check, number_to_usize_after_range_check,
     numbers_are_equal, primitive_wrapper_constructor, property_key_from_text, range_error,
-    string_from_code_units, string_ref_code_unit_len, string_ref_code_units, string_this_ref,
+    string_from_code_units, string_ref_code_unit_at, string_ref_code_unit_len, string_this_ref,
     string_value, symbol_descriptive_string, to_integer_or_infinity_for_builtin,
     to_length_for_builtin, to_number_for_builtin, to_string_string_ref, to_uint32_for_builtin,
     type_error, usize_index_as_number, BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
@@ -19,11 +19,11 @@ pub(super) fn dispatch_string_constructor_builtin<Cx: PublicBuiltinDispatchConte
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == super::super::string_builtin() {
-        return string_builtin(context, invocation).map(Some);
-    }
     if entry == super::super::string_from_char_code_builtin() {
         return string_from_char_code_builtin(context, invocation).map(Some);
+    }
+    if entry == super::super::string_builtin() {
+        return string_builtin(context, invocation).map(Some);
     }
     if entry == super::super::string_from_code_point_builtin() {
         return string_from_code_point_builtin(context, invocation).map(Some);
@@ -216,7 +216,6 @@ fn string_char_at_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let string = string_this_ref(cx, invocation.this_value())?;
-    let units = string_ref_code_units(cx, string)?;
     let position = to_integer_or_infinity_for_builtin(
         cx,
         invocation
@@ -225,10 +224,12 @@ fn string_char_at_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let Some(index) = string_position_index(position, units.len()) else {
+    let length = string_ref_code_unit_len(cx, string)?;
+    let Some(index) = string_position_index(position, length) else {
         return Ok(string_from_code_units(cx, &[]));
     };
-    Ok(string_from_code_units(cx, &units[index..=index]))
+    let unit = [string_ref_code_unit_at(cx, string, index)?];
+    Ok(string_from_code_units(cx, &unit))
 }
 
 fn string_char_code_at_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -236,7 +237,6 @@ fn string_char_code_at_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let string = string_this_ref(cx, invocation.this_value())?;
-    let units = string_ref_code_units(cx, string)?;
     let position = to_integer_or_infinity_for_builtin(
         cx,
         invocation
@@ -245,16 +245,36 @@ fn string_char_code_at_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let Some(index) = string_position_index(position, units.len()) else {
+    let length = string_ref_code_unit_len(cx, string)?;
+    let Some(index) = string_position_index(position, length) else {
         return Ok(Value::from_f64(f64::NAN));
     };
-    Ok(Value::from_smi(i32::from(units[index])))
+    Ok(Value::from_smi(i32::from(string_ref_code_unit_at(
+        cx, string, index,
+    )?)))
+}
+
+fn collect_small_smi_char_code_units(arguments: &[Value]) -> Option<([u16; 4], usize)> {
+    if arguments.len() > 4 {
+        return None;
+    }
+    let mut units = [0_u16; 4];
+    for (index, value) in arguments.iter().copied().enumerate() {
+        let value = value.as_smi()?;
+        units[index] = u16::try_from(value.cast_unsigned() & 0xffff)
+            .expect("masked UTF-16 code unit should fit into u16");
+    }
+    Some((units, arguments.len()))
 }
 
 fn string_from_char_code_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
+    if let Some((units, len)) = collect_small_smi_char_code_units(invocation.arguments()) {
+        return Ok(string_from_code_units(cx, &units[..len]));
+    }
+
     let mut units = Vec::with_capacity(invocation.arguments().len());
     for value in invocation.arguments().iter().copied() {
         let unit = if let Some(value) = value.as_smi() {
@@ -359,7 +379,6 @@ fn string_at_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let string = string_this_ref(cx, invocation.this_value())?;
-    let units = string_ref_code_units(cx, string)?;
     let relative_index = to_integer_or_infinity_for_builtin(
         cx,
         invocation
@@ -368,16 +387,18 @@ fn string_at_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
+    let length = string_ref_code_unit_len(cx, string)?;
     let index = if relative_index < 0.0 {
-        usize_index_as_number(units.len()) + relative_index
+        usize_index_as_number(length) + relative_index
     } else {
         relative_index
     };
-    if !index.is_finite() || index < 0.0 || index >= usize_index_as_number(units.len()) {
+    if !index.is_finite() || index < 0.0 || index >= usize_index_as_number(length) {
         return Ok(Value::undefined());
     }
     let index = number_to_usize_after_range_check(index);
-    Ok(string_from_code_units(cx, &units[index..=index]))
+    let unit = [string_ref_code_unit_at(cx, string, index)?];
+    Ok(string_from_code_units(cx, &unit))
 }
 
 fn string_code_point_at_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -385,7 +406,6 @@ fn string_code_point_at_builtin<Cx: PublicBuiltinDispatchContext>(
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
     let string = string_this_ref(cx, invocation.this_value())?;
-    let units = string_ref_code_units(cx, string)?;
     let position = to_integer_or_infinity_for_builtin(
         cx,
         invocation
@@ -394,25 +414,75 @@ fn string_code_point_at_builtin<Cx: PublicBuiltinDispatchContext>(
             .copied()
             .unwrap_or(Value::undefined()),
     )?;
-    let Some(index) = string_position_index(position, units.len()) else {
+    let length = string_ref_code_unit_len(cx, string)?;
+    let Some(index) = string_position_index(position, length) else {
         return Ok(Value::undefined());
     };
-    let first = units[index];
+    let first = string_ref_code_unit_at(cx, string, index)?;
     let code_point = if (0xD800..=0xDBFF).contains(&first) {
-        units.get(index + 1).copied().map_or_else(
-            || u32::from(first),
-            |second| {
-                if (0xDC00..=0xDFFF).contains(&second) {
-                    0x1_0000 + ((u32::from(first - 0xD800)) << 10) + u32::from(second - 0xDC00)
-                } else {
-                    u32::from(first)
-                }
-            },
-        )
+        if index + 1 < length {
+            let second = string_ref_code_unit_at(cx, string, index + 1)?;
+            if (0xDC00..=0xDFFF).contains(&second) {
+                0x1_0000 + ((u32::from(first - 0xD800)) << 10) + u32::from(second - 0xDC00)
+            } else {
+                u32::from(first)
+            }
+        } else {
+            u32::from(first)
+        }
     } else {
         u32::from(first)
     };
     Ok(Value::from_smi(
         i32::try_from(code_point).expect("Unicode code points fit into i32"),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn small_smi_char_code_units_mask_without_allocating_a_vec() {
+        let arguments = [
+            Value::from_smi(0xD83D),
+            Value::from_smi(0xDE00),
+            Value::from_smi(-1),
+        ];
+
+        let (units, len) = collect_small_smi_char_code_units(&arguments)
+            .expect("all-small-SMI arguments should use the stack fast path");
+
+        assert_eq!(len, 3);
+        assert_eq!(&units[..len], &[0xD83D, 0xDE00, 0xFFFF]);
+    }
+
+    #[test]
+    fn single_code_unit_string_builtins_do_not_clone_full_strings() {
+        let source = include_str!("basic.rs");
+        for function in [
+            "string_char_at_builtin",
+            "string_char_code_at_builtin",
+            "string_at_builtin",
+            "string_code_point_at_builtin",
+        ] {
+            let body = function_source(source, function);
+            assert!(
+                !body.contains("string_ref_code_units(cx, string)?"),
+                "{function} should read individual code units without cloning the full string"
+            );
+        }
+    }
+
+    fn function_source<'a>(source: &'a str, function: &str) -> &'a str {
+        let start = source
+            .find(&format!("fn {function}"))
+            .unwrap_or_else(|| panic!("{function} should exist in basic.rs"));
+        let rest = &source[start..];
+        let next_fn = rest[1..]
+            .find("\nfn ")
+            .or_else(|| rest[1..].find("\n#[cfg(test)]"))
+            .map_or(rest.len(), |index| index + 1);
+        &rest[..next_fn]
+    }
 }

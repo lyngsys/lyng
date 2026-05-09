@@ -101,6 +101,39 @@ fn runtime_boots_root_cluster_and_thread_affine_root_agent() {
 }
 
 #[test]
+fn agent_reuses_recent_two_code_unit_string() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let before_strings = agent.heap().view().string_stats().occupied_slots;
+
+    let first = agent.cached_two_code_unit_string([0xD83D, 0xDE00], AllocationLifetime::Default);
+    let repeated = agent.cached_two_code_unit_string([0xD83D, 0xDE00], AllocationLifetime::Default);
+    let different =
+        agent.cached_two_code_unit_string([0xD83D, 0xDE01], AllocationLifetime::Default);
+    let after_strings = agent.heap().view().string_stats().occupied_slots;
+
+    assert_eq!(first, repeated);
+    assert_ne!(first, different);
+    assert_eq!(after_strings - before_strings, 2);
+}
+
+#[test]
+fn agent_reuses_recent_short_latin1_string() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let before_strings = agent.heap().view().string_stats().occupied_slots;
+
+    let first = agent.cached_short_latin1_string(b"%8F", AllocationLifetime::Default);
+    let repeated = agent.cached_short_latin1_string(b"%8F", AllocationLifetime::Default);
+    let different = agent.cached_short_latin1_string(b"%90", AllocationLifetime::Default);
+    let after_strings = agent.heap().view().string_stats().occupied_slots;
+
+    assert_eq!(first, repeated);
+    assert_ne!(first, different);
+    assert_eq!(after_strings - before_strings, 2);
+}
+
+#[test]
 fn regexp_legacy_static_state_records_matches_as_lazy_source_ranges() {
     let source = StringRef::from_raw(17).expect("non-zero string ref");
     let mut state = RegExpLegacyStaticState::default();
