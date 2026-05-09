@@ -1,5 +1,3 @@
-#![allow(clippy::too_many_lines)]
-
 use lyng_js_bytecode::CompiledScriptUnit;
 use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_compiler::compile_script;
@@ -340,6 +338,21 @@ fn render_report(options: &Options, reports: &[WorkloadReport]) -> String {
     let aggregate = aggregate_density(reports);
     let invocation = invocation_hint(&options.report_path);
 
+    write_density_report_intro(&mut out, options, profile, &invocation);
+    write_static_density_table(&mut out, reports);
+    write_throughput_table(&mut out, reports);
+    write_aggregate_density_section(&mut out, reports.len(), &aggregate);
+    write_density_notes(&mut out);
+
+    out
+}
+
+fn write_density_report_intro(
+    out: &mut String,
+    options: &Options,
+    profile: &str,
+    invocation: &str,
+) {
     let _ = writeln!(
         out,
         "# Lyng JS Bytecode Density and Instruction-Cache Proxy ({})",
@@ -369,6 +382,9 @@ fn render_report(options: &Options, reports: &[WorkloadReport]) -> String {
         options.loop_trip_count
     );
     let _ = writeln!(out);
+}
+
+fn write_static_density_table(out: &mut String, reports: &[WorkloadReport]) {
     let _ = writeln!(out, "## Static Density");
     let _ = writeln!(out);
     let _ = writeln!(
@@ -398,6 +414,9 @@ fn render_report(options: &Options, reports: &[WorkloadReport]) -> String {
         );
     }
     let _ = writeln!(out);
+}
+
+fn write_throughput_table(out: &mut String, reports: &[WorkloadReport]) {
     let _ = writeln!(out, "## Runtime Throughput Proxy");
     let _ = writeln!(out);
     let _ = writeln!(
@@ -423,9 +442,16 @@ fn render_report(options: &Options, reports: &[WorkloadReport]) -> String {
         );
     }
     let _ = writeln!(out);
+}
+
+fn write_aggregate_density_section(
+    out: &mut String,
+    workload_count: usize,
+    aggregate: &AggregateDensity,
+) {
     let _ = writeln!(out, "## Aggregate Density");
     let _ = writeln!(out);
-    let _ = writeln!(out, "- Workloads measured: `{}`", reports.len());
+    let _ = writeln!(out, "- Workloads measured: `{workload_count}`");
     let _ = writeln!(out, "- Aggregate unit bytes: `{}`", aggregate.unit_bytes);
     let _ = writeln!(out, "- Aggregate base words: `{}`", aggregate.base_words);
     let _ = writeln!(
@@ -449,6 +475,9 @@ fn render_report(options: &Options, reports: &[WorkloadReport]) -> String {
         aggregate.max_unit_bytes
     );
     let _ = writeln!(out);
+}
+
+fn write_density_notes(out: &mut String) {
     let _ = writeln!(out, "## Notes");
     let _ = writeln!(out);
     let _ = writeln!(
@@ -463,8 +492,6 @@ fn render_report(options: &Options, reports: &[WorkloadReport]) -> String {
         out,
         "- The large-register row exists specifically to exercise wide operands and test whether the base 4-byte word plus one extra payload word remains acceptable without redesigning the common-case instruction layout."
     );
-
-    out
 }
 
 fn invocation_hint(report_path: &str) -> String {

@@ -161,7 +161,6 @@ enum ModuleExecutionError {
     Other(String),
 }
 
-#[allow(clippy::too_many_lines)]
 pub fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> RunOutcome {
     let source = match fs::read_to_string(&test.path) {
         Ok(source) => source,
@@ -174,175 +173,27 @@ pub fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> RunOutcome
         return outcome;
     }
 
-    if expectation.requires_standalone_frontend_check() {
-        let parse_source = effective_parse_source(&source, test.variant);
-        let parse_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let mut atoms = AtomTable::new();
-            if expectation.module_goal {
-                let parsed = parse_module(&mut atoms, SourceId::new(0), &parse_source);
-                (atoms, parsed.diagnostics, true)
-            } else {
-                let parsed = parse_script(&mut atoms, SourceId::new(0), &parse_source);
-                (atoms, parsed.diagnostics, false)
-            }
-        }));
-
-        let (atoms, parse_diagnostics, parsed_as_module) = match parse_result {
-            Ok(result) => result,
-            Err(panic) => {
-                return RunOutcome::Fail(format!("PANIC parse: {}", panic_message(&panic)));
-            }
-        };
-
-        if parse_diagnostics.has_errors() {
-            return match expectation
-                .negative
-                .as_ref()
-                .map(|negative| &negative.phase)
-            {
-                Some(ExpectedFailurePhase::Parse) => {
-                    frontend_negative_outcome("parse", expectation)
-                }
-                _ => RunOutcome::Fail("unexpected parse error".to_string()),
-            };
-        }
-
-        let sema_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let mut atoms = atoms;
-            if parsed_as_module {
-                let parsed = parse_module(&mut atoms, SourceId::new(0), &parse_source);
-                analyze_module(&parsed, &atoms).diagnostics
-            } else {
-                let parsed = parse_script(&mut atoms, SourceId::new(0), &parse_source);
-                analyze_script(&parsed, &atoms).diagnostics
-            }
-        }));
-        let sema_diagnostics = match sema_result {
-            Ok(sema) => sema,
-            Err(panic) => {
-                return RunOutcome::Fail(format!("PANIC sema: {}", panic_message(&panic)));
-            }
-        };
-
-        if sema_diagnostics.has_errors() {
-            return match expectation
-                .negative
-                .as_ref()
-                .map(|negative| &negative.phase)
-            {
-                Some(ExpectedFailurePhase::Parse) => {
-                    frontend_negative_outcome("parse", expectation)
-                }
-                Some(ExpectedFailurePhase::Early) => {
-                    frontend_negative_outcome("early", expectation)
-                }
-                _ => RunOutcome::Fail("unexpected sema error".to_string()),
-            };
-        }
-
-        if let Some(negative) = expectation.negative.as_ref() {
-            match negative.phase {
-                ExpectedFailurePhase::Parse => {
-                    return RunOutcome::Fail(
-                        "expected parse error but frontend succeeded".to_string(),
-                    );
-                }
-                ExpectedFailurePhase::Early => {
-                    return RunOutcome::Fail("expected early error but sema passed".to_string());
-                }
-                ExpectedFailurePhase::Other(_) => unreachable!("unknown phase handled earlier"),
-                ExpectedFailurePhase::Runtime | ExpectedFailurePhase::Resolution => {}
-            }
-        }
+    if expectation.requires_standalone_frontend_check()
+        && let Some(outcome) =
+            standalone_frontend_outcome(&source, test.variant, expectation.clone())
+    {
+        return outcome;
     }
 
-    let runtime_entry_source = if test.variant.is_raw() {
-        Cow::Borrowed(source.as_str())
-    } else {
-        hot_test_runtime_source(&test.path, &source)
-    };
-    let runtime_source = match helpers.build_runtime_source_for_variant(
-        &test.metadata,
-        test.variant,
-        &runtime_entry_source,
-    ) {
+    let runtime_source = match build_runtime_source(test, helpers, &source) {
         Ok(source) => source,
         Err(error) => return RunOutcome::Fail(error),
     };
-
     let print_observer = Test262PrintObserver::default();
     let provider: SharedRealmExtensionProvider =
         Arc::new(Test262RealmExtension::new(print_observer.clone()));
-
-    let outcome = if expectation.module_goal {
-        match run_module(&test.path, &runtime_source, helpers, &provider) {
-            Ok(()) => match expectation
-                .negative
-                .as_ref()
-                .map(|negative| &negative.phase)
-            {
-                Some(ExpectedFailurePhase::Runtime) => {
-                    RunOutcome::Fail("expected runtime error but evaluation succeeded".to_string())
-                }
-                Some(ExpectedFailurePhase::Resolution) => RunOutcome::Fail(
-                    "expected resolution error but module loading succeeded".to_string(),
-                ),
-                _ => RunOutcome::Pass,
-            },
-            Err(ModuleExecutionError::Abrupt { actual_type }) => negative_runtime_outcome(
-                expectation.negative.as_ref(),
-                "runtime",
-                actual_type.as_deref(),
-            ),
-            Err(ModuleExecutionError::FrontendSyntax { stage }) => {
-                negative_resolution_frontend_outcome(expectation.negative.as_ref(), stage)
-            }
-            Err(ModuleExecutionError::Other(error)) => match expectation
-                .negative
-                .as_ref()
-                .map(|negative| &negative.phase)
-            {
-                Some(ExpectedFailurePhase::Resolution) => RunOutcome::Fail(format!(
-                    "expected SyntaxError resolution failure but got {error}"
-                )),
-                Some(ExpectedFailurePhase::Runtime) => {
-                    RunOutcome::Fail(format!("expected runtime error but got {error}"))
-                }
-                _ => RunOutcome::Fail(error),
-            },
-        }
-    } else {
-        match run_script(&test.path, &runtime_source, helpers, &provider) {
-            Ok(()) => match expectation
-                .negative
-                .as_ref()
-                .map(|negative| &negative.phase)
-            {
-                Some(ExpectedFailurePhase::Runtime) => {
-                    RunOutcome::Fail("expected runtime error but evaluation succeeded".to_string())
-                }
-                Some(ExpectedFailurePhase::Resolution) => RunOutcome::Fail(
-                    "expected resolution error but script evaluation succeeded".to_string(),
-                ),
-                _ => RunOutcome::Pass,
-            },
-            Err(ScriptExecutionError::Abrupt { actual_type }) => negative_runtime_outcome(
-                expectation.negative.as_ref(),
-                "runtime",
-                actual_type.as_deref(),
-            ),
-            Err(ScriptExecutionError::Vm(error)) => match expectation
-                .negative
-                .as_ref()
-                .map(|negative| &negative.phase)
-            {
-                Some(ExpectedFailurePhase::Runtime) => {
-                    RunOutcome::Fail(format!("expected runtime error but got {error}"))
-                }
-                _ => RunOutcome::Fail(format!("runtime error: {error}")),
-            },
-        }
-    };
+    let outcome = run_runtime_test(
+        &test.path,
+        &runtime_source,
+        helpers,
+        &provider,
+        &expectation,
+    );
 
     if expectation.async_test && matches!(outcome, RunOutcome::Pass) {
         return async_completion_outcome(&print_observer.messages());
@@ -351,7 +202,97 @@ pub fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> RunOutcome
     outcome
 }
 
-#[allow(clippy::too_many_lines)]
+fn build_runtime_source(
+    test: &PreparedTest,
+    helpers: &Arc<HelperCatalog>,
+    source: &str,
+) -> Result<String, String> {
+    let runtime_entry_source = runtime_entry_source(&test.path, test.variant, source);
+    helpers.build_runtime_source_for_variant(&test.metadata, test.variant, &runtime_entry_source)
+}
+
+fn runtime_entry_source<'a>(path: &Path, variant: TestVariant, source: &'a str) -> Cow<'a, str> {
+    if variant.is_raw() {
+        Cow::Borrowed(source)
+    } else {
+        hot_test_runtime_source(path, source)
+    }
+}
+
+fn run_runtime_test(
+    path: &Path,
+    runtime_source: &str,
+    helpers: &Arc<HelperCatalog>,
+    provider: &SharedRealmExtensionProvider,
+    expectation: &TestExpectation,
+) -> RunOutcome {
+    if expectation.module_goal {
+        module_runtime_outcome(
+            run_module(path, runtime_source, helpers, provider),
+            expectation,
+        )
+    } else {
+        let result = run_script(path, runtime_source, helpers, provider);
+        script_runtime_outcome(result, expectation)
+    }
+}
+
+fn runtime_success_outcome(expectation: &TestExpectation, resolution_target: &str) -> RunOutcome {
+    match expectation
+        .negative
+        .as_ref()
+        .map(|negative| &negative.phase)
+    {
+        Some(ExpectedFailurePhase::Runtime) => {
+            RunOutcome::Fail("expected runtime error but evaluation succeeded".to_string())
+        }
+        Some(ExpectedFailurePhase::Resolution) => RunOutcome::Fail(format!(
+            "expected resolution error but {resolution_target} succeeded"
+        )),
+        _ => RunOutcome::Pass,
+    }
+}
+
+fn module_runtime_outcome(
+    result: Result<(), ModuleExecutionError>,
+    expectation: &TestExpectation,
+) -> RunOutcome {
+    match result {
+        Ok(()) => runtime_success_outcome(expectation, "module loading"),
+        Err(ModuleExecutionError::Abrupt { actual_type }) => negative_runtime_outcome(
+            expectation.negative.as_ref(),
+            "runtime",
+            actual_type.as_deref(),
+        ),
+        Err(ModuleExecutionError::FrontendSyntax { stage }) => {
+            negative_resolution_frontend_outcome(expectation.negative.as_ref(), stage)
+        }
+        Err(ModuleExecutionError::Other(error)) => match expectation
+            .negative
+            .as_ref()
+            .map(|negative| &negative.phase)
+        {
+            Some(ExpectedFailurePhase::Resolution) => RunOutcome::Fail(format!(
+                "expected SyntaxError resolution failure but got {error}"
+            )),
+            Some(ExpectedFailurePhase::Runtime) => {
+                RunOutcome::Fail(format!("expected runtime error but got {error}"))
+            }
+            _ => RunOutcome::Fail(error),
+        },
+    }
+}
+
+fn script_runtime_outcome(
+    result: Result<(), ScriptExecutionError>,
+    expectation: &TestExpectation,
+) -> RunOutcome {
+    match result {
+        Ok(()) => runtime_success_outcome(expectation, "script evaluation"),
+        Err(error) => script_error_outcome(error, expectation),
+    }
+}
+
 pub fn run_test_with_diagnostics(
     test: &PreparedTest,
     helpers: &Arc<HelperCatalog>,
@@ -359,33 +300,14 @@ pub fn run_test_with_diagnostics(
     let total_start = Instant::now();
     let mut timings = Test262DiagnosticTimings::default();
 
-    let read_start = Instant::now();
-    let source = match fs::read_to_string(&test.path) {
-        Ok(source) => {
-            timings.read_source = read_start.elapsed();
-            source
-        }
-        Err(error) => {
-            timings.read_source = read_start.elapsed();
-            timings.total = total_start.elapsed();
-            return DiagnosticExecution {
-                outcome_label: diagnostic_outcome_label(&RunOutcome::Fail(format!(
-                    "read error: {error}"
-                ))),
-                timings,
-                diagnostics: None,
-            };
-        }
+    let source = match read_source_with_timing(&test.path, &mut timings) {
+        Ok(source) => source,
+        Err(outcome) => return finish_diagnostic_execution(&outcome, total_start, timings, None),
     };
 
     let expectation = TestExpectation::from_metadata(&test.metadata);
     if let Some(outcome) = expectation.fail_for_unknown_phase() {
-        timings.total = total_start.elapsed();
-        return DiagnosticExecution {
-            outcome_label: diagnostic_outcome_label(&outcome),
-            timings,
-            diagnostics: None,
-        };
+        return finish_diagnostic_execution(&outcome, total_start, timings, None);
     }
 
     if expectation.requires_standalone_frontend_check() {
@@ -393,85 +315,28 @@ pub fn run_test_with_diagnostics(
         let outcome = standalone_frontend_outcome(&source, test.variant, expectation.clone());
         timings.frontend_check = frontend_start.elapsed();
         if let Some(outcome) = outcome {
-            timings.total = total_start.elapsed();
-            return DiagnosticExecution {
-                outcome_label: diagnostic_outcome_label(&outcome),
-                timings,
-                diagnostics: None,
-            };
+            return finish_diagnostic_execution(&outcome, total_start, timings, None);
         }
     }
 
-    let runtime_entry_source = if test.variant.is_raw() {
-        Cow::Borrowed(source.as_str())
-    } else {
-        hot_test_runtime_source(&test.path, &source)
-    };
-    let assembly_start = Instant::now();
-    let runtime_source = match helpers.build_runtime_source_for_variant(
-        &test.metadata,
-        test.variant,
-        &runtime_entry_source,
-    ) {
-        Ok(source) => {
-            timings.runtime_assembly = assembly_start.elapsed();
-            source
-        }
-        Err(error) => {
-            timings.runtime_assembly = assembly_start.elapsed();
-            timings.total = total_start.elapsed();
-            return DiagnosticExecution {
-                outcome_label: diagnostic_outcome_label(&RunOutcome::Fail(error)),
-                timings,
-                diagnostics: None,
-            };
-        }
-    };
+    let runtime_source =
+        match build_runtime_source_with_timing(test, helpers, &source, &mut timings) {
+            Ok(source) => source,
+            Err(outcome) => {
+                return finish_diagnostic_execution(&outcome, total_start, timings, None);
+            }
+        };
 
     let print_observer = Test262PrintObserver::default();
     let provider: SharedRealmExtensionProvider =
         Arc::new(Test262RealmExtension::new(print_observer.clone()));
-
-    let (outcome, script_timings, diagnostics) = if expectation.module_goal {
-        let eval_start = Instant::now();
-        let outcome = match run_module(&test.path, &runtime_source, helpers, &provider) {
-            Ok(()) => match expectation
-                .negative
-                .as_ref()
-                .map(|negative| &negative.phase)
-            {
-                Some(ExpectedFailurePhase::Runtime) => {
-                    RunOutcome::Fail("expected runtime error but evaluation succeeded".to_string())
-                }
-                Some(ExpectedFailurePhase::Resolution) => RunOutcome::Fail(
-                    "expected resolution error but module loading succeeded".to_string(),
-                ),
-                _ => RunOutcome::Pass,
-            },
-            Err(ModuleExecutionError::Abrupt { actual_type }) => negative_runtime_outcome(
-                expectation.negative.as_ref(),
-                "runtime",
-                actual_type.as_deref(),
-            ),
-            Err(ModuleExecutionError::FrontendSyntax { stage }) => {
-                negative_resolution_frontend_outcome(expectation.negative.as_ref(), stage)
-            }
-            Err(ModuleExecutionError::Other(error)) => RunOutcome::Fail(error),
-        };
-        let module_timings = Test262DiagnosticTimings {
-            evaluation: eval_start.elapsed(),
-            ..Test262DiagnosticTimings::default()
-        };
-        (outcome, module_timings, None)
-    } else {
-        run_script_with_diagnostics(
-            &test.path,
-            &runtime_source,
-            helpers,
-            &provider,
-            &expectation,
-        )
-    };
+    let (outcome, script_timings, diagnostics) = run_runtime_with_diagnostics(
+        &test.path,
+        &runtime_source,
+        helpers,
+        &provider,
+        &expectation,
+    );
     timings.parse += script_timings.parse;
     timings.sema += script_timings.sema;
     timings.lowering += script_timings.lowering;
@@ -483,9 +348,86 @@ pub fn run_test_with_diagnostics(
     } else {
         outcome
     };
+    finish_diagnostic_execution(&outcome, total_start, timings, diagnostics)
+}
+
+fn read_source_with_timing(
+    path: &Path,
+    timings: &mut Test262DiagnosticTimings,
+) -> Result<String, RunOutcome> {
+    let read_start = Instant::now();
+    let result =
+        fs::read_to_string(path).map_err(|error| RunOutcome::Fail(format!("read error: {error}")));
+    timings.read_source = read_start.elapsed();
+    result
+}
+
+fn build_runtime_source_with_timing(
+    test: &PreparedTest,
+    helpers: &Arc<HelperCatalog>,
+    source: &str,
+    timings: &mut Test262DiagnosticTimings,
+) -> Result<String, RunOutcome> {
+    let assembly_start = Instant::now();
+    let result = build_runtime_source(test, helpers, source).map_err(RunOutcome::Fail);
+    timings.runtime_assembly = assembly_start.elapsed();
+    result
+}
+
+fn run_runtime_with_diagnostics(
+    path: &Path,
+    runtime_source: &str,
+    helpers: &Arc<HelperCatalog>,
+    provider: &SharedRealmExtensionProvider,
+    expectation: &TestExpectation,
+) -> (
+    RunOutcome,
+    Test262DiagnosticTimings,
+    Option<Test262RuntimeDiagnostics>,
+) {
+    if expectation.module_goal {
+        let eval_start = Instant::now();
+        let outcome = diagnostic_module_runtime_outcome(
+            run_module(path, runtime_source, helpers, provider),
+            expectation,
+        );
+        let timings = Test262DiagnosticTimings {
+            evaluation: eval_start.elapsed(),
+            ..Test262DiagnosticTimings::default()
+        };
+        (outcome, timings, None)
+    } else {
+        run_script_with_diagnostics(path, runtime_source, helpers, provider, expectation)
+    }
+}
+
+fn diagnostic_module_runtime_outcome(
+    result: Result<(), ModuleExecutionError>,
+    expectation: &TestExpectation,
+) -> RunOutcome {
+    match result {
+        Ok(()) => runtime_success_outcome(expectation, "module loading"),
+        Err(ModuleExecutionError::Abrupt { actual_type }) => negative_runtime_outcome(
+            expectation.negative.as_ref(),
+            "runtime",
+            actual_type.as_deref(),
+        ),
+        Err(ModuleExecutionError::FrontendSyntax { stage }) => {
+            negative_resolution_frontend_outcome(expectation.negative.as_ref(), stage)
+        }
+        Err(ModuleExecutionError::Other(error)) => RunOutcome::Fail(error),
+    }
+}
+
+fn finish_diagnostic_execution(
+    outcome: &RunOutcome,
+    total_start: Instant,
+    mut timings: Test262DiagnosticTimings,
+    diagnostics: Option<Test262RuntimeDiagnostics>,
+) -> DiagnosticExecution {
     timings.total = total_start.elapsed();
     DiagnosticExecution {
-        outcome_label: diagnostic_outcome_label(&outcome),
+        outcome_label: diagnostic_outcome_label(outcome),
         timings,
         diagnostics,
     }

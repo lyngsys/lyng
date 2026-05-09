@@ -1,5 +1,3 @@
-#![allow(clippy::too_many_lines)]
-
 use lyng_js_builtins::BootstrapMode;
 use lyng_js_bytecode::{BytecodeFunction, CompiledAtom, CompiledScriptUnit};
 use lyng_js_common::{AtomTable, SourceId};
@@ -327,135 +325,151 @@ fn measure_throughput(
     workload: &Workload,
     options: &Options,
 ) -> BenchResult<ThroughputResult> {
-    let mut samples = Vec::with_capacity(options.samples);
-
-    match workload.pipeline {
+    let samples = match workload.pipeline {
         WorkloadPipeline::ScriptRuntime => {
-            let mut atoms = AtomTable::new();
-            let unit = compile_script_unit(source_id, &workload.source, &mut atoms)?;
-            for _ in 0..options.samples {
-                let mut runtime = Runtime::new(NoopHostHooks);
-                let agent = runtime.root_agent_mut();
-                let realm = agent.default_realm().ok_or_else(|| {
-                    "default realm should exist for runtime benchmark".to_string()
-                })?;
-                let mut vm = Vm::new();
-                let _ = vm
-                    .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
-                    .map_err(|error| {
-                        format!("spec bootstrap failed for runtime benchmark: {error:?}")
-                    })?;
-                let installed = vm
-                    .install_script(agent, realm.id(), &unit)
-                    .map_err(|error| {
-                        format!("script install failed for {}: {error:?}", workload.name)
-                    })?;
-
-                for _ in 0..options.warmup_runs {
-                    let value = vm
-                        .evaluate_installed(
-                            agent,
-                            installed,
-                            realm.global_env(),
-                            realm.global_env(),
-                        )
-                        .map_err(|error| {
-                            format!("warmup execution failed for {}: {error:?}", workload.name)
-                        })?;
-                    black_box(value.bits());
-                }
-
-                let start = Instant::now();
-                let mut checksum = 0_u64;
-                for _ in 0..options.runs_per_sample {
-                    let value = black_box(
-                        vm.evaluate_installed(
-                            agent,
-                            installed,
-                            realm.global_env(),
-                            realm.global_env(),
-                        )
-                        .map_err(|error| {
-                            format!("timed execution failed for {}: {error:?}", workload.name)
-                        })?,
-                    );
-                    checksum = checksum.wrapping_add(black_box(value.bits()));
-                }
-                black_box(checksum);
-                samples.push(SampleResult {
-                    elapsed: start.elapsed(),
-                });
-            }
+            measure_script_runtime_samples(source_id, workload, options)?
         }
         WorkloadPipeline::ScriptFrontend => {
-            for _ in 0..options.samples {
-                for _ in 0..options.warmup_runs {
-                    let mut atoms = AtomTable::new();
-                    let parsed = parse_script(&mut atoms, source_id, &workload.source);
-                    if parsed.diagnostics.has_errors() {
-                        return Err(format!(
-                            "parse errors in {}: {:?}",
-                            workload.name,
-                            parsed.diagnostics.as_slice()
-                        ));
-                    }
-                    let sema = analyze_script(&parsed, &atoms);
-                    if sema.diagnostics.has_errors() {
-                        return Err(format!(
-                            "sema errors in {}: {:?}",
-                            workload.name,
-                            sema.diagnostics.as_slice()
-                        ));
-                    }
-                    black_box(parsed.root.raw());
-                }
-
-                let start = Instant::now();
-                for _ in 0..options.runs_per_sample {
-                    let mut atoms = AtomTable::new();
-                    let parsed = parse_script(&mut atoms, source_id, &workload.source);
-                    if parsed.diagnostics.has_errors() {
-                        return Err(format!(
-                            "parse errors in {}: {:?}",
-                            workload.name,
-                            parsed.diagnostics.as_slice()
-                        ));
-                    }
-                    let sema = analyze_script(&parsed, &atoms);
-                    if sema.diagnostics.has_errors() {
-                        return Err(format!(
-                            "sema errors in {}: {:?}",
-                            workload.name,
-                            sema.diagnostics.as_slice()
-                        ));
-                    }
-                    black_box(parsed.root.raw());
-                }
-                samples.push(SampleResult {
-                    elapsed: start.elapsed(),
-                });
-            }
+            measure_script_frontend_samples(source_id, workload, options)?
         }
         WorkloadPipeline::ModuleCompile => {
-            for _ in 0..options.samples {
-                for _ in 0..options.warmup_runs {
-                    let mut atoms = AtomTable::new();
-                    let _ = compile_module_unit(source_id, &workload.source, &mut atoms)?;
-                }
-
-                let start = Instant::now();
-                for _ in 0..options.runs_per_sample {
-                    let mut atoms = AtomTable::new();
-                    let unit = compile_module_unit(source_id, &workload.source, &mut atoms)?;
-                    black_box(unit.entry());
-                }
-                samples.push(SampleResult {
-                    elapsed: start.elapsed(),
-                });
-            }
+            measure_module_compile_samples(source_id, workload, options)?
         }
+    };
+
+    throughput_result(options, workload, &samples)
+}
+
+fn measure_script_runtime_samples(
+    source_id: SourceId,
+    workload: &Workload,
+    options: &Options,
+) -> BenchResult<Vec<SampleResult>> {
+    let mut atoms = AtomTable::new();
+    let unit = compile_script_unit(source_id, &workload.source, &mut atoms)?;
+    let mut samples = Vec::with_capacity(options.samples);
+    for _ in 0..options.samples {
+        samples.push(measure_script_runtime_sample(workload, options, &unit)?);
+    }
+    Ok(samples)
+}
+
+fn measure_script_runtime_sample(
+    workload: &Workload,
+    options: &Options,
+    unit: &CompiledScriptUnit,
+) -> BenchResult<SampleResult> {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent
+        .default_realm()
+        .ok_or_else(|| "default realm should exist for runtime benchmark".to_string())?;
+    let mut vm = Vm::new();
+    let _ = vm
+        .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
+        .map_err(|error| format!("spec bootstrap failed for runtime benchmark: {error:?}"))?;
+    let installed = vm
+        .install_script(agent, realm.id(), unit)
+        .map_err(|error| format!("script install failed for {}: {error:?}", workload.name))?;
+
+    for _ in 0..options.warmup_runs {
+        let value = vm
+            .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .map_err(|error| format!("warmup execution failed for {}: {error:?}", workload.name))?;
+        black_box(value.bits());
     }
 
+    let start = Instant::now();
+    let mut checksum = 0_u64;
+    for _ in 0..options.runs_per_sample {
+        let value = black_box(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .map_err(|error| {
+                    format!("timed execution failed for {}: {error:?}", workload.name)
+                })?,
+        );
+        checksum = checksum.wrapping_add(black_box(value.bits()));
+    }
+    black_box(checksum);
+    Ok(SampleResult {
+        elapsed: start.elapsed(),
+    })
+}
+
+fn measure_script_frontend_samples(
+    source_id: SourceId,
+    workload: &Workload,
+    options: &Options,
+) -> BenchResult<Vec<SampleResult>> {
+    let mut samples = Vec::with_capacity(options.samples);
+    for _ in 0..options.samples {
+        for _ in 0..options.warmup_runs {
+            check_frontend_workload(source_id, workload)?;
+        }
+
+        let start = Instant::now();
+        for _ in 0..options.runs_per_sample {
+            check_frontend_workload(source_id, workload)?;
+        }
+        samples.push(SampleResult {
+            elapsed: start.elapsed(),
+        });
+    }
+    Ok(samples)
+}
+
+fn check_frontend_workload(source_id: SourceId, workload: &Workload) -> BenchResult<()> {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(&mut atoms, source_id, &workload.source);
+    if parsed.diagnostics.has_errors() {
+        return Err(format!(
+            "parse errors in {}: {:?}",
+            workload.name,
+            parsed.diagnostics.as_slice()
+        ));
+    }
+    let sema = analyze_script(&parsed, &atoms);
+    if sema.diagnostics.has_errors() {
+        return Err(format!(
+            "sema errors in {}: {:?}",
+            workload.name,
+            sema.diagnostics.as_slice()
+        ));
+    }
+    black_box(parsed.root.raw());
+    Ok(())
+}
+
+fn measure_module_compile_samples(
+    source_id: SourceId,
+    workload: &Workload,
+    options: &Options,
+) -> BenchResult<Vec<SampleResult>> {
+    let mut samples = Vec::with_capacity(options.samples);
+    for _ in 0..options.samples {
+        for _ in 0..options.warmup_runs {
+            let mut atoms = AtomTable::new();
+            let _ = compile_module_unit(source_id, &workload.source, &mut atoms)?;
+        }
+
+        let start = Instant::now();
+        for _ in 0..options.runs_per_sample {
+            let mut atoms = AtomTable::new();
+            let unit = compile_module_unit(source_id, &workload.source, &mut atoms)?;
+            black_box(unit.entry());
+        }
+        samples.push(SampleResult {
+            elapsed: start.elapsed(),
+        });
+    }
+    Ok(samples)
+}
+
+fn throughput_result(
+    options: &Options,
+    workload: &Workload,
+    samples: &[SampleResult],
+) -> BenchResult<ThroughputResult> {
     let median_total = median_duration(samples.iter().map(|sample| sample.elapsed).collect());
     let runs_per_sample = u32::try_from(options.runs_per_sample)
         .map_err(|_| "--runs exceeds runtime benchmark reporting range".to_string())?;
@@ -821,6 +835,49 @@ fn function_template_bytes(function: &BytecodeFunction) -> usize {
         + size_of_val(function.deopt_snapshots())
 }
 
+struct RuntimeWatchItems<'a> {
+    dense_array_runtime: &'a WorkloadReport,
+    iterator_array_runtime: &'a WorkloadReport,
+    string_runtime: &'a WorkloadReport,
+    regexp_runtime: &'a WorkloadReport,
+    regexp_constructor_runtime: &'a WorkloadReport,
+    regexp_replace_runtime: &'a WorkloadReport,
+    regexp_legacy_static_runtime: &'a WorkloadReport,
+    regexp_stable_exec_runtime: &'a WorkloadReport,
+    class_runtime: &'a WorkloadReport,
+    typed_array_runtime: &'a WorkloadReport,
+    seeded_snapshot: &'a RuntimeSnapshot,
+}
+
+impl<'a> RuntimeWatchItems<'a> {
+    fn collect(
+        reports: &'a [WorkloadReport],
+        snapshots: &'a [RuntimeSnapshot],
+    ) -> BenchResult<Self> {
+        let seeded_snapshot = snapshots
+            .iter()
+            .find(|snapshot| snapshot.label == "runtime.promise-and-backing-store")
+            .ok_or_else(|| "runtime.promise-and-backing-store snapshot is missing".to_string())?;
+
+        Ok(Self {
+            dense_array_runtime: report_by_name(reports, "array-heavy.literal-indexed-runtime")?,
+            iterator_array_runtime: report_by_name(reports, "array-heavy.iterator-runtime")?,
+            string_runtime: report_by_name(reports, "string-heavy.concat-runtime")?,
+            regexp_runtime: report_by_name(reports, "regexp-heavy.runtime")?,
+            regexp_constructor_runtime: report_by_name(
+                reports,
+                "regexp-constructor-compile.runtime",
+            )?,
+            regexp_replace_runtime: report_by_name(reports, "regexp-named-replace.runtime")?,
+            regexp_legacy_static_runtime: report_by_name(reports, "regexp-legacy-statics.runtime")?,
+            regexp_stable_exec_runtime: report_by_name(reports, "regexp-stable-exec.runtime")?,
+            class_runtime: report_by_name(reports, "class-heavy.runtime")?,
+            typed_array_runtime: report_by_name(reports, "typed-array-heavy.runtime")?,
+            seeded_snapshot,
+        })
+    }
+}
+
 fn render_report(
     options: &Options,
     reports: &[WorkloadReport],
@@ -831,62 +888,71 @@ fn render_report(
         "cargo run --release -p lyng-js-bench -- runtime --report {}",
         options.report_path
     );
-    let dense_array_runtime = report_by_name(reports, "array-heavy.literal-indexed-runtime")?;
-    let iterator_array_runtime = report_by_name(reports, "array-heavy.iterator-runtime")?;
-    let string_runtime = report_by_name(reports, "string-heavy.concat-runtime")?;
-    let regexp_runtime = report_by_name(reports, "regexp-heavy.runtime")?;
-    let regexp_constructor_runtime = report_by_name(reports, "regexp-constructor-compile.runtime")?;
-    let regexp_replace_runtime = report_by_name(reports, "regexp-named-replace.runtime")?;
-    let regexp_legacy_static_runtime = report_by_name(reports, "regexp-legacy-statics.runtime")?;
-    let regexp_stable_exec_runtime = report_by_name(reports, "regexp-stable-exec.runtime")?;
-    let class_runtime = report_by_name(reports, "class-heavy.runtime")?;
-    let typed_array_runtime = report_by_name(reports, "typed-array-heavy.runtime")?;
-    let seeded_snapshot = snapshots
-        .iter()
-        .find(|snapshot| snapshot.label == "runtime.promise-and-backing-store")
-        .ok_or_else(|| "runtime.promise-and-backing-store snapshot is missing".to_string())?;
+    let watch_items = RuntimeWatchItems::collect(reports, snapshots)?;
 
-    // `String` formatting is infallible for this report writer; missing required
-    // benchmark data is validated above and reported through `BenchResult`.
-    macro_rules! line {
-        () => {{
-            output.push('\n');
-        }};
-        ($($arg:tt)*) => {{
-            let _ = writeln!(&mut output, $($arg)*);
-        }};
-    }
+    write_runtime_report_intro(&mut output, options, &command);
+    write_workload_throughput_section(&mut output, reports);
+    write_template_feedback_section(&mut output, reports);
+    write_runtime_accounting_section(&mut output, snapshots);
+    write_watch_items_section(&mut output, &watch_items);
+    write_known_gaps_section(&mut output);
 
-    line!("# Lyng JS Benchmarks and Memory Report");
-    line!();
-    line!("This report is generated by `{command}`.");
-    line!(
+    Ok(output)
+}
+
+fn write_runtime_report_intro(output: &mut String, options: &Options, command: &str) {
+    let _ = writeln!(output, "# Lyng JS Benchmarks and Memory Report");
+    output.push('\n');
+    let _ = writeln!(output, "This report is generated by `{command}`.");
+    let _ = writeln!(
+        output,
         "It covers the current Lyng JS runtime, frontend, and memory benchmark surface with dense-indexed, iterator-driven, string-heavy, RegExp-heavy, class-heavy, and typed-array-heavy runtime baselines, plus the remaining async-heavy and module-heavy non-runtime rows. Executable workload rows sit alongside retained runtime-accounting snapshots."
     );
-    line!();
+    output.push('\n');
 
-    line!("## Settings");
-    line!();
-    line!("- Profile: `release`");
-    line!("- Target OS: `{}`", env::consts::OS);
-    line!("- Target architecture: `{}`", env::consts::ARCH);
-    line!("- Samples per benchmark: `{}`", options.samples);
-    line!("- Warmup runs per sample: `{}`", options.warmup_runs);
-    line!("- Timed runs per sample: `{}`", options.runs_per_sample);
-    line!("- Runtime loop trips: `{}`", options.loop_trip_count);
-    line!(
+    let _ = writeln!(output, "## Settings");
+    output.push('\n');
+    let _ = writeln!(output, "- Profile: `release`");
+    let _ = writeln!(output, "- Target OS: `{}`", env::consts::OS);
+    let _ = writeln!(output, "- Target architecture: `{}`", env::consts::ARCH);
+    let _ = writeln!(output, "- Samples per benchmark: `{}`", options.samples);
+    let _ = writeln!(
+        output,
+        "- Warmup runs per sample: `{}`",
+        options.warmup_runs
+    );
+    let _ = writeln!(
+        output,
+        "- Timed runs per sample: `{}`",
+        options.runs_per_sample
+    );
+    let _ = writeln!(
+        output,
+        "- Runtime loop trips: `{}`",
+        options.loop_trip_count
+    );
+    let _ = writeln!(
+        output,
         "- Frontend repetition count: `{}`",
         options.frontend_repetitions
     );
-    line!();
+    output.push('\n');
+}
 
-    line!("## Workload Throughput");
-    line!();
-    line!("| Benchmark | Pipeline | Samples | Runs/sample | Work units/run | Median total | Median us/run | Median ns/work-unit | Note |"
+fn write_workload_throughput_section(output: &mut String, reports: &[WorkloadReport]) {
+    let _ = writeln!(output, "## Workload Throughput");
+    output.push('\n');
+    let _ = writeln!(
+        output,
+        "| Benchmark | Pipeline | Samples | Runs/sample | Work units/run | Median total | Median us/run | Median ns/work-unit | Note |"
     );
-    line!("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+    let _ = writeln!(
+        output,
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+    );
     for report in reports {
-        line!(
+        let _ = writeln!(
+            output,
             "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{:.2}` | `{:.2}` | {} |",
             report.workload.name,
             report.workload.pipeline.label(),
@@ -899,15 +965,23 @@ fn render_report(
             report.workload.note,
         );
     }
-    line!();
+    output.push('\n');
+}
 
-    line!("## Template and Feedback Memory");
-    line!();
-    line!("| Benchmark | Pipeline | Functions | Encoded bytes | Metadata records | Template bytes | Atom payload bytes | Feedback slots | Live sites | Feedback codes | Allocated feedback bytes | Memory note |"
+fn write_template_feedback_section(output: &mut String, reports: &[WorkloadReport]) {
+    let _ = writeln!(output, "## Template and Feedback Memory");
+    output.push('\n');
+    let _ = writeln!(
+        output,
+        "| Benchmark | Pipeline | Functions | Encoded bytes | Metadata records | Template bytes | Atom payload bytes | Feedback slots | Live sites | Feedback codes | Allocated feedback bytes | Memory note |"
     );
-    line!("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+    let _ = writeln!(
+        output,
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+    );
     for report in reports {
-        line!(
+        let _ = writeln!(
+            output,
             "| `{}` | `{}` | {} | {} | {} | {} | `{}` | {} | {} | {} | {} | {} |",
             report.workload.name,
             report.workload.pipeline.label(),
@@ -923,15 +997,23 @@ fn render_report(
             report.memory.note,
         );
     }
-    line!();
+    output.push('\n');
+}
 
-    line!("## Runtime Accounting Snapshots");
-    line!();
-    line!("| Snapshot | Heap live bytes | Heap reserved bytes | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
+fn write_runtime_accounting_section(output: &mut String, snapshots: &[RuntimeSnapshot]) {
+    let _ = writeln!(output, "## Runtime Accounting Snapshots");
+    output.push('\n');
+    let _ = writeln!(
+        output,
+        "| Snapshot | Heap live bytes | Heap reserved bytes | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
     );
-    line!("| --- | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |");
+    let _ = writeln!(
+        output,
+        "| --- | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
+    );
     for snapshot in snapshots {
-        line!(
+        let _ = writeln!(
+            output,
             "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
             snapshot.label,
             snapshot.accounting.heap.live_bytes,
@@ -946,69 +1028,71 @@ fn render_report(
             snapshot.note,
         );
     }
-    line!();
+    output.push('\n');
+}
 
-    line!("## Watch Items");
-    line!();
-    line!("- The executable array runtime baselines now include both dense-indexed and iterator-driven rows. On this run, `array-heavy.literal-indexed-runtime` measured `{:.2}` ns/work-unit and `array-heavy.iterator-runtime` measured `{:.2}` ns/work-unit.",
-        dense_array_runtime.throughput.median_ns_per_operation,
-        iterator_array_runtime.throughput.median_ns_per_operation,
+fn write_watch_items_section(output: &mut String, items: &RuntimeWatchItems<'_>) {
+    let _ = writeln!(output, "## Watch Items");
+    output.push('\n');
+    let _ = writeln!(output, "- The executable array runtime baselines now include both dense-indexed and iterator-driven rows. On this run, `array-heavy.literal-indexed-runtime` measured `{:.2}` ns/work-unit and `array-heavy.iterator-runtime` measured `{:.2}` ns/work-unit.",
+        items.dense_array_runtime.throughput.median_ns_per_operation,
+        items.iterator_array_runtime.throughput.median_ns_per_operation,
     );
-    line!("- The iterator-driven row warmed `{}` feedback slots across `{}` live sites with `{}` template bytes, so the benchmark captures real iterator lowering and VM state rather than only the older dense-element hot path.",
-        opt_usize_text(iterator_array_runtime.memory.feedback_slots),
-        opt_usize_text(iterator_array_runtime.memory.live_feedback_sites),
-        opt_usize_text(iterator_array_runtime.memory.template_bytes),
+    let _ = writeln!(output, "- The iterator-driven row warmed `{}` feedback slots across `{}` live sites with `{}` template bytes, so the benchmark captures real iterator lowering and VM state rather than only the older dense-element hot path.",
+        opt_usize_text(items.iterator_array_runtime.memory.feedback_slots),
+        opt_usize_text(items.iterator_array_runtime.memory.live_feedback_sites),
+        opt_usize_text(items.iterator_array_runtime.memory.template_bytes),
     );
-    line!("- `string-heavy.concat-runtime` remains the lower-level string/runtime proxy at `{:.2}` ns/work-unit.",
-        string_runtime.throughput.median_ns_per_operation,
+    let _ = writeln!(output, "- `string-heavy.concat-runtime` remains the lower-level string/runtime proxy at `{:.2}` ns/work-unit.",
+        items.string_runtime.throughput.median_ns_per_operation,
     );
-    line!("- `regexp-heavy.runtime` measured `{:.2}` ns/work-unit while exercising global iteration, sticky state, match indices, and named-capture replacement through the shared matcher path.",
-        regexp_runtime.throughput.median_ns_per_operation,
+    let _ = writeln!(output, "- `regexp-heavy.runtime` measured `{:.2}` ns/work-unit while exercising global iteration, sticky state, match indices, and named-capture replacement through the shared matcher path.",
+        items.regexp_runtime.throughput.median_ns_per_operation,
     );
-    line!("- RegExp observability rows separate constructor compilation (`{:.2}` ns/work-unit), stable default exec/test (`{:.2}` ns/work-unit), named replacement (`{:.2}` ns/work-unit), and legacy static accessor reads (`{:.2}` ns/work-unit).",
-        regexp_constructor_runtime
+    let _ = writeln!(output, "- RegExp observability rows separate constructor compilation (`{:.2}` ns/work-unit), stable default exec/test (`{:.2}` ns/work-unit), named replacement (`{:.2}` ns/work-unit), and legacy static accessor reads (`{:.2}` ns/work-unit).",
+        items.regexp_constructor_runtime
             .throughput
             .median_ns_per_operation,
-        regexp_stable_exec_runtime
+        items.regexp_stable_exec_runtime
             .throughput
             .median_ns_per_operation,
-        regexp_replace_runtime.throughput.median_ns_per_operation,
-        regexp_legacy_static_runtime
+        items.regexp_replace_runtime.throughput.median_ns_per_operation,
+        items.regexp_legacy_static_runtime
             .throughput
             .median_ns_per_operation,
     );
-    line!("- `class-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering private fields, static blocks, and `super` dispatch on the executable runtime path.",
-        class_runtime.throughput.median_ns_per_operation,
-        opt_usize_text(class_runtime.memory.feedback_slots),
-        opt_usize_text(class_runtime.memory.live_feedback_sites),
-        opt_usize_text(class_runtime.memory.template_bytes),
+    let _ = writeln!(output, "- `class-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering private fields, static blocks, and `super` dispatch on the executable runtime path.",
+        items.class_runtime.throughput.median_ns_per_operation,
+        opt_usize_text(items.class_runtime.memory.feedback_slots),
+        opt_usize_text(items.class_runtime.memory.live_feedback_sites),
+        opt_usize_text(items.class_runtime.memory.template_bytes),
     );
-    line!("- `async-heavy.frontend` remains the only frontend-only async workload in the current benchmark surface. That is now a benchmark-shape gap rather than a known lowering/runtime hole, so follow-up work should add an executable async runtime row."
+    let _ = writeln!(output, "- `async-heavy.frontend` remains the only frontend-only async workload in the current benchmark surface. That is now a benchmark-shape gap rather than a known lowering/runtime hole, so follow-up work should add an executable async runtime row."
     );
-    line!("- `typed-array-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering ArrayBuffer-backed views and DataView byte traffic on the executable runtime path.",
-        typed_array_runtime.throughput.median_ns_per_operation,
-        opt_usize_text(typed_array_runtime.memory.feedback_slots),
-        opt_usize_text(typed_array_runtime.memory.live_feedback_sites),
-        opt_usize_text(typed_array_runtime.memory.template_bytes),
+    let _ = writeln!(output, "- `typed-array-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering ArrayBuffer-backed views and DataView byte traffic on the executable runtime path.",
+        items.typed_array_runtime.throughput.median_ns_per_operation,
+        opt_usize_text(items.typed_array_runtime.memory.feedback_slots),
+        opt_usize_text(items.typed_array_runtime.memory.live_feedback_sites),
+        opt_usize_text(items.typed_array_runtime.memory.template_bytes),
     );
-    line!("- The seeded accounting snapshot reports `{}` promise job and `{}` backing store so the retained runtime-accounting surface is exercised by real data. Retained RegExp payloads report as a distinct runtime domain, with payload bytes treated as a lower-bound estimate because the current regex backend does not expose all internally owned tables. Iterator-heavy evidence still lives in the executable array/iterator workload rows because iterator state is transient VM execution state rather than a retained post-run runtime record.",
-        seeded_snapshot.accounting.promise_jobs.records,
-        seeded_snapshot.accounting.backing_stores.records,
+    let _ = writeln!(output, "- The seeded accounting snapshot reports `{}` promise job and `{}` backing store so the retained runtime-accounting surface is exercised by real data. Retained RegExp payloads report as a distinct runtime domain, with payload bytes treated as a lower-bound estimate because the current regex backend does not expose all internally owned tables. Iterator-heavy evidence still lives in the executable array/iterator workload rows because iterator state is transient VM execution state rather than a retained post-run runtime record.",
+        items.seeded_snapshot.accounting.promise_jobs.records,
+        items.seeded_snapshot.accounting.backing_stores.records,
     );
-    line!();
+    output.push('\n');
+}
 
-    line!("## Known Gaps");
-    line!();
-    line!("- This report complements the dedicated bytecode-density suite rather than replacing it. The density run remains the finer-grained instruction-shape view."
+fn write_known_gaps_section(output: &mut String) {
+    let _ = writeln!(output, "## Known Gaps");
+    output.push('\n');
+    let _ = writeln!(output, "- This report complements the dedicated bytecode-density suite rather than replacing it. The density run remains the finer-grained instruction-shape view."
     );
-    line!("- The remaining frontend-only row does not report AST or sema heap residency. Its current memory row is limited to atom payload and the explicit absence of code-template or feedback state."
+    let _ = writeln!(output, "- The remaining frontend-only row does not report AST or sema heap residency. Its current memory row is limited to atom payload and the explicit absence of code-template or feedback state."
     );
-    line!("- Module-cache accounting remains a future retained-runtime domain. Post-run iterator-record rows are still zero because the current iterator state is transient to active VM execution, so the benchmarked array/iterator runtime rows are the authoritative memory/perf signal for that surface."
+    let _ = writeln!(output, "- Module-cache accounting remains a future retained-runtime domain. Post-run iterator-record rows are still zero because the current iterator state is transient to active VM execution, so the benchmarked array/iterator runtime rows are the authoritative memory/perf signal for that surface."
     );
-    line!("- RegExp payload accounting is currently a lower bound: it includes source text, retained UTF-16 source units, flag text, and the `regress::Regex` struct, but not the backend's private instruction vectors, class tables, and capture metadata allocations."
+    let _ = writeln!(output, "- RegExp payload accounting is currently a lower bound: it includes source text, retained UTF-16 source units, flag text, and the `regress::Regex` struct, but not the backend's private instruction vectors, class tables, and capture metadata allocations."
     );
-
-    Ok(output)
 }
 
 fn report_by_name<'a>(
