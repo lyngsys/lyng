@@ -6,6 +6,7 @@ use lyng_js_host::NoopHostHooks;
 use lyng_js_parser::parse_script;
 use lyng_js_sema::analyze_script;
 use lyng_js_vm::Vm;
+use serde_json::{json, Value};
 use std::env;
 use std::fmt::Write;
 use std::fs;
@@ -19,6 +20,7 @@ pub const DEFAULT_LOOP_TRIPS: usize = 2_048;
 
 struct Options {
     report_path: String,
+    json_path: String,
     samples: usize,
     evals_per_sample: usize,
     loop_trip_count: usize,
@@ -92,15 +94,22 @@ pub fn run(args: &[String]) -> Result<(), String> {
         .iter()
         .map(|workload| measure_workload(workload, &options))
         .collect::<Vec<_>>();
-    let report = render_report(&options, &reports);
+    let previous = read_previous_json(&options.json_path);
+    let report = render_report(&options, &reports, previous.as_ref());
+    let json = render_json_report(&options, &reports, previous.as_ref());
     write_report(&options.report_path, &report);
-    print_summary(&options.report_path, &reports);
+    write_report(
+        &options.json_path,
+        &serde_json::to_string_pretty(&json).expect("density JSON report should render"),
+    );
+    print_summary(&options, &reports);
     Ok(())
 }
 
 fn parse_options(args: &[String]) -> Result<Options, String> {
     let mut options = Options {
         report_path: default_report_path(env::consts::ARCH),
+        json_path: default_json_path(env::consts::ARCH),
         samples: DEFAULT_SAMPLES,
         evals_per_sample: DEFAULT_EVALS,
         loop_trip_count: DEFAULT_LOOP_TRIPS,
@@ -113,6 +122,19 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
                 options.report_path = args.next().map_or_else(
                     || Err("--report requires a path".to_string()),
                     |value| Ok(value.clone()),
+                )?;
+            }
+            "--json" => {
+                options.json_path = args.next().map_or_else(
+                    || Err("--json requires a path".to_string()),
+                    |value| Ok(value.clone()),
+                )?;
+            }
+            "--preset" => {
+                apply_preset(
+                    &mut options,
+                    args.next()
+                        .ok_or_else(|| "--preset requires a name".to_string())?,
                 )?;
             }
             "--samples" => {
@@ -145,13 +167,54 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
 }
 
 fn usage() -> String {
-    "Usage: lyng-js-bench density [--report <path>] [--samples <n>] [--evals <n>] [--loop-trips <n>]"
+    "Usage: lyng-js-bench density [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--evals <n>] [--loop-trips <n>]"
         .to_string()
 }
 
 #[must_use]
 pub fn default_report_path(arch: &str) -> String {
     format!("reports/js/lyng-js/bytecode-density-{arch}.md")
+}
+
+#[must_use]
+pub fn default_json_path(arch: &str) -> String {
+    format!("reports/js/lyng-js/bytecode-density-{arch}.json")
+}
+
+fn apply_preset(options: &mut Options, preset: &str) -> Result<(), String> {
+    match preset {
+        "smoke" => {
+            options.samples = 1;
+            options.evals_per_sample = 1;
+            options.loop_trip_count = 64;
+        }
+        "inner-loop" => {
+            options.samples = 3;
+            options.evals_per_sample = 5;
+            options.loop_trip_count = 512;
+        }
+        "baseline" => {
+            options.samples = DEFAULT_SAMPLES;
+            options.evals_per_sample = DEFAULT_EVALS;
+            options.loop_trip_count = DEFAULT_LOOP_TRIPS;
+        }
+        "ci-regression" => {
+            options.samples = 5;
+            options.evals_per_sample = 11;
+            options.loop_trip_count = 2_048;
+        }
+        "profile-target" => {
+            options.samples = 1;
+            options.evals_per_sample = 1;
+            options.loop_trip_count = 32_768;
+        }
+        _ => {
+            return Err(format!(
+                "invalid --preset value `{preset}`; expected smoke, inner-loop, baseline, ci-regression, or profile-target"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn parse_usize_arg(flag: &str, value: Option<&String>) -> Result<usize, String> {
@@ -328,7 +391,11 @@ fn single_eval_bits(unit: &CompiledScriptUnit) -> u64 {
         .bits()
 }
 
-fn render_report(options: &Options, reports: &[WorkloadReport]) -> String {
+fn render_report(
+    options: &Options,
+    reports: &[WorkloadReport],
+    previous: Option<&Value>,
+) -> String {
     let mut out = String::new();
     let profile = if cfg!(debug_assertions) {
         "debug"
@@ -340,7 +407,7 @@ fn render_report(options: &Options, reports: &[WorkloadReport]) -> String {
 
     write_density_report_intro(&mut out, options, profile, &invocation);
     write_static_density_table(&mut out, reports);
-    write_throughput_table(&mut out, reports);
+    write_throughput_table(&mut out, reports, previous);
     write_aggregate_density_section(&mut out, reports.len(), &aggregate);
     write_density_notes(&mut out);
 
@@ -381,6 +448,7 @@ fn write_density_report_intro(
         "- Primary loop trip count seed: `{}`",
         options.loop_trip_count
     );
+    let _ = writeln!(out, "- JSON: `{}`", options.json_path);
     let _ = writeln!(out);
 }
 
@@ -416,30 +484,69 @@ fn write_static_density_table(out: &mut String, reports: &[WorkloadReport]) {
     let _ = writeln!(out);
 }
 
-fn write_throughput_table(out: &mut String, reports: &[WorkloadReport]) {
+fn write_throughput_table(out: &mut String, reports: &[WorkloadReport], previous: Option<&Value>) {
     let _ = writeln!(out, "## Runtime Throughput Proxy");
     let _ = writeln!(out);
-    let _ = writeln!(
-        out,
-        "| Workload | Samples | Evals/sample | Median total | Median us/eval | Entry bytes | Unit bytes | Note |"
-    );
-    let _ = writeln!(
-        out,
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
-    );
-    for report in reports {
+    if previous.is_some() {
         let _ = writeln!(
             out,
-            "| `{}` | `{}` | `{}` | `{}` | `{:.2}` | `{}` | `{}` | {} |",
-            report.throughput.name,
-            report.throughput.samples,
-            report.throughput.evals_per_sample,
-            format_duration(report.throughput.median_total),
-            report.throughput.median_us_per_eval,
-            report.density.entry_bytes,
-            report.density.unit_bytes,
-            report.throughput.note,
+            "| Workload | Samples | Evals/sample | Median total | Median us/eval | Median us/eval delta | Entry bytes | Unit bytes | Unit bytes delta | Note |"
         );
+        let _ = writeln!(
+            out,
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+        );
+    } else {
+        let _ = writeln!(
+            out,
+            "| Workload | Samples | Evals/sample | Median total | Median us/eval | Entry bytes | Unit bytes | Note |"
+        );
+        let _ = writeln!(
+            out,
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+        );
+    }
+    for report in reports {
+        if let Some(previous) = previous {
+            let eval_delta = previous_density_median_us(previous, report.name)
+                .map(|previous| report.throughput.median_us_per_eval - previous)
+                .map_or_else(|| "n/a".to_string(), format_delta);
+            let unit_bytes_delta = previous_density_unit_bytes(previous, report.name)
+                .and_then(|previous| {
+                    isize::try_from(report.density.unit_bytes)
+                        .ok()
+                        .zip(isize::try_from(previous).ok())
+                })
+                .map(|(current, previous)| current - previous)
+                .map_or_else(|| "n/a".to_string(), format_signed_int);
+            let _ = writeln!(
+                out,
+                "| `{}` | `{}` | `{}` | `{}` | `{:.2}` | `{}` | `{}` | `{}` | `{}` | {} |",
+                report.throughput.name,
+                report.throughput.samples,
+                report.throughput.evals_per_sample,
+                format_duration(report.throughput.median_total),
+                report.throughput.median_us_per_eval,
+                eval_delta,
+                report.density.entry_bytes,
+                report.density.unit_bytes,
+                unit_bytes_delta,
+                report.throughput.note,
+            );
+        } else {
+            let _ = writeln!(
+                out,
+                "| `{}` | `{}` | `{}` | `{}` | `{:.2}` | `{}` | `{}` | {} |",
+                report.throughput.name,
+                report.throughput.samples,
+                report.throughput.evals_per_sample,
+                format_duration(report.throughput.median_total),
+                report.throughput.median_us_per_eval,
+                report.density.entry_bytes,
+                report.density.unit_bytes,
+                report.throughput.note,
+            );
+        }
     }
     let _ = writeln!(out);
 }
@@ -537,6 +644,103 @@ fn aggregate_density(reports: &[WorkloadReport]) -> AggregateDensity {
     }
 }
 
+#[must_use]
+fn render_json_report(
+    options: &Options,
+    reports: &[WorkloadReport],
+    previous: Option<&Value>,
+) -> Value {
+    let aggregate = aggregate_density(reports);
+    json!({
+        "schema_version": 1,
+        "suite": "density",
+        "tool": "lyng-js-bench density",
+        "settings": {
+            "report_path": options.report_path,
+            "json_path": options.json_path,
+            "samples": options.samples,
+            "evals_per_sample": options.evals_per_sample,
+            "loop_trip_count": options.loop_trip_count,
+            "target_arch": env::consts::ARCH,
+        },
+        "has_previous": previous.is_some(),
+        "aggregate": {
+            "unit_bytes": aggregate.unit_bytes,
+            "base_words": aggregate.base_words,
+            "wide_words": aggregate.wide_words,
+            "wide_share_percent": aggregate.wide_share_percent,
+            "max_entry_bytes": aggregate.max_entry_bytes,
+            "max_unit_bytes": aggregate.max_unit_bytes,
+        },
+        "workloads": reports
+            .iter()
+            .map(|report| density_workload_json(report, previous))
+            .collect::<Vec<_>>(),
+    })
+}
+
+fn density_workload_json(report: &WorkloadReport, previous: Option<&Value>) -> Value {
+    let delta = previous.map(|previous| {
+        json!({
+            "median_us_per_eval": previous_density_median_us(previous, report.name)
+                .map(|previous| report.throughput.median_us_per_eval - previous),
+            "unit_bytes": previous_density_unit_bytes(previous, report.name)
+                .and_then(|previous| {
+                    isize::try_from(report.density.unit_bytes)
+                        .ok()
+                        .zip(isize::try_from(previous).ok())
+                })
+                .map(|(current, previous)| current - previous),
+        })
+    });
+
+    json!({
+        "name": report.name,
+        "note": report.note,
+        "density": {
+            "functions": report.density.functions,
+            "entry_words": report.density.entry_words,
+            "entry_bytes": report.density.entry_bytes,
+            "unit_words": report.density.unit_words,
+            "unit_bytes": report.density.unit_bytes,
+            "base_words": report.density.base_words,
+            "wide_words": report.density.wide_words,
+            "wide_share_percent": report.density.wide_share_percent,
+            "metadata_records": report.density.metadata_records,
+            "max_registers": report.density.max_registers,
+        },
+        "throughput": {
+            "samples": report.throughput.samples,
+            "evals_per_sample": report.throughput.evals_per_sample,
+            "median_total_ns": duration_ns(report.throughput.median_total),
+            "median_us_per_eval": report.throughput.median_us_per_eval,
+            "checksum": report.throughput.checksum,
+        },
+        "delta": delta,
+    })
+}
+
+fn previous_density_median_us(previous: &Value, name: &str) -> Option<f64> {
+    previous
+        .get("workloads")?
+        .as_array()?
+        .iter()
+        .find(|workload| workload.get("name").and_then(Value::as_str) == Some(name))
+        .and_then(|workload| workload.pointer("/throughput/median_us_per_eval"))
+        .and_then(Value::as_f64)
+}
+
+fn previous_density_unit_bytes(previous: &Value, name: &str) -> Option<usize> {
+    previous
+        .get("workloads")?
+        .as_array()?
+        .iter()
+        .find(|workload| workload.get("name").and_then(Value::as_str) == Some(name))
+        .and_then(|workload| workload.pointer("/density/unit_bytes"))
+        .and_then(Value::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
+}
+
 fn format_duration(duration: Duration) -> String {
     if duration.as_secs() > 0 {
         format!("{:.3}s", duration.as_secs_f64())
@@ -547,6 +751,18 @@ fn format_duration(duration: Duration) -> String {
     } else {
         format!("{}ns", duration.as_nanos())
     }
+}
+
+fn format_delta(delta: f64) -> String {
+    format!("{delta:+.2}")
+}
+
+fn format_signed_int(delta: isize) -> String {
+    format!("{delta:+}")
+}
+
+fn duration_ns(duration: Duration) -> u64 {
+    u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
 }
 
 #[allow(
@@ -576,8 +792,15 @@ fn write_report(path: &str, report: &str) {
     fs::write(path, report).expect("failed to write report");
 }
 
-fn print_summary(path: &str, reports: &[WorkloadReport]) {
-    println!("Report written to {path}");
+fn read_previous_json(path: &str) -> Option<Value> {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|source| serde_json::from_str(&source).ok())
+}
+
+fn print_summary(options: &Options, reports: &[WorkloadReport]) {
+    println!("Report written to {}", options.report_path);
+    println!("JSON report written to {}", options.json_path);
     for report in reports {
         println!(
             "{}: {} entry bytes, {} unit bytes, {:.2}% wide, {:.2} us/eval, checksum {}",
@@ -751,5 +974,81 @@ mod tests {
             default_report_path("aarch64"),
             "reports/js/lyng-js/bytecode-density-aarch64.md"
         );
+    }
+
+    #[test]
+    fn density_options_support_named_presets_and_json_path() {
+        let options = parse_options(&[
+            "--preset".to_string(),
+            "smoke".to_string(),
+            "--json".to_string(),
+            "/tmp/density-smoke.json".to_string(),
+        ])
+        .expect("density smoke preset should parse");
+
+        assert_eq!(options.report_path, default_report_path(env::consts::ARCH));
+        assert_eq!(options.json_path, "/tmp/density-smoke.json");
+        assert_eq!(options.samples, 1);
+        assert_eq!(options.evals_per_sample, 1);
+        assert_eq!(options.loop_trip_count, 64);
+    }
+
+    #[test]
+    fn density_report_and_json_include_previous_deltas() {
+        let report = WorkloadReport {
+            name: "delta-density",
+            note: "Synthetic density row.",
+            density: DensityMetrics {
+                functions: 1,
+                entry_words: 10,
+                entry_bytes: 40,
+                unit_words: 20,
+                unit_bytes: 80,
+                base_words: 18,
+                wide_words: 2,
+                wide_share_percent: 10.0,
+                metadata_records: 4,
+                max_registers: 16,
+            },
+            throughput: ThroughputResult {
+                name: "delta-density",
+                note: "Synthetic density row.",
+                samples: 1,
+                evals_per_sample: 1,
+                median_total: Duration::from_micros(100),
+                median_us_per_eval: 100.0,
+                checksum: 7,
+            },
+        };
+        let options = Options {
+            report_path: "/tmp/density.md".to_string(),
+            json_path: "/tmp/density.json".to_string(),
+            samples: 1,
+            evals_per_sample: 1,
+            loop_trip_count: 64,
+        };
+        let previous = serde_json::json!({
+            "workloads": [{
+                "name": "delta-density",
+                "density": {
+                    "unit_bytes": 64
+                },
+                "throughput": {
+                    "median_us_per_eval": 120.0
+                }
+            }]
+        });
+
+        let markdown = render_report(&options, std::slice::from_ref(&report), Some(&previous));
+        assert!(markdown.contains("Median us/eval delta"));
+        assert!(markdown.contains("-20.00"));
+        assert!(markdown.contains("Unit bytes delta"));
+        assert!(markdown.contains("+16"));
+
+        let json = render_json_report(&options, std::slice::from_ref(&report), Some(&previous));
+        assert_eq!(json["schema_version"], 1);
+        assert_eq!(json["suite"], "density");
+        assert_eq!(json["workloads"][0]["delta"]["median_us_per_eval"], -20.0);
+        assert_eq!(json["workloads"][0]["delta"]["unit_bytes"], 16);
     }
 }

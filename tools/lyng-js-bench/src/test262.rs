@@ -206,6 +206,9 @@ fn parse_options(args: &[String]) -> Result<Test262Options, String> {
     let mut args = args.iter();
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "--preset" => {
+                apply_preset(&mut options, required_value("--preset", args.next())?)?;
+            }
             "--filter" => {
                 options.filter = Some(required_value("--filter", args.next())?.to_string());
             }
@@ -262,13 +265,69 @@ fn parse_options(args: &[String]) -> Result<Test262Options, String> {
     Ok(options)
 }
 
+/// Parse Test262 benchmark options for integration tests without running the suite.
+///
+/// # Errors
+///
+/// Returns an error if the supplied arguments are invalid.
+pub fn parse_options_for_test(args: &[String]) -> Result<Test262Options, String> {
+    parse_options(args)
+}
+
 fn usage() -> String {
     [
-        "Usage: lyng-js-bench test262 [--filter <path-or-fragment>] [--report <path>] [--json <path>] [--mode hybrid|scan|sample] [--samples <n>] [--warmup-samples <n>] [--sample-files <n>] [--manifest <path>] [--proposal-stage <4|3|2.7>] [--no-skip] [--timeout-ms <N>] [-j <N>]",
+        "Usage: lyng-js-bench test262 [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--filter <path-or-fragment>] [--report <path>] [--json <path>] [--mode hybrid|scan|sample] [--samples <n>] [--warmup-samples <n>] [--sample-files <n>] [--manifest <path>] [--proposal-stage <4|3|2.7>] [--no-skip] [--timeout-ms <N>] [-j <N>]",
         "",
         "Runs Test262 performance diagnostics for agent triage.",
     ]
     .join("\n")
+}
+
+fn apply_preset(options: &mut Test262Options, preset: &str) -> Result<(), String> {
+    match preset {
+        "smoke" => {
+            options.mode = Test262Mode::Hybrid;
+            options.samples = 1;
+            options.warmup_samples = 0;
+            options.sample_files = 2;
+            options.timeout_ms = 3_000;
+        }
+        "inner-loop" => {
+            options.mode = Test262Mode::Hybrid;
+            options.samples = 3;
+            options.warmup_samples = 1;
+            options.sample_files = 5;
+            options.timeout_ms = 3_000;
+        }
+        "baseline" => {
+            let defaults = Test262Options::default();
+            options.mode = defaults.mode;
+            options.samples = defaults.samples;
+            options.warmup_samples = defaults.warmup_samples;
+            options.sample_files = defaults.sample_files;
+            options.timeout_ms = defaults.timeout_ms;
+        }
+        "ci-regression" => {
+            options.mode = Test262Mode::Hybrid;
+            options.samples = 3;
+            options.warmup_samples = 1;
+            options.sample_files = 25;
+            options.timeout_ms = 1_000;
+        }
+        "profile-target" => {
+            options.mode = Test262Mode::Sample;
+            options.samples = 1;
+            options.warmup_samples = 0;
+            options.sample_files = 1;
+            options.timeout_ms = 10_000;
+        }
+        _ => {
+            return Err(format!(
+                "invalid --preset value `{preset}`; expected smoke, inner-loop, baseline, ci-regression, or profile-target"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn required_value<'a>(flag: &str, value: Option<&'a String>) -> Result<&'a str, String> {

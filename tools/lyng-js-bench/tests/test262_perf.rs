@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use lyng_js_bench::test262::{
-    aggregate_sampled_variants, cause_hints_for_aggregate, render_json_report,
-    render_markdown_report, Test262Aggregate, Test262Options, Test262PhaseTimings, Test262Sample,
-    Test262VariantDiagnostics, Test262VariantIdentity,
+    aggregate_sampled_variants, cause_hints_for_aggregate, parse_options_for_test,
+    render_json_report, render_markdown_report, Test262Aggregate, Test262Mode, Test262Options,
+    Test262PhaseTimings, Test262Sample, Test262VariantDiagnostics, Test262VariantIdentity,
 };
 use serde_json::json;
 
@@ -162,4 +162,25 @@ fn reports_deltas_from_previous_agent_json() {
 
     let json = render_json_report(&options, &[aggregate], Some(&previous));
     assert_eq!(json["aggregates"][0]["delta"]["median_total_ms"], 30.0);
+}
+
+#[test]
+fn test262_options_support_named_smoke_preset() {
+    let options = parse_options_for_test(&[
+        "--preset".to_string(),
+        "smoke".to_string(),
+        "--filter".to_string(),
+        "staging/sm/Date/dst-offset-caching-2-of-8".to_string(),
+    ])
+    .expect("test262 smoke preset should parse");
+
+    assert_eq!(options.mode, Test262Mode::Hybrid);
+    assert_eq!(options.samples, 1);
+    assert_eq!(options.warmup_samples, 0);
+    assert_eq!(options.sample_files, 2);
+    assert_eq!(options.timeout_ms, 3_000);
+    assert_eq!(
+        options.filter.as_deref(),
+        Some("staging/sm/Date/dst-offset-caching-2-of-8")
+    );
 }

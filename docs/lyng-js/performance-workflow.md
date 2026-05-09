@@ -24,6 +24,19 @@ Do not start by adding a new benchmark corpus. Test262 should remain the first s
 truth for runtime bottleneck discovery until the workflow itself stops answering the
 question.
 
+## Presets
+
+Use named presets for repeatable local loops:
+
+- `smoke`: fastest end-to-end check that the target and report path work.
+- `inner-loop`: short local iteration while changing code.
+- `baseline`: checked-in default measurement shape.
+- `ci-regression`: wider agent or CI regression sweep.
+- `profile-target`: one long-running target intended for profiler attachment.
+
+Explicit flags after `--preset` override the preset values. Keep `--json` stable across
+before and after runs so the report can render deltas from the previous JSON baseline.
+
 ## Finding Targets
 
 Start with the slowest checked-in Test262 timings:
@@ -53,14 +66,10 @@ diagnostic path works:
 
 ```sh
 cargo run --release -p lyng-js-bench -- test262 \
+  --preset smoke \
   --filter staging/sm/Date/dst-offset-caching-2-of-8 \
   --report /tmp/lyng-js-test262-perf-smoke.md \
   --json /tmp/lyng-js-test262-perf-smoke.json \
-  --mode hybrid \
-  --samples 1 \
-  --warmup-samples 0 \
-  --sample-files 2 \
-  --timeout-ms 3000 \
   -j 4
 ```
 
@@ -74,12 +83,10 @@ writing the new report, so repeated runs produce report-only deltas.
 
 ```sh
 cargo run --release -p lyng-js-bench -- test262 \
+  --preset baseline \
   --filter staging/sm/Date/dst-offset-caching-2-of-8 \
   --report /tmp/lyng-js-test262-perf-date-dst.md \
   --json /tmp/lyng-js-test262-perf-date-dst.json \
-  --mode hybrid \
-  --samples 5 \
-  --warmup-samples 1 \
   --sample-files 2 \
   --timeout-ms 3000 \
   -j 4
@@ -94,13 +101,10 @@ Use a filtered sweep when one family has many candidate files:
 
 ```sh
 cargo run --release -p lyng-js-bench -- test262 \
+  --preset ci-regression \
   --filter built-ins/RegExp/property-escapes/generated \
   --report /tmp/lyng-js-test262-perf-regexp-properties.md \
   --json /tmp/lyng-js-test262-perf-regexp-properties.json \
-  --mode hybrid \
-  --samples 3 \
-  --warmup-samples 1 \
-  --sample-files 25 \
   --timeout-ms 3000 \
   -j 8
 ```
@@ -109,13 +113,9 @@ Use the whole-corpus performance diagnostic mode only when a broad ranking is ne
 
 ```sh
 cargo run --release -p lyng-js-bench -- test262 \
+  --preset ci-regression \
   --report /tmp/lyng-js-test262-perf.md \
   --json /tmp/lyng-js-test262-perf.json \
-  --mode hybrid \
-  --samples 3 \
-  --warmup-samples 1 \
-  --sample-files 25 \
-  --timeout-ms 1000 \
   -j 12
 ```
 

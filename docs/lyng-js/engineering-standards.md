@@ -89,8 +89,8 @@ cargo run --release -p lyng-js-test262 -- --report /tmp/lyng-js-test262-report.m
 Use benchmark tooling for hot-path, memory, or bytecode-density changes:
 
 ```sh
-cargo run --release -p lyng-js-bench -- runtime --report /tmp/lyng-js-bench.md
-cargo run --release -p lyng-js-bench -- density --report /tmp/lyng-js-bytecode-density.md
+cargo run --release -p lyng-js-bench -- runtime --preset inner-loop --report /tmp/lyng-js-bench.md --json /tmp/lyng-js-bench.json
+cargo run --release -p lyng-js-bench -- density --preset inner-loop --report /tmp/lyng-js-bytecode-density.md --json /tmp/lyng-js-bytecode-density.json
 ```
 
 ## Review Checklist

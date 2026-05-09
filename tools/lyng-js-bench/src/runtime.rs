@@ -8,6 +8,7 @@ use lyng_js_parser::{parse_module, parse_script};
 use lyng_js_sema::{analyze_module, analyze_script};
 use lyng_js_types::CodeRef;
 use lyng_js_vm::Vm;
+use serde_json::{json, Value};
 use std::cmp::Ordering;
 use std::env;
 use std::fmt::Write;
@@ -18,6 +19,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 pub const DEFAULT_REPORT_PATH: &str = "reports/js/lyng-js/bench.md";
+pub const DEFAULT_JSON_PATH: &str = "reports/js/lyng-js/bench.json";
 const DEFAULT_SAMPLES: usize = 7;
 const DEFAULT_RUNS: usize = 9;
 const DEFAULT_WARMUP_RUNS: usize = 2;
@@ -28,6 +30,7 @@ type BenchResult<T> = Result<T, String>;
 
 struct Options {
     report_path: String,
+    json_path: String,
     samples: usize,
     runs_per_sample: usize,
     warmup_runs: usize,
@@ -139,15 +142,23 @@ pub fn run(args: &[String]) -> Result<(), String> {
     reports.sort_by(|left, right| left.workload.name.cmp(right.workload.name));
 
     let snapshots = capture_runtime_snapshots()?;
-    let report = render_report(&options, &reports, &snapshots)?;
+    let previous = read_previous_json(&options.json_path);
+    let report = render_report(&options, &reports, &snapshots, previous.as_ref());
+    let json = render_json_report(&options, &reports, &snapshots, previous.as_ref());
     write_report(&options.report_path, &report)?;
-    print_summary(&options.report_path, &reports, &snapshots)?;
+    write_report(
+        &options.json_path,
+        &serde_json::to_string_pretty(&json)
+            .map_err(|error| format!("failed to render runtime JSON report: {error}"))?,
+    )?;
+    print_summary(&options, &reports, &snapshots)?;
     Ok(())
 }
 
 fn parse_options(args: &[String]) -> Result<Options, String> {
     let mut options = Options {
         report_path: DEFAULT_REPORT_PATH.to_string(),
+        json_path: DEFAULT_JSON_PATH.to_string(),
         samples: DEFAULT_SAMPLES,
         runs_per_sample: DEFAULT_RUNS,
         warmup_runs: DEFAULT_WARMUP_RUNS,
@@ -162,6 +173,19 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
                 options.report_path = args.next().map_or_else(
                     || Err("--report requires a path".to_string()),
                     |value| Ok(value.clone()),
+                )?;
+            }
+            "--json" => {
+                options.json_path = args.next().map_or_else(
+                    || Err("--json requires a path".to_string()),
+                    |value| Ok(value.clone()),
+                )?;
+            }
+            "--preset" => {
+                apply_preset(
+                    &mut options,
+                    args.next()
+                        .ok_or_else(|| "--preset requires a name".to_string())?,
                 )?;
             }
             "--samples" => {
@@ -207,7 +231,53 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
 }
 
 fn usage() -> String {
-    "Usage: lyng-js-bench runtime [--report <path>] [--samples <n>] [--runs <n>] [--warmup-runs <n>] [--loop-trips <n>] [--frontend-repetitions <n>]".to_string()
+    "Usage: lyng-js-bench runtime [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--runs <n>] [--warmup-runs <n>] [--loop-trips <n>] [--frontend-repetitions <n>]".to_string()
+}
+
+fn apply_preset(options: &mut Options, preset: &str) -> Result<(), String> {
+    match preset {
+        "smoke" => {
+            options.samples = 1;
+            options.runs_per_sample = 1;
+            options.warmup_runs = 1;
+            options.loop_trip_count = 64;
+            options.frontend_repetitions = 4;
+        }
+        "inner-loop" => {
+            options.samples = 3;
+            options.runs_per_sample = 3;
+            options.warmup_runs = 1;
+            options.loop_trip_count = 512;
+            options.frontend_repetitions = 8;
+        }
+        "baseline" => {
+            options.samples = DEFAULT_SAMPLES;
+            options.runs_per_sample = DEFAULT_RUNS;
+            options.warmup_runs = DEFAULT_WARMUP_RUNS;
+            options.loop_trip_count = DEFAULT_LOOP_TRIPS;
+            options.frontend_repetitions = DEFAULT_FRONTEND_REPETITIONS;
+        }
+        "ci-regression" => {
+            options.samples = 5;
+            options.runs_per_sample = 7;
+            options.warmup_runs = 2;
+            options.loop_trip_count = 2_048;
+            options.frontend_repetitions = 24;
+        }
+        "profile-target" => {
+            options.samples = 1;
+            options.runs_per_sample = 1;
+            options.warmup_runs = 1;
+            options.loop_trip_count = 32_768;
+            options.frontend_repetitions = 32;
+        }
+        _ => {
+            return Err(format!(
+                "invalid --preset value `{preset}`; expected smoke, inner-loop, baseline, ci-regression, or profile-target"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn parse_usize_arg(flag: &str, value: Option<&String>) -> Result<usize, String> {
@@ -882,22 +952,24 @@ fn render_report(
     options: &Options,
     reports: &[WorkloadReport],
     snapshots: &[RuntimeSnapshot],
-) -> BenchResult<String> {
+    previous: Option<&Value>,
+) -> String {
     let mut output = String::new();
     let command = format!(
-        "cargo run --release -p lyng-js-bench -- runtime --report {}",
-        options.report_path
+        "cargo run --release -p lyng-js-bench -- runtime --report {} --json {}",
+        options.report_path, options.json_path
     );
-    let watch_items = RuntimeWatchItems::collect(reports, snapshots)?;
 
     write_runtime_report_intro(&mut output, options, &command);
-    write_workload_throughput_section(&mut output, reports);
+    write_workload_throughput_section(&mut output, reports, previous);
     write_template_feedback_section(&mut output, reports);
     write_runtime_accounting_section(&mut output, snapshots);
-    write_watch_items_section(&mut output, &watch_items);
+    if let Ok(watch_items) = RuntimeWatchItems::collect(reports, snapshots) {
+        write_watch_items_section(&mut output, &watch_items);
+    }
     write_known_gaps_section(&mut output);
 
-    Ok(output)
+    output
 }
 
 fn write_runtime_report_intro(output: &mut String, options: &Options, command: &str) {
@@ -936,34 +1008,70 @@ fn write_runtime_report_intro(output: &mut String, options: &Options, command: &
         "- Frontend repetition count: `{}`",
         options.frontend_repetitions
     );
+    let _ = writeln!(output, "- JSON: `{}`", options.json_path);
     output.push('\n');
 }
 
-fn write_workload_throughput_section(output: &mut String, reports: &[WorkloadReport]) {
+fn write_workload_throughput_section(
+    output: &mut String,
+    reports: &[WorkloadReport],
+    previous: Option<&Value>,
+) {
     let _ = writeln!(output, "## Workload Throughput");
     output.push('\n');
-    let _ = writeln!(
-        output,
-        "| Benchmark | Pipeline | Samples | Runs/sample | Work units/run | Median total | Median us/run | Median ns/work-unit | Note |"
-    );
-    let _ = writeln!(
-        output,
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
-    );
-    for report in reports {
+    if previous.is_some() {
         let _ = writeln!(
             output,
-            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{:.2}` | `{:.2}` | {} |",
-            report.workload.name,
-            report.workload.pipeline.label(),
-            report.throughput.samples,
-            report.throughput.runs_per_sample,
-            report.throughput.operations_per_run,
-            format_duration(report.throughput.median_total),
-            report.throughput.median_us_per_run,
-            report.throughput.median_ns_per_operation,
-            report.workload.note,
+            "| Benchmark | Pipeline | Samples | Runs/sample | Work units/run | Median total | Median us/run | Median ns/work-unit | Median ns/work-unit delta | Note |"
         );
+        let _ = writeln!(
+            output,
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+        );
+    } else {
+        let _ = writeln!(
+            output,
+            "| Benchmark | Pipeline | Samples | Runs/sample | Work units/run | Median total | Median us/run | Median ns/work-unit | Note |"
+        );
+        let _ = writeln!(
+            output,
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+        );
+    }
+    for report in reports {
+        if let Some(previous) = previous {
+            let delta = previous_runtime_median_ns(previous, report.workload.name)
+                .map(|previous| report.throughput.median_ns_per_operation - previous)
+                .map_or_else(|| "n/a".to_string(), format_delta);
+            let _ = writeln!(
+                output,
+                "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{:.2}` | `{:.2}` | `{}` | {} |",
+                report.workload.name,
+                report.workload.pipeline.label(),
+                report.throughput.samples,
+                report.throughput.runs_per_sample,
+                report.throughput.operations_per_run,
+                format_duration(report.throughput.median_total),
+                report.throughput.median_us_per_run,
+                report.throughput.median_ns_per_operation,
+                delta,
+                report.workload.note,
+            );
+        } else {
+            let _ = writeln!(
+                output,
+                "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{:.2}` | `{:.2}` | {} |",
+                report.workload.name,
+                report.workload.pipeline.label(),
+                report.throughput.samples,
+                report.throughput.runs_per_sample,
+                report.throughput.operations_per_run,
+                format_duration(report.throughput.median_total),
+                report.throughput.median_us_per_run,
+                report.throughput.median_ns_per_operation,
+                report.workload.note,
+            );
+        }
     }
     output.push('\n');
 }
@@ -1095,6 +1203,112 @@ fn write_known_gaps_section(output: &mut String) {
     );
 }
 
+#[must_use]
+fn render_json_report(
+    options: &Options,
+    reports: &[WorkloadReport],
+    snapshots: &[RuntimeSnapshot],
+    previous: Option<&Value>,
+) -> Value {
+    json!({
+        "schema_version": 1,
+        "suite": "runtime",
+        "tool": "lyng-js-bench runtime",
+        "settings": {
+            "report_path": options.report_path,
+            "json_path": options.json_path,
+            "samples": options.samples,
+            "runs_per_sample": options.runs_per_sample,
+            "warmup_runs": options.warmup_runs,
+            "loop_trip_count": options.loop_trip_count,
+            "frontend_repetitions": options.frontend_repetitions,
+        },
+        "has_previous": previous.is_some(),
+        "workloads": reports
+            .iter()
+            .map(|report| runtime_workload_json(report, previous))
+            .collect::<Vec<_>>(),
+        "runtime_snapshots": snapshots
+            .iter()
+            .map(runtime_snapshot_json)
+            .collect::<Vec<_>>(),
+    })
+}
+
+fn runtime_workload_json(report: &WorkloadReport, previous: Option<&Value>) -> Value {
+    let delta = previous
+        .and_then(|previous| previous_runtime_median_ns(previous, report.workload.name))
+        .map(|previous| {
+            json!({
+                "median_ns_per_operation": report.throughput.median_ns_per_operation - previous,
+            })
+        });
+
+    json!({
+        "name": report.workload.name,
+        "pipeline": report.workload.pipeline.label(),
+        "note": report.workload.note,
+        "throughput": {
+            "samples": report.throughput.samples,
+            "runs_per_sample": report.throughput.runs_per_sample,
+            "operations_per_run": report.throughput.operations_per_run,
+            "median_total_ns": report.throughput.median_total.as_nanos(),
+            "median_us_per_run": report.throughput.median_us_per_run,
+            "median_ns_per_operation": report.throughput.median_ns_per_operation,
+        },
+        "memory": {
+            "functions": report.memory.functions,
+            "encoded_bytes": report.memory.encoded_bytes,
+            "metadata_records": report.memory.metadata_records,
+            "template_bytes": report.memory.template_bytes,
+            "atom_payload_bytes": report.memory.atom_payload_bytes,
+            "feedback_slots": report.memory.feedback_slots,
+            "live_feedback_sites": report.memory.live_feedback_sites,
+            "allocated_feedback_code_count": report.memory.allocated_feedback_code_count,
+            "allocated_feedback_bytes": report.memory.allocated_feedback_bytes,
+            "note": report.memory.note,
+        },
+        "delta": delta,
+    })
+}
+
+fn runtime_snapshot_json(snapshot: &RuntimeSnapshot) -> Value {
+    json!({
+        "label": snapshot.label,
+        "heap": {
+            "live_bytes": snapshot.accounting.heap.live_bytes,
+            "reserved_bytes": snapshot.accounting.heap.reserved_bytes,
+        },
+        "iterator_records": runtime_domain_json(snapshot.accounting.iterator_records),
+        "regexp_payloads": runtime_domain_json(snapshot.accounting.regexp_payloads),
+        "regexp_literal_cache": runtime_domain_json(snapshot.accounting.regexp_literal_cache),
+        "module_caches": runtime_domain_json(snapshot.accounting.module_caches),
+        "promise_jobs": runtime_domain_json(snapshot.accounting.promise_jobs),
+        "backing_stores": runtime_domain_json(snapshot.accounting.backing_stores),
+        "live_bytes": snapshot.accounting.live_bytes,
+        "note": snapshot.note,
+    })
+}
+
+fn runtime_domain_json(accounting: lyng_js_env::RuntimeDomainAccounting) -> Value {
+    json!({
+        "records": accounting.records,
+        "metadata_bytes": accounting.metadata_bytes,
+        "payload_bytes": accounting.payload_bytes,
+        "live_bytes": accounting.live_bytes,
+    })
+}
+
+fn previous_runtime_median_ns(previous: &Value, name: &str) -> Option<f64> {
+    previous
+        .get("workloads")?
+        .as_array()?
+        .iter()
+        .find(|workload| workload.get("name").and_then(Value::as_str) == Some(name))
+        .and_then(|workload| workload.pointer("/throughput/median_ns_per_operation"))
+        .and_then(Value::as_f64)
+}
+
 fn report_by_name<'a>(
     reports: &'a [WorkloadReport],
     name: &str,
@@ -1144,6 +1358,16 @@ fn format_duration(duration: Duration) -> String {
     }
 }
 
+fn format_delta(delta: f64) -> String {
+    format!("{delta:+.2}")
+}
+
+fn read_previous_json(path: &str) -> Option<Value> {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|source| serde_json::from_str(&source).ok())
+}
+
 fn write_report(path: &str, report: &str) -> BenchResult<()> {
     let report_path = Path::new(path);
     if let Some(parent) = report_path.parent() {
@@ -1163,7 +1387,7 @@ fn write_report(path: &str, report: &str) -> BenchResult<()> {
 }
 
 fn print_summary(
-    path: &str,
+    options: &Options,
     reports: &[WorkloadReport],
     snapshots: &[RuntimeSnapshot],
 ) -> BenchResult<()> {
@@ -1185,7 +1409,8 @@ fn print_summary(
         .max_by_key(|snapshot| snapshot.accounting.live_bytes)
         .ok_or_else(|| "runtime benchmark produced no accounting snapshots".to_string())?;
 
-    println!("Wrote {path}");
+    println!("Wrote {}", options.report_path);
+    println!("Wrote {}", options.json_path);
     println!(
         "Slowest row: {} at {:.2} ns/work-unit",
         slowest.workload.name, slowest.throughput.median_ns_per_operation
@@ -1540,6 +1765,7 @@ mod tests {
     fn generated_workloads_prepare_at_declared_stage() {
         let options = Options {
             report_path: DEFAULT_REPORT_PATH.to_string(),
+            json_path: DEFAULT_JSON_PATH.to_string(),
             samples: 1,
             runs_per_sample: 1,
             warmup_runs: 1,
@@ -1666,6 +1892,103 @@ mod tests {
     #[test]
     fn runtime_report_path_drops_phase_naming() {
         assert_eq!(DEFAULT_REPORT_PATH, "reports/js/lyng-js/bench.md");
+    }
+
+    #[test]
+    fn runtime_options_support_named_presets_and_json_path() {
+        let options = parse_options(&[
+            "--preset".to_string(),
+            "smoke".to_string(),
+            "--json".to_string(),
+            "/tmp/runtime-smoke.json".to_string(),
+        ])
+        .expect("runtime smoke preset should parse");
+
+        assert_eq!(options.report_path, DEFAULT_REPORT_PATH);
+        assert_eq!(options.json_path, "/tmp/runtime-smoke.json");
+        assert_eq!(options.samples, 1);
+        assert_eq!(options.runs_per_sample, 1);
+        assert_eq!(options.warmup_runs, 1);
+        assert_eq!(options.loop_trip_count, 64);
+        assert_eq!(options.frontend_repetitions, 4);
+    }
+
+    #[test]
+    fn runtime_report_and_json_include_previous_deltas() {
+        let workload = Workload {
+            name: "delta-runtime",
+            pipeline: WorkloadPipeline::ScriptRuntime,
+            note: "Synthetic delta row.",
+            source: String::new(),
+            operations_per_run: 10,
+        };
+        let report = WorkloadReport {
+            workload,
+            throughput: ThroughputResult {
+                samples: 1,
+                runs_per_sample: 1,
+                operations_per_run: 10,
+                median_total: Duration::from_micros(20),
+                median_us_per_run: 20.0,
+                median_ns_per_operation: 2_000.0,
+            },
+            memory: MemoryResult {
+                functions: Some(1),
+                encoded_bytes: Some(40),
+                metadata_records: Some(3),
+                template_bytes: Some(128),
+                atom_payload_bytes: 7,
+                feedback_slots: Some(2),
+                live_feedback_sites: Some(2),
+                allocated_feedback_code_count: Some(1),
+                allocated_feedback_bytes: Some(96),
+                note: "Synthetic memory row.",
+            },
+        };
+        let snapshot = RuntimeSnapshot {
+            label: "runtime.synthetic",
+            accounting: RuntimeAccounting::default(),
+            note: "Synthetic snapshot.",
+        };
+        let options = Options {
+            report_path: "/tmp/runtime.md".to_string(),
+            json_path: "/tmp/runtime.json".to_string(),
+            samples: 1,
+            runs_per_sample: 1,
+            warmup_runs: 1,
+            loop_trip_count: 10,
+            frontend_repetitions: 4,
+        };
+        let previous = serde_json::json!({
+            "workloads": [{
+                "name": "delta-runtime",
+                "throughput": {
+                    "median_ns_per_operation": 1_500.0
+                }
+            }]
+        });
+
+        let markdown = render_report(
+            &options,
+            std::slice::from_ref(&report),
+            std::slice::from_ref(&snapshot),
+            Some(&previous),
+        );
+        assert!(markdown.contains("Median ns/work-unit delta"));
+        assert!(markdown.contains("+500.00"));
+
+        let json = render_json_report(
+            &options,
+            std::slice::from_ref(&report),
+            std::slice::from_ref(&snapshot),
+            Some(&previous),
+        );
+        assert_eq!(json["schema_version"], 1);
+        assert_eq!(json["suite"], "runtime");
+        assert_eq!(
+            json["workloads"][0]["delta"]["median_ns_per_operation"],
+            500.0
+        );
     }
 
     #[test]
