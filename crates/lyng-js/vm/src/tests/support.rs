@@ -1,21 +1,20 @@
 pub(super) use crate::{
     seed_registers, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FeedbackSiteDetail,
     FeedbackVectorSnapshot, FrameFlags, FrameRecord, InstalledCode, RegisterWindow, TierStatus, Vm,
-    VmError, VmMarker,
+    VmError,
 };
 pub(super) use lyng_js_bytecode::{
     ArgumentsMode, BytecodeBuilder, BytecodeFunction, BytecodeFunctionId, BytecodeFunctionKind,
-    BytecodeMarker, CompiledAtom, CompiledFunctionUnit, CompiledScriptUnit, ConstantValue,
-    DeoptFrameValue, DeoptValueSource, ExceptionHandler, ExceptionHandlerKind, FeedbackSiteKind,
+    CompiledAtom, CompiledFunctionUnit, CompiledScriptUnit, ConstantValue, DeoptFrameValue,
+    DeoptValueSource, ExceptionHandler, ExceptionHandlerKind, FeedbackSiteKind,
     FeedbackSiteMetadata, Instruction, Opcode, SafepointKind,
 };
 pub(super) use lyng_js_common::{AtomId, AtomTable, SourceId, WellKnownAtom};
 pub(super) use lyng_js_compiler::{compile_module, compile_script, CompiledModuleUnit};
 pub(super) use lyng_js_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
-    ExecutableId, ExecutionContext, ExecutionContextKind, JobQueueKind, ModuleStatus,
-    PromiseReactionHandler, PromiseReactionKind, PromiseReactionRecord, RealmBootstrapState,
-    Runtime, RuntimeJobPayload, ThisState,
+    ExecutableId, ExecutionContextKind, JobQueueKind, ModuleStatus, PromiseReactionHandler,
+    PromiseReactionKind, PromiseReactionRecord, RealmBootstrapState, Runtime, RuntimeJobPayload,
 };
 pub(super) use lyng_js_gc::{
     AllocationLifetime, BigIntSign, PrimitiveMutator, PrimitiveStringView,
@@ -38,7 +37,6 @@ pub(super) use lyng_js_types::{
 };
 pub(super) use std::fmt::Write;
 pub(super) use std::mem::size_of;
-pub(super) use std::num::NonZeroU32;
 pub(super) use std::sync::Arc;
 
 #[derive(Default)]

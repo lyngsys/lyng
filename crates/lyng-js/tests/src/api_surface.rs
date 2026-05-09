@@ -52,6 +52,41 @@ fn obsolete_marker_apis_are_not_part_of_runtime_public_surface() {
             "crates/lyng-js/builtins/src/lib.rs",
             "pub struct BuiltinsMarker",
         ),
+        (
+            "crates/lyng-js/bytecode/src/function.rs",
+            "pub use marker::BytecodeMarker",
+        ),
+        (
+            "crates/lyng-js/bytecode/src/function/marker.rs",
+            "pub struct BytecodeMarker",
+        ),
+        ("crates/lyng-js/bytecode/src/lib.rs", "BytecodeMarker"),
+        (
+            "crates/lyng-js/compiler/src/lib.rs",
+            "pub struct CompilerMarker",
+        ),
+        (
+            "crates/lyng-js/compiler/src/lib.rs",
+            "pub const fn installable_script_unit",
+        ),
+        (
+            "crates/lyng-js/compiler/src/lib.rs",
+            "pub const fn installable_module_unit",
+        ),
+        (
+            "crates/lyng-js/compiler/src/lib.rs",
+            "pub const fn installable_function_unit",
+        ),
+        ("crates/lyng-js/vm/src/lib.rs", "pub use marker::VmMarker"),
+        ("crates/lyng-js/vm/src/marker.rs", "pub struct VmMarker"),
+        (
+            "tools/lyng-js-bench/src/runtime.rs",
+            concat!("module-heavy.", "place", "holder", "-compile"),
+        ),
+        (
+            "tools/lyng-js-bench/src/runtime.rs",
+            concat!("place", "holder compile_module"),
+        ),
     ];
 
     for (relative_path, snippet) in forbidden {

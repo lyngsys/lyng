@@ -1,6 +1,6 @@
 use crate::Opcode;
 
-/// Fixed-width 4-byte instruction forms reserved by the Phase 4 bytecode contract.
+/// Fixed-width 4-byte instruction forms used by the bytecode decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Instruction {
     Abc { opcode: Opcode, a: u8, b: u8, c: u8 },

@@ -1,4 +1,4 @@
-//! Interpreter and runtime-installation scaffolding for the lyng-js Phase 4 VM layer.
+//! Interpreter and runtime installation for the lyng-js VM layer.
 //!
 //! Ownership: `lyng_js_vm` owns runtime installation, frame records, register-window
 //! bookkeeping, and bytecode execution entrypoints. It does not own lowering, object
@@ -17,7 +17,6 @@ mod error;
 mod extensions;
 mod frame;
 mod installed;
-mod marker;
 mod name_refs;
 mod vm;
 
@@ -31,7 +30,6 @@ pub use extensions::{
 };
 pub use frame::{seed_registers, FrameFlags, FrameRecord, RegisterWindow};
 pub use installed::InstalledCode;
-pub use marker::VmMarker;
 pub use vm::{
     FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FeedbackSiteDetail,
     FeedbackSiteSnapshot, FeedbackVectorFootprint, FeedbackVectorSnapshot,

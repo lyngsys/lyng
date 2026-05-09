@@ -8,6 +8,6 @@ mod json;
 mod objects;
 mod optional_chaining;
 mod regexp;
-mod runtime_scaffolding;
+mod runtime_pipeline;
 mod script_core;
 mod support;

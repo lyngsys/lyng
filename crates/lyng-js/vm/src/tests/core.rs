@@ -15,44 +15,6 @@ fn installed_code_reports_bytecode_executable_identity() {
     );
 }
 #[test]
-fn vm_marker_round_trips_context_and_frame_state() {
-    let context = ExecutionContext::bytecode(
-        RealmRef::from_raw(3).unwrap(),
-        CodeRef::from_raw(11).unwrap(),
-        EnvironmentRef::from_raw(4).unwrap(),
-        EnvironmentRef::from_raw(4).unwrap(),
-    )
-    .with_this_state(ThisState::Value(Value::undefined()));
-    let marker = VmMarker::new(
-        BytecodeMarker::new(
-            SourceId::new(1),
-            BytecodeFunctionId::new(NonZeroU32::new(5).unwrap()),
-            FeedbackSlotId::new(NonZeroU32::new(6).unwrap()),
-        ),
-        context,
-        FrameRecord::new(
-            CodeRef::from_raw(11).unwrap(),
-            0,
-            RegisterWindow::new(0, 4),
-            Some(1),
-            RealmRef::from_raw(3).unwrap(),
-            EnvironmentRef::from_raw(4).unwrap(),
-            EnvironmentRef::from_raw(4).unwrap(),
-            ExecutionContextKind::Function,
-        )
-        .with_flags(FrameFlags::entry()),
-    );
-
-    assert_eq!(marker.bytecode().source(), SourceId::new(1));
-    assert_eq!(
-        marker.context().executable(),
-        ExecutableId::Bytecode(CodeRef::from_raw(11).unwrap())
-    );
-    assert_eq!(marker.frame().registers(), RegisterWindow::new(0, 4));
-    assert!(marker.frame().flags().contains(FrameFlags::entry()));
-}
-
-#[test]
 fn seed_registers_uses_window_length() {
     let registers = seed_registers(RegisterWindow::new(10, 3));
 
@@ -61,7 +23,7 @@ fn seed_registers_uses_window_length() {
 }
 
 #[test]
-fn frame_record_carries_phase4_execution_state() {
+fn frame_record_carries_bytecode_execution_state() {
     let frame = FrameRecord::new(
         CodeRef::from_raw(2).unwrap(),
         4,

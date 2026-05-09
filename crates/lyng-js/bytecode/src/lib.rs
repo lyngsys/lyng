@@ -1,4 +1,4 @@
-//! Bytecode templates and metadata for the lyng-js Phase 4 execution layer.
+//! Bytecode templates and metadata for the lyng-js execution layer.
 //!
 //! Ownership: `lyng_js_bytecode` owns immutable bytecode templates, instruction records,
 //! compiled-unit containers, metadata shells, builders, and disassembly helpers shared by
@@ -30,7 +30,7 @@ pub use decoder::{
 pub use disassembler::{disassemble, disassemble_instruction};
 pub use function::{
     BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags, BytecodeFunction,
-    BytecodeFunctionHeader, BytecodeMarker, CompiledAtom, CompiledFunctionUnit, CompiledScriptUnit,
+    BytecodeFunctionHeader, CompiledAtom, CompiledFunctionUnit, CompiledScriptUnit,
     GlobalLexicalBindingPlan, GlobalScriptInstantiationPlan,
 };
 pub use ids::{BytecodeFunctionId, EnvironmentLayoutRef};

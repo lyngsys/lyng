@@ -4,7 +4,7 @@ use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
 use lyng_js_types::{Completion, ObjectRef, PropertyKey};
 use std::collections::HashSet;
 
-/// Baseline ordinary-object `for-in` state for Phase 4 script execution.
+/// Baseline ordinary-object `for-in` state for script execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ForInEnumerator {
     keys: Vec<EnumeratedKey>,

@@ -25,8 +25,8 @@ pub struct FunctionSemaRecord {
     /// Whether this function contains a `with` statement.
     pub has_with: bool,
     /// Whether this function uses the `arguments` object.
-    /// Note: detection deferred to Phase 4 (requires runtime knowledge of
-    /// whether `arguments` is shadowed by a binding).
+    /// Note: precise materialization is deferred to runtime lowering because it requires
+    /// knowing whether `arguments` is shadowed by a binding.
     pub needs_arguments: bool,
     /// Whether this function references `super`.
     pub references_super: bool,

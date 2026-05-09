@@ -248,9 +248,9 @@ fn build_workloads(loop_trip_count: usize, frontend_repetitions: usize) -> Vec<W
             operations_per_run: loop_trip_count,
         },
         Workload {
-            name: "module-heavy.placeholder-compile",
+            name: "module-heavy.compile",
             pipeline: WorkloadPipeline::ModuleCompile,
-            note: "Static import/export-heavy module sources through the current placeholder compile_module path.",
+            note: "Static import/export-heavy module sources through the current compile_module path.",
             source: module_heavy_compile_workload(frontend_repetitions),
             operations_per_run: frontend_repetitions,
         },

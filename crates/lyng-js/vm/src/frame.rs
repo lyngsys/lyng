@@ -121,7 +121,7 @@ impl RegisterWindow {
     }
 }
 
-/// Frame record scaffold matching the Phase 4 call-frame contract.
+/// Frame record for the active bytecode call-frame contract.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FrameRecord {
     code: CodeRef,

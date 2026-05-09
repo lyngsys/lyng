@@ -1,129 +1,21 @@
-//! Compile-smoke coverage for the execution-semantics crate DAG.
+//! Cross-crate coverage for the public compile, install, and evaluate pipeline.
 
-use lyng_js_ast::FunctionId;
 use lyng_js_bytecode::{
-    disassemble, ArgumentsMode, BytecodeBuilder, BytecodeFunction, BytecodeFunctionId,
-    BytecodeFunctionKind, BytecodeMarker, CompiledScriptUnit, DeoptFrameValue, DeoptValueSource,
-    FeedbackSiteDescriptor, FeedbackSiteKind, FeedbackSiteMetadata, Instruction, Opcode,
+    disassemble, BytecodeBuilder, BytecodeFunctionId, BytecodeFunctionKind, CompiledScriptUnit,
+    DeoptFrameValue, DeoptValueSource, FeedbackSiteKind, FeedbackSiteMetadata, Opcode,
     SafepointKind,
 };
-use lyng_js_common::{AtomId, AtomTable, SourceId};
-use lyng_js_compiler::{
-    compile_module, compile_script, installable_module_unit, installable_script_unit,
-    ActivationMetadata, CompilerMarker, LoweredFunctionPlan, LoweringContext,
-};
-use lyng_js_env::{ExecutableId, ExecutionContext, ExecutionContextKind, Runtime};
-use lyng_js_host::NoopHostHooks;
+use lyng_js_common::{AtomTable, SourceId, WellKnownAtom};
+use lyng_js_compiler::{compile_module, compile_script};
+use lyng_js_env::{ExecutionContext, ExecutionContextKind, ModuleStatus, Runtime};
+use lyng_js_host::{ModuleKey, NoopHostHooks};
 use lyng_js_parser::{parse_module, parse_script};
-use lyng_js_sema::{analyze_module, analyze_script, FunctionSemaId, ScopeId};
-use lyng_js_types::{CodeRef, EnvironmentRef, FeedbackSlotId, RealmRef, Value};
-use lyng_js_vm::{
-    seed_registers, FrameFlags, FrameRecord, InstalledCode, RegisterWindow, Vm, VmMarker,
-};
-use std::mem::size_of;
-use std::num::NonZeroU32;
+use lyng_js_sema::{analyze_module, analyze_script};
+use lyng_js_types::{CodeRef, EnvironmentRef, RealmRef, Value};
+use lyng_js_vm::{seed_registers, FrameRecord, RegisterWindow, Vm};
 
 #[test]
-fn phase4_scaffold_crates_form_expected_dependency_chain() {
-    let entry = BytecodeFunctionId::from_raw(1).expect("non-zero bytecode id");
-    let feedback_slot = FeedbackSlotId::from_raw(2).expect("non-zero feedback slot");
-    let marker = BytecodeMarker::new(SourceId::new(5), entry, feedback_slot);
-    let compiler = CompilerMarker::new(marker, ScopeId::new(3), FunctionSemaId::new(7));
-    let runtime = Runtime::new(NoopHostHooks);
-    let realm = runtime
-        .root_agent()
-        .default_realm()
-        .expect("runtime should expose a default realm");
-    let context = ExecutionContext::bytecode(
-        realm.id(),
-        CodeRef::from_raw(11).unwrap(),
-        realm.global_env(),
-        realm.global_env(),
-    );
-    let vm = VmMarker::new(
-        marker,
-        context,
-        FrameRecord::new(
-            CodeRef::from_raw(11).unwrap(),
-            0,
-            RegisterWindow::new(0, 4),
-            Some(1),
-            realm.id(),
-            realm.global_env(),
-            realm.global_env(),
-            ExecutionContextKind::Function,
-        )
-        .with_flags(FrameFlags::entry()),
-    );
-
-    assert_eq!(compiler.bytecode(), marker);
-    assert_eq!(compiler.scope_root(), ScopeId::new(3));
-    assert_eq!(compiler.function(), FunctionSemaId::new(7));
-    assert_eq!(vm.bytecode(), marker);
-    assert_eq!(
-        vm.context().executable(),
-        ExecutableId::Bytecode(CodeRef::from_raw(11).unwrap())
-    );
-    assert_eq!(vm.frame().registers(), RegisterWindow::new(0, 4));
-    assert_eq!(size_of::<BytecodeFunctionId>(), size_of::<u32>());
-    assert_eq!(size_of::<Option<BytecodeFunctionId>>(), size_of::<u32>());
-}
-
-#[test]
-fn phase4_scaffold_types_support_compile_smoke_instantiation() {
-    let source = SourceId::new(9);
-    let entry = BytecodeFunctionId::new(NonZeroU32::new(1).unwrap());
-    let function =
-        BytecodeFunction::new(entry, Some(AtomId::from_raw(17)), ArgumentsMode::Unmapped)
-            .with_register_counts(3, 1)
-            .with_instructions(vec![
-                Instruction::Abc {
-                    opcode: Opcode::Move,
-                    a: 0,
-                    b: 1,
-                    c: 0,
-                },
-                Instruction::Ax {
-                    opcode: Opcode::Return,
-                    ax: 0,
-                },
-            ])
-            .with_feedback_sites(vec![FeedbackSiteDescriptor::new(
-                FeedbackSlotId::new(NonZeroU32::new(4).unwrap()),
-                0,
-                FeedbackSiteKind::Arithmetic,
-            )]);
-    let unit = CompiledScriptUnit::new(source, entry, vec![function.clone()]);
-    let (unit_source, installed_unit) = installable_script_unit(source, unit.clone());
-    let activation = ActivationMetadata::new(false, ArgumentsMode::Unmapped, true, None, false);
-    let plan = LoweredFunctionPlan::new(
-        FunctionId::new(0),
-        FunctionSemaId::new(0),
-        ScopeId::new(0),
-        activation,
-        entry,
-    );
-    let lowering = LoweringContext::new(FunctionSemaId::new(0));
-    let installed = InstalledCode::new(CodeRef::from_raw(7).unwrap(), entry);
-    let text = disassemble(&function);
-
-    assert_eq!(unit_source, source);
-    assert_eq!(installed_unit, unit);
-    assert_eq!(plan.ast_function(), FunctionId::new(0));
-    assert_eq!(plan.sema_function(), FunctionSemaId::new(0));
-    assert_eq!(plan.bytecode(), entry);
-    assert_eq!(activation, plan.activation());
-    assert_eq!(lowering.function(), FunctionSemaId::new(0));
-    assert_eq!(
-        installed.executable(),
-        ExecutableId::Bytecode(CodeRef::from_raw(7).unwrap())
-    );
-    assert!(text.contains("Move"));
-    assert!(text.contains("Return"));
-}
-
-#[test]
-fn phase4_vm_scaffold_uses_real_execution_context_types() {
+fn runtime_context_and_frame_records_seed_register_windows() {
     let context = ExecutionContext::bytecode(
         RealmRef::from_raw(1).unwrap(),
         CodeRef::from_raw(2).unwrap(),
@@ -148,7 +40,7 @@ fn phase4_vm_scaffold_uses_real_execution_context_types() {
 }
 
 #[test]
-fn phase4_vm_installs_and_executes_hand_authored_bytecode() {
+fn vm_installs_and_executes_hand_authored_bytecode() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let realm = agent
@@ -194,7 +86,7 @@ fn phase4_vm_installs_and_executes_hand_authored_bytecode() {
 }
 
 #[test]
-fn phase4_public_compile_and_evaluate_script_entrypoints_execute_end_to_end() {
+fn public_compile_and_evaluate_script_entrypoints_execute_end_to_end() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
@@ -232,9 +124,9 @@ fn phase4_public_compile_and_evaluate_script_entrypoints_execute_end_to_end() {
 }
 
 #[test]
-fn phase4_public_compile_module_exposes_real_module_artifact() {
+fn public_compile_module_evaluates_default_export() {
     let mut atoms = AtomTable::new();
-    let parsed = parse_module(&mut atoms, SourceId::new(29), "export const value = 1;");
+    let parsed = parse_module(&mut atoms, SourceId::new(29), "export default 42;");
     assert!(
         !parsed.diagnostics.has_errors(),
         "unexpected parse errors: {:?}",
@@ -248,17 +140,38 @@ fn phase4_public_compile_module_exposes_real_module_artifact() {
     );
 
     let unit = compile_module(&parsed, &sema, &mut atoms).unwrap();
-    let (unit_source, installed_unit) = installable_module_unit(SourceId::new(29), unit.clone());
+    let key = ModuleKey::new("/tmp/pipeline-default.mjs");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm
+        .evaluate_module(agent, realm, &key, "/tmp/pipeline-default.mjs", &unit)
+        .unwrap();
 
-    assert_eq!(unit_source, SourceId::new(29));
-    assert_eq!(installed_unit, unit);
-    assert_eq!(unit.source(), SourceId::new(29));
-    assert!(unit.function(unit.entry()).is_some());
-    assert_eq!(unit.local_exports().len(), 1);
+    let record = agent
+        .module_record(&key)
+        .expect("evaluated module should stay cached on the agent");
+    let module_env = record
+        .environment()
+        .expect("module evaluation should materialize a module environment");
+    let default_slot = unit
+        .local_exports()
+        .iter()
+        .find(|entry| entry.export_name() == WellKnownAtom::default.id())
+        .expect("module should expose a default export")
+        .local_slot();
+
+    assert_eq!(result, Value::undefined());
+    assert_eq!(record.status(), ModuleStatus::Evaluated);
+    assert_eq!(
+        agent.environment_slot(module_env, default_slot),
+        Some(Value::from_smi(42))
+    );
 }
 
 #[test]
-fn phase4_public_vm_metadata_accessors_resolve_installed_template_records() {
+fn public_vm_metadata_accessors_resolve_installed_template_records() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
@@ -324,7 +237,7 @@ fn phase4_public_vm_metadata_accessors_resolve_installed_template_records() {
 }
 
 #[test]
-fn phase4_public_vm_feedback_footprint_reports_allocated_vector_bytes() {
+fn public_vm_feedback_footprint_reports_allocated_vector_bytes() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,

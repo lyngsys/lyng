@@ -149,7 +149,7 @@ impl BytecodeFunctionFlags {
     }
 }
 
-/// Typed constant pool entries reserved for Phase 4 bytecode templates.
+/// Typed constant pool entries stored in bytecode templates.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ConstantValue {
     Smi(i32),
@@ -470,7 +470,7 @@ impl ExceptionHandler {
     }
 }
 
-/// Phase 4 feedback-site kinds owned by the compiler and bytecode layer.
+/// Feedback-site kinds owned by the compiler and bytecode layer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FeedbackSiteKind {
     Arithmetic,
