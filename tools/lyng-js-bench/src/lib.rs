@@ -1,4 +1,5 @@
 pub mod cli;
+pub mod compare;
 pub mod density;
 pub mod runtime;
 pub mod test262;
@@ -17,5 +18,6 @@ pub fn run(args: &[String]) -> Result<(), String> {
         cli::Command::Runtime(command_args) => runtime::run(&command_args),
         cli::Command::Density(command_args) => density::run(&command_args),
         cli::Command::Test262(command_args) => test262::run(&command_args),
+        cli::Command::Compare(command_args) => compare::run(&command_args),
     }
 }

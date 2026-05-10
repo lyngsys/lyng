@@ -177,6 +177,77 @@ for run in 1 2 3 4 5; do
 done
 ```
 
+## External Engine Comparison
+
+Use the external comparison suite when a bottleneck has been reduced to a standalone
+script that can run without Test262 harness globals. This is the QuickJS/Boa comparison
+loop; it is not a replacement for Test262 diagnostics.
+
+Build the Lyng JS CLI and benchmark runner first:
+
+```sh
+cargo build --release -p lyng-js-cli -p lyng-js-bench
+```
+
+Run the smoke comparison to check local wiring:
+
+```sh
+target/release/lyng-js-bench compare \
+  --preset smoke \
+  --report /tmp/lyng-js-external-compare-smoke.md \
+  --json /tmp/lyng-js-external-compare-smoke.json
+```
+
+The suite writes three standalone scripts under `/tmp/lyng-js-bench-compare-scripts` by
+default:
+
+- `arithmetic-loop.js`: arithmetic, branches, and loop backedges.
+- `array-object-loop.js`: array growth, dense indexed reads, object literals, and named
+  property reads.
+- `builtin-string-regexp-loop.js`: string case mapping, RegExp replacement, URI decoding,
+  and character access.
+
+Defaults use `target/release/lyng-js`, `/opt/homebrew/bin/qjs` when present, and
+`/opt/homebrew/bin/boa` when present. Override paths explicitly when needed:
+
+```sh
+target/release/lyng-js-bench compare \
+  --preset baseline \
+  --lyng-js target/release/lyng-js \
+  --qjs /opt/homebrew/bin/qjs \
+  --boa /opt/homebrew/bin/boa \
+  --report reports/js/lyng-js/external-engine-compare.md \
+  --json reports/js/lyng-js/external-engine-compare.json
+```
+
+The report records each engine command, wall-clock samples, median/min/max timings, and a
+ratio against QuickJS for the same workload. Treat QuickJS as the primary interpreter
+baseline and Boa as a Rust-engine reference point. Evaluate parity by workload family and
+measured gap; do not expect exact equality across every script before moving on to JIT
+work.
+
+For profiling, regenerate scripts with a longer loop and use the report's generated
+`sample` or `xctrace` commands:
+
+```sh
+target/release/lyng-js-bench compare \
+  --preset profile-target \
+  --report /tmp/lyng-js-external-compare-profile.md \
+  --json /tmp/lyng-js-external-compare-profile.json
+```
+
+When a Test262 bottleneck is too harness-specific for external engines, extract only the
+observable hot path into a standalone script:
+
+- Keep the same builtin, opcode family, allocation path, or inline-cache shape that made
+  the Test262 case slow.
+- Remove `$262`, harness assertions, module-loader assumptions, and non-portable host
+  hooks.
+- Keep the extracted script small enough to understand and long-running enough for
+  profiler attachment.
+- Link the extracted workload back to the Test262 command and JSON report in the dcat
+  issue so conformance evidence and performance evidence stay connected.
+
 ## Wider Sweep
 
 Use a filtered sweep when one family has many candidate files:

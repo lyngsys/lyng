@@ -4,6 +4,7 @@ pub enum Command {
     Runtime(Vec<String>),
     Density(Vec<String>),
     Test262(Vec<String>),
+    Compare(Vec<String>),
 }
 
 /// Parse the top-level benchmark suite selector.
@@ -18,6 +19,7 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
         Some("runtime") => Ok(Command::Runtime(args[2..].to_vec())),
         Some("density") => Ok(Command::Density(args[2..].to_vec())),
         Some("test262") => Ok(Command::Test262(args[2..].to_vec())),
+        Some("compare") => Ok(Command::Compare(args[2..].to_vec())),
         Some(other) => Err(format!(
             "Unknown benchmark suite: {other}\n\n{}",
             help_text()
@@ -28,12 +30,13 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
 #[must_use]
 pub fn help_text() -> String {
     [
-        "Usage: lyng-js-bench [runtime|density|test262] [suite-options]",
+        "Usage: lyng-js-bench [runtime|density|test262|compare] [suite-options]",
         "",
         "Suites:",
         "  runtime  Lyng JS runtime, frontend, and memory benchmark report",
         "  density  Lyng JS bytecode-density and instruction-cache proxy report",
         "  test262  Test262 performance diagnostics for agents",
+        "  compare  External QuickJS and Boa comparison report",
         "",
         "Run `lyng-js-bench <suite> --help` for suite-specific options.",
     ]
@@ -79,10 +82,19 @@ mod tests {
     }
 
     #[test]
-    fn top_level_help_uses_single_runner_language() {
+    fn parses_external_engine_compare_suite() {
+        assert_eq!(
+            parse_command(&args(&["lyng-js-bench", "compare", "--samples", "3"])).unwrap(),
+            Command::Compare(vec!["--samples".to_string(), "3".to_string()])
+        );
+    }
+
+    #[test]
+    fn top_level_help_lists_external_engine_compare_suite() {
         let help = help_text();
-        assert!(help.contains("Usage: lyng-js-bench [runtime|density|test262]"));
+        assert!(help.contains("Usage: lyng-js-bench [runtime|density|test262|compare]"));
         assert!(help.contains("test262  Test262 performance diagnostics for agents"));
+        assert!(help.contains("compare  External QuickJS and Boa comparison report"));
         assert!(!help.contains("phase"));
     }
 }

@@ -1,0 +1,212 @@
+{
+  "engines": [
+    {
+      "executable": "target/release/lyng-js",
+      "name": "lyng-js",
+      "pre_args": []
+    },
+    {
+      "executable": "/opt/homebrew/bin/qjs",
+      "name": "quickjs",
+      "pre_args": [
+        "--script"
+      ]
+    },
+    {
+      "executable": "/opt/homebrew/bin/boa",
+      "name": "boa",
+      "pre_args": []
+    }
+  ],
+  "results": [
+    {
+      "category": "arithmetic-control-flow",
+      "command": [
+        "target/release/lyng-js",
+        "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js"
+      ],
+      "engine": "lyng-js",
+      "max_ms": 5.721167,
+      "median_ms": 5.6548750000000005,
+      "min_ms": 5.501167000000001,
+      "quickjs_ratio": 1.9448713931812094,
+      "samples_ms": [
+        5.6548750000000005,
+        5.721167,
+        5.501167000000001
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js",
+      "workload": "arithmetic-loop"
+    },
+    {
+      "category": "arithmetic-control-flow",
+      "command": [
+        "/opt/homebrew/bin/qjs",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js"
+      ],
+      "engine": "quickjs",
+      "max_ms": 3.336375,
+      "median_ms": 2.9075830000000003,
+      "min_ms": 2.75075,
+      "quickjs_ratio": 1.0,
+      "samples_ms": [
+        2.9075830000000003,
+        3.336375,
+        2.75075
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js",
+      "workload": "arithmetic-loop"
+    },
+    {
+      "category": "arithmetic-control-flow",
+      "command": [
+        "/opt/homebrew/bin/boa",
+        "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js"
+      ],
+      "engine": "boa",
+      "max_ms": 10.779125,
+      "median_ms": 9.949625,
+      "min_ms": 9.651875,
+      "quickjs_ratio": 3.4219573439520037,
+      "samples_ms": [
+        10.779125,
+        9.651875,
+        9.949625
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js",
+      "workload": "arithmetic-loop"
+    },
+    {
+      "category": "array-object",
+      "command": [
+        "target/release/lyng-js",
+        "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js"
+      ],
+      "engine": "lyng-js",
+      "max_ms": 8.376125,
+      "median_ms": 8.286625,
+      "min_ms": 7.9473329999999995,
+      "quickjs_ratio": 2.378081573008428,
+      "samples_ms": [
+        7.9473329999999995,
+        8.376125,
+        8.286625
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js",
+      "workload": "array-object-loop"
+    },
+    {
+      "category": "array-object",
+      "command": [
+        "/opt/homebrew/bin/qjs",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js"
+      ],
+      "engine": "quickjs",
+      "max_ms": 3.8885840000000003,
+      "median_ms": 3.4845840000000003,
+      "min_ms": 3.394916,
+      "quickjs_ratio": 1.0,
+      "samples_ms": [
+        3.394916,
+        3.8885840000000003,
+        3.4845840000000003
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js",
+      "workload": "array-object-loop"
+    },
+    {
+      "category": "array-object",
+      "command": [
+        "/opt/homebrew/bin/boa",
+        "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js"
+      ],
+      "engine": "boa",
+      "max_ms": 11.762,
+      "median_ms": 11.731542,
+      "min_ms": 11.132625,
+      "quickjs_ratio": 3.3666980046972603,
+      "samples_ms": [
+        11.762,
+        11.731542,
+        11.132625
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js",
+      "workload": "array-object-loop"
+    },
+    {
+      "category": "builtin-heavy",
+      "command": [
+        "target/release/lyng-js",
+        "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js"
+      ],
+      "engine": "lyng-js",
+      "max_ms": 18.546125,
+      "median_ms": 18.45625,
+      "min_ms": 18.268084,
+      "quickjs_ratio": 2.0460340335901557,
+      "samples_ms": [
+        18.268084,
+        18.45625,
+        18.546125
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js",
+      "workload": "builtin-string-regexp-loop"
+    },
+    {
+      "category": "builtin-heavy",
+      "command": [
+        "/opt/homebrew/bin/qjs",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js"
+      ],
+      "engine": "quickjs",
+      "max_ms": 9.034083,
+      "median_ms": 9.0205,
+      "min_ms": 9.011792,
+      "quickjs_ratio": 1.0,
+      "samples_ms": [
+        9.011792,
+        9.0205,
+        9.034083
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js",
+      "workload": "builtin-string-regexp-loop"
+    },
+    {
+      "category": "builtin-heavy",
+      "command": [
+        "/opt/homebrew/bin/boa",
+        "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js"
+      ],
+      "engine": "boa",
+      "max_ms": 21.872791999999997,
+      "median_ms": 21.750959,
+      "min_ms": 21.546291,
+      "quickjs_ratio": 2.411280860262735,
+      "samples_ms": [
+        21.546291,
+        21.750959,
+        21.872791999999997
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js",
+      "workload": "builtin-string-regexp-loop"
+    }
+  ],
+  "schema_version": 1,
+  "settings": {
+    "json_path": "reports/js/lyng-js/external-engine-compare.json",
+    "loop_trips": 2048,
+    "policy": {
+      "parity_rule": "Evaluate measured gaps per workload family rather than exact equality everywhere.",
+      "primary_baseline": "quickjs",
+      "secondary_reference": "boa"
+    },
+    "report_path": "reports/js/lyng-js/external-engine-compare.md",
+    "samples": 3,
+    "scripts_dir": "/tmp/lyng-js-bench-compare-scripts",
+    "warmup_samples": 1
+  },
+  "suite": "external-engine-compare"
+}
