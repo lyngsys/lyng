@@ -1008,6 +1008,74 @@ fn function_builtins_dispatch_through_the_shared_builtins_bridge() {
 }
 
 #[test]
+fn function_call_builtin_rebinds_nested_targets_without_frame_leaks() {
+    let unit = compile_test_unit(
+        147,
+        r"
+            function Base(left, right) {
+                this.total = left + right;
+            }
+
+            function Sub(left, right) {
+                Base.call(this, left, right);
+            }
+
+            var object = new Sub(3, 4);
+            var nested = Function.prototype.call.call(
+                function (value) { return this.total + value; },
+                object,
+                5
+            );
+            object.total + nested;
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(19));
+    assert!(vm.frames().is_empty());
+    assert!(vm.register_stack().is_empty());
+    assert!(agent.current_execution_context().is_none());
+}
+
+#[test]
+fn array_push_preserves_index_setter_observability() {
+    let unit = compile_test_unit(
+        148,
+        r#"
+            var observed = 0;
+            Object.defineProperty(Array.prototype, "0", {
+                set: function (value) { observed = value; },
+                configurable: true
+            });
+            var array = [];
+            var length = array.push(7);
+            var hasOwn = Object.prototype.hasOwnProperty.call(array, "0");
+            delete Array.prototype[0];
+            observed === 7 && length === 1 && array.length === 1 && !hasOwn;
+        "#,
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn for_in_state_is_cleared_when_return_exits_loop_body() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();

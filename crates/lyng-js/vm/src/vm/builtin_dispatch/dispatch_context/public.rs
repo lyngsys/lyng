@@ -406,6 +406,25 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .try_fast_apply_builtin(self.agent, target, this_value, arguments)
     }
 
+    fn try_fast_array_push(
+        &mut self,
+        object: ObjectRef,
+        length: u64,
+        arguments: &[Value],
+    ) -> Result<Option<u64>, Self::Error> {
+        if arguments.len() != 1 || length >= u64::from(u32::MAX) {
+            return Ok(None);
+        }
+        let index = u32::try_from(length).expect("length was checked to fit an array index");
+        let Some(new_length) = length.checked_add(1) else {
+            return Ok(None);
+        };
+        match Vm::try_fast_set_engine_array_index(self.agent, object, index, arguments[0])? {
+            Some(true) => Ok(Some(new_length)),
+            Some(false) | None => Ok(None),
+        }
+    }
+
     fn construct_to_completion(
         &mut self,
         callee_object: ObjectRef,

@@ -10,6 +10,7 @@ use lyng_js_objects::{
     ObjectRuntime,
 };
 use lyng_js_ops::{errors, object, proxy};
+use lyng_js_types::function_call_builtin;
 
 impl Vm {
     #[expect(
@@ -27,6 +28,19 @@ impl Vm {
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<()> {
+        if self.invoke_function_call_builtin_target(
+            agent,
+            host,
+            registry,
+            frame,
+            result_register,
+            callee,
+            this_value,
+            arguments,
+        )? == Some(())
+        {
+            return Ok(());
+        }
         if Self::bytecode_entry(agent, callee).is_some() {
             self.advance_instruction();
             return self.enter_bytecode_call(
@@ -66,6 +80,64 @@ impl Vm {
         self.write_register(frame, result_register, result)?;
         self.advance_instruction();
         Ok(())
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    fn invoke_function_call_builtin_target(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        result_register: u16,
+        callee: ObjectRef,
+        this_value: Value,
+        arguments: &[Value],
+    ) -> VmResult<Option<()>> {
+        if Self::builtin_entry(agent, callee) != Some(function_call_builtin()) {
+            return Ok(None);
+        }
+
+        let mut target = Self::require_callable_object(agent, frame, this_value)?;
+        let mut effective_this = arguments.first().copied().unwrap_or(Value::undefined());
+        let call_arguments = arguments.get(1..).unwrap_or(&[]);
+        if Self::bound_function_record(agent, target).is_some() {
+            let mut rebound_arguments = call_arguments.to_vec();
+            Self::resolve_bound_call_chain(
+                agent,
+                &mut target,
+                &mut effective_this,
+                &mut rebound_arguments,
+            )?;
+            Self::reject_class_constructor_call(agent, target, frame.realm())?;
+            self.invoke_call_target(
+                agent,
+                host,
+                registry,
+                frame,
+                result_register,
+                target,
+                effective_this,
+                &rebound_arguments,
+            )?;
+            return Ok(Some(()));
+        }
+
+        Self::reject_class_constructor_call(agent, target, frame.realm())?;
+        self.invoke_call_target(
+            agent,
+            host,
+            registry,
+            frame,
+            result_register,
+            target,
+            effective_this,
+            call_arguments,
+        )?;
+        Ok(Some(()))
     }
 
     #[expect(

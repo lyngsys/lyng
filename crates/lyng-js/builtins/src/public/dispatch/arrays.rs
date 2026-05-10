@@ -1299,6 +1299,9 @@ pub(super) fn array_push_builtin<Cx: PublicBuiltinDispatchContext>(
     if item_count > MAX_SAFE_INTEGER_U64.saturating_sub(length) {
         return Err(type_error(cx));
     }
+    if let Some(new_length) = cx.try_fast_array_push(object_ref, length, invocation.arguments())? {
+        return Ok(length_value_u64(new_length));
+    }
 
     for argument in invocation.arguments() {
         let key = array_like_index_property_key(cx, length);

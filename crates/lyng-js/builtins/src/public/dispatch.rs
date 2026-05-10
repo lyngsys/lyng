@@ -453,6 +453,15 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         Ok(None)
     }
 
+    fn try_fast_array_push(
+        &mut self,
+        _object: lyng_js_types::ObjectRef,
+        _length: u64,
+        _arguments: &[Value],
+    ) -> Result<Option<u64>, Self::Error> {
+        Ok(None)
+    }
+
     fn construct_to_completion(
         &mut self,
         callee_object: lyng_js_types::ObjectRef,

@@ -403,7 +403,7 @@ struct ConstructFeedback {
     expected_arity: Option<u16>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum FeedbackSiteState {
     Arithmetic(ArithmeticFeedback),
     Comparison(ComparisonFeedback),
@@ -797,7 +797,7 @@ impl FeedbackSiteState {
 
     #[cfg(test)]
     #[inline]
-    const fn execution_count(self) -> u32 {
+    const fn execution_count(&self) -> u32 {
         match self {
             Self::Arithmetic(feedback) => feedback.execution_count,
             Self::Comparison(feedback) => feedback.execution_count,
@@ -833,11 +833,10 @@ impl FeedbackVector {
     }
 
     #[inline]
-    fn site(&self, slot: FeedbackSlotId) -> Option<FeedbackSiteState> {
+    fn site(&self, slot: FeedbackSlotId) -> Option<&FeedbackSiteState> {
         self.sites
             .get(usize::try_from(slot.get().saturating_sub(1)).ok()?)
-            .copied()
-            .flatten()
+            .and_then(Option::as_ref)
     }
 }
 
@@ -866,11 +865,11 @@ impl Vm {
     }
 
     #[inline]
-    fn feedback_state_for_site(
+    fn feedback_site_for_site(
         &self,
         code: CodeRef,
         instruction_offset: u32,
-    ) -> Option<FeedbackSiteState> {
+    ) -> Option<&FeedbackSiteState> {
         let descriptor = self.feedback_descriptor_for_site(code, instruction_offset)?;
         self.feedback_vectors
             .get(code_index(code))
@@ -990,7 +989,7 @@ impl Vm {
         receiver: ObjectRef,
         value: Value,
     ) -> Option<bool> {
-        match self.feedback_state_for_site(code, instruction_offset) {
+        match self.feedback_site_for_site(code, instruction_offset) {
             Some(FeedbackSiteState::NamedProperty(feedback)) => {
                 feedback.try_store(agent, receiver, value)
             }
@@ -1033,7 +1032,7 @@ impl Vm {
         receiver: ObjectRef,
         atom: AtomId,
     ) -> Option<Value> {
-        match self.feedback_state_for_site(code, instruction_offset) {
+        match self.feedback_site_for_site(code, instruction_offset) {
             Some(FeedbackSiteState::KeyedProperty(feedback)) => {
                 feedback.try_load(agent, receiver, atom)
             }
@@ -1050,7 +1049,7 @@ impl Vm {
         atom: AtomId,
         value: Value,
     ) -> Option<bool> {
-        match self.feedback_state_for_site(code, instruction_offset) {
+        match self.feedback_site_for_site(code, instruction_offset) {
             Some(FeedbackSiteState::KeyedProperty(feedback)) => {
                 feedback.try_store(agent, receiver, atom, value)
             }
