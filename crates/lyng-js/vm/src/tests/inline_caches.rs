@@ -474,3 +474,132 @@ fn keyed_dense_index_sites_fall_back_to_megamorphic_classification() {
         Some(("Megamorphic", Some("DenseIndex"), 0))
     );
 }
+
+#[test]
+fn ordinary_object_dense_index_store_uses_fast_path_without_feedback_slow_path() {
+    let unit = compile_test_unit(44, "source[0] = 9;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a keyed-store site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for _ in 0..2 {
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            Value::from_smi(9)
+        );
+    }
+
+    assert_eq!(
+        vm.keyed_property_cache_snapshot(installed.code(), slot),
+        Some(("Uninitialized", None, 0))
+    );
+}
+
+#[test]
+fn ordinary_object_index_store_observes_inherited_index_setter() {
+    let unit = compile_test_unit(
+        45,
+        r#"
+        var hit = 0;
+        var proto = {};
+        Object.defineProperty(proto, "0", {
+            set: function(value) {
+                hit = value;
+            }
+        });
+        var source = Object.create(proto);
+        source[0] = 9;
+        hit;
+        "#,
+    );
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a keyed-store site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(9)
+    );
+
+    assert_eq!(
+        vm.keyed_property_cache_snapshot(installed.code(), slot),
+        Some(("Megamorphic", Some("DenseIndex"), 0))
+    );
+}
+
+#[test]
+fn engine_array_sparse_index_store_uses_fast_path_without_feedback_slow_path() {
+    let unit = compile_test_unit(
+        46,
+        r"
+        var source = [];
+        source[32] = 7;
+        source[31] = 9;
+        source.length;
+        ",
+    );
+    let entry = unit.function(unit.entry()).unwrap();
+    let slots: Vec<_> = entry
+        .feedback_sites()
+        .iter()
+        .filter(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .collect();
+    assert_eq!(
+        slots.len(),
+        2,
+        "entry script should contain two keyed-store sites"
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(33)
+    );
+
+    for slot in slots {
+        assert_eq!(
+            vm.keyed_property_cache_snapshot(installed.code(), slot),
+            Some(("Uninitialized", None, 0))
+        );
+    }
+}

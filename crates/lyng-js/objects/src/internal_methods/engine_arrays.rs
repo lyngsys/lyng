@@ -334,7 +334,13 @@ impl ObjectRuntime {
                     .get(index as usize)
                     .is_none_or(|value| *value != Value::array_hole()))
             }
-            ElementStorageMetadata::Sparse { .. } => Ok(false),
+            ElementStorageMetadata::Sparse { entries, .. } => {
+                let Some(entry) = entries.get(&index).copied() else {
+                    return Ok(true);
+                };
+                Ok(entry.payload().kind() == ShapePropertyKind::Data
+                    && entry.attrs() == ordinary_property_attrs())
+            }
         }
     }
 

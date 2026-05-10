@@ -568,6 +568,36 @@ impl Vm {
             .map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))
     }
 
+    pub(super) fn try_fast_set_ordinary_index_data_property(
+        agent: &mut Agent,
+        object: ObjectRef,
+        index: u32,
+        value: Value,
+    ) -> VmResult<Option<bool>> {
+        if agent
+            .objects()
+            .object_header(agent.heap().view(), object)
+            .is_some_and(|header| header.flags().is_engine_array())
+        {
+            return Ok(None);
+        }
+        if !Self::engine_array_index_prototype_chain_is_clear(agent, object) {
+            return Ok(None);
+        }
+        agent
+            .with_heap_and_objects(|heap, objects| {
+                let mut mutator = heap.mutator();
+                objects.fast_set_ordinary_index_data_property(
+                    &mut mutator,
+                    object,
+                    index,
+                    value,
+                    AllocationLifetime::Default,
+                )
+            })
+            .map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))
+    }
+
     pub(super) fn engine_array_index_prototype_chain_is_clear(
         agent: &Agent,
         object: ObjectRef,
@@ -578,6 +608,9 @@ impl Vm {
             .and_then(lyng_js_objects::ObjectHeader::prototype);
         while let Some(prototype) = current {
             if agent.objects().is_proxy_object(prototype)
+                || agent.objects().is_module_namespace_object(prototype)
+                || agent.objects().primitive_wrapper_kind(prototype)
+                    == Some(lyng_js_objects::PrimitiveWrapperKind::String)
                 || agent.objects().is_typed_array_object(prototype)
                 || agent.objects().element_logical_len(prototype).unwrap_or(0) != 0
             {

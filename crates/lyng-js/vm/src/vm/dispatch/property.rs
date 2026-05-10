@@ -382,16 +382,26 @@ impl Vm {
                 .and_then(|index| u32::try_from(index).ok())
         {
             let mut used_index_fast_path = false;
-            let stored =
-                if let Some(result) = self.mapped_arguments_set(agent, object, index, value) {
-                    let Some(()) = self.handle_vm_result(agent, result)? else {
-                        return Ok(());
-                    };
-                    Some(true)
+            let stored = if let Some(result) =
+                self.mapped_arguments_set(agent, object, index, value)
+            {
+                let Some(()) = self.handle_vm_result(agent, result)? else {
+                    return Ok(());
+                };
+                Some(true)
+            } else {
+                let fast_result = self.try_fast_set_typed_array_index(
+                    agent, host, registry, frame, object, index, value,
+                );
+                let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
+                    return Ok(());
+                };
+                if let Some(stored) = fast_result {
+                    used_index_fast_path = true;
+                    Some(stored)
                 } else {
-                    let fast_result = self.try_fast_set_typed_array_index(
-                        agent, host, registry, frame, object, index, value,
-                    );
+                    let fast_result =
+                        Self::try_fast_set_engine_array_index(agent, object, index, value);
                     let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
                         return Ok(());
                     };
@@ -399,8 +409,9 @@ impl Vm {
                         used_index_fast_path = true;
                         Some(stored)
                     } else {
-                        let fast_result =
-                            Self::try_fast_set_engine_array_index(agent, object, index, value);
+                        let fast_result = Self::try_fast_set_ordinary_index_data_property(
+                            agent, object, index, value,
+                        );
                         let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
                             return Ok(());
                         };
@@ -408,7 +419,8 @@ impl Vm {
                             used_index_fast_path = true;
                         })
                     }
-                };
+                }
+            };
             if let Some(stored) = stored {
                 if assignment {
                     let assignment_result = self.check_property_assignment_result(
@@ -463,13 +475,25 @@ impl Vm {
                             used_index_fast_path = true;
                             stored
                         } else {
-                            let set_result = self.set_property_on_value(
-                                agent, host, registry, frame, receiver, key, value,
+                            let fast_result = Self::try_fast_set_ordinary_index_data_property(
+                                agent, object, index, value,
                             );
-                            let Some(stored) = self.handle_vm_result(agent, set_result)? else {
+                            let Some(fast_result) = self.handle_vm_result(agent, fast_result)?
+                            else {
                                 return Ok(());
                             };
-                            stored
+                            if let Some(stored) = fast_result {
+                                used_index_fast_path = true;
+                                stored
+                            } else {
+                                let set_result = self.set_property_on_value(
+                                    agent, host, registry, frame, receiver, key, value,
+                                );
+                                let Some(stored) = self.handle_vm_result(agent, set_result)? else {
+                                    return Ok(());
+                                };
+                                stored
+                            }
                         }
                     }
                 };

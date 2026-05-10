@@ -289,6 +289,90 @@ impl ObjectRuntime {
         }
     }
 
+    /// Fast-path indexed assignment for ordinary objects with ordinary data elements.
+    ///
+    /// This intentionally excludes engine arrays, typed arrays, string exotics, module namespace
+    /// objects, proxies, and sparse elements because those paths carry additional observable
+    /// semantics or descriptor attributes.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when object metadata or dense element storage is corrupt.
+    pub fn fast_set_ordinary_index_data_property(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        index: u32,
+        value: Value,
+        lifetime: AllocationLifetime,
+    ) -> InternalMethodResult<Option<bool>> {
+        if value == Value::array_hole() {
+            return Ok(None);
+        }
+        let record = heap
+            .view()
+            .object(id)
+            .ok_or(InternalMethodError::MissingObject)?;
+        let metadata = self
+            .object_metadata(id)
+            .ok_or(InternalMethodError::MissingObject)?;
+        if !matches!(metadata.kind, ObjectKind::Ordinary | ObjectKind::Function)
+            || metadata.flags.is_engine_array()
+            || self.is_module_namespace_object(id)
+            || self.is_string_exotic_object(id)
+            || self.is_typed_array_object(id)
+        {
+            return Ok(None);
+        }
+
+        match &metadata.element_storage {
+            ElementStorageMetadata::Dense { logical_len } if index < *logical_len => {
+                let Some(elements) = record.elements() else {
+                    return Err(InternalMethodError::CorruptObjectState);
+                };
+                let Some(buffer) = heap.view().object_slots(elements) else {
+                    return Err(InternalMethodError::CorruptObjectState);
+                };
+                let current = buffer
+                    .get(index as usize)
+                    .copied()
+                    .unwrap_or(Value::array_hole());
+                if current != Value::array_hole() {
+                    return if heap
+                        .mut_store_value(ValueStoreTarget::ObjectSlot(elements, index), value)
+                    {
+                        Ok(Some(true))
+                    } else {
+                        Err(InternalMethodError::CorruptObjectState)
+                    };
+                }
+            }
+            ElementStorageMetadata::Sparse { .. } => return Ok(None),
+            ElementStorageMetadata::Empty | ElementStorageMetadata::Dense { .. } => {}
+        }
+
+        if !metadata.flags.is_extensible() {
+            return Ok(Some(false));
+        }
+        match &metadata.element_storage {
+            ElementStorageMetadata::Empty if index > DENSE_ELEMENT_SPARSE_GAP_THRESHOLD => {
+                return Ok(None);
+            }
+            ElementStorageMetadata::Dense { logical_len }
+                if index > logical_len.saturating_add(DENSE_ELEMENT_SPARSE_GAP_THRESHOLD) =>
+            {
+                return Ok(None);
+            }
+            ElementStorageMetadata::Sparse { .. } => return Ok(None),
+            ElementStorageMetadata::Empty | ElementStorageMetadata::Dense { .. } => {}
+        }
+
+        if self.set_element(heap, id, index, value, lifetime) {
+            Ok(Some(true))
+        } else {
+            Err(InternalMethodError::CorruptObjectState)
+        }
+    }
+
     fn can_fast_query_ordinary_index(&self, id: ObjectRef) -> InternalMethodResult<bool> {
         match self.require_object_kind(id)? {
             ObjectKind::Proxy => Ok(false),
