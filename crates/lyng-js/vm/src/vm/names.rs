@@ -12,7 +12,7 @@ use lyng_js_env::{
 use lyng_js_host::HostHooks;
 #[cfg(test)]
 use lyng_js_host::NoopHostHooks;
-use lyng_js_objects::NativeFunctionRegistry;
+use lyng_js_objects::{NativeFunctionRegistry, ObjectKind};
 use lyng_js_ops::{errors, object, proxy, read};
 use lyng_js_types::PropertyKey;
 
@@ -1478,6 +1478,9 @@ impl Vm {
     ) -> VmResult<Option<Value>> {
         let (_, global_object) = Self::find_global_environment_object(agent, start)?;
         let key = PropertyKey::from_atom(name);
+        if let Some(value) = Self::try_get_global_own_data_property(agent, global_object, key)? {
+            return Ok(Some(value));
+        }
         if !self.global_has_property_with_key(agent, host, registry, frame, global_object, key)? {
             return Ok(None);
         }
@@ -1491,6 +1494,34 @@ impl Vm {
             key,
         )
         .map(Some)
+    }
+
+    fn try_get_global_own_data_property(
+        agent: &mut Agent,
+        global_object: ObjectRef,
+        key: PropertyKey,
+    ) -> VmResult<Option<Value>> {
+        let Some(header) = agent
+            .objects()
+            .object_header(agent.heap().view(), global_object)
+        else {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        };
+        if header.kind() == ObjectKind::Proxy {
+            return Ok(None);
+        }
+
+        let descriptor = agent
+            .objects()
+            .get_own_property(agent.heap().view(), global_object, key)
+            .map_err(|_| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let Some(descriptor) = descriptor else {
+            return Ok(None);
+        };
+        if descriptor.has_value() && !descriptor.has_get() && !descriptor.has_set() {
+            return Ok(descriptor.value());
+        }
+        Ok(None)
     }
 
     fn find_global_environment_ref(

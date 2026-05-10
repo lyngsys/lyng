@@ -19,6 +19,8 @@ const ARITHMETIC_NOTE: &str =
     "Integer arithmetic, branches, and loop backedges without builtin calls.";
 const ARRAY_OBJECT_NOTE: &str =
     "Array growth, dense indexed reads, object literals, and named property reads.";
+const PAIR_INSTANCEOF_NOTE: &str =
+    "EarleyBoyer-shaped global constructor calls, pair allocation, car/cdr property traffic, and instanceof checks.";
 const BUILTIN_NOTE: &str =
     "String case mapping, RegExp replacement, URI decoding, and character access.";
 
@@ -382,6 +384,14 @@ fn build_workloads(loop_trip_count: usize) -> Vec<Workload> {
             requires_lyng_shell: false,
         },
         Workload {
+            name: "pair-instanceof-loop",
+            category: "pair-object-instanceof",
+            file_name: "pair-instanceof-loop.js",
+            source: pair_instanceof_workload(loop_trip_count),
+            metric_kind: MetricKind::WallTime,
+            requires_lyng_shell: false,
+        },
+        Workload {
             name: "builtin-string-regexp-loop",
             category: "builtin-heavy",
             file_name: "builtin-string-regexp-loop.js",
@@ -437,6 +447,34 @@ if (__lyngBenchSink === -1) {{
   throw new Error("unreachable array object sink");
 }}
 }})();
+"#
+    )
+}
+
+fn pair_instanceof_workload(loop_trip_count: usize) -> String {
+    format!(
+        r#"
+var __lyngBenchTrips = {loop_trip_count};
+var __lyngBenchSink = 0;
+function __lyngPair(car, cdr) {{
+  this.car = car;
+  this.cdr = cdr;
+}}
+function __lyngCons(car, cdr) {{
+  return new __lyngPair(car, cdr);
+}}
+var __lyngHead = null;
+for (var i = 0; i < __lyngBenchTrips; i = i + 1) {{
+  __lyngHead = __lyngCons(i, __lyngHead);
+}}
+var __lyngCursor = __lyngHead;
+while (__lyngCursor instanceof __lyngPair) {{
+  __lyngBenchSink = __lyngBenchSink + __lyngCursor.car;
+  __lyngCursor = __lyngCursor.cdr;
+}}
+if (__lyngBenchSink === -1) {{
+  throw new Error("unreachable pair sink");
+}}
 "#
     )
 }
@@ -907,6 +945,7 @@ fn workload_note(workload_name: &str) -> &'static str {
     match workload_name {
         "arithmetic-loop" => ARITHMETIC_NOTE,
         "array-object-loop" => ARRAY_OBJECT_NOTE,
+        "pair-instanceof-loop" => PAIR_INSTANCEOF_NOTE,
         "builtin-string-regexp-loop" => BUILTIN_NOTE,
         _ => "External engine comparison workload.",
     }
@@ -1509,7 +1548,12 @@ mod tests {
 
         assert_eq!(
             categories,
-            ["arithmetic-control-flow", "array-object", "builtin-heavy"]
+            [
+                "arithmetic-control-flow",
+                "array-object",
+                "pair-object-instanceof",
+                "builtin-heavy"
+            ]
         );
         for workload in workloads {
             assert!(workload.source.contains("var __lyngBenchTrips = 16;"));
@@ -1519,6 +1563,21 @@ mod tests {
                 .extension()
                 .is_some_and(|extension| extension.eq_ignore_ascii_case("js")));
         }
+    }
+
+    #[test]
+    fn synthetic_workloads_include_earley_boyer_pair_microbenchmark() {
+        let workload = build_workloads(16)
+            .into_iter()
+            .find(|workload| workload.name == "pair-instanceof-loop")
+            .expect("pair instanceof workload should exist");
+
+        assert_eq!(workload.category, "pair-object-instanceof");
+        assert!(workload.source.contains("function __lyngPair"));
+        assert!(workload.source.contains("new __lyngPair"));
+        assert!(workload.source.contains("instanceof __lyngPair"));
+        assert!(workload.source.contains("__lyngCursor.car"));
+        assert!(workload.source.contains("__lyngCursor.cdr"));
     }
 
     #[test]

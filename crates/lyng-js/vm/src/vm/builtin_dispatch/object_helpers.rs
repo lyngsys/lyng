@@ -1,8 +1,10 @@
 use super::{
-    errors, object, proxy, read, Agent, AllocationLifetime, FrameRecord, HostHooks,
-    NativeFunctionRegistry, ObjectAllocation, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
-    Value, Vm, VmError, VmProxyBridge, VmResult, WellKnownAtom, WellKnownSymbolId,
+    errors, object, proxy, read, Agent, AllocationLifetime, FrameRecord, FunctionEntryIdentity,
+    HostHooks, NativeFunctionRegistry, ObjectAllocation, ObjectRef, PropertyDescriptor,
+    PropertyKey, RealmRef, Value, Vm, VmError, VmProxyBridge, VmResult, WellKnownAtom,
+    WellKnownSymbolId,
 };
+use lyng_js_types::{function_symbol_has_instance_builtin, NativeFunctionId};
 
 impl Vm {
     pub(in crate::vm) fn allocate_ordinary_object_with_prototype(
@@ -221,6 +223,17 @@ impl Vm {
             )?
         };
         if !has_instance.is_undefined() && !has_instance.is_null() {
+            if Self::is_default_function_has_instance(agent, has_instance) {
+                let is_instance = self.ordinary_has_instance_with_context(
+                    agent,
+                    host,
+                    registry,
+                    caller,
+                    constructor_value,
+                    value,
+                )?;
+                return Ok(Value::from_bool(is_instance));
+            }
             let has_instance = Self::require_callable_object(agent, caller, has_instance)?;
             let result = self.call_to_completion(
                 agent,
@@ -264,5 +277,75 @@ impl Vm {
         }
 
         Ok(Value::from_bool(false))
+    }
+
+    fn is_default_function_has_instance(agent: &Agent, value: Value) -> bool {
+        let Some(object) = value.as_object_ref() else {
+            return false;
+        };
+        matches!(
+            agent
+                .objects()
+                .function_data(object)
+                .and_then(lyng_js_objects::FunctionObjectData::entry),
+            Some(FunctionEntryIdentity::Native(NativeFunctionId::Builtin(entry)))
+                if entry == function_symbol_has_instance_builtin()
+        )
+    }
+
+    fn ordinary_has_instance_with_context(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller: FrameRecord,
+        constructor: Value,
+        value: Value,
+    ) -> VmResult<bool> {
+        let Some(constructor) = constructor.as_object_ref() else {
+            return Ok(false);
+        };
+        if !agent.objects().is_callable(constructor) {
+            return Ok(false);
+        }
+        if let Some(bound) = Self::bound_function_record(agent, constructor) {
+            return self.ordinary_has_instance_with_context(
+                agent,
+                host,
+                registry,
+                caller,
+                Value::from_object_ref(bound.target()),
+                value,
+            );
+        }
+        let Some(object) = value.as_object_ref() else {
+            return Ok(false);
+        };
+
+        let mut bridge = VmProxyBridge {
+            vm: self,
+            agent,
+            host,
+            registry,
+            frame: caller,
+        };
+        let prototype = object::get_with_receiver_in_context(
+            &mut bridge,
+            constructor,
+            PropertyKey::from_atom(WellKnownAtom::prototype.id()),
+            Value::from_object_ref(constructor),
+        )?
+        .as_object_ref()
+        .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(bridge.agent)))?;
+
+        let mut current = object::get_prototype_of_in_context(&mut bridge, object)?;
+        while let Some(candidate) = current {
+            if candidate == prototype {
+                return Ok(true);
+            }
+            current = object::get_prototype_of_in_context(&mut bridge, candidate)?;
+        }
+
+        Ok(false)
     }
 }
