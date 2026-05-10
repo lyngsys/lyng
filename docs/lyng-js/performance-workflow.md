@@ -1,9 +1,9 @@
 # Lyng JS Performance Workflow
 
-This note defines the first Lyng JS performance loop. The initial corpus is Test262
-because it is already integrated, semantically meaningful, and visible in checked-in
-reports. V8, Octane, or other external benchmark suites are second-phase work after this
-loop is stable.
+This note defines the Lyng JS performance loop. Test262 remains the first corpus because
+it is semantically meaningful and visible in checked-in reports. The external-engine
+comparison loop also has a local V8 v7 benchmark corpus for QuickJS/Boa parity work after
+a bottleneck needs cross-engine measurement.
 
 Run commands from the workspace root. Use release builds for measurements. Write
 exploratory reports under `/tmp`; refresh checked-in reports only when intentionally
@@ -198,8 +198,8 @@ target/release/lyng-js-bench compare \
   --json /tmp/lyng-js-external-compare-smoke.json
 ```
 
-The suite writes three standalone scripts under `/tmp/lyng-js-bench-compare-scripts` by
-default:
+The default `synthetic` corpus writes three standalone scripts under
+`/tmp/lyng-js-bench-compare-scripts`:
 
 - `arithmetic-loop.js`: arithmetic, branches, and loop backedges.
 - `array-object-loop.js`: array growth, dense indexed reads, object literals, and named
@@ -225,6 +225,38 @@ ratio against QuickJS for the same workload. Treat QuickJS as the primary interp
 baseline and Boa as a Rust-engine reference point. Evaluate parity by workload family and
 measured gap; do not expect exact equality across every script before moving on to JIT
 work.
+
+The local V8 v7 corpus is vendored under `testdata/js-benchmarks/v8-v7/` with the
+upstream notice preserved. Use it when comparing old Octane-style workloads such as
+Richards, DeltaBlue, Crypto, RayTrace, EarleyBoyer, RegExp, Splay, and NavierStokes:
+
+```sh
+target/release/lyng-js-bench compare \
+  --corpus v8-v7 \
+  --filter Richards \
+  --preset smoke \
+  --report /tmp/lyng-js-v8-v7-richards-smoke.md \
+  --json /tmp/lyng-js-v8-v7-richards-smoke.json
+```
+
+Filtered V8 v7 runs generate one standalone script per selected benchmark. Lyng JS uses
+`target/release/lyng-js --shell` for this corpus so the benchmark harness can call
+`print`; QuickJS keeps `--script`, and Boa runs with its normal command form. V8 v7
+reports use benchmark scores as the primary metric: QuickJS score ratio is
+`quickjs score / engine score`, so QuickJS is `1.00x` and lower is better for other
+engines. Wall-clock columns remain in the report for diagnosing process overhead and
+profiling setup.
+
+Use the full V8 v7 suite only for wider checkpoints, not the inner loop:
+
+```sh
+target/release/lyng-js-bench compare \
+  --corpus v8-v7 \
+  --full-suite \
+  --preset baseline \
+  --report /tmp/lyng-js-v8-v7-full.md \
+  --json /tmp/lyng-js-v8-v7-full.json
+```
 
 For profiling, regenerate scripts with a longer loop and use the report's generated
 `sample` or `xctrace` commands:
@@ -360,9 +392,9 @@ Microbenchmarks should live in `tools/lyng-js-bench` unless there is a stronger 
 reason. Profiler targets should use the same source as the Test262 finding when possible,
 so the link between conformance evidence and performance evidence stays clear.
 
-## Phase Two
+## External Corpus Scope
 
-V8, Octane, and other external benchmark suites belong after the Test262 loop can already
-produce reproducible targets, JSON deltas, and issue-ready evidence. Track that work under
-`lyng-2o6e`; do not vendor an external corpus or add benchmark dependencies as part of the
-first Test262 performance iteration.
+The V8 v7 corpus is intentionally local and dependency-free. Do not rely on an external
+checkout such as `../js-engine-benchmark` when adding or running Lyng benchmark
+comparisons. Track further corpus expansion under `lyng-2o6e`, and keep Test262 as the
+default diagnostic loop for conformance-shaped performance work.
