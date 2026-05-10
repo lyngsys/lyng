@@ -246,7 +246,11 @@ pub fn storage_bits_from_value<Cx: ToPrimitiveContext>(
         kind,
         TypedArrayElementKind::BigInt64 | TypedArrayElementKind::BigUint64
     ) {
-        let primitive = object::to_primitive(cx, value, ToPrimitiveHint::Number)?;
+        let primitive = if value.is_object() {
+            object::to_primitive(cx, value, ToPrimitiveHint::Number)?
+        } else {
+            value
+        };
         if primitive.is_number() {
             return Err(cx.type_error());
         }
@@ -265,7 +269,11 @@ pub fn storage_bits_from_value<Cx: ToPrimitiveContext>(
         return bits.ok_or_else(|| cx.type_error());
     }
 
-    let primitive = object::to_primitive(cx, value, ToPrimitiveHint::Number)?;
+    let primitive = if value.is_object() {
+        object::to_primitive(cx, value, ToPrimitiveHint::Number)?
+    } else {
+        value
+    };
     let number = {
         let agent = cx.agent();
         read::to_number(agent.heap().view(), primitive)

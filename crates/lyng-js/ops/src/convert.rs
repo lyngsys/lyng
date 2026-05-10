@@ -154,6 +154,16 @@ pub fn lossy_string_from_view(view: PrimitiveStringView<'_>) -> String {
     String::from_utf16_lossy(&units)
 }
 
+pub fn string_view_to_number(view: PrimitiveStringView<'_>) -> f64 {
+    if let Some(bytes) = view.latin1_bytes()
+        && let Ok(text) = std::str::from_utf8(bytes)
+    {
+        return string_to_number(text);
+    }
+
+    string_to_number(&lossy_string_from_view(view))
+}
+
 pub fn string_to_number(text: &str) -> f64 {
     let trimmed = text.trim_matches(is_ecmascript_trim_whitespace);
 
@@ -178,8 +188,35 @@ pub fn string_to_number(text: &str) -> f64 {
     if is_non_ecmascript_infinity_literal(trimmed) {
         return f64::NAN;
     }
+    if let Some(number) = decimal_with_insignificant_fraction_to_number(trimmed) {
+        return number;
+    }
 
     trimmed.parse::<f64>().unwrap_or(f64::NAN)
+}
+
+fn decimal_with_insignificant_fraction_to_number(text: &str) -> Option<f64> {
+    let bytes = text.as_bytes();
+    let (negative, digits) = match bytes.first().copied() {
+        Some(b'+') => (false, &text[1..]),
+        Some(b'-') => (true, &text[1..]),
+        _ => (false, text),
+    };
+    let (integer_digits, fraction_digits) = digits.split_once('.')?;
+    if integer_digits.is_empty()
+        || fraction_digits.is_empty()
+        || !integer_digits.bytes().all(|byte| byte.is_ascii_digit())
+        || !fraction_digits.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let integer = integer_digits.parse::<u32>().ok()?;
+    let first_non_zero = fraction_digits.bytes().position(|byte| byte != b'0');
+    if matches!(first_non_zero, Some(index) if integer == 0 || index < 20) {
+        return None;
+    }
+    let number = f64::from(integer);
+    Some(if negative { -number } else { number })
 }
 
 pub fn parse_string_to_bigint(text: &str) -> Option<(BigIntSign, Vec<u64>)> {
@@ -553,6 +590,11 @@ mod tests {
     fn string_to_number_handles_trim_prefixes_and_invalid_input() {
         assert_eq!(string_to_number(""), 0.0);
         assert_eq!(string_to_number("\u{00A0}42\u{FEFF}"), 42.0);
+        assert_eq!(
+            string_to_number("17.0000000000000000000000000000000000000000000000000000001"),
+            17.0
+        );
+        assert_ne!(string_to_number("0.000000000000000000001"), 0.0);
         assert_eq!(string_to_number("0x10"), 16.0);
         assert_eq!(string_to_number("0o10"), 8.0);
         assert_eq!(string_to_number("0b10"), 2.0);
@@ -645,6 +687,40 @@ mod tests {
         assert_eq!(
             lossy_string_from_view(view.string_view(utf16).unwrap()),
             "\u{FFFD}"
+        );
+    }
+
+    #[test]
+    fn string_view_to_number_handles_ascii_latin1_and_non_ascii_fallback() {
+        let mut heap = PrimitiveHeap::new();
+        let (ascii, non_ascii) = {
+            let mut mutator = heap.mutator();
+            let ascii_bytes = b"17.0000000000000000000000000000000000000000000000000000001";
+            let ascii = mutator.alloc_string(
+                StringEncoding::Latin1,
+                u32::try_from(ascii_bytes.len()).unwrap(),
+                ascii_bytes,
+                None,
+                AllocationLifetime::Default,
+            );
+            let non_ascii = mutator.alloc_string(
+                StringEncoding::Latin1,
+                4,
+                &[0xA0, b'4', b'2', 0xA0],
+                None,
+                AllocationLifetime::Default,
+            );
+            (ascii, non_ascii)
+        };
+        let view = heap.view();
+
+        assert_eq!(
+            string_view_to_number(view.string_view(ascii).unwrap()),
+            17.0
+        );
+        assert_eq!(
+            string_view_to_number(view.string_view(non_ascii).unwrap()),
+            42.0
         );
     }
 

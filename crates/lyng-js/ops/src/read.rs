@@ -1,7 +1,7 @@
 use crate::convert::{
     bigint_equals_integral_number, bigint_view_equals_parts, encode_number, logical_type,
     lossy_string_from_view, parse_string_to_bigint, primitive_type_error, same_logical_type,
-    string_to_number, LogicalType,
+    string_view_to_number, LogicalType,
 };
 use crate::pure;
 use lyng_js_common::AtomId;
@@ -298,9 +298,7 @@ pub fn to_number(heap: PrimitiveHeapView<'_>, value: Value) -> Completion<Value>
     }
     if let Some(string) = value.as_string_ref() {
         let view = heap.string_view(string).ok_or_else(primitive_type_error)?;
-        return Ok(encode_number(string_to_number(&lossy_string_from_view(
-            view,
-        ))));
+        return Ok(encode_number(string_view_to_number(view)));
     }
     if value.is_symbol() || value.is_bigint() {
         return Err(primitive_type_error());
