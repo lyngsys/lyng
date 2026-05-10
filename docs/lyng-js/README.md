@@ -23,6 +23,7 @@ top-level architecture note and the subsystem note for the area being changed.
 - [Builtin Bootstrap](builtin-bootstrap.md)
 - [Dynamic Scope And Eval](dynamic-scope-and-eval.md)
 - [Performance Workflow](performance-workflow.md)
+- [V8 And Octane Benchmark Plan](v8-octane-benchmark-plan.md)
 
 ## Reports
 

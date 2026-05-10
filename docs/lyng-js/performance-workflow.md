@@ -396,5 +396,7 @@ so the link between conformance evidence and performance evidence stays clear.
 
 The V8 v7 corpus is intentionally local and dependency-free. Do not rely on an external
 checkout such as `../js-engine-benchmark` when adding or running Lyng benchmark
-comparisons. Track further corpus expansion under `lyng-2o6e`, and keep Test262 as the
-default diagnostic loop for conformance-shaped performance work.
+comparisons. See [V8 And Octane Benchmark Plan](v8-octane-benchmark-plan.md) for the
+accepted corpus, deferred corpus categories, harness policy, and report contract. Track
+future corpus expansion in focused child issues, and keep Test262 as the default
+diagnostic loop for conformance-shaped performance work.
