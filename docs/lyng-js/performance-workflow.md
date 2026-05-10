@@ -220,11 +220,17 @@ target/release/lyng-js-bench compare \
   --json reports/js/lyng-js/external-engine-compare.json
 ```
 
-The report records each engine command, wall-clock samples, median/min/max timings, and a
-ratio against QuickJS for the same workload. Treat QuickJS as the primary interpreter
-baseline and Boa as a Rust-engine reference point. Evaluate parity by workload family and
-measured gap; do not expect exact equality across every script before moving on to JIT
-work.
+Each engine/workload attempt has a timeout. The default is 30000ms, `profile-target`
+raises it to 120000ms, and `--timeout-ms 0` disables it for manual profiler sessions.
+When an engine fails or times out, the compare run records that status in Markdown and
+JSON, keeps any successful samples already collected, and continues with the remaining
+engines and workloads.
+
+The report records each engine command, status, wall-clock samples, median/min/max
+timings, and a ratio against QuickJS for the same workload when both sides completed.
+Treat QuickJS as the primary interpreter baseline and Boa as a Rust-engine reference
+point. Evaluate parity by workload family and measured gap; do not expect exact equality
+across every script before moving on to JIT work.
 
 The local V8 v7 corpus is vendored under `testdata/js-benchmarks/v8-v7/` with the
 upstream notice preserved. Use it when comparing old Octane-style workloads such as
@@ -235,6 +241,7 @@ target/release/lyng-js-bench compare \
   --corpus v8-v7 \
   --filter Richards \
   --preset smoke \
+  --timeout-ms 30000 \
   --report /tmp/lyng-js-v8-v7-richards-smoke.md \
   --json /tmp/lyng-js-v8-v7-richards-smoke.json
 ```
