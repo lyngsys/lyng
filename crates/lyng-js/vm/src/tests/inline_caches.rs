@@ -562,6 +562,49 @@ fn ordinary_object_index_store_observes_inherited_index_setter() {
 }
 
 #[test]
+fn engine_array_existing_index_store_skips_prototype_setter_scan() {
+    let unit = compile_test_unit(
+        48,
+        r#"
+        var hit = 0;
+        var proto = {};
+        Object.defineProperty(proto, "0", {
+            set: function(value) {
+                hit = value;
+            }
+        });
+        var source = [1];
+        Object.setPrototypeOf(source, proto);
+        source[0] = 9;
+        hit + source[0];
+        "#,
+    );
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a keyed-store site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(9)
+    );
+
+    assert_eq!(
+        vm.keyed_property_cache_snapshot(installed.code(), slot),
+        Some(("Uninitialized", None, 0))
+    );
+}
+
+#[test]
 fn engine_array_sparse_index_store_uses_fast_path_without_feedback_slow_path() {
     let unit = compile_test_unit(
         46,

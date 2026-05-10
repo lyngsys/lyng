@@ -636,15 +636,34 @@ impl KeyedPropertyFeedback {
     }
 
     #[inline]
-    const fn observe_dense_index(&mut self) {
+    fn observe_dense_index(&mut self) -> bool {
         match self.family {
             None | Some(KeyedPropertyFamily::DenseIndex) => {
+                if self.family == Some(KeyedPropertyFamily::DenseIndex)
+                    && self.cache_state == InlineCacheState::Megamorphic
+                    && self.entry_count == 0
+                {
+                    return false;
+                }
                 self.promote_to_megamorphic(Some(KeyedPropertyFamily::DenseIndex));
+                true
             }
             Some(KeyedPropertyFamily::NamedAtom | KeyedPropertyFamily::Generic) => {
+                if self.family == Some(KeyedPropertyFamily::Generic)
+                    && self.cache_state == InlineCacheState::Megamorphic
+                    && self.entry_count == 0
+                {
+                    return false;
+                }
                 self.promote_to_megamorphic(Some(KeyedPropertyFamily::Generic));
+                true
             }
         }
+    }
+
+    #[inline]
+    fn is_dense_index_family(&self) -> bool {
+        self.family == Some(KeyedPropertyFamily::DenseIndex)
     }
 
     #[inline]
@@ -1088,9 +1107,39 @@ impl Vm {
         let _ = self.ensure_feedback_site_execution(code, instruction_offset);
         let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
             if let FeedbackSiteState::KeyedProperty(feedback) = site {
-                feedback.observe_dense_index();
+                let _ = feedback.observe_dense_index();
             }
         });
+    }
+
+    fn record_keyed_dense_index_hit(&mut self, code: CodeRef, instruction_offset: u32) -> bool {
+        let Some(descriptor) = self.feedback_descriptor_for_site(code, instruction_offset) else {
+            return false;
+        };
+        let Some(site) = self
+            .feedback_vectors
+            .get_mut(code_index(code))
+            .and_then(Option::as_mut)
+            .and_then(|vector| vector.site_mut(descriptor.slot()))
+        else {
+            return false;
+        };
+        let FeedbackSiteState::KeyedProperty(feedback) = site else {
+            return false;
+        };
+        if !feedback.is_dense_index_family() {
+            return false;
+        }
+        site.record_execution();
+        self.observe_tier_feedback_event(code);
+        true
+    }
+
+    pub(super) fn observe_keyed_index_access(&mut self, code: CodeRef, instruction_offset: u32) {
+        if self.record_keyed_dense_index_hit(code, instruction_offset) {
+            return;
+        }
+        self.observe_keyed_index_slow_path(code, instruction_offset);
     }
 
     pub(super) fn observe_keyed_generic_slow_path(
@@ -1246,5 +1295,19 @@ impl Vm {
             )),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{KeyedPropertyFamily, KeyedPropertyFeedback};
+
+    #[test]
+    fn dense_index_observation_reports_whether_classification_changed() {
+        let mut feedback = KeyedPropertyFeedback::new();
+
+        assert!(feedback.observe_dense_index());
+        assert!(!feedback.observe_dense_index());
+        assert_eq!(feedback.family, Some(KeyedPropertyFamily::DenseIndex));
     }
 }

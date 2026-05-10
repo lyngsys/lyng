@@ -1,6 +1,61 @@
 use super::*;
 
 impl ObjectRuntime {
+    /// Fast-path indexed assignment for an existing dense element on an engine-owned array object.
+    ///
+    /// Existing ordinary data elements are receiver-owned, so updating them does not need a
+    /// prototype-chain scan. Misses, holes, sparse entries, and length-extending writes are left to
+    /// the full array set path.
+    ///
+    /// # Errors
+    /// Returns [`InternalMethodError`] when the receiver metadata or dense element storage is
+    /// corrupt.
+    pub fn fast_update_engine_array_existing_index(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        index: u32,
+        value: Value,
+    ) -> InternalMethodResult<Option<bool>> {
+        if value == Value::array_hole() {
+            return Ok(None);
+        }
+        let record = heap
+            .view()
+            .object(id)
+            .ok_or(InternalMethodError::MissingObject)?;
+        let metadata = self
+            .object_metadata(id)
+            .ok_or(InternalMethodError::MissingObject)?;
+        if !metadata.flags.is_engine_array() {
+            return Ok(None);
+        }
+        let ElementStorageMetadata::Dense { logical_len } = &metadata.element_storage else {
+            return Ok(None);
+        };
+        if index >= *logical_len {
+            return Ok(None);
+        }
+        let Some(elements) = record.elements() else {
+            return Err(InternalMethodError::CorruptObjectState);
+        };
+        let Some(buffer) = heap.view().object_slots(elements) else {
+            return Err(InternalMethodError::CorruptObjectState);
+        };
+        let current = buffer
+            .get(index as usize)
+            .copied()
+            .unwrap_or(Value::array_hole());
+        if current == Value::array_hole() {
+            return Ok(None);
+        }
+        if heap.mut_store_value(ValueStoreTarget::ObjectSlot(elements, index), value) {
+            Ok(Some(true))
+        } else {
+            Err(InternalMethodError::CorruptObjectState)
+        }
+    }
+
     /// Fast-path indexed assignment for engine-owned array objects.
     ///
     /// # Errors

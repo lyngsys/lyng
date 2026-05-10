@@ -551,6 +551,15 @@ impl Vm {
         index: u32,
         value: Value,
     ) -> VmResult<Option<bool>> {
+        if let Some(updated) = agent
+            .with_heap_and_objects(|heap, objects| {
+                let mut mutator = heap.mutator();
+                objects.fast_update_engine_array_existing_index(&mut mutator, object, index, value)
+            })
+            .map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?
+        {
+            return Ok(Some(updated));
+        }
         if !Self::engine_array_index_prototype_chain_is_clear(agent, object) {
             return Ok(None);
         }

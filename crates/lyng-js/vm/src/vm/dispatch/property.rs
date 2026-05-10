@@ -266,7 +266,7 @@ impl Vm {
                 Self::try_fast_own_index_value(agent, object, index)?
             };
             if let Some(value) = value {
-                self.observe_keyed_index_slow_path(frame.code(), frame.instruction_offset());
+                self.observe_keyed_index_access(frame.code(), frame.instruction_offset());
                 self.write_register(frame, target, value)?;
                 self.advance_instruction();
                 return Ok(());
@@ -297,7 +297,7 @@ impl Vm {
                     };
                     value
                 };
-                self.observe_keyed_index_slow_path(frame.code(), frame.instruction_offset());
+                self.observe_keyed_index_access(frame.code(), frame.instruction_offset());
                 value
             } else if let Some(atom) = key.as_atom() {
                 if let Some(value) = self.try_keyed_property_load_inline_cache(
@@ -435,7 +435,7 @@ impl Vm {
                 }
                 if !used_index_fast_path {
                     Self::sync_engine_array_length(agent, object)?;
-                    self.observe_keyed_index_slow_path(frame.code(), frame.instruction_offset());
+                    self.observe_keyed_index_access(frame.code(), frame.instruction_offset());
                 }
                 self.advance_instruction();
                 return Ok(());
@@ -510,7 +510,7 @@ impl Vm {
                 }
                 if !used_index_fast_path {
                     Self::sync_engine_array_length(agent, object)?;
-                    self.observe_keyed_index_slow_path(frame.code(), frame.instruction_offset());
+                    self.observe_keyed_index_access(frame.code(), frame.instruction_offset());
                 }
             } else if let Some(atom) = key.as_atom() {
                 if let Some(stored) = self.try_keyed_property_store_inline_cache(
