@@ -1,7 +1,8 @@
 # Lyng JS GC Allocation And Write-Site Audit
 
-This audit is the baseline for `lyng-16x3` under the JIT-ready GC plumbing epic. It
-documents heap allocation entrypoints and writes that store `Value` or typed heap handles
+This audit began as the baseline for `lyng-16x3` under the JIT-ready GC plumbing epic.
+`lyng-3gn5` updated the strong heap-record write sites to route through `HeapWriter`.
+It documents heap allocation entrypoints and writes that store `Value` or typed heap handles
 (`ObjectRef`, `StringRef`, `SymbolRef`, `BigIntRef`, `EnvironmentRef`, `CodeRef`,
 `RealmRef`, `ShapeId`, and slot-buffer handles) into records that are heap-owned or traced
 as runtime roots.
@@ -112,37 +113,45 @@ audit.
 
 ## Strong Heap Record Write Sites
 
+The strong heap-record writes below are routed through `HeapWriter::write_ref` or
+`HeapWriter::write_value` from the `PrimitiveMutator` store path. The current writer is a
+pass-through chokepoint; future barrier behavior belongs behind that API rather than at
+individual record fields.
+
 ### Value Slot Buffers
 
 - `ValueSlotAllocator::write` in `crates/lyng-js/gc/src/arena/storage.rs` writes one
   `Value` into object slot buffers, environment slot buffers, code slots, or suspended
-  register buffers. Barrier: yes for `mut_store_value`; init-only for current
+  register buffers through `HeapWriter::write_value`. Barrier: yes for `mut_store_value`; init-only for current
   `init_store_value` and suspended snapshot writes.
 
 ### Function Payload Records
 
 - `set_function_payload_home_object`, `set_function_payload_environment`, and
-  `set_function_payload_private_env` in `crates/lyng-js/gc/src/arena/store_helpers.rs`.
-  Barrier: yes.
+  `set_function_payload_private_env` in `crates/lyng-js/gc/src/arena/store_helpers.rs`
+  route typed handle writes through `HeapWriter::write_ref`. Barrier: yes.
 
 ### Symbol And Value-Cell Records
 
-- `set_symbol_description` in `crates/lyng-js/gc/src/arena/store_helpers.rs`.
-  Barrier: yes.
+- `set_symbol_description` in `crates/lyng-js/gc/src/arena/store_helpers.rs` routes the
+  description handle through `HeapWriter::write_ref`. Barrier: yes.
 - `set_value_cell_value` and `set_value_cell_linked_string` in
-  `crates/lyng-js/gc/src/arena/store_helpers.rs`. Barrier: yes.
+  `crates/lyng-js/gc/src/arena/store_helpers.rs` route value and linked-string writes
+  through `HeapWriter`. Barrier: yes.
 
 ### Object Records
 
 - `set_object_prototype`, `set_object_shape`, `set_object_named_slots`,
   `set_object_elements`, and `set_object_private_slots` in
-  `crates/lyng-js/gc/src/arena/store_helpers.rs`. Barrier: yes.
+  `crates/lyng-js/gc/src/arena/store_helpers.rs` route typed handle writes through
+  `HeapWriter::write_ref`. Barrier: yes.
 
 ### Environment Records
 
 - `set_environment_outer`, `set_environment_function_object`, `set_environment_this_value`,
   `set_environment_new_target`, and `set_environment_home_object` in
-  `crates/lyng-js/gc/src/arena/store_helpers.rs`. Barrier: yes.
+  `crates/lyng-js/gc/src/arena/store_helpers.rs` route typed handle and `Value` writes
+  through `HeapWriter`. Barrier: yes.
 - `Agent::{init_environment_slot, set_environment_slot, set_function_this_binding,
   set_function_new_target, set_function_home_object}` in
   `crates/lyng-js/env/src/agent/environments.rs` route environment slot and function-env
@@ -151,11 +160,14 @@ audit.
 ### Code, Realm, And Shape Records
 
 - `set_code_parent` and `set_code_realm` in
-  `crates/lyng-js/gc/src/arena/store_helpers.rs`. Barrier: yes.
+  `crates/lyng-js/gc/src/arena/store_helpers.rs` route typed handle writes through
+  `HeapWriter::write_ref`. Barrier: yes.
 - `set_realm_global_object`, `set_realm_global_env`, `set_realm_bootstrap_code`, and
-  `set_realm_root_shape` in `crates/lyng-js/gc/src/arena/store_helpers.rs`. Barrier: yes.
+  `set_realm_root_shape` in `crates/lyng-js/gc/src/arena/store_helpers.rs` route typed
+  handle writes through `HeapWriter::write_ref`. Barrier: yes.
 - `set_shape_parent` and `set_shape_prototype_guard` in
-  `crates/lyng-js/gc/src/arena/store_helpers.rs`. Barrier: yes.
+  `crates/lyng-js/gc/src/arena/store_helpers.rs` route typed handle writes through
+  `HeapWriter::write_ref`. Barrier: yes.
 
 ## Weak Or Ephemeron Write Sites
 
@@ -216,29 +228,6 @@ The following entries are consumed by `tools/check-lyng-js-gc-write-sites.sh`. E
 `path<TAB>regex`. Keep the prose above and this list in sync.
 
 <!-- gc-write-site-allowlist:start -->
-crates/lyng-js/gc/src/arena/storage.rs	[*]target = value;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]home_object = home_object;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]environment = environment;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]private_env = private_env;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]description = description;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]stored_value = value;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]linked_string = linked_string;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]prototype = prototype;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]shape = shape;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]named_slots = named_slots;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]elements = elements;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]private_slots = private_slots;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]outer = outer;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]function_object = function_object;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]this_value = this_value;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]new_target = new_target;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]parent = parent;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]realm = realm;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]global_object = global_object;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]global_env = global_env;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]bootstrap_code = bootstrap_code;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]root_shape = root_shape;
-crates/lyng-js/gc/src/arena/store_helpers.rs	record[.]prototype_guard = prototype_guard;
 crates/lyng-js/gc/src/weak.rs	self[.]entries[.]insert[(]key, value[)];
 crates/lyng-js/gc/src/weak.rs	self[.]entries[.]insert[(]value[)];
 crates/lyng-js/objects/src/object_metadata.rs	self[.]entries[.]insert[(]key, entry[)];

@@ -4,6 +4,7 @@ use super::{
     RealmRef, ShapeId, SideAllocationClass, SideAllocationRef, SideAllocationStats, StringRef,
     SuspendedExecutionRef, SuspendedRegistersRef, SymbolRef, Value, PRIMITIVE_SLOTS_PER_PAGE,
 };
+use crate::HeapWriter;
 use std::array::from_fn;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
@@ -693,7 +694,7 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
         let Some(target) = slot.values.get_mut(index as usize) else {
             return false;
         };
-        *target = value;
+        HeapWriter::new().write_value(target, value);
         true
     }
 

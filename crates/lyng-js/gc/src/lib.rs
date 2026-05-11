@@ -20,6 +20,7 @@ mod collection;
 mod mutator;
 mod rooting;
 mod weak;
+mod writer;
 
 pub use arena::{
     AllocationLifetime, BigIntSign, CodeSlotsRef, EnvironmentSlotsRef, FunctionPayloadRef,
@@ -44,6 +45,7 @@ pub use rooting::{
     PrimitiveTraceStats, PrimitiveTracer, TraceHeapEdges,
 };
 pub use weak::WeakHeapRef;
+pub use writer::{HeapRef, HeapWriter};
 
 /// GC-side driver for the shared atom-table collection contract.
 pub struct AtomGcSweep<'a> {
@@ -487,6 +489,26 @@ const fn expected_string_payload_len(encoding: StringEncoding, code_unit_len: u3
 mod tests {
     use super::*;
     use lyng_js_common::AtomLifetime;
+    use lyng_js_types::{ObjectRef, Value};
+
+    #[test]
+    fn heap_writer_updates_value_and_typed_ref_slots_as_chokepoint() {
+        let mut writer = HeapWriter::new();
+
+        let mut value_slot = Value::undefined();
+        writer.write_value(&mut value_slot, Value::from_smi(7));
+        assert_eq!(value_slot, Value::from_smi(7));
+
+        let object = ObjectRef::from_raw(1).expect("test object ref should be non-zero");
+        let mut optional_ref = None;
+        writer.write_ref(&mut optional_ref, Some(object));
+        assert_eq!(optional_ref, Some(object));
+
+        let replacement = ObjectRef::from_raw(2).expect("test object ref should be non-zero");
+        let mut direct_ref = object;
+        writer.write_ref(&mut direct_ref, replacement);
+        assert_eq!(direct_ref, replacement);
+    }
 
     #[test]
     fn gc_preserves_live_collectible_atoms_and_reclaims_dead_ones() {

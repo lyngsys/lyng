@@ -3,6 +3,7 @@ use super::{
     ObjectRef, ObjectSlotsRef, PrimitiveHeap, PrimitiveValueCellRef, RealmRef, ShapeId, StringRef,
     SuspendedRegistersRef, SymbolRef, Value,
 };
+use crate::HeapWriter;
 
 impl PrimitiveHeap {
     pub(crate) fn cache_string_hash(&mut self, id: StringRef) -> Option<u32> {
@@ -42,8 +43,9 @@ impl PrimitiveHeap {
         id: FunctionPayloadRef,
         home_object: Option<ObjectRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.function_payloads.update(id, |record| {
-            record.home_object = home_object;
+            writer.write_ref(&mut record.home_object, home_object);
         })
     }
 
@@ -53,8 +55,9 @@ impl PrimitiveHeap {
         id: FunctionPayloadRef,
         environment: Option<EnvironmentRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.function_payloads.update(id, |record| {
-            record.environment = environment;
+            writer.write_ref(&mut record.environment, environment);
         })
     }
 
@@ -64,8 +67,9 @@ impl PrimitiveHeap {
         id: FunctionPayloadRef,
         private_env: Option<EnvironmentRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.function_payloads.update(id, |record| {
-            record.private_env = private_env;
+            writer.write_ref(&mut record.private_env, private_env);
         })
     }
 
@@ -105,14 +109,16 @@ impl PrimitiveHeap {
         id: SymbolRef,
         description: Option<StringRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.symbols.update(id, |record| {
-            record.description = description;
+            writer.write_ref(&mut record.description, description);
         })
     }
 
     pub(crate) fn set_value_cell_value(&mut self, id: PrimitiveValueCellRef, value: Value) -> bool {
+        let mut writer = HeapWriter::new();
         self.value_cells.update(id, |record| {
-            record.stored_value = value;
+            writer.write_value(&mut record.stored_value, value);
         })
     }
 
@@ -121,8 +127,9 @@ impl PrimitiveHeap {
         id: PrimitiveValueCellRef,
         linked_string: Option<StringRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.value_cells.update(id, |record| {
-            record.linked_string = linked_string;
+            writer.write_ref(&mut record.linked_string, linked_string);
         })
     }
 
@@ -131,14 +138,16 @@ impl PrimitiveHeap {
         id: ObjectRef,
         prototype: Option<ObjectRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.objects.update(id, |record| {
-            record.prototype = prototype;
+            writer.write_ref(&mut record.prototype, prototype);
         })
     }
 
     pub(crate) fn set_object_shape(&mut self, id: ObjectRef, shape: Option<ShapeId>) -> bool {
+        let mut writer = HeapWriter::new();
         self.objects.update(id, |record| {
-            record.shape = shape;
+            writer.write_ref(&mut record.shape, shape);
         })
     }
 
@@ -147,8 +156,9 @@ impl PrimitiveHeap {
         id: ObjectRef,
         named_slots: Option<ObjectSlotsRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.objects.update(id, |record| {
-            record.named_slots = named_slots;
+            writer.write_ref(&mut record.named_slots, named_slots);
         })
     }
 
@@ -157,8 +167,9 @@ impl PrimitiveHeap {
         id: ObjectRef,
         elements: Option<ObjectSlotsRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.objects.update(id, |record| {
-            record.elements = elements;
+            writer.write_ref(&mut record.elements, elements);
         })
     }
 
@@ -167,8 +178,9 @@ impl PrimitiveHeap {
         id: ObjectRef,
         private_slots: Option<ObjectSlotsRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.objects.update(id, |record| {
-            record.private_slots = private_slots;
+            writer.write_ref(&mut record.private_slots, private_slots);
         })
     }
 
@@ -177,8 +189,9 @@ impl PrimitiveHeap {
         id: EnvironmentRef,
         outer: Option<EnvironmentRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.environments.update(id, |record| {
-            record.outer = outer;
+            writer.write_ref(&mut record.outer, outer);
         })
     }
 
@@ -187,8 +200,9 @@ impl PrimitiveHeap {
         id: EnvironmentRef,
         function_object: Option<ObjectRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.environments.update(id, |record| {
-            record.function_object = function_object;
+            writer.write_ref(&mut record.function_object, function_object);
         })
     }
 
@@ -197,8 +211,9 @@ impl PrimitiveHeap {
         id: EnvironmentRef,
         this_value: Value,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.environments.update(id, |record| {
-            record.this_value = this_value;
+            writer.write_value(&mut record.this_value, this_value);
         })
     }
 
@@ -207,8 +222,9 @@ impl PrimitiveHeap {
         id: EnvironmentRef,
         new_target: Option<ObjectRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.environments.update(id, |record| {
-            record.new_target = new_target;
+            writer.write_ref(&mut record.new_target, new_target);
         })
     }
 
@@ -217,20 +233,23 @@ impl PrimitiveHeap {
         id: EnvironmentRef,
         home_object: Option<ObjectRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.environments.update(id, |record| {
-            record.home_object = home_object;
+            writer.write_ref(&mut record.home_object, home_object);
         })
     }
 
     pub(crate) fn set_code_parent(&mut self, id: CodeRef, parent: Option<CodeRef>) -> bool {
+        let mut writer = HeapWriter::new();
         self.codes.update(id, |record| {
-            record.parent = parent;
+            writer.write_ref(&mut record.parent, parent);
         })
     }
 
     pub(crate) fn set_code_realm(&mut self, id: CodeRef, realm: Option<RealmRef>) -> bool {
+        let mut writer = HeapWriter::new();
         self.codes.update(id, |record| {
-            record.realm = realm;
+            writer.write_ref(&mut record.realm, realm);
         })
     }
 
@@ -239,8 +258,9 @@ impl PrimitiveHeap {
         id: RealmRef,
         global_object: Option<ObjectRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.realms.update(id, |record| {
-            record.global_object = global_object;
+            writer.write_ref(&mut record.global_object, global_object);
         })
     }
 
@@ -249,8 +269,9 @@ impl PrimitiveHeap {
         id: RealmRef,
         global_env: Option<EnvironmentRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.realms.update(id, |record| {
-            record.global_env = global_env;
+            writer.write_ref(&mut record.global_env, global_env);
         })
     }
 
@@ -259,8 +280,9 @@ impl PrimitiveHeap {
         id: RealmRef,
         bootstrap_code: Option<CodeRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.realms.update(id, |record| {
-            record.bootstrap_code = bootstrap_code;
+            writer.write_ref(&mut record.bootstrap_code, bootstrap_code);
         })
     }
 
@@ -269,14 +291,16 @@ impl PrimitiveHeap {
         id: RealmRef,
         root_shape: Option<ShapeId>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.realms.update(id, |record| {
-            record.root_shape = root_shape;
+            writer.write_ref(&mut record.root_shape, root_shape);
         })
     }
 
     pub(crate) fn set_shape_parent(&mut self, id: ShapeId, parent: Option<ShapeId>) -> bool {
+        let mut writer = HeapWriter::new();
         self.shapes.update(id, |record| {
-            record.parent = parent;
+            writer.write_ref(&mut record.parent, parent);
         })
     }
 
@@ -285,8 +309,9 @@ impl PrimitiveHeap {
         id: ShapeId,
         prototype_guard: Option<ObjectRef>,
     ) -> bool {
+        let mut writer = HeapWriter::new();
         self.shapes.update(id, |record| {
-            record.prototype_guard = prototype_guard;
+            writer.write_ref(&mut record.prototype_guard, prototype_guard);
         })
     }
 }
