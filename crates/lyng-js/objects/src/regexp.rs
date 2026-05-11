@@ -1,4 +1,4 @@
-use regress::Regex;
+use regress::{Match as BackendMatch, Regex};
 use std::{borrow::Cow, fmt::Write as _, mem::size_of, ops::Range};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -296,6 +296,7 @@ enum RegExpFastPattern {
     LegacyFrogTrailStar,
     LegacyFrogClass,
     UnicodeLeadHiraganaClassStar,
+    EdgeWhitespaceRun,
     AnchoredAnyRun,
     AnchoredAsciiRun,
     AnchoredAsciiNonRun,
@@ -306,8 +307,10 @@ enum RegExpFastPattern {
     AsciiDigit,
     AsciiNonDigit,
     Whitespace,
+    WhitespaceRun,
     NonWhitespace,
     NonWhitespaceRun,
+    LiteralCodeUnit(u16),
     AsciiWord,
     AsciiNonWord,
     UnicodeIgnoreCaseWord,
@@ -893,7 +896,50 @@ impl RegExpPayload {
 
     #[inline]
     pub const fn supports_literal_global_replace_fast_path(&self) -> bool {
-        matches!(self.fast_pattern, Some(RegExpFastPattern::NonWhitespaceRun))
+        matches!(
+            self.fast_pattern,
+            Some(
+                RegExpFastPattern::LiteralCodeUnit(_)
+                    | RegExpFastPattern::EdgeWhitespaceRun
+                    | RegExpFastPattern::Whitespace
+                    | RegExpFastPattern::NonWhitespaceRun
+                    | RegExpFastPattern::NonWhitespace
+                    | RegExpFastPattern::WhitespaceRun
+            )
+        )
+    }
+
+    pub fn literal_global_replace_ranges(&self, text: &[u16]) -> Option<Vec<Range<usize>>> {
+        if self.flags.sticky() || self.flags.unicode_aware() {
+            return None;
+        }
+        match self.fast_pattern? {
+            RegExpFastPattern::LiteralCodeUnit(unit) => {
+                Some(Self::literal_code_unit_ranges(text, unit))
+            }
+            RegExpFastPattern::Whitespace => Some(Self::class_ranges(
+                text,
+                is_js_whitespace_or_line_terminator,
+                false,
+            )),
+            RegExpFastPattern::WhitespaceRun => Some(Self::class_ranges(
+                text,
+                is_js_whitespace_or_line_terminator,
+                true,
+            )),
+            RegExpFastPattern::NonWhitespace => Some(Self::class_ranges(
+                text,
+                |unit| !is_js_whitespace_or_line_terminator(unit),
+                false,
+            )),
+            RegExpFastPattern::NonWhitespaceRun => Some(Self::class_ranges(
+                text,
+                |unit| !is_js_whitespace_or_line_terminator(unit),
+                true,
+            )),
+            RegExpFastPattern::EdgeWhitespaceRun => Some(Self::edge_whitespace_ranges(text)),
+            _ => None,
+        }
     }
 
     pub fn find_from_code_units(&self, text: &[u16], start: usize) -> Option<RegExpMatchRecord> {
@@ -905,17 +951,17 @@ impl RegExpPayload {
         } else {
             self.backend.find_from_ucs2(text, start).next()?
         };
+        Some(Self::match_record_from_backend(matched))
+    }
+
+    fn match_record_from_backend(matched: BackendMatch) -> RegExpMatchRecord {
         let named_captures = matched
             .named_groups()
             .map(|(name, range)| RegExpNamedCapture::new(name.into(), range))
             .collect::<Vec<_>>()
             .into_boxed_slice();
         let captures = matched.captures.into_boxed_slice();
-        Some(RegExpMatchRecord::new(
-            matched.range,
-            captures,
-            named_captures,
-        ))
+        RegExpMatchRecord::new(matched.range, captures, named_captures)
     }
 
     #[allow(
@@ -1020,6 +1066,9 @@ impl RegExpPayload {
             RegExpFastPattern::UnicodeLeadHiraganaClassStar => Some(Some(
                 Self::find_unicode_lead_hiragana_class_star(text, start),
             )),
+            RegExpFastPattern::EdgeWhitespaceRun => {
+                Some(Self::find_fast_edge_whitespace_run(text, start))
+            }
             RegExpFastPattern::AnchoredAnyRun => {
                 Some((start == 0 && !text.is_empty()).then(|| simple_match_record(0..text.len())))
             }
@@ -1062,6 +1111,11 @@ impl RegExpPayload {
             RegExpFastPattern::Whitespace => {
                 Some(self.find_fast_class(text, start, is_js_whitespace_or_line_terminator))
             }
+            RegExpFastPattern::WhitespaceRun => Some(Self::find_fast_class_run(
+                text,
+                start,
+                is_js_whitespace_or_line_terminator,
+            )),
             RegExpFastPattern::NonWhitespace => Some(self.find_fast_class(text, start, |unit| {
                 !is_js_whitespace_or_line_terminator(unit)
             })),
@@ -1069,6 +1123,9 @@ impl RegExpPayload {
                 Some(Self::find_fast_class_run(text, start, |unit| {
                     !is_js_whitespace_or_line_terminator(unit)
                 }))
+            }
+            RegExpFastPattern::LiteralCodeUnit(unit) => {
+                Some(Self::find_fast_literal_code_unit(text, start, unit))
             }
             RegExpFastPattern::AsciiWord => {
                 Some(self.find_fast_class(text, start, is_ascii_word_code_unit))
@@ -1573,6 +1630,100 @@ impl RegExpPayload {
         Some(simple_match_record(index..end))
     }
 
+    fn find_fast_literal_code_unit(
+        text: &[u16],
+        start: usize,
+        unit: u16,
+    ) -> Option<RegExpMatchRecord> {
+        let index = text.get(start..).and_then(|tail| {
+            tail.iter()
+                .position(|candidate| *candidate == unit)
+                .map(|offset| start + offset)
+        })?;
+        Some(simple_match_record(index..index + 1))
+    }
+
+    fn find_fast_edge_whitespace_run(text: &[u16], start: usize) -> Option<RegExpMatchRecord> {
+        if start == 0 {
+            let leading_end = text
+                .iter()
+                .position(|unit| !is_js_whitespace_or_line_terminator(*unit))
+                .unwrap_or(text.len());
+            if leading_end > 0 {
+                return Some(simple_match_record(0..leading_end));
+            }
+        }
+
+        if start >= text.len() {
+            return None;
+        }
+        let trailing_start = text
+            .iter()
+            .rposition(|unit| !is_js_whitespace_or_line_terminator(*unit))
+            .map_or(0, |index| index + 1);
+        if trailing_start == text.len() {
+            return None;
+        }
+        Some(simple_match_record(trailing_start.max(start)..text.len()))
+    }
+
+    fn literal_code_unit_ranges(text: &[u16], unit: u16) -> Vec<Range<usize>> {
+        text.iter()
+            .enumerate()
+            .filter_map(|(index, candidate)| (*candidate == unit).then_some(index..index + 1))
+            .collect()
+    }
+
+    fn class_ranges(
+        text: &[u16],
+        predicate: impl Fn(u16) -> bool,
+        coalesce_runs: bool,
+    ) -> Vec<Range<usize>> {
+        let mut ranges = Vec::new();
+        let mut index = 0;
+        while index < text.len() {
+            if !predicate(text[index]) {
+                index += 1;
+                continue;
+            }
+            let start = index;
+            index += 1;
+            if coalesce_runs {
+                while index < text.len() && predicate(text[index]) {
+                    index += 1;
+                }
+            }
+            ranges.push(start..index);
+        }
+        ranges
+    }
+
+    fn edge_whitespace_ranges(text: &[u16]) -> Vec<Range<usize>> {
+        let leading_end = text
+            .iter()
+            .position(|unit| !is_js_whitespace_or_line_terminator(*unit))
+            .unwrap_or(text.len());
+        if leading_end == text.len() {
+            return (!text.is_empty())
+                .then_some(0..text.len())
+                .into_iter()
+                .collect();
+        }
+
+        let mut ranges = Vec::with_capacity(2);
+        if leading_end > 0 {
+            ranges.push(0..leading_end);
+        }
+        let trailing_start = text
+            .iter()
+            .rposition(|unit| !is_js_whitespace_or_line_terminator(*unit))
+            .map_or(0, |index| index + 1);
+        if trailing_start < text.len() {
+            ranges.push(trailing_start..text.len());
+        }
+        ranges
+    }
+
     fn match_fast_anchored_run(
         text: &[u16],
         start: usize,
@@ -1694,11 +1845,18 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
             _ => {}
         }
     }
+    if !flags.multiline() && pattern == r"^\s+|\s+$" {
+        return Some(RegExpFastPattern::EdgeWhitespaceRun);
+    }
+    if let Some(unit) = detect_fast_literal_code_unit_pattern(pattern, flags) {
+        return Some(RegExpFastPattern::LiteralCodeUnit(unit));
+    }
 
     match pattern {
         r"\d" => Some(RegExpFastPattern::AsciiDigit),
         r"\D" => Some(RegExpFastPattern::AsciiNonDigit),
         r"\s" => Some(RegExpFastPattern::Whitespace),
+        r"\s+" => Some(RegExpFastPattern::WhitespaceRun),
         r"\S" => Some(RegExpFastPattern::NonWhitespace),
         r"\S+" => Some(RegExpFastPattern::NonWhitespaceRun),
         r"\w" if word_classes_are_ascii => Some(RegExpFastPattern::AsciiWord),
@@ -1728,6 +1886,72 @@ fn detect_fast_ignore_case_captured_literal_pattern(
         legacy_ignore_case_literal_class(unit)?
     };
     Some(RegExpFastPattern::CapturedIgnoreCaseLiteral { class, one_or_more })
+}
+
+fn detect_fast_literal_code_unit_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<u16> {
+    let unit = decode_standalone_literal_code_unit(pattern, flags)?;
+    if flags.ignore_case() && is_ascii_alpha_code_unit(unit) {
+        return None;
+    }
+    Some(unit)
+}
+
+fn decode_standalone_literal_code_unit(pattern: &str, flags: RegExpObjectFlags) -> Option<u16> {
+    let mut chars = pattern.chars();
+    let first = chars.next()?;
+    if first != '\\' {
+        if chars.next().is_some() || is_unescaped_syntax_character(first) {
+            return None;
+        }
+        return ascii_code_unit(first);
+    }
+
+    let escaped = chars.next()?;
+    match escaped {
+        'f' if chars.next().is_none() => Some(0x000C),
+        'n' if chars.next().is_none() => Some(0x000A),
+        'r' if chars.next().is_none() => Some(0x000D),
+        't' if chars.next().is_none() => Some(0x0009),
+        'v' if chars.next().is_none() => Some(0x000B),
+        'x' => decode_exact_hex_escape(chars.as_str(), 2),
+        'u' => decode_exact_hex_escape(chars.as_str(), 4),
+        ch if chars.next().is_none()
+            && (is_escaped_syntax_character(ch, false)
+                || ch == '/'
+                || is_legacy_literal_identity_escape(ch, flags)) =>
+        {
+            ascii_code_unit(ch)
+        }
+        _ => None,
+    }
+}
+
+fn decode_exact_hex_escape(hex: &str, digits: usize) -> Option<u16> {
+    if hex.len() == digits && hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return u16::from_str_radix(hex, 16).ok();
+    }
+    None
+}
+
+const fn is_unescaped_syntax_character(ch: char) -> bool {
+    matches!(
+        ch,
+        '^' | '$' | '\\' | '.' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '|'
+    )
+}
+
+const fn is_legacy_literal_identity_escape(ch: char, flags: RegExpObjectFlags) -> bool {
+    !flags.unicode_aware()
+        && !is_legacy_backend_escape(ch)
+        && !ch.is_ascii_digit()
+        && ascii_code_unit(ch).is_some()
+}
+
+const fn ascii_code_unit(ch: char) -> Option<u16> {
+    if ch.is_ascii() {
+        return Some(ch as u16);
+    }
+    None
 }
 
 fn captured_literal_code_unit(pattern: &str) -> Option<(u16, bool)> {
@@ -2169,6 +2393,26 @@ mod tests {
             Some(RegExpFastPattern::NonWhitespaceRun)
         );
         assert_eq!(
+            detect_fast_pattern(r"\s+", flags("g")),
+            Some(RegExpFastPattern::WhitespaceRun)
+        );
+        assert_eq!(
+            detect_fast_pattern(r"=", flags("")),
+            Some(RegExpFastPattern::LiteralCodeUnit(u16::from(b'=')))
+        );
+        assert_eq!(
+            detect_fast_pattern(r"\+", flags("g")),
+            Some(RegExpFastPattern::LiteralCodeUnit(u16::from(b'+')))
+        );
+        assert_eq!(
+            detect_fast_pattern(r"\t", flags("g")),
+            Some(RegExpFastPattern::LiteralCodeUnit(0x0009))
+        );
+        assert_eq!(
+            detect_fast_pattern(r"^\s+|\s+$", flags("g")),
+            Some(RegExpFastPattern::EdgeWhitespaceRun)
+        );
+        assert_eq!(
             detect_fast_pattern(r"^\W+$", flags("")),
             Some(RegExpFastPattern::AnchoredAsciiNonWordRun)
         );
@@ -2225,5 +2469,45 @@ mod tests {
         let bidi = RegExpPayload::compile(r"^\p{Bidi_Control}+$", "u").unwrap();
         assert!(bidi.find_from_code_units(&[0x061C, 0x202E], 0).is_some());
         assert!(bidi.find_from_code_units(&[0x061C, 0x20], 0).is_none());
+    }
+
+    #[test]
+    fn fast_literal_and_whitespace_run_patterns_match_expected_ranges() {
+        let literal = RegExpPayload::compile("=", "").unwrap();
+        assert_eq!(
+            literal.find_from_code_units(&[0x61, 0x3D, 0x62], 0),
+            Some(simple_match_record(1..2))
+        );
+        assert!(literal.find_from_code_units(&[0x61, 0x62], 0).is_none());
+
+        let escaped_literal = RegExpPayload::compile(r"\+", "g").unwrap();
+        assert_eq!(
+            escaped_literal.find_from_code_units(&[0x2D, 0x2B, 0x2B], 1),
+            Some(simple_match_record(1..2))
+        );
+
+        let whitespace_run = RegExpPayload::compile(r"\s+", "g").unwrap();
+        assert_eq!(
+            whitespace_run.find_from_code_units(&[0x61, 0x20, 0x09, 0x62], 0),
+            Some(simple_match_record(1..3))
+        );
+
+        let edge_whitespace = RegExpPayload::compile(r"^\s+|\s+$", "g").unwrap();
+        assert_eq!(
+            edge_whitespace.find_from_code_units(&[0x20, 0x61, 0x20], 0),
+            Some(simple_match_record(0..1))
+        );
+        assert_eq!(
+            edge_whitespace.find_from_code_units(&[0x20, 0x61, 0x20], 1),
+            Some(simple_match_record(2..3))
+        );
+        assert_eq!(
+            edge_whitespace.literal_global_replace_ranges(&[0x20, 0x61, 0x20]),
+            Some(vec![0..1, 2..3])
+        );
+        assert_eq!(
+            whitespace_run.literal_global_replace_ranges(&[0x61, 0x20, 0x09, 0x62]),
+            Some(std::iter::once(1..3).collect())
+        );
     }
 }

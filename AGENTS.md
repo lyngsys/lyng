@@ -80,6 +80,7 @@ See `crates/lyng-js/AGENTS.md` for the detailed Lyng JS operating guide.
 - Lyng JS remains focused on ECMA-262 semantics and conformance.
 - Aim for a gold-standard implementation bar. Do not treat code quality or readability as secondary to feature completion.
 - Prioritize code quality, readability, performance, memory behavior, cleanup, auditability, and verification clarity.
+- Performance optimizations must be defensible as general semantic engine improvements, not benchmark-score hacks. Benchmarks are evidence for bottlenecks and regressions; do not special-case a benchmark source shape, input string, or harness behavior just to improve a score. Gold-standard parity comes from improving the engine, not cheating the benchmarks.
 - Keep docs, tooling, reports, and issue tracking aligned with the live Lyng JS docs and the checked-in report/report-manifest flow under `reports/js/lyng-js/`.
 - Do not blur core ECMA-262 completion work with ECMA-402 Intl or other extension work unless the user explicitly asks for that scope.
 - The old JavaScript engine has been removed. Treat Lyng JS as the only in-repo JavaScript engine and keep docs, tooling, and verification aligned with that cutover.

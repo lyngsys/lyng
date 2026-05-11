@@ -114,6 +114,37 @@ fn regexp_replace_rejects_oversized_static_replacement_expansion() {
 }
 
 #[test]
+fn regexp_literal_and_whitespace_fast_paths_preserve_exec_and_replace_semantics() {
+    let result = compile_and_run_string(
+        r#"
+        let literal = /=/g;
+        let input = "a=b=c";
+        let seen = [];
+        let match;
+        while ((match = literal.exec(input)) !== null) {
+            seen.push(match.index + ":" + literal.lastIndex + ":" + match[0]);
+        }
+
+        let literalReplace = input.replace(/=/g, "");
+        let whitespaceReplace = "a  \t b\nc".replace(/\s+/g, "_");
+        let plus = /\+/.exec("a+b");
+        let edgeTrim = " a b ".replace(/^\s+|\s+$/g, "");
+
+        [
+            seen.join(","),
+            literalReplace,
+            whitespaceReplace,
+            plus.index + ":" + plus[0],
+            edgeTrim,
+            RegExp.lastMatch
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "1:2:=,3:4:=|abc|a_b_c|1:+|a b| ");
+}
+
+#[test]
 fn regexp_replace_custom_receiver_does_not_probe_exec_before_builtin_path() {
     let result = compile_and_run_string(
         r#"

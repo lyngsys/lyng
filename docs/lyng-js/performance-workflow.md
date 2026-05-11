@@ -9,6 +9,20 @@ Run commands from the workspace root. Use release builds for measurements. Write
 exploratory reports under `/tmp`; refresh checked-in reports only when intentionally
 updating verification evidence.
 
+## Optimization Bar
+
+Performance work must improve the engine, not the benchmark score alone. Any optimization
+must be defensible as a general semantic improvement: it should accelerate a real language,
+runtime, object-model, builtin, memory, or parser behavior that can occur outside the
+measured corpus. A change that recognizes one benchmark's exact source shape, input string,
+or scoring harness is not acceptable unless it is also a correct, maintainable instance of
+a broader engine strategy.
+
+Use benchmarks to find and verify bottlenecks, not as targets to game. If a proposed fix
+only helps because it special-cases a benchmark artifact, stop and either redesign it as a
+general optimization or record the profiling finding for follow-up. The gold-standard goal
+is QuickJS/Boa parity through better engine behavior, not by cheating benchmark suites.
+
 ## Loop Shape
 
 Use the narrowest loop that answers the current question:
