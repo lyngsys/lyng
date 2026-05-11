@@ -1113,18 +1113,20 @@ fn write_runtime_accounting_section(output: &mut String, snapshots: &[RuntimeSna
     output.push('\n');
     let _ = writeln!(
         output,
-        "| Snapshot | Heap live bytes | Heap reserved bytes | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
+        "| Snapshot | Heap live bytes | Heap young live bytes | Heap old live bytes | Heap reserved bytes | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
     );
     let _ = writeln!(
         output,
-        "| --- | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
+        "| --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
     );
     for snapshot in snapshots {
         let _ = writeln!(
             output,
-            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
+            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
             snapshot.label,
             snapshot.accounting.heap.live_bytes,
+            snapshot.accounting.heap.young_live_bytes,
+            snapshot.accounting.heap.old_live_bytes,
             snapshot.accounting.heap.reserved_bytes,
             domain_cell(snapshot.accounting.iterator_records),
             domain_cell(snapshot.accounting.regexp_payloads),
@@ -1277,6 +1279,8 @@ fn runtime_snapshot_json(snapshot: &RuntimeSnapshot) -> Value {
         "label": snapshot.label,
         "heap": {
             "live_bytes": snapshot.accounting.heap.live_bytes,
+            "young_live_bytes": snapshot.accounting.heap.young_live_bytes,
+            "old_live_bytes": snapshot.accounting.heap.old_live_bytes,
             "reserved_bytes": snapshot.accounting.heap.reserved_bytes,
         },
         "iterator_records": runtime_domain_json(snapshot.accounting.iterator_records),
@@ -1989,6 +1993,32 @@ mod tests {
             json["workloads"][0]["delta"]["median_ns_per_operation"],
             500.0
         );
+    }
+
+    #[test]
+    fn runtime_report_and_json_include_heap_generation_split() {
+        let snapshot = RuntimeSnapshot {
+            label: "runtime.synthetic",
+            accounting: RuntimeAccounting::default(),
+            note: "Synthetic snapshot.",
+        };
+        let options = Options {
+            report_path: "/tmp/runtime.md".to_string(),
+            json_path: "/tmp/runtime.json".to_string(),
+            samples: 1,
+            runs_per_sample: 1,
+            warmup_runs: 1,
+            loop_trip_count: 10,
+            frontend_repetitions: 4,
+        };
+
+        let markdown = render_report(&options, &[], std::slice::from_ref(&snapshot), None);
+        assert!(markdown.contains("Heap young live bytes"));
+        assert!(markdown.contains("Heap old live bytes"));
+
+        let json = render_json_report(&options, &[], std::slice::from_ref(&snapshot), None);
+        assert_eq!(json["runtime_snapshots"][0]["heap"]["young_live_bytes"], 0);
+        assert_eq!(json["runtime_snapshots"][0]["heap"]["old_live_bytes"], 0);
     }
 
     #[test]

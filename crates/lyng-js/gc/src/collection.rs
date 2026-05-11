@@ -14,6 +14,8 @@ const COLLECTION_GROWTH_FACTOR: usize = 2;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PrimitiveDomainAccounting {
     pub live_bytes: usize,
+    pub young_live_bytes: usize,
+    pub old_live_bytes: usize,
     pub reclaimable_bytes: usize,
     pub reserved_bytes: usize,
 }
@@ -31,6 +33,8 @@ pub struct PrimitiveHeapAccounting {
     pub realms: PrimitiveDomainAccounting,
     pub shapes: PrimitiveDomainAccounting,
     pub live_bytes: usize,
+    pub young_live_bytes: usize,
+    pub old_live_bytes: usize,
     pub reclaimable_bytes: usize,
     pub reserved_bytes: usize,
 }
@@ -97,6 +101,24 @@ impl PrimitiveHeap {
                 + codes.live_bytes
                 + realms.live_bytes
                 + shapes.live_bytes,
+            young_live_bytes: strings.young_live_bytes
+                + symbols.young_live_bytes
+                + bigints.young_live_bytes
+                + value_cells.young_live_bytes
+                + objects.young_live_bytes
+                + environments.young_live_bytes
+                + codes.young_live_bytes
+                + realms.young_live_bytes
+                + shapes.young_live_bytes,
+            old_live_bytes: strings.old_live_bytes
+                + symbols.old_live_bytes
+                + bigints.old_live_bytes
+                + value_cells.old_live_bytes
+                + objects.old_live_bytes
+                + environments.old_live_bytes
+                + codes.old_live_bytes
+                + realms.old_live_bytes
+                + shapes.old_live_bytes,
             reclaimable_bytes: strings.reclaimable_bytes
                 + symbols.reclaimable_bytes
                 + bigints.reclaimable_bytes
@@ -166,7 +188,7 @@ impl PrimitiveHeap {
             return None;
         }
 
-        Some(self.finish_collection_report(roots, trigger, before))
+        Some(self.finish_collection_report(roots, trigger, &before))
     }
 
     pub(crate) fn collect_with_trigger(
@@ -175,14 +197,14 @@ impl PrimitiveHeap {
         trigger: PrimitiveCollectionTrigger,
     ) -> PrimitiveCollectionReport {
         let before = self.accounting();
-        self.finish_collection_report(roots, trigger, before)
+        self.finish_collection_report(roots, trigger, &before)
     }
 
     fn finish_collection_report(
         &mut self,
         roots: &PrimitiveRoots,
         trigger: PrimitiveCollectionTrigger,
-        before: PrimitiveHeapAccounting,
+        before: &PrimitiveHeapAccounting,
     ) -> PrimitiveCollectionReport {
         let stats = self.collect(roots);
         let after = self.accounting();
@@ -191,7 +213,7 @@ impl PrimitiveHeap {
 
         PrimitiveCollectionReport {
             trigger,
-            before,
+            before: *before,
             after,
             stats,
             next_budget_bytes,
@@ -204,6 +226,10 @@ const fn domain_accounting<Record>(stats: PrimitiveDomainStats) -> PrimitiveDoma
 
     PrimitiveDomainAccounting {
         live_bytes: stats.occupied_slots * slot_bytes + stats.side_allocations.live_payload_bytes,
+        young_live_bytes: stats.young_slots * slot_bytes
+            + stats.side_allocations.young_live_payload_bytes,
+        old_live_bytes: stats.old_slots * slot_bytes
+            + stats.side_allocations.old_live_payload_bytes,
         reclaimable_bytes: stats.reusable_slots * slot_bytes
             + stats.side_allocations.reusable_reserved_bytes,
         reserved_bytes: stats.pages * PRIMITIVE_SLOTS_PER_PAGE * slot_bytes
@@ -217,6 +243,8 @@ const fn merge_domain_accounting(
 ) -> PrimitiveDomainAccounting {
     PrimitiveDomainAccounting {
         live_bytes: left.live_bytes + right.live_bytes,
+        young_live_bytes: left.young_live_bytes + right.young_live_bytes,
+        old_live_bytes: left.old_live_bytes + right.old_live_bytes,
         reclaimable_bytes: left.reclaimable_bytes + right.reclaimable_bytes,
         reserved_bytes: left.reserved_bytes + right.reserved_bytes,
     }
@@ -264,6 +292,42 @@ mod tests {
         assert!(report.next_budget_bytes >= report.after.live_bytes);
         assert_eq!(heap.accounting(), report.after);
         assert_eq!(heap.collection_budget_bytes(), report.next_budget_bytes);
+    }
+
+    #[test]
+    fn accounting_reports_current_allocations_as_old_generation() {
+        let mut heap = PrimitiveHeap::new();
+        let _string = heap.alloc_string(
+            StringEncoding::Latin1,
+            4,
+            b"live",
+            None,
+            AllocationLifetime::Default,
+        );
+        let _object = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+
+        let string_stats = heap.string_stats();
+        assert_eq!(string_stats.young_slots, 0);
+        assert_eq!(string_stats.old_slots, 1);
+        assert_eq!(string_stats.side_allocations.young_allocations, 0);
+        assert_eq!(string_stats.side_allocations.old_allocations, 1);
+
+        let accounting = heap.accounting();
+        assert_eq!(accounting.young_live_bytes, 0);
+        assert_eq!(accounting.old_live_bytes, accounting.live_bytes);
+        assert_eq!(accounting.strings.young_live_bytes, 0);
+        assert_eq!(
+            accounting.strings.old_live_bytes,
+            accounting.strings.live_bytes
+        );
+        assert_eq!(accounting.objects.young_live_bytes, 0);
+        assert_eq!(
+            accounting.objects.old_live_bytes,
+            accounting.objects.live_bytes
+        );
     }
 
     #[test]

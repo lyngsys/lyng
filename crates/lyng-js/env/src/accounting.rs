@@ -58,7 +58,7 @@ pub struct RuntimePhase6Accounting {
 
 #[inline]
 pub const fn total_live_bytes(
-    heap: PrimitiveHeapAccounting,
+    heap: &PrimitiveHeapAccounting,
     iterator_records: RuntimeDomainAccounting,
     regexp_payloads: RuntimeDomainAccounting,
     regexp_literal_cache: RuntimeDomainAccounting,
@@ -82,6 +82,8 @@ pub const fn merge_primitive_domain_accounting(
 ) -> PrimitiveDomainAccounting {
     PrimitiveDomainAccounting {
         live_bytes: left.live_bytes + right.live_bytes,
+        young_live_bytes: left.young_live_bytes + right.young_live_bytes,
+        old_live_bytes: left.old_live_bytes + right.old_live_bytes,
         reclaimable_bytes: left.reclaimable_bytes + right.reclaimable_bytes,
         reserved_bytes: left.reserved_bytes + right.reserved_bytes,
     }
@@ -89,8 +91,8 @@ pub const fn merge_primitive_domain_accounting(
 
 #[allow(clippy::too_many_lines)]
 pub const fn merge_primitive_heap_accounting(
-    left: PrimitiveHeapAccounting,
-    right: PrimitiveHeapAccounting,
+    left: &PrimitiveHeapAccounting,
+    right: &PrimitiveHeapAccounting,
 ) -> PrimitiveHeapAccounting {
     PrimitiveHeapAccounting {
         strings: merge_primitive_domain_accounting(left.strings, right.strings),
@@ -103,6 +105,8 @@ pub const fn merge_primitive_heap_accounting(
         realms: merge_primitive_domain_accounting(left.realms, right.realms),
         shapes: merge_primitive_domain_accounting(left.shapes, right.shapes),
         live_bytes: left.live_bytes + right.live_bytes,
+        young_live_bytes: left.young_live_bytes + right.young_live_bytes,
+        old_live_bytes: left.old_live_bytes + right.old_live_bytes,
         reclaimable_bytes: left.reclaimable_bytes + right.reclaimable_bytes,
         reserved_bytes: left.reserved_bytes + right.reserved_bytes,
     }

@@ -1,8 +1,9 @@
 use super::{
     AllocationLifetime, BigIntRef, CodeRef, CodeSlotsRef, EnvironmentRef, EnvironmentSlotsRef,
-    FunctionPayloadRef, ObjectRef, ObjectSlotsRef, PrimitiveDomainStats, PrimitiveValueCellRef,
-    RealmRef, ShapeId, SideAllocationClass, SideAllocationRef, SideAllocationStats, StringRef,
-    SuspendedExecutionRef, SuspendedRegistersRef, SymbolRef, Value, PRIMITIVE_SLOTS_PER_PAGE,
+    FunctionPayloadRef, HeapGeneration, ObjectRef, ObjectSlotsRef, PrimitiveDomainStats,
+    PrimitiveValueCellRef, RealmRef, ShapeId, SideAllocationClass, SideAllocationRef,
+    SideAllocationStats, StringRef, SuspendedExecutionRef, SuspendedRegistersRef, SymbolRef, Value,
+    PRIMITIVE_SLOTS_PER_PAGE,
 };
 use crate::HeapWriter;
 use std::array::from_fn;
@@ -268,6 +269,8 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
             stats.occupied_slots += page.occupied;
             stats.reusable_slots += page.free_list.len();
             stats.marked_slots += page.marked_slots();
+            stats.young_slots += page.young_slots();
+            stats.old_slots += page.old_slots();
             stats.default_slots += page.default_slots();
             stats.long_lived_slots += page.long_lived_slots();
         }
@@ -358,6 +361,7 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
 struct SlotPage<Record> {
     slots: [Option<Record>; PRIMITIVE_SLOTS_PER_PAGE],
     marks: [bool; PRIMITIVE_SLOTS_PER_PAGE],
+    generations: [HeapGeneration; PRIMITIVE_SLOTS_PER_PAGE],
     lifetimes: [AllocationLifetime; PRIMITIVE_SLOTS_PER_PAGE],
     occupied: usize,
     next_uninitialized: usize,
@@ -369,6 +373,7 @@ impl<Record: Copy> SlotPage<Record> {
         Self {
             slots: from_fn(|_| None),
             marks: [false; PRIMITIVE_SLOTS_PER_PAGE],
+            generations: [HeapGeneration::Old; PRIMITIVE_SLOTS_PER_PAGE],
             lifetimes: [AllocationLifetime::Default; PRIMITIVE_SLOTS_PER_PAGE],
             occupied: 0,
             next_uninitialized: 0,
@@ -389,6 +394,7 @@ impl<Record: Copy> SlotPage<Record> {
 
         self.slots[slot_index] = Some(record);
         self.marks[slot_index] = false;
+        self.generations[slot_index] = HeapGeneration::Old;
         self.lifetimes[slot_index] = lifetime;
         self.occupied += 1;
         Some(slot_index)
@@ -415,6 +421,7 @@ impl<Record: Copy> SlotPage<Record> {
     fn free(&mut self, slot_index: usize) -> Option<Record> {
         let record = self.slots.get_mut(slot_index)?.take()?;
         self.marks[slot_index] = false;
+        self.generations[slot_index] = HeapGeneration::Old;
         self.lifetimes[slot_index] = AllocationLifetime::Default;
         self.occupied -= 1;
         self.free_list
@@ -457,6 +464,7 @@ impl<Record: Copy> SlotPage<Record> {
                 Some(record) => {
                     self.slots[slot_index] = None;
                     self.marks[slot_index] = false;
+                    self.generations[slot_index] = HeapGeneration::Old;
                     self.lifetimes[slot_index] = AllocationLifetime::Default;
                     self.occupied -= 1;
                     self.free_list.push(
@@ -476,6 +484,22 @@ impl<Record: Copy> SlotPage<Record> {
     fn marked_slots(&self) -> usize {
         (0..self.next_uninitialized)
             .filter(|&slot_index| self.slots[slot_index].is_some() && self.marks[slot_index])
+            .count()
+    }
+
+    fn young_slots(&self) -> usize {
+        self.count_slots_with_generation(HeapGeneration::Young)
+    }
+
+    fn old_slots(&self) -> usize {
+        self.count_slots_with_generation(HeapGeneration::Old)
+    }
+
+    fn count_slots_with_generation(&self, generation: HeapGeneration) -> usize {
+        (0..self.next_uninitialized)
+            .filter(|&slot_index| {
+                self.slots[slot_index].is_some() && self.generations[slot_index] == generation
+            })
             .count()
     }
 
@@ -504,6 +528,7 @@ pub(super) struct SideAllocator {
 
 struct SideAllocationSlot {
     class: SideAllocationClass,
+    generation: HeapGeneration,
     lifetime: AllocationLifetime,
     payload_len: usize,
     occupied: bool,
@@ -548,6 +573,7 @@ impl SideAllocator {
         }
 
         slot.occupied = false;
+        slot.generation = HeapGeneration::Old;
         slot.payload_len = 0;
         self.free_by_class
             .entry(slot.class)
@@ -564,6 +590,16 @@ impl SideAllocator {
             if slot.occupied {
                 stats.live_allocations += 1;
                 stats.live_payload_bytes += slot.payload_len;
+                match slot.generation {
+                    HeapGeneration::Young => {
+                        stats.young_allocations += 1;
+                        stats.young_live_payload_bytes += slot.payload_len;
+                    }
+                    HeapGeneration::Old => {
+                        stats.old_allocations += 1;
+                        stats.old_live_payload_bytes += slot.payload_len;
+                    }
+                }
                 match slot.lifetime {
                     AllocationLifetime::Default => stats.default_allocations += 1,
                     AllocationLifetime::LongLived => stats.long_lived_allocations += 1,
@@ -590,6 +626,7 @@ impl SideAllocator {
         {
             let slot_index = (id - 1) as usize;
             let slot = &mut self.slots[slot_index];
+            slot.generation = HeapGeneration::Old;
             slot.lifetime = lifetime;
             slot.payload_len = payload_len;
             slot.occupied = true;
@@ -599,6 +636,7 @@ impl SideAllocator {
         let bytes = vec![0_u8; class.slot_bytes()].into_boxed_slice();
         self.slots.push(SideAllocationSlot {
             class,
+            generation: HeapGeneration::Old,
             lifetime,
             payload_len,
             occupied: true,
@@ -630,6 +668,7 @@ impl<Handle> Default for ValueSlotAllocator<Handle> {
 }
 
 struct ValueSlotBufferSlot {
+    generation: HeapGeneration,
     lifetime: AllocationLifetime,
     occupied: bool,
     values: Box<[Value]>,
@@ -656,6 +695,7 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
             .and_then(std::vec::Vec::pop)
         {
             let slot = &mut self.slots[(id - 1) as usize];
+            slot.generation = HeapGeneration::Old;
             slot.lifetime = lifetime;
             slot.occupied = true;
             for value in &mut slot.values {
@@ -665,6 +705,7 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
         }
 
         self.slots.push(ValueSlotBufferSlot {
+            generation: HeapGeneration::Old,
             lifetime,
             occupied: true,
             values: vec![fill; slot_count].into_boxed_slice(),
@@ -707,6 +748,7 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
         }
 
         slot.occupied = false;
+        slot.generation = HeapGeneration::Old;
         self.free_by_len
             .entry(slot.values.len())
             .or_default()
@@ -724,6 +766,16 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
             if slot.occupied {
                 stats.live_allocations += 1;
                 stats.live_payload_bytes += reserved_bytes;
+                match slot.generation {
+                    HeapGeneration::Young => {
+                        stats.young_allocations += 1;
+                        stats.young_live_payload_bytes += reserved_bytes;
+                    }
+                    HeapGeneration::Old => {
+                        stats.old_allocations += 1;
+                        stats.old_live_payload_bytes += reserved_bytes;
+                    }
+                }
                 match slot.lifetime {
                     AllocationLifetime::Default => stats.default_allocations += 1,
                     AllocationLifetime::LongLived => stats.long_lived_allocations += 1,

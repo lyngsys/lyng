@@ -25,7 +25,7 @@ impl Agent {
             module_caches,
             promise_jobs,
             live_bytes: total_live_bytes(
-                heap,
+                &heap,
                 iterator_records,
                 regexp_payloads,
                 regexp_literal_cache,

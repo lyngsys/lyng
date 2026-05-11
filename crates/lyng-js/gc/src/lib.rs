@@ -24,12 +24,13 @@ mod writer;
 
 pub use arena::{
     AllocationLifetime, BigIntSign, CodeSlotsRef, EnvironmentSlotsRef, FunctionPayloadRef,
-    ObjectSlotsRef, PrimitiveBigIntRecord, PrimitiveBigIntView, PrimitiveDomainStats,
-    PrimitiveHeap, PrimitiveSymbolClass, PrimitiveSymbolRecord, PrimitiveSymbolView,
-    PrimitiveValueCellRecord, PrimitiveValueCellRef, RuntimeBoundFunctionRecord, RuntimeCodeRecord,
-    RuntimeEnvironmentRecord, RuntimeFunctionRecord, RuntimeObjectRecord, RuntimeRealmRecord,
-    RuntimeShapeRecord, RuntimeSuspendedExecutionRecord, SideAllocationClass, SideAllocationRef,
-    SideAllocationStats, SuspendedRegistersRef, SymbolFlags, PRIMITIVE_SLOTS_PER_PAGE,
+    HeapGeneration, ObjectSlotsRef, PrimitiveBigIntRecord, PrimitiveBigIntView,
+    PrimitiveDomainStats, PrimitiveHeap, PrimitiveSymbolClass, PrimitiveSymbolRecord,
+    PrimitiveSymbolView, PrimitiveValueCellRecord, PrimitiveValueCellRef,
+    RuntimeBoundFunctionRecord, RuntimeCodeRecord, RuntimeEnvironmentRecord, RuntimeFunctionRecord,
+    RuntimeObjectRecord, RuntimeRealmRecord, RuntimeShapeRecord, RuntimeSuspendedExecutionRecord,
+    SideAllocationClass, SideAllocationRef, SideAllocationStats, SuspendedRegistersRef,
+    SymbolFlags, PRIMITIVE_SLOTS_PER_PAGE,
 };
 pub use collection::{
     PrimitiveCollectionReport, PrimitiveCollectionTrigger, PrimitiveDomainAccounting,

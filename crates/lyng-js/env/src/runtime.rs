@@ -71,7 +71,7 @@ impl Runtime {
                 continue;
             };
             let accounting = agent.phase6_accounting();
-            heap = merge_primitive_heap_accounting(heap, accounting.heap);
+            heap = merge_primitive_heap_accounting(&heap, &accounting.heap);
             iterator_records = iterator_records.merge(accounting.iterator_records);
             regexp_payloads = regexp_payloads.merge(accounting.regexp_payloads);
             regexp_literal_cache = regexp_literal_cache.merge(accounting.regexp_literal_cache);
@@ -90,7 +90,7 @@ impl Runtime {
             promise_jobs,
             backing_stores,
             live_bytes: total_live_bytes(
-                heap,
+                &heap,
                 iterator_records,
                 regexp_payloads,
                 regexp_literal_cache,

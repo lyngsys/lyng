@@ -13,6 +13,13 @@ pub enum AllocationLifetime {
     LongLived,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+pub enum HeapGeneration {
+    Young,
+    #[default]
+    Old,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct SideAllocationClass(usize);
@@ -933,8 +940,12 @@ pub struct SideAllocationStats {
     pub live_allocations: usize,
     pub reusable_allocations: usize,
     pub live_payload_bytes: usize,
+    pub young_live_payload_bytes: usize,
+    pub old_live_payload_bytes: usize,
     pub reserved_bytes: usize,
     pub reusable_reserved_bytes: usize,
+    pub young_allocations: usize,
+    pub old_allocations: usize,
     pub default_allocations: usize,
     pub long_lived_allocations: usize,
 }
@@ -945,6 +956,8 @@ pub struct PrimitiveDomainStats {
     pub occupied_slots: usize,
     pub reusable_slots: usize,
     pub marked_slots: usize,
+    pub young_slots: usize,
+    pub old_slots: usize,
     pub default_slots: usize,
     pub long_lived_slots: usize,
     pub side_allocations: SideAllocationStats,
