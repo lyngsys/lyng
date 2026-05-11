@@ -1,4 +1,4 @@
-use lyng_js_gc::{PrimitiveDomainAccounting, PrimitiveHeapAccounting};
+use lyng_js_gc::{PrimitiveAllocationProfile, PrimitiveDomainAccounting, PrimitiveHeapAccounting};
 
 /// Runtime-owned memory summary for one Phase 6 domain outside the primitive heap.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -109,6 +109,21 @@ pub const fn merge_primitive_heap_accounting(
         old_live_bytes: left.old_live_bytes + right.old_live_bytes,
         reclaimable_bytes: left.reclaimable_bytes + right.reclaimable_bytes,
         reserved_bytes: left.reserved_bytes + right.reserved_bytes,
+        allocation_profile: PrimitiveAllocationProfile {
+            nursery_allocations: left.allocation_profile.nursery_allocations
+                + right.allocation_profile.nursery_allocations,
+            old_allocations: left.allocation_profile.old_allocations
+                + right.allocation_profile.old_allocations,
+        },
+        nursery_capacity_bytes: left.nursery_capacity_bytes + right.nursery_capacity_bytes,
+        nursery_used_bytes: left.nursery_used_bytes + right.nursery_used_bytes,
+        minor_collections: left.minor_collections + right.minor_collections,
+        last_minor_pause_ns: left.last_minor_pause_ns + right.last_minor_pause_ns,
+        last_minor_survivors: left.last_minor_survivors + right.last_minor_survivors,
+        last_minor_tenured: left.last_minor_tenured + right.last_minor_tenured,
+        last_minor_reclaimed: left.last_minor_reclaimed + right.last_minor_reclaimed,
+        last_minor_cards_dirtied: left.last_minor_cards_dirtied + right.last_minor_cards_dirtied,
+        last_minor_cards_scanned: left.last_minor_cards_scanned + right.last_minor_cards_scanned,
     }
 }
 

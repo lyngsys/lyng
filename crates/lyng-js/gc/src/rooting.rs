@@ -1,9 +1,9 @@
 use crate::{
-    CodeSlotsRef, EnvironmentSlotsRef, ObjectSlotsRef, PrimitiveBigIntRecord, PrimitiveHeap,
-    PrimitiveStringRecord, PrimitiveSymbolRecord, PrimitiveValueCellRecord, PrimitiveValueCellRef,
-    RuntimeBoundFunctionRecord, RuntimeCodeRecord, RuntimeEnvironmentRecord, RuntimeFunctionRecord,
-    RuntimeObjectRecord, RuntimeRealmRecord, RuntimeShapeRecord, RuntimeSuspendedExecutionRecord,
-    SuspendedRegistersRef,
+    CodeSlotsRef, EnvironmentSlotsRef, FunctionPayloadRef, ObjectSlotsRef, PrimitiveBigIntRecord,
+    PrimitiveHeap, PrimitiveStringRecord, PrimitiveSymbolRecord, PrimitiveValueCellRecord,
+    PrimitiveValueCellRef, RuntimeBoundFunctionRecord, RuntimeCodeRecord, RuntimeEnvironmentRecord,
+    RuntimeFunctionRecord, RuntimeObjectRecord, RuntimeRealmRecord, RuntimeShapeRecord,
+    RuntimeSuspendedExecutionRecord, SuspendedRegistersRef,
 };
 use lyng_js_types::{
     BigIntRef, CodeRef, EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, StringRef,
@@ -77,6 +77,11 @@ pub struct PrimitiveRootGuard<'a, T> {
 pub struct PrimitiveTracer<'a> {
     heap: &'a mut PrimitiveHeap,
     stats: PrimitiveTraceStats,
+}
+
+/// Young-generation tracer for minor collections.
+pub struct PrimitiveMinorTracer<'a> {
+    heap: &'a mut PrimitiveHeap,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -207,6 +212,24 @@ impl PrimitiveRoots {
                 RootRegistration::Realm(id) => tracer.mark_realm(id),
                 RootRegistration::Shape(id) => tracer.mark_shape(id),
                 RootRegistration::SuspendedExecution(id) => tracer.mark_suspended_execution(id),
+            }
+        }
+    }
+
+    pub(crate) fn trace_minor_roots(&self, tracer: &mut PrimitiveMinorTracer<'_>) {
+        for registration in self.slots.borrow().iter().copied().flatten() {
+            match registration {
+                RootRegistration::Value(value) => tracer.mark_value(value),
+                RootRegistration::String(id) => tracer.mark_string(id),
+                RootRegistration::Symbol(id) => tracer.mark_symbol(id),
+                RootRegistration::BigInt(id) => tracer.mark_bigint(id),
+                RootRegistration::ValueCell(id) => tracer.mark_value_cell(id),
+                RootRegistration::Object(id) => tracer.mark_object(id),
+                RootRegistration::Environment(id) => tracer.mark_environment(id),
+                RootRegistration::SuspendedExecution(id) => tracer.mark_suspended_execution(id),
+                RootRegistration::Code(_)
+                | RootRegistration::Realm(_)
+                | RootRegistration::Shape(_) => {}
             }
         }
     }
@@ -572,6 +595,387 @@ impl<'a> PrimitiveTracer<'a> {
                 return ephemeron_fixes;
             }
             ephemeron_fixes += after - before;
+        }
+    }
+}
+
+impl<'a> PrimitiveMinorTracer<'a> {
+    #[inline]
+    pub(crate) const fn new(heap: &'a mut PrimitiveHeap) -> Self {
+        Self { heap }
+    }
+
+    #[inline]
+    pub(crate) fn mark_value(&mut self, value: Value) {
+        if let Some(id) = value.as_string_ref() {
+            self.mark_string(id);
+        } else if let Some(id) = value.as_symbol_ref() {
+            self.mark_symbol(id);
+        } else if let Some(id) = value.as_bigint_ref() {
+            self.mark_bigint(id);
+        } else if let Some(id) = value.as_object_ref() {
+            self.mark_object(id);
+        } else if let Some(id) = value.as_suspended_execution_ref() {
+            self.mark_suspended_execution(id);
+        }
+    }
+
+    pub(crate) fn mark_string(&mut self, id: StringRef) {
+        if !self.heap.is_young_string(id) || !self.heap.mark_string(id) {
+            return;
+        }
+        if let Some(record) = self.heap.string(id)
+            && let Some((left, right)) = record.cons_children()
+        {
+            self.mark_string(left);
+            self.mark_string(right);
+        }
+    }
+
+    pub(crate) fn mark_symbol(&mut self, id: SymbolRef) {
+        if !self.heap.is_young_symbol(id) || !self.heap.mark_symbol(id) {
+            return;
+        }
+        if let Some(record) = self.heap.symbol(id)
+            && let Some(description) = record.description()
+        {
+            self.mark_string(description);
+        }
+    }
+
+    pub(crate) fn mark_bigint(&mut self, id: BigIntRef) {
+        if self.heap.is_young_bigint(id) {
+            self.heap.mark_bigint(id);
+        }
+    }
+
+    pub(crate) fn mark_value_cell(&mut self, id: PrimitiveValueCellRef) {
+        if !self.heap.is_young_value_cell(id) || !self.heap.mark_value_cell(id) {
+            return;
+        }
+        if let Some(record) = self.heap.value_cell(id) {
+            self.mark_value(record.stored_value());
+            if let Some(string) = record.linked_string() {
+                self.mark_string(string);
+            }
+        }
+    }
+
+    pub(crate) fn mark_object(&mut self, id: ObjectRef) {
+        if !self.heap.is_young_object(id) || !self.heap.mark_object(id) {
+            return;
+        }
+        self.trace_object_record(id);
+    }
+
+    pub(crate) fn mark_function_payload(&mut self, id: FunctionPayloadRef) {
+        if !self.heap.is_young_function_payload(id) || !self.heap.mark_function_payload(id) {
+            return;
+        }
+        if let Some(record) = self.heap.function_payload(id) {
+            self.trace_function_payload_edges(record);
+        }
+    }
+
+    pub(crate) fn mark_environment(&mut self, id: EnvironmentRef) {
+        if !self.heap.is_young_environment(id) || !self.heap.mark_environment(id) {
+            return;
+        }
+        self.trace_environment_record(id);
+    }
+
+    pub(crate) fn mark_suspended_execution(&mut self, id: SuspendedExecutionRef) {
+        if !self.heap.is_young_suspended_execution(id) || !self.heap.mark_suspended_execution(id) {
+            return;
+        }
+        self.trace_suspended_execution_record(id);
+    }
+
+    pub(crate) fn mark_object_slots(&mut self, id: ObjectSlotsRef) {
+        if self.heap.is_young_object_slots(id) {
+            self.heap.mark_object_slots(id);
+        }
+        let Some(values) = self.heap.object_slots(id).map(<[Value]>::to_vec) else {
+            return;
+        };
+        for value in values {
+            self.mark_value(value);
+        }
+    }
+
+    pub(crate) fn mark_environment_slots(&mut self, id: EnvironmentSlotsRef) {
+        if self.heap.is_young_environment_slots(id) {
+            self.heap.mark_environment_slots(id);
+        }
+        let Some(values) = self.heap.environment_slots(id).map(<[Value]>::to_vec) else {
+            return;
+        };
+        for value in values {
+            self.mark_value(value);
+        }
+    }
+
+    pub(crate) fn mark_suspended_registers(&mut self, id: SuspendedRegistersRef) {
+        if self.heap.is_young_suspended_registers(id) {
+            self.heap.mark_suspended_registers(id);
+        }
+        let Some(values) = self.heap.suspended_registers(id).map(<[Value]>::to_vec) else {
+            return;
+        };
+        for value in values {
+            self.mark_value(value);
+        }
+    }
+
+    pub(crate) fn trace_string_card(&mut self, card_index: usize) {
+        let mut records = Vec::new();
+        self.heap
+            .scan_string_card(card_index, |record| records.push(record));
+        for record in records {
+            self.trace_string_edges(record);
+        }
+    }
+
+    pub(crate) fn trace_symbol_card(&mut self, card_index: usize) {
+        let mut records = Vec::new();
+        self.heap
+            .scan_symbol_card(card_index, |record| records.push(record));
+        for record in records {
+            self.trace_symbol_edges(record);
+        }
+    }
+
+    pub(crate) fn trace_object_slots_card(&mut self, card_index: usize) {
+        let mut values = Vec::new();
+        self.heap.scan_object_slots_card(card_index, |slot_values| {
+            values.extend_from_slice(slot_values);
+        });
+        for value in values {
+            self.mark_value(value);
+        }
+    }
+
+    pub(crate) fn trace_environment_slots_card(&mut self, card_index: usize) {
+        let mut values = Vec::new();
+        self.heap
+            .scan_environment_slots_card(card_index, |slot_values| {
+                values.extend_from_slice(slot_values);
+            });
+        for value in values {
+            self.mark_value(value);
+        }
+    }
+
+    pub(crate) fn trace_code_slots_card(&mut self, card_index: usize) {
+        let mut values = Vec::new();
+        self.heap.scan_code_slots_card(card_index, |slot_values| {
+            values.extend_from_slice(slot_values);
+        });
+        for value in values {
+            self.mark_value(value);
+        }
+    }
+
+    pub(crate) fn trace_object_card(&mut self, card_index: usize) {
+        let mut records = Vec::new();
+        self.heap
+            .scan_object_card(card_index, |record| records.push(record));
+        for record in records {
+            self.trace_object_edges(record);
+        }
+    }
+
+    pub(crate) fn trace_environment_card(&mut self, card_index: usize) {
+        let mut records = Vec::new();
+        self.heap
+            .scan_environment_card(card_index, |record| records.push(record));
+        for record in records {
+            self.trace_environment_edges(record);
+        }
+    }
+
+    pub(crate) fn trace_function_payload_card(&mut self, card_index: usize) {
+        let mut records = Vec::new();
+        self.heap
+            .scan_function_payload_card(card_index, |record| records.push(record));
+        for record in records {
+            self.trace_function_payload_edges(record);
+        }
+    }
+
+    pub(crate) fn trace_value_cell_card(&mut self, card_index: usize) {
+        let mut records = Vec::new();
+        self.heap
+            .scan_value_cell_card(card_index, |record| records.push(record));
+        for record in records {
+            self.mark_value(record.stored_value());
+            if let Some(string) = record.linked_string() {
+                self.mark_string(string);
+            }
+        }
+    }
+
+    pub(crate) fn trace_suspended_execution_card(&mut self, card_index: usize) {
+        let mut records = Vec::new();
+        self.heap
+            .scan_suspended_execution_card(card_index, |record| records.push(record));
+        for record in records {
+            self.trace_suspended_execution_edges(record);
+        }
+    }
+
+    pub(crate) fn trace_suspended_registers_card(&mut self, card_index: usize) {
+        let mut values = Vec::new();
+        self.heap
+            .scan_suspended_registers_card(card_index, |slot_values| {
+                values.extend_from_slice(slot_values);
+            });
+        for value in values {
+            self.mark_value(value);
+        }
+    }
+
+    pub(crate) fn trace_realm_card(&mut self, card_index: usize) {
+        let mut records = Vec::new();
+        self.heap
+            .scan_realm_card(card_index, |record| records.push(record));
+        for record in records {
+            self.trace_realm_edges(record);
+        }
+    }
+
+    pub(crate) fn trace_shape_card(&mut self, card_index: usize) {
+        let mut records = Vec::new();
+        self.heap
+            .scan_shape_card(card_index, |record| records.push(record));
+        for record in records {
+            self.trace_shape_edges(record);
+        }
+    }
+
+    fn trace_object_record(&mut self, id: ObjectRef) {
+        if let Some(record) = self.heap.object(id) {
+            self.trace_object_edges(record);
+        }
+    }
+
+    fn trace_string_edges(&mut self, record: PrimitiveStringRecord) {
+        if let Some((left, right)) = record.cons_children() {
+            self.mark_string(left);
+            self.mark_string(right);
+        }
+    }
+
+    fn trace_symbol_edges(&mut self, record: PrimitiveSymbolRecord) {
+        if let Some(description) = record.description() {
+            self.mark_string(description);
+        }
+    }
+
+    fn trace_object_edges(&mut self, record: RuntimeObjectRecord) {
+        if let Some(prototype) = record.prototype() {
+            self.mark_object(prototype);
+        }
+        if let Some(slots) = record.named_slots() {
+            self.mark_object_slots(slots);
+        }
+        if let Some(elements) = record.elements() {
+            self.mark_object_slots(elements);
+        }
+        if let Some(private_slots) = record.private_slots() {
+            self.mark_object_slots(private_slots);
+        }
+        if let Some(payload) = record.function_payload() {
+            self.mark_function_payload(payload);
+        }
+        if let Some(payload) = record.ordinary_payload() {
+            self.mark_value_cell(payload);
+        }
+    }
+
+    fn trace_function_payload_edges(&mut self, record: RuntimeFunctionRecord) {
+        if let Some(environment) = record.environment() {
+            self.mark_environment(environment);
+        }
+        if let Some(private_env) = record.private_env() {
+            self.mark_environment(private_env);
+        }
+        if let Some(home_object) = record.home_object() {
+            self.mark_object(home_object);
+        }
+        if let Some(bound) = record.bound() {
+            self.mark_object(bound.target());
+            self.mark_value(bound.this_value());
+            if let Some(arguments) = bound.arguments() {
+                self.mark_object_slots(arguments);
+            }
+        }
+    }
+
+    fn trace_environment_record(&mut self, id: EnvironmentRef) {
+        if let Some(record) = self.heap.environment(id) {
+            self.trace_environment_edges(record);
+        }
+    }
+
+    fn trace_environment_edges(&mut self, record: RuntimeEnvironmentRecord) {
+        if let Some(outer) = record.outer() {
+            self.mark_environment(outer);
+        }
+        if let Some(slots) = record.slots() {
+            self.mark_environment_slots(slots);
+        }
+        if let Some(function_object) = record.function_object() {
+            self.mark_object(function_object);
+        }
+        self.mark_value(record.this_value());
+        if let Some(new_target) = record.new_target() {
+            self.mark_object(new_target);
+        }
+        if let Some(home_object) = record.home_object() {
+            self.mark_object(home_object);
+        }
+    }
+
+    fn trace_suspended_execution_record(&mut self, id: SuspendedExecutionRef) {
+        if let Some(record) = self.heap.suspended_execution(id) {
+            self.trace_suspended_execution_edges(record);
+        }
+    }
+
+    fn trace_suspended_execution_edges(&mut self, record: RuntimeSuspendedExecutionRecord) {
+        self.mark_environment(record.lexical_env());
+        self.mark_environment(record.variable_env());
+        if let Some(private_env) = record.private_env() {
+            self.mark_environment(private_env);
+        }
+        self.mark_value(record.this_value());
+        if let Some(construct_this) = record.construct_this() {
+            self.mark_object(construct_this);
+        }
+        if let Some(new_target) = record.new_target() {
+            self.mark_object(new_target);
+        }
+        if let Some(callee) = record.callee() {
+            self.mark_object(callee);
+        }
+        if let Some(registers) = record.registers() {
+            self.mark_suspended_registers(registers);
+        }
+    }
+
+    fn trace_realm_edges(&mut self, record: RuntimeRealmRecord) {
+        if let Some(global_object) = record.global_object() {
+            self.mark_object(global_object);
+        }
+        if let Some(global_env) = record.global_env() {
+            self.mark_environment(global_env);
+        }
+    }
+
+    fn trace_shape_edges(&mut self, record: RuntimeShapeRecord) {
+        if let Some(prototype_guard) = record.prototype_guard() {
+            self.mark_object(prototype_guard);
         }
     }
 }

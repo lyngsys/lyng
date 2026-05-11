@@ -5,10 +5,17 @@ use super::{
     SideAllocationStats, StringRef, SuspendedExecutionRef, SuspendedRegistersRef, SymbolRef, Value,
     PRIMITIVE_SLOTS_PER_PAGE,
 };
-use crate::HeapWriter;
+use crate::{card_table::CARD_SIZE_BYTES, HeapWriter};
 use std::array::from_fn;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct YoungSweepStats {
+    pub survivors: usize,
+    pub tenured: usize,
+    pub reclaimed: usize,
+}
 
 pub(super) trait ArenaHandle: Copy {
     fn from_raw(raw: u32) -> Option<Self>;
@@ -188,10 +195,15 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
         !self.pages.is_empty() && self.pages_with_available_slots == 0
     }
 
-    pub(super) fn allocate(&mut self, record: Record, lifetime: AllocationLifetime) -> Handle {
+    pub(super) fn allocate(
+        &mut self,
+        record: Record,
+        lifetime: AllocationLifetime,
+        generation: HeapGeneration,
+    ) -> Handle {
         if let Some(page_index) = self.first_page_with_available_slot {
             let slot_index = self.pages[page_index]
-                .allocate(record, lifetime)
+                .allocate(record, lifetime, generation)
                 .expect("page availability hint must point at a page with a free slot");
             if !self.pages[page_index].has_available_slot() {
                 self.pages_with_available_slots -= 1;
@@ -203,7 +215,7 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
 
         let mut page = SlotPage::new();
         let slot_index = page
-            .allocate(record, lifetime)
+            .allocate(record, lifetime, generation)
             .expect("fresh primitive page must accept its first record");
         let page_has_available_slot = page.has_available_slot();
         self.pages.push(page);
@@ -305,6 +317,55 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
             .is_some_and(|page| page.update(slot_index, &mut update))
     }
 
+    pub(super) fn generation(&self, handle: Handle) -> Option<HeapGeneration> {
+        let (page_index, slot_index) = locate::<Handle>(handle)?;
+        self.pages.get(page_index)?.generation(slot_index)
+    }
+
+    pub(super) fn age(&self, handle: Handle) -> Option<u8> {
+        let (page_index, slot_index) = locate::<Handle>(handle)?;
+        self.pages.get(page_index)?.age(slot_index)
+    }
+
+    pub(super) fn card_index(handle: Handle, record_size: usize) -> usize {
+        let raw = handle.get().saturating_sub(1) as usize;
+        raw.saturating_mul(record_size) / CARD_SIZE_BYTES
+    }
+
+    pub(super) fn scan_card(
+        &self,
+        card_index: usize,
+        record_size: usize,
+        mut scan: impl FnMut(Record),
+    ) {
+        for (page_index, page) in self.pages.iter().enumerate() {
+            page.scan_card(page_index, card_index, record_size, &mut scan);
+        }
+    }
+
+    pub(super) fn sweep_young(
+        &mut self,
+        tenuring_threshold: u8,
+        mut reclaim: impl FnMut(Record),
+    ) -> YoungSweepStats {
+        let mut stats = YoungSweepStats::default();
+
+        for page_index in 0..self.pages.len() {
+            let (was_available, is_available, page_stats) = {
+                let page = &mut self.pages[page_index];
+                let was_available = page.has_available_slot();
+                let page_stats = page.sweep_young(tenuring_threshold, &mut reclaim);
+                (was_available, page.has_available_slot(), page_stats)
+            };
+            self.update_page_availability(page_index, was_available, is_available);
+            stats.survivors += page_stats.survivors;
+            stats.tenured += page_stats.tenured;
+            stats.reclaimed += page_stats.reclaimed;
+        }
+
+        stats
+    }
+
     fn find_available_page_after(&self, start: usize) -> Option<usize> {
         self.pages
             .iter()
@@ -363,6 +424,7 @@ struct SlotPage<Record> {
     marks: [bool; PRIMITIVE_SLOTS_PER_PAGE],
     generations: [HeapGeneration; PRIMITIVE_SLOTS_PER_PAGE],
     lifetimes: [AllocationLifetime; PRIMITIVE_SLOTS_PER_PAGE],
+    ages: [u8; PRIMITIVE_SLOTS_PER_PAGE],
     occupied: usize,
     next_uninitialized: usize,
     free_list: Vec<u16>,
@@ -375,13 +437,19 @@ impl<Record: Copy> SlotPage<Record> {
             marks: [false; PRIMITIVE_SLOTS_PER_PAGE],
             generations: [HeapGeneration::Old; PRIMITIVE_SLOTS_PER_PAGE],
             lifetimes: [AllocationLifetime::Default; PRIMITIVE_SLOTS_PER_PAGE],
+            ages: [0; PRIMITIVE_SLOTS_PER_PAGE],
             occupied: 0,
             next_uninitialized: 0,
             free_list: Vec::new(),
         }
     }
 
-    fn allocate(&mut self, record: Record, lifetime: AllocationLifetime) -> Option<usize> {
+    fn allocate(
+        &mut self,
+        record: Record,
+        lifetime: AllocationLifetime,
+        generation: HeapGeneration,
+    ) -> Option<usize> {
         let slot_index = if let Some(slot) = self.free_list.pop() {
             usize::from(slot)
         } else if self.next_uninitialized < PRIMITIVE_SLOTS_PER_PAGE {
@@ -394,8 +462,9 @@ impl<Record: Copy> SlotPage<Record> {
 
         self.slots[slot_index] = Some(record);
         self.marks[slot_index] = false;
-        self.generations[slot_index] = HeapGeneration::Old;
+        self.generations[slot_index] = generation;
         self.lifetimes[slot_index] = lifetime;
+        self.ages[slot_index] = 0;
         self.occupied += 1;
         Some(slot_index)
     }
@@ -423,6 +492,7 @@ impl<Record: Copy> SlotPage<Record> {
         self.marks[slot_index] = false;
         self.generations[slot_index] = HeapGeneration::Old;
         self.lifetimes[slot_index] = AllocationLifetime::Default;
+        self.ages[slot_index] = 0;
         self.occupied -= 1;
         self.free_list
             .push(u16::try_from(slot_index).expect("primitive page slot index must fit into u16"));
@@ -466,6 +536,7 @@ impl<Record: Copy> SlotPage<Record> {
                     self.marks[slot_index] = false;
                     self.generations[slot_index] = HeapGeneration::Old;
                     self.lifetimes[slot_index] = AllocationLifetime::Default;
+                    self.ages[slot_index] = 0;
                     self.occupied -= 1;
                     self.free_list.push(
                         u16::try_from(slot_index)
@@ -518,6 +589,79 @@ impl<Record: Copy> SlotPage<Record> {
             })
             .count()
     }
+
+    fn generation(&self, slot_index: usize) -> Option<HeapGeneration> {
+        self.slots
+            .get(slot_index)
+            .and_then(|slot| slot.map(|_| self.generations[slot_index]))
+    }
+
+    fn age(&self, slot_index: usize) -> Option<u8> {
+        self.slots
+            .get(slot_index)
+            .and_then(|slot| slot.map(|_| self.ages[slot_index]))
+    }
+
+    fn scan_card(
+        &self,
+        page_index: usize,
+        card_index: usize,
+        record_size: usize,
+        scan: &mut impl FnMut(Record),
+    ) {
+        for slot_index in 0..self.next_uninitialized {
+            let offset =
+                (page_index * PRIMITIVE_SLOTS_PER_PAGE + slot_index).saturating_mul(record_size);
+            if offset / CARD_SIZE_BYTES == card_index
+                && self.slots[slot_index].is_some()
+                && self.generations[slot_index] == HeapGeneration::Old
+            {
+                scan(self.slots[slot_index].expect("occupied slot checked above"));
+            }
+        }
+    }
+
+    fn sweep_young(
+        &mut self,
+        tenuring_threshold: u8,
+        reclaim: &mut impl FnMut(Record),
+    ) -> YoungSweepStats {
+        let mut stats = YoungSweepStats::default();
+
+        for slot_index in 0..self.next_uninitialized {
+            if self.slots[slot_index].is_none()
+                || self.generations[slot_index] != HeapGeneration::Young
+            {
+                continue;
+            }
+
+            if self.marks[slot_index] {
+                self.marks[slot_index] = false;
+                self.ages[slot_index] = self.ages[slot_index].saturating_add(1);
+                stats.survivors += 1;
+                if self.ages[slot_index] >= tenuring_threshold {
+                    self.generations[slot_index] = HeapGeneration::Old;
+                    self.ages[slot_index] = 0;
+                    stats.tenured += 1;
+                }
+                continue;
+            }
+
+            let record = self.slots[slot_index]
+                .take()
+                .expect("young occupied slot checked above");
+            self.lifetimes[slot_index] = AllocationLifetime::Default;
+            self.ages[slot_index] = 0;
+            self.occupied -= 1;
+            self.free_list.push(
+                u16::try_from(slot_index).expect("primitive page slot index must fit into u16"),
+            );
+            reclaim(record);
+            stats.reclaimed += 1;
+        }
+
+        stats
+    }
 }
 
 #[derive(Default)]
@@ -532,6 +676,7 @@ struct SideAllocationSlot {
     lifetime: AllocationLifetime,
     payload_len: usize,
     occupied: bool,
+    age: u8,
     bytes: Box<[u8]>,
 }
 
@@ -548,9 +693,10 @@ impl SideAllocator {
         &mut self,
         payload: &[u8],
         lifetime: AllocationLifetime,
+        generation: HeapGeneration,
     ) -> SideAllocationRef {
         let class = SideAllocationClass::for_payload_len(payload.len());
-        let (slot_index, id) = self.reserve_slot(class, payload.len(), lifetime);
+        let (slot_index, id) = self.reserve_slot(class, payload.len(), lifetime, generation);
         self.slots[slot_index].bytes[..payload.len()].copy_from_slice(payload);
         id
     }
@@ -574,6 +720,7 @@ impl SideAllocator {
 
         slot.occupied = false;
         slot.generation = HeapGeneration::Old;
+        slot.age = 0;
         slot.payload_len = 0;
         self.free_by_class
             .entry(slot.class)
@@ -618,6 +765,7 @@ impl SideAllocator {
         class: SideAllocationClass,
         payload_len: usize,
         lifetime: AllocationLifetime,
+        generation: HeapGeneration,
     ) -> (usize, SideAllocationRef) {
         if let Some(id) = self
             .free_by_class
@@ -626,20 +774,22 @@ impl SideAllocator {
         {
             let slot_index = (id - 1) as usize;
             let slot = &mut self.slots[slot_index];
-            slot.generation = HeapGeneration::Old;
+            slot.generation = generation;
             slot.lifetime = lifetime;
             slot.payload_len = payload_len;
             slot.occupied = true;
+            slot.age = 0;
             return (slot_index, SideAllocationRef::from_raw(id).unwrap());
         }
 
         let bytes = vec![0_u8; class.slot_bytes()].into_boxed_slice();
         self.slots.push(SideAllocationSlot {
             class,
-            generation: HeapGeneration::Old,
+            generation,
             lifetime,
             payload_len,
             occupied: true,
+            age: 0,
             bytes,
         });
         let id = SideAllocationRef::from_raw(
@@ -671,6 +821,8 @@ struct ValueSlotBufferSlot {
     generation: HeapGeneration,
     lifetime: AllocationLifetime,
     occupied: bool,
+    marked: bool,
+    age: u8,
     values: Box<[Value]>,
 }
 
@@ -688,6 +840,7 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
         slot_count: usize,
         fill: Value,
         lifetime: AllocationLifetime,
+        generation: HeapGeneration,
     ) -> Handle {
         if let Some(id) = self
             .free_by_len
@@ -695,9 +848,11 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
             .and_then(std::vec::Vec::pop)
         {
             let slot = &mut self.slots[(id - 1) as usize];
-            slot.generation = HeapGeneration::Old;
+            slot.generation = generation;
             slot.lifetime = lifetime;
             slot.occupied = true;
+            slot.marked = false;
+            slot.age = 0;
             for value in &mut slot.values {
                 *value = fill;
             }
@@ -705,9 +860,11 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
         }
 
         self.slots.push(ValueSlotBufferSlot {
-            generation: HeapGeneration::Old,
+            generation,
             lifetime,
             occupied: true,
+            marked: false,
+            age: 0,
             values: vec![fill; slot_count].into_boxed_slice(),
         });
         Handle::from_raw(
@@ -739,6 +896,36 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
         true
     }
 
+    pub(super) fn mark(&mut self, id: Handle) -> bool {
+        let Some(slot) = self.slots.get_mut((id.get() - 1) as usize) else {
+            return false;
+        };
+        if !slot.occupied {
+            return false;
+        }
+        let was_marked = slot.marked;
+        slot.marked = true;
+        !was_marked
+    }
+
+    pub(super) fn generation(&self, id: Handle) -> Option<HeapGeneration> {
+        let slot = self.slots.get((id.get() - 1) as usize)?;
+        slot.occupied.then_some(slot.generation)
+    }
+
+    pub(super) fn card_index(id: Handle) -> usize {
+        id.get().saturating_sub(1) as usize
+    }
+
+    pub(super) fn scan_card(&self, card_index: usize, mut scan: impl FnMut(&[Value])) {
+        let Some(slot) = self.slots.get(card_index) else {
+            return;
+        };
+        if slot.occupied && slot.generation == HeapGeneration::Old {
+            scan(&slot.values);
+        }
+    }
+
     pub(super) fn free(&mut self, id: Handle) -> bool {
         let Some(slot) = self.slots.get_mut((id.get() - 1) as usize) else {
             return false;
@@ -749,6 +936,8 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
 
         slot.occupied = false;
         slot.generation = HeapGeneration::Old;
+        slot.marked = false;
+        slot.age = 0;
         self.free_by_len
             .entry(slot.values.len())
             .or_default()
@@ -784,6 +973,46 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
                 stats.reusable_allocations += 1;
                 stats.reusable_reserved_bytes += reserved_bytes;
             }
+        }
+
+        stats
+    }
+
+    pub(super) fn clear_marks(&mut self) {
+        for slot in &mut self.slots {
+            if slot.occupied {
+                slot.marked = false;
+            }
+        }
+    }
+
+    pub(super) fn sweep_young(&mut self, tenuring_threshold: u8) -> YoungSweepStats {
+        let mut stats = YoungSweepStats::default();
+
+        for (slot_index, slot) in self.slots.iter_mut().enumerate() {
+            if !slot.occupied || slot.generation != HeapGeneration::Young {
+                continue;
+            }
+
+            if slot.marked {
+                slot.marked = false;
+                slot.age = slot.age.saturating_add(1);
+                stats.survivors += 1;
+                if slot.age >= tenuring_threshold {
+                    slot.generation = HeapGeneration::Old;
+                    slot.age = 0;
+                    stats.tenured += 1;
+                }
+                continue;
+            }
+
+            slot.occupied = false;
+            slot.generation = HeapGeneration::Old;
+            slot.age = 0;
+            self.free_by_len.entry(slot.values.len()).or_default().push(
+                u32::try_from(slot_index + 1).expect("value slot buffer index must fit into u32"),
+            );
+            stats.reclaimed += 1;
         }
 
         stats

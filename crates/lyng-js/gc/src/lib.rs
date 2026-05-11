@@ -16,8 +16,10 @@ use lyng_js_common::{AtomCollection, AtomId, AtomSweepStats, AtomTable};
 use lyng_js_types::StringRef;
 
 mod arena;
+mod card_table;
 mod collection;
 mod mutator;
+mod nursery;
 mod rooting;
 mod weak;
 mod writer;
@@ -33,14 +35,15 @@ pub use arena::{
     SymbolFlags, PRIMITIVE_SLOTS_PER_PAGE,
 };
 pub use collection::{
-    PrimitiveCollectionReport, PrimitiveCollectionTrigger, PrimitiveDomainAccounting,
-    PrimitiveHeapAccounting,
+    PrimitiveCollectionKind, PrimitiveCollectionReport, PrimitiveCollectionTrigger,
+    PrimitiveDomainAccounting, PrimitiveHeapAccounting, PrimitiveMinorCollectionStats,
 };
 pub use mutator::{
     CodeHandleStoreTarget, EnvironmentHandleStoreTarget, ObjectHandleStoreTarget,
     ObjectSlotsHandleStoreTarget, PrimitiveHeapView, PrimitiveMutator, RealmHandleStoreTarget,
     ShapeHandleStoreTarget, StringHandleStoreTarget, ValueStoreTarget,
 };
+pub use nursery::{NurseryStats, PrimitiveAllocationProfile};
 pub use rooting::{
     PrimitiveCollectionStats, PrimitiveRootGuard, PrimitiveRootScope, PrimitiveRoots,
     PrimitiveTraceStats, PrimitiveTracer, TraceHeapEdges,

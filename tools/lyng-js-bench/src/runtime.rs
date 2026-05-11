@@ -3,10 +3,11 @@ use lyng_js_bytecode::{BytecodeFunction, CompiledAtom, CompiledScriptUnit};
 use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_compiler::{compile_module, compile_script, CompiledModuleUnit};
 use lyng_js_env::{ExecutableId, Runtime, RuntimePhase6Accounting as RuntimeAccounting};
+use lyng_js_gc::{AllocationLifetime, PrimitiveRoots, RuntimeObjectRecord, ValueStoreTarget};
 use lyng_js_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
 use lyng_js_parser::{parse_module, parse_script};
 use lyng_js_sema::{analyze_module, analyze_script};
-use lyng_js_types::CodeRef;
+use lyng_js_types::{CodeRef, Value as JsValue};
 use lyng_js_vm::Vm;
 use serde_json::{json, Value};
 use std::cmp::Ordering;
@@ -714,54 +715,107 @@ fn capture_runtime_snapshots() -> BenchResult<Vec<RuntimeSnapshot>> {
         }
     };
 
-    let promise_and_backing_store = {
-        let mut runtime = Runtime::new(NoopHostHooks);
-        let root = runtime.root_agent_id();
-        let worker = runtime
-            .root_cluster_mut()
-            .add_agent(None, Some("bench-worker".into()));
-        let shared_buffer = HostSharedBufferId::from_raw(19)
-            .ok_or_else(|| "shared buffer fixture id must be non-zero".to_string())?;
-        let backing_store = runtime
-            .root_cluster_mut()
-            .register_shared_backing_store(root, 4096)
-            .ok_or_else(|| "shared backing-store fixture failed to register".to_string())?;
-
-        if !runtime
-            .root_cluster_mut()
-            .cache_shared_backing_store_handle(backing_store, shared_buffer)
-        {
-            return Err("shared backing-store fixture failed to cache host handle".to_string());
-        }
-        if !runtime
-            .root_cluster_mut()
-            .share_shared_backing_store(backing_store, worker)
-        {
-            return Err("shared backing-store fixture failed to share with worker".to_string());
-        }
-        runtime
-            .enqueue_job(
-                root,
-                HostJobKind::Promise,
-                ExecutableId::Builtin,
-                None,
-                Some("bench-promise-job".into()),
-            )
-            .map_err(|error| format!("promise job fixture failed to enqueue: {error:?}"))?;
-
-        RuntimeSnapshot {
-            label: "runtime.promise-and-backing-store",
-            accounting: runtime.phase6_accounting(),
-            note: "Seeded promise-job queue entry plus one shared backing-store fixture. Iterator state remains transient VM execution state, so the post-run iterator and module-cache domains stay at zero in this retained-runtime snapshot.",
-        }
-    };
-
     Ok(vec![
         empty,
         spec_bootstrapped,
         regexp_literal_cache,
-        promise_and_backing_store,
+        capture_promise_and_backing_store_snapshot()?,
+        capture_nursery_minor_gc_snapshot()?,
     ])
+}
+
+fn capture_promise_and_backing_store_snapshot() -> BenchResult<RuntimeSnapshot> {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let root = runtime.root_agent_id();
+    let worker = runtime
+        .root_cluster_mut()
+        .add_agent(None, Some("bench-worker".into()));
+    let shared_buffer = HostSharedBufferId::from_raw(19)
+        .ok_or_else(|| "shared buffer fixture id must be non-zero".to_string())?;
+    let backing_store = runtime
+        .root_cluster_mut()
+        .register_shared_backing_store(root, 4096)
+        .ok_or_else(|| "shared backing-store fixture failed to register".to_string())?;
+
+    if !runtime
+        .root_cluster_mut()
+        .cache_shared_backing_store_handle(backing_store, shared_buffer)
+    {
+        return Err("shared backing-store fixture failed to cache host handle".to_string());
+    }
+    if !runtime
+        .root_cluster_mut()
+        .share_shared_backing_store(backing_store, worker)
+    {
+        return Err("shared backing-store fixture failed to share with worker".to_string());
+    }
+    runtime
+        .enqueue_job(
+            root,
+            HostJobKind::Promise,
+            ExecutableId::Builtin,
+            None,
+            Some("bench-promise-job".into()),
+        )
+        .map_err(|error| format!("promise job fixture failed to enqueue: {error:?}"))?;
+
+    Ok(RuntimeSnapshot {
+        label: "runtime.promise-and-backing-store",
+        accounting: runtime.phase6_accounting(),
+        note: "Seeded promise-job queue entry plus one shared backing-store fixture. Iterator state remains transient VM execution state, so the post-run iterator and module-cache domains stay at zero in this retained-runtime snapshot.",
+    })
+}
+
+fn capture_nursery_minor_gc_snapshot() -> BenchResult<RuntimeSnapshot> {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let roots = PrimitiveRoots::new();
+    let allocation_count = (1024 * 1024 / size_of::<RuntimeObjectRecord>()) + 8;
+    {
+        let heap = runtime.root_agent_mut().heap_mut();
+        let mut mutator = heap.mutator_with_roots(&roots);
+        let survivor = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let survivor_root = roots.root_object(survivor);
+        let remembered_slots = mutator.alloc_object_slots(
+            1,
+            JsValue::empty_internal_slot(),
+            AllocationLifetime::LongLived,
+        );
+        let remembered_target = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        if !mutator.mut_store_value(
+            ValueStoreTarget::ObjectSlot(remembered_slots, 0),
+            JsValue::from_object_ref(remembered_target),
+        ) {
+            return Err(
+                "nursery remembered-set fixture failed to write old object slot".to_string(),
+            );
+        }
+        for _ in 0..allocation_count {
+            let object = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+            black_box(object);
+        }
+        black_box(remembered_slots);
+        black_box(remembered_target);
+        black_box(survivor_root.get());
+    }
+    let accounting = runtime.phase6_accounting();
+    if accounting.heap.minor_collections == 0 {
+        return Err("nursery minor-GC fixture did not trigger a minor collection".to_string());
+    }
+
+    Ok(RuntimeSnapshot {
+        label: "runtime.nursery-minor-gc",
+        accounting,
+        note: "Allocated more than 1 MiB of short-lived ordinary object records through a rooted mutator so the nursery limit triggers a visible minor GC.",
+    })
 }
 
 fn compile_script_unit(
@@ -1113,21 +1167,31 @@ fn write_runtime_accounting_section(output: &mut String, snapshots: &[RuntimeSna
     output.push('\n');
     let _ = writeln!(
         output,
-        "| Snapshot | Heap live bytes | Heap young live bytes | Heap old live bytes | Heap reserved bytes | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
+        "| Snapshot | Heap live bytes | Heap young live bytes | Heap old live bytes | Heap reserved bytes | Nursery allocation % | Minor GCs | Last minor pause ns | Last survivors | Last tenured | Last cards dirtied/minor | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
     );
     let _ = writeln!(
         output,
-        "| --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
     );
     for snapshot in snapshots {
         let _ = writeln!(
             output,
-            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
+            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
             snapshot.label,
             snapshot.accounting.heap.live_bytes,
             snapshot.accounting.heap.young_live_bytes,
             snapshot.accounting.heap.old_live_bytes,
             snapshot.accounting.heap.reserved_bytes,
+            snapshot
+                .accounting
+                .heap
+                .allocation_profile
+                .nursery_allocation_ratio(),
+            snapshot.accounting.heap.minor_collections,
+            snapshot.accounting.heap.last_minor_pause_ns,
+            snapshot.accounting.heap.last_minor_survivors,
+            snapshot.accounting.heap.last_minor_tenured,
+            snapshot.accounting.heap.last_minor_cards_dirtied,
             domain_cell(snapshot.accounting.iterator_records),
             domain_cell(snapshot.accounting.regexp_payloads),
             domain_cell(snapshot.accounting.regexp_literal_cache),
@@ -1282,6 +1346,26 @@ fn runtime_snapshot_json(snapshot: &RuntimeSnapshot) -> Value {
             "young_live_bytes": snapshot.accounting.heap.young_live_bytes,
             "old_live_bytes": snapshot.accounting.heap.old_live_bytes,
             "reserved_bytes": snapshot.accounting.heap.reserved_bytes,
+        },
+        "nursery": {
+            "capacity_bytes": snapshot.accounting.heap.nursery_capacity_bytes,
+            "used_bytes": snapshot.accounting.heap.nursery_used_bytes,
+            "allocation_profile": {
+                "nursery_allocations": snapshot.accounting.heap.allocation_profile.nursery_allocations,
+                "old_allocations": snapshot.accounting.heap.allocation_profile.old_allocations,
+                "nursery_allocation_percent": snapshot
+                    .accounting
+                    .heap
+                    .allocation_profile
+                    .nursery_allocation_ratio(),
+            },
+            "minor_collections": snapshot.accounting.heap.minor_collections,
+            "last_minor_pause_ns": snapshot.accounting.heap.last_minor_pause_ns,
+            "last_minor_survivors": snapshot.accounting.heap.last_minor_survivors,
+            "last_minor_tenured": snapshot.accounting.heap.last_minor_tenured,
+            "last_minor_reclaimed": snapshot.accounting.heap.last_minor_reclaimed,
+            "last_minor_cards_dirtied": snapshot.accounting.heap.last_minor_cards_dirtied,
+            "last_minor_cards_scanned": snapshot.accounting.heap.last_minor_cards_scanned,
         },
         "iterator_records": runtime_domain_json(snapshot.accounting.iterator_records),
         "regexp_payloads": runtime_domain_json(snapshot.accounting.regexp_payloads),
@@ -1894,6 +1978,31 @@ mod tests {
     }
 
     #[test]
+    fn runtime_snapshots_report_nursery_minor_gc_accounting() {
+        let snapshots =
+            capture_runtime_snapshots().expect("runtime snapshots should capture successfully");
+        let seeded = snapshots
+            .iter()
+            .find(|snapshot| snapshot.label == "runtime.nursery-minor-gc")
+            .unwrap();
+
+        assert!(seeded.accounting.heap.minor_collections > 0);
+        assert!(seeded.accounting.heap.last_minor_pause_ns > 0);
+        assert!(seeded.accounting.heap.last_minor_survivors > 0);
+        assert!(seeded.accounting.heap.last_minor_tenured > 0);
+        assert!(seeded.accounting.heap.last_minor_reclaimed > 0);
+        assert!(seeded.accounting.heap.last_minor_cards_dirtied > 0);
+        assert!(
+            seeded
+                .accounting
+                .heap
+                .allocation_profile
+                .nursery_allocation_ratio()
+                >= 80
+        );
+    }
+
+    #[test]
     fn runtime_report_path_drops_phase_naming() {
         assert_eq!(DEFAULT_REPORT_PATH, "reports/js/lyng-js/bench.md");
     }
@@ -2015,10 +2124,18 @@ mod tests {
         let markdown = render_report(&options, &[], std::slice::from_ref(&snapshot), None);
         assert!(markdown.contains("Heap young live bytes"));
         assert!(markdown.contains("Heap old live bytes"));
+        assert!(markdown.contains("Nursery allocation %"));
+        assert!(markdown.contains("Last minor pause ns"));
+        assert!(markdown.contains("Last tenured"));
+        assert!(markdown.contains("Last cards dirtied/minor"));
 
         let json = render_json_report(&options, &[], std::slice::from_ref(&snapshot), None);
         assert_eq!(json["runtime_snapshots"][0]["heap"]["young_live_bytes"], 0);
         assert_eq!(json["runtime_snapshots"][0]["heap"]["old_live_bytes"], 0);
+        assert_eq!(
+            json["runtime_snapshots"][0]["nursery"]["minor_collections"],
+            0
+        );
     }
 
     #[test]

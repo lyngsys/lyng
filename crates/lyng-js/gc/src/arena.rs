@@ -1,7 +1,13 @@
+use crate::nursery::{Nursery, NurseryDomain};
 use crate::{
-    collection::DEFAULT_COLLECTION_BUDGET_BYTES, weak::FinalizationRegistryState,
-    weak::WeakMapState, weak::WeakRefState, weak::WeakSetState, PrimitiveStringRecord,
-    PrimitiveStringView, StringEncoding, WeakHeapRef,
+    card_table::{CardDomain, CardKey, CardTable},
+    collection::DEFAULT_COLLECTION_BUDGET_BYTES,
+    weak::FinalizationRegistryState,
+    weak::WeakMapState,
+    weak::WeakRefState,
+    weak::WeakSetState,
+    NurseryStats, PrimitiveAllocationProfile, PrimitiveStringRecord, PrimitiveStringView,
+    StringEncoding, WeakHeapRef,
 };
 use lyng_js_common::AtomId;
 use lyng_js_types::{
@@ -16,7 +22,7 @@ mod store_helpers;
 mod weak_state;
 
 pub use records::*;
-use storage::{SideAllocator, SlotArena, ValueSlotAllocator};
+use storage::{SideAllocator, SlotArena, ValueSlotAllocator, YoungSweepStats};
 
 pub struct PrimitiveHeap {
     strings: SlotArena<PrimitiveStringRecord, StringRef>,
@@ -42,6 +48,8 @@ pub struct PrimitiveHeap {
     finalization_registries: BTreeMap<ObjectRef, FinalizationRegistryState>,
     pending_finalization_registries: Vec<ObjectRef>,
     pub(crate) collection_budget_bytes: usize,
+    nursery: Nursery,
+    card_table: CardTable,
 }
 
 impl PrimitiveHeap {
@@ -65,17 +73,80 @@ impl PrimitiveHeap {
             "string payload length must match encoding and code unit count"
         );
 
+        let record_bytes = std::mem::size_of::<PrimitiveStringRecord>();
+        let record_generation =
+            self.allocation_generation(NurseryDomain::String, record_bytes, lifetime);
+
         let record = if payload_bytes.is_empty() {
             cached_atom.map_or_else(
                 || PrimitiveStringRecord::new(encoding, code_unit_len),
                 |atom| PrimitiveStringRecord::with_cached_atom(encoding, code_unit_len, atom),
             )
         } else {
-            let payload = self.string_payloads.allocate(payload_bytes, lifetime);
+            let payload_generation = self.allocation_generation(
+                NurseryDomain::StringPayload,
+                payload_bytes.len(),
+                lifetime,
+            );
+            let payload =
+                self.string_payloads
+                    .allocate(payload_bytes, lifetime, payload_generation);
             PrimitiveStringRecord::with_payload(encoding, code_unit_len, cached_atom, payload)
         };
 
-        self.strings.allocate(record, lifetime)
+        self.strings.allocate(record, lifetime, record_generation)
+    }
+
+    #[inline]
+    pub const fn nursery_stats(&self) -> NurseryStats {
+        self.nursery.stats()
+    }
+
+    #[inline]
+    pub const fn allocation_profile(&self) -> PrimitiveAllocationProfile {
+        self.nursery.profile()
+    }
+
+    #[inline]
+    pub fn set_nursery_capacity_bytes(&mut self, bytes: usize) {
+        self.nursery.set_capacity_bytes(bytes);
+    }
+
+    #[inline]
+    pub fn set_nursery_tenuring_threshold(&mut self, threshold: u8) {
+        self.nursery.set_tenuring_threshold(threshold);
+    }
+
+    #[inline]
+    pub(crate) const fn nursery_tenuring_threshold(&self) -> u8 {
+        self.nursery.tenuring_threshold()
+    }
+
+    #[inline]
+    pub(crate) const fn nursery_can_fit(&self, bytes: usize) -> bool {
+        self.nursery.can_fit(bytes)
+    }
+
+    #[inline]
+    pub(crate) const fn should_allocate_in_nursery(
+        domain: NurseryDomain,
+        lifetime: AllocationLifetime,
+    ) -> bool {
+        Nursery::is_nursery_eligible(domain, lifetime)
+    }
+
+    const fn allocation_generation(
+        &mut self,
+        domain: NurseryDomain,
+        bytes: usize,
+        lifetime: AllocationLifetime,
+    ) -> HeapGeneration {
+        if Self::should_allocate_in_nursery(domain, lifetime) && self.nursery.reserve(bytes) {
+            HeapGeneration::Young
+        } else {
+            self.nursery.note_old_allocation();
+            HeapGeneration::Old
+        }
     }
 
     pub(crate) fn latin1_concat_string_payload_len(
@@ -139,7 +210,14 @@ impl PrimitiveHeap {
 
         let record =
             PrimitiveStringRecord::with_cons(StringEncoding::Latin1, code_unit_len, left, right);
-        Some(self.strings.allocate(record, lifetime))
+        let generation = self.allocation_generation(
+            NurseryDomain::String,
+            std::mem::size_of::<PrimitiveStringRecord>(),
+            lifetime,
+        );
+        let id = self.strings.allocate(record, lifetime, generation);
+        self.mark_string_card_if_old_points_to_young(id, record);
+        Some(id)
     }
 
     pub(crate) fn alloc_utf16_concat_string(
@@ -168,7 +246,14 @@ impl PrimitiveHeap {
 
         let record =
             PrimitiveStringRecord::with_cons(StringEncoding::Utf16, code_unit_len, left, right);
-        Some(self.strings.allocate(record, lifetime))
+        let generation = self.allocation_generation(
+            NurseryDomain::String,
+            std::mem::size_of::<PrimitiveStringRecord>(),
+            lifetime,
+        );
+        let id = self.strings.allocate(record, lifetime, generation);
+        self.mark_string_card_if_old_points_to_young(id, record);
+        Some(id)
     }
 
     #[inline]
@@ -272,8 +357,18 @@ impl PrimitiveHeap {
         flags: SymbolFlags,
         lifetime: AllocationLifetime,
     ) -> SymbolRef {
-        self.symbols
-            .allocate(PrimitiveSymbolRecord::new(description, flags), lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::Symbol,
+            std::mem::size_of::<PrimitiveSymbolRecord>(),
+            lifetime,
+        );
+        let id = self.symbols.allocate(
+            PrimitiveSymbolRecord::new(description, flags),
+            lifetime,
+            generation,
+        );
+        self.mark_symbol_card_if_old_points_to_young(id, description);
+        id
     }
 
     #[inline]
@@ -334,7 +429,12 @@ impl PrimitiveHeap {
             for limb in &limbs[..normalized_len] {
                 bytes.extend_from_slice(&limb.to_le_bytes());
             }
-            (sign, Some(self.bigint_payloads.allocate(&bytes, lifetime)))
+            let generation =
+                self.allocation_generation(NurseryDomain::BigIntPayload, bytes.len(), lifetime);
+            (
+                sign,
+                Some(self.bigint_payloads.allocate(&bytes, lifetime, generation)),
+            )
         };
 
         let record = PrimitiveBigIntRecord::new(
@@ -342,7 +442,12 @@ impl PrimitiveHeap {
             u32::try_from(normalized_len).expect("normalized bigint limb count must fit into u32"),
             limb_storage,
         );
-        self.bigints.allocate(record, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::BigInt,
+            std::mem::size_of::<PrimitiveBigIntRecord>(),
+            lifetime,
+        );
+        self.bigints.allocate(record, lifetime, generation)
     }
 
     #[inline]
@@ -405,9 +510,15 @@ impl PrimitiveHeap {
         &mut self,
         lifetime: AllocationLifetime,
     ) -> PrimitiveValueCellRef {
+        let generation = self.allocation_generation(
+            NurseryDomain::ValueCell,
+            std::mem::size_of::<PrimitiveValueCellRecord>(),
+            lifetime,
+        );
         self.value_cells.allocate(
             PrimitiveValueCellRecord::new(Value::empty_internal_slot(), None),
             lifetime,
+            generation,
         )
     }
 
@@ -450,7 +561,14 @@ impl PrimitiveHeap {
         record: RuntimeObjectRecord,
         lifetime: AllocationLifetime,
     ) -> ObjectRef {
-        self.objects.allocate(record, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::Object,
+            std::mem::size_of::<RuntimeObjectRecord>(),
+            lifetime,
+        );
+        let id = self.objects.allocate(record, lifetime, generation);
+        self.mark_object_card_if_old_points_to_young(id, record);
+        id
     }
 
     #[inline]
@@ -479,7 +597,16 @@ impl PrimitiveHeap {
         record: RuntimeFunctionRecord,
         lifetime: AllocationLifetime,
     ) -> FunctionPayloadRef {
-        self.function_payloads.allocate(record, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::FunctionPayload,
+            std::mem::size_of::<RuntimeFunctionRecord>(),
+            lifetime,
+        );
+        let id = self
+            .function_payloads
+            .allocate(record, lifetime, generation);
+        self.mark_function_payload_card_if_old_points_to_young(id, record);
+        id
     }
 
     #[inline]
@@ -534,7 +661,16 @@ impl PrimitiveHeap {
         record: RuntimeSuspendedExecutionRecord,
         lifetime: AllocationLifetime,
     ) -> SuspendedExecutionRef {
-        self.suspended_executions.allocate(record, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::SuspendedExecution,
+            std::mem::size_of::<RuntimeSuspendedExecutionRecord>(),
+            lifetime,
+        );
+        let id = self
+            .suspended_executions
+            .allocate(record, lifetime, generation);
+        self.mark_suspended_execution_card_if_old_points_to_young(id, record);
+        id
     }
 
     #[inline]
@@ -585,8 +721,21 @@ impl PrimitiveHeap {
         fill: Value,
         lifetime: AllocationLifetime,
     ) -> SuspendedRegistersRef {
-        self.suspended_registers
-            .allocate(slot_count, fill, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::SuspendedRegisters,
+            slot_count.saturating_mul(std::mem::size_of::<Value>()),
+            lifetime,
+        );
+        let id = self
+            .suspended_registers
+            .allocate(slot_count, fill, lifetime, generation);
+        self.mark_value_slot_card_if_old_points_to_young(
+            CardDomain::SuspendedRegisters,
+            id,
+            generation,
+            fill,
+        );
+        id
     }
 
     #[inline]
@@ -606,7 +755,21 @@ impl PrimitiveHeap {
         fill: Value,
         lifetime: AllocationLifetime,
     ) -> ObjectSlotsRef {
-        self.object_slots.allocate(slot_count, fill, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::ObjectSlots,
+            slot_count.saturating_mul(std::mem::size_of::<Value>()),
+            lifetime,
+        );
+        let id = self
+            .object_slots
+            .allocate(slot_count, fill, lifetime, generation);
+        self.mark_value_slot_card_if_old_points_to_young(
+            CardDomain::ObjectSlots,
+            id,
+            generation,
+            fill,
+        );
+        id
     }
 
     #[inline]
@@ -625,7 +788,14 @@ impl PrimitiveHeap {
         record: RuntimeEnvironmentRecord,
         lifetime: AllocationLifetime,
     ) -> EnvironmentRef {
-        self.environments.allocate(record, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::Environment,
+            std::mem::size_of::<RuntimeEnvironmentRecord>(),
+            lifetime,
+        );
+        let id = self.environments.allocate(record, lifetime, generation);
+        self.mark_environment_card_if_old_points_to_young(id, record);
+        id
     }
 
     #[inline]
@@ -671,7 +841,21 @@ impl PrimitiveHeap {
         fill: Value,
         lifetime: AllocationLifetime,
     ) -> EnvironmentSlotsRef {
-        self.environment_slots.allocate(slot_count, fill, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::EnvironmentSlots,
+            slot_count.saturating_mul(std::mem::size_of::<Value>()),
+            lifetime,
+        );
+        let id = self
+            .environment_slots
+            .allocate(slot_count, fill, lifetime, generation);
+        self.mark_value_slot_card_if_old_points_to_young(
+            CardDomain::EnvironmentSlots,
+            id,
+            generation,
+            fill,
+        );
+        id
     }
 
     #[inline]
@@ -691,7 +875,12 @@ impl PrimitiveHeap {
         record: RuntimeCodeRecord,
         lifetime: AllocationLifetime,
     ) -> CodeRef {
-        self.codes.allocate(record, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::Code,
+            std::mem::size_of::<RuntimeCodeRecord>(),
+            lifetime,
+        );
+        self.codes.allocate(record, lifetime, generation)
     }
 
     #[inline]
@@ -734,7 +923,21 @@ impl PrimitiveHeap {
         fill: Value,
         lifetime: AllocationLifetime,
     ) -> CodeSlotsRef {
-        self.code_slots.allocate(slot_count, fill, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::CodeSlots,
+            slot_count.saturating_mul(std::mem::size_of::<Value>()),
+            lifetime,
+        );
+        let id = self
+            .code_slots
+            .allocate(slot_count, fill, lifetime, generation);
+        self.mark_value_slot_card_if_old_points_to_young(
+            CardDomain::CodeSlots,
+            id,
+            generation,
+            fill,
+        );
+        id
     }
 
     #[inline]
@@ -753,7 +956,14 @@ impl PrimitiveHeap {
         record: RuntimeRealmRecord,
         lifetime: AllocationLifetime,
     ) -> RealmRef {
-        self.realms.allocate(record, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::Realm,
+            std::mem::size_of::<RuntimeRealmRecord>(),
+            lifetime,
+        );
+        let id = self.realms.allocate(record, lifetime, generation);
+        self.mark_realm_card_if_old_points_to_young(id, record);
+        id
     }
 
     #[inline]
@@ -792,7 +1002,14 @@ impl PrimitiveHeap {
         record: RuntimeShapeRecord,
         lifetime: AllocationLifetime,
     ) -> ShapeId {
-        self.shapes.allocate(record, lifetime)
+        let generation = self.allocation_generation(
+            NurseryDomain::Shape,
+            std::mem::size_of::<RuntimeShapeRecord>(),
+            lifetime,
+        );
+        let id = self.shapes.allocate(record, lifetime, generation);
+        self.mark_shape_card_if_old_points_to_young(id, record);
+        id
     }
 
     #[inline]
@@ -885,6 +1102,307 @@ impl PrimitiveHeap {
     pub(crate) fn sweep_unmarked_shapes(&mut self) -> usize {
         self.shapes.sweep(|_| {})
     }
+
+    #[inline]
+    pub(crate) fn is_young_object(&self, id: ObjectRef) -> bool {
+        self.objects.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    #[inline]
+    pub(crate) fn is_young_function_payload(&self, id: FunctionPayloadRef) -> bool {
+        self.function_payloads.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    #[inline]
+    pub(crate) fn is_young_string(&self, id: StringRef) -> bool {
+        self.strings.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    #[inline]
+    pub(crate) fn is_young_symbol(&self, id: SymbolRef) -> bool {
+        self.symbols.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    #[inline]
+    pub(crate) fn is_young_bigint(&self, id: BigIntRef) -> bool {
+        self.bigints.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    #[inline]
+    pub(crate) fn is_young_value_cell(&self, id: PrimitiveValueCellRef) -> bool {
+        self.value_cells.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    #[inline]
+    pub(crate) fn is_young_environment(&self, id: EnvironmentRef) -> bool {
+        self.environments.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    #[inline]
+    pub(crate) fn is_young_suspended_execution(&self, id: SuspendedExecutionRef) -> bool {
+        self.suspended_executions.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    #[inline]
+    pub(crate) fn is_young_object_slots(&self, id: ObjectSlotsRef) -> bool {
+        self.object_slots.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    #[inline]
+    pub(crate) fn is_young_environment_slots(&self, id: EnvironmentSlotsRef) -> bool {
+        self.environment_slots.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    #[inline]
+    pub(crate) fn is_young_suspended_registers(&self, id: SuspendedRegistersRef) -> bool {
+        self.suspended_registers.generation(id) == Some(HeapGeneration::Young)
+    }
+
+    pub fn nursery_age(&self, id: ObjectRef) -> Option<u8> {
+        if self.is_young_object(id) {
+            self.objects.age(id)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn mark_object_slots(&mut self, id: ObjectSlotsRef) -> bool {
+        self.object_slots.mark(id)
+    }
+
+    pub(crate) fn mark_environment_slots(&mut self, id: EnvironmentSlotsRef) -> bool {
+        self.environment_slots.mark(id)
+    }
+
+    pub(crate) fn mark_suspended_registers(&mut self, id: SuspendedRegistersRef) -> bool {
+        self.suspended_registers.mark(id)
+    }
+
+    pub(crate) fn mark_function_payload(&mut self, id: FunctionPayloadRef) -> bool {
+        self.function_payloads.mark(id)
+    }
+
+    pub(crate) fn scan_object_slots_card(&self, card_index: usize, scan: impl FnMut(&[Value])) {
+        self.object_slots.scan_card(card_index, scan);
+    }
+
+    pub(crate) fn scan_environment_slots_card(
+        &self,
+        card_index: usize,
+        scan: impl FnMut(&[Value]),
+    ) {
+        self.environment_slots.scan_card(card_index, scan);
+    }
+
+    pub(crate) fn scan_code_slots_card(&self, card_index: usize, scan: impl FnMut(&[Value])) {
+        self.code_slots.scan_card(card_index, scan);
+    }
+
+    pub(crate) fn scan_suspended_registers_card(
+        &self,
+        card_index: usize,
+        scan: impl FnMut(&[Value]),
+    ) {
+        self.suspended_registers.scan_card(card_index, scan);
+    }
+
+    pub(crate) fn scan_string_card(
+        &self,
+        card_index: usize,
+        scan: impl FnMut(PrimitiveStringRecord),
+    ) {
+        self.strings.scan_card(
+            card_index,
+            std::mem::size_of::<PrimitiveStringRecord>(),
+            scan,
+        );
+    }
+
+    pub(crate) fn scan_symbol_card(
+        &self,
+        card_index: usize,
+        scan: impl FnMut(PrimitiveSymbolRecord),
+    ) {
+        self.symbols.scan_card(
+            card_index,
+            std::mem::size_of::<PrimitiveSymbolRecord>(),
+            scan,
+        );
+    }
+
+    pub(crate) fn scan_object_card(
+        &self,
+        card_index: usize,
+        scan: impl FnMut(RuntimeObjectRecord),
+    ) {
+        self.objects
+            .scan_card(card_index, std::mem::size_of::<RuntimeObjectRecord>(), scan);
+    }
+
+    pub(crate) fn scan_environment_card(
+        &self,
+        card_index: usize,
+        scan: impl FnMut(RuntimeEnvironmentRecord),
+    ) {
+        self.environments.scan_card(
+            card_index,
+            std::mem::size_of::<RuntimeEnvironmentRecord>(),
+            scan,
+        );
+    }
+
+    pub(crate) fn scan_function_payload_card(
+        &self,
+        card_index: usize,
+        scan: impl FnMut(RuntimeFunctionRecord),
+    ) {
+        self.function_payloads.scan_card(
+            card_index,
+            std::mem::size_of::<RuntimeFunctionRecord>(),
+            scan,
+        );
+    }
+
+    pub(crate) fn scan_value_cell_card(
+        &self,
+        card_index: usize,
+        scan: impl FnMut(PrimitiveValueCellRecord),
+    ) {
+        self.value_cells.scan_card(
+            card_index,
+            std::mem::size_of::<PrimitiveValueCellRecord>(),
+            scan,
+        );
+    }
+
+    pub(crate) fn scan_suspended_execution_card(
+        &self,
+        card_index: usize,
+        scan: impl FnMut(RuntimeSuspendedExecutionRecord),
+    ) {
+        self.suspended_executions.scan_card(
+            card_index,
+            std::mem::size_of::<RuntimeSuspendedExecutionRecord>(),
+            scan,
+        );
+    }
+
+    pub(crate) fn scan_realm_card(&self, card_index: usize, scan: impl FnMut(RuntimeRealmRecord)) {
+        self.realms
+            .scan_card(card_index, std::mem::size_of::<RuntimeRealmRecord>(), scan);
+    }
+
+    pub(crate) fn scan_shape_card(&self, card_index: usize, scan: impl FnMut(RuntimeShapeRecord)) {
+        self.shapes
+            .scan_card(card_index, std::mem::size_of::<RuntimeShapeRecord>(), scan);
+    }
+
+    pub(crate) fn take_dirty_cards(&mut self) -> Vec<CardKey> {
+        self.card_table.take_dirty()
+    }
+
+    pub(crate) const fn card_table_dirtied_since_minor(&self) -> usize {
+        self.card_table.dirtied_since_minor()
+    }
+
+    pub(crate) fn mark_card(&mut self, domain: CardDomain, index: usize) {
+        self.card_table.mark(CardKey::new(domain, index));
+    }
+
+    pub(crate) fn clear_all_marks(&mut self) {
+        self.clear_string_marks();
+        self.clear_symbol_marks();
+        self.clear_bigint_marks();
+        self.clear_value_cell_marks();
+        self.clear_object_marks();
+        self.suspended_registers.clear_marks();
+        self.clear_suspended_execution_marks();
+        self.clear_environment_marks();
+        self.environment_slots.clear_marks();
+        self.object_slots.clear_marks();
+        self.clear_code_marks();
+        self.code_slots.clear_marks();
+        self.clear_realm_marks();
+        self.clear_shape_marks();
+    }
+
+    pub(crate) fn sweep_young_generation(
+        &mut self,
+        cards_dirtied: usize,
+        cards_scanned: usize,
+        pause: std::time::Duration,
+    ) -> crate::PrimitiveMinorCollectionStats {
+        let tenuring_threshold = self.nursery_tenuring_threshold();
+        let mut young = YoungSweepStats::default();
+
+        macro_rules! merge {
+            ($stats:expr) => {{
+                let stats = $stats;
+                young.survivors += stats.survivors;
+                young.tenured += stats.tenured;
+                young.reclaimed += stats.reclaimed;
+            }};
+        }
+
+        merge!(self.strings.sweep_young(tenuring_threshold, |record| {
+            if let Some(payload) = record.payload() {
+                self.string_payloads.free(payload);
+            }
+        }));
+        merge!(self.symbols.sweep_young(tenuring_threshold, |_| {}));
+        merge!(self.bigints.sweep_young(tenuring_threshold, |record| {
+            if let Some(storage) = record.limb_storage() {
+                self.bigint_payloads.free(storage);
+            }
+        }));
+        merge!(self.value_cells.sweep_young(tenuring_threshold, |_| {}));
+        merge!(self.objects.sweep_young(tenuring_threshold, |record| {
+            if let Some(slots) = record.named_slots() {
+                self.object_slots.free(slots);
+            }
+            if let Some(elements) = record.elements() {
+                self.object_slots.free(elements);
+            }
+            if let Some(function_payload) = record.function_payload() {
+                self.function_payloads.free(function_payload);
+            }
+            if let Some(ordinary_payload) = record.ordinary_payload() {
+                self.value_cells.free(ordinary_payload);
+            }
+        }));
+        merge!(self
+            .function_payloads
+            .sweep_young(tenuring_threshold, |_| {}));
+        merge!(self.object_slots.sweep_young(tenuring_threshold));
+        merge!(self
+            .suspended_executions
+            .sweep_young(tenuring_threshold, |record| {
+                if let Some(registers) = record.registers() {
+                    self.suspended_registers.free(registers);
+                }
+            }));
+        merge!(self.suspended_registers.sweep_young(tenuring_threshold));
+        merge!(self.environments.sweep_young(tenuring_threshold, |record| {
+            if let Some(slots) = record.slots() {
+                self.environment_slots.free(slots);
+            }
+        }));
+        merge!(self.environment_slots.sweep_young(tenuring_threshold));
+
+        let pause_ns = pause.as_nanos().max(1);
+        let accounting = self.accounting();
+        let minor = crate::PrimitiveMinorCollectionStats {
+            survivors: young.survivors,
+            tenured: young.tenured,
+            reclaimed: young.reclaimed,
+            cards_dirtied,
+            cards_scanned,
+            pause_ns,
+        };
+        self.nursery
+            .finish_minor_collection(accounting.young_live_bytes, minor);
+        minor
+    }
 }
 
 impl Default for PrimitiveHeap {
@@ -913,6 +1431,8 @@ impl Default for PrimitiveHeap {
             finalization_registries: BTreeMap::new(),
             pending_finalization_registries: Vec::new(),
             collection_budget_bytes: DEFAULT_COLLECTION_BUDGET_BYTES,
+            nursery: Nursery::default(),
+            card_table: CardTable::default(),
         }
     }
 }

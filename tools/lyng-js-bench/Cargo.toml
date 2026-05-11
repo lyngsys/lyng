@@ -11,6 +11,7 @@ lyng-js-bytecode.workspace = true
 lyng-js-common.workspace = true
 lyng-js-compiler.workspace = true
 lyng-js-env.workspace = true
+lyng-js-gc.workspace = true
 lyng-js-host.workspace = true
 lyng-js-parser.workspace = true
 lyng-js-sema.workspace = true

@@ -1,12 +1,12 @@
 use crate::{
-    AllocationLifetime, BigIntSign, CodeSlotsRef, EnvironmentSlotsRef, FunctionPayloadRef,
-    ObjectSlotsRef, PrimitiveBigIntRecord, PrimitiveBigIntView, PrimitiveCollectionReport,
-    PrimitiveCollectionTrigger, PrimitiveDomainStats, PrimitiveHeap, PrimitiveHeapAccounting,
-    PrimitiveRoots, PrimitiveStringRecord, PrimitiveStringView, PrimitiveSymbolRecord,
-    PrimitiveSymbolView, PrimitiveValueCellRecord, PrimitiveValueCellRef, RuntimeCodeRecord,
-    RuntimeEnvironmentRecord, RuntimeFunctionRecord, RuntimeObjectRecord, RuntimeRealmRecord,
-    RuntimeShapeRecord, RuntimeSuspendedExecutionRecord, StringEncoding, SuspendedRegistersRef,
-    WeakHeapRef,
+    nursery::NurseryDomain, AllocationLifetime, BigIntSign, CodeSlotsRef, EnvironmentSlotsRef,
+    FunctionPayloadRef, ObjectSlotsRef, PrimitiveBigIntRecord, PrimitiveBigIntView,
+    PrimitiveCollectionReport, PrimitiveCollectionTrigger, PrimitiveDomainStats, PrimitiveHeap,
+    PrimitiveHeapAccounting, PrimitiveRoots, PrimitiveStringRecord, PrimitiveStringView,
+    PrimitiveSymbolRecord, PrimitiveSymbolView, PrimitiveValueCellRecord, PrimitiveValueCellRef,
+    RuntimeCodeRecord, RuntimeEnvironmentRecord, RuntimeFunctionRecord, RuntimeObjectRecord,
+    RuntimeRealmRecord, RuntimeShapeRecord, RuntimeSuspendedExecutionRecord, StringEncoding,
+    SuspendedRegistersRef, WeakHeapRef,
 };
 use lyng_js_common::AtomId;
 use lyng_js_types::{
@@ -443,6 +443,11 @@ impl PrimitiveMutator<'_> {
         cached_atom: Option<AtomId>,
         lifetime: AllocationLifetime,
     ) -> StringRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::String,
+            std::mem::size_of::<PrimitiveStringRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::StringAllocationSlowPath,
             self.heap
@@ -494,6 +499,11 @@ impl PrimitiveMutator<'_> {
         flags: crate::SymbolFlags,
         lifetime: AllocationLifetime,
     ) -> SymbolRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::Symbol,
+            std::mem::size_of::<PrimitiveSymbolRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::SymbolAllocationSlowPath,
             self.heap.symbol_allocation_requires_growth(),
@@ -508,6 +518,11 @@ impl PrimitiveMutator<'_> {
         limbs: &[u64],
         lifetime: AllocationLifetime,
     ) -> BigIntRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::BigInt,
+            std::mem::size_of::<PrimitiveBigIntRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::BigIntAllocationSlowPath,
             self.heap.bigint_allocation_requires_growth(limbs),
@@ -517,6 +532,11 @@ impl PrimitiveMutator<'_> {
 
     #[inline]
     pub fn alloc_value_cell(&mut self, lifetime: AllocationLifetime) -> PrimitiveValueCellRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::ValueCell,
+            std::mem::size_of::<PrimitiveValueCellRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::ValueCellAllocationSlowPath,
             self.heap.value_cell_allocation_requires_growth(),
@@ -530,6 +550,11 @@ impl PrimitiveMutator<'_> {
         record: RuntimeObjectRecord,
         lifetime: AllocationLifetime,
     ) -> ObjectRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::Object,
+            std::mem::size_of::<RuntimeObjectRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::ObjectAllocationSlowPath,
             self.heap.object_allocation_requires_growth(),
@@ -543,6 +568,11 @@ impl PrimitiveMutator<'_> {
         record: RuntimeFunctionRecord,
         lifetime: AllocationLifetime,
     ) -> FunctionPayloadRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::FunctionPayload,
+            std::mem::size_of::<RuntimeFunctionRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::ObjectAllocationSlowPath,
             self.heap.function_payload_allocation_requires_growth(),
@@ -556,6 +586,11 @@ impl PrimitiveMutator<'_> {
         record: RuntimeSuspendedExecutionRecord,
         lifetime: AllocationLifetime,
     ) -> SuspendedExecutionRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::SuspendedExecution,
+            std::mem::size_of::<RuntimeSuspendedExecutionRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::ObjectAllocationSlowPath,
             self.heap.suspended_execution_allocation_requires_growth(),
@@ -570,6 +605,11 @@ impl PrimitiveMutator<'_> {
         fill: Value,
         lifetime: AllocationLifetime,
     ) -> ObjectSlotsRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::ObjectSlots,
+            slot_count.saturating_mul(std::mem::size_of::<Value>()),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::ObjectAllocationSlowPath,
             self.heap
@@ -585,6 +625,11 @@ impl PrimitiveMutator<'_> {
         fill: Value,
         lifetime: AllocationLifetime,
     ) -> SuspendedRegistersRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::SuspendedRegisters,
+            slot_count.saturating_mul(std::mem::size_of::<Value>()),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::ObjectAllocationSlowPath,
             self.heap
@@ -600,6 +645,11 @@ impl PrimitiveMutator<'_> {
         record: RuntimeEnvironmentRecord,
         lifetime: AllocationLifetime,
     ) -> EnvironmentRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::Environment,
+            std::mem::size_of::<RuntimeEnvironmentRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::EnvironmentAllocationSlowPath,
             self.heap.environment_allocation_requires_growth(),
@@ -614,6 +664,11 @@ impl PrimitiveMutator<'_> {
         fill: Value,
         lifetime: AllocationLifetime,
     ) -> EnvironmentSlotsRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::EnvironmentSlots,
+            slot_count.saturating_mul(std::mem::size_of::<Value>()),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::EnvironmentAllocationSlowPath,
             self.heap
@@ -629,6 +684,11 @@ impl PrimitiveMutator<'_> {
         record: RuntimeCodeRecord,
         lifetime: AllocationLifetime,
     ) -> CodeRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::Code,
+            std::mem::size_of::<RuntimeCodeRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::CodeAllocationSlowPath,
             self.heap.code_allocation_requires_growth(),
@@ -643,6 +703,11 @@ impl PrimitiveMutator<'_> {
         fill: Value,
         lifetime: AllocationLifetime,
     ) -> CodeSlotsRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::CodeSlots,
+            slot_count.saturating_mul(std::mem::size_of::<Value>()),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::CodeAllocationSlowPath,
             self.heap.code_slots_allocation_requires_growth(slot_count),
@@ -656,6 +721,11 @@ impl PrimitiveMutator<'_> {
         record: RuntimeRealmRecord,
         lifetime: AllocationLifetime,
     ) -> RealmRef {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::Realm,
+            std::mem::size_of::<RuntimeRealmRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::RealmAllocationSlowPath,
             self.heap.realm_allocation_requires_growth(),
@@ -669,6 +739,11 @@ impl PrimitiveMutator<'_> {
         record: RuntimeShapeRecord,
         lifetime: AllocationLifetime,
     ) -> ShapeId {
+        self.maybe_collect_for_nursery(
+            NurseryDomain::Shape,
+            std::mem::size_of::<RuntimeShapeRecord>(),
+            lifetime,
+        );
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::ShapeAllocationSlowPath,
             self.heap.shape_allocation_requires_growth(),
@@ -1083,6 +1158,26 @@ impl PrimitiveMutator<'_> {
         if let Some(report) = self.heap.maybe_collect_before_growth(roots, trigger) {
             self.last_collection_report = Some(report);
         }
+    }
+
+    fn maybe_collect_for_nursery(
+        &mut self,
+        domain: NurseryDomain,
+        bytes: usize,
+        lifetime: AllocationLifetime,
+    ) {
+        if !PrimitiveHeap::should_allocate_in_nursery(domain, lifetime)
+            || self.heap.nursery_can_fit(bytes)
+        {
+            return;
+        }
+        let Some(roots) = self.roots else {
+            return;
+        };
+        let report = self
+            .heap
+            .minor_collect_with_trigger(roots, PrimitiveCollectionTrigger::NurseryAllocationLimit);
+        self.last_collection_report = Some(report);
     }
 }
 
