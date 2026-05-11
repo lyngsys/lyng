@@ -283,6 +283,27 @@ fn regexp_raw_surrogate_literals_match_staging_semantics() {
 }
 
 #[test]
+fn regexp_unicode_literal_fast_paths_preserve_surrogate_and_case_folding_edges() {
+    let result = compile_and_run_string(
+        r#"
+        [
+            /\udf06/.exec("\ud834\udf06") !== null,
+            /\udf06/u.exec("\ud834\udf06") === null,
+            /\udf06/u[Symbol.search]("\ud834\udf06") === -1,
+            /\u212a/iu.test("k"),
+            /k/iu.test("\u212a"),
+            /\u017f/iu.test("S"),
+            /s/iu.test("\u017f"),
+            /\u00ff/iu.test("\u0178"),
+            /\u0178/iu.test("\u00ff")
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "true|true|true|true|true|true|true|true|true");
+}
+
+#[test]
 #[allow(
     clippy::too_many_lines,
     reason = "single conformance trace covers the observable split protocol order"

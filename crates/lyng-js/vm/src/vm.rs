@@ -78,6 +78,8 @@ pub use feedback::{
 };
 pub use tiering::{TierStatus, TieringSnapshot};
 
+const VM_DISPATCH_MODE_ENV: &str = "LYNG_JS_VM_DISPATCH";
+
 /// Observer for coarse VM evaluation phases around one installed entry execution.
 ///
 /// The observer is intentionally timing-agnostic. Embedders that need diagnostics can
@@ -93,6 +95,34 @@ pub trait VmEvaluationObserver {
 struct NoopVmEvaluationObserver;
 
 impl VmEvaluationObserver for NoopVmEvaluationObserver {}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum VmDispatchMode {
+    #[default]
+    Match,
+    FunctionTable,
+}
+
+impl VmDispatchMode {
+    #[inline]
+    #[must_use]
+    pub fn from_env_value(value: Option<&str>) -> Self {
+        if matches!(
+            value,
+            Some("function-table" | "threaded" | "threaded-function-table")
+        ) {
+            Self::FunctionTable
+        } else {
+            Self::Match
+        }
+    }
+
+    #[inline]
+    fn configured() -> Self {
+        let value = std::env::var(VM_DISPATCH_MODE_ENV).ok();
+        Self::from_env_value(value.as_deref())
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FeedbackVectorFootprint {
@@ -132,6 +162,7 @@ impl FeedbackVectorFootprint {
 
 #[derive(Default)]
 pub struct Vm {
+    dispatch_mode: VmDispatchMode,
     register_stack: Vec<Value>,
     frames: Vec<FrameRecord>,
     installed: Vec<Option<Arc<InstalledFunction>>>,
@@ -187,6 +218,7 @@ impl Vm {
     #[inline]
     pub fn new() -> Self {
         Self {
+            dispatch_mode: VmDispatchMode::configured(),
             register_stack: Vec::new(),
             frames: Vec::new(),
             installed: Vec::new(),
@@ -236,6 +268,16 @@ impl Vm {
             #[cfg(test)]
             peak_frame_depth: 0,
         }
+    }
+
+    #[inline]
+    pub const fn dispatch_mode(&self) -> VmDispatchMode {
+        self.dispatch_mode
+    }
+
+    #[inline]
+    pub const fn set_dispatch_mode(&mut self, mode: VmDispatchMode) {
+        self.dispatch_mode = mode;
     }
 
     #[inline]

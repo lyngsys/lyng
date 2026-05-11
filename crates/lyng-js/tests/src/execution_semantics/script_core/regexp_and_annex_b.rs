@@ -842,6 +842,10 @@ fn script_core_supports_annex_b_regexp_legacy_identity_escapes() {
         let invalidControl = new RegExp("\\c" + cyrillic);
         total += (invalidControl.test("\\c" + cyrillic) ? 1 : 0);
         total += (!invalidControl.test(String.fromCharCode(cyrillic.charCodeAt(0) % 32)) ? 2 : 0);
+        total += (!invalidControl.test("c" + cyrillic) ? 32 : 0);
+
+        let danglingControl = new RegExp("\\c");
+        total += (danglingControl.test("\\c") && !danglingControl.test("c") ? 64 : 0);
 
         let invalidClass = new RegExp("[\\c_]");
         total += (invalidClass.test(String.fromCharCode("_".charCodeAt(0) % 32)) ? 4 : 0);
@@ -855,7 +859,7 @@ fn script_core_supports_annex_b_regexp_legacy_identity_escapes() {
         "#,
     );
 
-    assert_eq!(result, Value::from_smi(31));
+    assert_eq!(result, Value::from_smi(127));
 }
 
 #[test]

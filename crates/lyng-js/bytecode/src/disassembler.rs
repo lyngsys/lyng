@@ -145,17 +145,24 @@ fn format_abc_instruction(
         | crate::Opcode::Increment
         | crate::Opcode::Decrement => format!("{opcode}r{}, r{}", operands.a(), operands.b()),
         crate::Opcode::Add
+        | crate::Opcode::AddSmi
         | crate::Opcode::Sub
+        | crate::Opcode::SubSmi
         | crate::Opcode::Mul
+        | crate::Opcode::MulSmi
         | crate::Opcode::Div
         | crate::Opcode::Mod
+        | crate::Opcode::DivSmi
+        | crate::Opcode::ModSmi
         | crate::Opcode::BitAnd
+        | crate::Opcode::BitAndSmi
         | crate::Opcode::BitXor
         | crate::Opcode::ShiftLeft
         | crate::Opcode::ShiftRight
         | crate::Opcode::UnsignedShiftRight
         | crate::Opcode::Equal
         | crate::Opcode::StrictEqual
+        | crate::Opcode::EqualZero
         | crate::Opcode::LessThan
         | crate::Opcode::LessEqual
         | crate::Opcode::GreaterThan
@@ -166,6 +173,21 @@ fn format_abc_instruction(
         | crate::Opcode::StrictAssignKeyedProperty
         | crate::Opcode::DefineKeyedProperty
         | crate::Opcode::CopyDataProperties => {
+            if matches!(
+                bytecode_opcode,
+                crate::Opcode::AddSmi
+                    | crate::Opcode::SubSmi
+                    | crate::Opcode::MulSmi
+                    | crate::Opcode::DivSmi
+                    | crate::Opcode::ModSmi
+                    | crate::Opcode::BitAndSmi
+            ) {
+                let immediate = decode_smi16_operand(operands.c());
+                return format!("{opcode}r{}, r{}, {immediate}", operands.a(), operands.b());
+            }
+            if bytecode_opcode == crate::Opcode::EqualZero {
+                return format!("{opcode}r{}, r{}", operands.a(), operands.b());
+            }
             format!(
                 "{opcode}r{}, r{}, r{}",
                 operands.a(),
@@ -195,9 +217,13 @@ fn format_abc_instruction(
     }
 }
 
+const fn decode_smi16_operand(raw: u16) -> i16 {
+    i16::from_le_bytes(raw.to_le_bytes())
+}
+
 fn decode_smi_operand(bx: u32) -> i16 {
     let narrow = u16::try_from(bx).expect("load-smi operand should fit into u16");
-    i16::from_le_bytes(narrow.to_le_bytes())
+    decode_smi16_operand(narrow)
 }
 
 fn format_abx_instruction(
@@ -222,6 +248,7 @@ fn format_abx_instruction(
             let value = decode_smi_operand(operands.bx());
             format!("{opcode}r{}, {value}", operands.a())
         }
+        crate::Opcode::LoadZero | crate::Opcode::LoadOne => format!("{opcode}r{}", operands.a()),
         crate::Opcode::CreateClosure => {
             format!("{opcode}r{}, child[{}]", operands.a(), operands.bx())
         }

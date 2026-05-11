@@ -15,8 +15,13 @@ use std::collections::HashMap;
 /// Checked-in threshold before stable shapes switch from inline descriptor scan
 /// to a flattened lookup table.
 pub const SMALL_SHAPE_INLINE_PROPERTY_LIMIT: usize = 4;
-/// Explicit fallback threshold for dynamic named-property churn.
-pub const NAMED_PROPERTY_CHURN_DICTIONARY_THRESHOLD: u32 = 3;
+/// Explicit fallback cap for pure named-property addition chains.
+pub const NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT: u32 = 128;
+/// Explicit fallback threshold for structural named-property churn.
+pub const NAMED_PROPERTY_STRUCTURAL_CHURN_DICTIONARY_THRESHOLD: u32 = 8;
+/// Compatibility alias for callers that still treat churn as structural mutation.
+pub const NAMED_PROPERTY_CHURN_DICTIONARY_THRESHOLD: u32 =
+    NAMED_PROPERTY_STRUCTURAL_CHURN_DICTIONARY_THRESHOLD;
 /// Dense elements switch to sparse mode when a single write would create a gap
 /// beyond this checked-in threshold.
 pub const DENSE_ELEMENT_SPARSE_GAP_THRESHOLD: u32 = 16;
@@ -313,6 +318,7 @@ impl ObjectRuntime {
                 cold: allocation.cold,
                 private_brands: Vec::new(),
                 named_properties: NamedPropertyStorage::ShapeStable,
+                named_property_additions: 0,
                 named_property_churn: 0,
                 element_storage: if allocation.element_capacity == 0 {
                     ElementStorageMetadata::Empty
@@ -381,6 +387,7 @@ impl ObjectRuntime {
                 cold: ObjectColdData::Ordinary(OrdinaryObjectData::Date(value)),
                 private_brands: Vec::new(),
                 named_properties: NamedPropertyStorage::ShapeStable,
+                named_property_additions: 0,
                 named_property_churn: 0,
                 element_storage: ElementStorageMetadata::Empty,
                 last_invalidation: None,

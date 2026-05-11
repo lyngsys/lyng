@@ -145,6 +145,8 @@ const fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::LoadNull
         | Opcode::LoadTrue
         | Opcode::LoadFalse
+        | Opcode::LoadZero
+        | Opcode::LoadOne
         | Opcode::LoadSmi
         | Opcode::LoadConst
         | Opcode::LoadEnvSlot
@@ -180,14 +182,20 @@ const fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::CloseIterator => InstructionForm::Abx,
         Opcode::Move
         | Opcode::Add
+        | Opcode::AddSmi
         | Opcode::Sub
+        | Opcode::SubSmi
         | Opcode::Mul
+        | Opcode::MulSmi
         | Opcode::Div
         | Opcode::Mod
+        | Opcode::DivSmi
+        | Opcode::ModSmi
         | Opcode::Exp
         | Opcode::BitOr
         | Opcode::BitXor
         | Opcode::BitAnd
+        | Opcode::BitAndSmi
         | Opcode::BitNot
         | Opcode::ShiftLeft
         | Opcode::ShiftRight
@@ -197,6 +205,7 @@ const fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::Decrement
         | Opcode::Equal
         | Opcode::StrictEqual
+        | Opcode::EqualZero
         | Opcode::LessThan
         | Opcode::LessEqual
         | Opcode::GreaterThan
@@ -311,5 +320,48 @@ mod tests {
         for instruction in function.instructions() {
             let _ = disassemble_instruction(instruction, &function);
         }
+    }
+
+    #[test]
+    fn specialized_smi_opcodes_decode_and_disassemble_immediates() {
+        let function = BytecodeFunction::new(
+            BytecodeFunctionId::from_raw(2).expect("non-zero bytecode id"),
+            None,
+            ArgumentsMode::None,
+        )
+        .with_instructions(vec![
+            Instruction::abx(Opcode::LoadZero, 0, 0),
+            Instruction::abx(Opcode::LoadOne, 1, 0),
+            Instruction::abc(Opcode::AddSmi, 2, 1, 13),
+            Instruction::abc(Opcode::SubSmi, 3, 2, 5),
+            Instruction::abc(Opcode::MulSmi, 4, 3, 7),
+            Instruction::abc(Opcode::DivSmi, 5, 4, 2),
+            Instruction::abc(Opcode::ModSmi, 6, 5, 3),
+            Instruction::abc(Opcode::BitAndSmi, 7, 6, 1),
+            Instruction::abc(Opcode::EqualZero, 8, 7, 0),
+        ]);
+
+        assert_eq!(
+            decode_instruction_word(function.instructions()[2].encode_word()),
+            Ok(Instruction::abc(Opcode::AddSmi, 2, 1, 13))
+        );
+
+        let text = disassemble(&function);
+        assert!(text.contains("LoadZero"));
+        assert!(text.contains("LoadOne"));
+        assert!(text.contains("AddSmi"));
+        assert!(text.contains("r2, r1, 13"));
+        assert!(text.contains("SubSmi"));
+        assert!(text.contains("r3, r2, 5"));
+        assert!(text.contains("MulSmi"));
+        assert!(text.contains("r4, r3, 7"));
+        assert!(text.contains("DivSmi"));
+        assert!(text.contains("r5, r4, 2"));
+        assert!(text.contains("ModSmi"));
+        assert!(text.contains("r6, r5, 3"));
+        assert!(text.contains("BitAndSmi"));
+        assert!(text.contains("r7, r6, 1"));
+        assert!(text.contains("EqualZero"));
+        assert!(text.contains("r8, r7"));
     }
 }

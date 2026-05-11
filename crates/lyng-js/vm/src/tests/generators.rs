@@ -119,7 +119,13 @@ fn generator_object_spread_uses_copy_data_properties() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("summary should be a string");
 
     assert_eq!(text, "42:39:2:false");
@@ -285,7 +291,7 @@ fn typed_array_for_of_tracks_resizable_array_buffer_growth() {
     let actual = result
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("for-of result should be a string");
 
     assert_eq!(actual, "1,2,0,0,0,0");

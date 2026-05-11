@@ -174,11 +174,18 @@ impl FunctionCompiler<'_, '_> {
     }
 
     pub(super) fn emit_load_smi(&mut self, dest: u16, value: i16) -> LoweringResult<()> {
-        self.builder.emit_abx(
-            Opcode::LoadSmi,
-            self.encode_register(dest)?,
-            u16::from_le_bytes(value.to_le_bytes()),
-        )?;
+        let opcode = match value {
+            0 => Opcode::LoadZero,
+            1 => Opcode::LoadOne,
+            _ => Opcode::LoadSmi,
+        };
+        let immediate = if matches!(opcode, Opcode::LoadSmi) {
+            u16::from_le_bytes(value.to_le_bytes())
+        } else {
+            0
+        };
+        self.builder
+            .emit_abx(opcode, self.encode_register(dest)?, immediate)?;
         Ok(())
     }
 
@@ -809,6 +816,44 @@ impl FunctionCompiler<'_, '_> {
             | Opcode::LessEqual
             | Opcode::GreaterThan
             | Opcode::GreaterEqual => FeedbackSiteKind::Comparison,
+            _ => return Ok(()),
+        };
+        self.builder
+            .add_feedback_site(instruction_offset, kind, FeedbackSiteMetadata::None)?;
+        Ok(())
+    }
+
+    pub(super) fn emit_profiled_smi_binary(
+        &mut self,
+        opcode: Opcode,
+        dest: u16,
+        left: u16,
+        immediate: i16,
+    ) -> LoweringResult<()> {
+        debug_assert!(matches!(
+            opcode,
+            Opcode::AddSmi
+                | Opcode::SubSmi
+                | Opcode::MulSmi
+                | Opcode::DivSmi
+                | Opcode::ModSmi
+                | Opcode::BitAndSmi
+                | Opcode::EqualZero
+        ));
+        let instruction_offset = self.builder.emit_abc(
+            opcode,
+            self.encode_register(dest)?,
+            self.encode_register(left)?,
+            u16::from_le_bytes(immediate.to_le_bytes()),
+        )?;
+        let kind = match opcode {
+            Opcode::AddSmi
+            | Opcode::SubSmi
+            | Opcode::MulSmi
+            | Opcode::DivSmi
+            | Opcode::ModSmi
+            | Opcode::BitAndSmi => FeedbackSiteKind::Arithmetic,
+            Opcode::EqualZero => FeedbackSiteKind::Comparison,
             _ => return Ok(()),
         };
         self.builder

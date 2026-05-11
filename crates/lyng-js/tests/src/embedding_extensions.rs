@@ -44,7 +44,7 @@ fn compile_unit(source: &str, atoms: &mut AtomTable) -> lyng_js_bytecode::Compil
     compile_script(&parsed, &sema, atoms).expect("script should lower")
 }
 
-fn decode_string(view: PrimitiveStringView<'_>) -> String {
+fn decode_string(view: &PrimitiveStringView<'_>) -> String {
     if let Some(bytes) = view.latin1_bytes() {
         return bytes.iter().map(|byte| char::from(*byte)).collect();
     }
@@ -209,7 +209,7 @@ fn compile_and_run_string(source: &str, provider: Option<&SharedRealmExtensionPr
         .as_string_ref()
         .expect("script should return a string value");
     decode_string(
-        agent
+        &agent
             .heap()
             .view()
             .string_view(string)

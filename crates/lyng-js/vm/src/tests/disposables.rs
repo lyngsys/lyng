@@ -238,7 +238,7 @@ fn using_statement_disposes_resource_on_block_exit() {
         .as_string_ref()
         .expect("using block should evaluate to a string");
     let decoded = decode_string(
-        agent
+        &agent
             .heap()
             .view()
             .string_view(value)
@@ -281,7 +281,7 @@ fn for_of_using_disposes_each_iteration_before_advancing() {
         .as_string_ref()
         .expect("for-of using should evaluate to a string");
     let decoded = decode_string(
-        agent
+        &agent
             .heap()
             .view()
             .string_view(value)
@@ -390,7 +390,7 @@ fn using_declarations_dispose_in_statement_contexts() {
         .as_string_ref()
         .expect("statement disposal check should return a string");
     let decoded = decode_string(
-        agent
+        &agent
             .heap()
             .view()
             .string_view(value)

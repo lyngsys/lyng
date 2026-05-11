@@ -564,7 +564,7 @@ fn symbol_description_getter_builtin<Cx: PublicBuiltinDispatchContext>(
         let heap_view = agent.heap().view();
         heap_view
             .symbol_view(symbol)
-            .and_then(lyng_js_gc::PrimitiveSymbolView::description)
+            .and_then(|view| view.description())
             .map_or(Value::undefined(), Value::from_string_ref)
     };
     Ok(description)

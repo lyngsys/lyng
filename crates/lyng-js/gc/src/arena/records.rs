@@ -119,7 +119,7 @@ pub struct PrimitiveSymbolRecord {
     pub(super) flags: SymbolFlags,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub struct PrimitiveSymbolView<'a> {
     pub(super) id: SymbolRef,
     pub(super) record: PrimitiveSymbolRecord,
@@ -172,42 +172,42 @@ impl<'a> PrimitiveSymbolView<'a> {
     }
 
     #[inline]
-    pub const fn identity(self) -> SymbolRef {
+    pub const fn identity(&self) -> SymbolRef {
         self.id
     }
 
     #[inline]
-    pub const fn record(self) -> PrimitiveSymbolRecord {
+    pub const fn record(&self) -> PrimitiveSymbolRecord {
         self.record
     }
 
     #[inline]
-    pub const fn description(self) -> Option<StringRef> {
+    pub const fn description(&self) -> Option<StringRef> {
         self.record.description()
     }
 
     #[inline]
-    pub const fn description_view(self) -> Option<PrimitiveStringView<'a>> {
-        self.description
+    pub const fn description_view(&self) -> Option<&PrimitiveStringView<'a>> {
+        self.description.as_ref()
     }
 
     #[inline]
-    pub const fn flags(self) -> SymbolFlags {
+    pub const fn flags(&self) -> SymbolFlags {
         self.record.flags()
     }
 
     #[inline]
-    pub const fn class(self) -> PrimitiveSymbolClass {
+    pub const fn class(&self) -> PrimitiveSymbolClass {
         self.record.class()
     }
 
     #[inline]
-    pub const fn is_ordinary(self) -> bool {
+    pub const fn is_ordinary(&self) -> bool {
         self.record.is_ordinary()
     }
 
     #[inline]
-    pub const fn is_well_known(self) -> bool {
+    pub const fn is_well_known(&self) -> bool {
         self.record.is_well_known()
     }
 }

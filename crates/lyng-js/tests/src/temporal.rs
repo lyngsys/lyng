@@ -75,7 +75,7 @@ fn compile_and_run_string_with_host(source: &str, host: impl HostHooks + 'static
         .as_string_ref()
         .expect("script should return a string value");
     decode_string(
-        agent
+        &agent
             .heap()
             .view()
             .string_view(string)
@@ -83,7 +83,7 @@ fn compile_and_run_string_with_host(source: &str, host: impl HostHooks + 'static
     )
 }
 
-fn decode_string(view: PrimitiveStringView<'_>) -> String {
+fn decode_string(view: &PrimitiveStringView<'_>) -> String {
     if let Some(bytes) = view.latin1_bytes() {
         return bytes.iter().map(|byte| char::from(*byte)).collect();
     }

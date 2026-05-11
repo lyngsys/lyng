@@ -1,13 +1,31 @@
+use super::install::InstalledFunction;
 use super::values::decode_env_operand;
 use super::{
-    code_index, Agent, CallRange, HostHooks, Instruction, NativeFunctionRegistry, Opcode,
-    ThisState, Value, Vm, VmError, VmResult,
+    code_index, Agent, CallRange, FrameRecord, HostHooks, Instruction, NativeFunctionRegistry,
+    Opcode, ThisState, Value, Vm, VmDispatchMode, VmError, VmResult,
 };
 use lyng_js_ops::{errors, read};
 use lyng_js_types::{AbruptCompletion, PropertyKey};
 
 mod arithmetic;
 mod property;
+
+type ThreadedOpcodeHandler = fn(
+    &mut Vm,
+    &mut Agent,
+    &dyn HostHooks,
+    &mut dyn NativeFunctionRegistry,
+    FrameRecord,
+    &InstalledFunction,
+    Instruction,
+) -> VmResult<ThreadedStep>;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ThreadedStep {
+    Continue,
+    Return(Value),
+    SwitchToMatch,
+}
 
 impl Vm {
     pub(super) fn handle_vm_result<T>(
@@ -28,11 +46,23 @@ impl Vm {
         }
     }
 
+    pub(super) fn run(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+    ) -> VmResult<Value> {
+        match self.dispatch_mode() {
+            VmDispatchMode::Match => self.run_match(agent, host, registry),
+            VmDispatchMode::FunctionTable => self.run_function_table(agent, host, registry),
+        }
+    }
+
     #[expect(
         clippy::too_many_lines,
         reason = "main interpreter dispatch keeps opcode fetch and branch handling in one profiler-friendly loop"
     )]
-    pub(super) fn run(
+    fn run_match(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -65,24 +95,31 @@ impl Vm {
                     let (a, b, c) = Self::decode_abc_operands(installed, frame, opcode, a, b, c);
                     match opcode {
                         Opcode::Move => {
-                            let value = self.read_register(frame, b)?;
-                            self.write_register(frame, a, value)?;
+                            let value = self.read_register(frame, b);
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::Add
+                        | Opcode::AddSmi
                         | Opcode::Sub
+                        | Opcode::SubSmi
                         | Opcode::Mul
+                        | Opcode::MulSmi
                         | Opcode::Div
                         | Opcode::Mod
+                        | Opcode::DivSmi
+                        | Opcode::ModSmi
                         | Opcode::Exp
                         | Opcode::BitOr
                         | Opcode::BitAnd
+                        | Opcode::BitAndSmi
                         | Opcode::BitXor
                         | Opcode::ShiftLeft
                         | Opcode::ShiftRight
                         | Opcode::UnsignedShiftRight
                         | Opcode::Equal
                         | Opcode::StrictEqual
+                        | Opcode::EqualZero
                         | Opcode::LessThan
                         | Opcode::LessEqual
                         | Opcode::GreaterThan
@@ -94,7 +131,7 @@ impl Vm {
                                 continue;
                             };
                             self.record_feedback_site(frame.code(), frame.instruction_offset());
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::In => {
@@ -106,7 +143,7 @@ impl Vm {
                                 continue;
                             };
                             self.record_feedback_site(frame.code(), frame.instruction_offset());
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::BitNot => {
@@ -116,7 +153,7 @@ impl Vm {
                                 continue;
                             };
                             self.record_feedback_site(frame.code(), frame.instruction_offset());
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::Increment | Opcode::Decrement => {
@@ -133,9 +170,9 @@ impl Vm {
                             else {
                                 continue;
                             };
-                            self.write_register(frame, b, numeric)?;
+                            self.write_register(frame, b, numeric);
                             self.record_feedback_site(frame.code(), frame.instruction_offset());
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::GetNamedProperty => {
@@ -174,7 +211,7 @@ impl Vm {
                         }
                         Opcode::SetFunctionName => {
                             let function = self.object_register(frame, a)?;
-                            let name_value = self.read_register(frame, b)?;
+                            let name_value = self.read_register(frame, b);
                             let set_result = Self::set_function_name(agent, function, name_value);
                             let Some(()) = self.handle_vm_result(agent, set_result)? else {
                                 continue;
@@ -289,7 +326,7 @@ impl Vm {
                             self.record_feedback_site(frame.code(), frame.instruction_offset());
                         }
                         Opcode::CreateForIn => {
-                            let value = self.read_register(frame, b)?;
+                            let value = self.read_register(frame, b);
                             let enumerator_result = self.create_for_in_enumerator_for_value(
                                 agent, host, registry, frame, value,
                             );
@@ -314,15 +351,15 @@ impl Vm {
                             let done = next.is_none();
                             if let Some(key) = next {
                                 let value = self.property_key_to_enumeration_value(agent, key);
-                                self.write_register(frame, b, value)?;
+                                self.write_register(frame, b, value);
                             } else {
-                                self.write_register(frame, b, Value::undefined())?;
+                                self.write_register(frame, b, Value::undefined());
                             }
-                            self.write_register(frame, c, Value::from_bool(done))?;
+                            self.write_register(frame, c, Value::from_bool(done));
                             self.advance_instruction();
                         }
                         Opcode::CreateIterator => {
-                            let value = self.read_register(frame, b)?;
+                            let value = self.read_register(frame, b);
                             let iterator_result = self.create_iterator_for_value(
                                 agent,
                                 host,
@@ -345,8 +382,8 @@ impl Vm {
                                 continue;
                             };
                             let done = next.is_none();
-                            self.write_register(frame, b, next.unwrap_or(Value::undefined()))?;
-                            self.write_register(frame, c, Value::from_bool(done))?;
+                            self.write_register(frame, b, next.unwrap_or(Value::undefined()));
+                            self.write_register(frame, c, Value::from_bool(done));
                             self.advance_instruction();
                         }
                         Opcode::DelegateYield => {
@@ -369,34 +406,42 @@ impl Vm {
                     let (a, bx) = Self::decode_abx_operands(installed, frame, a, bx);
                     match opcode {
                         Opcode::LoadUndefined => {
-                            self.write_register(frame, a, Value::undefined())?;
+                            self.write_register(frame, a, Value::undefined());
                             self.advance_instruction();
                         }
                         Opcode::LoadUninitializedLexical => {
-                            self.write_register(frame, a, Value::uninitialized_lexical())?;
+                            self.write_register(frame, a, Value::uninitialized_lexical());
                             self.advance_instruction();
                         }
                         Opcode::LoadNull => {
-                            self.write_register(frame, a, Value::null())?;
+                            self.write_register(frame, a, Value::null());
                             self.advance_instruction();
                         }
                         Opcode::LoadTrue => {
-                            self.write_register(frame, a, Value::from_bool(true))?;
+                            self.write_register(frame, a, Value::from_bool(true));
                             self.advance_instruction();
                         }
                         Opcode::LoadFalse => {
-                            self.write_register(frame, a, Value::from_bool(false))?;
+                            self.write_register(frame, a, Value::from_bool(false));
+                            self.advance_instruction();
+                        }
+                        Opcode::LoadZero => {
+                            self.write_register(frame, a, Value::from_smi(0));
+                            self.advance_instruction();
+                        }
+                        Opcode::LoadOne => {
+                            self.write_register(frame, a, Value::from_smi(1));
                             self.advance_instruction();
                         }
                         Opcode::LoadSmi => {
                             let bytes = bx.to_le_bytes();
                             let value = i16::from_le_bytes([bytes[0], bytes[1]]);
-                            self.write_register(frame, a, Value::from_smi(i32::from(value)))?;
+                            self.write_register(frame, a, Value::from_smi(i32::from(value)));
                             self.advance_instruction();
                         }
                         Opcode::LoadConst => {
                             let value = self.read_constant(agent, frame.code(), bx)?;
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::LoadEnvSlot => {
@@ -411,7 +456,7 @@ impl Vm {
                             let Some(value) = self.handle_vm_result(agent, slot_value)? else {
                                 continue;
                             };
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::StoreEnvSlot => {
@@ -422,7 +467,7 @@ impl Vm {
                                 depth,
                                 slot,
                             )?;
-                            let value = self.read_register(frame, a)?;
+                            let value = self.read_register(frame, a);
                             let store_result =
                                 self.write_environment_slot(agent, environment, slot, value);
                             let Some(()) = self.handle_vm_result(agent, store_result)? else {
@@ -438,7 +483,7 @@ impl Vm {
                                 depth,
                                 slot,
                             )?;
-                            let value = self.read_register(frame, a)?;
+                            let value = self.read_register(frame, a);
                             let assign_result = self.assign_environment_slot(
                                 agent,
                                 environment,
@@ -473,7 +518,7 @@ impl Vm {
                             let Some(value) = self.handle_vm_result(agent, load_result)? else {
                                 continue;
                             };
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::LoadName => {
@@ -483,7 +528,7 @@ impl Vm {
                             let Some(value) = self.handle_vm_result(agent, load_result)? else {
                                 continue;
                             };
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::ResolveName => {
@@ -493,7 +538,7 @@ impl Vm {
                             let Some(value) = self.handle_vm_result(agent, resolve_result)? else {
                                 continue;
                             };
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::ResolveGlobal => {
@@ -503,12 +548,12 @@ impl Vm {
                             let Some(value) = self.handle_vm_result(agent, resolve_result)? else {
                                 continue;
                             };
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::AssignName => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
-                            let value = self.read_register(frame, a)?;
+                            let value = self.read_register(frame, a);
                             let assign_result = self.assign_name_with_context(
                                 agent, host, registry, frame, atom, value,
                             );
@@ -519,7 +564,7 @@ impl Vm {
                         }
                         Opcode::AssignVariableName => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
-                            let value = self.read_register(frame, a)?;
+                            let value = self.read_register(frame, a);
                             let assign_result = self.assign_variable_name_with_context(
                                 agent, host, registry, frame, atom, value,
                             );
@@ -535,7 +580,7 @@ impl Vm {
                             let Some(deleted) = self.handle_vm_result(agent, delete_result)? else {
                                 continue;
                             };
-                            self.write_register(frame, a, Value::from_bool(deleted))?;
+                            self.write_register(frame, a, Value::from_bool(deleted));
                             self.advance_instruction();
                         }
                         Opcode::CaptureName => {
@@ -563,7 +608,7 @@ impl Vm {
                             let Some(value) = self.handle_vm_result(agent, load_result)? else {
                                 continue;
                             };
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::LoadCapturedNameThis => {
@@ -577,7 +622,7 @@ impl Vm {
                             let Some(value) = self.handle_vm_result(agent, load_result)? else {
                                 continue;
                             };
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::AssignCapturedName => {
@@ -586,7 +631,7 @@ impl Vm {
                                     code: frame.code(),
                                     register: u16::MAX,
                                 })?;
-                            let value = self.read_register(frame, a)?;
+                            let value = self.read_register(frame, a);
                             let assign_result = self.assign_captured_name_with_context(
                                 agent,
                                 host,
@@ -602,7 +647,7 @@ impl Vm {
                         }
                         Opcode::StoreGlobal => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
-                            let value = self.read_register(frame, a)?;
+                            let value = self.read_register(frame, a);
                             let store_result = self.store_global_with_feedback(
                                 agent,
                                 host,
@@ -620,7 +665,7 @@ impl Vm {
                         }
                         Opcode::AssignGlobal => {
                             let atom = self.read_atom_constant(frame.code(), bx)?;
-                            let value = self.read_register(frame, a)?;
+                            let value = self.read_register(frame, a);
                             let assign_result = self.assign_global_with_feedback(
                                 agent,
                                 host,
@@ -642,7 +687,7 @@ impl Vm {
                             let Some(deleted) = self.handle_vm_result(agent, delete_result)? else {
                                 continue;
                             };
-                            self.write_register(frame, a, Value::from_bool(deleted))?;
+                            self.write_register(frame, a, Value::from_bool(deleted));
                             self.advance_instruction();
                         }
                         Opcode::LoadThis => {
@@ -661,25 +706,25 @@ impl Vm {
                             let Some(value) = self.handle_vm_result(agent, load_this)? else {
                                 continue;
                             };
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::LoadCallee => {
                             let value = frame
                                 .callee()
                                 .map_or(Value::undefined(), Value::from_object_ref);
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::LoadNewTarget => {
                             let value = frame
                                 .new_target()
                                 .map_or(Value::undefined(), Value::from_object_ref);
-                            self.write_register(frame, a, value)?;
+                            self.write_register(frame, a, value);
                             self.advance_instruction();
                         }
                         Opcode::JumpIfTrue | Opcode::JumpIfFalse => {
-                            let condition = self.read_register(frame, a)?;
+                            let condition = self.read_register(frame, a);
                             let Some(truthy) = self.handle_vm_result(
                                 agent,
                                 read::to_boolean_agent(agent, condition).map_err(VmError::Abrupt),
@@ -705,7 +750,7 @@ impl Vm {
                                 frame.realm(),
                                 usize::try_from(bx).unwrap_or(usize::MAX),
                             )?;
-                            self.write_register(frame, a, Value::from_object_ref(object))?;
+                            self.write_register(frame, a, Value::from_object_ref(object));
                             self.advance_instruction();
                         }
                         Opcode::CreateArray => {
@@ -715,11 +760,11 @@ impl Vm {
                             if length != 0 {
                                 Self::define_length_property(agent, object, length, false)?;
                             }
-                            self.write_register(frame, a, Value::from_object_ref(object))?;
+                            self.write_register(frame, a, Value::from_object_ref(object));
                             self.advance_instruction();
                         }
                         Opcode::CheckObjectCoercible => {
-                            let value = self.read_register(frame, a)?;
+                            let value = self.read_register(frame, a);
                             let coercible = Self::check_object_coercible(agent, value);
                             let Some(()) = self.handle_vm_result(agent, coercible)? else {
                                 continue;
@@ -727,7 +772,7 @@ impl Vm {
                             self.advance_instruction();
                         }
                         Opcode::ThrowIfUninitialized => {
-                            let value = self.read_register(frame, a)?;
+                            let value = self.read_register(frame, a);
                             if value == Value::uninitialized_lexical() {
                                 let result =
                                     Err(VmError::Abrupt(errors::throw_reference_error(agent)));
@@ -743,7 +788,7 @@ impl Vm {
                             else {
                                 continue;
                             };
-                            self.write_register(frame, a, Value::from_object_ref(closure))?;
+                            self.write_register(frame, a, Value::from_object_ref(closure));
                             self.advance_instruction();
                         }
                         Opcode::CloseForIn => {
@@ -811,7 +856,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        let value = self.read_register(frame, register)?;
+                        let value = self.read_register(frame, register);
                         let push_result = self.push_with_environment(agent, frame, value);
                         let Some(()) = self.handle_vm_result(agent, push_result)? else {
                             continue;
@@ -828,9 +873,9 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        let value = self.read_register(frame, register)?;
+                        let value = self.read_register(frame, register);
                         let type_string = Self::type_of_value(agent, value);
-                        self.write_register(frame, register, type_string)?;
+                        self.write_register(frame, register, type_string);
                         self.advance_instruction();
                     }
                     Opcode::Return => {
@@ -839,7 +884,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        let value = self.read_register(frame, register)?;
+                        let value = self.read_register(frame, register);
                         let _ = agent.pop_execution_context();
                         if let Some(result) = self.finish_frame(agent, value)? {
                             return Ok(result);
@@ -864,7 +909,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        let value = self.read_register(frame, register)?;
+                        let value = self.read_register(frame, register);
                         self.suspend_current_generator_frame(
                             agent,
                             frame,
@@ -887,7 +932,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        let value = self.read_register(frame, register)?;
+                        let value = self.read_register(frame, register);
                         if self.transfer_to_exception_handler(agent, value)? {
                             continue;
                         }
@@ -901,7 +946,7 @@ impl Vm {
                                 register: 0,
                             })?;
                         let value = self.current_exception.unwrap_or(Value::undefined());
-                        self.write_register(frame, register, value)?;
+                        self.write_register(frame, register, value);
                         self.advance_instruction();
                     }
                     Opcode::LoadResumeKind => {
@@ -914,7 +959,7 @@ impl Vm {
                             frame,
                             register,
                             Value::from_smi(i32::from(frame.resume_kind().raw())),
-                        )?;
+                        );
                         self.advance_instruction();
                     }
                     Opcode::LoadResumeValue => {
@@ -923,7 +968,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        self.write_register(frame, register, frame.resume_value())?;
+                        self.write_register(frame, register, frame.resume_value());
                         self.clear_active_resume();
                         self.advance_instruction();
                     }
@@ -937,5 +982,508 @@ impl Vm {
                 },
             }
         }
+    }
+
+    fn run_function_table(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+    ) -> VmResult<Value> {
+        loop {
+            let frame = self
+                .frame()
+                .expect("evaluation should install one active frame");
+            let installed = self
+                .installed
+                .get(code_index(frame.code()))
+                .and_then(Option::as_ref)
+                .cloned()
+                .ok_or_else(|| VmError::MissingInstalledCode(frame.code()))?;
+            let instruction = installed
+                .function
+                .instructions()
+                .get(
+                    usize::try_from(frame.instruction_offset())
+                        .expect("instruction offset should fit into usize"),
+                )
+                .copied()
+                .ok_or_else(|| VmError::InstructionOutOfBounds {
+                    code: frame.code(),
+                    instruction_offset: frame.instruction_offset(),
+                })?;
+
+            let handler = Self::threaded_opcode_handler(instruction.opcode());
+            match handler(
+                self,
+                agent,
+                host,
+                registry,
+                frame,
+                installed.as_ref(),
+                instruction,
+            )? {
+                ThreadedStep::Continue => {}
+                ThreadedStep::Return(value) => return Ok(value),
+                ThreadedStep::SwitchToMatch => return self.run_match(agent, host, registry),
+            }
+        }
+    }
+
+    fn threaded_opcode_handler(opcode: Opcode) -> ThreadedOpcodeHandler {
+        match opcode {
+            Opcode::Move => Self::threaded_move,
+            Opcode::LoadUndefined
+            | Opcode::LoadUninitializedLexical
+            | Opcode::LoadNull
+            | Opcode::LoadTrue
+            | Opcode::LoadFalse
+            | Opcode::LoadZero
+            | Opcode::LoadOne
+            | Opcode::LoadSmi
+            | Opcode::LoadConst => Self::threaded_load,
+            Opcode::LoadEnvSlot | Opcode::StoreEnvSlot | Opcode::AssignEnvSlot => {
+                Self::threaded_env_slot
+            }
+            Opcode::LoadGlobal | Opcode::StoreGlobal | Opcode::AssignGlobal => {
+                Self::threaded_global
+            }
+            Opcode::Add
+            | Opcode::AddSmi
+            | Opcode::Sub
+            | Opcode::SubSmi
+            | Opcode::Mul
+            | Opcode::MulSmi
+            | Opcode::Div
+            | Opcode::Mod
+            | Opcode::DivSmi
+            | Opcode::ModSmi
+            | Opcode::Exp
+            | Opcode::BitOr
+            | Opcode::BitAnd
+            | Opcode::BitAndSmi
+            | Opcode::BitXor
+            | Opcode::ShiftLeft
+            | Opcode::ShiftRight
+            | Opcode::UnsignedShiftRight
+            | Opcode::Equal
+            | Opcode::StrictEqual
+            | Opcode::EqualZero
+            | Opcode::LessThan
+            | Opcode::LessEqual
+            | Opcode::GreaterThan
+            | Opcode::GreaterEqual => Self::threaded_abc_value,
+            Opcode::Jump | Opcode::LoopHeader => Self::threaded_jump,
+            Opcode::JumpIfTrue | Opcode::JumpIfFalse => Self::threaded_conditional_jump,
+            Opcode::CreateClosure => Self::threaded_create_closure,
+            Opcode::Call => Self::threaded_call,
+            Opcode::Nop => Self::threaded_nop,
+            Opcode::Return | Opcode::ReturnUndefined => Self::threaded_return,
+            _ => Self::threaded_switch_to_match,
+        }
+    }
+
+    #[expect(
+        clippy::unnecessary_wraps,
+        clippy::unused_self,
+        reason = "threaded handlers share one fallible function-pointer ABI even when the fallback handler itself is infallible"
+    )]
+    fn threaded_switch_to_match(
+        &mut self,
+        _agent: &mut Agent,
+        _host: &dyn HostHooks,
+        _registry: &mut dyn NativeFunctionRegistry,
+        _frame: FrameRecord,
+        _installed: &InstalledFunction,
+        _instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        Ok(ThreadedStep::SwitchToMatch)
+    }
+
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "threaded handlers share one fallible function-pointer ABI even when Move is infallible after install-time validation"
+    )]
+    fn threaded_move(
+        &mut self,
+        _agent: &mut Agent,
+        _host: &dyn HostHooks,
+        _registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        installed: &InstalledFunction,
+        instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        let Instruction::Abc {
+            opcode, a, b, c, ..
+        } = instruction
+        else {
+            return Ok(ThreadedStep::SwitchToMatch);
+        };
+        let (a, b, _) = Self::decode_abc_operands(installed, frame, opcode, a, b, c);
+        let value = self.read_register(frame, b);
+        self.write_register(frame, a, value);
+        self.advance_instruction();
+        Ok(ThreadedStep::Continue)
+    }
+
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "threaded handlers share one fallible function-pointer ABI even when Nop is infallible"
+    )]
+    fn threaded_nop(
+        &mut self,
+        _agent: &mut Agent,
+        _host: &dyn HostHooks,
+        _registry: &mut dyn NativeFunctionRegistry,
+        _frame: FrameRecord,
+        _installed: &InstalledFunction,
+        _instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        self.advance_instruction();
+        Ok(ThreadedStep::Continue)
+    }
+
+    fn threaded_load(
+        &mut self,
+        agent: &mut Agent,
+        _host: &dyn HostHooks,
+        _registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        installed: &InstalledFunction,
+        instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        let Instruction::Abx { opcode, a, bx } = instruction else {
+            return Ok(ThreadedStep::SwitchToMatch);
+        };
+        let (a, bx) = Self::decode_abx_operands(installed, frame, a, bx);
+        let value = match opcode {
+            Opcode::LoadUndefined => Value::undefined(),
+            Opcode::LoadUninitializedLexical => Value::uninitialized_lexical(),
+            Opcode::LoadNull => Value::null(),
+            Opcode::LoadTrue => Value::from_bool(true),
+            Opcode::LoadFalse => Value::from_bool(false),
+            Opcode::LoadZero => Value::from_smi(0),
+            Opcode::LoadOne => Value::from_smi(1),
+            Opcode::LoadSmi => {
+                let bytes = bx.to_le_bytes();
+                let value = i16::from_le_bytes([bytes[0], bytes[1]]);
+                Value::from_smi(i32::from(value))
+            }
+            Opcode::LoadConst => self.read_constant(agent, frame.code(), bx)?,
+            _ => return Ok(ThreadedStep::SwitchToMatch),
+        };
+        self.write_register(frame, a, value);
+        self.advance_instruction();
+        Ok(ThreadedStep::Continue)
+    }
+
+    fn threaded_env_slot(
+        &mut self,
+        agent: &mut Agent,
+        _host: &dyn HostHooks,
+        _registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        installed: &InstalledFunction,
+        instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        let Instruction::Abx { opcode, a, bx } = instruction else {
+            return Ok(ThreadedStep::SwitchToMatch);
+        };
+        let (a, bx) = Self::decode_abx_operands(installed, frame, a, bx);
+        let (depth, slot) = decode_env_operand(bx);
+        let environment =
+            self.environment_for_slot_access(agent, frame.lexical_env(), depth, slot)?;
+        match opcode {
+            Opcode::LoadEnvSlot => {
+                let slot_value = Self::read_environment_slot(agent, environment, slot);
+                let Some(value) = self.handle_vm_result(agent, slot_value)? else {
+                    return Ok(ThreadedStep::Continue);
+                };
+                self.write_register(frame, a, value);
+            }
+            Opcode::StoreEnvSlot => {
+                let value = self.read_register(frame, a);
+                let store_result = self.write_environment_slot(agent, environment, slot, value);
+                let Some(()) = self.handle_vm_result(agent, store_result)? else {
+                    return Ok(ThreadedStep::Continue);
+                };
+            }
+            Opcode::AssignEnvSlot => {
+                let value = self.read_register(frame, a);
+                let assign_result = self.assign_environment_slot(
+                    agent,
+                    environment,
+                    slot,
+                    value,
+                    self.frame_is_strict(frame),
+                );
+                let Some(()) = self.handle_vm_result(agent, assign_result)? else {
+                    return Ok(ThreadedStep::Continue);
+                };
+            }
+            _ => return Ok(ThreadedStep::SwitchToMatch),
+        }
+        self.advance_instruction();
+        Ok(ThreadedStep::Continue)
+    }
+
+    fn threaded_global(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        installed: &InstalledFunction,
+        instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        let Instruction::Abx { opcode, a, bx } = instruction else {
+            return Ok(ThreadedStep::SwitchToMatch);
+        };
+        let (a, bx) = Self::decode_abx_operands(installed, frame, a, bx);
+        let atom = self.read_atom_constant(frame.code(), bx)?;
+        match opcode {
+            Opcode::LoadGlobal => {
+                let load_result = self.load_global_with_feedback(
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                    atom,
+                    frame.code(),
+                    frame.instruction_offset(),
+                );
+                let Some(value) = self.handle_vm_result(agent, load_result)? else {
+                    return Ok(ThreadedStep::Continue);
+                };
+                self.write_register(frame, a, value);
+            }
+            Opcode::StoreGlobal => {
+                let value = self.read_register(frame, a);
+                let store_result = self.store_global_with_feedback(
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                    atom,
+                    value,
+                    frame.code(),
+                    frame.instruction_offset(),
+                );
+                let Some(()) = self.handle_vm_result(agent, store_result)? else {
+                    return Ok(ThreadedStep::Continue);
+                };
+            }
+            Opcode::AssignGlobal => {
+                let value = self.read_register(frame, a);
+                let assign_result = self.assign_global_with_feedback(
+                    agent,
+                    host,
+                    registry,
+                    frame,
+                    atom,
+                    value,
+                    frame.code(),
+                    frame.instruction_offset(),
+                );
+                let Some(()) = self.handle_vm_result(agent, assign_result)? else {
+                    return Ok(ThreadedStep::Continue);
+                };
+            }
+            _ => return Ok(ThreadedStep::SwitchToMatch),
+        }
+        self.advance_instruction();
+        Ok(ThreadedStep::Continue)
+    }
+
+    fn threaded_abc_value(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        installed: &InstalledFunction,
+        instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        let Instruction::Abc { opcode, a, b, c } = instruction else {
+            return Ok(ThreadedStep::SwitchToMatch);
+        };
+        let (a, b, c) = Self::decode_abc_operands(installed, frame, opcode, a, b, c);
+        let opcode_result =
+            self.execute_abc_value_opcode(agent, host, registry, frame, opcode, b, c);
+        let Some(value) = self.handle_vm_result(agent, opcode_result)? else {
+            return Ok(ThreadedStep::Continue);
+        };
+        self.record_feedback_site(frame.code(), frame.instruction_offset());
+        self.write_register(frame, a, value);
+        self.advance_instruction();
+        Ok(ThreadedStep::Continue)
+    }
+
+    fn threaded_jump(
+        &mut self,
+        _agent: &mut Agent,
+        _host: &dyn HostHooks,
+        _registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        _installed: &InstalledFunction,
+        instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        let Instruction::Ax { opcode, ax } = instruction else {
+            return Ok(ThreadedStep::SwitchToMatch);
+        };
+        match opcode {
+            Opcode::Jump | Opcode::LoopHeader => {
+                if opcode == Opcode::Jump && ax < 0 {
+                    self.observe_tier_backedge_event(frame.code());
+                }
+                if opcode == Opcode::LoopHeader {
+                    self.observe_tier_backedge_event(frame.code());
+                    self.advance_instruction();
+                } else {
+                    self.jump_by(ax)?;
+                }
+            }
+            _ => return Ok(ThreadedStep::SwitchToMatch),
+        }
+        Ok(ThreadedStep::Continue)
+    }
+
+    fn threaded_conditional_jump(
+        &mut self,
+        agent: &mut Agent,
+        _host: &dyn HostHooks,
+        _registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        installed: &InstalledFunction,
+        instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        let Instruction::Abx { opcode, a, bx } = instruction else {
+            return Ok(ThreadedStep::SwitchToMatch);
+        };
+        let (a, bx) = Self::decode_abx_operands(installed, frame, a, bx);
+        match opcode {
+            Opcode::JumpIfTrue | Opcode::JumpIfFalse => {
+                let condition = self.read_register(frame, a);
+                let Some(truthy) = self.handle_vm_result(
+                    agent,
+                    read::to_boolean_agent(agent, condition).map_err(VmError::Abrupt),
+                )?
+                else {
+                    return Ok(ThreadedStep::Continue);
+                };
+                let delta = i32::from_le_bytes(bx.to_le_bytes());
+                let should_jump = match opcode {
+                    Opcode::JumpIfTrue => truthy,
+                    Opcode::JumpIfFalse => !truthy,
+                    _ => unreachable!("guarded by opcode match"),
+                };
+                if should_jump {
+                    self.jump_by(delta)?;
+                } else {
+                    self.advance_instruction();
+                }
+            }
+            _ => return Ok(ThreadedStep::SwitchToMatch),
+        }
+        Ok(ThreadedStep::Continue)
+    }
+
+    fn threaded_create_closure(
+        &mut self,
+        agent: &mut Agent,
+        _host: &dyn HostHooks,
+        _registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        installed: &InstalledFunction,
+        instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        let Instruction::Abx { opcode, a, bx } = instruction else {
+            return Ok(ThreadedStep::SwitchToMatch);
+        };
+        if opcode != Opcode::CreateClosure {
+            return Ok(ThreadedStep::SwitchToMatch);
+        }
+        let (a, bx) = Self::decode_abx_operands(installed, frame, a, bx);
+        let closure_result = self.create_closure(agent, frame, bx);
+        let Some(closure) = self.handle_vm_result(agent, closure_result)? else {
+            return Ok(ThreadedStep::Continue);
+        };
+        self.write_register(frame, a, Value::from_object_ref(closure));
+        self.advance_instruction();
+        Ok(ThreadedStep::Continue)
+    }
+
+    fn threaded_call(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        installed: &InstalledFunction,
+        instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        let Instruction::Abc { opcode, a, b, c } = instruction else {
+            return Ok(ThreadedStep::SwitchToMatch);
+        };
+        if opcode != Opcode::Call {
+            return Ok(ThreadedStep::SwitchToMatch);
+        }
+        let (a, b, c) = Self::decode_abc_operands(installed, frame, opcode, a, b, c);
+        let payload = installed
+            .wide_payload(frame.instruction_offset())
+            .ok_or_else(|| VmError::MissingWideOperand {
+                code: frame.code(),
+                instruction_offset: frame.instruction_offset(),
+                opcode,
+            })?;
+        let spread_mask = installed
+            .feedback_descriptor(frame.instruction_offset())
+            .and_then(|descriptor| descriptor.metadata().spread_mask());
+        let call_result = self.call_value(
+            agent,
+            host,
+            registry,
+            frame,
+            a,
+            b,
+            c,
+            CallRange::decode(payload),
+            spread_mask,
+        );
+        let Some(()) = self.handle_vm_result(agent, call_result)? else {
+            return Ok(ThreadedStep::Continue);
+        };
+        self.record_feedback_site(frame.code(), frame.instruction_offset());
+        Ok(ThreadedStep::Continue)
+    }
+
+    fn threaded_return(
+        &mut self,
+        agent: &mut Agent,
+        _host: &dyn HostHooks,
+        _registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        _installed: &InstalledFunction,
+        instruction: Instruction,
+    ) -> VmResult<ThreadedStep> {
+        let Instruction::Ax { opcode, ax } = instruction else {
+            return Ok(ThreadedStep::SwitchToMatch);
+        };
+        let value = match opcode {
+            Opcode::Return => {
+                let register = u16::try_from(ax).map_err(|_| VmError::RegisterOutOfBounds {
+                    code: frame.code(),
+                    register: 0,
+                })?;
+                self.read_register(frame, register)
+            }
+            Opcode::ReturnUndefined => Value::undefined(),
+            _ => return Ok(ThreadedStep::SwitchToMatch),
+        };
+        let _ = agent.pop_execution_context();
+        if let Some(result) = self.finish_frame(agent, value)? {
+            return Ok(ThreadedStep::Return(result));
+        }
+        Ok(ThreadedStep::Continue)
     }
 }

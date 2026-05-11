@@ -3,6 +3,7 @@ use super::{
     BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode, RealmRef,
     TieringState, Value, Vm, VmError, VmResult,
 };
+use lyng_js_bytecode::{CallRange, Instruction, Opcode, WideAbcOperands, WideAbxOperands};
 use lyng_js_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
 };
@@ -276,6 +277,257 @@ fn offset_table_len(offsets: impl Iterator<Item = u32>) -> usize {
     })
 }
 
+fn validate_register_operands(code: CodeRef, function: &BytecodeFunction) -> VmResult<()> {
+    let register_len = function
+        .register_count()
+        .checked_add(function.hidden_register_count())
+        .ok_or(VmError::RegisterOutOfBounds {
+            code,
+            register: u16::MAX,
+        })?;
+    for (offset, instruction) in function.instructions().iter().copied().enumerate() {
+        validate_instruction_registers(
+            code,
+            function,
+            register_len,
+            u32::try_from(offset).expect("instruction offset should fit u32"),
+            instruction,
+        )?;
+    }
+    Ok(())
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "the register validation table mirrors VM dispatch operand ownership"
+)]
+fn validate_instruction_registers(
+    code: CodeRef,
+    function: &BytecodeFunction,
+    register_len: u16,
+    instruction_offset: u32,
+    instruction: Instruction,
+) -> VmResult<()> {
+    match instruction {
+        Instruction::Abc { opcode, a, b, c } => {
+            let (a, b, c) =
+                abc_operands_for_validation(function, instruction_offset, opcode, a, b, c);
+            match opcode {
+                Opcode::Move
+                | Opcode::Negate
+                | Opcode::BitNot
+                | Opcode::Increment
+                | Opcode::Decrement
+                | Opcode::SetFunctionName
+                | Opcode::ToPropertyKey
+                | Opcode::CreateForIn
+                | Opcode::CreateIterator
+                | Opcode::GetNamedProperty
+                | Opcode::DefineNamedProperty
+                | Opcode::SetNamedProperty
+                | Opcode::AssignNamedProperty
+                | Opcode::StrictAssignNamedProperty
+                | Opcode::StoreDenseElement
+                | Opcode::LoadDenseElement
+                | Opcode::AddSmi
+                | Opcode::SubSmi
+                | Opcode::MulSmi
+                | Opcode::DivSmi
+                | Opcode::ModSmi
+                | Opcode::BitAndSmi
+                | Opcode::EqualZero => validate_registers(code, register_len, [a, b]),
+                Opcode::Add
+                | Opcode::Sub
+                | Opcode::Mul
+                | Opcode::Div
+                | Opcode::Mod
+                | Opcode::Exp
+                | Opcode::BitOr
+                | Opcode::BitXor
+                | Opcode::BitAnd
+                | Opcode::ShiftLeft
+                | Opcode::ShiftRight
+                | Opcode::UnsignedShiftRight
+                | Opcode::Equal
+                | Opcode::StrictEqual
+                | Opcode::LessThan
+                | Opcode::LessEqual
+                | Opcode::GreaterThan
+                | Opcode::GreaterEqual
+                | Opcode::In
+                | Opcode::GetKeyedProperty
+                | Opcode::SetKeyedProperty
+                | Opcode::AssignKeyedProperty
+                | Opcode::StrictAssignKeyedProperty
+                | Opcode::DefineKeyedProperty
+                | Opcode::DeleteProperty
+                | Opcode::CopyDataProperties
+                | Opcode::AdvanceForIn
+                | Opcode::AdvanceIterator
+                | Opcode::DelegateYield => validate_registers(code, register_len, [a, b, c]),
+                Opcode::Call => {
+                    validate_registers(code, register_len, [a, b, c])?;
+                    validate_call_range(code, function, register_len, instruction_offset)
+                }
+                Opcode::TailCall | Opcode::Construct => {
+                    validate_registers(code, register_len, [a, b])?;
+                    validate_call_range(code, function, register_len, instruction_offset)
+                }
+                _ => Ok(()),
+            }
+        }
+        Instruction::Abx { opcode, a, bx } => {
+            let operands = abx_operands_for_validation(function, instruction_offset, a, bx);
+            let a = operands.a();
+            let bx = operands.bx();
+            match opcode {
+                Opcode::LoadUndefined
+                | Opcode::LoadUninitializedLexical
+                | Opcode::LoadNull
+                | Opcode::LoadTrue
+                | Opcode::LoadFalse
+                | Opcode::LoadZero
+                | Opcode::LoadOne
+                | Opcode::LoadSmi
+                | Opcode::LoadConst
+                | Opcode::LoadEnvSlot
+                | Opcode::StoreEnvSlot
+                | Opcode::AssignEnvSlot
+                | Opcode::LoadGlobal
+                | Opcode::StoreGlobal
+                | Opcode::AssignGlobal
+                | Opcode::DeleteGlobal
+                | Opcode::LoadName
+                | Opcode::ResolveName
+                | Opcode::ResolveGlobal
+                | Opcode::AssignName
+                | Opcode::AssignVariableName
+                | Opcode::DeleteName
+                | Opcode::CaptureName
+                | Opcode::LoadThis
+                | Opcode::LoadCallee
+                | Opcode::LoadNewTarget
+                | Opcode::JumpIfTrue
+                | Opcode::JumpIfFalse
+                | Opcode::CreateObject
+                | Opcode::CreateArray
+                | Opcode::CheckObjectCoercible
+                | Opcode::ThrowIfUninitialized
+                | Opcode::CreateClosure
+                | Opcode::CloseForIn
+                | Opcode::CloseIterator => validate_registers(code, register_len, [a]),
+                Opcode::LoadCapturedName
+                | Opcode::LoadCapturedNameThis
+                | Opcode::AssignCapturedName => {
+                    let reference = register_from_u32(code, bx)?;
+                    validate_registers(code, register_len, [a, reference])
+                }
+                _ => Ok(()),
+            }
+        }
+        Instruction::Ax { opcode, ax } => match opcode {
+            Opcode::PushWithEnv
+            | Opcode::TypeOf
+            | Opcode::Return
+            | Opcode::Yield
+            | Opcode::Await
+            | Opcode::Throw
+            | Opcode::LoadException
+            | Opcode::LoadResumeKind
+            | Opcode::LoadResumeValue => {
+                let register = register_from_i32(code, ax)?;
+                validate_registers(code, register_len, [register])
+            }
+            _ => Ok(()),
+        },
+    }
+}
+
+fn abc_operands_for_validation(
+    function: &BytecodeFunction,
+    instruction_offset: u32,
+    opcode: Opcode,
+    a: u8,
+    b: u8,
+    c: u8,
+) -> (u16, u16, u16) {
+    if matches!(opcode, Opcode::Call | Opcode::TailCall | Opcode::Construct) {
+        return (u16::from(a), u16::from(b), u16::from(c));
+    }
+    let operands = wide_payload(function, instruction_offset).map_or_else(
+        || WideAbcOperands::narrow(a, b, c),
+        |payload| WideAbcOperands::decode(a, b, c, payload),
+    );
+    (operands.a(), operands.b(), operands.c())
+}
+
+fn abx_operands_for_validation(
+    function: &BytecodeFunction,
+    instruction_offset: u32,
+    a: u8,
+    bx: u16,
+) -> WideAbxOperands {
+    wide_payload(function, instruction_offset).map_or_else(
+        || WideAbxOperands::narrow(a, bx),
+        |payload| WideAbxOperands::decode(a, bx, payload),
+    )
+}
+
+fn validate_call_range(
+    code: CodeRef,
+    function: &BytecodeFunction,
+    register_len: u16,
+    instruction_offset: u32,
+) -> VmResult<()> {
+    let Some(payload) = wide_payload(function, instruction_offset) else {
+        return Ok(());
+    };
+    let range = CallRange::decode(payload);
+    if range.argument_count() == 0 {
+        return Ok(());
+    }
+    let Some(last_register) = range
+        .argument_base()
+        .checked_add(range.argument_count().saturating_sub(1))
+    else {
+        return Err(VmError::RegisterOutOfBounds {
+            code,
+            register: u16::MAX,
+        });
+    };
+    validate_registers(code, register_len, [last_register])
+}
+
+fn validate_registers<const N: usize>(
+    code: CodeRef,
+    register_len: u16,
+    registers: [u16; N],
+) -> VmResult<()> {
+    for register in registers {
+        if register >= register_len {
+            return Err(VmError::RegisterOutOfBounds { code, register });
+        }
+    }
+    Ok(())
+}
+
+fn register_from_u32(code: CodeRef, register: u32) -> VmResult<u16> {
+    u16::try_from(register).map_err(|_| VmError::RegisterOutOfBounds {
+        code,
+        register: u16::MAX,
+    })
+}
+
+fn register_from_i32(code: CodeRef, register: i32) -> VmResult<u16> {
+    u16::try_from(register).map_err(|_| VmError::RegisterOutOfBounds { code, register: 0 })
+}
+
+fn wide_payload(function: &BytecodeFunction, instruction_offset: u32) -> Option<u32> {
+    function.wide_operands().iter().find_map(|operand| {
+        (operand.instruction_offset() == instruction_offset).then_some(operand.payload())
+    })
+}
+
 impl Vm {
     #[expect(
         clippy::too_many_lines,
@@ -412,6 +664,7 @@ impl Vm {
                 RuntimeCodeRecord::new(None, Some(realm), constants),
                 AllocationLifetime::Default,
             );
+            validate_register_operands(code, &installed_function)?;
             codes_by_function[bytecode_index(function_id)] = Some(code);
             installed_templates[bytecode_index(function_id)] = Some(installed_function);
         }

@@ -261,7 +261,7 @@ fn for_await_of_sync_iterator_preserves_async_from_sync_tick_order() {
         .result()
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("for await log should be a string");
 
     assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
@@ -326,7 +326,7 @@ fn for_await_of_break_rejects_when_async_close_rejects() {
         .expect("error name should be readable")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("error name should be a string");
     assert_eq!(name, "Error");
 }
@@ -689,7 +689,13 @@ fn async_generator_private_yield_star_awaits_async_iterator_next_results() {
     let text = record
         .result()
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("async generator delegated yield-star result should be a string");
 
     assert_eq!(text, "true:false|ret:done:true|next:undefined;next:sent;");
@@ -786,7 +792,13 @@ fn async_generator_explicit_return_undefined_awaits_before_settling() {
     let text = record
         .result()
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("async generator explicit-return timing should return a string");
 
     assert_eq!(text, "tick 1|implicit|bare|tick 2|explicit");
@@ -840,7 +852,13 @@ fn async_generator_yield_return_resumption_awaits_return_value() {
     let text = record
         .result()
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("async generator yield-return timing should return a string");
 
     assert_eq!(text, "start|tick 1|get then|tick 2");
@@ -893,7 +911,13 @@ fn async_generator_return_promise_resolve_abrupt_resumes_suspended_yield_as_thro
     let text = record
         .result()
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("async generator abrupt return should fulfill with a string");
 
     assert_eq!(text, "broken promise|1|true");
@@ -962,7 +986,13 @@ fn async_generator_yield_star_return_resumption_awaits_before_delegate_return_lo
     let text = record
         .result()
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("async generator yield-star return timing should return a string");
 
     assert_eq!(
@@ -1263,11 +1293,11 @@ fn generator_instances_use_the_function_prototype_chain() {
         .expect("shared prototype tag should be a string");
 
     assert_eq!(
-        decode_string(agent.heap().view().string_view(shared_next).unwrap()),
+        decode_string(&agent.heap().view().string_view(shared_next).unwrap()),
         "function"
     );
     assert_eq!(
-        decode_string(agent.heap().view().string_view(shared_tag).unwrap()),
+        decode_string(&agent.heap().view().string_view(shared_tag).unwrap()),
         "Generator"
     );
 }

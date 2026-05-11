@@ -42,7 +42,7 @@ pub fn primitive_to_bigint(agent: &mut Agent, value: Value) -> Completion<Value>
             .heap()
             .view()
             .string_view(string)
-            .map(lossy_string_from_view)
+            .map(|view| lossy_string_from_view(&view))
             .ok_or_else(|| throw_type_error(agent))?;
         let Some((sign, limbs)) = parse_string_to_bigint(&text) else {
             return Err(throw_syntax_error(agent));
@@ -69,7 +69,7 @@ pub fn string_to_bigint_value(agent: &mut Agent, value: Value) -> Completion<Opt
         .heap()
         .view()
         .string_view(string)
-        .map(lossy_string_from_view)
+        .map(|view| lossy_string_from_view(&view))
         .ok_or_else(|| throw_type_error(agent))?;
     let Some((sign, limbs)) = parse_string_to_bigint(&text) else {
         return Ok(None);

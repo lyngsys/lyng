@@ -339,6 +339,26 @@ fn script_core_array_reverse_gets_lower_before_testing_upper() {
 }
 
 #[test]
+fn script_core_array_length_store_cache_preserves_shrink_deletions() {
+    let result = compile_and_run_string(
+        r#"
+        function shrink(array) {
+            array.length = 0;
+            return array.length + ":" + (0 in array) + ":" + (1 in array);
+        }
+
+        [
+            shrink([1, 2]),
+            shrink([1, 2]),
+            shrink([1, 2])
+        ].join("|");
+        "#,
+    );
+
+    assert_eq!(result, "0:false:false|0:false:false|0:false:false");
+}
+
+#[test]
 fn script_core_in_operator_rejects_primitive_rhs_with_type_error() {
     let result = compile_and_run(
         r#"

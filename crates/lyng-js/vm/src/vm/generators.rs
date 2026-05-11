@@ -1162,8 +1162,8 @@ impl Vm {
             } => {
                 self.iterator_states
                     .insert(register_base, iterator_register, record);
-                self.write_register(frame, result_register, value)?;
-                self.write_register(frame, done_register, Value::from_bool(false))?;
+                self.write_register(frame, result_register, value);
+                self.write_register(frame, done_register, Value::from_bool(false));
                 self.suspend_current_generator_frame(
                     agent,
                     frame,
@@ -1173,8 +1173,8 @@ impl Vm {
                 )
             }
             DelegateYieldOutcome::Complete { value } => {
-                self.write_register(frame, result_register, value)?;
-                self.write_register(frame, done_register, Value::from_bool(true))?;
+                self.write_register(frame, result_register, value);
+                self.write_register(frame, done_register, Value::from_bool(true));
                 self.advance_instruction();
                 Ok(())
             }

@@ -93,6 +93,11 @@ impl PrimitiveHeap {
             .checked_add(usize::try_from(right.code_unit_len()).ok()?)
     }
 
+    #[inline]
+    pub(crate) const fn string_record_allocation_requires_growth(&self) -> bool {
+        self.strings.allocation_requires_growth()
+    }
+
     pub(crate) fn utf16_concat_string_payload_len(
         &self,
         left: StringRef,
@@ -132,19 +137,8 @@ impl PrimitiveHeap {
             return Some(left);
         }
 
-        let payload = self.string_payloads.allocate_concat(
-            left_record.payload()?,
-            usize::try_from(left_record.code_unit_len()).ok()?,
-            right_record.payload()?,
-            usize::try_from(right_record.code_unit_len()).ok()?,
-            lifetime,
-        )?;
-        let record = PrimitiveStringRecord::with_payload(
-            StringEncoding::Latin1,
-            code_unit_len,
-            None,
-            payload,
-        );
+        let record =
+            PrimitiveStringRecord::with_cons(StringEncoding::Latin1, code_unit_len, left, right);
         Some(self.strings.allocate(record, lifetime))
     }
 
@@ -172,21 +166,8 @@ impl PrimitiveHeap {
             return Some(left);
         }
 
-        let payload = self.string_payloads.allocate_utf16_concat(
-            left_record.payload()?,
-            left_record.encoding(),
-            left_record.code_unit_len(),
-            right_record.payload()?,
-            right_record.encoding(),
-            right_record.code_unit_len(),
-            lifetime,
-        )?;
-        let record = PrimitiveStringRecord::with_payload(
-            StringEncoding::Utf16,
-            code_unit_len,
-            None,
-            payload,
-        );
+        let record =
+            PrimitiveStringRecord::with_cons(StringEncoding::Utf16, code_unit_len, left, right);
         Some(self.strings.allocate(record, lifetime))
     }
 
@@ -206,13 +187,45 @@ impl PrimitiveHeap {
 
     pub(crate) fn string_view(&self, id: StringRef) -> Option<PrimitiveStringView<'_>> {
         let record = self.string(id)?;
-        let payload = match record.payload() {
-            Some(payload) => self.string_payloads.get(payload)?,
-            None if record.code_unit_len() == 0 => &[],
-            None => return None,
-        };
+        match record.payload() {
+            Some(payload) => Some(PrimitiveStringView::new(
+                record,
+                self.string_payloads.get(payload)?,
+            )),
+            None if record.code_unit_len() == 0 => Some(PrimitiveStringView::new(record, &[])),
+            None if record.is_cons() => Some(PrimitiveStringView::with_heap(record, None, self)),
+            None => None,
+        }
+    }
 
-        Some(PrimitiveStringView::new(record, payload))
+    pub(crate) fn flatten_string_payload(&self, record: PrimitiveStringRecord) -> Option<Vec<u8>> {
+        let mut payload = Vec::with_capacity(expected_string_payload_len(
+            record.encoding(),
+            record.code_unit_len(),
+        ));
+        self.append_string_payload(record, record.encoding(), &mut payload)?;
+        Some(payload)
+    }
+
+    fn append_string_payload(
+        &self,
+        record: PrimitiveStringRecord,
+        target_encoding: StringEncoding,
+        output: &mut Vec<u8>,
+    ) -> Option<()> {
+        if let Some(payload) = record.payload() {
+            let payload = self.string_payloads.get(payload)?;
+            append_flat_string_payload(record.encoding(), target_encoding, payload, output);
+            return Some(());
+        }
+
+        if record.code_unit_len() == 0 {
+            return Some(());
+        }
+
+        let (left, right) = record.cons_children()?;
+        self.append_string_payload(self.string(left)?, target_encoding, output)?;
+        self.append_string_payload(self.string(right)?, target_encoding, output)
     }
 
     pub(crate) fn string_payload(&self, id: StringRef) -> Option<&[u8]> {
@@ -917,6 +930,29 @@ const fn expected_string_payload_len(encoding: StringEncoding, code_unit_len: u3
         StringEncoding::Utf16 => (code_unit_len as usize)
             .checked_mul(2)
             .expect("UTF-16 strings must fit in addressable side storage"),
+    }
+}
+
+fn append_flat_string_payload(
+    source_encoding: StringEncoding,
+    target_encoding: StringEncoding,
+    payload: &[u8],
+    output: &mut Vec<u8>,
+) {
+    match (source_encoding, target_encoding) {
+        (StringEncoding::Latin1, StringEncoding::Latin1)
+        | (StringEncoding::Utf16, StringEncoding::Utf16) => output.extend_from_slice(payload),
+        (StringEncoding::Latin1, StringEncoding::Utf16) => {
+            for byte in payload {
+                output.extend_from_slice(&u16::from(*byte).to_le_bytes());
+            }
+        }
+        (StringEncoding::Utf16, StringEncoding::Latin1) => {
+            debug_assert!(
+                false,
+                "UTF-16 payloads cannot be flattened into Latin-1 strings"
+            );
+        }
     }
 }
 

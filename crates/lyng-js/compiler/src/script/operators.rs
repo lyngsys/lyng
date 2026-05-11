@@ -95,6 +95,17 @@ impl FunctionCompiler<'_, '_> {
         right: ExprId,
         dest: u16,
     ) -> LoweringResult<()> {
+        if let Some(opcode) = Self::smi_binary_opcode(operator)
+            && let Some(immediate) = self.smi_i16_literal(right)
+        {
+            let left_register = self.lower_expr_to_temp(left)?;
+            return self.emit_profiled_smi_binary(opcode, dest, left_register, immediate);
+        }
+        if operator == BinaryOp::StrictEq && self.smi_i16_literal(right) == Some(0) {
+            let left_register = self.lower_expr_to_temp(left)?;
+            return self.emit_profiled_smi_binary(Opcode::EqualZero, dest, left_register, 0);
+        }
+
         match operator {
             BinaryOp::Add
             | BinaryOp::Sub
@@ -138,6 +149,28 @@ impl FunctionCompiler<'_, '_> {
                 right,
                 dest,
             ),
+        }
+    }
+
+    fn smi_i16_literal(&self, expr: ExprId) -> Option<i16> {
+        match self.ast().get_expr(expr) {
+            Expr::NumericLiteral {
+                value: lyng_js_ast::NumericLiteral::Int32(value),
+                ..
+            } => i16::try_from(*value).ok(),
+            _ => None,
+        }
+    }
+
+    const fn smi_binary_opcode(operator: BinaryOp) -> Option<Opcode> {
+        match operator {
+            BinaryOp::Add => Some(Opcode::AddSmi),
+            BinaryOp::Sub => Some(Opcode::SubSmi),
+            BinaryOp::Mul => Some(Opcode::MulSmi),
+            BinaryOp::Div => Some(Opcode::DivSmi),
+            BinaryOp::Rem => Some(Opcode::ModSmi),
+            BinaryOp::BitAnd => Some(Opcode::BitAndSmi),
+            _ => None,
         }
     }
 

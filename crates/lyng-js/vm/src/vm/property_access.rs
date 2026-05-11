@@ -28,7 +28,7 @@ fn primitive_string_code_unit_len(agent: &mut Agent, string: StringRef) -> VmRes
         .heap()
         .view()
         .string_view(string)
-        .map(lyng_js_gc::PrimitiveStringView::code_unit_len)
+        .map(|view| view.code_unit_len())
     {
         return Ok(length);
     }

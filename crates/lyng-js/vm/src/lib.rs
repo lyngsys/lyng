@@ -36,5 +36,5 @@ pub use vm::{
     FeedbackSiteSnapshot, FeedbackVectorFootprint, FeedbackVectorSnapshot,
     KeyedNamedPropertyCacheEntrySnapshot, KeyedPropertyFeedbackSnapshot, LoadedModuleRoot,
     NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot, TierStatus, TieringSnapshot,
-    Vm, VmEvaluationObserver,
+    Vm, VmDispatchMode, VmEvaluationObserver,
 };

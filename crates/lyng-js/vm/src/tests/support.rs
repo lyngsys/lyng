@@ -1,7 +1,7 @@
 pub(super) use crate::{
     seed_registers, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FeedbackSiteDetail,
     FeedbackVectorSnapshot, FrameFlags, FrameRecord, InstalledCode, RegisterWindow, TierStatus, Vm,
-    VmError,
+    VmDispatchMode, VmError,
 };
 pub(super) use lyng_js_bytecode::{
     ArgumentsMode, BytecodeBuilder, BytecodeFunction, BytecodeFunctionId, BytecodeFunctionKind,
@@ -176,7 +176,7 @@ pub(super) fn install_global_value(
     .unwrap());
 }
 
-pub(super) fn decode_string(view: PrimitiveStringView<'_>) -> String {
+pub(super) fn decode_string(view: &PrimitiveStringView<'_>) -> String {
     if let Some(bytes) = view.latin1_bytes() {
         return bytes.iter().map(|byte| char::from(*byte)).collect();
     }

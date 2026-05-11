@@ -1500,7 +1500,7 @@ pub(super) fn symbol_descriptive_string<Cx: PublicBuiltinDispatchContext>(
         let heap_view = agent.heap().view();
         heap_view
             .symbol_view(symbol)
-            .and_then(lyng_js_gc::PrimitiveSymbolView::description)
+            .and_then(|view| view.description())
     };
     if let Some(description) = description {
         let description_text = cx.value_to_string_text(Value::from_string_ref(description))?;

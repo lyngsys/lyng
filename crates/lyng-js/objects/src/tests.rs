@@ -999,6 +999,126 @@ fn canonical_transitions_assign_slots_and_reuse_existing_shapes() {
 }
 
 #[test]
+fn small_shape_transitions_use_inline_storage_before_overflow() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let transition = |raw| {
+        ShapeTransitionKey::new(
+            PropertyKey::from_atom(AtomId::from_raw(raw)),
+            ShapePropertyKind::Data,
+            attrs(true, true, true),
+        )
+    };
+
+    let first = runtime
+        .transition_shape(
+            &mut mutator,
+            root,
+            transition(1),
+            AllocationLifetime::Default,
+        )
+        .unwrap();
+    assert_eq!(
+        runtime
+            .shape_metadata(root)
+            .unwrap()
+            .transitions
+            .inline_len(),
+        1
+    );
+    assert_eq!(
+        runtime
+            .shape_metadata(root)
+            .unwrap()
+            .transitions
+            .overflow_len(),
+        0
+    );
+
+    let first_again = runtime
+        .transition_shape(
+            &mut mutator,
+            root,
+            transition(1),
+            AllocationLifetime::Default,
+        )
+        .unwrap();
+    let second = runtime
+        .transition_shape(
+            &mut mutator,
+            root,
+            transition(2),
+            AllocationLifetime::Default,
+        )
+        .unwrap();
+    let third = runtime
+        .transition_shape(
+            &mut mutator,
+            root,
+            transition(3),
+            AllocationLifetime::Default,
+        )
+        .unwrap();
+
+    assert_eq!(first, first_again);
+    assert_ne!(first, second);
+    assert_ne!(second, third);
+    assert_eq!(
+        runtime
+            .shape_metadata(root)
+            .unwrap()
+            .transitions
+            .inline_len(),
+        3
+    );
+    assert_eq!(
+        runtime
+            .shape_metadata(root)
+            .unwrap()
+            .transitions
+            .overflow_len(),
+        0
+    );
+
+    let fourth = runtime
+        .transition_shape(
+            &mut mutator,
+            root,
+            transition(4),
+            AllocationLifetime::Default,
+        )
+        .unwrap();
+    let fourth_again = runtime
+        .transition_shape(
+            &mut mutator,
+            root,
+            transition(4),
+            AllocationLifetime::Default,
+        )
+        .unwrap();
+
+    assert_eq!(fourth, fourth_again);
+    assert_eq!(
+        runtime
+            .shape_metadata(root)
+            .unwrap()
+            .transitions
+            .inline_len(),
+        3
+    );
+    assert_eq!(
+        runtime
+            .shape_metadata(root)
+            .unwrap()
+            .transitions
+            .overflow_len(),
+        1
+    );
+}
+
+#[test]
 fn duplicate_property_add_is_not_a_shape_transition() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
@@ -1361,7 +1481,51 @@ fn slot_store_helpers_route_named_and_element_writes_through_gc_helpers() {
 }
 
 #[test]
-fn named_property_churn_transitions_objects_to_dictionary_mode() {
+fn ordinary_named_property_addition_chains_remain_shape_stable_before_cap() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let object = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+
+    for raw in 1..=4 {
+        let key = PropertyKey::from_atom(AtomId::from_raw(raw));
+        assert!(runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                key,
+                data_descriptor(Value::from_smi(i32::try_from(raw).unwrap()), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap());
+        assert!(runtime.note_named_property_addition(&mut mutator, object));
+        assert_eq!(
+            runtime.named_property_storage_mode(object),
+            Some(NamedPropertyStorageMode::ShapeStable)
+        );
+        assert!(!runtime
+            .object_header(mutator.view(), object)
+            .unwrap()
+            .flags()
+            .uses_named_property_dictionary());
+    }
+
+    assert_eq!(
+        runtime
+            .own_property_keys(mutator.view(), object)
+            .unwrap()
+            .len(),
+        4
+    );
+}
+
+#[test]
+fn structural_named_property_churn_transitions_objects_at_explicit_cap() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();
@@ -1385,9 +1549,14 @@ fn named_property_churn_transitions_objects_to_dictionary_mode() {
     );
 
     assert!(runtime.init_named_slot(&mut mutator, object, 0, Value::from_smi(41)));
-    for _ in 0..NAMED_PROPERTY_CHURN_DICTIONARY_THRESHOLD {
+    for _ in 1..NAMED_PROPERTY_STRUCTURAL_CHURN_DICTIONARY_THRESHOLD {
         assert!(runtime.note_named_property_churn(&mut mutator, object));
+        assert_eq!(
+            runtime.named_property_storage_mode(object),
+            Some(NamedPropertyStorageMode::ShapeStable)
+        );
     }
+    assert!(runtime.note_named_property_churn(&mut mutator, object));
 
     let header = runtime.object_header(mutator.view(), object).unwrap();
     let entry = runtime
@@ -1411,6 +1580,89 @@ fn named_property_churn_transitions_objects_to_dictionary_mode() {
         InvalidationCause::DictionaryTransition
     );
     assert_eq!(invalidation.epoch(), 1);
+}
+
+#[test]
+fn deleting_shape_stable_named_property_uses_dictionary_storage() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let key = PropertyKey::from_atom(AtomId::from_raw(5));
+    let object = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+
+    assert!(runtime
+        .define_own_property(
+            &mut mutator,
+            object,
+            key,
+            data_descriptor(Value::from_smi(5), true, true),
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+    assert!(runtime.delete_named_property(&mut mutator, object, key));
+
+    assert_eq!(
+        runtime.named_property_storage_mode(object),
+        Some(NamedPropertyStorageMode::Dictionary)
+    );
+    assert_eq!(runtime.named_property_dictionary_entry(object, key), None);
+    assert!(runtime
+        .own_property_keys(mutator.view(), object)
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn redefining_shape_stable_named_property_uses_dictionary_storage() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let key = PropertyKey::from_atom(AtomId::from_raw(6));
+    let object = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+
+    assert!(runtime
+        .define_own_property(
+            &mut mutator,
+            object,
+            key,
+            data_descriptor(Value::from_smi(6), true, true),
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+    let mut redefine = PropertyDescriptor::new();
+    redefine.set_enumerable(false);
+    assert!(runtime
+        .define_own_property(
+            &mut mutator,
+            object,
+            key,
+            redefine,
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+
+    let entry = runtime
+        .named_property_dictionary_entry(object, key)
+        .expect("redefined property should move into dictionary storage");
+    assert_eq!(
+        runtime.named_property_storage_mode(object),
+        Some(NamedPropertyStorageMode::Dictionary)
+    );
+    assert_eq!(
+        entry.payload(),
+        NamedPropertyValue::data(Value::from_smi(6))
+    );
+    assert!(!entry.attrs().enumerable());
 }
 
 #[test]
@@ -2627,6 +2879,19 @@ fn leaf_shape_free_removes_canonical_transition_entry() {
         .unwrap();
 
     let freed = runtime.free_shape(&mut mutator, shape).unwrap();
+    assert_eq!(
+        runtime
+            .shape_metadata(root)
+            .unwrap()
+            .transitions
+            .inline_len(),
+        0
+    );
+    assert!(!runtime
+        .shape_metadata(root)
+        .unwrap()
+        .transitions
+        .contains_key(&transition));
     let recreated = runtime
         .transition_shape(&mut mutator, root, transition, AllocationLifetime::Default)
         .unwrap();

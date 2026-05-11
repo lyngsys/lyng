@@ -42,7 +42,7 @@ impl Vm {
                 caller_frame,
                 result_register,
                 Value::from_object_ref(generator),
-            )?;
+            );
             return Ok(());
         }
         if self
@@ -55,7 +55,7 @@ impl Vm {
                 caller_frame,
                 result_register,
                 Value::from_object_ref(promise),
-            )?;
+            );
             return Ok(());
         }
         let construct_this = construct_call

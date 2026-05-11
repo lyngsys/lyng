@@ -267,7 +267,7 @@ fn evaluate_script_promise_reaction_rebinding_is_visible_to_existing_closure() {
     let text = result
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("event trace should be a string");
 
     assert_eq!(text, "observe:0,then:1,observe:1");
@@ -332,7 +332,7 @@ fn checkpoint_harness_callback_observes_rebound_lexical_from_promise_job() {
     let text = result
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("event trace should be a string");
 
     assert_eq!(text, "observe:0,then:1,observe:1");
@@ -370,7 +370,7 @@ fn evaluate_script_top_level_closures_share_rebound_lexical_binding() {
     let text = result
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("event trace should be a string");
     assert_eq!(text, "observe:0,update:1,observe:1");
 }
@@ -407,7 +407,7 @@ fn evaluate_script_top_level_arrow_and_function_share_rebound_lexical_binding() 
     let text = result
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("event trace should be a string");
     assert_eq!(text, "observe:0,update:1,observe:1");
 }
@@ -456,7 +456,7 @@ fn evaluate_script_named_function_expression_closure_observes_rebound_lexical_bi
     let text = result
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("event trace should be a string");
     assert_eq!(text, "observe:0,then:1,observe:1");
 }
@@ -596,7 +596,7 @@ fn evaluate_script_array_from_async_sync_iterator_observes_mutation_after_first_
         .as_string_ref()
         .expect("Array.fromAsync mutation result should be a string");
     assert_eq!(
-        decode_string(agent.heap().view().string_view(text).unwrap()),
+        decode_string(&agent.heap().view().string_view(text).unwrap()),
         "1,2,3,4"
     );
 }
@@ -641,7 +641,7 @@ fn evaluate_script_array_from_async_awaits_async_iterator_values_before_mapping(
         .as_string_ref()
         .expect("Array.fromAsync async iterator result should be a string");
     assert_eq!(
-        decode_string(agent.heap().view().string_view(text).unwrap()),
+        decode_string(&agent.heap().view().string_view(text).unwrap()),
         "0,2,8,18"
     );
 }
@@ -716,7 +716,7 @@ fn evaluate_script_array_from_async_preserves_custom_constructor_operation_order
         .as_string_ref()
         .expect("operation order should be returned as a string");
     assert_eq!(
-        decode_string(agent.heap().view().string_view(text).unwrap()),
+        decode_string(&agent.heap().view().string_view(text).unwrap()),
         "construct MyArray|defineProperty A[0]|defineProperty A[1]|set A[length]"
     );
 }
@@ -770,7 +770,7 @@ fn evaluate_script_array_from_async_custom_constructor_uses_custom_sync_iterator
         .as_string_ref()
         .expect("custom iterator result should be returned as a string");
     assert_eq!(
-        decode_string(agent.heap().view().string_view(text).unwrap()),
+        decode_string(&agent.heap().view().string_view(text).unwrap()),
         "10,20"
     );
 }
@@ -826,7 +826,7 @@ fn evaluate_script_resolves_promise_all_settled_records() {
     let second_reason = ordinary_get(agent, second, PropertyKey::from_atom(reason_atom)).unwrap();
     assert_eq!(
         decode_string(
-            agent
+            &agent
                 .heap()
                 .view()
                 .string_view(first_status.as_string_ref().unwrap())
@@ -837,7 +837,7 @@ fn evaluate_script_resolves_promise_all_settled_records() {
     assert_eq!(first_value, Value::from_smi(1));
     assert_eq!(
         decode_string(
-            agent
+            &agent
                 .heap()
                 .view()
                 .string_view(second_status.as_string_ref().unwrap())
@@ -1350,7 +1350,7 @@ fn evaluate_script_promise_any_iterator_step_errors_reject_the_result_promise() 
     let message = ordinary_get(agent, error, PropertyKey::from_atom(message_atom)).unwrap();
     assert_eq!(
         decode_string(
-            agent
+            &agent
                 .heap()
                 .view()
                 .string_view(message.as_string_ref().unwrap())

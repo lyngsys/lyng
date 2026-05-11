@@ -740,7 +740,12 @@ impl<T: TraceHeapEdges> TraceHeapEdges for Option<T> {
 }
 
 impl TraceHeapEdges for PrimitiveStringRecord {
-    fn trace_heap_edges(&self, _tracer: &mut PrimitiveTracer<'_>) {}
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        if let Some((left, right)) = self.cons_children() {
+            tracer.mark_string(left);
+            tracer.mark_string(right);
+        }
+    }
 }
 
 impl TraceHeapEdges for PrimitiveSymbolRecord {

@@ -96,7 +96,7 @@ fn dynamic_import_evaluates_options_after_the_specifier_expression() {
         .heap()
         .view()
         .string_view(result.as_string_ref().expect("result should be a string"))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("log string should be allocated");
     assert_eq!(text, "first,second");
 }
@@ -629,7 +629,7 @@ fn top_level_await_dynamic_imports_settle_leaf_before_parent() {
         .result()
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("script promise should fulfill with joined logs");
     assert_eq!(text, "B,A");
 }
@@ -718,7 +718,7 @@ fn top_level_await_dynamic_import_rejections_settle_leaf_before_parent() {
         .result()
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("script promise should fulfill with joined logs");
     assert_eq!(text, "B,A");
 }
@@ -766,7 +766,7 @@ fn dynamic_import_rejects_module_parse_errors_with_syntax_error() {
         .expect("error name should be readable")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("error name should be a string");
     assert_eq!(name, "SyntaxError");
 }
@@ -814,7 +814,7 @@ fn dynamic_import_source_phase_rejects_source_text_modules_with_syntax_error() {
         .expect("error name should be readable")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("error name should be a string");
     assert_eq!(name, "SyntaxError");
 }
@@ -870,12 +870,12 @@ fn dynamic_import_defer_sync_module_evaluates_on_namespace_access() {
     let before = global_value(agent, &realm, "beforeDeferredAccess")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("beforeDeferredAccess should be a string");
     let after = global_value(agent, &realm, "afterDeferredAccess")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("afterDeferredAccess should be a string");
     assert_eq!(before, "");
     assert_eq!(after, "dep,sync");
@@ -952,12 +952,12 @@ fn static_import_defer_sync_module_evaluates_on_namespace_access() {
     let before = global_value(agent, &realm, "beforeDeferredAccess")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("beforeDeferredAccess should be a string");
     let after = global_value(agent, &realm, "afterDeferredAccess")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("afterDeferredAccess should be a string");
     assert_eq!(before, "");
     assert_eq!(after, "dep,sync");
@@ -1236,7 +1236,7 @@ fn static_source_phase_import_rejects_source_text_modules_with_syntax_error() {
         .expect("error name should be readable")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("error name should be a string");
     assert_eq!(name, "SyntaxError");
 }
@@ -1291,7 +1291,7 @@ fn dynamic_import_attributes_reject_non_object_and_non_string_values() {
             .expect("error name should be readable")
             .as_string_ref()
             .and_then(|string| agent.heap().view().string_view(string))
-            .map(decode_string)
+            .map(|view| decode_string(&view))
             .expect("error name should be a string");
         assert_eq!(name, "TypeError");
     }
@@ -1367,7 +1367,7 @@ fn dynamic_import_rejects_ambiguous_module_exports_with_syntax_error() {
         .expect("error name should be readable")
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("error name should be a string");
     assert_eq!(name, "SyntaxError");
 }

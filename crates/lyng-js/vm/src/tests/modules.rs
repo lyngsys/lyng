@@ -104,7 +104,7 @@ fn import_meta_returns_one_cached_object_and_exposes_the_module_key() {
             url.as_string_ref()
                 .expect("default export should be a string"),
         )
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("import.meta.url string should be allocated");
 
     assert_eq!(
@@ -203,7 +203,7 @@ fn linked_module_graph_initializes_anonymous_default_function_expression_exports
                 .as_string_ref()
                 .expect("name export should be a string"),
         )
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("name export string should be allocated");
 
     assert_eq!(
@@ -260,7 +260,7 @@ fn linked_module_graph_initializes_anonymous_default_class_expression_exports() 
                 .as_string_ref()
                 .expect("name export should be a string"),
         )
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("name export string should be allocated");
 
     assert_eq!(
@@ -317,7 +317,7 @@ fn linked_module_graph_initializes_named_default_class_exports() {
                 .as_string_ref()
                 .expect("name export should be a string"),
         )
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("name export string should be allocated");
 
     assert_eq!(
@@ -371,7 +371,7 @@ fn linked_module_graph_names_anonymous_default_class_before_static_field_initial
         .heap()
         .view()
         .string_view(observed_value)
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("observed export string should be allocated");
 
     assert_eq!(observed_value, "default");
@@ -564,7 +564,7 @@ fn host_module_loader_recurses_through_attributes_and_import_meta() {
                 .as_string_ref()
                 .expect("default export should be a string"),
         )
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("default export string should be allocated");
 
     assert_eq!(loaded.display_name(), "entry.mjs");
@@ -1493,7 +1493,7 @@ fn linked_module_graph_supports_named_default_function_self_imports() {
                 .as_string_ref()
                 .expect("name export should be a string"),
         )
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("name export string should be allocated");
 
     assert_eq!(
@@ -1857,7 +1857,7 @@ fn linked_module_graph_imports_self_importing_namespace_module_through_mixed_sta
                 .as_string_ref()
                 .expect("dep_status should be a string"),
         )
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("dep_status string should be allocated");
 
     let main_record = agent
@@ -1883,7 +1883,7 @@ fn linked_module_graph_imports_self_importing_namespace_module_through_mixed_sta
                 .as_string_ref()
                 .expect("main_status should be a string"),
         )
-        .map(decode_string)
+        .map(|view| decode_string(&view))
         .expect("main_status string should be allocated");
 
     assert_eq!(dep_status, "object");

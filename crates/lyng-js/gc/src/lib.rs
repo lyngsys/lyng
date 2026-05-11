@@ -10,7 +10,10 @@
     reason = "GC substrate APIs expose compact handles and reporting accessors where names must stay domain-specific"
 )]
 
+use std::{cell::OnceCell, fmt};
+
 use lyng_js_common::{AtomCollection, AtomId, AtomSweepStats, AtomTable};
+use lyng_js_types::StringRef;
 
 mod arena;
 mod collection;
@@ -54,6 +57,14 @@ pub enum StringEncoding {
     Utf16,
 }
 
+/// Storage backing an immutable runtime string.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PrimitiveStringStorage {
+    Empty,
+    Flat(SideAllocationRef),
+    Cons { left: StringRef, right: StringRef },
+}
+
 /// Shared tracing hook for primitive records or metadata that retain `AtomId` edges.
 pub trait TraceAtomEdges {
     fn trace_atom_edges(&self, sweep: &mut AtomGcSweep<'_>);
@@ -66,14 +77,25 @@ pub struct PrimitiveStringRecord {
     code_unit_len: u32,
     cached_hash: Option<u32>,
     cached_atom: Option<AtomId>,
-    payload: Option<SideAllocationRef>,
+    storage: PrimitiveStringStorage,
 }
 
-/// Read-only borrowed view over an immutable flat runtime string record.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Read-only borrowed view over an immutable runtime string record.
 pub struct PrimitiveStringView<'a> {
     record: PrimitiveStringRecord,
-    payload: &'a [u8],
+    payload: Option<&'a [u8]>,
+    heap: Option<&'a PrimitiveHeap>,
+    flattened_payload: OnceCell<Option<Vec<u8>>>,
+}
+
+impl fmt::Debug for PrimitiveStringView<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PrimitiveStringView")
+            .field("record", &self.record)
+            .field("has_flat_payload", &self.payload.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 /// Minimal stand-in for other `AtomId`-bearing primitive metadata.
@@ -107,20 +129,26 @@ impl PrimitiveStringRecord {
         code_unit_len: u32,
         cached_hash: Option<u32>,
         cached_atom: Option<AtomId>,
-        payload: Option<SideAllocationRef>,
+        storage: PrimitiveStringStorage,
     ) -> Self {
         Self {
             encoding,
             code_unit_len,
             cached_hash,
             cached_atom,
-            payload,
+            storage,
         }
     }
 
     #[inline]
     pub const fn new(encoding: StringEncoding, code_unit_len: u32) -> Self {
-        Self::from_parts(encoding, code_unit_len, None, None, None)
+        Self::from_parts(
+            encoding,
+            code_unit_len,
+            None,
+            None,
+            PrimitiveStringStorage::Empty,
+        )
     }
 
     #[inline]
@@ -129,7 +157,13 @@ impl PrimitiveStringRecord {
         code_unit_len: u32,
         cached_atom: AtomId,
     ) -> Self {
-        Self::from_parts(encoding, code_unit_len, None, Some(cached_atom), None)
+        Self::from_parts(
+            encoding,
+            code_unit_len,
+            None,
+            Some(cached_atom),
+            PrimitiveStringStorage::Empty,
+        )
     }
 
     #[inline]
@@ -139,7 +173,29 @@ impl PrimitiveStringRecord {
         cached_atom: Option<AtomId>,
         payload: SideAllocationRef,
     ) -> Self {
-        Self::from_parts(encoding, code_unit_len, None, cached_atom, Some(payload))
+        Self::from_parts(
+            encoding,
+            code_unit_len,
+            None,
+            cached_atom,
+            PrimitiveStringStorage::Flat(payload),
+        )
+    }
+
+    #[inline]
+    pub const fn with_cons(
+        encoding: StringEncoding,
+        code_unit_len: u32,
+        left: StringRef,
+        right: StringRef,
+    ) -> Self {
+        Self::from_parts(
+            encoding,
+            code_unit_len,
+            None,
+            None,
+            PrimitiveStringStorage::Cons { left, right },
+        )
     }
 
     #[inline]
@@ -164,7 +220,31 @@ impl PrimitiveStringRecord {
 
     #[inline]
     pub const fn payload(self) -> Option<SideAllocationRef> {
-        self.payload
+        match self.storage {
+            PrimitiveStringStorage::Flat(payload) => Some(payload),
+            PrimitiveStringStorage::Empty | PrimitiveStringStorage::Cons { .. } => None,
+        }
+    }
+
+    #[inline]
+    pub const fn is_flat(self) -> bool {
+        matches!(
+            self.storage,
+            PrimitiveStringStorage::Empty | PrimitiveStringStorage::Flat(_)
+        )
+    }
+
+    #[inline]
+    pub const fn is_cons(self) -> bool {
+        matches!(self.storage, PrimitiveStringStorage::Cons { .. })
+    }
+
+    #[inline]
+    pub const fn cons_children(self) -> Option<(StringRef, StringRef)> {
+        match self.storage {
+            PrimitiveStringStorage::Cons { left, right } => Some((left, right)),
+            PrimitiveStringStorage::Empty | PrimitiveStringStorage::Flat(_) => None,
+        }
     }
 }
 
@@ -176,72 +256,123 @@ impl<'a> PrimitiveStringView<'a> {
             "string view payload length must match record encoding and code-unit length"
         );
 
-        Self { record, payload }
+        Self {
+            record,
+            payload: Some(payload),
+            heap: None,
+            flattened_payload: OnceCell::new(),
+        }
+    }
+
+    pub(crate) fn with_heap(
+        record: PrimitiveStringRecord,
+        payload: Option<&'a [u8]>,
+        heap: &'a PrimitiveHeap,
+    ) -> Self {
+        if let Some(payload) = payload {
+            debug_assert_eq!(
+                payload.len(),
+                expected_string_payload_len(record.encoding(), record.code_unit_len()),
+                "string view payload length must match record encoding and code-unit length"
+            );
+        } else {
+            debug_assert!(
+                record.is_cons(),
+                "only cons string views may defer payload materialization"
+            );
+        }
+
+        Self {
+            record,
+            payload,
+            heap: Some(heap),
+            flattened_payload: OnceCell::new(),
+        }
     }
 
     #[inline]
-    pub const fn record(self) -> PrimitiveStringRecord {
+    pub const fn record(&self) -> PrimitiveStringRecord {
         self.record
     }
 
     #[inline]
-    pub const fn encoding(self) -> StringEncoding {
+    pub const fn encoding(&self) -> StringEncoding {
         self.record.encoding()
     }
 
     #[inline]
-    pub const fn code_unit_len(self) -> u32 {
+    pub const fn code_unit_len(&self) -> u32 {
         self.record.code_unit_len()
     }
 
     #[inline]
-    pub const fn cached_hash(self) -> Option<u32> {
+    pub const fn cached_hash(&self) -> Option<u32> {
         self.record.cached_hash()
     }
 
     #[inline]
-    pub const fn cached_atom(self) -> Option<AtomId> {
+    pub const fn cached_atom(&self) -> Option<AtomId> {
         self.record.cached_atom()
     }
 
     #[inline]
-    pub const fn payload_bytes(self) -> &'a [u8] {
-        self.payload
+    pub fn payload_bytes(&self) -> Option<&[u8]> {
+        self.materialized_payload()
     }
 
     #[inline]
-    pub const fn latin1_bytes(self) -> Option<&'a [u8]> {
+    pub const fn flat_latin1_bytes(&self) -> Option<&'a [u8]> {
         match self.encoding() {
-            StringEncoding::Latin1 => Some(self.payload),
+            StringEncoding::Latin1 => self.payload,
             StringEncoding::Utf16 => None,
         }
     }
 
     #[inline]
-    pub const fn utf16_bytes(self) -> Option<&'a [u8]> {
+    pub fn latin1_bytes(&self) -> Option<&[u8]> {
         match self.encoding() {
-            StringEncoding::Latin1 => None,
-            StringEncoding::Utf16 => Some(self.payload),
-        }
-    }
-
-    pub fn code_unit_at(self, index: usize) -> Option<u16> {
-        if index >= self.code_unit_len() as usize {
-            return None;
-        }
-
-        match self.encoding() {
-            StringEncoding::Latin1 => self.payload.get(index).copied().map(u16::from),
-            StringEncoding::Utf16 => utf16_code_unit_at(self.payload, index),
+            StringEncoding::Latin1 => self.materialized_payload(),
+            StringEncoding::Utf16 => None,
         }
     }
 
     #[inline]
-    pub fn compute_hash(self) -> u32 {
+    pub fn utf16_bytes(&self) -> Option<&[u8]> {
+        match self.encoding() {
+            StringEncoding::Latin1 => None,
+            StringEncoding::Utf16 => self.materialized_payload(),
+        }
+    }
+
+    pub fn code_unit_at(&self, index: usize) -> Option<u16> {
+        if index >= self.code_unit_len() as usize {
+            return None;
+        }
+
+        if let Some(payload) = self.payload {
+            return match self.encoding() {
+                StringEncoding::Latin1 => payload.get(index).copied().map(u16::from),
+                StringEncoding::Utf16 => utf16_code_unit_at(payload, index),
+            };
+        }
+
+        let heap = self.heap?;
+        let (left, right) = self.record.cons_children()?;
+        let left_record = heap.string(left)?;
+        let left_len = left_record.code_unit_len() as usize;
+        if index < left_len {
+            heap.string_view(left)?.code_unit_at(index)
+        } else {
+            heap.string_view(right)?.code_unit_at(index - left_len)
+        }
+    }
+
+    #[inline]
+    pub fn compute_hash(&self) -> u32 {
         deterministic_string_hash(self)
     }
 
-    pub fn equals(self, other: PrimitiveStringView<'_>) -> bool {
+    pub fn equals(&self, other: &PrimitiveStringView<'_>) -> bool {
         if self.code_unit_len() != other.code_unit_len() {
             return false;
         }
@@ -251,8 +382,11 @@ impl<'a> PrimitiveStringView<'a> {
             _ => {}
         }
 
-        if self.encoding() == other.encoding() {
-            return self.payload == other.payload;
+        if self.encoding() == other.encoding()
+            && let (Some(left), Some(right)) =
+                (self.materialized_payload(), other.materialized_payload())
+        {
+            return left == right;
         }
 
         for index in 0..self.code_unit_len() as usize {
@@ -262,6 +396,19 @@ impl<'a> PrimitiveStringView<'a> {
         }
 
         true
+    }
+
+    fn materialized_payload(&self) -> Option<&[u8]> {
+        if let Some(payload) = self.payload {
+            return Some(payload);
+        }
+
+        self.flattened_payload
+            .get_or_init(|| {
+                let heap = self.heap?;
+                heap.flatten_string_payload(self.record)
+            })
+            .as_deref()
     }
 }
 
@@ -310,7 +457,7 @@ fn utf16_code_unit_at(payload: &[u8], index: usize) -> Option<u16> {
     Some(u16::from_le_bytes([lo, hi]))
 }
 
-fn deterministic_string_hash(view: PrimitiveStringView<'_>) -> u32 {
+fn deterministic_string_hash(view: &PrimitiveStringView<'_>) -> u32 {
     const OFFSET_BASIS: u32 = 2_166_136_261;
     const FNV_PRIME: u32 = 16_777_619;
 
@@ -436,7 +583,7 @@ mod tests {
         assert_eq!(utf16.code_unit_at(1), Some(0x62));
         assert_eq!(utf16.code_unit_at(3), None);
         assert_eq!(latin1.compute_hash(), utf16.compute_hash());
-        assert!(latin1.equals(utf16));
-        assert!(!latin1.equals(different));
+        assert!(latin1.equals(&utf16));
+        assert!(!latin1.equals(&different));
     }
 }

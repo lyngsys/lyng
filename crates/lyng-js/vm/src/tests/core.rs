@@ -111,6 +111,156 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
 }
 
 #[test]
+fn vm_function_table_dispatch_mode_executes_installed_bytecode() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut builder = BytecodeBuilder::new(
+        BytecodeFunctionId::from_raw(12).unwrap(),
+        BytecodeFunctionKind::Script,
+    );
+    builder
+        .alloc_registers(3)
+        .expect("test bytecode registers should allocate");
+    builder
+        .emit_abx(Opcode::LoadOne, 0, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::AddSmi, 1, 0, 41)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::Move, 2, 1, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 2)
+        .expect("test bytecode should build");
+    let function = builder.finish().expect("test bytecode should build");
+    let unit = CompiledScriptUnit::new(SourceId::new(12), function.id(), vec![function]);
+
+    let mut vm = Vm::new();
+    vm.set_dispatch_mode(VmDispatchMode::FunctionTable);
+    assert_eq!(vm.dispatch_mode(), VmDispatchMode::FunctionTable);
+
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(42));
+    assert!(vm.frames().is_empty());
+}
+
+#[test]
+fn vm_executes_specialized_smi_opcodes_and_fallback_paths() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut builder = BytecodeBuilder::new(
+        BytecodeFunctionId::from_raw(11).unwrap(),
+        BytecodeFunctionKind::Script,
+    );
+    builder
+        .alloc_registers(13)
+        .expect("test bytecode registers should allocate");
+    builder
+        .emit_abx(Opcode::LoadOne, 0, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::AddSmi, 1, 0, 13)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::SubSmi, 2, 1, 5)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::MulSmi, 3, 2, 7)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::DivSmi, 4, 3, 2)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::ModSmi, 4, 4, 5)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::BitAndSmi, 4, 4, 3)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::EqualZero, 4, 3, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_abx(Opcode::LoadZero, 5, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::EqualZero, 6, 5, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::AddSmi, 7, 6, 1)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::SubSmi, 8, 6, 1)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::MulSmi, 9, 6, 7)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::Add, 10, 3, 7)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::Add, 11, 10, 8)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::Add, 12, 11, 9)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 12)
+        .expect("test bytecode should build");
+    let function = builder.finish().expect("test bytecode should build");
+    let unit = CompiledScriptUnit::new(SourceId::new(22), function.id(), vec![function]);
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(72));
+}
+
+#[test]
+fn vm_rejects_register_operands_outside_installed_frame() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let function = BytecodeFunction::new(
+        BytecodeFunctionId::from_raw(1).unwrap(),
+        None,
+        ArgumentsMode::None,
+    )
+    .with_kind(BytecodeFunctionKind::Script)
+    .with_register_counts(1, 0)
+    .with_instructions(vec![
+        Instruction::abc(Opcode::Move, 1, 0, 0),
+        Instruction::ax(Opcode::ReturnUndefined, 0),
+    ]);
+    let unit = CompiledScriptUnit::new(SourceId::new(19), function.id(), vec![function]);
+
+    let mut vm = Vm::new();
+    let error = vm
+        .install_script(agent, realm.id(), &unit)
+        .expect_err("invalid register operands should be rejected at install");
+
+    assert!(matches!(
+        error,
+        VmError::RegisterOutOfBounds {
+            code,
+            register: 1
+        } if code == CodeRef::from_raw(1).unwrap()
+    ));
+}
+
+#[test]
 fn vm_installs_callable_index_accessors_from_object_literals() {
     let unit = compile_test_unit(
         41,
@@ -560,7 +710,34 @@ fn typeof_name_resolution_matches_runtime_atom_text_when_ids_differ() {
         .string_view(string)
         .expect("string should exist in the heap");
 
-    assert_eq!(decode_string(view), "number");
+    assert_eq!(decode_string(&view), "number");
+}
+
+#[test]
+fn concatenated_strings_feed_char_access_and_slice_consumers() {
+    let unit = compile_test_unit(
+        2_050,
+        r#"
+        let value = "ab" + "cd";
+        String.fromCharCode(value.charCodeAt(2)) + value.slice(1, 3);
+        "#,
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let string = result
+        .as_string_ref()
+        .expect("consumer result should be a string");
+    let view = agent
+        .heap()
+        .view()
+        .string_view(string)
+        .expect("string should exist in the heap");
+
+    assert_eq!(decode_string(&view), "cbc");
 }
 
 #[test]
@@ -954,7 +1131,7 @@ fn symbol_global_dispatches_through_the_shared_builtins_bridge() {
         .expect("symbol description should be stored");
 
     assert_eq!(
-        decode_string(agent.heap().view().string_view(description).unwrap()),
+        decode_string(&agent.heap().view().string_view(description).unwrap()),
         "dispatch-bridge"
     );
 }

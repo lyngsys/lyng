@@ -12,6 +12,11 @@ use lyng_js_objects::NativeFunctionRegistry;
 use lyng_js_ops::{errors, object, pure, read};
 use lyng_js_types::{AbruptCompletion, Value};
 
+#[inline]
+const fn decode_smi_immediate(raw: u16) -> i16 {
+    i16::from_le_bytes(raw.to_le_bytes())
+}
+
 impl Vm {
     #[expect(
         clippy::too_many_arguments,
@@ -27,7 +32,12 @@ impl Vm {
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
-        if let Some(value) = self.try_primitive_number_binary_opcode(frame, opcode, left, right)? {
+        if let Some(value) =
+            self.execute_smi_immediate_opcode(agent, host, registry, frame, opcode, left, right)
+        {
+            return value;
+        }
+        if let Some(value) = self.try_primitive_number_binary_opcode(frame, opcode, left, right) {
             return Ok(value);
         }
         match opcode {
@@ -46,15 +56,15 @@ impl Vm {
                 self.unsigned_shift_right(agent, host, registry, frame, left, right)
             }
             Opcode::Equal => {
-                let left = self.read_register(frame, left)?;
-                let right = self.read_register(frame, right)?;
+                let left = self.read_register(frame, left);
+                let right = self.read_register(frame, right);
                 Ok(Value::from_bool(self.loosely_equal(
                     agent, host, registry, frame, left, right,
                 )?))
             }
             Opcode::StrictEqual => {
-                let left = self.read_register(frame, left)?;
-                let right = self.read_register(frame, right)?;
+                let left = self.read_register(frame, left);
+                let right = self.read_register(frame, right);
                 if let Some(result) = pure::is_strictly_equal(left, right) {
                     return Ok(Value::from_bool(result));
                 }
@@ -87,6 +97,50 @@ impl Vm {
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    fn execute_smi_immediate_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        opcode: Opcode,
+        left: u16,
+        immediate: u16,
+    ) -> Option<VmResult<Value>> {
+        let immediate = decode_smi_immediate(immediate);
+        match opcode {
+            Opcode::AddSmi => {
+                Some(self.add_value_and_smi(agent, host, registry, frame, left, immediate))
+            }
+            Opcode::SubSmi => {
+                Some(self.sub_value_and_smi(agent, host, registry, frame, left, immediate))
+            }
+            Opcode::MulSmi => {
+                Some(self.mul_value_and_smi(agent, host, registry, frame, left, immediate))
+            }
+            Opcode::DivSmi => {
+                Some(self.div_value_and_smi(agent, host, registry, frame, left, immediate))
+            }
+            Opcode::ModSmi => {
+                Some(self.rem_value_and_smi(agent, host, registry, frame, left, immediate))
+            }
+            Opcode::BitAndSmi => {
+                Some(self.bitwise_and_value_and_smi(agent, host, registry, frame, left, immediate))
+            }
+            Opcode::EqualZero => {
+                let value = self.read_register(frame, left);
+                Some(Ok(Value::from_bool(
+                    value.as_f64().is_some_and(|number| number == 0.0),
+                )))
+            }
+            _ => None,
+        }
+    }
+
     #[allow(
         clippy::float_cmp,
         reason = "ECMAScript Number equality and exponentiation edge cases require exact IEEE-754 comparisons"
@@ -97,9 +151,9 @@ impl Vm {
         opcode: Opcode,
         left: u16,
         right: u16,
-    ) -> VmResult<Option<Value>> {
-        let left = self.read_register(frame, left)?;
-        let right = self.read_register(frame, right)?;
+    ) -> Option<Value> {
+        let left = self.read_register(frame, left);
+        let right = self.read_register(frame, right);
         if let (Some(left), Some(right)) = (left.as_smi(), right.as_smi()) {
             let value = match opcode {
                 Opcode::Add => encode_number(f64::from(left) + f64::from(right)),
@@ -128,12 +182,12 @@ impl Vm {
                 Opcode::LessEqual => Value::from_bool(left <= right),
                 Opcode::GreaterThan => Value::from_bool(left > right),
                 Opcode::GreaterEqual => Value::from_bool(left >= right),
-                _ => return Ok(None),
+                _ => return None,
             };
-            return Ok(Some(value));
+            return Some(value);
         }
         if !left.is_number() || !right.is_number() {
-            return Ok(None);
+            return None;
         }
         let left = left
             .as_f64()
@@ -189,9 +243,9 @@ impl Vm {
             Opcode::GreaterEqual => {
                 Value::from_bool(left.partial_cmp(&right).is_some_and(|o| !o.is_lt()))
             }
-            _ => return Ok(None),
+            _ => return None,
         };
-        Ok(Some(value))
+        Some(value)
     }
 
     // ECMAScript IsLooselyEqual only converts an Object operand via ToPrimitive
@@ -259,7 +313,7 @@ impl Vm {
             host,
             registry,
             frame,
-            self.read_register(frame, register)?,
+            self.read_register(frame, register),
             ToPrimitiveHint::Number,
         )?;
         Self::to_numeric_primitive(agent, primitive)
@@ -303,7 +357,7 @@ impl Vm {
             host,
             registry,
             frame,
-            self.read_register(frame, left_register)?,
+            self.read_register(frame, left_register),
             ToPrimitiveHint::Number,
         )?;
         let right = self.to_primitive(
@@ -311,7 +365,7 @@ impl Vm {
             host,
             registry,
             frame,
-            self.read_register(frame, right_register)?,
+            self.read_register(frame, right_register),
             ToPrimitiveHint::Number,
         )?;
         if left.is_string() && right.is_string() {
@@ -367,6 +421,85 @@ impl Vm {
         let left = number_to_int32(numeric_value_to_f64(left));
         let right = number_to_int32(numeric_value_to_f64(right));
         Ok(Value::from_smi(left & right))
+    }
+
+    pub(super) fn bitwise_and_value_and_smi(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        left_register: u16,
+        immediate: i16,
+    ) -> VmResult<Value> {
+        let left = self.read_register(frame, left_register);
+        if let Some(left) = left.as_smi() {
+            return Ok(Value::from_smi(left & i32::from(immediate)));
+        }
+        if left.is_number() {
+            let left = number_to_int32(numeric_value_to_f64(left));
+            return Ok(Value::from_smi(left & i32::from(immediate)));
+        }
+        let left = self.numeric_register_value(agent, host, registry, frame, left_register)?;
+        if left.is_bigint() {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        let left = number_to_int32(numeric_value_to_f64(left));
+        Ok(Value::from_smi(left & i32::from(immediate)))
+    }
+
+    pub(super) fn div_value_and_smi(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        left_register: u16,
+        immediate: i16,
+    ) -> VmResult<Value> {
+        let left = self.read_register(frame, left_register);
+        if let Some(left) = left.as_smi() {
+            return Ok(encode_number(f64::from(left) / f64::from(immediate)));
+        }
+        if left.is_number() {
+            return Ok(encode_number(
+                numeric_value_to_f64(left) / f64::from(immediate),
+            ));
+        }
+        let left = self.numeric_register_value(agent, host, registry, frame, left_register)?;
+        if left.is_bigint() {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        Ok(encode_number(
+            numeric_value_to_f64(left) / f64::from(immediate),
+        ))
+    }
+
+    pub(super) fn rem_value_and_smi(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        left_register: u16,
+        immediate: i16,
+    ) -> VmResult<Value> {
+        let left = self.read_register(frame, left_register);
+        if let Some(left) = left.as_smi() {
+            return Ok(encode_number(f64::from(left) % f64::from(immediate)));
+        }
+        if left.is_number() {
+            return Ok(encode_number(
+                numeric_value_to_f64(left) % f64::from(immediate),
+            ));
+        }
+        let left = self.numeric_register_value(agent, host, registry, frame, left_register)?;
+        if left.is_bigint() {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        Ok(encode_number(
+            numeric_value_to_f64(left) % f64::from(immediate),
+        ))
     }
 
     pub(super) fn bitwise_or(
@@ -559,9 +692,7 @@ mod tests {
         let mut vm = Vm::new();
         vm.register_stack = vec![Value::from_f64(1.5), Value::from_f64(2.25)];
 
-        let value = vm
-            .try_primitive_number_binary_opcode(test_frame(), Opcode::Add, 0, 1)
-            .expect("register reads should succeed");
+        let value = vm.try_primitive_number_binary_opcode(test_frame(), Opcode::Add, 0, 1);
 
         assert_eq!(
             value.and_then(Value::as_f64),

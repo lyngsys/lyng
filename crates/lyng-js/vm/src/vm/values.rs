@@ -63,20 +63,62 @@ impl Vm {
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
-        let left = self.to_primitive(
+        self.add_value_operands(
             agent,
             host,
             registry,
             frame,
-            self.read_register(frame, left_register)?,
-            ToPrimitiveHint::Default,
-        )?;
+            self.read_register(frame, left_register),
+            self.read_register(frame, right_register),
+        )
+    }
+
+    pub(super) fn add_value_and_smi(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        left_register: u16,
+        immediate: i16,
+    ) -> VmResult<Value> {
+        let left = self.read_register(frame, left_register);
+        if let Some(left) = left.as_smi() {
+            return Ok(encode_number(f64::from(left) + f64::from(immediate)));
+        }
+        if left.is_number() {
+            let left = left
+                .as_f64()
+                .expect("Number value should expose an f64 payload");
+            return Ok(encode_number(left + f64::from(immediate)));
+        }
+        self.add_value_operands(
+            agent,
+            host,
+            registry,
+            frame,
+            left,
+            Value::from_smi(i32::from(immediate)),
+        )
+    }
+
+    fn add_value_operands(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        left: Value,
+        right: Value,
+    ) -> VmResult<Value> {
+        let left =
+            self.to_primitive(agent, host, registry, frame, left, ToPrimitiveHint::Default)?;
         let right = self.to_primitive(
             agent,
             host,
             registry,
             frame,
-            self.read_register(frame, right_register)?,
+            right,
             ToPrimitiveHint::Default,
         )?;
         if left.is_string() || right.is_string() {
@@ -139,6 +181,33 @@ impl Vm {
         Ok(encode_number(left - right))
     }
 
+    pub(super) fn sub_value_and_smi(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        left_register: u16,
+        immediate: i16,
+    ) -> VmResult<Value> {
+        let left = self.read_register(frame, left_register);
+        if let Some(left) = left.as_smi() {
+            return Ok(encode_number(f64::from(left) - f64::from(immediate)));
+        }
+        if left.is_number() {
+            let left = left
+                .as_f64()
+                .expect("Number value should expose an f64 payload");
+            return Ok(encode_number(left - f64::from(immediate)));
+        }
+        let left = self.numeric_value_operand(agent, host, registry, frame, left)?;
+        if left.is_bigint() {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        let left = to_f64_number_or_type_error(agent, left)?;
+        Ok(encode_number(left - f64::from(immediate)))
+    }
+
     pub(super) fn negate_value(
         &mut self,
         agent: &mut Agent,
@@ -152,7 +221,7 @@ impl Vm {
             host,
             registry,
             frame,
-            self.read_register(frame, register)?,
+            self.read_register(frame, register),
             ToPrimitiveHint::Number,
         )?;
         if value.is_bigint() {
@@ -229,6 +298,33 @@ impl Vm {
         let left = to_f64_number_or_type_error(agent, left)?;
         let right = to_f64_number_or_type_error(agent, right)?;
         Ok(encode_number(left * right))
+    }
+
+    pub(super) fn mul_value_and_smi(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        left_register: u16,
+        immediate: i16,
+    ) -> VmResult<Value> {
+        let left = self.read_register(frame, left_register);
+        if let Some(left) = left.as_smi() {
+            return Ok(encode_number(f64::from(left) * f64::from(immediate)));
+        }
+        if left.is_number() {
+            let left = left
+                .as_f64()
+                .expect("Number value should expose an f64 payload");
+            return Ok(encode_number(left * f64::from(immediate)));
+        }
+        let left = self.numeric_value_operand(agent, host, registry, frame, left)?;
+        if left.is_bigint() {
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+        }
+        let left = to_f64_number_or_type_error(agent, left)?;
+        Ok(encode_number(left * f64::from(immediate)))
     }
 
     pub(super) fn div_values(
@@ -312,14 +408,25 @@ impl Vm {
         frame: FrameRecord,
         register: u16,
     ) -> VmResult<Value> {
-        let primitive = self.to_primitive(
+        self.numeric_value_operand(
             agent,
             host,
             registry,
             frame,
-            self.read_register(frame, register)?,
-            ToPrimitiveHint::Number,
-        )?;
+            self.read_register(frame, register),
+        )
+    }
+
+    fn numeric_value_operand(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        value: Value,
+    ) -> VmResult<Value> {
+        let primitive =
+            self.to_primitive(agent, host, registry, frame, value, ToPrimitiveHint::Number)?;
         read::to_numeric(agent.heap().view(), primitive)
             .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
     }
@@ -353,7 +460,7 @@ impl Vm {
             let Some(view) = heap_view.string_view(string) else {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             };
-            return Ok(decode_string_view(view));
+            return Ok(decode_string_view(&view));
         }
 
         Err(VmError::Abrupt(errors::throw_type_error(agent)))
@@ -368,7 +475,7 @@ impl Vm {
             let Some(view) = heap_view.string_view(string) else {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             };
-            return utf16_code_units(view)
+            return utf16_code_units(&view)
                 .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)));
         }
 
@@ -440,7 +547,7 @@ impl Vm {
     }
 
     pub(super) fn object_register(&self, frame: FrameRecord, register: u16) -> VmResult<ObjectRef> {
-        let value = self.read_register(frame, register)?;
+        let value = self.read_register(frame, register);
         Self::require_object(frame, value)
     }
 
@@ -780,7 +887,7 @@ impl Vm {
                         value,
                     },
                 )?;
-                let array_index = string_view_array_index(view);
+                let array_index = string_view_array_index(&view);
                 let cached_atom = view.cached_atom();
                 let (latin1_bytes, utf16_units) = if array_index.is_none() && cached_atom.is_none()
                 {
@@ -789,7 +896,7 @@ impl Vm {
                     } else {
                         (
                             None,
-                            Some(utf16_code_units(view).ok_or(
+                            Some(utf16_code_units(&view).ok_or(
                                 VmError::UnsupportedPropertyKey {
                                     code,
                                     instruction_offset,
@@ -859,9 +966,10 @@ fn concat_string_refs(agent: &mut Agent, left: StringRef, right: StringRef) -> V
         if right_view.code_unit_len() == 0 {
             return Ok(left);
         }
-        if let (Some(left_bytes), Some(right_bytes)) =
-            (left_view.latin1_bytes(), right_view.latin1_bytes())
-        {
+        if let (Some(left_bytes), Some(right_bytes)) = (
+            left_view.flat_latin1_bytes(),
+            right_view.flat_latin1_bytes(),
+        ) {
             let len = left_bytes.len() + right_bytes.len();
             if (2..=3).contains(&len) {
                 let mut bytes = [0_u8; 3];
@@ -871,7 +979,8 @@ fn concat_string_refs(agent: &mut Agent, left: StringRef, right: StringRef) -> V
             }
             true
         } else {
-            false
+            left_view.encoding() == StringEncoding::Latin1
+                && right_view.encoding() == StringEncoding::Latin1
         }
     };
 
@@ -903,7 +1012,7 @@ fn concat_string_refs(agent: &mut Agent, left: StringRef, right: StringRef) -> V
         let Some(right_view) = heap_view.string_view(right) else {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         };
-        concat_string_views(left_view, right_view)
+        concat_string_views(&left_view, &right_view)
     };
 
     if payload.encoding == StringEncoding::Latin1 && payload.code_unit_len == 1 {
@@ -920,8 +1029,8 @@ fn concat_string_refs(agent: &mut Agent, left: StringRef, right: StringRef) -> V
 }
 
 fn concat_string_views(
-    left: PrimitiveStringView<'_>,
-    right: PrimitiveStringView<'_>,
+    left: &PrimitiveStringView<'_>,
+    right: &PrimitiveStringView<'_>,
 ) -> ConcatStringPayload {
     if let (Some(left_bytes), Some(right_bytes)) = (left.latin1_bytes(), right.latin1_bytes()) {
         let len = left_bytes.len() + right_bytes.len();
@@ -946,7 +1055,7 @@ fn concat_string_views(
     }
 }
 
-fn append_string_view_utf16_bytes(view: PrimitiveStringView<'_>, output: &mut Vec<u8>) {
+fn append_string_view_utf16_bytes(view: &PrimitiveStringView<'_>, output: &mut Vec<u8>) {
     if let Some(bytes) = view.utf16_bytes() {
         output.extend_from_slice(bytes);
         return;
@@ -1111,7 +1220,7 @@ const fn immediate_constant_value(constant: ConstantValue) -> Option<Value> {
     }
 }
 
-fn decode_string_view(view: PrimitiveStringView<'_>) -> String {
+fn decode_string_view(view: &PrimitiveStringView<'_>) -> String {
     if let Some(bytes) = view.latin1_bytes() {
         return bytes.iter().map(|byte| char::from(*byte)).collect();
     }
@@ -1215,7 +1324,7 @@ fn number_to_array_index(number: f64) -> Option<u32> {
 }
 
 #[inline]
-fn string_view_array_index(view: PrimitiveStringView<'_>) -> Option<u32> {
+fn string_view_array_index(view: &PrimitiveStringView<'_>) -> Option<u32> {
     let len = view.code_unit_len() as usize;
     if len == 0 {
         return None;
@@ -1257,7 +1366,7 @@ pub(super) fn string_text_array_index(text: &str) -> Option<u32> {
 }
 
 #[inline]
-fn utf16_code_units(view: PrimitiveStringView<'_>) -> Option<Vec<u16>> {
+fn utf16_code_units(view: &PrimitiveStringView<'_>) -> Option<Vec<u16>> {
     if let Some(bytes) = view.utf16_bytes() {
         return Some(
             bytes

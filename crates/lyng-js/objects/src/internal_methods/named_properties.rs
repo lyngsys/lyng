@@ -1,8 +1,29 @@
 use super::*;
 
-const LARGE_SHAPE_DICTIONARY_PROPERTY_LIMIT: u32 = 128;
-
 impl ObjectRuntime {
+    pub fn note_named_property_addition(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+    ) -> bool {
+        let should_transition = {
+            let Some(metadata) = self.object_metadata_mut(id) else {
+                return false;
+            };
+            if metadata.named_properties.is_dictionary() {
+                return true;
+            }
+            metadata.named_property_additions = metadata.named_property_additions.saturating_add(1);
+            metadata.named_property_additions > NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT
+        };
+
+        if should_transition {
+            self.ensure_named_property_dictionary(heap, id)
+        } else {
+            heap.view().object(id).is_some()
+        }
+    }
+
     pub fn init_named_slot(
         &self,
         heap: &mut PrimitiveMutator<'_>,
@@ -54,7 +75,7 @@ impl ObjectRuntime {
                 return true;
             }
             metadata.named_property_churn = metadata.named_property_churn.saturating_add(1);
-            metadata.named_property_churn >= NAMED_PROPERTY_CHURN_DICTIONARY_THRESHOLD
+            metadata.named_property_churn >= NAMED_PROPERTY_STRUCTURAL_CHURN_DICTIONARY_THRESHOLD
         };
 
         if should_transition {
@@ -236,6 +257,15 @@ impl ObjectRuntime {
             .view()
             .object(id)
             .ok_or(InternalMethodError::MissingObject)?;
+        if !self.note_named_property_addition(heap, id) {
+            return Err(InternalMethodError::MissingObject);
+        }
+        if self.named_property_storage_mode(id) == Some(NamedPropertyStorageMode::Dictionary) {
+            if self.redefine_named_property(heap, id, key, payload, attrs) {
+                return Ok(true);
+            }
+            return Err(InternalMethodError::CorruptObjectState);
+        }
         if self.has_reserved_named_slots(heap.view(), record) {
             if self.redefine_named_property(heap, id, key, payload, attrs) {
                 return Ok(true);
@@ -245,10 +275,9 @@ impl ObjectRuntime {
         let current_shape = record
             .shape()
             .ok_or(InternalMethodError::CorruptObjectState)?;
-        if self
-            .shape(heap.view(), current_shape)
-            .is_some_and(|shape| shape.property_count() >= LARGE_SHAPE_DICTIONARY_PROPERTY_LIMIT)
-        {
+        if self.shape(heap.view(), current_shape).is_some_and(|shape| {
+            shape.property_count() >= NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT
+        }) {
             if self.redefine_named_property(heap, id, key, payload, attrs) {
                 return Ok(true);
             }

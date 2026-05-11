@@ -311,6 +311,7 @@ enum RegExpFastPattern {
     NonWhitespace,
     NonWhitespaceRun,
     LiteralCodeUnit(u16),
+    IgnoreCaseLiteral(IgnoreCaseLiteralClass),
     AsciiWord,
     AsciiNonWord,
     UnicodeIgnoreCaseWord,
@@ -523,7 +524,7 @@ fn normalize_legacy_identity_escapes(pattern: &str) -> String {
                         continue;
                     }
                 }
-                normalized.push_str(r"\\c");
+                normalized.push_str(r"\x5Cc");
                 index += 2;
             }
             'x' => {
@@ -1124,8 +1125,14 @@ impl RegExpPayload {
                     !is_js_whitespace_or_line_terminator(unit)
                 }))
             }
-            RegExpFastPattern::LiteralCodeUnit(unit) => {
-                Some(Self::find_fast_literal_code_unit(text, start, unit))
+            RegExpFastPattern::LiteralCodeUnit(unit) => Some(Self::find_fast_literal_code_unit(
+                text,
+                start,
+                unit,
+                self.flags.unicode_aware(),
+            )),
+            RegExpFastPattern::IgnoreCaseLiteral(class) => {
+                Some(self.find_fast_ignore_case_literal(text, start, class))
             }
             RegExpFastPattern::AsciiWord => {
                 Some(self.find_fast_class(text, start, is_ascii_word_code_unit))
@@ -1634,13 +1641,43 @@ impl RegExpPayload {
         text: &[u16],
         start: usize,
         unit: u16,
+        unicode_aware: bool,
     ) -> Option<RegExpMatchRecord> {
-        let index = text.get(start..).and_then(|tail| {
-            tail.iter()
-                .position(|candidate| *candidate == unit)
-                .map(|offset| start + offset)
-        })?;
-        Some(simple_match_record(index..index + 1))
+        let mut index = start;
+        while index < text.len() {
+            let end = index + 1;
+            if text[index] == unit
+                && (!unicode_aware
+                    || (is_unicode_code_point_boundary(text, index)
+                        && is_unicode_code_point_boundary(text, end)))
+            {
+                return Some(simple_match_record(index..end));
+            }
+            index += 1;
+        }
+        None
+    }
+
+    fn find_fast_ignore_case_literal(
+        &self,
+        text: &[u16],
+        start: usize,
+        class: IgnoreCaseLiteralClass,
+    ) -> Option<RegExpMatchRecord> {
+        let unicode_aware = self.flags.unicode_aware();
+        let mut index = start;
+        while index < text.len() {
+            let end = index + fast_match_code_unit_width(text, index, unicode_aware);
+            if class.matches(text[index])
+                && (!unicode_aware
+                    || (is_unicode_code_point_boundary(text, index)
+                        && is_unicode_code_point_boundary(text, end)))
+            {
+                return Some(simple_match_record(index..end));
+            }
+            index += 1;
+        }
+        None
     }
 
     fn find_fast_edge_whitespace_run(text: &[u16], start: usize) -> Option<RegExpMatchRecord> {
@@ -1845,6 +1882,18 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
             _ => {}
         }
     }
+    if flags.ignore_case()
+        && let Some(unit) = decode_standalone_literal_code_unit(pattern, flags)
+    {
+        let class = if flags.unicode_aware() {
+            unicode_ignore_case_literal_class(unit)
+        } else {
+            legacy_ignore_case_literal_class(unit)
+        };
+        if let Some(class) = class {
+            return Some(RegExpFastPattern::IgnoreCaseLiteral(class));
+        }
+    }
     if !flags.multiline() && pattern == r"^\s+|\s+$" {
         return Some(RegExpFastPattern::EdgeWhitespaceRun);
     }
@@ -1889,10 +1938,10 @@ fn detect_fast_ignore_case_captured_literal_pattern(
 }
 
 fn detect_fast_literal_code_unit_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<u16> {
-    let unit = decode_standalone_literal_code_unit(pattern, flags)?;
-    if flags.ignore_case() && is_ascii_alpha_code_unit(unit) {
+    if flags.ignore_case() {
         return None;
     }
+    let unit = decode_standalone_literal_code_unit(pattern, flags)?;
     Some(unit)
 }
 
@@ -1943,6 +1992,7 @@ const fn is_unescaped_syntax_character(ch: char) -> bool {
 const fn is_legacy_literal_identity_escape(ch: char, flags: RegExpObjectFlags) -> bool {
     !flags.unicode_aware()
         && !is_legacy_backend_escape(ch)
+        && ch != 'c'
         && !ch.is_ascii_digit()
         && ascii_code_unit(ch).is_some()
 }

@@ -120,10 +120,10 @@ pub fn string_to_property_key(
     let (mut mutator, atoms) = context.split_mut();
     let (array_index, cached_atom, code_units) = {
         let view = mutator.string_view(string)?;
-        let array_index = canonical_array_index(view);
+        let array_index = canonical_array_index(&view);
         let cached_atom = view.cached_atom();
         let code_units = if array_index.is_none() && cached_atom.is_none() {
-            Some(string_code_units(view)?)
+            Some(string_code_units(&view)?)
         } else {
             None
         };
@@ -156,7 +156,7 @@ pub fn to_property_key(context: &mut PrimitiveContext<'_>, value: Value) -> Opti
     string_to_property_key(context, value.as_string_ref()?)
 }
 
-fn canonical_array_index(view: PrimitiveStringView<'_>) -> Option<u32> {
+fn canonical_array_index(view: &PrimitiveStringView<'_>) -> Option<u32> {
     let len = view.code_unit_len() as usize;
     if len == 0 {
         return None;
@@ -187,7 +187,7 @@ fn ascii_digit_value(code_unit: u16) -> Option<u8> {
     }
 }
 
-fn string_code_units(view: PrimitiveStringView<'_>) -> Option<Vec<u16>> {
+fn string_code_units(view: &PrimitiveStringView<'_>) -> Option<Vec<u16>> {
     if let Some(bytes) = view.latin1_bytes() {
         return Some(bytes.iter().copied().map(u16::from).collect());
     }

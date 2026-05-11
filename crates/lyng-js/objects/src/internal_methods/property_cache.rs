@@ -24,6 +24,12 @@ impl ObjectRuntime {
         if receiver_header.kind() == ObjectKind::Proxy {
             return Ok(None);
         }
+        if matches!(purpose, NamedPropertyCachePurpose::Store)
+            && receiver_header.flags().is_engine_array()
+            && key.as_atom() == Some(WellKnownAtom::length.id())
+        {
+            return Ok(None);
+        }
         let mut dependencies = [None; PROPERTY_CACHE_MAX_DEPENDENCIES];
         let mut dependency_count = 0u8;
         if !Self::push_property_cache_dependency(

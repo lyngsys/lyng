@@ -921,6 +921,63 @@ fn compile_script_assigns_feedback_sites_for_minimum_phase4_kinds() {
 }
 
 #[test]
+fn compile_script_specializes_hot_smi_constants_and_arithmetic() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(902),
+        r"
+            var sink = 0;
+            var one = 1;
+            for (var i = 0; i < 10; i = i + 1) {
+                var value = i * 13 + 7;
+                if ((value & 3) === 0) {
+                    sink = value / 2;
+                } else {
+                    sink = value - 1 + (i % 5) + one;
+                }
+            }
+            sink;
+        ",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let instructions = entry.instructions();
+
+    assert!(instructions
+        .iter()
+        .any(|instruction| matches!(instruction.opcode(), Opcode::LoadZero)));
+    assert!(instructions
+        .iter()
+        .any(|instruction| matches!(instruction.opcode(), Opcode::LoadOne)));
+    assert!(instructions
+        .iter()
+        .any(|instruction| matches!(instruction.opcode(), Opcode::AddSmi)));
+    assert!(instructions
+        .iter()
+        .any(|instruction| matches!(instruction.opcode(), Opcode::SubSmi)));
+    assert!(instructions
+        .iter()
+        .any(|instruction| matches!(instruction.opcode(), Opcode::MulSmi)));
+    assert!(instructions
+        .iter()
+        .any(|instruction| matches!(instruction.opcode(), Opcode::DivSmi)));
+    assert!(instructions
+        .iter()
+        .any(|instruction| matches!(instruction.opcode(), Opcode::ModSmi)));
+    assert!(instructions
+        .iter()
+        .any(|instruction| matches!(instruction.opcode(), Opcode::BitAndSmi)));
+    assert!(instructions
+        .iter()
+        .any(|instruction| matches!(instruction.opcode(), Opcode::EqualZero)));
+}
+
+#[test]
 fn compile_script_assigns_named_load_feedback_to_global_loads() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(

@@ -20,7 +20,7 @@ fn borrowed_strings_equal(
         return Ok(true);
     }
     let right_view = heap.string_view(right).ok_or_else(primitive_type_error)?;
-    Ok(left_view.equals(right_view))
+    Ok(left_view.equals(&right_view))
 }
 
 #[inline]
@@ -298,7 +298,7 @@ pub fn to_number(heap: PrimitiveHeapView<'_>, value: Value) -> Completion<Value>
     }
     if let Some(string) = value.as_string_ref() {
         let view = heap.string_view(string).ok_or_else(primitive_type_error)?;
-        return Ok(encode_number(string_view_to_number(view)));
+        return Ok(encode_number(string_view_to_number(&view)));
     }
     if value.is_symbol() || value.is_bigint() {
         return Err(primitive_type_error());
@@ -363,10 +363,10 @@ pub fn is_loosely_equal(
     }
 
     if left.is_bigint() && right.is_string() {
-        let right_text = lossy_string_from_view(
-            heap.string_view(right.as_string_ref().unwrap())
-                .ok_or_else(primitive_type_error)?,
-        );
+        let right_view = heap
+            .string_view(right.as_string_ref().unwrap())
+            .ok_or_else(primitive_type_error)?;
+        let right_text = lossy_string_from_view(&right_view);
         let Some((sign, limbs)) = parse_string_to_bigint(&right_text) else {
             return Ok(false);
         };

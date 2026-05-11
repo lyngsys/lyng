@@ -245,8 +245,8 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
                 assert_eq!(named.entries().len(), 2);
             }
             5 => {
-                assert_eq!(named.state(), FeedbackInlineCacheState::Megamorphic);
-                assert!(named.entries().is_empty());
+                assert_eq!(named.state(), FeedbackInlineCacheState::Polymorphic);
+                assert_eq!(named.entries().len(), 6);
             }
             _ => {}
         }
@@ -375,11 +375,12 @@ fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
     else {
         panic!("source[index] should expose keyed-property feedback");
     };
-    assert_eq!(dense_keyed.state(), FeedbackInlineCacheState::Megamorphic);
+    assert_eq!(dense_keyed.state(), FeedbackInlineCacheState::Monomorphic);
     assert_eq!(
         dense_keyed.family(),
         Some(FeedbackKeyedPropertyFamily::DenseIndex)
     );
+    assert_eq!(dense_keyed.dense_entries().len(), 1);
     assert!(dense_keyed.entries().is_empty());
 }
 

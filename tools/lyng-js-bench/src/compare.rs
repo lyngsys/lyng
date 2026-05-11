@@ -19,6 +19,8 @@ const ARITHMETIC_NOTE: &str =
     "Integer arithmetic, branches, and loop backedges without builtin calls.";
 const ARRAY_OBJECT_NOTE: &str =
     "Array growth, dense indexed reads, object literals, and named property reads.";
+const POLYMORPHIC_PROPERTY_NOTE: &str =
+    "Single named-property load site cycling through six receiver shapes.";
 const PAIR_INSTANCEOF_NOTE: &str =
     "EarleyBoyer-shaped global constructor calls, pair allocation, car/cdr property traffic, and instanceof checks.";
 const BUILTIN_NOTE: &str =
@@ -384,6 +386,14 @@ fn build_workloads(loop_trip_count: usize) -> Vec<Workload> {
             requires_lyng_shell: false,
         },
         Workload {
+            name: "polymorphic-property-loop",
+            category: "polymorphic-property",
+            file_name: "polymorphic-property-loop.js",
+            source: polymorphic_property_workload(loop_trip_count),
+            metric_kind: MetricKind::WallTime,
+            requires_lyng_shell: false,
+        },
+        Workload {
             name: "pair-instanceof-loop",
             category: "pair-object-instanceof",
             file_name: "pair-instanceof-loop.js",
@@ -404,9 +414,37 @@ fn build_workloads(loop_trip_count: usize) -> Vec<Workload> {
 
 fn build_selected_workloads(options: &Options) -> CompareResult<Vec<Workload>> {
     match options.corpus {
-        Corpus::Synthetic => Ok(build_workloads(options.loop_trip_count)),
+        Corpus::Synthetic => build_synthetic_workloads(options),
         Corpus::V8V7 => v8_v7::build_workloads(options.filter.as_deref(), options.full_suite),
     }
+}
+
+fn build_synthetic_workloads(options: &Options) -> CompareResult<Vec<Workload>> {
+    let workloads = build_workloads(options.loop_trip_count)
+        .into_iter()
+        .filter(|workload| {
+            options
+                .filter
+                .as_deref()
+                .is_none_or(|filter| synthetic_workload_matches(workload, filter))
+        })
+        .collect::<Vec<_>>();
+
+    if workloads.is_empty() {
+        return Err(format!(
+            "no synthetic workloads matched filter `{}`",
+            options.filter.as_deref().unwrap_or("")
+        ));
+    }
+
+    Ok(workloads)
+}
+
+fn synthetic_workload_matches(workload: &Workload, filter: &str) -> bool {
+    let filter = filter.to_ascii_lowercase();
+    workload.name.contains(&filter)
+        || workload.category.contains(&filter)
+        || workload.file_name.contains(&filter)
 }
 
 fn arithmetic_workload(loop_trip_count: usize) -> String {
@@ -445,6 +483,31 @@ for (var j = 0; j < records.length; j = j + 1) {{
 }}
 if (__lyngBenchSink === -1) {{
   throw new Error("unreachable array object sink");
+}}
+}})();
+"#
+    )
+}
+
+fn polymorphic_property_workload(loop_trip_count: usize) -> String {
+    format!(
+        r#"(function() {{
+var __lyngBenchTrips = {loop_trip_count};
+var __lyngBenchSink = 0;
+var __lyngPolymorphicShapes = [
+  {{ value: 1 }},
+  {{ a: 1, value: 2 }},
+  {{ a: 1, b: 1, value: 3 }},
+  {{ a: 1, b: 1, c: 1, value: 4 }},
+  {{ a: 1, b: 1, c: 1, d: 1, value: 5 }},
+  {{ a: 1, b: 1, c: 1, d: 1, e: 1, value: 6 }}
+];
+for (var i = 0; i < __lyngBenchTrips; i = i + 1) {{
+  var record = __lyngPolymorphicShapes[i % __lyngPolymorphicShapes.length];
+  __lyngBenchSink = __lyngBenchSink + record.value;
+}}
+if (__lyngBenchSink === -1) {{
+  throw new Error("unreachable polymorphic property sink");
 }}
 }})();
 "#
@@ -945,6 +1008,7 @@ fn workload_note(workload_name: &str) -> &'static str {
     match workload_name {
         "arithmetic-loop" => ARITHMETIC_NOTE,
         "array-object-loop" => ARRAY_OBJECT_NOTE,
+        "polymorphic-property-loop" => POLYMORPHIC_PROPERTY_NOTE,
         "pair-instanceof-loop" => PAIR_INSTANCEOF_NOTE,
         "builtin-string-regexp-loop" => BUILTIN_NOTE,
         _ => "External engine comparison workload.",
@@ -1551,6 +1615,7 @@ mod tests {
             [
                 "arithmetic-control-flow",
                 "array-object",
+                "polymorphic-property",
                 "pair-object-instanceof",
                 "builtin-heavy"
             ]
@@ -1563,6 +1628,21 @@ mod tests {
                 .extension()
                 .is_some_and(|extension| extension.eq_ignore_ascii_case("js")));
         }
+    }
+
+    #[test]
+    fn synthetic_filter_selects_polymorphic_property_loop() {
+        let options = parse_options(&["--filter".to_string(), "polymorphic-property".to_string()])
+            .expect("synthetic compare options should parse");
+        let workloads =
+            build_selected_workloads(&options).expect("filtered synthetic workload should build");
+
+        assert_eq!(workloads.len(), 1);
+        let workload = &workloads[0];
+        assert_eq!(workload.name, "polymorphic-property-loop");
+        assert_eq!(workload.category, "polymorphic-property");
+        assert!(workload.source.contains("__lyngPolymorphicShapes"));
+        assert!(workload.source.contains("record.value"));
     }
 
     #[test]

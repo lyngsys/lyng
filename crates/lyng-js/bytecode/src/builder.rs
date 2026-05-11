@@ -14,6 +14,8 @@ use crate::Opcode;
 use lyng_js_common::{AtomId, SourceId, Span};
 use lyng_js_types::FeedbackSlotId;
 
+mod peephole;
+
 pub type BytecodeBuildResult<T> = Result<T, BytecodeBuildError>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -856,7 +858,8 @@ impl BytecodeBuilder {
     /// # Errors
     /// Returns [`BytecodeBuildError::LimitExceeded`] when the visible and hidden register counts do
     /// not fit in the final register window.
-    pub fn finish(self) -> BytecodeBuildResult<BytecodeFunction> {
+    pub fn finish(mut self) -> BytecodeBuildResult<BytecodeFunction> {
+        peephole::optimize(&mut self)?;
         let final_register_window = self
             .header
             .register_count()
@@ -933,10 +936,23 @@ mod tests {
         assert_eq!(function.exception_handlers().len(), 1);
         assert_eq!(function.register_count(), 3);
         assert_eq!(function.hidden_register_count(), 1);
-        assert_eq!(
-            function.instructions()[usize::try_from(jump).unwrap()].ax_value(),
-            Some(1)
-        );
+        assert_eq!(function.instructions().len(), 2);
+        assert!(matches!(
+            function.instructions(),
+            [
+                Instruction::Abx {
+                    opcode: Opcode::LoadConst,
+                    ..
+                },
+                Instruction::Ax {
+                    opcode: Opcode::Return,
+                    ax: 1
+                }
+            ]
+        ));
+        assert_eq!(function.exception_handlers()[0].protected_start(), 0);
+        assert_eq!(function.exception_handlers()[0].protected_end(), 1);
+        assert_eq!(function.exception_handlers()[0].handler(), 1);
         Ok(())
     }
 
@@ -959,6 +975,109 @@ mod tests {
         assert_eq!(
             function.feedback_sites()[0].instruction_offset(),
             instruction
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn peephole_threads_jump_to_jump_targets_and_removes_unreachable_jump_chain(
+    ) -> BytecodeBuildResult<()> {
+        let mut builder = BytecodeBuilder::new(
+            BytecodeFunctionId::new(NonZeroU32::new(12).unwrap()),
+            BytecodeFunctionKind::Function,
+        );
+        builder.alloc_registers(1)?;
+        builder.emit_abx(Opcode::LoadTrue, 0, 0)?;
+        let branch = builder.emit_cond_jump_placeholder(Opcode::JumpIfTrue, 0)?;
+        builder.emit_ax(Opcode::ReturnUndefined, 0)?;
+        let intermediate = builder.emit_jump_placeholder(Opcode::Jump)?;
+        builder.emit_abx(Opcode::LoadOne, 0, 0)?;
+        let ret = builder.emit_ax(Opcode::Return, 0)?;
+        builder.patch_jump_to(branch, intermediate)?;
+        builder.patch_jump_to(intermediate, ret)?;
+
+        let function = builder.finish()?;
+
+        assert_eq!(function.instructions().len(), 4);
+        assert!(matches!(
+            function.instructions(),
+            [
+                Instruction::Abx {
+                    opcode: Opcode::LoadTrue,
+                    ..
+                },
+                Instruction::Abx {
+                    opcode: Opcode::JumpIfTrue,
+                    ..
+                },
+                Instruction::Ax {
+                    opcode: Opcode::ReturnUndefined,
+                    ..
+                },
+                Instruction::Ax {
+                    opcode: Opcode::Return,
+                    ..
+                }
+            ]
+        ));
+        assert_eq!(function.instructions()[1].bx_value(), Some(1));
+        Ok(())
+    }
+
+    #[test]
+    fn peephole_removes_noop_jump_and_remaps_offset_metadata() -> BytecodeBuildResult<()> {
+        let mut builder = BytecodeBuilder::new(
+            BytecodeFunctionId::new(NonZeroU32::new(13).unwrap()),
+            BytecodeFunctionKind::Function,
+        );
+        builder.alloc_registers(1)?;
+        let jump = builder.emit_jump_placeholder(Opcode::Jump)?;
+        let ret = builder.emit_ax(Opcode::ReturnUndefined, 0)?;
+        builder.patch_jump_to(jump, ret)?;
+        builder.add_source_map_entry(SourceId::new(1), ret, 10, 20);
+        let slot = builder.add_feedback_site(
+            ret,
+            FeedbackSiteKind::Comparison,
+            FeedbackSiteMetadata::None,
+        )?;
+        let safepoint = builder.add_safepoint_at(ret, SafepointKind::LoopBackedge, 1)?;
+        builder.add_deopt_snapshot(DeoptSnapshot::new(
+            safepoint,
+            vec![crate::DeoptValueSource::Register(0)],
+        ));
+
+        let function = builder.finish()?;
+
+        assert_eq!(
+            function.instructions(),
+            &[Instruction::ax(Opcode::ReturnUndefined, 0)]
+        );
+        assert_eq!(function.source_map()[0].instruction_offset(), 0);
+        assert_eq!(function.feedback_sites()[0].slot(), slot);
+        assert_eq!(function.feedback_sites()[0].instruction_offset(), 0);
+        assert_eq!(function.safepoints()[0].id(), safepoint);
+        assert_eq!(function.safepoints()[0].instruction_offset(), 0);
+        assert_eq!(function.deopt_snapshots().len(), 1);
+        assert_eq!(function.deopt_snapshots()[0].safepoint_id(), safepoint);
+        Ok(())
+    }
+
+    #[test]
+    fn peephole_removes_dead_code_after_terminal_control_flow() -> BytecodeBuildResult<()> {
+        let mut builder = BytecodeBuilder::new(
+            BytecodeFunctionId::new(NonZeroU32::new(14).unwrap()),
+            BytecodeFunctionKind::Function,
+        );
+        builder.alloc_registers(1)?;
+        builder.emit_ax(Opcode::ReturnUndefined, 0)?;
+        builder.emit_abx(Opcode::LoadOne, 0, 0)?;
+        builder.emit_ax(Opcode::Return, 0)?;
+
+        let function = builder.finish()?;
+
+        assert_eq!(
+            function.instructions(),
+            &[Instruction::ax(Opcode::ReturnUndefined, 0)]
         );
         Ok(())
     }
@@ -1039,13 +1158,14 @@ mod tests {
         builder.alloc_registers(1)?;
 
         let conditional = builder.emit_cond_jump_placeholder(Opcode::JumpIfFalse, 0)?;
+        builder.emit_ax(Opcode::Nop, 0)?;
         let target = builder.emit_ax(Opcode::ReturnUndefined, 0)?;
         builder.patch_jump_to(conditional, target)?;
         let function = builder.finish()?;
 
         assert_eq!(
             function.instructions()[usize::try_from(conditional).unwrap()].bx_value(),
-            Some(0)
+            Some(1)
         );
         Ok(())
     }

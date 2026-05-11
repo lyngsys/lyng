@@ -1178,8 +1178,7 @@ fn function_name_text_from_property_key(
             .heap()
             .view()
             .symbol_view(symbol)
-            .and_then(lyng_js_gc::PrimitiveSymbolView::description_view)
-            .and_then(decode_function_name_text)
+            .and_then(|view| view.description_view().and_then(decode_function_name_text))
             .map_or_else(String::new, |description| format!("[{description}]")),
     };
     match prefix {
@@ -1188,7 +1187,7 @@ fn function_name_text_from_property_key(
     }
 }
 
-fn decode_function_name_text(view: lyng_js_gc::PrimitiveStringView<'_>) -> Option<String> {
+fn decode_function_name_text(view: &lyng_js_gc::PrimitiveStringView<'_>) -> Option<String> {
     if let Some(bytes) = view.latin1_bytes() {
         return Some(bytes.iter().map(|byte| char::from(*byte)).collect());
     }

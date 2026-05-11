@@ -64,7 +64,7 @@ pub(super) fn compile_and_run_string(source: &str) -> String {
         .as_string_ref()
         .expect("script should return a string value");
     decode_string(
-        agent
+        &agent
             .heap()
             .view()
             .string_view(string)
@@ -158,7 +158,7 @@ pub(super) fn install_native_global(
     function_object
 }
 
-fn decode_string(view: PrimitiveStringView<'_>) -> String {
+fn decode_string(view: &PrimitiveStringView<'_>) -> String {
     if let Some(bytes) = view.latin1_bytes() {
         return bytes.iter().map(|byte| char::from(*byte)).collect();
     }

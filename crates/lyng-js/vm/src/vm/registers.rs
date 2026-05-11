@@ -3,33 +3,28 @@ use super::{Agent, FrameRecord, Value, Vm, VmError, VmResult};
 use lyng_js_types::AbruptCompletion;
 
 impl Vm {
-    pub(super) fn read_register(&self, frame: FrameRecord, register: u16) -> VmResult<Value> {
-        let absolute = absolute_register(frame, register)?;
-        self.register_stack
-            .get(absolute)
-            .copied()
-            .ok_or_else(|| VmError::RegisterOutOfBounds {
-                code: frame.code(),
-                register,
-            })
+    pub(super) fn read_register(&self, frame: FrameRecord, register: u16) -> Value {
+        let absolute = absolute_register(frame, register);
+        debug_assert!(
+            absolute < self.register_stack.len(),
+            "validated register window should be reserved on the VM stack"
+        );
+        // SAFETY: bytecode installation validates every register operand against the function's
+        // register window, and frame creation reserves that full window on `register_stack`.
+        unsafe { *self.register_stack.get_unchecked(absolute) }
     }
 
-    pub(super) fn write_register(
-        &mut self,
-        frame: FrameRecord,
-        register: u16,
-        value: Value,
-    ) -> VmResult<()> {
-        let absolute = absolute_register(frame, register)?;
-        let slot =
-            self.register_stack
-                .get_mut(absolute)
-                .ok_or_else(|| VmError::RegisterOutOfBounds {
-                    code: frame.code(),
-                    register,
-                })?;
-        *slot = value;
-        Ok(())
+    pub(super) fn write_register(&mut self, frame: FrameRecord, register: u16, value: Value) {
+        let absolute = absolute_register(frame, register);
+        debug_assert!(
+            absolute < self.register_stack.len(),
+            "validated register window should be reserved on the VM stack"
+        );
+        // SAFETY: bytecode installation validates every register operand against the function's
+        // register window, and frame creation reserves that full window on `register_stack`.
+        unsafe {
+            *self.register_stack.get_unchecked_mut(absolute) = value;
+        }
     }
 
     pub(super) fn advance_instruction(&mut self) {
@@ -125,7 +120,7 @@ impl Vm {
 
         if let Some(caller) = self.frames.last().copied() {
             if let Some(return_register) = frame.return_register() {
-                self.write_register(caller, return_register, result)?;
+                self.write_register(caller, return_register, result);
             }
             return Ok(None);
         }
@@ -135,17 +130,15 @@ impl Vm {
 }
 
 #[inline]
-fn absolute_register(frame: FrameRecord, register: u16) -> VmResult<usize> {
-    if register >= frame.registers().len() {
-        return Err(VmError::RegisterOutOfBounds {
-            code: frame.code(),
-            register,
-        });
-    }
-    usize::try_from(frame.registers().base() + u32::from(register)).map_err(|_| {
-        VmError::RegisterOutOfBounds {
-            code: frame.code(),
-            register,
-        }
-    })
+fn absolute_register(frame: FrameRecord, register: u16) -> usize {
+    debug_assert!(
+        register < frame.registers().len(),
+        "bytecode register operand should be validated before execution"
+    );
+    let absolute = frame.registers().base() + u32::from(register);
+    debug_assert!(
+        absolute < frame.registers().end(),
+        "register should remain inside the active frame window"
+    );
+    absolute as usize
 }

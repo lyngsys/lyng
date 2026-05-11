@@ -236,7 +236,7 @@ fn global_property_store_ic_caches_global_object_data_property() {
 }
 
 #[test]
-fn named_property_load_ic_grows_polymorphic_and_then_megamorphic() {
+fn named_property_load_ic_keeps_six_shape_polymorphic_cache() {
     let unit = compile_test_unit(31, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
     let value_atom = unit_atom(&unit, "value");
@@ -274,6 +274,82 @@ fn named_property_load_ic_grows_polymorphic_and_then_megamorphic() {
                 agent,
                 object,
                 PropertyKey::from_atom(AtomId::from_raw(20_000 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+            )
+            .unwrap());
+        }
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(index.cast_signed()),
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+        sources.push(object);
+    }
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for (index, object) in sources.into_iter().enumerate() {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
+        );
+    }
+
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Polymorphic",
+            6,
+            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+}
+
+#[test]
+fn named_property_load_ic_promotes_to_megamorphic_beyond_polymorphic_capacity() {
+    let unit = compile_test_unit(47, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let mut sources = Vec::new();
+    for index in 0..10 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(22_000 + extra)),
                 Value::from_smi(extra.cast_signed()),
                 AllocationLifetime::Default,
             )
@@ -422,7 +498,75 @@ fn keyed_named_atom_ic_becomes_monomorphic() {
 }
 
 #[test]
-fn keyed_dense_index_sites_fall_back_to_megamorphic_classification() {
+fn keyed_named_atom_ic_keeps_six_shape_polymorphic_cache() {
+    let unit = compile_test_unit(48, "source[\"value\"];");
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a keyed-access site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "value"));
+
+    let mut sources = Vec::new();
+    for index in 0..6 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(23_000 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+            )
+            .unwrap());
+        }
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(index.cast_signed()),
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+        sources.push(object);
+    }
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for (index, object) in sources.into_iter().enumerate() {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
+        );
+    }
+
+    assert_eq!(
+        vm.keyed_property_cache_snapshot(installed.code(), slot),
+        Some(("Polymorphic", Some("NamedAtom"), 6))
+    );
+}
+
+#[test]
+fn keyed_dense_index_load_site_caches_dense_shape() {
     let unit = compile_test_unit(34, "let index = 0; source[index];");
     let entry = unit.function(unit.entry()).unwrap();
     let slot = entry
@@ -470,8 +614,240 @@ fn keyed_dense_index_sites_fall_back_to_megamorphic_classification() {
         Value::from_smi(12)
     );
     assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(12)
+    );
+    assert_eq!(
+        vm.keyed_property_cache_snapshot(installed.code(), slot),
+        Some(("Monomorphic", Some("DenseIndex"), 1))
+    );
+}
+
+#[test]
+fn keyed_dense_index_load_cache_tracks_shape_changes_polymorphically() {
+    let unit = compile_test_unit(49, "let index = 0; source[index];");
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a keyed-access site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let extra_name = agent.atoms_mut().intern_collectible("extra");
+    let first = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        let object = objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_element_capacity(1),
+            AllocationLifetime::Default,
+        );
+        assert!(objects.set_element(
+            &mut mutator,
+            object,
+            0,
+            Value::from_smi(3),
+            AllocationLifetime::Default,
+        ));
+        object
+    });
+    let second = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        let object = objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_element_capacity(1),
+            AllocationLifetime::Default,
+        );
+        assert!(objects.set_element(
+            &mut mutator,
+            object,
+            0,
+            Value::from_smi(5),
+            AllocationLifetime::Default,
+        ));
+        object
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        second,
+        PropertyKey::from_atom(extra_name),
+        Value::from_smi(1),
+        AllocationLifetime::Default,
+    )
+    .unwrap());
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for (object, expected) in [
+        (first, Value::from_smi(3)),
+        (second, Value::from_smi(5)),
+        (first, Value::from_smi(3)),
+        (second, Value::from_smi(5)),
+    ] {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            expected
+        );
+    }
+
+    assert_eq!(
+        vm.keyed_property_cache_snapshot(installed.code(), slot),
+        Some(("Polymorphic", Some("DenseIndex"), 2))
+    );
+}
+
+#[test]
+fn keyed_dense_index_cache_falls_back_after_sparse_transition() {
+    let unit = compile_test_unit(50, "let index = 0; source[index];");
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a keyed-access site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        let object = objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_element_capacity(1),
+            AllocationLifetime::Default,
+        );
+        assert!(objects.set_element(
+            &mut mutator,
+            object,
+            0,
+            Value::from_smi(12),
+            AllocationLifetime::Default,
+        ));
+        object
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for _ in 0..3 {
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            Value::from_smi(12)
+        );
+    }
+    assert_eq!(
+        vm.keyed_property_cache_snapshot(installed.code(), slot),
+        Some(("Monomorphic", Some("DenseIndex"), 1))
+    );
+
+    agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        assert!(objects.set_element(
+            &mut mutator,
+            object,
+            32,
+            Value::from_smi(32),
+            AllocationLifetime::Default,
+        ));
+    });
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(12)
+    );
+    assert_eq!(
         vm.keyed_property_cache_snapshot(installed.code(), slot),
         Some(("Megamorphic", Some("DenseIndex"), 0))
+    );
+}
+
+#[test]
+fn mixed_named_and_dense_index_keyed_site_promotes_to_generic() {
+    let unit = compile_test_unit(51, "source[key];");
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a keyed-access site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let key_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "key"));
+    let value_name = agent.atoms_mut().intern_collectible("value");
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        let object = objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_element_capacity(1),
+            AllocationLifetime::Default,
+        );
+        assert!(objects.set_element(
+            &mut mutator,
+            object,
+            0,
+            Value::from_smi(12),
+            AllocationLifetime::Default,
+        ));
+        object
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        object,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(44),
+        AllocationLifetime::Default,
+    )
+    .unwrap());
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+    install_global_value(agent, &realm, key_name, Value::from_smi(0));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for _ in 0..3 {
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            Value::from_smi(12)
+        );
+    }
+    assert_eq!(
+        vm.keyed_property_cache_snapshot(installed.code(), slot),
+        Some(("Monomorphic", Some("DenseIndex"), 1))
+    );
+
+    let key_string = agent.alloc_runtime_string("value", None, AllocationLifetime::Default);
+    install_global_value(agent, &realm, key_name, Value::from_string_ref(key_string));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(44)
+    );
+    assert_eq!(
+        vm.keyed_property_cache_snapshot(installed.code(), slot),
+        Some(("Megamorphic", Some("Generic"), 0))
     );
 }
 
@@ -515,7 +891,7 @@ fn ordinary_object_dense_index_store_uses_fast_path_without_feedback_slow_path()
 
     assert_eq!(
         vm.keyed_property_cache_snapshot(installed.code(), slot),
-        Some(("Uninitialized", None, 0))
+        Some(("Monomorphic", Some("DenseIndex"), 1))
     );
 }
 
@@ -600,7 +976,7 @@ fn engine_array_existing_index_store_skips_prototype_setter_scan() {
 
     assert_eq!(
         vm.keyed_property_cache_snapshot(installed.code(), slot),
-        Some(("Uninitialized", None, 0))
+        Some(("Monomorphic", Some("DenseIndex"), 1))
     );
 }
 
@@ -642,7 +1018,7 @@ fn engine_array_sparse_index_store_uses_fast_path_without_feedback_slow_path() {
     for slot in slots {
         assert_eq!(
             vm.keyed_property_cache_snapshot(installed.code(), slot),
-            Some(("Uninitialized", None, 0))
+            Some(("Megamorphic", Some("DenseIndex"), 0))
         );
     }
 }

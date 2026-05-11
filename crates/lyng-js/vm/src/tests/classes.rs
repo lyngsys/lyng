@@ -283,7 +283,7 @@ fn class_static_block_super_property_uses_parent_class_home_object() {
 
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = decode_string(
-        agent
+        &agent
             .heap()
             .view()
             .string_view(result.as_string_ref().expect("value should be a string"))
@@ -334,7 +334,7 @@ fn evaluate_script_super_property_compound_assignment_uses_stable_reference() {
 
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = decode_string(
-        agent
+        &agent
             .heap()
             .view()
             .string_view(result.as_string_ref().expect("value should be a string"))

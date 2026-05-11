@@ -7,6 +7,8 @@ use super::{
 use lyng_js_common::AtomId;
 use std::collections::HashMap;
 
+const INLINE_SHAPE_TRANSITION_LIMIT: usize = 3;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ObjectMetadata {
     pub(crate) kind: ObjectKind,
@@ -14,6 +16,7 @@ pub struct ObjectMetadata {
     pub(crate) cold: ObjectColdData,
     pub(crate) private_brands: Vec<InstalledPrivateBrand>,
     pub(crate) named_properties: NamedPropertyStorage,
+    pub(crate) named_property_additions: u32,
     pub(crate) named_property_churn: u32,
     pub(crate) element_storage: ElementStorageMetadata,
     pub(crate) last_invalidation: Option<InvalidationEvent>,
@@ -288,17 +291,17 @@ pub struct ShapeMetadata {
     pub(crate) property: Option<ShapeProperty>,
     pub(crate) properties: Vec<ShapeProperty>,
     pub(crate) property_lookup: Option<HashMap<PropertyKey, usize>>,
-    pub(crate) transitions: HashMap<ShapeTransitionKey, ShapeId>,
+    pub(crate) transitions: ShapeTransitionStorage,
 }
 
 impl ShapeMetadata {
-    pub(crate) fn bootstrap() -> Self {
+    pub(crate) const fn bootstrap() -> Self {
         Self {
             transition_key: None,
             property: None,
             properties: Vec::new(),
             property_lookup: None,
-            transitions: HashMap::new(),
+            transitions: ShapeTransitionStorage::new(),
         }
     }
 
@@ -312,7 +315,7 @@ impl ShapeMetadata {
             property: properties.last().copied(),
             properties,
             property_lookup,
-            transitions: HashMap::new(),
+            transitions: ShapeTransitionStorage::new(),
         }
     }
 
@@ -331,6 +334,119 @@ impl ShapeMetadata {
                     .and_then(|index| self.properties.get(index).copied())
             },
         )
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ShapeTransitionStorage {
+    inline: [Option<(ShapeTransitionKey, ShapeId)>; INLINE_SHAPE_TRANSITION_LIMIT],
+    inline_len: usize,
+    overflow: Option<HashMap<ShapeTransitionKey, ShapeId>>,
+}
+
+impl ShapeTransitionStorage {
+    #[inline]
+    pub(crate) const fn new() -> Self {
+        Self {
+            inline: [None; INLINE_SHAPE_TRANSITION_LIMIT],
+            inline_len: 0,
+            overflow: None,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn get(&self, key: &ShapeTransitionKey) -> Option<&ShapeId> {
+        self.inline[..self.inline_len]
+            .iter()
+            .flatten()
+            .find_map(|(entry_key, shape)| (entry_key == key).then_some(shape))
+            .or_else(|| {
+                self.overflow
+                    .as_ref()
+                    .and_then(|overflow| overflow.get(key))
+            })
+    }
+
+    #[inline]
+    pub(crate) fn insert(&mut self, key: ShapeTransitionKey, shape: ShapeId) -> Option<ShapeId> {
+        for slot in &mut self.inline[..self.inline_len] {
+            if let Some((entry_key, existing)) = slot
+                && *entry_key == key
+            {
+                return Some(std::mem::replace(existing, shape));
+            }
+        }
+
+        if let Some(overflow) = &mut self.overflow
+            && let Some(existing) = overflow.get_mut(&key)
+        {
+            return Some(std::mem::replace(existing, shape));
+        }
+
+        if self.inline_len < INLINE_SHAPE_TRANSITION_LIMIT {
+            self.inline[self.inline_len] = Some((key, shape));
+            self.inline_len += 1;
+            return None;
+        }
+
+        self.overflow
+            .get_or_insert_with(HashMap::new)
+            .insert(key, shape)
+    }
+
+    #[inline]
+    pub(crate) fn remove(&mut self, key: &ShapeTransitionKey) -> Option<ShapeId> {
+        if let Some(index) = self.inline[..self.inline_len]
+            .iter()
+            .position(|entry| entry.is_some_and(|(entry_key, _)| entry_key == *key))
+        {
+            let (_, removed) =
+                self.inline[index].expect("inline transition slot should be populated");
+            self.remove_inline(index);
+            return Some(removed);
+        }
+
+        let overflow = self.overflow.as_mut()?;
+        let removed = overflow.remove(key);
+        if overflow.is_empty() {
+            self.overflow = None;
+        }
+        removed
+    }
+
+    #[cfg(test)]
+    #[inline]
+    pub(crate) fn contains_key(&self, key: &ShapeTransitionKey) -> bool {
+        self.get(key).is_some()
+    }
+
+    #[inline]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inline_len == 0
+            && self
+                .overflow
+                .as_ref()
+                .is_none_or(std::collections::HashMap::is_empty)
+    }
+
+    #[cfg(test)]
+    #[inline]
+    pub(crate) const fn inline_len(&self) -> usize {
+        self.inline_len
+    }
+
+    #[cfg(test)]
+    #[inline]
+    pub(crate) fn overflow_len(&self) -> usize {
+        self.overflow.as_ref().map_or(0, HashMap::len)
+    }
+
+    fn remove_inline(&mut self, index: usize) {
+        for slot in index..self.inline_len - 1 {
+            self.inline[slot] = self.inline[slot + 1];
+        }
+        self.inline_len -= 1;
+        self.inline[self.inline_len] = None;
     }
 }
 

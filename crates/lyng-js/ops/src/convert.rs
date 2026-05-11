@@ -135,7 +135,7 @@ pub fn number_to_string(number: f64) -> String {
     text
 }
 
-pub fn lossy_string_from_view(view: PrimitiveStringView<'_>) -> String {
+pub fn lossy_string_from_view(view: &PrimitiveStringView<'_>) -> String {
     if let Some(bytes) = view.latin1_bytes() {
         let mut text = String::with_capacity(bytes.len());
         for byte in bytes {
@@ -154,7 +154,7 @@ pub fn lossy_string_from_view(view: PrimitiveStringView<'_>) -> String {
     String::from_utf16_lossy(&units)
 }
 
-pub fn string_view_to_number(view: PrimitiveStringView<'_>) -> f64 {
+pub fn string_view_to_number(view: &PrimitiveStringView<'_>) -> f64 {
     if let Some(bytes) = view.latin1_bytes()
         && let Ok(text) = std::str::from_utf8(bytes)
     {
@@ -681,11 +681,11 @@ mod tests {
         let view = heap.view();
 
         assert_eq!(
-            lossy_string_from_view(view.string_view(latin1).unwrap()),
+            lossy_string_from_view(&view.string_view(latin1).unwrap()),
             "café"
         );
         assert_eq!(
-            lossy_string_from_view(view.string_view(utf16).unwrap()),
+            lossy_string_from_view(&view.string_view(utf16).unwrap()),
             "\u{FFFD}"
         );
     }
@@ -715,11 +715,11 @@ mod tests {
         let view = heap.view();
 
         assert_eq!(
-            string_view_to_number(view.string_view(ascii).unwrap()),
+            string_view_to_number(&view.string_view(ascii).unwrap()),
             17.0
         );
         assert_eq!(
-            string_view_to_number(view.string_view(non_ascii).unwrap()),
+            string_view_to_number(&view.string_view(non_ascii).unwrap()),
             42.0
         );
     }

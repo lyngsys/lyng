@@ -152,7 +152,7 @@ impl<'a> PrimitiveHeapView<'a> {
 
         let left_view = self.string_view(left)?;
         let right_view = self.string_view(right)?;
-        Some(left_view.equals(right_view))
+        Some(left_view.equals(&right_view))
     }
 
     #[inline]
@@ -464,10 +464,10 @@ impl PrimitiveMutator<'_> {
         right: StringRef,
         lifetime: AllocationLifetime,
     ) -> Option<StringRef> {
-        let payload_len = self.heap.latin1_concat_string_payload_len(left, right)?;
+        self.heap.latin1_concat_string_payload_len(left, right)?;
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::StringAllocationSlowPath,
-            self.heap.string_allocation_requires_growth(payload_len),
+            self.heap.string_record_allocation_requires_growth(),
         );
         self.heap.alloc_latin1_concat_string(left, right, lifetime)
     }
@@ -479,10 +479,10 @@ impl PrimitiveMutator<'_> {
         right: StringRef,
         lifetime: AllocationLifetime,
     ) -> Option<StringRef> {
-        let payload_len = self.heap.utf16_concat_string_payload_len(left, right)?;
+        self.heap.utf16_concat_string_payload_len(left, right)?;
         self.maybe_collect_for_growth(
             PrimitiveCollectionTrigger::StringAllocationSlowPath,
-            self.heap.string_allocation_requires_growth(payload_len),
+            self.heap.string_record_allocation_requires_growth(),
         );
         self.heap.alloc_utf16_concat_string(left, right, lifetime)
     }
@@ -1167,6 +1167,17 @@ mod tests {
         assert_eq!(view.string(combined).unwrap().code_unit_len(), 33);
         assert_eq!(
             view.string_payload(combined),
+            None,
+            "concat results should defer flat payload allocation"
+        );
+        let combined_view = view
+            .string_view(combined)
+            .expect("concat result should remain viewable");
+        assert_eq!(combined_view.code_unit_at(0), Some(u16::from(b'l')));
+        assert_eq!(combined_view.code_unit_at(16), Some(u16::from(b'r')));
+        assert_eq!(combined_view.code_unit_at(32), Some(u16::from(b'g')));
+        assert_eq!(
+            combined_view.latin1_bytes(),
             Some(&b"left-hand-stringright-hand-string"[..])
         );
     }
@@ -1208,8 +1219,65 @@ mod tests {
         assert_eq!(view.string(combined).unwrap().code_unit_len(), 4);
         assert_eq!(
             view.string_payload(combined),
+            None,
+            "concat results should defer flat payload allocation"
+        );
+        let combined_view = view
+            .string_view(combined)
+            .expect("concat result should remain viewable");
+        assert_eq!(combined_view.code_unit_at(0), Some(0x0041));
+        assert_eq!(combined_view.code_unit_at(1), Some(0x007A));
+        assert_eq!(combined_view.code_unit_at(2), Some(0x0100));
+        assert_eq!(combined_view.code_unit_at(3), Some(0x1234));
+        assert_eq!(
+            combined_view.utf16_bytes(),
             Some(&[b'A', 0x00, b'z', 0x00, 0x00, 0x01, 0x34, 0x12][..])
         );
+    }
+
+    #[test]
+    fn rooted_concat_string_traces_child_strings() {
+        let mut heap = PrimitiveHeap::new();
+        let roots = PrimitiveRoots::new();
+        let (left, right, combined, dead) = {
+            let mut mutator = heap.mutator();
+            let left = mutator.alloc_string(
+                StringEncoding::Latin1,
+                4,
+                b"left",
+                None,
+                AllocationLifetime::Default,
+            );
+            let right = mutator.alloc_string(
+                StringEncoding::Latin1,
+                5,
+                b"right",
+                None,
+                AllocationLifetime::Default,
+            );
+            let combined = mutator
+                .alloc_latin1_concat_string(left, right, AllocationLifetime::Default)
+                .expect("latin1 strings should concatenate");
+            let dead = mutator.alloc_string(
+                StringEncoding::Latin1,
+                4,
+                b"dead",
+                None,
+                AllocationLifetime::Default,
+            );
+            (left, right, combined, dead)
+        };
+        let _rooted = roots.root_string(combined);
+
+        let stats = heap.collect(&roots);
+        let view = heap.view();
+
+        assert_eq!(stats.trace.strings_marked, 3);
+        assert_eq!(stats.strings_reclaimed, 1);
+        assert!(view.string(left).is_some());
+        assert!(view.string(right).is_some());
+        assert!(view.string(combined).is_some());
+        assert_eq!(view.string(dead), None);
     }
 
     #[test]

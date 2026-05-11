@@ -388,7 +388,13 @@ fn evaluate_script_with_statement_var_initializer_assigns_through_object_environ
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "3:undefined:3");
@@ -420,7 +426,13 @@ fn evaluate_script_function_declared_inside_with_captures_object_environment_for
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "x1:x1:local:obj:1");
@@ -452,7 +464,13 @@ fn evaluate_script_function_called_inside_with_uses_declaration_environment() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "x1:a:x1:a");
@@ -482,7 +500,13 @@ fn evaluate_script_function_containing_with_uses_function_this_binding() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "x2:b");
@@ -512,7 +536,13 @@ fn evaluate_script_function_called_inside_with_uses_global_this_binding() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "x2:b");
@@ -541,7 +571,13 @@ fn evaluate_script_function_called_inside_with_keeps_local_var_separate_from_obj
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "local:obj");
@@ -574,7 +610,13 @@ fn evaluate_script_function_called_inside_with_uses_hoisted_local_before_initial
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "undefined:undefined:obj");
@@ -639,7 +681,13 @@ fn evaluate_script_function_containing_with_reports_binding_targets() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(
@@ -675,7 +723,13 @@ fn evaluate_script_with_exception_restores_outer_name_resolution() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "1:boom:1:3");
@@ -712,7 +766,13 @@ fn evaluate_script_with_call_exception_restores_outer_name_resolution() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "x1:boom:x1:2");
@@ -734,7 +794,13 @@ fn evaluate_script_eval_with_statement_preserves_normal_completion_value() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "undefined:3");
@@ -761,7 +827,13 @@ fn evaluate_script_eval_with_statement_updates_empty_abrupt_completion() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "3:undefined:10:undefined");
@@ -1021,7 +1093,13 @@ fn evaluate_script_with_statement_compound_assignment_uses_stable_identifier_ref
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(
@@ -1084,7 +1162,13 @@ fn evaluate_script_with_statement_inc_dec_looks_up_unscopables_once() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "1:7:5:1:7:3");
@@ -1127,7 +1211,13 @@ fn evaluate_script_with_statement_strict_assignment_keeps_deleted_binding_refere
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "2:undefined");
@@ -1161,7 +1251,13 @@ fn evaluate_script_with_statement_sloppy_assignment_keeps_deleted_binding_refere
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "undefined");
@@ -1185,7 +1281,13 @@ fn evaluate_script_logical_and_assignment_infers_identifier_function_name() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "value");
@@ -1246,7 +1348,13 @@ fn evaluate_script_logical_and_assignment_updates_private_fields() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "false:false");
@@ -1316,7 +1424,13 @@ fn evaluate_script_logical_and_assignment_updates_private_accessors() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "2:3");
@@ -1380,7 +1494,13 @@ fn evaluate_script_compound_assignment_keeps_initial_identifier_reference_across
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     let text = result
         .as_string_ref()
-        .and_then(|value| agent.heap().view().string_view(value).map(decode_string))
+        .and_then(|value| {
+            agent
+                .heap()
+                .view()
+                .string_view(value)
+                .map(|view| decode_string(&view))
+        })
         .expect("script should return a string");
 
     assert_eq!(text, "2:12");

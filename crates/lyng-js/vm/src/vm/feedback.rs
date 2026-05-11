@@ -1,14 +1,15 @@
 use super::{code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, Value, Vm};
 use lyng_js_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
+use lyng_js_gc::ValueStoreTarget;
 use lyng_js_objects::{
-    NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyCachePurpose,
-    PropertyCacheDependency,
+    NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyCachePurpose, ObjectFlags,
+    ObjectHeader, ObjectKind, PrimitiveWrapperKind, PropertyCacheDependency,
 };
 use lyng_js_types::{FeedbackSlotId, PropertyKey, ShapeId};
 use std::mem::size_of;
 
 const FEEDBACK_ALLOCATION_THRESHOLD: u16 = 2;
-const POLYMORPHIC_PROPERTY_CACHE_LIMIT: usize = 4;
+const POLYMORPHIC_PROPERTY_CACHE_LIMIT: usize = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FeedbackInlineCacheState {
@@ -159,6 +160,7 @@ pub struct KeyedPropertyFeedbackSnapshot {
     state: FeedbackInlineCacheState,
     family: Option<FeedbackKeyedPropertyFamily>,
     entries: Vec<KeyedNamedPropertyCacheEntrySnapshot>,
+    dense_entries: Vec<DenseIndexCacheEntrySnapshot>,
 }
 
 impl KeyedPropertyFeedbackSnapshot {
@@ -169,6 +171,7 @@ impl KeyedPropertyFeedbackSnapshot {
             state: FeedbackInlineCacheState::Uninitialized,
             family: None,
             entries: Vec::new(),
+            dense_entries: Vec::new(),
         }
     }
 
@@ -179,8 +182,12 @@ impl KeyedPropertyFeedbackSnapshot {
             state: feedback.cache_state.into(),
             family: feedback.family.map(FeedbackKeyedPropertyFamily::from),
             entries: feedback
-                .active_entries()
+                .active_named_entries()
                 .map(KeyedNamedPropertyCacheEntrySnapshot::from_entry)
+                .collect(),
+            dense_entries: feedback
+                .active_dense_entries()
+                .map(DenseIndexCacheEntrySnapshot::from_entry)
                 .collect(),
         }
     }
@@ -203,6 +210,37 @@ impl KeyedPropertyFeedbackSnapshot {
     #[inline]
     pub fn entries(&self) -> &[KeyedNamedPropertyCacheEntrySnapshot] {
         &self.entries
+    }
+
+    #[inline]
+    pub fn dense_entries(&self) -> &[DenseIndexCacheEntrySnapshot] {
+        &self.dense_entries
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DenseIndexCacheEntrySnapshot {
+    receiver_shape: ShapeId,
+    receiver_flags: ObjectFlags,
+}
+
+impl DenseIndexCacheEntrySnapshot {
+    #[inline]
+    const fn from_entry(entry: DenseIndexCacheEntry) -> Self {
+        Self {
+            receiver_shape: entry.receiver_shape,
+            receiver_flags: entry.receiver_flags,
+        }
+    }
+
+    #[inline]
+    pub const fn receiver_shape(self) -> ShapeId {
+        self.receiver_shape
+    }
+
+    #[inline]
+    pub const fn receiver_flags(self) -> ObjectFlags {
+        self.receiver_flags
     }
 }
 
@@ -383,12 +421,40 @@ struct KeyedNamedPropertyCacheEntry {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct DenseIndexCacheEntry {
+    receiver_shape: ShapeId,
+    receiver_flags: ObjectFlags,
+}
+
+impl DenseIndexCacheEntry {
+    #[inline]
+    const fn new(receiver_shape: ShapeId, receiver_flags: ObjectFlags) -> Self {
+        Self {
+            receiver_shape,
+            receiver_flags,
+        }
+    }
+
+    #[inline]
+    const fn from_header(header: ObjectHeader) -> Self {
+        Self::new(header.shape(), header.flags())
+    }
+
+    #[inline]
+    fn matches_header(self, header: ObjectHeader) -> bool {
+        self.receiver_shape == header.shape() && self.receiver_flags == header.flags()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct KeyedPropertyFeedback {
     execution_count: u32,
     family: Option<KeyedPropertyFamily>,
     cache_state: InlineCacheState,
-    entry_count: u8,
-    entries: [Option<KeyedNamedPropertyCacheEntry>; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
+    named_entry_count: u8,
+    named_entries: [Option<KeyedNamedPropertyCacheEntry>; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
+    dense_entry_count: u8,
+    dense_entries: [Option<DenseIndexCacheEntry>; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -430,7 +496,14 @@ impl NamedPropertyFeedback {
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {}
             InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => return None,
         }
+        let receiver_shape = agent
+            .objects()
+            .object_header(agent.heap().view(), receiver)?
+            .shape();
         for entry in self.active_entries() {
+            if entry.receiver_shape() != receiver_shape {
+                continue;
+            }
             if let Ok(Some(value)) =
                 agent
                     .objects()
@@ -448,7 +521,14 @@ impl NamedPropertyFeedback {
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {}
             InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => return None,
         }
+        let receiver_shape = agent
+            .objects()
+            .object_header(agent.heap().view(), receiver)?
+            .shape();
         for entry in self.active_entries() {
+            if entry.receiver_shape() != receiver_shape {
+                continue;
+            }
             let result = agent.with_heap_and_objects(|heap, objects| {
                 let mut mutator = heap.mutator();
                 objects.store_to_named_property_cache(&mut mutator, receiver, entry, value)
@@ -526,8 +606,10 @@ impl KeyedPropertyFeedback {
             execution_count: 0,
             family: None,
             cache_state: InlineCacheState::Uninitialized,
-            entry_count: 0,
-            entries: [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
+            named_entry_count: 0,
+            named_entries: [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
+            dense_entry_count: 0,
+            dense_entries: [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
         }
     }
 
@@ -540,8 +622,12 @@ impl KeyedPropertyFeedback {
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {}
             InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => return None,
         }
-        for entry in self.active_entries() {
-            if entry.atom != atom {
+        let receiver_shape = agent
+            .objects()
+            .object_header(agent.heap().view(), receiver)?
+            .shape();
+        for entry in self.active_named_entries() {
+            if entry.atom != atom || entry.entry.receiver_shape() != receiver_shape {
                 continue;
             }
             if let Ok(Some(value)) = agent.objects().load_from_named_property_cache(
@@ -570,8 +656,12 @@ impl KeyedPropertyFeedback {
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {}
             InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => return None,
         }
-        for entry in self.active_entries() {
-            if entry.atom != atom {
+        let receiver_shape = agent
+            .objects()
+            .object_header(agent.heap().view(), receiver)?
+            .shape();
+        for entry in self.active_named_entries() {
+            if entry.atom != atom || entry.entry.receiver_shape() != receiver_shape {
                 continue;
             }
             let result = agent.with_heap_and_objects(|heap, objects| {
@@ -583,6 +673,48 @@ impl KeyedPropertyFeedback {
             }
         }
         None
+    }
+
+    #[inline]
+    fn try_dense_index_load(
+        &self,
+        agent: &Agent,
+        receiver: ObjectRef,
+        index: u32,
+    ) -> Option<Value> {
+        let header = self.match_dense_index_header(agent, receiver)?;
+        Self::dense_value_from_header(agent, header, index)
+    }
+
+    #[inline]
+    fn try_dense_index_store(
+        &self,
+        agent: &mut Agent,
+        receiver: ObjectRef,
+        index: u32,
+        value: Value,
+    ) -> Option<bool> {
+        if value == Value::array_hole() {
+            return None;
+        }
+        let header = self.match_dense_index_header(agent, receiver)?;
+        let elements = header.elements()?;
+        let index_usize = usize::try_from(index).expect("u32 index should fit into usize");
+        let current = agent
+            .heap()
+            .view()
+            .object_slots(elements.raw())?
+            .get(index_usize)
+            .copied()
+            .unwrap_or(Value::array_hole());
+        if current == Value::array_hole() {
+            return None;
+        }
+        let stored = agent.with_heap_and_objects(|heap, _objects| {
+            let mut mutator = heap.mutator();
+            mutator.mut_store_value(ValueStoreTarget::ObjectSlot(elements.raw(), index), value)
+        });
+        stored.then_some(true)
     }
 
     #[inline]
@@ -598,31 +730,32 @@ impl KeyedPropertyFeedback {
         match self.family {
             None => {
                 self.family = Some(KeyedPropertyFamily::NamedAtom);
-                self.entries[0] = Some(KeyedNamedPropertyCacheEntry { atom, entry: plan });
-                self.entry_count = 1;
+                self.named_entries[0] = Some(KeyedNamedPropertyCacheEntry { atom, entry: plan });
+                self.named_entry_count = 1;
                 self.cache_state = InlineCacheState::Monomorphic;
             }
             Some(KeyedPropertyFamily::NamedAtom) => match self.cache_state {
                 InlineCacheState::Megamorphic => {}
                 InlineCacheState::Uninitialized => {
-                    self.entries[0] = Some(KeyedNamedPropertyCacheEntry { atom, entry: plan });
-                    self.entry_count = 1;
+                    self.named_entries[0] =
+                        Some(KeyedNamedPropertyCacheEntry { atom, entry: plan });
+                    self.named_entry_count = 1;
                     self.cache_state = InlineCacheState::Monomorphic;
                 }
                 InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
-                    if let Some(index) = self.find_entry_index(atom, plan.receiver_shape()) {
-                        self.entries[index] =
+                    if let Some(index) = self.find_named_entry_index(atom, plan.receiver_shape()) {
+                        self.named_entries[index] =
                             Some(KeyedNamedPropertyCacheEntry { atom, entry: plan });
                         return;
                     }
-                    if usize::from(self.entry_count) >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
+                    if usize::from(self.named_entry_count) >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
                         self.promote_to_megamorphic(Some(KeyedPropertyFamily::NamedAtom));
                         return;
                     }
-                    self.entries[usize::from(self.entry_count)] =
+                    self.named_entries[usize::from(self.named_entry_count)] =
                         Some(KeyedNamedPropertyCacheEntry { atom, entry: plan });
-                    self.entry_count = self.entry_count.saturating_add(1);
-                    self.cache_state = if self.entry_count <= 1 {
+                    self.named_entry_count = self.named_entry_count.saturating_add(1);
+                    self.cache_state = if self.named_entry_count <= 1 {
                         InlineCacheState::Monomorphic
                     } else {
                         InlineCacheState::Polymorphic
@@ -636,12 +769,56 @@ impl KeyedPropertyFeedback {
     }
 
     #[inline]
-    fn observe_dense_index(&mut self) -> bool {
+    fn observe_dense_index(&mut self, plan: Option<DenseIndexCacheEntry>) -> bool {
+        let Some(plan) = plan else {
+            return self.observe_uncacheable_dense_index();
+        };
+        match self.family {
+            None | Some(KeyedPropertyFamily::DenseIndex) => {
+                if self.family.is_none() {
+                    self.install_first_dense_entry(plan);
+                    return true;
+                }
+                match self.cache_state {
+                    InlineCacheState::Megamorphic => false,
+                    InlineCacheState::Uninitialized => {
+                        self.install_first_dense_entry(plan);
+                        true
+                    }
+                    InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
+                        if let Some(index) = self.find_dense_entry_index(plan) {
+                            let changed = self.dense_entries[index] != Some(plan);
+                            self.dense_entries[index] = Some(plan);
+                            return changed;
+                        }
+                        if usize::from(self.dense_entry_count) >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
+                            self.promote_to_megamorphic(Some(KeyedPropertyFamily::DenseIndex));
+                            return true;
+                        }
+                        self.dense_entries[usize::from(self.dense_entry_count)] = Some(plan);
+                        self.dense_entry_count = self.dense_entry_count.saturating_add(1);
+                        self.cache_state = if self.dense_entry_count <= 1 {
+                            InlineCacheState::Monomorphic
+                        } else {
+                            InlineCacheState::Polymorphic
+                        };
+                        true
+                    }
+                }
+            }
+            Some(KeyedPropertyFamily::NamedAtom | KeyedPropertyFamily::Generic) => {
+                self.promote_mixed_keyed_family_to_generic()
+            }
+        }
+    }
+
+    #[inline]
+    fn observe_uncacheable_dense_index(&mut self) -> bool {
         match self.family {
             None | Some(KeyedPropertyFamily::DenseIndex) => {
                 if self.family == Some(KeyedPropertyFamily::DenseIndex)
                     && self.cache_state == InlineCacheState::Megamorphic
-                    && self.entry_count == 0
+                    && self.dense_entry_count == 0
                 {
                     return false;
                 }
@@ -649,21 +826,22 @@ impl KeyedPropertyFeedback {
                 true
             }
             Some(KeyedPropertyFamily::NamedAtom | KeyedPropertyFamily::Generic) => {
-                if self.family == Some(KeyedPropertyFamily::Generic)
-                    && self.cache_state == InlineCacheState::Megamorphic
-                    && self.entry_count == 0
-                {
-                    return false;
-                }
-                self.promote_to_megamorphic(Some(KeyedPropertyFamily::Generic));
-                true
+                self.promote_mixed_keyed_family_to_generic()
             }
         }
     }
 
     #[inline]
-    fn is_dense_index_family(&self) -> bool {
-        self.family == Some(KeyedPropertyFamily::DenseIndex)
+    fn promote_mixed_keyed_family_to_generic(&mut self) -> bool {
+        if self.family == Some(KeyedPropertyFamily::Generic)
+            && self.cache_state == InlineCacheState::Megamorphic
+            && self.named_entry_count == 0
+            && self.dense_entry_count == 0
+        {
+            return false;
+        }
+        self.promote_to_megamorphic(Some(KeyedPropertyFamily::Generic));
+        true
     }
 
     #[inline]
@@ -672,16 +850,93 @@ impl KeyedPropertyFeedback {
     }
 
     #[inline]
-    fn active_entries(&self) -> impl Iterator<Item = KeyedNamedPropertyCacheEntry> + '_ {
-        self.entries
+    fn dense_index_plan(
+        agent: &Agent,
+        receiver: ObjectRef,
+        index: u32,
+    ) -> Option<DenseIndexCacheEntry> {
+        let header = agent
+            .objects()
+            .object_header(agent.heap().view(), receiver)?;
+        if !Self::dense_index_receiver_is_cacheable(agent, receiver, header) {
+            return None;
+        }
+        Self::dense_value_from_header(agent, header, index)?;
+        Some(DenseIndexCacheEntry::from_header(header))
+    }
+
+    #[inline]
+    fn dense_index_receiver_is_cacheable(
+        agent: &Agent,
+        receiver: ObjectRef,
+        header: ObjectHeader,
+    ) -> bool {
+        matches!(header.kind(), ObjectKind::Ordinary | ObjectKind::Function)
+            && !header.flags().is_arguments_object()
+            && !agent.objects().is_module_namespace_object(receiver)
+            && !agent.objects().is_typed_array_object(receiver)
+            && agent.objects().primitive_wrapper_kind(receiver)
+                != Some(PrimitiveWrapperKind::String)
+    }
+
+    #[inline]
+    fn dense_value_from_header(agent: &Agent, header: ObjectHeader, index: u32) -> Option<Value> {
+        let elements = header.elements()?;
+        let index = usize::try_from(index).expect("u32 index should fit into usize");
+        let value = agent
+            .heap()
+            .view()
+            .object_slots(elements.raw())?
+            .get(index)
+            .copied()
+            .unwrap_or(Value::array_hole());
+        (value != Value::array_hole()).then_some(value)
+    }
+
+    #[inline]
+    fn match_dense_index_header(&self, agent: &Agent, receiver: ObjectRef) -> Option<ObjectHeader> {
+        if self.family != Some(KeyedPropertyFamily::DenseIndex) {
+            return None;
+        }
+        match self.cache_state {
+            InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {}
+            InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => return None,
+        }
+        let header = agent
+            .objects()
+            .object_header(agent.heap().view(), receiver)?;
+        self.active_dense_entries()
+            .any(|entry| entry.matches_header(header))
+            .then_some(header)
+    }
+
+    #[inline]
+    fn active_named_entries(&self) -> impl Iterator<Item = KeyedNamedPropertyCacheEntry> + '_ {
+        self.named_entries
             .iter()
-            .take(usize::from(self.entry_count))
+            .take(usize::from(self.named_entry_count))
             .filter_map(|entry| *entry)
     }
 
     #[inline]
-    fn find_entry_index(&self, atom: AtomId, receiver_shape: ShapeId) -> Option<usize> {
-        self.active_entries()
+    fn active_dense_entries(&self) -> impl Iterator<Item = DenseIndexCacheEntry> + '_ {
+        self.dense_entries
+            .iter()
+            .take(usize::from(self.dense_entry_count))
+            .filter_map(|entry| *entry)
+    }
+
+    #[inline]
+    const fn install_first_dense_entry(&mut self, entry: DenseIndexCacheEntry) {
+        self.family = Some(KeyedPropertyFamily::DenseIndex);
+        self.dense_entries[0] = Some(entry);
+        self.dense_entry_count = 1;
+        self.cache_state = InlineCacheState::Monomorphic;
+    }
+
+    #[inline]
+    fn find_named_entry_index(&self, atom: AtomId, receiver_shape: ShapeId) -> Option<usize> {
+        self.active_named_entries()
             .enumerate()
             .find_map(|(index, entry)| {
                 (entry.atom == atom && entry.entry.receiver_shape() == receiver_shape)
@@ -690,11 +945,20 @@ impl KeyedPropertyFeedback {
     }
 
     #[inline]
+    fn find_dense_entry_index(&self, plan: DenseIndexCacheEntry) -> Option<usize> {
+        self.active_dense_entries()
+            .enumerate()
+            .find_map(|(index, entry)| (entry == plan).then_some(index))
+    }
+
+    #[inline]
     const fn promote_to_megamorphic(&mut self, family: Option<KeyedPropertyFamily>) {
         self.family = family;
         self.cache_state = InlineCacheState::Megamorphic;
-        self.entry_count = 0;
-        self.entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
+        self.named_entry_count = 0;
+        self.named_entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
+        self.dense_entry_count = 0;
+        self.dense_entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
     }
 }
 
@@ -1076,6 +1340,57 @@ impl Vm {
         }
     }
 
+    pub(super) fn try_keyed_dense_index_load_inline_cache_hit(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        instruction_offset: u32,
+        receiver: ObjectRef,
+        index: u32,
+    ) -> Option<Value> {
+        let descriptor = self.feedback_descriptor_for_site(code, instruction_offset)?;
+        let site = self
+            .feedback_vectors
+            .get_mut(code_index(code))
+            .and_then(Option::as_mut)?
+            .site_mut(descriptor.slot())?;
+        let value = match site {
+            FeedbackSiteState::KeyedProperty(feedback) => {
+                feedback.try_dense_index_load(agent, receiver, index)
+            }
+            _ => None,
+        }?;
+        site.record_execution();
+        self.observe_tier_feedback_event(code);
+        Some(value)
+    }
+
+    pub(super) fn try_keyed_dense_index_store_inline_cache_hit(
+        &mut self,
+        agent: &mut Agent,
+        code: CodeRef,
+        instruction_offset: u32,
+        receiver: ObjectRef,
+        index: u32,
+        value: Value,
+    ) -> Option<bool> {
+        let descriptor = self.feedback_descriptor_for_site(code, instruction_offset)?;
+        let site = self
+            .feedback_vectors
+            .get_mut(code_index(code))
+            .and_then(Option::as_mut)?
+            .site_mut(descriptor.slot())?;
+        let stored = match site {
+            FeedbackSiteState::KeyedProperty(feedback) => {
+                feedback.try_dense_index_store(agent, receiver, index, value)
+            }
+            _ => None,
+        }?;
+        site.record_execution();
+        self.observe_tier_feedback_event(code);
+        Some(stored)
+    }
+
     pub(super) fn observe_keyed_atom_slow_path(
         &mut self,
         agent: &Agent,
@@ -1103,43 +1418,30 @@ impl Vm {
         });
     }
 
-    pub(super) fn observe_keyed_index_slow_path(&mut self, code: CodeRef, instruction_offset: u32) {
+    fn observe_keyed_index_slow_path(
+        &mut self,
+        code: CodeRef,
+        instruction_offset: u32,
+        plan: Option<DenseIndexCacheEntry>,
+    ) {
         let _ = self.ensure_feedback_site_execution(code, instruction_offset);
         let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
             if let FeedbackSiteState::KeyedProperty(feedback) = site {
-                let _ = feedback.observe_dense_index();
+                let _ = feedback.observe_dense_index(plan);
             }
         });
     }
 
-    fn record_keyed_dense_index_hit(&mut self, code: CodeRef, instruction_offset: u32) -> bool {
-        let Some(descriptor) = self.feedback_descriptor_for_site(code, instruction_offset) else {
-            return false;
-        };
-        let Some(site) = self
-            .feedback_vectors
-            .get_mut(code_index(code))
-            .and_then(Option::as_mut)
-            .and_then(|vector| vector.site_mut(descriptor.slot()))
-        else {
-            return false;
-        };
-        let FeedbackSiteState::KeyedProperty(feedback) = site else {
-            return false;
-        };
-        if !feedback.is_dense_index_family() {
-            return false;
-        }
-        site.record_execution();
-        self.observe_tier_feedback_event(code);
-        true
-    }
-
-    pub(super) fn observe_keyed_index_access(&mut self, code: CodeRef, instruction_offset: u32) {
-        if self.record_keyed_dense_index_hit(code, instruction_offset) {
-            return;
-        }
-        self.observe_keyed_index_slow_path(code, instruction_offset);
+    pub(super) fn observe_keyed_index_access(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        instruction_offset: u32,
+        receiver: ObjectRef,
+        index: u32,
+    ) {
+        let plan = KeyedPropertyFeedback::dense_index_plan(agent, receiver, index);
+        self.observe_keyed_index_slow_path(code, instruction_offset, plan);
     }
 
     pub(super) fn observe_keyed_generic_slow_path(
@@ -1291,7 +1593,11 @@ impl Vm {
                     KeyedPropertyFamily::NamedAtom => "NamedAtom",
                     KeyedPropertyFamily::Generic => "Generic",
                 }),
-                feedback.entry_count,
+                match feedback.family {
+                    Some(KeyedPropertyFamily::DenseIndex) => feedback.dense_entry_count,
+                    Some(KeyedPropertyFamily::NamedAtom) => feedback.named_entry_count,
+                    Some(KeyedPropertyFamily::Generic) | None => 0,
+                },
             )),
             _ => None,
         }
@@ -1300,14 +1606,29 @@ impl Vm {
 
 #[cfg(test)]
 mod tests {
-    use super::{KeyedPropertyFamily, KeyedPropertyFeedback};
+    use super::{
+        DenseIndexCacheEntry, InlineCacheState, KeyedPropertyFamily, KeyedPropertyFeedback,
+    };
+    use lyng_js_objects::ObjectFlags;
+    use lyng_js_types::ShapeId;
 
     #[test]
     fn dense_index_observation_reports_whether_classification_changed() {
         let mut feedback = KeyedPropertyFeedback::new();
+        let plan = DenseIndexCacheEntry::new(
+            ShapeId::from_raw(1).expect("test shape id should be non-zero"),
+            ObjectFlags::extensible(),
+        );
 
-        assert!(feedback.observe_dense_index());
-        assert!(!feedback.observe_dense_index());
+        assert!(feedback.observe_dense_index(Some(plan)));
+        assert!(!feedback.observe_dense_index(Some(plan)));
         assert_eq!(feedback.family, Some(KeyedPropertyFamily::DenseIndex));
+        assert_eq!(feedback.cache_state, InlineCacheState::Monomorphic);
+        assert_eq!(feedback.dense_entry_count, 1);
+
+        assert!(feedback.observe_dense_index(None));
+        assert!(!feedback.observe_dense_index(None));
+        assert_eq!(feedback.cache_state, InlineCacheState::Megamorphic);
+        assert_eq!(feedback.dense_entry_count, 0);
     }
 }
