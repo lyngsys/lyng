@@ -96,6 +96,20 @@ fn format_call_like_instruction(
     format!("{opcode}{result_prefix}callee=r{callee}, this=r{this_value}")
 }
 
+fn format_small_call_instruction(
+    opcode: &str,
+    result: u8,
+    callee: u8,
+    call_base: u8,
+    argument_count: u8,
+) -> String {
+    let argument_base = u16::from(call_base) + 1;
+    let argument_end = argument_base + u16::from(argument_count);
+    format!(
+        "{opcode}r{result}, callee=r{callee}, this=r{call_base}, args=[r{argument_base}..r{argument_end})"
+    )
+}
+
 fn format_construct_instruction(
     opcode: &str,
     instruction_offset: usize,
@@ -397,6 +411,16 @@ fn disassemble_instruction_at(
     let opcode = format!("{opcode:<16}");
     match instruction {
         Instruction::Abc { opcode: _, a, b, c } => match instruction.opcode() {
+            crate::Opcode::Call0
+            | crate::Opcode::Call1
+            | crate::Opcode::Call2
+            | crate::Opcode::Call3 => format_small_call_instruction(
+                &opcode,
+                a,
+                b,
+                c,
+                instruction.opcode().small_call_arity().unwrap_or(0),
+            ),
             crate::Opcode::Call => {
                 format_call_like_instruction(&opcode, instruction_offset, function, a, b, c, true)
             }

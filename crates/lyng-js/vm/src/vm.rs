@@ -164,6 +164,7 @@ impl FeedbackVectorFootprint {
 pub struct Vm {
     dispatch_mode: VmDispatchMode,
     register_stack: Vec<Value>,
+    register_stack_top: usize,
     frames: Vec<FrameRecord>,
     installed: Vec<Option<Arc<InstalledFunction>>>,
     current_exception: Option<Value>,
@@ -220,6 +221,7 @@ impl Vm {
         Self {
             dispatch_mode: VmDispatchMode::configured(),
             register_stack: Vec::new(),
+            register_stack_top: 0,
             frames: Vec::new(),
             installed: Vec::new(),
             current_exception: None,
@@ -282,7 +284,7 @@ impl Vm {
 
     #[inline]
     pub fn register_stack(&self) -> &[Value] {
-        &self.register_stack
+        &self.register_stack[..self.register_stack_top]
     }
 
     #[inline]
@@ -293,6 +295,39 @@ impl Vm {
     #[inline]
     pub fn frame(&self) -> Option<FrameRecord> {
         self.frames.last().copied()
+    }
+
+    #[inline]
+    pub(super) const fn register_stack_top(&self) -> usize {
+        self.register_stack_top
+    }
+
+    #[inline]
+    pub(super) fn release_register_stack_to(&mut self, top: usize) {
+        debug_assert!(
+            top <= self.register_stack_top,
+            "register stack cursor should only move back during cleanup"
+        );
+        debug_assert!(
+            top <= self.register_stack.len(),
+            "register stack cursor should stay inside backing storage"
+        );
+        self.register_stack_top = top;
+    }
+
+    #[inline]
+    pub(super) fn release_register_window(&mut self, register_base: u32) {
+        let Ok(top) = usize::try_from(register_base) else {
+            debug_assert!(false, "register stack base should fit into usize");
+            return;
+        };
+        self.release_register_stack_to(top);
+    }
+
+    #[cfg(test)]
+    #[inline]
+    pub(crate) const fn register_stack_storage_len_for_tests(&self) -> usize {
+        self.register_stack.len()
     }
 
     #[cfg(test)]
@@ -337,9 +372,17 @@ impl Vm {
             debug_assert!(false, "register stack base should fit into usize");
             return;
         };
-        debug_assert_eq!(self.register_stack.len(), start);
-        self.register_stack
-            .resize(start + usize::from(register_len), Value::undefined());
+        debug_assert_eq!(self.register_stack_top, start);
+        let Some(end) = start.checked_add(usize::from(register_len)) else {
+            debug_assert!(false, "register window end should fit into usize");
+            return;
+        };
+        if self.register_stack.len() < end {
+            self.register_stack.resize(end, Value::undefined());
+        } else {
+            self.register_stack[start..end].fill(Value::undefined());
+        }
+        self.register_stack_top = end;
     }
 
     #[inline]
@@ -1136,7 +1179,7 @@ impl Vm {
             .checked_add(function.hidden_register_count())
             .expect("frame register span should fit within u16");
         let register_base =
-            u32::try_from(self.register_stack.len()).expect("register stack length should fit u32");
+            u32::try_from(self.register_stack_top()).expect("register stack length should fit u32");
         self.reserve_register_window(register_base, register_len);
 
         let context = ExecutionContext::bytecode(realm, code, lexical_env, variable_env)
@@ -1200,11 +1243,9 @@ impl Vm {
             self.captured_name_references
                 .clear_window(leaked.registers());
             self.finalize_mapped_arguments(agent, leaked.lexical_env())?;
-            self.register_stack.truncate(
-                usize::try_from(leaked.registers().base()).expect("base should fit usize"),
-            );
+            self.release_register_window(leaked.registers().base());
         }
-        self.register_stack.truncate(prior_register_len);
+        self.release_register_stack_to(prior_register_len);
         while agent.execution_contexts().len() > prior_context_depth {
             let _ = agent.pop_execution_context();
         }

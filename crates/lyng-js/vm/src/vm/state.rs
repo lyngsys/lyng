@@ -205,7 +205,7 @@ impl TraceHeapEdges for ActiveVmRoots<'_> {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
         trace_frame_record(self.caller_frame, tracer);
 
-        for value in &self.vm.register_stack {
+        for value in self.vm.register_stack() {
             value.trace_heap_edges(tracer);
         }
         for frame in &self.vm.frames {

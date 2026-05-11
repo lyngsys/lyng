@@ -228,6 +228,10 @@ const fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::CopyDataProperties
         | Opcode::SetFunctionName
         | Opcode::ToPropertyKey
+        | Opcode::Call0
+        | Opcode::Call1
+        | Opcode::Call2
+        | Opcode::Call3
         | Opcode::Call
         | Opcode::CallMethod
         | Opcode::TailCall

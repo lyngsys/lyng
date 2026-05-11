@@ -35,11 +35,9 @@ impl Vm {
                 .async_generator_frame_states
                 .remove(&leaked.registers().base());
             self.finalize_mapped_arguments(agent, leaked.lexical_env())?;
-            self.register_stack.truncate(
-                usize::try_from(leaked.registers().base()).expect("base should fit usize"),
-            );
+            self.release_register_window(leaked.registers().base());
         }
-        self.register_stack.truncate(prior_register_len);
+        self.release_register_stack_to(prior_register_len);
         while agent.execution_contexts().len() > prior_context_depth {
             let _ = agent.pop_execution_context();
         }
@@ -107,7 +105,7 @@ impl Vm {
 
         let prior_frame_depth = self.frames.len();
         let prior_context_depth = agent.execution_contexts().len();
-        let prior_register_len = self.register_stack.len();
+        let prior_register_len = self.register_stack_top();
         let prepared =
             self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, None)?;
         let register_base =
@@ -220,7 +218,7 @@ impl Vm {
 
         let prior_frame_depth = self.frames.len();
         let prior_context_depth = agent.execution_contexts().len();
-        let prior_register_len = self.register_stack.len();
+        let prior_register_len = self.register_stack_top();
         let derived_construct = Self::bytecode_entry(agent, callee)
             .and_then(|code| self.installed_function(code))
             .is_some_and(|function| function.flags().derived_class_constructor());

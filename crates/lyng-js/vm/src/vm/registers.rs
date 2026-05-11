@@ -6,7 +6,7 @@ impl Vm {
     pub(super) fn read_register(&self, frame: FrameRecord, register: u16) -> Value {
         let absolute = absolute_register(frame, register);
         debug_assert!(
-            absolute < self.register_stack.len(),
+            absolute < self.register_stack_top(),
             "validated register window should be reserved on the VM stack"
         );
         // SAFETY: bytecode installation validates every register operand against the function's
@@ -17,7 +17,7 @@ impl Vm {
     pub(super) fn write_register(&mut self, frame: FrameRecord, register: u16, value: Value) {
         let absolute = absolute_register(frame, register);
         debug_assert!(
-            absolute < self.register_stack.len(),
+            absolute < self.register_stack_top(),
             "validated register window should be reserved on the VM stack"
         );
         // SAFETY: bytecode installation validates every register operand against the function's
@@ -86,9 +86,7 @@ impl Vm {
         self.captured_name_references
             .clear_window(frame.registers());
         self.finalize_mapped_arguments(agent, frame.lexical_env())?;
-        self.register_stack.truncate(
-            usize::try_from(frame.registers().base()).expect("base should fit into usize"),
-        );
+        self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
 
         let internal_completion_target =

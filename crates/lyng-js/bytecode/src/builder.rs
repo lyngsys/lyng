@@ -60,6 +60,7 @@ pub enum BytecodeOperandKind {
     CallResult,
     CallCallee,
     CallThis,
+    CallBase,
     TailCallCallee,
     TailCallThis,
     ConstructResult,
@@ -548,6 +549,39 @@ impl BytecodeBuilder {
             self.emit(Instruction::abc(Opcode::Call, result, callee, this_value))?;
         self.add_wide_operand(instruction_offset, arguments.encode());
         Ok(instruction_offset)
+    }
+
+    #[inline]
+    /// Append a compact non-spread call instruction for zero through three arguments.
+    ///
+    /// The encoded call base register stores the receiver, followed by the argument registers.
+    ///
+    /// # Errors
+    /// Returns [`BytecodeBuildError::OperandOverflow`] when one of the fixed call registers cannot
+    /// fit in the compact call fields, or [`BytecodeBuildError::LimitExceeded`] when the
+    /// instruction offset is too large.
+    pub fn emit_small_call(
+        &mut self,
+        result: u16,
+        callee: u16,
+        call_base: u16,
+        argument_count: u8,
+    ) -> BytecodeBuildResult<u32> {
+        let opcode = match argument_count {
+            0 => Opcode::Call0,
+            1 => Opcode::Call1,
+            2 => Opcode::Call2,
+            3 => Opcode::Call3,
+            _ => {
+                return Err(BytecodeBuildError::OperandOverflow {
+                    kind: BytecodeOperandKind::CallBase,
+                });
+            }
+        };
+        let result = narrow_call_operand(result, BytecodeOperandKind::CallResult)?;
+        let callee = narrow_call_operand(callee, BytecodeOperandKind::CallCallee)?;
+        let call_base = narrow_call_operand(call_base, BytecodeOperandKind::CallBase)?;
+        self.emit(Instruction::abc(opcode, result, callee, call_base))
     }
 
     #[inline]

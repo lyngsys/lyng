@@ -143,6 +143,27 @@ fn dispatch_string_transform_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(None)
 }
 
+pub(super) fn string_to_upper_case_builtin<Cx: PublicBuiltinDispatchContext>(
+    context: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    string_case_mapping_builtin(context, invocation, StringCaseMapping::Upper)
+}
+
+pub(super) fn string_char_code_at_builtin<Cx: PublicBuiltinDispatchContext>(
+    context: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    basic::string_char_code_at_builtin(context, invocation)
+}
+
+pub(super) fn string_from_char_code_builtin<Cx: PublicBuiltinDispatchContext>(
+    context: &mut Cx,
+    invocation: BuiltinInvocation<'_>,
+) -> Result<Value, Cx::Error> {
+    basic::string_from_char_code_builtin(context, invocation)
+}
+
 #[derive(Clone, Copy)]
 struct StringHtmlMethodSpec {
     tag: &'static str,

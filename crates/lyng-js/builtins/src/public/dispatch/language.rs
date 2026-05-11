@@ -718,7 +718,7 @@ fn encode_uri_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(string_value(cx, &encoded))
 }
 
-fn decode_uri_builtin<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn decode_uri_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
     component: bool,

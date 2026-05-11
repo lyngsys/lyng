@@ -232,7 +232,7 @@ fn string_char_at_builtin<Cx: PublicBuiltinDispatchContext>(
     Ok(string_from_code_units(cx, &unit))
 }
 
-fn string_char_code_at_builtin<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn string_char_code_at_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
@@ -267,7 +267,7 @@ fn collect_small_smi_char_code_units(arguments: &[Value]) -> Option<([u16; 4], u
     Some((units, arguments.len()))
 }
 
-fn string_from_char_code_builtin<Cx: PublicBuiltinDispatchContext>(
+pub(super) fn string_from_char_code_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {

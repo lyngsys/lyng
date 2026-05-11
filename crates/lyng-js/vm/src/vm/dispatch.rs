@@ -243,6 +243,22 @@ impl Vm {
                                 agent, host, registry, frame, a, b, c,
                             )?;
                         }
+                        Opcode::Call0 | Opcode::Call1 | Opcode::Call2 | Opcode::Call3 => {
+                            let call_result = self.call_value_small(
+                                agent,
+                                host,
+                                registry,
+                                frame,
+                                a,
+                                b,
+                                c,
+                                opcode.small_call_arity().unwrap_or(0),
+                            );
+                            let Some(()) = self.handle_vm_result(agent, call_result)? else {
+                                continue;
+                            };
+                            self.record_feedback_site(frame.code(), frame.instruction_offset());
+                        }
                         Opcode::Call => {
                             let payload = installed
                                 .wide_payload(frame.instruction_offset())
@@ -1076,7 +1092,9 @@ impl Vm {
             Opcode::Jump | Opcode::LoopHeader => Self::threaded_jump,
             Opcode::JumpIfTrue | Opcode::JumpIfFalse => Self::threaded_conditional_jump,
             Opcode::CreateClosure => Self::threaded_create_closure,
-            Opcode::Call => Self::threaded_call,
+            Opcode::Call0 | Opcode::Call1 | Opcode::Call2 | Opcode::Call3 | Opcode::Call => {
+                Self::threaded_call
+            }
             Opcode::Nop => Self::threaded_nop,
             Opcode::Return | Opcode::ReturnUndefined => Self::threaded_return,
             _ => Self::threaded_switch_to_match,
@@ -1425,6 +1443,23 @@ impl Vm {
         let Instruction::Abc { opcode, a, b, c } = instruction else {
             return Ok(ThreadedStep::SwitchToMatch);
         };
+        if let Some(argument_count) = opcode.small_call_arity() {
+            let call_result = self.call_value_small(
+                agent,
+                host,
+                registry,
+                frame,
+                u16::from(a),
+                u16::from(b),
+                u16::from(c),
+                argument_count,
+            );
+            let Some(()) = self.handle_vm_result(agent, call_result)? else {
+                return Ok(ThreadedStep::Continue);
+            };
+            self.record_feedback_site(frame.code(), frame.instruction_offset());
+            return Ok(ThreadedStep::Continue);
+        }
         if opcode != Opcode::Call {
             return Ok(ThreadedStep::SwitchToMatch);
         }

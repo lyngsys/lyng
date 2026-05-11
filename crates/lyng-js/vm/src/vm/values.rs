@@ -519,7 +519,9 @@ impl Vm {
         b: u8,
         c: u8,
     ) -> (u16, u16, u16) {
-        if matches!(opcode, Opcode::Call | Opcode::TailCall | Opcode::Construct) {
+        if opcode.small_call_arity().is_some()
+            || matches!(opcode, Opcode::Call | Opcode::TailCall | Opcode::Construct)
+        {
             return (u16::from(a), u16::from(b), u16::from(c));
         }
         let operands = installed

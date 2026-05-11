@@ -365,6 +365,15 @@ fn validate_instruction_registers(
                 | Opcode::AdvanceForIn
                 | Opcode::AdvanceIterator
                 | Opcode::DelegateYield => validate_registers(code, register_len, [a, b, c]),
+                Opcode::Call0 | Opcode::Call1 | Opcode::Call2 | Opcode::Call3 => {
+                    validate_registers(code, register_len, [a, b])?;
+                    validate_small_call_registers(
+                        code,
+                        register_len,
+                        c,
+                        opcode.small_call_arity().unwrap_or(0),
+                    )
+                }
                 Opcode::Call => {
                     validate_registers(code, register_len, [a, b, c])?;
                     validate_call_range(code, function, register_len, instruction_offset)
@@ -451,7 +460,9 @@ fn abc_operands_for_validation(
     b: u8,
     c: u8,
 ) -> (u16, u16, u16) {
-    if matches!(opcode, Opcode::Call | Opcode::TailCall | Opcode::Construct) {
+    if opcode.small_call_arity().is_some()
+        || matches!(opcode, Opcode::Call | Opcode::TailCall | Opcode::Construct)
+    {
         return (u16::from(a), u16::from(b), u16::from(c));
     }
     let operands = wide_payload(function, instruction_offset).map_or_else(
@@ -496,6 +507,21 @@ fn validate_call_range(
         });
     };
     validate_registers(code, register_len, [last_register])
+}
+
+fn validate_small_call_registers(
+    code: CodeRef,
+    register_len: u16,
+    call_base: u16,
+    argument_count: u8,
+) -> VmResult<()> {
+    let Some(last_register) = call_base.checked_add(u16::from(argument_count)) else {
+        return Err(VmError::RegisterOutOfBounds {
+            code,
+            register: u16::MAX,
+        });
+    };
+    validate_registers(code, register_len, [call_base, last_register])
 }
 
 fn validate_registers<const N: usize>(

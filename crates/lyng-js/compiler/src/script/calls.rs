@@ -271,6 +271,35 @@ impl FunctionCompiler<'_, '_> {
         ))
     }
 
+    pub(super) fn bridge_small_call_registers(
+        &mut self,
+        dest: u16,
+        callee: u16,
+    ) -> LoweringResult<(u16, u16, Option<u16>)> {
+        if u8::try_from(dest).is_ok() && u8::try_from(callee).is_ok() {
+            return Ok((dest, callee, None));
+        }
+
+        let bridges = self
+            .call_bridge_registers
+            .expect("call bridge registers should be reserved before lowering");
+        if bridges.result > u16::from(u8::MAX) || bridges.callee > u16::from(u8::MAX) {
+            return Err(LoweringError::RegisterOverflow {
+                register: bridges.callee.max(bridges.result),
+            });
+        }
+
+        if callee != bridges.callee {
+            self.emit_move(bridges.callee, callee)?;
+        }
+
+        Ok((
+            bridges.result,
+            bridges.callee,
+            (dest != bridges.result).then_some(dest),
+        ))
+    }
+
     pub(super) fn bridge_tail_call_registers(
         &mut self,
         callee: u16,
@@ -317,24 +346,49 @@ impl FunctionCompiler<'_, '_> {
         }
         let (callee_register, this_register) = self.lower_call_target(callee)?;
         let argument_values = self.lower_call_arguments(arguments)?;
-        let argument_range = self.materialize_argument_block(&argument_values.registers)?;
-        let (call_result, call_callee, call_this, move_back) =
-            self.bridge_call_registers(dest, callee_register, this_register)?;
-        let instruction_offset = self.builder.emit_call(
-            self.encode_register(call_result)?,
-            self.encode_register(call_callee)?,
-            self.encode_register(call_this)?,
-            argument_range,
-        )?;
+        let (instruction_offset, argument_count, call_result, move_back) = if let Some(call_base) =
+            self.materialize_small_call_block(
+                this_register,
+                &argument_values.registers,
+                argument_values.spread_mask,
+            )? {
+            let (call_result, call_callee, move_back) =
+                self.bridge_small_call_registers(dest, callee_register)?;
+            let argument_count = u8::try_from(argument_values.registers.len())
+                .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+            (
+                self.builder.emit_small_call(
+                    self.encode_register(call_result)?,
+                    self.encode_register(call_callee)?,
+                    self.encode_register(call_base)?,
+                    argument_count,
+                )?,
+                u16::from(argument_count),
+                call_result,
+                move_back,
+            )
+        } else {
+            let argument_range = self.materialize_argument_block(&argument_values.registers)?;
+            let (call_result, call_callee, call_this, move_back) =
+                self.bridge_call_registers(dest, callee_register, this_register)?;
+            (
+                self.builder.emit_call(
+                    self.encode_register(call_result)?,
+                    self.encode_register(call_callee)?,
+                    self.encode_register(call_this)?,
+                    argument_range,
+                )?,
+                argument_range.argument_count(),
+                call_result,
+                move_back,
+            )
+        };
         let span = self.ast().get_expr(expr_id).span();
         self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         self.builder.add_feedback_site(
             instruction_offset,
             FeedbackSiteKind::Call,
-            self.call_feedback_metadata(
-                argument_range.argument_count(),
-                argument_values.spread_mask,
-            ),
+            self.call_feedback_metadata(argument_count, argument_values.spread_mask),
         )?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
@@ -581,6 +635,32 @@ impl FunctionCompiler<'_, '_> {
         }
 
         Ok(CallRange::new(base, count))
+    }
+
+    pub(super) fn materialize_small_call_block(
+        &mut self,
+        this_value: u16,
+        arguments: &[u16],
+        spread_mask: u64,
+    ) -> LoweringResult<Option<u16>> {
+        if spread_mask != 0 || arguments.len() > 3 {
+            return Ok(None);
+        }
+        let call_base = self.builder.header().register_count();
+        if call_base > u16::from(u8::MAX) {
+            return Ok(None);
+        }
+        let block_width = u16::try_from(arguments.len() + 1)
+            .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+        let Some(call_base) = self.builder.try_alloc_registers(block_width) else {
+            return Ok(None);
+        };
+        self.emit_move(call_base, this_value)?;
+        for (index, source) in arguments.iter().enumerate() {
+            let target = call_base + 1 + u16::try_from(index).unwrap_or(u16::MAX);
+            self.emit_move(target, *source)?;
+        }
+        Ok(Some(call_base))
     }
 
     #[allow(

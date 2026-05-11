@@ -691,6 +691,7 @@ mod tests {
     fn number_binary_opcode_fast_path_handles_double_operands() {
         let mut vm = Vm::new();
         vm.register_stack = vec![Value::from_f64(1.5), Value::from_f64(2.25)];
+        vm.register_stack_top = vm.register_stack.len();
 
         let value = vm.try_primitive_number_binary_opcode(test_frame(), Opcode::Add, 0, 1);
 

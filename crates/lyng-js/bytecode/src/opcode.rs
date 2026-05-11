@@ -91,6 +91,10 @@ pub enum Opcode {
     CopyDataProperties,
     SetFunctionName,
     ToPropertyKey,
+    Call0,
+    Call1,
+    Call2,
+    Call3,
     Call,
     CallMethod,
     TailCall,
@@ -212,6 +216,10 @@ const OPCODES: [Opcode; OPCODE_COUNT as usize] = [
     Opcode::CopyDataProperties,
     Opcode::SetFunctionName,
     Opcode::ToPropertyKey,
+    Opcode::Call0,
+    Opcode::Call1,
+    Opcode::Call2,
+    Opcode::Call3,
     Opcode::Call,
     Opcode::CallMethod,
     Opcode::TailCall,
@@ -343,6 +351,10 @@ impl Opcode {
             Self::CopyDataProperties => "CopyDataProperties",
             Self::SetFunctionName => "SetFunctionName",
             Self::ToPropertyKey => "ToPropertyKey",
+            Self::Call0 => "Call0",
+            Self::Call1 => "Call1",
+            Self::Call2 => "Call2",
+            Self::Call3 => "Call3",
             Self::Call => "Call",
             Self::CallMethod => "CallMethod",
             Self::TailCall => "TailCall",
@@ -376,6 +388,17 @@ impl Opcode {
     #[inline]
     pub const fn is_jump(self) -> bool {
         matches!(self, Self::Jump | Self::JumpIfTrue | Self::JumpIfFalse)
+    }
+
+    #[inline]
+    pub const fn small_call_arity(self) -> Option<u8> {
+        match self {
+            Self::Call0 => Some(0),
+            Self::Call1 => Some(1),
+            Self::Call2 => Some(2),
+            Self::Call3 => Some(3),
+            _ => None,
+        }
     }
 }
 

@@ -30,7 +30,7 @@ impl Vm {
     ) -> VmResult<()> {
         let prepared =
             self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, new_target)?;
-        let register_base = u32::try_from(self.register_stack.len())
+        let register_base = u32::try_from(self.register_stack_top())
             .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
         if self
             .installed_function(prepared.code)
@@ -292,7 +292,7 @@ impl Vm {
         ) {
             let register_base = usize::try_from(register_base)
                 .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
-            self.register_stack.truncate(register_base);
+            self.release_register_stack_to(register_base);
             return Err(error);
         }
         let frame = FrameRecord::new(
@@ -340,7 +340,7 @@ impl Vm {
         self.finalize_mapped_arguments(agent, frame.lexical_env())?;
         let register_base = usize::try_from(frame.registers().base())
             .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
-        self.register_stack.truncate(register_base);
+        self.release_register_stack_to(register_base);
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
         Ok(())
@@ -904,6 +904,7 @@ mod tests {
             ExecutionContextKind::Script,
         );
         vm.register_stack.resize(4, Value::undefined());
+        vm.register_stack_top = vm.register_stack.len();
         agent.push_execution_context(ExecutionContext::script(
             realm.id(),
             realm.global_env(),

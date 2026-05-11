@@ -50,6 +50,99 @@ fn frame_record_carries_bytecode_execution_state() {
 }
 
 #[test]
+fn completed_bytecode_calls_keep_register_storage_inactive_for_reuse() {
+    let unit = compile_test_unit(
+        149,
+        r"
+        function add(left, right) {
+            return left + right;
+        }
+
+        var total = 0;
+        for (var i = 0; i < 4; i = i + 1) {
+            total = add(total, i);
+        }
+        total;
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(6));
+    assert!(vm.register_stack().is_empty());
+    assert!(vm.register_stack_storage_len_for_tests() > 0);
+}
+
+#[test]
+fn small_arity_calls_preserve_call_semantics() {
+    let unit = compile_test_unit(
+        150,
+        r#"
+        function score(a, b, c, d) {
+            return arguments.length * 1000
+                + (a || 0)
+                + (b || 0) * 10
+                + (c || 0) * 100
+                + (d || 0) * 1000;
+        }
+
+        var receiver = {
+            base: 50,
+            plus(a, b, c) {
+                return this.base + a + b + c;
+            }
+        };
+        var bound = receiver.plus.bind({ base: 70 }, 1);
+        var proxy = new Proxy(function(a, b) {
+            return this.base + a + b;
+        }, {
+            apply(target, thisArg, args) {
+                return Reflect.apply(target, thisArg, args) + args.length;
+            }
+        });
+        function Constructor(a, b, c) {
+            this.total = a + b + c;
+        }
+        function tail(n, acc) {
+            "use strict";
+            if (n === 0) {
+                return acc;
+            }
+            return tail(n - 1, acc + n);
+        }
+
+        score() === 0
+            && score(4) === 1004
+            && score(4, 5) === 2054
+            && score(4, 5, 6) === 3654
+            && score(4, 5, 6, 7) === 11654
+            && score(...[4]) === 1004
+            && receiver.plus(1, 2, 3) === 56
+            && bound(2, 3) === 76
+            && receiver.plus.call(receiver, 4, 5, 6) === 65
+            && proxy.call(receiver, 8, 9) === 69
+            && new Constructor(1, 2, 3).total === 6
+            && tail(3, 0) === 6;
+        "#,
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();

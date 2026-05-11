@@ -30,6 +30,10 @@ impl Vm {
             GeneratorResumeKind::Next
         };
         self.restore_suspended_execution(agent, suspended, resume_kind, argument)?;
+        let resumed_frame_base = self
+            .frame()
+            .map(|frame| frame.registers().base())
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let resumed_module_key = self.frame().and_then(|frame| {
             agent
                 .module_key_for_environment(frame.variable_env())
@@ -37,12 +41,8 @@ impl Vm {
         });
         let prior_frame_depth = self.frames.len().saturating_sub(1);
         let prior_context_depth = agent.execution_contexts().len().saturating_sub(1);
-        let prior_register_len = usize::try_from(
-            self.frames
-                .get(prior_frame_depth)
-                .map_or(0, |frame| frame.registers().end()),
-        )
-        .expect("prior register length should fit usize");
+        let prior_register_len =
+            usize::try_from(resumed_frame_base).expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
 
         let result = self.run(agent, host, registry);
@@ -83,7 +83,7 @@ impl Vm {
         let promise = Self::promise_capability_promise(agent, capability)?;
         let prior_frame_depth = self.frames.len();
         let prior_context_depth = agent.execution_contexts().len();
-        let prior_register_len = self.register_stack.len();
+        let prior_register_len = self.register_stack_top();
         let register_base =
             u32::try_from(prior_register_len).expect("register stack length should fit u32");
 
@@ -206,12 +206,8 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let prior_frame_depth = self.frames.len().saturating_sub(1);
         let prior_context_depth = agent.execution_contexts().len().saturating_sub(1);
-        let prior_register_len = usize::try_from(
-            self.frames
-                .get(prior_frame_depth)
-                .map_or(0, |frame| frame.registers().end()),
-        )
-        .expect("prior register length should fit usize");
+        let prior_register_len =
+            usize::try_from(async_frame_base).expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
 
         let result = self.run(agent, host, registry);
@@ -347,9 +343,7 @@ impl Vm {
             .pop()
             .expect("await suspension requires one active frame");
         debug_assert_eq!(active, frame);
-        self.register_stack.truncate(
-            usize::try_from(frame.registers().base()).expect("base should fit into usize"),
-        );
+        self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
         Self::enqueue_await_resume(agent, promise, suspended)?;

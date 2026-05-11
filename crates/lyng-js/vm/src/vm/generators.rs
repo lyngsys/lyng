@@ -55,7 +55,7 @@ impl Vm {
             .is_some_and(|function| function.flags().async_function());
         let prior_frame_depth = self.frames.len();
         let prior_context_depth = agent.execution_contexts().len();
-        let prior_register_len = self.register_stack.len();
+        let prior_register_len = self.register_stack_top();
         self.install_prepared_bytecode_call(
             agent,
             prepared,
@@ -724,12 +724,8 @@ impl Vm {
         }
         let prior_frame_depth = self.frames.len().saturating_sub(1);
         let prior_context_depth = agent.execution_contexts().len().saturating_sub(1);
-        let prior_register_len = usize::try_from(
-            self.frames
-                .get(prior_frame_depth)
-                .map_or(0, |frame| frame.registers().end()),
-        )
-        .expect("prior register length should fit usize");
+        let prior_register_len =
+            usize::try_from(frame_base).expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
 
         let result = self.run(agent, host, registry);
@@ -792,9 +788,7 @@ impl Vm {
             .pop()
             .expect("generator suspension requires one active frame");
         debug_assert_eq!(active, frame);
-        self.register_stack.truncate(
-            usize::try_from(frame.registers().base()).expect("base should fit into usize"),
-        );
+        self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
         Err(VmError::GeneratorYield {
@@ -817,9 +811,7 @@ impl Vm {
             .pop()
             .expect("generator start suspension requires one active frame");
         debug_assert_eq!(active, frame);
-        self.register_stack.truncate(
-            usize::try_from(frame.registers().base()).expect("base should fit into usize"),
-        );
+        self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
         Err(VmError::GeneratorStart { suspended })
@@ -1525,7 +1517,7 @@ impl Vm {
         }
 
         let register_base =
-            u32::try_from(self.register_stack.len()).expect("register stack length should fit u32");
+            u32::try_from(self.register_stack_top()).expect("register stack length should fit u32");
         let register_len = u16::try_from(saved_registers.len())
             .expect("suspended register window length should fit u16");
         self.reserve_register_window(register_base, register_len);

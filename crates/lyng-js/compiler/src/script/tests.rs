@@ -4,6 +4,10 @@ use lyng_js_sema::analyze_script;
 use std::collections::HashSet;
 use std::fmt::Write as _;
 
+fn is_ordinary_call_opcode(opcode: Opcode) -> bool {
+    opcode == Opcode::Call || opcode.small_call_arity().is_some()
+}
+
 #[test]
 fn compile_script_allocates_persistent_slots_for_global_lexicals_and_explicit_global_access() {
     let mut atoms = AtomTable::new();
@@ -136,13 +140,10 @@ fn compile_script_emits_child_templates_and_call_sites() {
             ..
         }
     )));
-    assert!(entry.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::Call,
-            ..
-        }
-    )));
+    assert!(entry
+        .instructions()
+        .iter()
+        .any(|instruction| is_ordinary_call_opcode(instruction.opcode())));
 }
 
 #[test]
@@ -766,6 +767,48 @@ fn compile_script_supports_large_register_functions_and_high_register_calls() {
 }
 
 #[test]
+fn compile_script_uses_small_arity_call_opcodes_for_non_spread_calls() {
+    let source = r"
+        function fnRef(a, b, c, d) { return a + b + c + d; }
+        fnRef();
+        fnRef(1);
+        fnRef(1, 2);
+        fnRef(1, 2, 3);
+        fnRef(1, 2, 3, 4);
+        fnRef(...[1]);
+    ";
+
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(&mut atoms, lyng_js_common::SourceId::new(3_141), source);
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let instructions = entry.instructions();
+
+    for opcode in [Opcode::Call0, Opcode::Call1, Opcode::Call2, Opcode::Call3] {
+        assert!(
+            instructions
+                .iter()
+                .any(|instruction| instruction.opcode() == opcode),
+            "expected {opcode:?} in:\n{}",
+            lyng_js_bytecode::disassemble(entry)
+        );
+    }
+    assert_eq!(
+        instructions
+            .iter()
+            .filter(|instruction| matches!(instruction.opcode(), Opcode::Call))
+            .count(),
+        2,
+        "four-argument and spread calls should keep the Call fallback:\n{}",
+        lyng_js_bytecode::disassemble(entry)
+    );
+}
+
+#[test]
 fn compile_script_reuses_private_field_registers_for_extremely_large_classes() {
     let mut source = String::from("class Overflow {\n");
     for index in 0..10_000 {
@@ -1118,13 +1161,10 @@ fn compile_script_marks_direct_tail_calls_explicitly() {
             ..
         }
     )));
-    assert!(!recur.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::Call,
-            ..
-        }
-    )));
+    assert!(!recur
+        .instructions()
+        .iter()
+        .any(|instruction| is_ordinary_call_opcode(instruction.opcode())));
 }
 
 #[test]
@@ -1172,13 +1212,10 @@ fn compile_script_keeps_non_tail_calls_and_finally_returns_non_tail() {
         .find_map(|(name, function)| (*name == "guarded").then_some(*function))
         .expect("guarded function should be lowered");
 
-    assert!(direct.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::Call,
-            ..
-        }
-    )));
+    assert!(direct
+        .instructions()
+        .iter()
+        .any(|instruction| is_ordinary_call_opcode(instruction.opcode())));
     assert!(!direct.instructions().iter().any(|instruction| matches!(
         instruction,
         lyng_js_bytecode::Instruction::Abc {
@@ -1186,13 +1223,10 @@ fn compile_script_keeps_non_tail_calls_and_finally_returns_non_tail() {
             ..
         }
     )));
-    assert!(guarded.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::Call,
-            ..
-        }
-    )));
+    assert!(guarded
+        .instructions()
+        .iter()
+        .any(|instruction| is_ordinary_call_opcode(instruction.opcode())));
     assert!(!guarded.instructions().iter().any(|instruction| matches!(
         instruction,
         lyng_js_bytecode::Instruction::Abc {
@@ -1272,13 +1306,10 @@ fn compile_script_keeps_shadowed_eval_fallback_on_the_tail_path() {
             ..
         }
     )));
-    assert!(recur.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::Call,
-            ..
-        }
-    )));
+    assert!(recur
+        .instructions()
+        .iter()
+        .any(|instruction| is_ordinary_call_opcode(instruction.opcode())));
 }
 
 #[test]

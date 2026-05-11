@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use lyng_js_types::{ObjectRef, SymbolRef, Value};
 
@@ -100,14 +100,14 @@ impl WeakMapState {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct WeakSetState {
-    entries: Vec<WeakHeapRef>,
+    entries: HashSet<WeakHeapRef>,
 }
 
 impl WeakSetState {
     #[inline]
-    pub(crate) const fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            entries: Vec::new(),
+            entries: HashSet::new(),
         }
     }
 
@@ -117,15 +117,11 @@ impl WeakSetState {
     }
 
     pub(crate) fn insert(&mut self, value: WeakHeapRef) {
-        if !self.contains(value) {
-            self.entries.push(value);
-        }
+        self.entries.insert(value);
     }
 
     pub(crate) fn delete(&mut self, value: WeakHeapRef) -> bool {
-        let original_len = self.entries.len();
-        self.entries.retain(|entry| *entry != value);
-        original_len != self.entries.len()
+        self.entries.remove(&value)
     }
 
     pub(crate) fn retain_live_values(&mut self, mut is_live: impl FnMut(WeakHeapRef) -> bool) {
@@ -171,6 +167,75 @@ mod tests {
 
     fn object_key(raw: u32) -> WeakHeapRef {
         WeakHeapRef::Object(ObjectRef::from_raw(raw).expect("test object handle"))
+    }
+
+    #[test]
+    fn weak_set_tracks_insert_duplicate_contains_and_delete() {
+        let first = object_key(1);
+        let second = object_key(2);
+        let mut state = WeakSetState::new();
+
+        assert!(!state.contains(first));
+        state.insert(first);
+        state.insert(first);
+        assert!(state.contains(first));
+        assert!(!state.contains(second));
+
+        let mut retained_count = 0;
+        state.retain_live_values(|value| {
+            retained_count += 1;
+            value == first
+        });
+        assert_eq!(retained_count, 1);
+        assert!(state.contains(first));
+
+        state.insert(second);
+        assert!(state.delete(first));
+        assert!(!state.delete(first));
+        assert!(!state.contains(first));
+        assert!(state.contains(second));
+    }
+
+    #[test]
+    fn weak_set_retain_live_values_filters_dead_members() {
+        let mut state = WeakSetState::new();
+        for raw in 1..=5 {
+            state.insert(object_key(raw));
+        }
+
+        state.retain_live_values(
+            |value| matches!(value, WeakHeapRef::Object(object) if object.get() % 2 == 1),
+        );
+
+        assert!(state.contains(object_key(1)));
+        assert!(!state.contains(object_key(2)));
+        assert!(state.contains(object_key(3)));
+        assert!(!state.contains(object_key(4)));
+        assert!(state.contains(object_key(5)));
+    }
+
+    #[test]
+    fn weak_set_membership_scales_for_deep_sets() {
+        const ENTRY_COUNT: u32 = 12_000;
+
+        let mut state = WeakSetState::new();
+        let started = Instant::now();
+        for raw in 1..=ENTRY_COUNT {
+            state.insert(object_key(raw));
+        }
+        let mut observed = 0_u32;
+        for raw in 1..=ENTRY_COUNT {
+            if state.contains(object_key(raw)) {
+                observed += 1;
+            }
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(observed, ENTRY_COUNT);
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "weak set insert and lookup over {ENTRY_COUNT} entries took {elapsed:?}"
+        );
     }
 
     #[test]

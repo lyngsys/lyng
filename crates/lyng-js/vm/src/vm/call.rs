@@ -86,6 +86,43 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
     )]
+    fn invoke_collected_call_value(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        result_register: u16,
+        callee_value: Value,
+        this_value: Value,
+        collected_arguments: &mut Vec<Value>,
+    ) -> VmResult<()> {
+        let mut callee = Self::require_callable_object(agent, frame, callee_value)?;
+        let mut effective_this = this_value;
+        Self::resolve_bound_call_chain(
+            agent,
+            &mut callee,
+            &mut effective_this,
+            collected_arguments,
+        )?;
+        Self::reject_class_constructor_call(agent, callee, frame.realm())?;
+
+        self.invoke_call_target(
+            agent,
+            host,
+            registry,
+            frame,
+            result_register,
+            callee,
+            effective_this,
+            collected_arguments,
+        )
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
     fn invoke_function_call_builtin_target(
         &mut self,
         agent: &mut Agent,
@@ -235,27 +272,55 @@ impl Vm {
                 spread_mask,
                 &mut collected_arguments,
             )?;
-            let mut callee = Self::require_callable_object(agent, frame, callee_value)?;
-            let mut effective_this = this_value;
-            Self::resolve_bound_call_chain(
-                agent,
-                &mut callee,
-                &mut effective_this,
-                &mut collected_arguments,
-            )?;
-            Self::reject_class_constructor_call(agent, callee, frame.realm())?;
-
-            self.invoke_call_target(
+            self.invoke_collected_call_value(
                 agent,
                 host,
                 registry,
                 frame,
                 result_register,
-                callee,
-                effective_this,
-                &collected_arguments,
+                callee_value,
+                this_value,
+                &mut collected_arguments,
             )
         })();
+        self.argument_scratch = collected_arguments;
+        result
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    pub(super) fn call_value_small(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        result_register: u16,
+        callee_register: u16,
+        call_base_register: u16,
+        argument_count: u8,
+    ) -> VmResult<()> {
+        let callee_value = self.read_register(frame, callee_register);
+        let this_value = self.read_register(frame, call_base_register);
+        let mut collected_arguments = std::mem::take(&mut self.argument_scratch);
+        collected_arguments.clear();
+        collected_arguments.reserve(usize::from(argument_count));
+        for offset in 0..argument_count {
+            collected_arguments
+                .push(self.read_register(frame, call_base_register + 1 + u16::from(offset)));
+        }
+        let result = self.invoke_collected_call_value(
+            agent,
+            host,
+            registry,
+            frame,
+            result_register,
+            callee_value,
+            this_value,
+            &mut collected_arguments,
+        );
         self.argument_scratch = collected_arguments;
         result
     }

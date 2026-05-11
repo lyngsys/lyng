@@ -77,7 +77,14 @@ impl Vm {
             .copied()?
         {
             Instruction::Abc {
-                opcode: Opcode::Call | Opcode::TailCall | Opcode::Construct,
+                opcode:
+                    Opcode::Call0
+                    | Opcode::Call1
+                    | Opcode::Call2
+                    | Opcode::Call3
+                    | Opcode::Call
+                    | Opcode::TailCall
+                    | Opcode::Construct,
                 ..
             } => Some(instruction_offset),
             _ => None,
@@ -96,9 +103,7 @@ impl Vm {
         self.captured_name_references
             .clear_window(frame.registers());
         self.finalize_mapped_arguments(agent, frame.lexical_env())?;
-        self.register_stack.truncate(
-            usize::try_from(frame.registers().base()).expect("base should fit into usize"),
-        );
+        self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
         Ok(())
