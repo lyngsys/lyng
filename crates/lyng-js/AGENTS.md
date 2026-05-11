@@ -6,7 +6,8 @@ This file is the Lyng JS operating guide for coding agents. Read it before touch
 
 Lyng JS is the repository JavaScript engine. The goal is a gold-standard ECMA-262
 implementation in Rust: spec-compliant, fast, readable, maintainable, and disciplined
-about memory behavior.
+about memory behavior. This work is currently in alpha. We do not need any form of backwards
+compatibility, and it should be considered bloat at the current stage.
 
 ## The Quality Bar
 
