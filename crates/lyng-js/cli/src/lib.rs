@@ -32,7 +32,8 @@ Runs one Lyng JS entry file through the shared default-realm bootstrap.
 The CLI does not install harness globals, browser globals, or Node-style globals.
 
 Options:
-  --shell  Install non-spec shell globals (currently: print).
+  --shell    Install non-spec shell globals (currently: print).
+  --test262  Install the Test262 host harness ($262 globals, print, setTimeout).
 ";
 
 /// High-level CLI command.
@@ -48,6 +49,7 @@ pub struct CliInvocation {
     script_path: PathBuf,
     bootstrap_mode: BootstrapMode,
     shell_mode: bool,
+    test262_mode: bool,
 }
 
 impl CliInvocation {
@@ -56,11 +58,13 @@ impl CliInvocation {
         script_path: PathBuf,
         bootstrap_mode: BootstrapMode,
         shell_mode: bool,
+        test262_mode: bool,
     ) -> Self {
         Self {
             script_path,
             bootstrap_mode,
             shell_mode,
+            test262_mode,
         }
     }
 
@@ -86,6 +90,11 @@ impl CliInvocation {
     pub const fn shell_mode(&self) -> bool {
         self.shell_mode
     }
+
+    #[inline]
+    pub const fn test262_mode(&self) -> bool {
+        self.test262_mode
+    }
 }
 
 #[inline]
@@ -101,6 +110,7 @@ pub fn parse_args(args: impl IntoIterator<Item = OsString>) -> CliResult<CliComm
     let mut args = args.into_iter();
     let _program_name = args.next();
     let mut shell_mode = false;
+    let mut test262_mode = false;
     let mut script_path = None;
 
     for arg in args.by_ref() {
@@ -109,6 +119,10 @@ pub fn parse_args(args: impl IntoIterator<Item = OsString>) -> CliResult<CliComm
         }
         if arg == "--shell" {
             shell_mode = true;
+            continue;
+        }
+        if arg == "--test262" {
+            test262_mode = true;
             continue;
         }
         if arg.to_string_lossy().starts_with('-') {
@@ -137,6 +151,7 @@ pub fn parse_args(args: impl IntoIterator<Item = OsString>) -> CliResult<CliComm
         PathBuf::from(script_path),
         BootstrapMode::SpecOnly,
         shell_mode,
+        test262_mode,
     )))
 }
 
@@ -219,6 +234,53 @@ mod tests {
     }
 
     #[test]
+    fn parse_args_accepts_test262_flag() {
+        let command = parse_args([
+            OsString::from("lyng-js"),
+            OsString::from("--test262"),
+            OsString::from("x.js"),
+        ])
+        .expect("test262-mode parse should succeed");
+
+        let CliCommand::Run(invocation) = command else {
+            panic!("test262 flag should produce a run invocation");
+        };
+        assert_eq!(invocation.script_path(), Path::new("x.js"));
+        assert!(invocation.test262_mode());
+        assert!(!invocation.shell_mode());
+    }
+
+    #[test]
+    fn parse_args_accepts_test262_and_shell_together() {
+        let command = parse_args([
+            OsString::from("lyng-js"),
+            OsString::from("--shell"),
+            OsString::from("--test262"),
+            OsString::from("x.js"),
+        ])
+        .expect("test262+shell parse should succeed");
+
+        let CliCommand::Run(invocation) = command else {
+            panic!("test262+shell flags should produce a run invocation");
+        };
+        assert!(invocation.test262_mode());
+        assert!(invocation.shell_mode());
+    }
+
+    #[test]
+    fn parse_args_rejects_test262_after_script() {
+        let error = parse_args([
+            OsString::from("lyng-js"),
+            OsString::from("x.js"),
+            OsString::from("--test262"),
+        ])
+        .expect_err("test262 flag after the script path should fail");
+
+        assert_eq!(error.kind(), CliErrorKind::Usage);
+        assert!(error.message().contains("unexpected trailing argument"));
+    }
+
+    #[test]
     fn parse_args_rejects_shell_after_script() {
         let error = parse_args([
             OsString::from("lyng-js"),
@@ -265,6 +327,7 @@ mod tests {
                 script.path().to_path_buf(),
                 BootstrapMode::SpecOnly,
                 false,
+                false,
             )),
             &mut stdout,
             &mut stderr,
@@ -307,6 +370,7 @@ mod tests {
                 script.path().to_path_buf(),
                 BootstrapMode::SpecOnly,
                 false,
+                false,
             )),
             &mut stdout,
             &mut stderr,
@@ -331,6 +395,7 @@ mod tests {
                 script.path().to_path_buf(),
                 BootstrapMode::SpecOnly,
                 false,
+                false,
             )),
             &mut stdout,
             &mut stderr,
@@ -341,6 +406,102 @@ mod tests {
         assert_eq!(exit_code, 1);
         assert!(stdout.is_empty());
         assert!(stderr.contains("Uncaught exception: TypeError: boom"));
+    }
+
+    #[test]
+    fn run_script_in_test262_mode_installs_harness_globals() {
+        let script = TempScript::new(
+            "cli-test262-globals.js",
+            r#"
+            if (typeof $262 !== "object") throw new Error("no $262");
+            for (const k of ["evalScript", "createRealm", "detachArrayBuffer", "gc"]) {
+                if (typeof $262[k] !== "function") throw new Error("missing " + k);
+            }
+            if (typeof print !== "function") throw new Error("no print");
+            if (typeof setTimeout !== "function") throw new Error("no setTimeout");
+            print("ok");
+            "#,
+        );
+        let command = parse_args([
+            OsString::from("lyng-js"),
+            OsString::from("--test262"),
+            script.path().as_os_str().to_owned(),
+        ])
+        .expect("test262-mode parse should succeed");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+
+        let exit_code = run_with_io(command, &mut stdout, &mut stderr)
+            .expect("test262 hooks should evaluate without harness errors");
+
+        assert_eq!(exit_code, 0);
+        assert!(
+            stderr.is_empty(),
+            "stderr was: {:?}",
+            String::from_utf8_lossy(&stderr)
+        );
+    }
+
+    #[test]
+    fn run_script_in_test262_mode_isolates_realms() {
+        let script = TempScript::new(
+            "cli-test262-isolation.js",
+            r#"
+            const r = $262.createRealm();
+            r.evalScript("var x = 1;");
+            if ("x" in globalThis) throw new Error("realm leaked");
+            if (r.global === $262.global) throw new Error("realm not isolated");
+            "#,
+        );
+        let command = parse_args([
+            OsString::from("lyng-js"),
+            OsString::from("--test262"),
+            script.path().as_os_str().to_owned(),
+        ])
+        .expect("test262-mode parse should succeed");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+
+        let exit_code = run_with_io(command, &mut stdout, &mut stderr)
+            .expect("cross-realm script should evaluate without errors");
+
+        assert_eq!(exit_code, 0);
+        assert!(
+            stderr.is_empty(),
+            "stderr was: {:?}",
+            String::from_utf8_lossy(&stderr)
+        );
+    }
+
+    #[test]
+    fn run_module_in_test262_mode_installs_harness_globals() {
+        let workspace = TempWorkspace::new();
+        let entry = workspace.write(
+            "entry.mjs",
+            r#"
+            if (typeof $262 !== "object") throw new Error("no $262");
+            if (typeof $262.evalScript !== "function") throw new Error("missing evalScript");
+            if (typeof print !== "function") throw new Error("no print");
+            "#,
+        );
+        let command = parse_args([
+            OsString::from("lyng-js"),
+            OsString::from("--test262"),
+            entry.as_os_str().to_owned(),
+        ])
+        .expect("test262-mode module parse should succeed");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+
+        let exit_code = run_with_io(command, &mut stdout, &mut stderr)
+            .expect("test262 hooks should evaluate in module realms without errors");
+
+        assert_eq!(exit_code, 0);
+        assert!(
+            stderr.is_empty(),
+            "stderr was: {:?}",
+            String::from_utf8_lossy(&stderr)
+        );
     }
 
     #[test]
@@ -355,7 +516,12 @@ mod tests {
         let mut stderr = Vec::new();
 
         let exit_code = run_with_io(
-            CliCommand::Run(CliInvocation::new(entry, BootstrapMode::SpecOnly, false)),
+            CliCommand::Run(CliInvocation::new(
+                entry,
+                BootstrapMode::SpecOnly,
+                false,
+                false,
+            )),
             &mut stdout,
             &mut stderr,
         )

@@ -60,6 +60,315 @@ fn feedback_site(
         .expect("feedback snapshot should include the requested slot")
 }
 
+fn first_call_slot(unit: &CompiledScriptUnit) -> FeedbackSlotId {
+    unit.function(unit.entry())
+        .expect("test unit should have an entry function")
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::Call)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a call site")
+}
+
+fn first_construct_slot(unit: &CompiledScriptUnit) -> FeedbackSlotId {
+    unit.function(unit.entry())
+        .expect("test unit should have an entry function")
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::Construct)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a construct site")
+}
+
+fn evaluated_entry_snapshot(
+    source_id: u32,
+    source: &str,
+    expected: Value,
+) -> (FeedbackVectorSnapshot, FeedbackSlotId) {
+    let unit = compile_test_unit(source_id, source);
+    let call_slot = first_call_slot(&unit);
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(result, expected);
+
+    (
+        vm.feedback_vector_snapshot(installed.code())
+            .expect("entry code should expose a feedback snapshot"),
+        call_slot,
+    )
+}
+
+fn evaluated_construct_entry_snapshot(
+    source_id: u32,
+    source: &str,
+    expected: Value,
+) -> (FeedbackVectorSnapshot, FeedbackSlotId) {
+    let unit = compile_test_unit(source_id, source);
+    let construct_slot = first_construct_slot(&unit);
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(result, expected);
+
+    (
+        vm.feedback_vector_snapshot(installed.code())
+            .expect("entry code should expose a feedback snapshot"),
+        construct_slot,
+    )
+}
+
+#[test]
+fn call_feedback_snapshot_records_monomorphic_target_identity() {
+    let (snapshot, call_slot) = evaluated_entry_snapshot(
+        601,
+        r"
+            function target(value) { return value + 1; }
+            var total = 0;
+            for (var i = 0; i < 4; i = i + 1) {
+                total = total + target(i);
+            }
+            total;
+        ",
+        Value::from_smi(10),
+    );
+
+    let FeedbackSiteDetail::Call(call) = feedback_site(&snapshot, call_slot).detail() else {
+        panic!("call site should expose call feedback");
+    };
+
+    assert_eq!(call.expected_arity(), Some(1));
+    assert_eq!(call.state(), FeedbackInlineCacheState::Monomorphic);
+    assert_eq!(call.entries().len(), 1);
+    assert!(call.entries()[0].realm().is_some());
+}
+
+#[test]
+fn call_feedback_snapshot_records_builtin_target_identity() {
+    let (snapshot, call_slot) = evaluated_entry_snapshot(
+        607,
+        r#"
+            var text = "abc";
+            var total = 0;
+            for (var i = 0; i < 4; i = i + 1) {
+                total = total + text.charCodeAt(1);
+            }
+            total;
+        "#,
+        Value::from_smi(392),
+    );
+
+    let FeedbackSiteDetail::Call(call) = feedback_site(&snapshot, call_slot).detail() else {
+        panic!("call site should expose call feedback");
+    };
+
+    assert_eq!(call.expected_arity(), Some(1));
+    assert_eq!(call.state(), FeedbackInlineCacheState::Monomorphic);
+    assert_eq!(call.entries().len(), 1);
+    assert_eq!(
+        call.entries()[0].builtin(),
+        Some(lyng_js_types::string_char_code_at_builtin())
+    );
+}
+
+#[test]
+fn call_feedback_snapshot_records_polymorphic_target_identities() {
+    let (snapshot, call_slot) = evaluated_entry_snapshot(
+        602,
+        r"
+            function a(value) { return value + 1; }
+            function b(value) { return value + 2; }
+            var total = 0;
+            for (var i = 0; i < 6; i = i + 1) {
+                var fn = a;
+                if (i >= 3) {
+                    fn = b;
+                }
+                total = total + fn(i);
+            }
+            total;
+        ",
+        Value::from_smi(24),
+    );
+
+    let FeedbackSiteDetail::Call(call) = feedback_site(&snapshot, call_slot).detail() else {
+        panic!("call site should expose call feedback");
+    };
+
+    assert_eq!(call.expected_arity(), Some(1));
+    assert_eq!(call.state(), FeedbackInlineCacheState::Polymorphic);
+    assert_eq!(call.entries().len(), 2);
+    assert_ne!(call.entries()[0].callee(), call.entries()[1].callee());
+    assert!(call.entries().iter().all(|entry| entry.realm().is_some()));
+}
+
+#[test]
+fn call_feedback_snapshot_promotes_to_megamorphic_after_cache_limit() {
+    let (snapshot, call_slot) = evaluated_entry_snapshot(
+        603,
+        r"
+            function f0(value) { return value; }
+            function f1(value) { return value; }
+            function f2(value) { return value; }
+            function f3(value) { return value; }
+            function f4(value) { return value; }
+            function f5(value) { return value; }
+            function f6(value) { return value; }
+            function f7(value) { return value; }
+            function f8(value) { return value; }
+            function f9(value) { return value; }
+            var total = 0;
+            for (var i = 0; i < 10; i = i + 1) {
+                var fn = f0;
+                if (i === 1) { fn = f1; }
+                if (i === 2) { fn = f2; }
+                if (i === 3) { fn = f3; }
+                if (i === 4) { fn = f4; }
+                if (i === 5) { fn = f5; }
+                if (i === 6) { fn = f6; }
+                if (i === 7) { fn = f7; }
+                if (i === 8) { fn = f8; }
+                if (i === 9) { fn = f9; }
+                total = total + fn(i);
+            }
+            total;
+        ",
+        Value::from_smi(45),
+    );
+
+    let FeedbackSiteDetail::Call(call) = feedback_site(&snapshot, call_slot).detail() else {
+        panic!("call site should expose call feedback");
+    };
+
+    assert_eq!(call.expected_arity(), Some(1));
+    assert_eq!(call.state(), FeedbackInlineCacheState::Megamorphic);
+    assert!(call.entries().is_empty());
+}
+
+#[test]
+fn construct_feedback_snapshot_records_monomorphic_target_and_created_shape() {
+    let (snapshot, construct_slot) = evaluated_construct_entry_snapshot(
+        604,
+        r"
+            function Target(value) { this.value = value; }
+            var total = 0;
+            for (var i = 0; i < 4; i = i + 1) {
+                total = total + new Target(i).value;
+            }
+            total;
+        ",
+        Value::from_smi(6),
+    );
+
+    let FeedbackSiteDetail::Construct(construct) =
+        feedback_site(&snapshot, construct_slot).detail()
+    else {
+        panic!("construct site should expose construct feedback");
+    };
+
+    assert_eq!(construct.expected_arity(), Some(1));
+    assert_eq!(construct.state(), FeedbackInlineCacheState::Monomorphic);
+    assert_eq!(construct.entries().len(), 1);
+    assert!(construct.entries()[0].realm().is_some());
+    assert!(construct.entries()[0].created_shape().is_some());
+}
+
+#[test]
+fn construct_feedback_snapshot_records_polymorphic_targets() {
+    let (snapshot, construct_slot) = evaluated_construct_entry_snapshot(
+        605,
+        r"
+            function A(value) { this.value = value + 1; }
+            function B(value) { this.value = value + 2; }
+            var total = 0;
+            for (var i = 0; i < 6; i = i + 1) {
+                var Ctor = A;
+                if (i >= 3) {
+                    Ctor = B;
+                }
+                total = total + new Ctor(i).value;
+            }
+            total;
+        ",
+        Value::from_smi(24),
+    );
+
+    let FeedbackSiteDetail::Construct(construct) =
+        feedback_site(&snapshot, construct_slot).detail()
+    else {
+        panic!("construct site should expose construct feedback");
+    };
+
+    assert_eq!(construct.expected_arity(), Some(1));
+    assert_eq!(construct.state(), FeedbackInlineCacheState::Polymorphic);
+    assert_eq!(construct.entries().len(), 2);
+    assert_ne!(
+        construct.entries()[0].constructor(),
+        construct.entries()[1].constructor()
+    );
+    assert!(construct
+        .entries()
+        .iter()
+        .all(|entry| entry.created_shape().is_some()));
+}
+
+#[test]
+fn construct_feedback_snapshot_promotes_to_megamorphic_after_cache_limit() {
+    let (snapshot, construct_slot) = evaluated_construct_entry_snapshot(
+        606,
+        r"
+            function C0(value) { this.value = value; }
+            function C1(value) { this.value = value; }
+            function C2(value) { this.value = value; }
+            function C3(value) { this.value = value; }
+            function C4(value) { this.value = value; }
+            function C5(value) { this.value = value; }
+            function C6(value) { this.value = value; }
+            function C7(value) { this.value = value; }
+            function C8(value) { this.value = value; }
+            function C9(value) { this.value = value; }
+            var total = 0;
+            for (var i = 0; i < 10; i = i + 1) {
+                var Ctor = C0;
+                if (i === 1) { Ctor = C1; }
+                if (i === 2) { Ctor = C2; }
+                if (i === 3) { Ctor = C3; }
+                if (i === 4) { Ctor = C4; }
+                if (i === 5) { Ctor = C5; }
+                if (i === 6) { Ctor = C6; }
+                if (i === 7) { Ctor = C7; }
+                if (i === 8) { Ctor = C8; }
+                if (i === 9) { Ctor = C9; }
+                total = total + new Ctor(i).value;
+            }
+            total;
+        ",
+        Value::from_smi(45),
+    );
+
+    let FeedbackSiteDetail::Construct(construct) =
+        feedback_site(&snapshot, construct_slot).detail()
+    else {
+        panic!("construct site should expose construct feedback");
+    };
+
+    assert_eq!(construct.expected_arity(), Some(1));
+    assert_eq!(construct.state(), FeedbackInlineCacheState::Megamorphic);
+    assert!(construct.entries().is_empty());
+}
+
 #[test]
 fn feedback_vector_snapshot_reports_scalar_sites_for_tier_decisions() {
     let mut atoms = AtomTable::new();
@@ -136,18 +445,16 @@ fn feedback_vector_snapshot_reports_scalar_sites_for_tier_decisions() {
         .expect("entry code should expose a feedback snapshot");
     assert!(entry_snapshot.allocated());
     assert!(feedback_site(&entry_snapshot, comparison_slot).execution_count() >= 1);
-    assert_eq!(
-        feedback_site(&entry_snapshot, call_slot).detail(),
-        FeedbackSiteDetail::Call {
-            expected_arity: Some(2)
-        }
-    );
-    assert_eq!(
-        feedback_site(&entry_snapshot, construct_slot).detail(),
-        FeedbackSiteDetail::Construct {
-            expected_arity: Some(1)
-        }
-    );
+    let FeedbackSiteDetail::Call(call) = feedback_site(&entry_snapshot, call_slot).detail() else {
+        panic!("entry call site should expose call feedback");
+    };
+    assert_eq!(call.expected_arity(), Some(2));
+    let FeedbackSiteDetail::Construct(construct) =
+        feedback_site(&entry_snapshot, construct_slot).detail()
+    else {
+        panic!("entry construct site should expose construct feedback");
+    };
+    assert_eq!(construct.expected_arity(), Some(1));
 
     let add_snapshot = vm
         .feedback_vector_snapshot(add_code)

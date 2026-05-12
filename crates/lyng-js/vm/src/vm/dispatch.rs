@@ -2,7 +2,7 @@ use super::install::InstalledFunction;
 use super::values::decode_env_operand;
 use super::{
     code_index, Agent, CallRange, FrameRecord, HostHooks, Instruction, NativeFunctionRegistry,
-    Opcode, ThisState, Value, Vm, VmDispatchMode, VmError, VmResult,
+    Opcode, ThisState, Value, Vm, VmDebugSafepointKind, VmDispatchMode, VmError, VmResult,
 };
 use lyng_js_ops::{errors, read};
 use lyng_js_types::{AbruptCompletion, PropertyKey};
@@ -52,9 +52,35 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
-        match self.dispatch_mode() {
-            VmDispatchMode::Match => self.run_match(agent, host, registry),
-            VmDispatchMode::FunctionTable => self.run_function_table(agent, host, registry),
+        match (
+            self.dispatch_mode(),
+            self.opcode_dispatch_counts_enabled(),
+            self.debug_poll_enabled(),
+        ) {
+            (VmDispatchMode::Match, false, false) => {
+                self.run_match::<false, false>(agent, host, registry, false)
+            }
+            (VmDispatchMode::Match, false, true) => {
+                self.run_match::<false, true>(agent, host, registry, false)
+            }
+            (VmDispatchMode::Match, true, false) => {
+                self.run_match::<true, false>(agent, host, registry, false)
+            }
+            (VmDispatchMode::Match, true, true) => {
+                self.run_match::<true, true>(agent, host, registry, false)
+            }
+            (VmDispatchMode::FunctionTable, false, false) => {
+                self.run_function_table::<false, false>(agent, host, registry)
+            }
+            (VmDispatchMode::FunctionTable, false, true) => {
+                self.run_function_table::<false, true>(agent, host, registry)
+            }
+            (VmDispatchMode::FunctionTable, true, false) => {
+                self.run_function_table::<true, false>(agent, host, registry)
+            }
+            (VmDispatchMode::FunctionTable, true, true) => {
+                self.run_function_table::<true, true>(agent, host, registry)
+            }
         }
     }
 
@@ -62,11 +88,12 @@ impl Vm {
         clippy::too_many_lines,
         reason = "main interpreter dispatch keeps opcode fetch and branch handling in one profiler-friendly loop"
     )]
-    fn run_match(
+    fn run_match<const COUNT_OPCODES: bool, const DEBUG: bool>(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
+        mut skip_first_opcode_count: bool,
     ) -> VmResult<Value> {
         loop {
             let frame = self
@@ -89,6 +116,13 @@ impl Vm {
                     code: frame.code(),
                     instruction_offset: frame.instruction_offset(),
                 })?;
+            if COUNT_OPCODES {
+                if skip_first_opcode_count {
+                    skip_first_opcode_count = false;
+                } else {
+                    self.record_opcode_dispatch(instruction.opcode());
+                }
+            }
 
             match instruction {
                 Instruction::Abc { opcode, a, b, c } => {
@@ -257,7 +291,6 @@ impl Vm {
                             let Some(()) = self.handle_vm_result(agent, call_result)? else {
                                 continue;
                             };
-                            self.record_feedback_site(frame.code(), frame.instruction_offset());
                         }
                         Opcode::Call => {
                             let payload = installed
@@ -284,7 +317,6 @@ impl Vm {
                             let Some(()) = self.handle_vm_result(agent, call_result)? else {
                                 continue;
                             };
-                            self.record_feedback_site(frame.code(), frame.instruction_offset());
                         }
                         Opcode::TailCall => {
                             let payload = installed
@@ -339,7 +371,6 @@ impl Vm {
                             let Some(()) = self.handle_vm_result(agent, construct_result)? else {
                                 continue;
                             };
-                            self.record_feedback_site(frame.code(), frame.instruction_offset());
                         }
                         Opcode::CreateForIn => {
                             let value = self.read_register(frame, b);
@@ -755,6 +786,9 @@ impl Vm {
                                 _ => unreachable!("guarded by opcode match"),
                             };
                             if should_jump {
+                                if delta < 0 {
+                                    Self::poll_incremental_mark_safepoint(agent);
+                                }
                                 self.jump_by(delta)?;
                             } else {
                                 self.advance_instruction();
@@ -835,12 +869,17 @@ impl Vm {
                 Instruction::Ax { opcode, ax } => match opcode {
                     Opcode::Nop => self.advance_instruction(),
                     Opcode::LoopHeader => {
+                        if DEBUG {
+                            self.poll_debug_safepoint(agent, VmDebugSafepointKind::LoopHeader);
+                        }
                         self.observe_tier_backedge_event(frame.code());
+                        Self::poll_incremental_mark_safepoint(agent);
                         self.advance_instruction();
                     }
                     Opcode::Jump => {
                         if ax < 0 {
                             self.observe_tier_backedge_event(frame.code());
+                            Self::poll_incremental_mark_safepoint(agent);
                         }
                         self.jump_by(ax)?;
                     }
@@ -1000,7 +1039,7 @@ impl Vm {
         }
     }
 
-    fn run_function_table(
+    fn run_function_table<const COUNT_OPCODES: bool, const DEBUG: bool>(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -1028,6 +1067,12 @@ impl Vm {
                     code: frame.code(),
                     instruction_offset: frame.instruction_offset(),
                 })?;
+            if COUNT_OPCODES {
+                self.record_opcode_dispatch(instruction.opcode());
+            }
+            if DEBUG && instruction.opcode() == Opcode::LoopHeader {
+                self.poll_debug_safepoint(agent, VmDebugSafepointKind::LoopHeader);
+            }
 
             let handler = Self::threaded_opcode_handler(instruction.opcode());
             match handler(
@@ -1041,7 +1086,14 @@ impl Vm {
             )? {
                 ThreadedStep::Continue => {}
                 ThreadedStep::Return(value) => return Ok(value),
-                ThreadedStep::SwitchToMatch => return self.run_match(agent, host, registry),
+                ThreadedStep::SwitchToMatch => {
+                    return self.run_match::<COUNT_OPCODES, DEBUG>(
+                        agent,
+                        host,
+                        registry,
+                        COUNT_OPCODES,
+                    );
+                }
             }
         }
     }
@@ -1339,7 +1391,7 @@ impl Vm {
 
     fn threaded_jump(
         &mut self,
-        _agent: &mut Agent,
+        agent: &mut Agent,
         _host: &dyn HostHooks,
         _registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
@@ -1353,9 +1405,11 @@ impl Vm {
             Opcode::Jump | Opcode::LoopHeader => {
                 if opcode == Opcode::Jump && ax < 0 {
                     self.observe_tier_backedge_event(frame.code());
+                    Self::poll_incremental_mark_safepoint(agent);
                 }
                 if opcode == Opcode::LoopHeader {
                     self.observe_tier_backedge_event(frame.code());
+                    Self::poll_incremental_mark_safepoint(agent);
                     self.advance_instruction();
                 } else {
                     self.jump_by(ax)?;
@@ -1396,6 +1450,9 @@ impl Vm {
                     _ => unreachable!("guarded by opcode match"),
                 };
                 if should_jump {
+                    if delta < 0 {
+                        Self::poll_incremental_mark_safepoint(agent);
+                    }
                     self.jump_by(delta)?;
                 } else {
                     self.advance_instruction();
@@ -1457,7 +1514,6 @@ impl Vm {
             let Some(()) = self.handle_vm_result(agent, call_result)? else {
                 return Ok(ThreadedStep::Continue);
             };
-            self.record_feedback_site(frame.code(), frame.instruction_offset());
             return Ok(ThreadedStep::Continue);
         }
         if opcode != Opcode::Call {
@@ -1488,7 +1544,6 @@ impl Vm {
         let Some(()) = self.handle_vm_result(agent, call_result)? else {
             return Ok(ThreadedStep::Continue);
         };
-        self.record_feedback_site(frame.code(), frame.instruction_offset());
         Ok(ThreadedStep::Continue)
     }
 

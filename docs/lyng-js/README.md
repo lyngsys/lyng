@@ -18,6 +18,7 @@ top-level architecture note and the subsystem note for the area being changed.
 - [Runtime Model](runtime-model.md)
 - [Runtime Primitives](runtime-primitives.md)
 - [Runtime Substrate](runtime-substrate.md)
+- [Garbage Collection](gc.md)
 - [Shared Memory And Backing Stores](shared-memory-and-backing-stores.md)
 - [Bytecode And VM](bytecode-and-vm.md)
 - [Builtin Bootstrap](builtin-bootstrap.md)

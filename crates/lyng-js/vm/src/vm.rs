@@ -29,6 +29,7 @@ use crate::enumeration::{ForInStateTable, IteratorStateTable};
 use crate::error::VmResult;
 use crate::extensions::{RealmExtensionInstallation, SharedRealmExtensionProvider};
 use crate::name_refs::CapturedNameReferenceTable;
+use crate::opcode_counts::{OpcodeDispatchCounterStore, OpcodeDispatchCounts};
 use crate::{FrameFlags, FrameRecord, InstalledCode, RegisterWindow, VmError};
 
 mod activation_objects;
@@ -36,6 +37,7 @@ mod async_functions;
 mod builtin_dispatch;
 mod bytecode_calls;
 mod call;
+mod debugger;
 mod direct_eval_env;
 mod dispatch;
 mod dynamic_compilation;
@@ -58,6 +60,7 @@ mod values;
 mod with_env;
 
 use call::RejectingNativeRegistry;
+use debugger::{VmDebugPauseRequest, VmDebugState};
 use feedback::FeedbackVector;
 use install::InstalledFunction;
 use state::{
@@ -71,10 +74,16 @@ use values::{bytecode_index, code_index, decode_env_operand, string_text_array_i
 
 pub use modules::LoadedModuleRoot;
 
+pub use debugger::{
+    VmDebugCommand, VmDebugFrame, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason,
+    VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode,
+};
 pub use feedback::{
-    FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FeedbackSiteDetail,
-    FeedbackSiteSnapshot, FeedbackVectorSnapshot, KeyedNamedPropertyCacheEntrySnapshot,
-    KeyedPropertyFeedbackSnapshot, NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot,
+    CallCacheEntrySnapshot, CallFeedbackSnapshot, ConstructCacheEntrySnapshot,
+    ConstructFeedbackSnapshot, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily,
+    FeedbackSiteDetail, FeedbackSiteSnapshot, FeedbackVectorSnapshot,
+    KeyedNamedPropertyCacheEntrySnapshot, KeyedPropertyFeedbackSnapshot,
+    NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot,
 };
 pub use tiering::{TierStatus, TieringSnapshot};
 
@@ -168,6 +177,9 @@ pub struct Vm {
     frames: Vec<FrameRecord>,
     installed: Vec<Option<Arc<InstalledFunction>>>,
     current_exception: Option<Value>,
+    opcode_dispatch_counts: Option<OpcodeDispatchCounterStore>,
+    debug_hook: Option<Box<dyn VmDebugHook>>,
+    debug_state: VmDebugState,
     atom_texts: HashMap<AtomId, Box<str>>,
     preferred_atoms_by_text: HashMap<Box<str>, AtomId>,
     source_texts: HashMap<SourceId, Arc<str>>,
@@ -225,6 +237,9 @@ impl Vm {
             frames: Vec::new(),
             installed: Vec::new(),
             current_exception: None,
+            opcode_dispatch_counts: None,
+            debug_hook: None,
+            debug_state: VmDebugState::default(),
             atom_texts: HashMap::new(),
             preferred_atoms_by_text: HashMap::new(),
             source_texts: HashMap::new(),
@@ -280,6 +295,90 @@ impl Vm {
     #[inline]
     pub const fn set_dispatch_mode(&mut self, mode: VmDispatchMode) {
         self.dispatch_mode = mode;
+    }
+
+    pub fn enable_opcode_dispatch_counts(&mut self) {
+        if self.opcode_dispatch_counts.is_none() {
+            self.opcode_dispatch_counts = Some(OpcodeDispatchCounterStore::new());
+        }
+    }
+
+    pub fn disable_opcode_dispatch_counts(&mut self) {
+        self.opcode_dispatch_counts = None;
+    }
+
+    pub fn reset_opcode_dispatch_counts(&mut self) {
+        if let Some(counts) = &self.opcode_dispatch_counts {
+            counts.reset();
+        }
+    }
+
+    #[inline]
+    pub fn opcode_dispatch_counts(&self) -> Option<OpcodeDispatchCounts> {
+        self.opcode_dispatch_counts
+            .as_ref()
+            .map(OpcodeDispatchCounterStore::snapshot)
+    }
+
+    #[inline]
+    pub(super) const fn opcode_dispatch_counts_enabled(&self) -> bool {
+        self.opcode_dispatch_counts.is_some()
+    }
+
+    #[inline]
+    pub(super) fn record_opcode_dispatch(&self, opcode: Opcode) {
+        if let Some(counts) = &self.opcode_dispatch_counts {
+            counts.increment(opcode);
+        }
+    }
+
+    pub fn set_debug_hook(&mut self, hook: impl VmDebugHook + 'static) {
+        self.debug_hook = Some(Box::new(hook));
+    }
+
+    pub fn clear_debug_hook(&mut self) {
+        self.debug_hook = None;
+        self.debug_state.clear();
+    }
+
+    pub const fn request_debug_pause(&mut self) {
+        self.debug_state.request_pause(VmDebugPauseRequest::any());
+    }
+
+    pub const fn request_debug_pause_at(&mut self, code: CodeRef, instruction_offset: u32) {
+        self.debug_state
+            .request_pause(VmDebugPauseRequest::at(code, instruction_offset));
+    }
+
+    pub const fn clear_debug_pause_request(&mut self) {
+        self.debug_state.clear_pause_request();
+    }
+
+    #[inline]
+    pub(super) const fn debug_poll_enabled(&self) -> bool {
+        self.debug_hook.is_some() && self.debug_state.should_poll()
+    }
+
+    #[inline]
+    pub(super) fn poll_debug_safepoint(&mut self, agent: &Agent, kind: VmDebugSafepointKind) {
+        if !self.debug_poll_enabled() {
+            return;
+        }
+        let Some(frame) = self.frame() else {
+            return;
+        };
+        let safepoint = VmDebugSafepoint::new(kind, frame, self.frames.len());
+        let Some(reason) = self.debug_state.consume_pause(safepoint) else {
+            return;
+        };
+        let mut hook = self
+            .debug_hook
+            .take()
+            .expect("debug polling requires an installed hook");
+        let command = hook.on_pause(VmDebugPauseContext::new(self, agent, safepoint, reason));
+        self.debug_hook = Some(hook);
+        self.debug_state
+            .apply_command(command, safepoint.frame_depth());
     }
 
     #[inline]
@@ -399,6 +498,11 @@ impl Vm {
             vm: self,
             caller_frame,
         })
+    }
+
+    #[inline]
+    pub(super) fn poll_incremental_mark_safepoint(agent: &mut Agent) {
+        let _ = agent.heap_mut().poll_incremental_mark_step();
     }
 
     #[inline]
@@ -1224,6 +1328,7 @@ impl Vm {
         self.frames.push(frame);
         self.note_frame_depth();
         self.internal_completion_targets.push(prior_frame_depth);
+        self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
 
         let result = self.run(agent, host, registry);
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {

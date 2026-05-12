@@ -176,6 +176,21 @@ target/release/lyng-js-bench density \
   --json /tmp/lyng-js-density-profile.json
 ```
 
+Add `--count-opcodes` to runtime benchmark runs when the question is which bytecode
+operations dominate an executable workload row:
+
+```sh
+cargo run --release -p lyng-js-bench -- runtime \
+  --preset smoke \
+  --count-opcodes \
+  --report /tmp/lyng-js-runtime-opcodes.md \
+  --json /tmp/lyng-js-runtime-opcodes.json
+```
+
+The flag enables optional VM dispatch counters for the timed runtime rows and adds an
+`Opcode Dispatch Counts` Markdown section plus per-row `opcode_dispatch_counts` JSON data.
+Keep the flag disabled for ordinary before/after throughput baselines.
+
 When profiler tooling is unavailable, use a plain release timing loop and compare the
 stable JSON report path before and after the change:
 

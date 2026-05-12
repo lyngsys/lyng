@@ -114,9 +114,12 @@ audit.
 ## Strong Heap Record Write Sites
 
 The strong heap-record writes below are routed through `HeapWriter::write_ref` or
-`HeapWriter::write_value` from the `PrimitiveMutator` store path. The current writer is a
-pass-through chokepoint; future barrier behavior belongs behind that API rather than at
-individual record fields.
+`HeapWriter::write_value` from the `PrimitiveMutator` store path. Mutating writes also run
+the active incremental Dijkstra barrier from the writer boundary: when the owning heap
+record has already been marked in the current major mark phase, the newly written strong
+referent is shaded through the active marker before the mark is finalized. Generational
+old-to-young card marking remains in the owning `PrimitiveHeap` store helper so the common
+non-incremental path can return before touching marker state.
 
 ### Value Slot Buffers
 

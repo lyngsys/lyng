@@ -25,8 +25,10 @@ use lyng_js_vm::{
     Vm, VmError, VmEvaluationObserver,
 };
 
+use lyng_js_test262_harness::{Test262PrintObserver, Test262RealmExtension};
+
 use crate::diagnostics::{Test262DiagnosticTimings, Test262RuntimeDiagnostics};
-use crate::extensions::{Test262Host, Test262PrintObserver, Test262RealmExtension};
+use crate::extensions::Test262Host;
 use crate::helpers::HelperCatalog;
 use crate::metadata::{
     effective_parse_source, has_async_flag, is_module_test, parse_metadata, NegativeExpectation,
@@ -225,7 +227,7 @@ pub fn run_test(test: &PreparedTest, helpers: &Arc<HelperCatalog>) -> RunOutcome
     };
     let print_observer = Test262PrintObserver::default();
     let provider: SharedRealmExtensionProvider =
-        Arc::new(Test262RealmExtension::new(print_observer.clone()));
+        Arc::new(Test262RealmExtension::new(Arc::new(print_observer.clone())));
     let outcome = run_runtime_test(
         &test.path,
         &runtime_source,
@@ -368,7 +370,7 @@ pub fn run_test_with_diagnostics(
 
     let print_observer = Test262PrintObserver::default();
     let provider: SharedRealmExtensionProvider =
-        Arc::new(Test262RealmExtension::new(print_observer.clone()));
+        Arc::new(Test262RealmExtension::new(Arc::new(print_observer.clone())));
     let (outcome, script_timings, diagnostics) = run_runtime_with_diagnostics(
         &test.path,
         &runtime_source,

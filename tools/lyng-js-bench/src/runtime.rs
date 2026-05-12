@@ -1,13 +1,16 @@
 use lyng_js_builtins::BootstrapMode;
+#[cfg(test)]
+use lyng_js_bytecode::Opcode;
 use lyng_js_bytecode::{BytecodeFunction, CompiledAtom, CompiledScriptUnit};
 use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_compiler::{compile_module, compile_script, CompiledModuleUnit};
 use lyng_js_env::{ExecutableId, Runtime, RuntimePhase6Accounting as RuntimeAccounting};
+use lyng_js_gc::{AllocationLifetime, PrimitiveRoots, RuntimeObjectRecord, ValueStoreTarget};
 use lyng_js_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
 use lyng_js_parser::{parse_module, parse_script};
 use lyng_js_sema::{analyze_module, analyze_script};
-use lyng_js_types::CodeRef;
-use lyng_js_vm::Vm;
+use lyng_js_types::{CodeRef, Value as JsValue};
+use lyng_js_vm::{FeedbackInlineCacheState, FeedbackSiteDetail, OpcodeDispatchCounts, Vm};
 use serde_json::{json, Value};
 use std::cmp::Ordering;
 use std::env;
@@ -36,6 +39,7 @@ struct Options {
     warmup_runs: usize,
     loop_trip_count: usize,
     frontend_repetitions: usize,
+    count_opcodes: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -72,6 +76,7 @@ struct ThroughputResult {
     median_total: Duration,
     median_us_per_run: f64,
     median_ns_per_operation: f64,
+    opcode_dispatch_counts: Option<OpcodeDispatchCounts>,
 }
 
 #[derive(Clone, Default)]
@@ -85,6 +90,15 @@ struct MemoryResult {
     live_feedback_sites: Option<usize>,
     allocated_feedback_code_count: Option<usize>,
     allocated_feedback_bytes: Option<usize>,
+    call_cache_uninit_sites: Option<usize>,
+    call_cache_mono_sites: Option<usize>,
+    call_cache_poly_sites: Option<usize>,
+    call_cache_mega_sites: Option<usize>,
+    construct_cache_uninit_sites: Option<usize>,
+    construct_cache_mono_sites: Option<usize>,
+    construct_cache_poly_sites: Option<usize>,
+    construct_cache_mega_sites: Option<usize>,
+    construct_created_shape_entries: Option<usize>,
     note: &'static str,
 }
 
@@ -95,9 +109,10 @@ struct WorkloadReport {
     memory: MemoryResult,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct SampleResult {
     elapsed: Duration,
+    opcode_dispatch_counts: Option<OpcodeDispatchCounts>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -106,6 +121,15 @@ struct FeedbackTotals {
     live_site_count: usize,
     allocated_code_count: usize,
     allocated_bytes: usize,
+    call_cache_uninit_sites: usize,
+    call_cache_mono_sites: usize,
+    call_cache_poly_sites: usize,
+    call_cache_mega_sites: usize,
+    construct_cache_uninit_sites: usize,
+    construct_cache_mono_sites: usize,
+    construct_cache_poly_sites: usize,
+    construct_cache_mega_sites: usize,
+    construct_created_shape_entries: usize,
 }
 
 #[derive(Clone)]
@@ -164,6 +188,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
         warmup_runs: DEFAULT_WARMUP_RUNS,
         loop_trip_count: DEFAULT_LOOP_TRIPS,
         frontend_repetitions: DEFAULT_FRONTEND_REPETITIONS,
+        count_opcodes: false,
     };
 
     let mut args = args.iter();
@@ -204,6 +229,9 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
                 options.frontend_repetitions =
                     parse_usize_arg("--frontend-repetitions", args.next())?;
             }
+            "--count-opcodes" | "--counter-opcodes" => {
+                options.count_opcodes = true;
+            }
             "--help" | "-h" => {
                 return Err(usage());
             }
@@ -231,7 +259,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
 }
 
 fn usage() -> String {
-    "Usage: lyng-js-bench runtime [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--runs <n>] [--warmup-runs <n>] [--loop-trips <n>] [--frontend-repetitions <n>]".to_string()
+    "Usage: lyng-js-bench runtime [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--runs <n>] [--warmup-runs <n>] [--loop-trips <n>] [--frontend-repetitions <n>] [--count-opcodes]".to_string()
 }
 
 fn apply_preset(options: &mut Options, preset: &str) -> Result<(), String> {
@@ -448,6 +476,10 @@ fn measure_script_runtime_sample(
             .map_err(|error| format!("warmup execution failed for {}: {error:?}", workload.name))?;
         black_box(value.bits());
     }
+    if options.count_opcodes {
+        vm.enable_opcode_dispatch_counts();
+        vm.reset_opcode_dispatch_counts();
+    }
 
     let start = Instant::now();
     let mut checksum = 0_u64;
@@ -463,6 +495,9 @@ fn measure_script_runtime_sample(
     black_box(checksum);
     Ok(SampleResult {
         elapsed: start.elapsed(),
+        opcode_dispatch_counts: options
+            .count_opcodes
+            .then(|| vm.opcode_dispatch_counts().unwrap_or_default()),
     })
 }
 
@@ -483,6 +518,7 @@ fn measure_script_frontend_samples(
         }
         samples.push(SampleResult {
             elapsed: start.elapsed(),
+            opcode_dispatch_counts: None,
         });
     }
     Ok(samples)
@@ -530,6 +566,7 @@ fn measure_module_compile_samples(
         }
         samples.push(SampleResult {
             elapsed: start.elapsed(),
+            opcode_dispatch_counts: None,
         });
     }
     Ok(samples)
@@ -561,7 +598,22 @@ fn throughput_result(
         median_total,
         median_us_per_run,
         median_ns_per_operation,
+        opcode_dispatch_counts: merge_opcode_dispatch_counts(samples),
     })
+}
+
+fn merge_opcode_dispatch_counts(samples: &[SampleResult]) -> Option<OpcodeDispatchCounts> {
+    let counts = samples
+        .iter()
+        .filter_map(|sample| sample.opcode_dispatch_counts.as_ref())
+        .flat_map(|counts| {
+            counts
+                .iter()
+                .filter(|entry| entry.count() != 0)
+                .map(|entry| (entry.opcode(), entry.count()))
+        });
+    let merged = OpcodeDispatchCounts::from_counts(counts);
+    (merged.total() != 0).then_some(merged)
 }
 
 fn capture_memory(
@@ -612,6 +664,15 @@ fn capture_memory(
                 live_feedback_sites: Some(feedback.live_site_count),
                 allocated_feedback_code_count: Some(feedback.allocated_code_count),
                 allocated_feedback_bytes: Some(feedback.allocated_bytes),
+                call_cache_uninit_sites: Some(feedback.call_cache_uninit_sites),
+                call_cache_mono_sites: Some(feedback.call_cache_mono_sites),
+                call_cache_poly_sites: Some(feedback.call_cache_poly_sites),
+                call_cache_mega_sites: Some(feedback.call_cache_mega_sites),
+                construct_cache_uninit_sites: Some(feedback.construct_cache_uninit_sites),
+                construct_cache_mono_sites: Some(feedback.construct_cache_mono_sites),
+                construct_cache_poly_sites: Some(feedback.construct_cache_poly_sites),
+                construct_cache_mega_sites: Some(feedback.construct_cache_mega_sites),
+                construct_created_shape_entries: Some(feedback.construct_created_shape_entries),
                 note: "Warmed script-template and feedback-vector footprint.",
             })
         }
@@ -714,54 +775,183 @@ fn capture_runtime_snapshots() -> BenchResult<Vec<RuntimeSnapshot>> {
         }
     };
 
-    let promise_and_backing_store = {
-        let mut runtime = Runtime::new(NoopHostHooks);
-        let root = runtime.root_agent_id();
-        let worker = runtime
-            .root_cluster_mut()
-            .add_agent(None, Some("bench-worker".into()));
-        let shared_buffer = HostSharedBufferId::from_raw(19)
-            .ok_or_else(|| "shared buffer fixture id must be non-zero".to_string())?;
-        let backing_store = runtime
-            .root_cluster_mut()
-            .register_shared_backing_store(root, 4096)
-            .ok_or_else(|| "shared backing-store fixture failed to register".to_string())?;
-
-        if !runtime
-            .root_cluster_mut()
-            .cache_shared_backing_store_handle(backing_store, shared_buffer)
-        {
-            return Err("shared backing-store fixture failed to cache host handle".to_string());
-        }
-        if !runtime
-            .root_cluster_mut()
-            .share_shared_backing_store(backing_store, worker)
-        {
-            return Err("shared backing-store fixture failed to share with worker".to_string());
-        }
-        runtime
-            .enqueue_job(
-                root,
-                HostJobKind::Promise,
-                ExecutableId::Builtin,
-                None,
-                Some("bench-promise-job".into()),
-            )
-            .map_err(|error| format!("promise job fixture failed to enqueue: {error:?}"))?;
-
-        RuntimeSnapshot {
-            label: "runtime.promise-and-backing-store",
-            accounting: runtime.phase6_accounting(),
-            note: "Seeded promise-job queue entry plus one shared backing-store fixture. Iterator state remains transient VM execution state, so the post-run iterator and module-cache domains stay at zero in this retained-runtime snapshot.",
-        }
-    };
-
     Ok(vec![
         empty,
         spec_bootstrapped,
         regexp_literal_cache,
-        promise_and_backing_store,
+        capture_promise_and_backing_store_snapshot()?,
+        capture_nursery_minor_gc_snapshot()?,
+        capture_major_gc_snapshot()?,
     ])
+}
+
+fn capture_promise_and_backing_store_snapshot() -> BenchResult<RuntimeSnapshot> {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let root = runtime.root_agent_id();
+    let worker = runtime
+        .root_cluster_mut()
+        .add_agent(None, Some("bench-worker".into()));
+    let shared_buffer = HostSharedBufferId::from_raw(19)
+        .ok_or_else(|| "shared buffer fixture id must be non-zero".to_string())?;
+    let backing_store = runtime
+        .root_cluster_mut()
+        .register_shared_backing_store(root, 4096)
+        .ok_or_else(|| "shared backing-store fixture failed to register".to_string())?;
+
+    if !runtime
+        .root_cluster_mut()
+        .cache_shared_backing_store_handle(backing_store, shared_buffer)
+    {
+        return Err("shared backing-store fixture failed to cache host handle".to_string());
+    }
+    if !runtime
+        .root_cluster_mut()
+        .share_shared_backing_store(backing_store, worker)
+    {
+        return Err("shared backing-store fixture failed to share with worker".to_string());
+    }
+    runtime
+        .enqueue_job(
+            root,
+            HostJobKind::Promise,
+            ExecutableId::Builtin,
+            None,
+            Some("bench-promise-job".into()),
+        )
+        .map_err(|error| format!("promise job fixture failed to enqueue: {error:?}"))?;
+
+    Ok(RuntimeSnapshot {
+        label: "runtime.promise-and-backing-store",
+        accounting: runtime.phase6_accounting(),
+        note: "Seeded promise-job queue entry plus one shared backing-store fixture. Iterator state remains transient VM execution state, so the post-run iterator and module-cache domains stay at zero in this retained-runtime snapshot.",
+    })
+}
+
+fn capture_nursery_minor_gc_snapshot() -> BenchResult<RuntimeSnapshot> {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let roots = PrimitiveRoots::new();
+    let allocation_count = (1024 * 1024 / size_of::<RuntimeObjectRecord>()) + 8;
+    {
+        let heap = runtime.root_agent_mut().heap_mut();
+        let mut mutator = heap.mutator_with_roots(&roots);
+        let survivor = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let survivor_root = roots.root_object(survivor);
+        let remembered_slots = mutator.alloc_object_slots(
+            1,
+            JsValue::empty_internal_slot(),
+            AllocationLifetime::LongLived,
+        );
+        let remembered_target = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        if !mutator.mut_store_value(
+            ValueStoreTarget::ObjectSlot(remembered_slots, 0),
+            JsValue::from_object_ref(remembered_target),
+        ) {
+            return Err(
+                "nursery remembered-set fixture failed to write old object slot".to_string(),
+            );
+        }
+        for _ in 0..allocation_count {
+            let object = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+            black_box(object);
+        }
+        black_box(remembered_slots);
+        black_box(remembered_target);
+        black_box(survivor_root.get());
+    }
+    let accounting = runtime.phase6_accounting();
+    if accounting.heap.minor_collections == 0 {
+        return Err("nursery minor-GC fixture did not trigger a minor collection".to_string());
+    }
+
+    Ok(RuntimeSnapshot {
+        label: "runtime.nursery-minor-gc",
+        accounting,
+        note: "Allocated more than 1 MiB of short-lived ordinary object records through a rooted mutator so the nursery limit triggers a visible minor GC.",
+    })
+}
+
+fn capture_major_gc_snapshot() -> BenchResult<RuntimeSnapshot> {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let roots = PrimitiveRoots::new();
+    let (root, extra_root_a, extra_root_b, dead) = {
+        let heap = runtime.root_agent_mut().heap_mut();
+        heap.set_major_mark_slice_budget(1);
+        let mut mutator = heap.mutator();
+        let grandchild = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let child_slots = mutator.alloc_object_slots(
+            1,
+            JsValue::from_object_ref(grandchild),
+            AllocationLifetime::Default,
+        );
+        let child = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, Some(child_slots), None, None),
+            AllocationLifetime::Default,
+        );
+        let root_slots = mutator.alloc_object_slots(
+            1,
+            JsValue::from_object_ref(child),
+            AllocationLifetime::Default,
+        );
+        let root = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, Some(root_slots), None, None),
+            AllocationLifetime::Default,
+        );
+        let extra_root_a = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let extra_root_b = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let dead = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        (root, extra_root_a, extra_root_b, dead)
+    };
+    let rooted = roots.root_object(root);
+    let rooted_extra_a = roots.root_object(extra_root_a);
+    let rooted_extra_b = roots.root_object(extra_root_b);
+    let report = runtime.root_agent_mut().heap_mut().force_collect(&roots);
+    black_box(rooted.get());
+    black_box(rooted_extra_a.get());
+    black_box(rooted_extra_b.get());
+    black_box(dead);
+    black_box(report.stats.major_mark_slices);
+
+    let accounting = runtime.phase6_accounting();
+    if accounting.heap.last_major_mark_slices <= 1 {
+        return Err("major-GC fixture did not produce multiple mark slices".to_string());
+    }
+    if accounting.heap.last_major_mark_finish_work_items == 0
+        || accounting.heap.last_major_gray_work_items_after_finish != 0
+    {
+        return Err("major-GC fixture did not produce a verified atomic finish".to_string());
+    }
+    if !accounting.heap.last_major_background_sweep_completed
+        || accounting.heap.last_major_background_sweep_reclaimed == 0
+    {
+        return Err("major-GC fixture did not produce a completed background sweep".to_string());
+    }
+
+    Ok(RuntimeSnapshot {
+        label: "runtime.major-gc-mark-slices",
+        accounting,
+        note: "Forced a major collection over rooted and dead objects with a one-item mark budget so mark-slice distribution, atomic finish pause, and background sweep reporting are visible.",
+    })
 }
 
 fn compile_script_unit(
@@ -828,6 +1018,59 @@ fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> BenchResult<FeedbackTotals
                 .saturating_add(footprint.allocated_bytes());
             if footprint.allocated() {
                 totals.allocated_code_count = totals.allocated_code_count.saturating_add(1);
+            }
+        }
+        if let Some(snapshot) = vm.feedback_vector_snapshot(code) {
+            for site in snapshot.sites() {
+                match site.detail() {
+                    FeedbackSiteDetail::Call(call) => match call.state() {
+                        FeedbackInlineCacheState::Uninitialized => {
+                            totals.call_cache_uninit_sites =
+                                totals.call_cache_uninit_sites.saturating_add(1);
+                        }
+                        FeedbackInlineCacheState::Monomorphic => {
+                            totals.call_cache_mono_sites =
+                                totals.call_cache_mono_sites.saturating_add(1);
+                        }
+                        FeedbackInlineCacheState::Polymorphic => {
+                            totals.call_cache_poly_sites =
+                                totals.call_cache_poly_sites.saturating_add(1);
+                        }
+                        FeedbackInlineCacheState::Megamorphic => {
+                            totals.call_cache_mega_sites =
+                                totals.call_cache_mega_sites.saturating_add(1);
+                        }
+                    },
+                    FeedbackSiteDetail::Construct(construct) => {
+                        match construct.state() {
+                            FeedbackInlineCacheState::Uninitialized => {
+                                totals.construct_cache_uninit_sites =
+                                    totals.construct_cache_uninit_sites.saturating_add(1);
+                            }
+                            FeedbackInlineCacheState::Monomorphic => {
+                                totals.construct_cache_mono_sites =
+                                    totals.construct_cache_mono_sites.saturating_add(1);
+                            }
+                            FeedbackInlineCacheState::Polymorphic => {
+                                totals.construct_cache_poly_sites =
+                                    totals.construct_cache_poly_sites.saturating_add(1);
+                            }
+                            FeedbackInlineCacheState::Megamorphic => {
+                                totals.construct_cache_mega_sites =
+                                    totals.construct_cache_mega_sites.saturating_add(1);
+                            }
+                        }
+                        totals.construct_created_shape_entries =
+                            totals.construct_created_shape_entries.saturating_add(
+                                construct
+                                    .entries()
+                                    .iter()
+                                    .filter(|entry| entry.created_shape().is_some())
+                                    .count(),
+                            );
+                    }
+                    _ => {}
+                }
             }
         }
         for child_index in 0..function.child_functions().len() {
@@ -955,13 +1198,17 @@ fn render_report(
     previous: Option<&Value>,
 ) -> String {
     let mut output = String::new();
-    let command = format!(
+    let mut command = format!(
         "cargo run --release -p lyng-js-bench -- runtime --report {} --json {}",
         options.report_path, options.json_path
     );
+    if options.count_opcodes {
+        command.push_str(" --count-opcodes");
+    }
 
     write_runtime_report_intro(&mut output, options, &command);
     write_workload_throughput_section(&mut output, reports, previous);
+    write_opcode_dispatch_counts_section(&mut output, reports);
     write_template_feedback_section(&mut output, reports);
     write_runtime_accounting_section(&mut output, snapshots);
     if let Ok(watch_items) = RuntimeWatchItems::collect(reports, snapshots) {
@@ -1007,6 +1254,15 @@ fn write_runtime_report_intro(output: &mut String, options: &Options, command: &
         output,
         "- Frontend repetition count: `{}`",
         options.frontend_repetitions
+    );
+    let _ = writeln!(
+        output,
+        "- Opcode dispatch counters: `{}`",
+        if options.count_opcodes {
+            "enabled"
+        } else {
+            "disabled"
+        }
     );
     let _ = writeln!(output, "- JSON: `{}`", options.json_path);
     output.push('\n');
@@ -1076,21 +1332,64 @@ fn write_workload_throughput_section(
     output.push('\n');
 }
 
+fn write_opcode_dispatch_counts_section(output: &mut String, reports: &[WorkloadReport]) {
+    if !reports
+        .iter()
+        .any(|report| report.throughput.opcode_dispatch_counts.is_some())
+    {
+        return;
+    }
+
+    let _ = writeln!(output, "## Opcode Dispatch Counts");
+    output.push('\n');
+    let _ = writeln!(output, "| Benchmark | Total dispatches | Top opcodes |");
+    let _ = writeln!(output, "| --- | ---: | --- |");
+    for report in reports {
+        let Some(counts) = report.throughput.opcode_dispatch_counts.as_ref() else {
+            continue;
+        };
+        let _ = writeln!(
+            output,
+            "| `{}` | `{}` | {} |",
+            report.workload.name,
+            counts.total(),
+            format_opcode_top_counts(counts, 20),
+        );
+    }
+    output.push('\n');
+}
+
+fn format_opcode_top_counts(counts: &OpcodeDispatchCounts, limit: usize) -> String {
+    let top = counts.top(limit);
+    if top.is_empty() {
+        return "`none`".to_string();
+    }
+
+    let mut output = String::new();
+    for (index, entry) in top.iter().enumerate() {
+        if index != 0 {
+            output.push_str(", ");
+        }
+        let _ = write!(output, "`{}`: `{}`", entry.opcode().name(), entry.count());
+    }
+    output
+}
+
 fn write_template_feedback_section(output: &mut String, reports: &[WorkloadReport]) {
     let _ = writeln!(output, "## Template and Feedback Memory");
     output.push('\n');
     let _ = writeln!(
         output,
-        "| Benchmark | Pipeline | Functions | Encoded bytes | Metadata records | Template bytes | Atom payload bytes | Feedback slots | Live sites | Feedback codes | Allocated feedback bytes | Memory note |"
+        "| Benchmark | Pipeline | Functions | Encoded bytes | Metadata records | Template bytes | Atom payload bytes | Feedback slots | Live sites | Feedback codes | Allocated feedback bytes | Call IC uninit | Call IC mono | Call IC poly | Call IC mega | Construct IC uninit | Construct IC mono | Construct IC poly | Construct IC mega | Construct created shapes | Memory note |"
     );
     let _ = writeln!(
         output,
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
     );
     for report in reports {
         let _ = writeln!(
             output,
-            "| `{}` | `{}` | {} | {} | {} | {} | `{}` | {} | {} | {} | {} | {} |",
+            "| `{}` | `{}` | {} | {} | {} | {} | `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
             report.workload.name,
             report.workload.pipeline.label(),
             opt_usize_cell(report.memory.functions),
@@ -1102,6 +1401,15 @@ fn write_template_feedback_section(output: &mut String, reports: &[WorkloadRepor
             opt_usize_cell(report.memory.live_feedback_sites),
             opt_usize_cell(report.memory.allocated_feedback_code_count),
             opt_usize_cell(report.memory.allocated_feedback_bytes),
+            opt_usize_cell(report.memory.call_cache_uninit_sites),
+            opt_usize_cell(report.memory.call_cache_mono_sites),
+            opt_usize_cell(report.memory.call_cache_poly_sites),
+            opt_usize_cell(report.memory.call_cache_mega_sites),
+            opt_usize_cell(report.memory.construct_cache_uninit_sites),
+            opt_usize_cell(report.memory.construct_cache_mono_sites),
+            opt_usize_cell(report.memory.construct_cache_poly_sites),
+            opt_usize_cell(report.memory.construct_cache_mega_sites),
+            opt_usize_cell(report.memory.construct_created_shape_entries),
             report.memory.note,
         );
     }
@@ -1113,21 +1421,43 @@ fn write_runtime_accounting_section(output: &mut String, snapshots: &[RuntimeSna
     output.push('\n');
     let _ = writeln!(
         output,
-        "| Snapshot | Heap live bytes | Heap young live bytes | Heap old live bytes | Heap reserved bytes | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
+        "| Snapshot | Heap live bytes | Heap young live bytes | Heap old live bytes | Heap reserved bytes | Nursery allocation % | Minor GCs | Last minor pause ns | Last survivors | Last tenured | Last cards dirtied/minor | Major mark slices | Major mark budget | Major mark work items | Max major mark pause ns | Major mark finish work items | Major mark finish pause ns | Gray after finish | Background sweep completed | Background sweep candidates | Background sweep reclaimed | Background sweep duration ns | Background sweep apply pause ns | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
     );
     let _ = writeln!(
         output,
-        "| --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
     );
     for snapshot in snapshots {
         let _ = writeln!(
             output,
-            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
+            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
             snapshot.label,
             snapshot.accounting.heap.live_bytes,
             snapshot.accounting.heap.young_live_bytes,
             snapshot.accounting.heap.old_live_bytes,
             snapshot.accounting.heap.reserved_bytes,
+            snapshot
+                .accounting
+                .heap
+                .allocation_profile
+                .nursery_allocation_ratio(),
+            snapshot.accounting.heap.minor_collections,
+            snapshot.accounting.heap.last_minor_pause_ns,
+            snapshot.accounting.heap.last_minor_survivors,
+            snapshot.accounting.heap.last_minor_tenured,
+            snapshot.accounting.heap.last_minor_cards_dirtied,
+            snapshot.accounting.heap.last_major_mark_slices,
+            snapshot.accounting.heap.last_major_mark_slice_budget,
+            snapshot.accounting.heap.last_major_mark_work_items,
+            snapshot.accounting.heap.last_major_max_mark_pause_ns,
+            snapshot.accounting.heap.last_major_mark_finish_work_items,
+            snapshot.accounting.heap.last_major_mark_finish_pause_ns,
+            snapshot.accounting.heap.last_major_gray_work_items_after_finish,
+            snapshot.accounting.heap.last_major_background_sweep_completed,
+            snapshot.accounting.heap.last_major_background_sweep_candidates,
+            snapshot.accounting.heap.last_major_background_sweep_reclaimed,
+            snapshot.accounting.heap.last_major_background_sweep_duration_ns,
+            snapshot.accounting.heap.last_major_background_sweep_apply_pause_ns,
             domain_cell(snapshot.accounting.iterator_records),
             domain_cell(snapshot.accounting.regexp_payloads),
             domain_cell(snapshot.accounting.regexp_literal_cache),
@@ -1224,6 +1554,7 @@ fn render_json_report(
             "warmup_runs": options.warmup_runs,
             "loop_trip_count": options.loop_trip_count,
             "frontend_repetitions": options.frontend_repetitions,
+            "count_opcodes": options.count_opcodes,
         },
         "has_previous": previous.is_some(),
         "workloads": reports
@@ -1268,9 +1599,39 @@ fn runtime_workload_json(report: &WorkloadReport, previous: Option<&Value>) -> V
             "live_feedback_sites": report.memory.live_feedback_sites,
             "allocated_feedback_code_count": report.memory.allocated_feedback_code_count,
             "allocated_feedback_bytes": report.memory.allocated_feedback_bytes,
+            "call_cache_uninit_sites": report.memory.call_cache_uninit_sites,
+            "call_cache_mono_sites": report.memory.call_cache_mono_sites,
+            "call_cache_poly_sites": report.memory.call_cache_poly_sites,
+            "call_cache_mega_sites": report.memory.call_cache_mega_sites,
+            "construct_cache_uninit_sites": report.memory.construct_cache_uninit_sites,
+            "construct_cache_mono_sites": report.memory.construct_cache_mono_sites,
+            "construct_cache_poly_sites": report.memory.construct_cache_poly_sites,
+            "construct_cache_mega_sites": report.memory.construct_cache_mega_sites,
+            "construct_created_shape_entries": report.memory.construct_created_shape_entries,
             "note": report.memory.note,
         },
+        "opcode_dispatch_counts": report
+            .throughput
+            .opcode_dispatch_counts
+            .as_ref()
+            .map(opcode_dispatch_counts_json),
         "delta": delta,
+    })
+}
+
+fn opcode_dispatch_counts_json(counts: &OpcodeDispatchCounts) -> Value {
+    json!({
+        "total": counts.total(),
+        "top": counts
+            .top(20)
+            .into_iter()
+            .map(|entry| {
+                json!({
+                    "opcode": entry.opcode().name(),
+                    "count": entry.count(),
+                })
+            })
+            .collect::<Vec<_>>(),
     })
 }
 
@@ -1282,6 +1643,44 @@ fn runtime_snapshot_json(snapshot: &RuntimeSnapshot) -> Value {
             "young_live_bytes": snapshot.accounting.heap.young_live_bytes,
             "old_live_bytes": snapshot.accounting.heap.old_live_bytes,
             "reserved_bytes": snapshot.accounting.heap.reserved_bytes,
+        },
+        "nursery": {
+            "capacity_bytes": snapshot.accounting.heap.nursery_capacity_bytes,
+            "used_bytes": snapshot.accounting.heap.nursery_used_bytes,
+            "allocation_profile": {
+                "nursery_allocations": snapshot.accounting.heap.allocation_profile.nursery_allocations,
+                "old_allocations": snapshot.accounting.heap.allocation_profile.old_allocations,
+                "nursery_allocation_percent": snapshot
+                    .accounting
+                    .heap
+                    .allocation_profile
+                    .nursery_allocation_ratio(),
+            },
+            "minor_collections": snapshot.accounting.heap.minor_collections,
+            "last_minor_pause_ns": snapshot.accounting.heap.last_minor_pause_ns,
+            "last_minor_survivors": snapshot.accounting.heap.last_minor_survivors,
+            "last_minor_tenured": snapshot.accounting.heap.last_minor_tenured,
+            "last_minor_reclaimed": snapshot.accounting.heap.last_minor_reclaimed,
+            "last_minor_cards_dirtied": snapshot.accounting.heap.last_minor_cards_dirtied,
+            "last_minor_cards_scanned": snapshot.accounting.heap.last_minor_cards_scanned,
+        },
+        "major_gc": {
+            "last_mark_slices": snapshot.accounting.heap.last_major_mark_slices,
+            "last_mark_slice_budget": snapshot.accounting.heap.last_major_mark_slice_budget,
+            "last_mark_work_items": snapshot.accounting.heap.last_major_mark_work_items,
+            "last_max_mark_slice_work_items": snapshot.accounting.heap.last_major_max_mark_slice_work_items,
+            "last_total_mark_pause_ns": snapshot.accounting.heap.last_major_total_mark_pause_ns,
+            "last_max_mark_pause_ns": snapshot.accounting.heap.last_major_max_mark_pause_ns,
+            "last_mark_finish_work_items": snapshot.accounting.heap.last_major_mark_finish_work_items,
+            "last_mark_finish_pause_ns": snapshot.accounting.heap.last_major_mark_finish_pause_ns,
+            "last_gray_work_items_after_finish": snapshot.accounting.heap.last_major_gray_work_items_after_finish,
+            "last_background_sweep_started": snapshot.accounting.heap.last_major_background_sweep_started,
+            "last_background_sweep_completed": snapshot.accounting.heap.last_major_background_sweep_completed,
+            "last_background_sweep_worker_thread_id": snapshot.accounting.heap.last_major_background_sweep_worker_thread_id,
+            "last_background_sweep_candidates": snapshot.accounting.heap.last_major_background_sweep_candidates,
+            "last_background_sweep_reclaimed": snapshot.accounting.heap.last_major_background_sweep_reclaimed,
+            "last_background_sweep_duration_ns": snapshot.accounting.heap.last_major_background_sweep_duration_ns,
+            "last_background_sweep_apply_pause_ns": snapshot.accounting.heap.last_major_background_sweep_apply_pause_ns,
         },
         "iterator_records": runtime_domain_json(snapshot.accounting.iterator_records),
         "regexp_payloads": runtime_domain_json(snapshot.accounting.regexp_payloads),
@@ -1775,6 +2174,7 @@ mod tests {
             warmup_runs: 1,
             loop_trip_count: 16,
             frontend_repetitions: 4,
+            count_opcodes: false,
         };
         let baseline_atom_payload = AtomTable::new().payload_bytes();
 
@@ -1894,6 +2294,31 @@ mod tests {
     }
 
     #[test]
+    fn runtime_snapshots_report_nursery_minor_gc_accounting() {
+        let snapshots =
+            capture_runtime_snapshots().expect("runtime snapshots should capture successfully");
+        let seeded = snapshots
+            .iter()
+            .find(|snapshot| snapshot.label == "runtime.nursery-minor-gc")
+            .unwrap();
+
+        assert!(seeded.accounting.heap.minor_collections > 0);
+        assert!(seeded.accounting.heap.last_minor_pause_ns > 0);
+        assert!(seeded.accounting.heap.last_minor_survivors > 0);
+        assert!(seeded.accounting.heap.last_minor_tenured > 0);
+        assert!(seeded.accounting.heap.last_minor_reclaimed > 0);
+        assert!(seeded.accounting.heap.last_minor_cards_dirtied > 0);
+        assert!(
+            seeded
+                .accounting
+                .heap
+                .allocation_profile
+                .nursery_allocation_ratio()
+                >= 80
+        );
+    }
+
+    #[test]
     fn runtime_report_path_drops_phase_naming() {
         assert_eq!(DEFAULT_REPORT_PATH, "reports/js/lyng-js/bench.md");
     }
@@ -1915,10 +2340,22 @@ mod tests {
         assert_eq!(options.warmup_runs, 1);
         assert_eq!(options.loop_trip_count, 64);
         assert_eq!(options.frontend_repetitions, 4);
+        assert!(!options.count_opcodes);
     }
 
     #[test]
-    fn runtime_report_and_json_include_previous_deltas() {
+    fn runtime_options_enable_opcode_dispatch_counts() {
+        let options = parse_options(&[
+            "--preset".to_string(),
+            "smoke".to_string(),
+            "--count-opcodes".to_string(),
+        ])
+        .expect("runtime smoke preset should parse with opcode counters");
+
+        assert!(options.count_opcodes);
+    }
+
+    fn synthetic_delta_workload_report() -> WorkloadReport {
         let workload = Workload {
             name: "delta-runtime",
             pipeline: WorkloadPipeline::ScriptRuntime,
@@ -1926,7 +2363,7 @@ mod tests {
             source: String::new(),
             operations_per_run: 10,
         };
-        let report = WorkloadReport {
+        WorkloadReport {
             workload,
             throughput: ThroughputResult {
                 samples: 1,
@@ -1935,6 +2372,10 @@ mod tests {
                 median_total: Duration::from_micros(20),
                 median_us_per_run: 20.0,
                 median_ns_per_operation: 2_000.0,
+                opcode_dispatch_counts: Some(OpcodeDispatchCounts::from_counts([
+                    (Opcode::AddSmi, 12),
+                    (Opcode::LoopHeader, 3),
+                ])),
             },
             memory: MemoryResult {
                 functions: Some(1),
@@ -1946,15 +2387,30 @@ mod tests {
                 live_feedback_sites: Some(2),
                 allocated_feedback_code_count: Some(1),
                 allocated_feedback_bytes: Some(96),
+                call_cache_uninit_sites: Some(1),
+                call_cache_mono_sites: Some(2),
+                call_cache_poly_sites: Some(3),
+                call_cache_mega_sites: Some(4),
+                construct_cache_uninit_sites: Some(5),
+                construct_cache_mono_sites: Some(6),
+                construct_cache_poly_sites: Some(7),
+                construct_cache_mega_sites: Some(8),
+                construct_created_shape_entries: Some(9),
                 note: "Synthetic memory row.",
             },
-        };
-        let snapshot = RuntimeSnapshot {
+        }
+    }
+
+    fn synthetic_runtime_snapshot() -> RuntimeSnapshot {
+        RuntimeSnapshot {
             label: "runtime.synthetic",
             accounting: RuntimeAccounting::default(),
             note: "Synthetic snapshot.",
-        };
-        let options = Options {
+        }
+    }
+
+    fn synthetic_runtime_options(count_opcodes: bool) -> Options {
+        Options {
             report_path: "/tmp/runtime.md".to_string(),
             json_path: "/tmp/runtime.json".to_string(),
             samples: 1,
@@ -1962,7 +2418,15 @@ mod tests {
             warmup_runs: 1,
             loop_trip_count: 10,
             frontend_repetitions: 4,
-        };
+            count_opcodes,
+        }
+    }
+
+    #[test]
+    fn runtime_report_and_json_include_previous_deltas() {
+        let report = synthetic_delta_workload_report();
+        let snapshot = synthetic_runtime_snapshot();
+        let options = synthetic_runtime_options(true);
         let previous = serde_json::json!({
             "workloads": [{
                 "name": "delta-runtime",
@@ -1980,6 +2444,11 @@ mod tests {
         );
         assert!(markdown.contains("Median ns/work-unit delta"));
         assert!(markdown.contains("+500.00"));
+        assert!(markdown.contains("Call IC mono"));
+        assert!(markdown.contains("Construct created shapes"));
+        assert!(markdown.contains("## Opcode Dispatch Counts"));
+        assert!(markdown.contains("| `delta-runtime` | `15` | `AddSmi`: `12`, `LoopHeader`: `3` |"));
+        assert!(markdown.contains("| `delta-runtime` | `script.runtime` | `1` | `40` | `3` | `128` | `7` | `2` | `2` | `1` | `96` | `1` | `2` | `3` | `4` | `5` | `6` | `7` | `8` | `9` | Synthetic memory row. |"));
 
         let json = render_json_report(
             &options,
@@ -1993,32 +2462,78 @@ mod tests {
             json["workloads"][0]["delta"]["median_ns_per_operation"],
             500.0
         );
+        assert_eq!(json["workloads"][0]["memory"]["call_cache_mono_sites"], 2);
+        assert_eq!(json["workloads"][0]["memory"]["call_cache_poly_sites"], 3);
+        assert_eq!(json["workloads"][0]["memory"]["call_cache_mega_sites"], 4);
+        assert_eq!(
+            json["workloads"][0]["memory"]["construct_cache_mono_sites"],
+            6
+        );
+        assert_eq!(
+            json["workloads"][0]["memory"]["construct_created_shape_entries"],
+            9
+        );
+        assert_eq!(json["workloads"][0]["opcode_dispatch_counts"]["total"], 15);
+        assert_eq!(
+            json["workloads"][0]["opcode_dispatch_counts"]["top"][0]["opcode"],
+            "AddSmi"
+        );
+        assert_eq!(
+            json["workloads"][0]["opcode_dispatch_counts"]["top"][0]["count"],
+            12
+        );
     }
 
     #[test]
     fn runtime_report_and_json_include_heap_generation_split() {
-        let snapshot = RuntimeSnapshot {
-            label: "runtime.synthetic",
-            accounting: RuntimeAccounting::default(),
-            note: "Synthetic snapshot.",
-        };
-        let options = Options {
-            report_path: "/tmp/runtime.md".to_string(),
-            json_path: "/tmp/runtime.json".to_string(),
-            samples: 1,
-            runs_per_sample: 1,
-            warmup_runs: 1,
-            loop_trip_count: 10,
-            frontend_repetitions: 4,
-        };
+        let snapshot = synthetic_runtime_snapshot();
+        let options = synthetic_runtime_options(false);
 
         let markdown = render_report(&options, &[], std::slice::from_ref(&snapshot), None);
         assert!(markdown.contains("Heap young live bytes"));
         assert!(markdown.contains("Heap old live bytes"));
+        assert!(markdown.contains("Nursery allocation %"));
+        assert!(markdown.contains("Last minor pause ns"));
+        assert!(markdown.contains("Last tenured"));
+        assert!(markdown.contains("Last cards dirtied/minor"));
+        assert!(markdown.contains("Major mark slices"));
+        assert!(markdown.contains("Max major mark pause ns"));
+        assert!(markdown.contains("Major mark finish pause ns"));
+        assert!(markdown.contains("Gray after finish"));
+        assert!(markdown.contains("Background sweep completed"));
+        assert!(markdown.contains("Background sweep reclaimed"));
 
         let json = render_json_report(&options, &[], std::slice::from_ref(&snapshot), None);
         assert_eq!(json["runtime_snapshots"][0]["heap"]["young_live_bytes"], 0);
         assert_eq!(json["runtime_snapshots"][0]["heap"]["old_live_bytes"], 0);
+        assert_eq!(
+            json["runtime_snapshots"][0]["nursery"]["minor_collections"],
+            0
+        );
+        assert_eq!(
+            json["runtime_snapshots"][0]["major_gc"]["last_mark_slices"],
+            0
+        );
+        assert_eq!(
+            json["runtime_snapshots"][0]["major_gc"]["last_max_mark_slice_work_items"],
+            0
+        );
+        assert_eq!(
+            json["runtime_snapshots"][0]["major_gc"]["last_mark_finish_work_items"],
+            0
+        );
+        assert_eq!(
+            json["runtime_snapshots"][0]["major_gc"]["last_gray_work_items_after_finish"],
+            0
+        );
+        assert_eq!(
+            json["runtime_snapshots"][0]["major_gc"]["last_background_sweep_reclaimed"],
+            0
+        );
+        assert_eq!(
+            json["runtime_snapshots"][0]["major_gc"]["last_background_sweep_completed"],
+            false
+        );
     }
 
     #[test]
