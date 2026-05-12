@@ -724,6 +724,82 @@ mod tests {
     }
 
     #[test]
+    fn weak_refs_and_finalizers_settle_before_background_sweep_reclaims_targets() {
+        let mut heap = PrimitiveHeap::new();
+        let weak_ref = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let weak_target = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let registry = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let finalization_target = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let holdings = heap.alloc_string(
+            StringEncoding::Latin1,
+            4,
+            b"held",
+            None,
+            AllocationLifetime::Default,
+        );
+
+        {
+            let mut mutator = heap.mutator();
+            assert!(mutator.init_weak_ref(weak_ref, WeakHeapRef::Object(weak_target)));
+            assert!(mutator.init_finalization_registry(registry));
+            assert!(mutator.finalization_registry_register(
+                registry,
+                WeakHeapRef::Object(finalization_target),
+                Value::from_string_ref(holdings),
+                None,
+            ));
+        }
+
+        assert!(heap.mark_object(weak_ref));
+        assert!(heap.mark_object(registry));
+        assert!(heap.mark_string(holdings));
+
+        let (weak_refs_cleared, finalization_cells_queued, pending_registries) =
+            heap.sweep_weak_state();
+
+        assert_eq!(weak_refs_cleared, 1);
+        assert_eq!(finalization_cells_queued, 1);
+        assert_eq!(pending_registries, 1);
+        assert_eq!(heap.view().weak_ref_target(weak_ref), Some(None));
+        assert_eq!(heap.pending_finalization_registries(), &[registry]);
+        assert!(heap.view().object(weak_target).is_some());
+        assert!(heap.view().object(finalization_target).is_some());
+
+        let candidates = heap.collect_major_sweep_candidates();
+        heap.start_background_sweep(candidates);
+        assert!(heap.view().object(weak_target).is_some());
+        assert!(heap.view().object(finalization_target).is_some());
+
+        let (reclaimed, stats) = heap
+            .complete_background_sweep()
+            .expect("background sweep should be pending");
+
+        assert_eq!(reclaimed.objects, 2);
+        assert_eq!(stats.reclaimed, 2);
+        assert!(heap.view().object(weak_ref).is_some());
+        assert!(heap.view().object(registry).is_some());
+        assert!(heap.view().object(weak_target).is_none());
+        assert!(heap.view().object(finalization_target).is_none());
+        assert!(heap.view().string(holdings).is_some());
+        assert_eq!(
+            heap.take_finalization_cleanup_holdings(registry),
+            vec![Value::from_string_ref(holdings)]
+        );
+    }
+
+    #[test]
     fn nursery_minor_collection_promotes_rooted_survivors_and_reclaims_dead_young_objects() {
         let mut heap = PrimitiveHeap::new();
         heap.set_nursery_capacity_bytes(256);
