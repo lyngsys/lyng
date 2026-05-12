@@ -198,6 +198,11 @@ fn execute_module(invocation: &CliInvocation, host: &CliHost) -> Result<ScriptOu
             .map_err(CliError::host)?;
             1
         }
+        Err(error @ (VmError::MissingModuleResolution | VmError::AmbiguousModuleExport)) => {
+            return Err(CliError::vm(format!(
+                "SyntaxError: module resolution failed: {error:?}"
+            )));
+        }
         Err(error) => {
             return Err(CliError::vm(format!("module execution failed: {error:?}")));
         }
