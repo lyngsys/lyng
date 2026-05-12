@@ -17,5 +17,6 @@ lyng-js-host = { workspace = true }
 lyng-js-ops = { workspace = true }
 lyng-js-parser = { workspace = true }
 lyng-js-sema = { workspace = true }
+lyng-js-test262-harness = { workspace = true }
 lyng-js-types = { workspace = true }
 lyng-js-vm = { workspace = true }

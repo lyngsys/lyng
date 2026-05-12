@@ -12,6 +12,7 @@ use lyng_js_host::{
 use lyng_js_ops::{number_to_string, object};
 use lyng_js_parser::parse_script;
 use lyng_js_sema::analyze_script;
+use lyng_js_test262_harness::Test262RealmExtension;
 use lyng_js_types::{ObjectRef, PropertyKey, Value};
 use lyng_js_vm::{ModuleLoadError, SharedRealmExtensionProvider, Vm, VmError};
 use std::fmt::Write as _;
@@ -206,6 +207,11 @@ fn execute_module(invocation: &CliInvocation, host: &CliHost) -> Result<ScriptOu
 }
 
 fn shell_extension_provider(invocation: &CliInvocation) -> Option<SharedRealmExtensionProvider> {
+    if invocation.test262_mode() {
+        // Test262 mode installs `$262` plus its own `print` and `setTimeout`,
+        // so the harness extension supersedes the bare `--shell` print global.
+        return Some(Arc::new(Test262RealmExtension::to_stdout()));
+    }
     if invocation.shell_mode() {
         Some(Arc::new(CliRealmExtension))
     } else {
