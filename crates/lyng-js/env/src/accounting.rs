@@ -124,6 +124,27 @@ pub const fn merge_primitive_heap_accounting(
         last_minor_reclaimed: left.last_minor_reclaimed + right.last_minor_reclaimed,
         last_minor_cards_dirtied: left.last_minor_cards_dirtied + right.last_minor_cards_dirtied,
         last_minor_cards_scanned: left.last_minor_cards_scanned + right.last_minor_cards_scanned,
+        last_major_mark_slices: left.last_major_mark_slices + right.last_major_mark_slices,
+        last_major_mark_slice_budget: left.last_major_mark_slice_budget
+            + right.last_major_mark_slice_budget,
+        last_major_mark_work_items: left.last_major_mark_work_items
+            + right.last_major_mark_work_items,
+        last_major_max_mark_slice_work_items: if left.last_major_max_mark_slice_work_items
+            > right.last_major_max_mark_slice_work_items
+        {
+            left.last_major_max_mark_slice_work_items
+        } else {
+            right.last_major_max_mark_slice_work_items
+        },
+        last_major_total_mark_pause_ns: left.last_major_total_mark_pause_ns
+            + right.last_major_total_mark_pause_ns,
+        last_major_max_mark_pause_ns: if left.last_major_max_mark_pause_ns
+            > right.last_major_max_mark_pause_ns
+        {
+            left.last_major_max_mark_pause_ns
+        } else {
+            right.last_major_max_mark_pause_ns
+        },
     }
 }
 

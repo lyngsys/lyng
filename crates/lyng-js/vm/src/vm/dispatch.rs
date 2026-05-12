@@ -755,6 +755,9 @@ impl Vm {
                                 _ => unreachable!("guarded by opcode match"),
                             };
                             if should_jump {
+                                if delta < 0 {
+                                    Self::poll_incremental_mark_safepoint(agent);
+                                }
                                 self.jump_by(delta)?;
                             } else {
                                 self.advance_instruction();
@@ -836,11 +839,13 @@ impl Vm {
                     Opcode::Nop => self.advance_instruction(),
                     Opcode::LoopHeader => {
                         self.observe_tier_backedge_event(frame.code());
+                        Self::poll_incremental_mark_safepoint(agent);
                         self.advance_instruction();
                     }
                     Opcode::Jump => {
                         if ax < 0 {
                             self.observe_tier_backedge_event(frame.code());
+                            Self::poll_incremental_mark_safepoint(agent);
                         }
                         self.jump_by(ax)?;
                     }
@@ -1339,7 +1344,7 @@ impl Vm {
 
     fn threaded_jump(
         &mut self,
-        _agent: &mut Agent,
+        agent: &mut Agent,
         _host: &dyn HostHooks,
         _registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
@@ -1353,9 +1358,11 @@ impl Vm {
             Opcode::Jump | Opcode::LoopHeader => {
                 if opcode == Opcode::Jump && ax < 0 {
                     self.observe_tier_backedge_event(frame.code());
+                    Self::poll_incremental_mark_safepoint(agent);
                 }
                 if opcode == Opcode::LoopHeader {
                     self.observe_tier_backedge_event(frame.code());
+                    Self::poll_incremental_mark_safepoint(agent);
                     self.advance_instruction();
                 } else {
                     self.jump_by(ax)?;
@@ -1396,6 +1403,9 @@ impl Vm {
                     _ => unreachable!("guarded by opcode match"),
                 };
                 if should_jump {
+                    if delta < 0 {
+                        Self::poll_incremental_mark_safepoint(agent);
+                    }
                     self.jump_by(delta)?;
                 } else {
                     self.advance_instruction();

@@ -45,8 +45,9 @@ pub use mutator::{
 };
 pub use nursery::{NurseryStats, PrimitiveAllocationProfile};
 pub use rooting::{
-    PrimitiveCollectionStats, PrimitiveRootGuard, PrimitiveRootScope, PrimitiveRoots,
-    PrimitiveTraceStats, PrimitiveTracer, TraceHeapEdges,
+    PrimitiveCollectionStats, PrimitiveIncrementalMark, PrimitiveMarkProgress, PrimitiveMarkStep,
+    PrimitiveRootGuard, PrimitiveRootScope, PrimitiveRoots, PrimitiveTraceStats, PrimitiveTracer,
+    TraceHeapEdges,
 };
 pub use weak::WeakHeapRef;
 pub use writer::{HeapRef, HeapWriter};

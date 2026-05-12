@@ -37,6 +37,12 @@ pub struct PrimitiveTraceStats {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PrimitiveCollectionStats {
     pub trace: PrimitiveTraceStats,
+    pub major_mark_slices: usize,
+    pub major_mark_slice_budget: usize,
+    pub major_mark_work_items: usize,
+    pub max_major_mark_slice_work_items: usize,
+    pub total_major_mark_pause_ns: u128,
+    pub max_major_mark_pause_ns: u128,
     pub ephemeron_fixes: usize,
     pub weak_refs_cleared: usize,
     pub finalization_cells_queued: usize,
@@ -76,12 +82,45 @@ pub struct PrimitiveRootGuard<'a, T> {
 /// Type-directed marker walk over `PrimitiveHeap`.
 pub struct PrimitiveTracer<'a> {
     heap: &'a mut PrimitiveHeap,
-    stats: PrimitiveTraceStats,
+    marker: &'a mut PrimitiveIncrementalMark,
 }
 
 /// Young-generation tracer for minor collections.
 pub struct PrimitiveMinorTracer<'a> {
     heap: &'a mut PrimitiveHeap,
+}
+
+/// Worklist-backed state for a bounded major mark phase.
+#[derive(Default)]
+pub struct PrimitiveIncrementalMark {
+    worklist: Vec<MarkWorkItem>,
+    stats: PrimitiveTraceStats,
+}
+
+/// Progress state returned by one bounded major mark step.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PrimitiveMarkProgress {
+    Complete,
+    HasMoreWork,
+}
+
+/// Summary of one bounded major mark step.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PrimitiveMarkStep {
+    pub work_items_processed: usize,
+    pub remaining_work_items: usize,
+    pub max_work_items_per_slice: usize,
+    pub progress: PrimitiveMarkProgress,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PrimitiveMajorMarkMetrics {
+    budget: usize,
+    slices: usize,
+    work_items: usize,
+    max_work_items: usize,
+    total_pause_ns: u128,
+    max_pause_ns: u128,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -97,6 +136,24 @@ enum RootRegistration {
     Realm(RealmRef),
     Shape(ShapeId),
     SuspendedExecution(SuspendedExecutionRef),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MarkWorkItem {
+    String(StringRef),
+    Symbol(SymbolRef),
+    BigInt(BigIntRef),
+    ValueCell(PrimitiveValueCellRef),
+    Object(ObjectRef),
+    SuspendedExecution(SuspendedExecutionRef),
+    Environment(EnvironmentRef),
+    Code(CodeRef),
+    Realm(RealmRef),
+    Shape(ShapeId),
+    ObjectSlots(ObjectSlotsRef),
+    SuspendedRegisters(SuspendedRegistersRef),
+    EnvironmentSlots(EnvironmentSlotsRef),
+    CodeSlots(CodeSlotsRef),
 }
 
 trait RootRegistrationCodec: Copy {
@@ -378,18 +435,25 @@ impl_root_guard_accessors!(RealmRef);
 impl_root_guard_accessors!(ShapeId);
 impl_root_guard_accessors!(SuspendedExecutionRef);
 
-impl<'a> PrimitiveTracer<'a> {
+impl PrimitiveIncrementalMark {
     #[inline]
-    pub fn new(heap: &'a mut PrimitiveHeap) -> Self {
-        Self {
-            heap,
-            stats: PrimitiveTraceStats::default(),
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     #[inline]
-    pub const fn finish(self) -> PrimitiveTraceStats {
+    pub const fn trace_stats(&self) -> PrimitiveTraceStats {
         self.stats
+    }
+
+    #[inline]
+    pub const fn has_work(&self) -> bool {
+        !self.worklist.is_empty()
+    }
+
+    #[inline]
+    pub const fn pending_work_items(&self) -> usize {
+        self.worklist.len()
     }
 
     const fn total_live_marks(&self) -> usize {
@@ -404,10 +468,55 @@ impl<'a> PrimitiveTracer<'a> {
             + self.stats.realms_marked
             + self.stats.shapes_marked
     }
+}
+
+impl PrimitiveMarkStep {
+    #[inline]
+    pub const fn has_more_work(self) -> bool {
+        matches!(self.progress, PrimitiveMarkProgress::HasMoreWork)
+    }
+
+    #[inline]
+    pub const fn is_complete(self) -> bool {
+        matches!(self.progress, PrimitiveMarkProgress::Complete)
+    }
+}
+
+impl PrimitiveMajorMarkMetrics {
+    #[inline]
+    pub const fn new(budget: usize) -> Self {
+        Self {
+            budget,
+            slices: 0,
+            work_items: 0,
+            max_work_items: 0,
+            total_pause_ns: 0,
+            max_pause_ns: 0,
+        }
+    }
+
+    fn record(&mut self, work_items: usize, pause: std::time::Duration) {
+        self.slices += 1;
+        self.work_items += work_items;
+        self.max_work_items = self.max_work_items.max(work_items);
+        let pause_ns = pause.as_nanos();
+        self.total_pause_ns = self.total_pause_ns.saturating_add(pause_ns);
+        self.max_pause_ns = self.max_pause_ns.max(pause_ns);
+    }
+}
+
+impl<'a> PrimitiveTracer<'a> {
+    #[inline]
+    pub const fn new(
+        heap: &'a mut PrimitiveHeap,
+        marker: &'a mut PrimitiveIncrementalMark,
+    ) -> Self {
+        Self { heap, marker }
+    }
 
     #[inline]
     pub fn mark_value(&mut self, value: Value) {
-        self.stats.values_traced += 1;
+        self.marker.stats.values_traced += 1;
 
         if let Some(id) = value.as_string_ref() {
             self.mark_string(id);
@@ -425,176 +534,217 @@ impl<'a> PrimitiveTracer<'a> {
     #[inline]
     pub fn mark_string(&mut self, id: StringRef) {
         if self.heap.mark_string(id) {
-            self.stats.strings_marked += 1;
-            if let Some(record) = self.heap.string(id) {
-                record.trace_heap_edges(self);
-            }
+            self.marker.stats.strings_marked += 1;
+            self.marker.worklist.push(MarkWorkItem::String(id));
         }
     }
 
     #[inline]
     pub fn mark_symbol(&mut self, id: SymbolRef) {
         if self.heap.mark_symbol(id) {
-            self.stats.symbols_marked += 1;
-            if let Some(record) = self.heap.symbol(id) {
-                record.trace_heap_edges(self);
-            }
+            self.marker.stats.symbols_marked += 1;
+            self.marker.worklist.push(MarkWorkItem::Symbol(id));
         }
     }
 
     #[inline]
     pub fn mark_bigint(&mut self, id: BigIntRef) {
         if self.heap.mark_bigint(id) {
-            self.stats.bigints_marked += 1;
-            if let Some(record) = self.heap.bigint(id) {
-                record.trace_heap_edges(self);
-            }
+            self.marker.stats.bigints_marked += 1;
+            self.marker.worklist.push(MarkWorkItem::BigInt(id));
         }
     }
 
     #[inline]
     pub fn mark_value_cell(&mut self, id: PrimitiveValueCellRef) {
         if self.heap.mark_value_cell(id) {
-            self.stats.value_cells_marked += 1;
-            if let Some(record) = self.heap.value_cell(id) {
-                record.trace_heap_edges(self);
-            }
+            self.marker.stats.value_cells_marked += 1;
+            self.marker.worklist.push(MarkWorkItem::ValueCell(id));
         }
     }
 
     #[inline]
     pub fn mark_object(&mut self, id: ObjectRef) {
         if self.heap.mark_object(id) {
-            self.stats.objects_marked += 1;
-            if let Some(record) = self.heap.object(id) {
-                record.trace_heap_edges(self);
-                if let Some(function_payload) = record.function_payload()
-                    && let Some(payload) = self.heap.function_payload(function_payload)
-                {
-                    payload.trace_heap_edges(self);
-                }
-            }
+            self.marker.stats.objects_marked += 1;
+            self.marker.worklist.push(MarkWorkItem::Object(id));
         }
     }
 
     #[inline]
     pub fn mark_suspended_execution(&mut self, id: SuspendedExecutionRef) {
         if self.heap.mark_suspended_execution(id) {
-            self.stats.suspended_executions_marked += 1;
-            if let Some(record) = self.heap.suspended_execution(id) {
-                record.trace_heap_edges(self);
-            }
+            self.marker.stats.suspended_executions_marked += 1;
+            self.marker
+                .worklist
+                .push(MarkWorkItem::SuspendedExecution(id));
         }
     }
 
     #[inline]
     pub fn mark_environment(&mut self, id: EnvironmentRef) {
         if self.heap.mark_environment(id) {
-            self.stats.environments_marked += 1;
-            if let Some(record) = self.heap.environment(id) {
-                record.trace_heap_edges(self);
-            }
+            self.marker.stats.environments_marked += 1;
+            self.marker.worklist.push(MarkWorkItem::Environment(id));
         }
     }
 
     #[inline]
     pub fn mark_code(&mut self, id: CodeRef) {
         if self.heap.mark_code(id) {
-            self.stats.codes_marked += 1;
-            if let Some(record) = self.heap.code(id) {
-                record.trace_heap_edges(self);
-            }
+            self.marker.stats.codes_marked += 1;
+            self.marker.worklist.push(MarkWorkItem::Code(id));
         }
     }
 
     #[inline]
     pub fn mark_realm(&mut self, id: RealmRef) {
         if self.heap.mark_realm(id) {
-            self.stats.realms_marked += 1;
-            if let Some(record) = self.heap.realm(id) {
-                record.trace_heap_edges(self);
-            }
+            self.marker.stats.realms_marked += 1;
+            self.marker.worklist.push(MarkWorkItem::Realm(id));
         }
     }
 
     #[inline]
     pub fn mark_shape(&mut self, id: ShapeId) {
         if self.heap.mark_shape(id) {
-            self.stats.shapes_marked += 1;
-            if let Some(record) = self.heap.shape(id) {
-                record.trace_heap_edges(self);
-            }
+            self.marker.stats.shapes_marked += 1;
+            self.marker.worklist.push(MarkWorkItem::Shape(id));
         }
     }
 
     fn mark_object_slots(&mut self, id: ObjectSlotsRef) {
-        let Some(values) = self.heap.object_slots(id).map(<[Value]>::to_vec) else {
-            return;
-        };
-        for value in values {
-            self.mark_value(value);
-        }
+        self.marker.worklist.push(MarkWorkItem::ObjectSlots(id));
     }
 
     fn mark_suspended_registers(&mut self, id: SuspendedRegistersRef) {
-        let Some(values) = self.heap.suspended_registers(id).map(<[Value]>::to_vec) else {
-            return;
-        };
-        for value in values {
-            self.mark_value(value);
-        }
+        self.marker
+            .worklist
+            .push(MarkWorkItem::SuspendedRegisters(id));
     }
 
     fn mark_environment_slots(&mut self, id: EnvironmentSlotsRef) {
-        let Some(values) = self.heap.environment_slots(id).map(<[Value]>::to_vec) else {
-            return;
-        };
-        for value in values {
-            self.mark_value(value);
-        }
+        self.marker
+            .worklist
+            .push(MarkWorkItem::EnvironmentSlots(id));
     }
 
     fn mark_code_slots(&mut self, id: CodeSlotsRef) {
-        let Some(values) = self.heap.code_slots(id).map(<[Value]>::to_vec) else {
-            return;
-        };
-        for value in values {
-            self.mark_value(value);
-        }
+        self.marker.worklist.push(MarkWorkItem::CodeSlots(id));
     }
 
-    fn trace_weak_structures_to_fixpoint(&mut self) -> usize {
-        let mut ephemeron_fixes = 0;
-
-        loop {
-            let before = self.total_live_marks();
-            let weak_maps = self.heap.weak_map_snapshots();
-            for (owner, entries) in weak_maps {
-                if !self.heap.is_object_marked(owner) {
-                    continue;
+    fn trace_work_item(&mut self, item: MarkWorkItem) {
+        match item {
+            MarkWorkItem::String(id) => {
+                if let Some(record) = self.heap.string(id) {
+                    record.trace_heap_edges(self);
                 }
-                for (key, value) in entries {
-                    if self.heap.is_weak_ref_marked(key) {
-                        self.mark_value(value);
+            }
+            MarkWorkItem::Symbol(id) => {
+                if let Some(record) = self.heap.symbol(id) {
+                    record.trace_heap_edges(self);
+                }
+            }
+            MarkWorkItem::BigInt(id) => {
+                if let Some(record) = self.heap.bigint(id) {
+                    record.trace_heap_edges(self);
+                }
+            }
+            MarkWorkItem::ValueCell(id) => {
+                if let Some(record) = self.heap.value_cell(id) {
+                    record.trace_heap_edges(self);
+                }
+            }
+            MarkWorkItem::Object(id) => {
+                if let Some(record) = self.heap.object(id) {
+                    record.trace_heap_edges(self);
+                    if let Some(function_payload) = record.function_payload()
+                        && let Some(payload) = self.heap.function_payload(function_payload)
+                    {
+                        payload.trace_heap_edges(self);
                     }
                 }
             }
-
-            let finalization_registries = self.heap.finalization_registry_snapshots();
-            for (owner, live_cells, pending_holdings) in finalization_registries {
-                if !self.heap.is_object_marked(owner) {
-                    continue;
-                }
-                for holdings in live_cells.into_iter().chain(pending_holdings) {
-                    self.mark_value(holdings);
+            MarkWorkItem::SuspendedExecution(id) => {
+                if let Some(record) = self.heap.suspended_execution(id) {
+                    record.trace_heap_edges(self);
                 }
             }
-
-            let after = self.total_live_marks();
-            if after == before {
-                return ephemeron_fixes;
+            MarkWorkItem::Environment(id) => {
+                if let Some(record) = self.heap.environment(id) {
+                    record.trace_heap_edges(self);
+                }
             }
-            ephemeron_fixes += after - before;
+            MarkWorkItem::Code(id) => {
+                if let Some(record) = self.heap.code(id) {
+                    record.trace_heap_edges(self);
+                }
+            }
+            MarkWorkItem::Realm(id) => {
+                if let Some(record) = self.heap.realm(id) {
+                    record.trace_heap_edges(self);
+                }
+            }
+            MarkWorkItem::Shape(id) => {
+                if let Some(record) = self.heap.shape(id) {
+                    record.trace_heap_edges(self);
+                }
+            }
+            MarkWorkItem::ObjectSlots(id) => {
+                let Some(values) = self.heap.object_slots(id).map(<[Value]>::to_vec) else {
+                    return;
+                };
+                for value in values {
+                    self.mark_value(value);
+                }
+            }
+            MarkWorkItem::SuspendedRegisters(id) => {
+                let Some(values) = self.heap.suspended_registers(id).map(<[Value]>::to_vec) else {
+                    return;
+                };
+                for value in values {
+                    self.mark_value(value);
+                }
+            }
+            MarkWorkItem::EnvironmentSlots(id) => {
+                let Some(values) = self.heap.environment_slots(id).map(<[Value]>::to_vec) else {
+                    return;
+                };
+                for value in values {
+                    self.mark_value(value);
+                }
+            }
+            MarkWorkItem::CodeSlots(id) => {
+                let Some(values) = self.heap.code_slots(id).map(<[Value]>::to_vec) else {
+                    return;
+                };
+                for value in values {
+                    self.mark_value(value);
+                }
+            }
+        }
+    }
+
+    fn mark_step(&mut self, budget: usize) -> PrimitiveMarkStep {
+        let mut work_items_processed = 0;
+        while work_items_processed < budget {
+            let Some(item) = self.marker.worklist.pop() else {
+                break;
+            };
+            work_items_processed += 1;
+            self.trace_work_item(item);
+        }
+
+        let progress = if self.marker.has_work() {
+            PrimitiveMarkProgress::HasMoreWork
+        } else {
+            PrimitiveMarkProgress::Complete
+        };
+        PrimitiveMarkStep {
+            work_items_processed,
+            remaining_work_items: self.marker.pending_work_items(),
+            max_work_items_per_slice: budget,
+            progress,
         }
     }
 }
@@ -981,6 +1131,84 @@ impl<'a> PrimitiveMinorTracer<'a> {
 }
 
 impl PrimitiveHeap {
+    #[inline]
+    pub const fn incremental_mark_in_progress(&self) -> bool {
+        self.active_major_mark.is_some()
+    }
+
+    #[inline]
+    pub fn active_incremental_mark_pending_work_items(&self) -> Option<usize> {
+        self.active_major_mark
+            .as_ref()
+            .map(PrimitiveIncrementalMark::pending_work_items)
+    }
+
+    pub fn begin_incremental_mark(&mut self, roots: &PrimitiveRoots) -> bool {
+        self.begin_incremental_mark_tracing(roots, &())
+    }
+
+    pub fn begin_incremental_mark_tracing<T: TraceHeapEdges + ?Sized>(
+        &mut self,
+        roots: &PrimitiveRoots,
+        additional_roots: &T,
+    ) -> bool {
+        if self.active_major_mark.is_some() {
+            return false;
+        }
+
+        let marker = self.start_incremental_mark_tracing(roots, additional_roots);
+        self.active_major_mark = Some(marker);
+        true
+    }
+
+    pub fn poll_incremental_mark_step(&mut self) -> Option<PrimitiveMarkStep> {
+        let mut marker = self.active_major_mark.take()?;
+        let step = self.mark_step(&mut marker, self.major_mark_slice_budget());
+        self.active_major_mark = Some(marker);
+        Some(step)
+    }
+
+    pub fn finish_active_incremental_mark(&mut self) -> Option<PrimitiveCollectionStats> {
+        let marker = self.active_major_mark.take()?;
+        Some(self.finish_incremental_mark(marker))
+    }
+
+    pub fn start_incremental_mark(&mut self, roots: &PrimitiveRoots) -> PrimitiveIncrementalMark {
+        self.start_incremental_mark_tracing(roots, &())
+    }
+
+    pub fn start_incremental_mark_tracing<T: TraceHeapEdges + ?Sized>(
+        &mut self,
+        roots: &PrimitiveRoots,
+        additional_roots: &T,
+    ) -> PrimitiveIncrementalMark {
+        self.active_major_mark = None;
+        self.clear_all_marks();
+        let mut marker = PrimitiveIncrementalMark::new();
+        {
+            let mut tracer = PrimitiveTracer::new(self, &mut marker);
+            roots.trace_roots(&mut tracer);
+            additional_roots.trace_heap_edges(&mut tracer);
+        }
+        marker
+    }
+
+    pub fn mark_step(
+        &mut self,
+        marker: &mut PrimitiveIncrementalMark,
+        budget: usize,
+    ) -> PrimitiveMarkStep {
+        let mut tracer = PrimitiveTracer::new(self, marker);
+        tracer.mark_step(budget)
+    }
+
+    pub fn finish_incremental_mark(
+        &mut self,
+        mut marker: PrimitiveIncrementalMark,
+    ) -> PrimitiveCollectionStats {
+        self.finish_incremental_mark_with_budget(&mut marker, usize::MAX, None)
+    }
+
     pub fn collect(&mut self, roots: &PrimitiveRoots) -> PrimitiveCollectionStats {
         self.collect_tracing(roots, &())
     }
@@ -990,31 +1218,55 @@ impl PrimitiveHeap {
         roots: &PrimitiveRoots,
         additional_roots: &T,
     ) -> PrimitiveCollectionStats {
-        self.clear_string_marks();
-        self.clear_symbol_marks();
-        self.clear_bigint_marks();
-        self.clear_value_cell_marks();
-        self.clear_object_marks();
-        self.clear_suspended_execution_marks();
-        self.clear_environment_marks();
-        self.clear_code_marks();
-        self.clear_realm_marks();
-        self.clear_shape_marks();
+        let mut marker = self.start_incremental_mark_tracing(roots, additional_roots);
+        self.finish_incremental_mark_with_budget(&mut marker, self.major_mark_slice_budget(), None)
+    }
 
-        let trace = {
-            let mut tracer = PrimitiveTracer::new(self);
-            roots.trace_roots(&mut tracer);
-            additional_roots.trace_heap_edges(&mut tracer);
-            let ephemeron_fixes = tracer.trace_weak_structures_to_fixpoint();
-            let trace = tracer.finish();
-            (trace, ephemeron_fixes)
-        };
+    pub(crate) fn collect_tracing_with_mark_metrics<T: TraceHeapEdges + ?Sized>(
+        &mut self,
+        roots: &PrimitiveRoots,
+        additional_roots: &T,
+        metrics: &mut PrimitiveMajorMarkMetrics,
+    ) -> PrimitiveCollectionStats {
+        let mut marker = self.start_incremental_mark_tracing(roots, additional_roots);
+        self.finish_incremental_mark_with_budget(
+            &mut marker,
+            self.major_mark_slice_budget(),
+            Some(metrics),
+        )
+    }
+
+    fn finish_incremental_mark_with_budget(
+        &mut self,
+        marker: &mut PrimitiveIncrementalMark,
+        budget: usize,
+        mut metrics: Option<&mut PrimitiveMajorMarkMetrics>,
+    ) -> PrimitiveCollectionStats {
+        let budget = budget.max(1);
+        while marker.has_work() {
+            let start = std::time::Instant::now();
+            let step = self.mark_step(marker, budget);
+            if let Some(metrics) = metrics.as_deref_mut() {
+                metrics.record(step.work_items_processed, start.elapsed());
+            }
+        }
+
+        let ephemeron_fixes =
+            self.trace_weak_structures_to_fixpoint(marker, budget, metrics.as_deref_mut());
+        let trace = marker.trace_stats();
         let (weak_refs_cleared, finalization_cells_queued, pending_finalization_registries) =
             self.sweep_weak_state();
 
+        let major = metrics.as_deref().copied().unwrap_or_default();
         PrimitiveCollectionStats {
-            trace: trace.0,
-            ephemeron_fixes: trace.1,
+            trace,
+            major_mark_slices: major.slices,
+            major_mark_slice_budget: major.budget,
+            major_mark_work_items: major.work_items,
+            max_major_mark_slice_work_items: major.max_work_items,
+            total_major_mark_pause_ns: major.total_pause_ns,
+            max_major_mark_pause_ns: major.max_pause_ns,
+            ephemeron_fixes,
             weak_refs_cleared,
             finalization_cells_queued,
             pending_finalization_registries,
@@ -1028,6 +1280,57 @@ impl PrimitiveHeap {
             codes_reclaimed: self.sweep_unmarked_codes(),
             realms_reclaimed: self.sweep_unmarked_realms(),
             shapes_reclaimed: self.sweep_unmarked_shapes(),
+        }
+    }
+
+    fn trace_weak_structures_to_fixpoint(
+        &mut self,
+        marker: &mut PrimitiveIncrementalMark,
+        budget: usize,
+        mut metrics: Option<&mut PrimitiveMajorMarkMetrics>,
+    ) -> usize {
+        let mut ephemeron_fixes = 0;
+
+        loop {
+            let before = marker.total_live_marks();
+            let weak_maps = self.weak_map_snapshots();
+            {
+                let mut tracer = PrimitiveTracer::new(self, marker);
+                for (owner, entries) in weak_maps {
+                    if !tracer.heap.is_object_marked(owner) {
+                        continue;
+                    }
+                    for (key, value) in entries {
+                        if tracer.heap.is_weak_ref_marked(key) {
+                            tracer.mark_value(value);
+                        }
+                    }
+                }
+
+                let finalization_registries = tracer.heap.finalization_registry_snapshots();
+                for (owner, live_cells, pending_holdings) in finalization_registries {
+                    if !tracer.heap.is_object_marked(owner) {
+                        continue;
+                    }
+                    for holdings in live_cells.into_iter().chain(pending_holdings) {
+                        tracer.mark_value(holdings);
+                    }
+                }
+            }
+
+            while marker.has_work() {
+                let start = std::time::Instant::now();
+                let step = self.mark_step(marker, budget);
+                if let Some(metrics) = metrics.as_deref_mut() {
+                    metrics.record(step.work_items_processed, start.elapsed());
+                }
+            }
+
+            let after = marker.total_live_marks();
+            if after == before {
+                return ephemeron_fixes;
+            }
+            ephemeron_fixes += after - before;
         }
     }
 }
@@ -1481,16 +1784,20 @@ mod tests {
             AllocationLifetime::Default,
         );
 
-        let mut tracer = PrimitiveTracer::new(&mut heap);
-        Value::from_string_ref(string).trace_heap_edges(&mut tracer);
-        symbol.trace_heap_edges(&mut tracer);
-        bigint.trace_heap_edges(&mut tracer);
-        object.trace_heap_edges(&mut tracer);
-        environment.trace_heap_edges(&mut tracer);
-        code.trace_heap_edges(&mut tracer);
-        realm.trace_heap_edges(&mut tracer);
-        shape.trace_heap_edges(&mut tracer);
-        let stats = tracer.finish();
+        let mut marker = PrimitiveIncrementalMark::new();
+        {
+            let mut tracer = PrimitiveTracer::new(&mut heap, &mut marker);
+            Value::from_string_ref(string).trace_heap_edges(&mut tracer);
+            symbol.trace_heap_edges(&mut tracer);
+            bigint.trace_heap_edges(&mut tracer);
+            object.trace_heap_edges(&mut tracer);
+            environment.trace_heap_edges(&mut tracer);
+            code.trace_heap_edges(&mut tracer);
+            realm.trace_heap_edges(&mut tracer);
+            shape.trace_heap_edges(&mut tracer);
+        }
+        while heap.mark_step(&mut marker, 16).has_more_work() {}
+        let stats = marker.trace_stats();
 
         assert_eq!(stats.values_traced, 2);
         assert_eq!(stats.strings_marked, 1);

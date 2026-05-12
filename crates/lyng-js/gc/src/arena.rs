@@ -1,7 +1,8 @@
 use crate::nursery::{Nursery, NurseryDomain};
 use crate::{
     card_table::{CardDomain, CardKey, CardTable},
-    collection::DEFAULT_COLLECTION_BUDGET_BYTES,
+    collection::{DEFAULT_COLLECTION_BUDGET_BYTES, DEFAULT_MAJOR_MARK_SLICE_BUDGET},
+    rooting::PrimitiveIncrementalMark,
     weak::FinalizationRegistryState,
     weak::WeakMapState,
     weak::WeakRefState,
@@ -48,6 +49,13 @@ pub struct PrimitiveHeap {
     finalization_registries: BTreeMap<ObjectRef, FinalizationRegistryState>,
     pending_finalization_registries: Vec<ObjectRef>,
     pub(crate) collection_budget_bytes: usize,
+    pub(crate) major_mark_slice_budget: usize,
+    pub(crate) last_major_mark_slices: usize,
+    pub(crate) last_major_mark_work_items: usize,
+    pub(crate) last_major_max_mark_slice_work_items: usize,
+    pub(crate) last_major_total_mark_pause_ns: u128,
+    pub(crate) last_major_max_mark_pause_ns: u128,
+    pub(crate) active_major_mark: Option<PrimitiveIncrementalMark>,
     nursery: Nursery,
     card_table: CardTable,
 }
@@ -1431,6 +1439,13 @@ impl Default for PrimitiveHeap {
             finalization_registries: BTreeMap::new(),
             pending_finalization_registries: Vec::new(),
             collection_budget_bytes: DEFAULT_COLLECTION_BUDGET_BYTES,
+            major_mark_slice_budget: DEFAULT_MAJOR_MARK_SLICE_BUDGET,
+            last_major_mark_slices: 0,
+            last_major_mark_work_items: 0,
+            last_major_max_mark_slice_work_items: 0,
+            last_major_total_mark_pause_ns: 0,
+            last_major_max_mark_pause_ns: 0,
+            active_major_mark: None,
             nursery: Nursery::default(),
             card_table: CardTable::default(),
         }

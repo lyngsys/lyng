@@ -1,3 +1,4 @@
+use crate::rooting::PrimitiveMajorMarkMetrics;
 use crate::{
     card_table::CardDomain, nursery::PrimitiveAllocationProfile, PrimitiveBigIntRecord,
     PrimitiveCollectionStats, PrimitiveDomainStats, PrimitiveHeap, PrimitiveRoots,
@@ -8,6 +9,7 @@ use crate::{
 use std::mem::size_of;
 
 pub const DEFAULT_COLLECTION_BUDGET_BYTES: usize = 1024;
+pub const DEFAULT_MAJOR_MARK_SLICE_BUDGET: usize = 64;
 const COLLECTION_GROWTH_FACTOR: usize = 2;
 
 /// Accounting summary for one primitive heap domain.
@@ -47,6 +49,12 @@ pub struct PrimitiveHeapAccounting {
     pub last_minor_reclaimed: usize,
     pub last_minor_cards_dirtied: usize,
     pub last_minor_cards_scanned: usize,
+    pub last_major_mark_slices: usize,
+    pub last_major_mark_slice_budget: usize,
+    pub last_major_mark_work_items: usize,
+    pub last_major_max_mark_slice_work_items: usize,
+    pub last_major_total_mark_pause_ns: u128,
+    pub last_major_max_mark_pause_ns: u128,
 }
 
 /// Which collector policy produced a collection report.
@@ -181,6 +189,12 @@ impl PrimitiveHeap {
             last_minor_reclaimed: nursery_stats.last_reclaimed,
             last_minor_cards_dirtied: nursery_stats.last_cards_dirtied,
             last_minor_cards_scanned: nursery_stats.last_cards_scanned,
+            last_major_mark_slices: self.last_major_mark_slices,
+            last_major_mark_slice_budget: self.major_mark_slice_budget,
+            last_major_mark_work_items: self.last_major_mark_work_items,
+            last_major_max_mark_slice_work_items: self.last_major_max_mark_slice_work_items,
+            last_major_total_mark_pause_ns: self.last_major_total_mark_pause_ns,
+            last_major_max_mark_pause_ns: self.last_major_max_mark_pause_ns,
         }
     }
 
@@ -194,6 +208,16 @@ impl PrimitiveHeap {
         self.collection_budget_bytes = bytes;
     }
 
+    #[inline]
+    pub const fn major_mark_slice_budget(&self) -> usize {
+        self.major_mark_slice_budget
+    }
+
+    #[inline]
+    pub const fn set_major_mark_slice_budget(&mut self, budget: usize) {
+        self.major_mark_slice_budget = budget;
+    }
+
     pub fn force_collect(&mut self, roots: &PrimitiveRoots) -> PrimitiveCollectionReport {
         self.collect_with_trigger(roots, PrimitiveCollectionTrigger::Forced)
     }
@@ -204,7 +228,9 @@ impl PrimitiveHeap {
         additional_roots: &T,
     ) -> PrimitiveCollectionReport {
         let before = self.accounting();
-        let stats = self.collect_tracing(roots, additional_roots);
+        let mut metrics = PrimitiveMajorMarkMetrics::new(self.major_mark_slice_budget().max(1));
+        let stats = self.collect_tracing_with_mark_metrics(roots, additional_roots, &mut metrics);
+        self.record_last_major_mark_stats(&stats);
         let after = self.accounting();
         let next_budget_bytes = next_collection_budget(after.live_bytes);
         self.collection_budget_bytes = next_budget_bytes;
@@ -311,7 +337,9 @@ impl PrimitiveHeap {
         trigger: PrimitiveCollectionTrigger,
         before: &PrimitiveHeapAccounting,
     ) -> PrimitiveCollectionReport {
-        let stats = self.collect(roots);
+        let mut metrics = PrimitiveMajorMarkMetrics::new(self.major_mark_slice_budget().max(1));
+        let stats = self.collect_tracing_with_mark_metrics(roots, &(), &mut metrics);
+        self.record_last_major_mark_stats(&stats);
         let after = self.accounting();
         let next_budget_bytes = next_collection_budget(after.live_bytes);
         self.collection_budget_bytes = next_budget_bytes;
@@ -325,6 +353,14 @@ impl PrimitiveHeap {
             minor: PrimitiveMinorCollectionStats::default(),
             next_budget_bytes,
         }
+    }
+
+    const fn record_last_major_mark_stats(&mut self, stats: &PrimitiveCollectionStats) {
+        self.last_major_mark_slices = stats.major_mark_slices;
+        self.last_major_mark_work_items = stats.major_mark_work_items;
+        self.last_major_max_mark_slice_work_items = stats.max_major_mark_slice_work_items;
+        self.last_major_total_mark_pause_ns = stats.total_major_mark_pause_ns;
+        self.last_major_max_mark_pause_ns = stats.max_major_mark_pause_ns;
     }
 }
 
@@ -723,6 +759,104 @@ mod tests {
                 .and_then(|values| values[0].as_object_ref()),
             Some(young)
         );
+    }
+
+    #[test]
+    fn incremental_major_mark_step_respects_budget_and_preserves_live_chain() {
+        let mut heap = PrimitiveHeap::new();
+        let roots = PrimitiveRoots::new();
+        let (root, child, grandchild, dead) = {
+            let mut mutator = heap.mutator();
+            let grandchild = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+            let child_slots = mutator.alloc_object_slots(
+                1,
+                Value::from_object_ref(grandchild),
+                AllocationLifetime::Default,
+            );
+            let child = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, Some(child_slots), None, None),
+                AllocationLifetime::Default,
+            );
+            let root_slots = mutator.alloc_object_slots(
+                1,
+                Value::from_object_ref(child),
+                AllocationLifetime::Default,
+            );
+            let root = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, Some(root_slots), None, None),
+                AllocationLifetime::Default,
+            );
+            let dead = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+            (root, child, grandchild, dead)
+        };
+        let _rooted = roots.root_object(root);
+
+        let mut marker = heap.start_incremental_mark(&roots);
+        let first = heap.mark_step(&mut marker, 1);
+
+        assert_eq!(first.work_items_processed, 1);
+        assert_eq!(first.max_work_items_per_slice, 1);
+        assert!(first.has_more_work());
+        while heap.mark_step(&mut marker, 1).has_more_work() {}
+
+        let stats = heap.finish_incremental_mark(marker);
+        let view = heap.view();
+
+        assert_eq!(stats.trace.objects_marked, 3);
+        assert_eq!(stats.objects_reclaimed, 1);
+        assert!(view.object(root).is_some());
+        assert!(view.object(child).is_some());
+        assert!(view.object(grandchild).is_some());
+        assert_eq!(view.object(dead), None);
+    }
+
+    #[test]
+    fn force_collect_reports_major_mark_slice_distribution() {
+        let mut heap = PrimitiveHeap::new();
+        heap.set_major_mark_slice_budget(1);
+        let roots = PrimitiveRoots::new();
+        let (root, child) = {
+            let mut mutator = heap.mutator();
+            let child = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+            let root_slots = mutator.alloc_object_slots(
+                1,
+                Value::from_object_ref(child),
+                AllocationLifetime::Default,
+            );
+            let root = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, Some(root_slots), None, None),
+                AllocationLifetime::Default,
+            );
+            (root, child)
+        };
+        let _rooted = roots.root_object(root);
+
+        let report = heap.force_collect(&roots);
+
+        assert_eq!(report.stats.trace.objects_marked, 2);
+        assert!(report.stats.major_mark_slices >= 2);
+        assert_eq!(report.stats.major_mark_slice_budget, 1);
+        assert_eq!(report.stats.max_major_mark_slice_work_items, 1);
+        assert!(report.stats.total_major_mark_pause_ns > 0);
+        assert!(report.stats.max_major_mark_pause_ns > 0);
+        assert_eq!(
+            heap.accounting().last_major_mark_slices,
+            report.stats.major_mark_slices
+        );
+        assert_eq!(
+            heap.accounting().last_major_max_mark_slice_work_items,
+            report.stats.max_major_mark_slice_work_items
+        );
+        assert!(heap.view().object(child).is_some());
     }
 
     #[test]

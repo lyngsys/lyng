@@ -245,6 +245,55 @@ fn vm_function_table_dispatch_mode_executes_installed_bytecode() {
 }
 
 #[test]
+fn vm_loop_backedges_poll_active_incremental_major_mark() {
+    let unit = compile_test_unit(
+        151,
+        r"
+        var i = 0;
+        while (i < 3) {
+            i = i + 1;
+        }
+        i;
+        ",
+    );
+
+    for dispatch_mode in [VmDispatchMode::Match, VmDispatchMode::FunctionTable] {
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let realm = agent.default_realm().expect("default realm should exist");
+        let mut vm = Vm::new();
+        vm.set_dispatch_mode(dispatch_mode);
+        let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+        let roots = PrimitiveRoots::new();
+        let live = agent.heap_mut().mutator().alloc_string(
+            StringEncoding::Latin1,
+            4,
+            b"live",
+            None,
+            AllocationLifetime::Default,
+        );
+        let _rooted = roots.root_string(live);
+        agent.heap_mut().set_major_mark_slice_budget(1);
+        assert!(agent.heap_mut().begin_incremental_mark(&roots));
+        assert_eq!(
+            agent.heap().active_incremental_mark_pending_work_items(),
+            Some(1)
+        );
+
+        let result = vm
+            .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap();
+
+        assert_eq!(result, Value::from_smi(3));
+        assert_eq!(
+            agent.heap().active_incremental_mark_pending_work_items(),
+            Some(0)
+        );
+    }
+}
+
+#[test]
 fn vm_executes_specialized_smi_opcodes_and_fallback_paths() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();

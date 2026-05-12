@@ -1149,6 +1149,7 @@ impl PrimitiveMutator<'_> {
         trigger: PrimitiveCollectionTrigger,
         requires_growth: bool,
     ) {
+        let _ = self.heap.poll_incremental_mark_step();
         let Some(roots) = self.roots else {
             return;
         };
@@ -1937,6 +1938,70 @@ mod tests {
         assert_eq!(view.string(replacement).unwrap().code_unit_len(), 0);
         assert!(report.after.reclaimable_bytes > 0);
         assert_eq!(view.collection_budget_bytes(), report.next_budget_bytes);
+    }
+
+    #[test]
+    fn allocation_safepoint_polls_active_incremental_major_mark() {
+        let roots = PrimitiveRoots::new();
+        let mut heap = PrimitiveHeap::new();
+        heap.set_major_mark_slice_budget(1);
+
+        let live = heap.mutator().alloc_string(
+            StringEncoding::Latin1,
+            0,
+            b"",
+            None,
+            AllocationLifetime::Default,
+        );
+        let _rooted = roots.root_string(live);
+
+        assert!(heap.begin_incremental_mark(&roots));
+        assert_eq!(heap.active_incremental_mark_pending_work_items(), Some(1));
+
+        let mutator = &mut heap.mutator_with_roots(&roots);
+        let _unrooted = mutator.alloc_string(
+            StringEncoding::Latin1,
+            7,
+            b"trigger",
+            None,
+            AllocationLifetime::Default,
+        );
+
+        assert_eq!(heap.active_incremental_mark_pending_work_items(), Some(0));
+        let stats = heap.finish_active_incremental_mark().unwrap();
+        assert_eq!(stats.trace.strings_marked, 1);
+    }
+
+    #[test]
+    fn repeated_allocation_safepoints_drain_active_incremental_major_mark() {
+        let roots = PrimitiveRoots::new();
+        let mut heap = PrimitiveHeap::new();
+        heap.set_major_mark_slice_budget(1);
+
+        let live = heap.mutator().alloc_string(
+            StringEncoding::Latin1,
+            4,
+            b"live",
+            None,
+            AllocationLifetime::Default,
+        );
+        let _rooted = roots.root_string(live);
+
+        assert!(heap.begin_incremental_mark(&roots));
+        for _ in 0..(PRIMITIVE_SLOTS_PER_PAGE / 2) {
+            let mutator = &mut heap.mutator_with_roots(&roots);
+            let _allocation = mutator.alloc_string(
+                StringEncoding::Latin1,
+                0,
+                b"",
+                None,
+                AllocationLifetime::Default,
+            );
+        }
+
+        assert_eq!(heap.active_incremental_mark_pending_work_items(), Some(0));
+        let stats = heap.finish_active_incremental_mark().unwrap();
+        assert_eq!(stats.trace.strings_marked, 1);
     }
 
     #[test]

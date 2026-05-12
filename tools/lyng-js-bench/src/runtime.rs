@@ -721,6 +721,7 @@ fn capture_runtime_snapshots() -> BenchResult<Vec<RuntimeSnapshot>> {
         regexp_literal_cache,
         capture_promise_and_backing_store_snapshot()?,
         capture_nursery_minor_gc_snapshot()?,
+        capture_major_gc_snapshot()?,
     ])
 }
 
@@ -815,6 +816,53 @@ fn capture_nursery_minor_gc_snapshot() -> BenchResult<RuntimeSnapshot> {
         label: "runtime.nursery-minor-gc",
         accounting,
         note: "Allocated more than 1 MiB of short-lived ordinary object records through a rooted mutator so the nursery limit triggers a visible minor GC.",
+    })
+}
+
+fn capture_major_gc_snapshot() -> BenchResult<RuntimeSnapshot> {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let roots = PrimitiveRoots::new();
+    let root = {
+        let heap = runtime.root_agent_mut().heap_mut();
+        heap.set_major_mark_slice_budget(1);
+        let mut mutator = heap.mutator();
+        let grandchild = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let child_slots = mutator.alloc_object_slots(
+            1,
+            JsValue::from_object_ref(grandchild),
+            AllocationLifetime::Default,
+        );
+        let child = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, Some(child_slots), None, None),
+            AllocationLifetime::Default,
+        );
+        let root_slots = mutator.alloc_object_slots(
+            1,
+            JsValue::from_object_ref(child),
+            AllocationLifetime::Default,
+        );
+        mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, Some(root_slots), None, None),
+            AllocationLifetime::Default,
+        )
+    };
+    let rooted = roots.root_object(root);
+    let report = runtime.root_agent_mut().heap_mut().force_collect(&roots);
+    black_box(rooted.get());
+    black_box(report.stats.major_mark_slices);
+
+    let accounting = runtime.phase6_accounting();
+    if accounting.heap.last_major_mark_slices <= 1 {
+        return Err("major-GC fixture did not produce multiple mark slices".to_string());
+    }
+
+    Ok(RuntimeSnapshot {
+        label: "runtime.major-gc-mark-slices",
+        accounting,
+        note: "Forced a major collection over a small object chain with a one-item mark budget so max mark-slice pause and work distribution are visible.",
     })
 }
 
@@ -1167,16 +1215,16 @@ fn write_runtime_accounting_section(output: &mut String, snapshots: &[RuntimeSna
     output.push('\n');
     let _ = writeln!(
         output,
-        "| Snapshot | Heap live bytes | Heap young live bytes | Heap old live bytes | Heap reserved bytes | Nursery allocation % | Minor GCs | Last minor pause ns | Last survivors | Last tenured | Last cards dirtied/minor | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
+        "| Snapshot | Heap live bytes | Heap young live bytes | Heap old live bytes | Heap reserved bytes | Nursery allocation % | Minor GCs | Last minor pause ns | Last survivors | Last tenured | Last cards dirtied/minor | Major mark slices | Major mark budget | Major mark work items | Max major mark pause ns | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
     );
     let _ = writeln!(
         output,
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
     );
     for snapshot in snapshots {
         let _ = writeln!(
             output,
-            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
+            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
             snapshot.label,
             snapshot.accounting.heap.live_bytes,
             snapshot.accounting.heap.young_live_bytes,
@@ -1192,6 +1240,10 @@ fn write_runtime_accounting_section(output: &mut String, snapshots: &[RuntimeSna
             snapshot.accounting.heap.last_minor_survivors,
             snapshot.accounting.heap.last_minor_tenured,
             snapshot.accounting.heap.last_minor_cards_dirtied,
+            snapshot.accounting.heap.last_major_mark_slices,
+            snapshot.accounting.heap.last_major_mark_slice_budget,
+            snapshot.accounting.heap.last_major_mark_work_items,
+            snapshot.accounting.heap.last_major_max_mark_pause_ns,
             domain_cell(snapshot.accounting.iterator_records),
             domain_cell(snapshot.accounting.regexp_payloads),
             domain_cell(snapshot.accounting.regexp_literal_cache),
@@ -1366,6 +1418,14 @@ fn runtime_snapshot_json(snapshot: &RuntimeSnapshot) -> Value {
             "last_minor_reclaimed": snapshot.accounting.heap.last_minor_reclaimed,
             "last_minor_cards_dirtied": snapshot.accounting.heap.last_minor_cards_dirtied,
             "last_minor_cards_scanned": snapshot.accounting.heap.last_minor_cards_scanned,
+        },
+        "major_gc": {
+            "last_mark_slices": snapshot.accounting.heap.last_major_mark_slices,
+            "last_mark_slice_budget": snapshot.accounting.heap.last_major_mark_slice_budget,
+            "last_mark_work_items": snapshot.accounting.heap.last_major_mark_work_items,
+            "last_max_mark_slice_work_items": snapshot.accounting.heap.last_major_max_mark_slice_work_items,
+            "last_total_mark_pause_ns": snapshot.accounting.heap.last_major_total_mark_pause_ns,
+            "last_max_mark_pause_ns": snapshot.accounting.heap.last_major_max_mark_pause_ns,
         },
         "iterator_records": runtime_domain_json(snapshot.accounting.iterator_records),
         "regexp_payloads": runtime_domain_json(snapshot.accounting.regexp_payloads),
@@ -2128,12 +2188,22 @@ mod tests {
         assert!(markdown.contains("Last minor pause ns"));
         assert!(markdown.contains("Last tenured"));
         assert!(markdown.contains("Last cards dirtied/minor"));
+        assert!(markdown.contains("Major mark slices"));
+        assert!(markdown.contains("Max major mark pause ns"));
 
         let json = render_json_report(&options, &[], std::slice::from_ref(&snapshot), None);
         assert_eq!(json["runtime_snapshots"][0]["heap"]["young_live_bytes"], 0);
         assert_eq!(json["runtime_snapshots"][0]["heap"]["old_live_bytes"], 0);
         assert_eq!(
             json["runtime_snapshots"][0]["nursery"]["minor_collections"],
+            0
+        );
+        assert_eq!(
+            json["runtime_snapshots"][0]["major_gc"]["last_mark_slices"],
+            0
+        );
+        assert_eq!(
+            json["runtime_snapshots"][0]["major_gc"]["last_max_mark_slice_work_items"],
             0
         );
     }

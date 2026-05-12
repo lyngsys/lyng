@@ -17,7 +17,8 @@ pub(super) use lyng_js_env::{
     PromiseReactionKind, PromiseReactionRecord, RealmBootstrapState, Runtime, RuntimeJobPayload,
 };
 pub(super) use lyng_js_gc::{
-    AllocationLifetime, BigIntSign, PrimitiveMutator, PrimitiveStringView,
+    AllocationLifetime, BigIntSign, PrimitiveMutator, PrimitiveRoots, PrimitiveStringView,
+    StringEncoding,
 };
 pub(super) use lyng_js_host::{
     HostCall, HostJobKind, HostJobPhase, ImportMetaProperties, ImportMetaProperty, ImportMetaValue,

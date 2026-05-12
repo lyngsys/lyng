@@ -402,6 +402,11 @@ impl Vm {
     }
 
     #[inline]
+    pub(super) fn poll_incremental_mark_safepoint(agent: &mut Agent) {
+        let _ = agent.heap_mut().poll_incremental_mark_step();
+    }
+
+    #[inline]
     #[allow(clippy::needless_pass_by_ref_mut)]
     #[cfg_attr(
         not(test),
