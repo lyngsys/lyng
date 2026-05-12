@@ -145,6 +145,7 @@ enum MarkWorkItem {
     BigInt(BigIntRef),
     ValueCell(PrimitiveValueCellRef),
     Object(ObjectRef),
+    FunctionPayload(FunctionPayloadRef),
     SuspendedExecution(SuspendedExecutionRef),
     Environment(EnvironmentRef),
     Code(CodeRef),
@@ -572,6 +573,13 @@ impl<'a> PrimitiveTracer<'a> {
     }
 
     #[inline]
+    pub fn mark_function_payload(&mut self, id: FunctionPayloadRef) {
+        if self.heap.mark_function_payload(id) {
+            self.marker.worklist.push(MarkWorkItem::FunctionPayload(id));
+        }
+    }
+
+    #[inline]
     pub fn mark_suspended_execution(&mut self, id: SuspendedExecutionRef) {
         if self.heap.mark_suspended_execution(id) {
             self.marker.stats.suspended_executions_marked += 1;
@@ -614,23 +622,31 @@ impl<'a> PrimitiveTracer<'a> {
     }
 
     fn mark_object_slots(&mut self, id: ObjectSlotsRef) {
-        self.marker.worklist.push(MarkWorkItem::ObjectSlots(id));
+        if self.heap.mark_object_slots(id) {
+            self.marker.worklist.push(MarkWorkItem::ObjectSlots(id));
+        }
     }
 
     fn mark_suspended_registers(&mut self, id: SuspendedRegistersRef) {
-        self.marker
-            .worklist
-            .push(MarkWorkItem::SuspendedRegisters(id));
+        if self.heap.mark_suspended_registers(id) {
+            self.marker
+                .worklist
+                .push(MarkWorkItem::SuspendedRegisters(id));
+        }
     }
 
     fn mark_environment_slots(&mut self, id: EnvironmentSlotsRef) {
-        self.marker
-            .worklist
-            .push(MarkWorkItem::EnvironmentSlots(id));
+        if self.heap.mark_environment_slots(id) {
+            self.marker
+                .worklist
+                .push(MarkWorkItem::EnvironmentSlots(id));
+        }
     }
 
     fn mark_code_slots(&mut self, id: CodeSlotsRef) {
-        self.marker.worklist.push(MarkWorkItem::CodeSlots(id));
+        if self.heap.mark_code_slots(id) {
+            self.marker.worklist.push(MarkWorkItem::CodeSlots(id));
+        }
     }
 
     fn trace_work_item(&mut self, item: MarkWorkItem) {
@@ -658,11 +674,11 @@ impl<'a> PrimitiveTracer<'a> {
             MarkWorkItem::Object(id) => {
                 if let Some(record) = self.heap.object(id) {
                     record.trace_heap_edges(self);
-                    if let Some(function_payload) = record.function_payload()
-                        && let Some(payload) = self.heap.function_payload(function_payload)
-                    {
-                        payload.trace_heap_edges(self);
-                    }
+                }
+            }
+            MarkWorkItem::FunctionPayload(id) => {
+                if let Some(record) = self.heap.function_payload(id) {
+                    record.trace_heap_edges(self);
                 }
             }
             MarkWorkItem::SuspendedExecution(id) => {
@@ -1202,6 +1218,17 @@ impl PrimitiveHeap {
         tracer.mark_step(budget)
     }
 
+    pub(crate) fn shade_active_incremental_mark<T: TraceHeapEdges>(&mut self, value: &T) {
+        let Some(mut marker) = self.active_major_mark.take() else {
+            return;
+        };
+        {
+            let mut tracer = PrimitiveTracer::new(self, &mut marker);
+            value.trace_heap_edges(&mut tracer);
+        }
+        self.active_major_mark = Some(marker);
+    }
+
     pub fn finish_incremental_mark(
         &mut self,
         mut marker: PrimitiveIncrementalMark,
@@ -1375,6 +1402,12 @@ impl TraceHeapEdges for ObjectRef {
     }
 }
 
+impl TraceHeapEdges for FunctionPayloadRef {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        tracer.mark_function_payload(*self);
+    }
+}
+
 impl TraceHeapEdges for EnvironmentRef {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
         tracer.mark_environment(*self);
@@ -1479,6 +1512,7 @@ impl TraceHeapEdges for RuntimeObjectRecord {
         self.named_slots().trace_heap_edges(tracer);
         self.elements().trace_heap_edges(tracer);
         self.private_slots().trace_heap_edges(tracer);
+        self.function_payload().trace_heap_edges(tracer);
         self.ordinary_payload().trace_heap_edges(tracer);
     }
 }

@@ -908,6 +908,12 @@ impl<Handle: ArenaHandle> ValueSlotAllocator<Handle> {
         !was_marked
     }
 
+    pub(super) fn is_marked(&self, id: Handle) -> bool {
+        self.slots
+            .get((id.get() - 1) as usize)
+            .is_some_and(|slot| slot.occupied && slot.marked)
+    }
+
     pub(super) fn generation(&self, id: Handle) -> Option<HeapGeneration> {
         let slot = self.slots.get((id.get() - 1) as usize)?;
         slot.occupied.then_some(slot.generation)

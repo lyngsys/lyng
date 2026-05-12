@@ -817,6 +817,93 @@ mod tests {
     }
 
     #[test]
+    fn incremental_major_barrier_preserves_slot_referent_written_after_owner_is_marked() {
+        let mut heap = PrimitiveHeap::new();
+        let roots = PrimitiveRoots::new();
+        let (root, slots, late_child) = {
+            let mut mutator = heap.mutator();
+            let slots = mutator.alloc_object_slots(
+                1,
+                Value::empty_internal_slot(),
+                AllocationLifetime::Default,
+            );
+            let root = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, Some(slots), None, None),
+                AllocationLifetime::Default,
+            );
+            let late_child = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+            (root, slots, late_child)
+        };
+        let _rooted = roots.root_object(root);
+
+        assert!(heap.begin_incremental_mark(&roots));
+        while heap
+            .poll_incremental_mark_step()
+            .is_some_and(crate::PrimitiveMarkStep::has_more_work)
+        {}
+
+        assert!(heap.mutator().mut_store_value(
+            ValueStoreTarget::ObjectSlot(slots, 0),
+            Value::from_object_ref(late_child),
+        ));
+
+        let stats = heap.finish_active_incremental_mark().unwrap();
+
+        assert_eq!(stats.trace.objects_marked, 2);
+        assert!(heap.view().object(late_child).is_some());
+        assert_eq!(
+            heap.view()
+                .object_slots(slots)
+                .and_then(|values| values[0].as_object_ref()),
+            Some(late_child)
+        );
+    }
+
+    #[test]
+    fn incremental_major_barrier_preserves_handle_referent_written_after_owner_is_marked() {
+        let mut heap = PrimitiveHeap::new();
+        let roots = PrimitiveRoots::new();
+        let (root, late_prototype) = {
+            let mut mutator = heap.mutator();
+            let root = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+            let late_prototype = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+            (root, late_prototype)
+        };
+        let _rooted = roots.root_object(root);
+
+        assert!(heap.begin_incremental_mark(&roots));
+        while heap
+            .poll_incremental_mark_step()
+            .is_some_and(crate::PrimitiveMarkStep::has_more_work)
+        {}
+
+        assert!(heap.mutator().mut_store_object_handle(
+            crate::ObjectHandleStoreTarget::ObjectPrototype(root),
+            Some(late_prototype),
+        ));
+
+        let stats = heap.finish_active_incremental_mark().unwrap();
+
+        assert_eq!(stats.trace.objects_marked, 2);
+        assert!(heap.view().object(late_prototype).is_some());
+        assert_eq!(
+            heap.view()
+                .object(root)
+                .and_then(RuntimeObjectRecord::prototype),
+            Some(late_prototype)
+        );
+    }
+
+    #[test]
     fn force_collect_reports_major_mark_slice_distribution() {
         let mut heap = PrimitiveHeap::new();
         heap.set_major_mark_slice_budget(1);

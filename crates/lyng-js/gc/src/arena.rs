@@ -341,6 +341,11 @@ impl PrimitiveHeap {
     }
 
     #[inline]
+    pub(crate) fn is_string_marked(&self, id: StringRef) -> bool {
+        self.strings.is_marked(id)
+    }
+
+    #[inline]
     pub(crate) fn clear_string_marks(&mut self) {
         self.strings.clear_marks();
     }
@@ -504,6 +509,11 @@ impl PrimitiveHeap {
     }
 
     #[inline]
+    pub(crate) fn is_bigint_marked(&self, id: BigIntRef) -> bool {
+        self.bigints.is_marked(id)
+    }
+
+    #[inline]
     pub(crate) fn clear_bigint_marks(&mut self) {
         self.bigints.clear_marks();
     }
@@ -551,6 +561,11 @@ impl PrimitiveHeap {
     #[inline]
     pub(crate) fn mark_value_cell(&mut self, id: PrimitiveValueCellRef) -> bool {
         self.value_cells.mark(id)
+    }
+
+    #[inline]
+    pub(crate) fn is_value_cell_marked(&self, id: PrimitiveValueCellRef) -> bool {
+        self.value_cells.is_marked(id)
     }
 
     #[inline]
@@ -712,6 +727,11 @@ impl PrimitiveHeap {
     }
 
     #[inline]
+    pub(crate) fn is_suspended_execution_marked(&self, id: SuspendedExecutionRef) -> bool {
+        self.suspended_executions.is_marked(id)
+    }
+
+    #[inline]
     pub(crate) fn clear_suspended_execution_marks(&mut self) {
         self.suspended_executions.clear_marks();
     }
@@ -834,6 +854,11 @@ impl PrimitiveHeap {
     }
 
     #[inline]
+    pub(crate) fn is_environment_marked(&self, id: EnvironmentRef) -> bool {
+        self.environments.is_marked(id)
+    }
+
+    #[inline]
     pub(crate) fn clear_environment_marks(&mut self) {
         self.environments.clear_marks();
     }
@@ -916,6 +941,11 @@ impl PrimitiveHeap {
     }
 
     #[inline]
+    pub(crate) fn is_code_marked(&self, id: CodeRef) -> bool {
+        self.codes.is_marked(id)
+    }
+
+    #[inline]
     pub(crate) fn clear_code_marks(&mut self) {
         self.codes.clear_marks();
     }
@@ -958,6 +988,15 @@ impl PrimitiveHeap {
         self.code_slots.get(id)
     }
 
+    pub(crate) fn mark_code_slots(&mut self, id: CodeSlotsRef) -> bool {
+        self.code_slots.mark(id)
+    }
+
+    #[inline]
+    pub(crate) fn is_code_slots_marked(&self, id: CodeSlotsRef) -> bool {
+        self.code_slots.is_marked(id)
+    }
+
     #[inline]
     pub(crate) fn alloc_realm(
         &mut self,
@@ -992,6 +1031,11 @@ impl PrimitiveHeap {
     #[inline]
     pub(crate) fn mark_realm(&mut self, id: RealmRef) -> bool {
         self.realms.mark(id)
+    }
+
+    #[inline]
+    pub(crate) fn is_realm_marked(&self, id: RealmRef) -> bool {
+        self.realms.is_marked(id)
     }
 
     #[inline]
@@ -1038,6 +1082,11 @@ impl PrimitiveHeap {
     #[inline]
     pub(crate) fn mark_shape(&mut self, id: ShapeId) -> bool {
         self.shapes.mark(id)
+    }
+
+    #[inline]
+    pub(crate) fn is_shape_marked(&self, id: ShapeId) -> bool {
+        self.shapes.is_marked(id)
     }
 
     #[inline]
@@ -1178,16 +1227,36 @@ impl PrimitiveHeap {
         self.object_slots.mark(id)
     }
 
+    #[inline]
+    pub(crate) fn is_object_slots_marked(&self, id: ObjectSlotsRef) -> bool {
+        self.object_slots.is_marked(id)
+    }
+
     pub(crate) fn mark_environment_slots(&mut self, id: EnvironmentSlotsRef) -> bool {
         self.environment_slots.mark(id)
+    }
+
+    #[inline]
+    pub(crate) fn is_environment_slots_marked(&self, id: EnvironmentSlotsRef) -> bool {
+        self.environment_slots.is_marked(id)
     }
 
     pub(crate) fn mark_suspended_registers(&mut self, id: SuspendedRegistersRef) -> bool {
         self.suspended_registers.mark(id)
     }
 
+    #[inline]
+    pub(crate) fn is_suspended_registers_marked(&self, id: SuspendedRegistersRef) -> bool {
+        self.suspended_registers.is_marked(id)
+    }
+
     pub(crate) fn mark_function_payload(&mut self, id: FunctionPayloadRef) -> bool {
         self.function_payloads.mark(id)
+    }
+
+    #[inline]
+    pub(crate) fn is_function_payload_marked(&self, id: FunctionPayloadRef) -> bool {
+        self.function_payloads.is_marked(id)
     }
 
     pub(crate) fn scan_object_slots_card(&self, card_index: usize, scan: impl FnMut(&[Value])) {
@@ -1323,6 +1392,7 @@ impl PrimitiveHeap {
         self.clear_bigint_marks();
         self.clear_value_cell_marks();
         self.clear_object_marks();
+        self.function_payloads.clear_marks();
         self.suspended_registers.clear_marks();
         self.clear_suspended_execution_marks();
         self.clear_environment_marks();
