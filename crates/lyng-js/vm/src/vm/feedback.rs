@@ -4,15 +4,31 @@ use super::{
 use lyng_js_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
 use lyng_js_gc::ValueStoreTarget;
 use lyng_js_objects::{
-    NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyCachePurpose, ObjectFlags,
-    ObjectHeader, ObjectKind, PrimitiveWrapperKind, PropertyCacheDependency,
+    FunctionEntryIdentity, NamedPropertyCacheEntry, NamedPropertyCachePath,
+    NamedPropertyCachePurpose, ObjectFlags, ObjectHeader, ObjectKind, PrimitiveWrapperKind,
+    PropertyCacheDependency,
 };
-use lyng_js_types::{FeedbackSlotId, PropertyKey, ShapeId};
+use lyng_js_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
 use std::mem::size_of;
 
 const FEEDBACK_ALLOCATION_THRESHOLD: u16 = 2;
 const POLYMORPHIC_PROPERTY_CACHE_LIMIT: usize = 8;
 const POLYMORPHIC_CALL_CACHE_LIMIT: usize = 8;
+
+#[inline]
+pub(super) fn call_feedback_builtin_is_frame_safe(entry: BuiltinFunctionId) -> bool {
+    // Keep this whitelist narrow: these direct-call targets do not inspect caller
+    // strictness, dynamically compile source, or re-enter through Function.prototype
+    // call helpers, so dispatching from a monomorphic feedback entry preserves the
+    // general call path's caller frame and callee realm behavior.
+    entry == lyng_js_types::regexp_exec_builtin()
+        || entry == lyng_js_types::regexp_symbol_replace_builtin()
+        || entry == lyng_js_types::regexp_test_builtin()
+        || entry == lyng_js_types::string_char_code_at_builtin()
+        || entry == lyng_js_types::string_from_char_code_builtin()
+        || entry == lyng_js_types::string_replace_builtin()
+        || entry == lyng_js_types::string_to_upper_case_builtin()
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FeedbackInlineCacheState {
@@ -226,6 +242,7 @@ pub struct CallCacheEntrySnapshot {
     callee: ObjectRef,
     callee_shape: ShapeId,
     realm: Option<RealmRef>,
+    builtin: Option<BuiltinFunctionId>,
 }
 
 impl CallCacheEntrySnapshot {
@@ -235,6 +252,7 @@ impl CallCacheEntrySnapshot {
             callee: entry.callee,
             callee_shape: entry.callee_shape,
             realm: entry.realm,
+            builtin: entry.builtin,
         }
     }
 
@@ -251,6 +269,11 @@ impl CallCacheEntrySnapshot {
     #[inline]
     pub const fn realm(self) -> Option<RealmRef> {
         self.realm
+    }
+
+    #[inline]
+    pub const fn builtin(self) -> Option<BuiltinFunctionId> {
+        self.builtin
     }
 }
 
@@ -644,6 +667,7 @@ struct CallCacheEntry {
     callee: ObjectRef,
     callee_shape: ShapeId,
     realm: Option<RealmRef>,
+    builtin: Option<BuiltinFunctionId>,
 }
 
 impl CallCacheEntry {
@@ -653,14 +677,19 @@ impl CallCacheEntry {
             .objects()
             .object_header(agent.heap().view(), callee)?
             .shape();
-        let realm = agent
-            .objects()
-            .function_data(callee)
-            .and_then(lyng_js_objects::FunctionObjectData::realm);
+        let function = agent.objects().function_data(callee);
+        let realm = function.and_then(lyng_js_objects::FunctionObjectData::realm);
+        let builtin = function.and_then(|function| {
+            let FunctionEntryIdentity::Native(entry) = function.entry()? else {
+                return None;
+            };
+            entry.builtin_entry()
+        });
         Some(Self {
             callee,
             callee_shape,
             realm,
+            builtin,
         })
     }
 }
@@ -1283,6 +1312,20 @@ impl CallFeedback {
     }
 
     #[inline]
+    fn frame_safe_builtin_target(&self, callee: ObjectRef) -> Option<BuiltinFunctionId> {
+        if self.cache_state != InlineCacheState::Monomorphic {
+            return None;
+        }
+        let entry = self.entries[0]?;
+        if entry.callee != callee {
+            return None;
+        }
+        entry
+            .builtin
+            .filter(|builtin| call_feedback_builtin_is_frame_safe(*builtin))
+    }
+
+    #[inline]
     const fn install_first_entry(&mut self, entry: CallCacheEntry) {
         self.entries[0] = Some(entry);
         self.entry_count = 1;
@@ -1748,6 +1791,19 @@ impl Vm {
     }
 
     #[inline]
+    pub(super) fn cached_frame_safe_builtin_call_target(
+        &self,
+        code: CodeRef,
+        instruction_offset: u32,
+        callee: ObjectRef,
+    ) -> Option<BuiltinFunctionId> {
+        match self.feedback_site_for_site(code, instruction_offset)? {
+            FeedbackSiteState::Call(feedback) => feedback.frame_safe_builtin_target(callee),
+            _ => None,
+        }
+    }
+
+    #[inline]
     pub(super) fn observe_construct_target(
         &mut self,
         agent: &Agent,
@@ -2147,10 +2203,13 @@ impl Vm {
 #[cfg(test)]
 mod tests {
     use super::{
-        DenseIndexCacheEntry, InlineCacheState, KeyedPropertyFamily, KeyedPropertyFeedback,
+        call_feedback_builtin_is_frame_safe, DenseIndexCacheEntry, InlineCacheState,
+        KeyedPropertyFamily, KeyedPropertyFeedback,
     };
     use lyng_js_objects::ObjectFlags;
-    use lyng_js_types::ShapeId;
+    use lyng_js_types::{
+        eval_builtin, function_builtin, function_call_builtin, string_char_code_at_builtin, ShapeId,
+    };
 
     #[test]
     fn dense_index_observation_reports_whether_classification_changed() {
@@ -2170,5 +2229,15 @@ mod tests {
         assert!(!feedback.observe_dense_index(None));
         assert_eq!(feedback.cache_state, InlineCacheState::Megamorphic);
         assert_eq!(feedback.dense_entry_count, 0);
+    }
+
+    #[test]
+    fn frame_safe_builtin_classification_excludes_frame_observers() {
+        assert!(call_feedback_builtin_is_frame_safe(
+            string_char_code_at_builtin()
+        ));
+        assert!(!call_feedback_builtin_is_frame_safe(eval_builtin()));
+        assert!(!call_feedback_builtin_is_frame_safe(function_builtin()));
+        assert!(!call_feedback_builtin_is_frame_safe(function_call_builtin()));
     }
 }

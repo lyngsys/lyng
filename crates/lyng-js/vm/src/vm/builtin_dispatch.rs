@@ -148,6 +148,37 @@ impl Vm {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    pub(super) fn call_frame_safe_builtin(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        caller_frame: FrameRecord,
+        callee_object: ObjectRef,
+        entry: BuiltinFunctionId,
+        this_value: Value,
+        arguments: &[Value],
+    ) -> VmResult<Option<Value>> {
+        debug_assert!(super::feedback::call_feedback_builtin_is_frame_safe(entry));
+        let mut bridge = VmBuiltinDispatch {
+            vm: self,
+            agent,
+            host,
+            registry,
+            caller_frame,
+            callee_object,
+        };
+        dispatch_builtin(
+            &mut bridge,
+            entry,
+            BuiltinInvocation::new(this_value, arguments, None),
+        )
+    }
+
     fn builtin_realm(
         agent: &Agent,
         callee_object: ObjectRef,

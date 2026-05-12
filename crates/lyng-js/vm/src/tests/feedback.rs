@@ -156,6 +156,34 @@ fn call_feedback_snapshot_records_monomorphic_target_identity() {
 }
 
 #[test]
+fn call_feedback_snapshot_records_builtin_target_identity() {
+    let (snapshot, call_slot) = evaluated_entry_snapshot(
+        607,
+        r#"
+            var text = "abc";
+            var total = 0;
+            for (var i = 0; i < 4; i = i + 1) {
+                total = total + text.charCodeAt(1);
+            }
+            total;
+        "#,
+        Value::from_smi(392),
+    );
+
+    let FeedbackSiteDetail::Call(call) = feedback_site(&snapshot, call_slot).detail() else {
+        panic!("call site should expose call feedback");
+    };
+
+    assert_eq!(call.expected_arity(), Some(1));
+    assert_eq!(call.state(), FeedbackInlineCacheState::Monomorphic);
+    assert_eq!(call.entries().len(), 1);
+    assert_eq!(
+        call.entries()[0].builtin(),
+        Some(lyng_js_types::string_char_code_at_builtin())
+    );
+}
+
+#[test]
 fn call_feedback_snapshot_records_polymorphic_target_identities() {
     let (snapshot, call_slot) = evaluated_entry_snapshot(
         602,

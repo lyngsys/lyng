@@ -57,6 +57,18 @@ impl Vm {
             );
         }
 
+        if self.try_invoke_cached_builtin_call(
+            agent,
+            host,
+            registry,
+            frame,
+            result_register,
+            callee,
+            this_value,
+            arguments,
+        )? {
+            return Ok(());
+        }
         let result = if let Some(result) = self.call_builtin(
             agent, host, registry, frame, callee, this_value, arguments, None,
         )? {
@@ -119,6 +131,45 @@ impl Vm {
         )?;
         self.observe_call_target(agent, frame.code(), frame.instruction_offset(), callee);
         Ok(())
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    fn try_invoke_cached_builtin_call(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: FrameRecord,
+        result_register: u16,
+        callee: ObjectRef,
+        this_value: Value,
+        arguments: &[Value],
+    ) -> VmResult<bool> {
+        let Some(entry) = self.cached_frame_safe_builtin_call_target(
+            frame.code(),
+            frame.instruction_offset(),
+            callee,
+        ) else {
+            return Ok(false);
+        };
+        let Some(result) = self.call_frame_safe_builtin(
+            agent,
+            host,
+            registry,
+            frame,
+            callee,
+            entry,
+            this_value,
+            arguments,
+        )? else {
+            return Ok(false);
+        };
+        self.write_register(frame, result_register, result);
+        self.advance_instruction();
+        Ok(true)
     }
 
     #[expect(
