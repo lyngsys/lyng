@@ -308,6 +308,99 @@ impl CallFeedbackSnapshot {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ConstructCacheEntrySnapshot {
+    constructor: ObjectRef,
+    constructor_shape: ShapeId,
+    realm: Option<RealmRef>,
+    created_shape: Option<ShapeId>,
+}
+
+impl ConstructCacheEntrySnapshot {
+    #[inline]
+    const fn from_entry(entry: ConstructCacheEntry) -> Self {
+        Self {
+            constructor: entry.constructor,
+            constructor_shape: entry.constructor_shape,
+            realm: entry.realm,
+            created_shape: entry.created_shape,
+        }
+    }
+
+    #[inline]
+    pub const fn constructor(self) -> ObjectRef {
+        self.constructor
+    }
+
+    #[inline]
+    pub const fn constructor_shape(self) -> ShapeId {
+        self.constructor_shape
+    }
+
+    #[inline]
+    pub const fn realm(self) -> Option<RealmRef> {
+        self.realm
+    }
+
+    #[inline]
+    pub const fn created_shape(self) -> Option<ShapeId> {
+        self.created_shape
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConstructFeedbackSnapshot {
+    execution_count: u32,
+    expected_arity: Option<u16>,
+    state: FeedbackInlineCacheState,
+    entries: Vec<ConstructCacheEntrySnapshot>,
+}
+
+impl ConstructFeedbackSnapshot {
+    #[inline]
+    const fn uninitialized(expected_arity: Option<u16>, execution_count: u32) -> Self {
+        Self {
+            execution_count,
+            expected_arity,
+            state: FeedbackInlineCacheState::Uninitialized,
+            entries: Vec::new(),
+        }
+    }
+
+    #[inline]
+    fn from_feedback(feedback: &ConstructFeedback) -> Self {
+        Self {
+            execution_count: feedback.execution_count,
+            expected_arity: feedback.expected_arity,
+            state: feedback.cache_state.into(),
+            entries: feedback
+                .active_entries()
+                .map(ConstructCacheEntrySnapshot::from_entry)
+                .collect(),
+        }
+    }
+
+    #[inline]
+    pub const fn execution_count(&self) -> u32 {
+        self.execution_count
+    }
+
+    #[inline]
+    pub const fn expected_arity(&self) -> Option<u16> {
+        self.expected_arity
+    }
+
+    #[inline]
+    pub const fn state(&self) -> FeedbackInlineCacheState {
+        self.state
+    }
+
+    #[inline]
+    pub fn entries(&self) -> &[ConstructCacheEntrySnapshot] {
+        &self.entries
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DenseIndexCacheEntrySnapshot {
     receiver_shape: ShapeId,
     receiver_flags: ObjectFlags,
@@ -340,7 +433,7 @@ pub enum FeedbackSiteDetail {
     NamedProperty(NamedPropertyFeedbackSnapshot),
     KeyedProperty(KeyedPropertyFeedbackSnapshot),
     Call(CallFeedbackSnapshot),
-    Construct { expected_arity: Option<u16> },
+    Construct(ConstructFeedbackSnapshot),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -582,9 +675,55 @@ struct CallFeedback {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ConstructCacheEntry {
+    constructor: ObjectRef,
+    constructor_shape: ShapeId,
+    realm: Option<RealmRef>,
+    created_shape: Option<ShapeId>,
+}
+
+impl ConstructCacheEntry {
+    #[inline]
+    fn from_constructor(
+        agent: &Agent,
+        constructor: ObjectRef,
+        created: Option<ObjectRef>,
+    ) -> Option<Self> {
+        let constructor_shape = agent
+            .objects()
+            .object_header(agent.heap().view(), constructor)?
+            .shape();
+        let realm = agent
+            .objects()
+            .function_data(constructor)
+            .and_then(lyng_js_objects::FunctionObjectData::realm);
+        let created_shape = Self::created_shape(agent, created);
+        Some(Self {
+            constructor,
+            constructor_shape,
+            realm,
+            created_shape,
+        })
+    }
+
+    #[inline]
+    fn created_shape(agent: &Agent, created: Option<ObjectRef>) -> Option<ShapeId> {
+        created.and_then(|object| {
+            agent
+                .objects()
+                .object_header(agent.heap().view(), object)
+                .map(lyng_js_objects::ObjectHeader::shape)
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ConstructFeedback {
     execution_count: u32,
     expected_arity: Option<u16>,
+    cache_state: InlineCacheState,
+    entry_count: u8,
+    entries: [Option<ConstructCacheEntry>; POLYMORPHIC_CALL_CACHE_LIMIT],
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1158,6 +1297,121 @@ impl CallFeedback {
     }
 }
 
+impl ConstructFeedback {
+    #[inline]
+    const fn new(expected_arity: Option<u16>) -> Self {
+        Self {
+            execution_count: 0,
+            expected_arity,
+            cache_state: InlineCacheState::Uninitialized,
+            entry_count: 0,
+            entries: [None; POLYMORPHIC_CALL_CACHE_LIMIT],
+        }
+    }
+
+    #[inline]
+    fn observe_target(
+        &mut self,
+        agent: &Agent,
+        constructor: ObjectRef,
+        created: Option<ObjectRef>,
+    ) {
+        match self.cache_state {
+            InlineCacheState::Megamorphic => {}
+            InlineCacheState::Uninitialized => {
+                let Some(entry) =
+                    ConstructCacheEntry::from_constructor(agent, constructor, created)
+                else {
+                    self.promote_to_megamorphic();
+                    return;
+                };
+                self.install_first_entry(entry);
+            }
+            InlineCacheState::Monomorphic => {
+                if self.refresh_matching_entry_created_shape(agent, 0, constructor, created) {
+                    return;
+                }
+                let Some(entry) =
+                    ConstructCacheEntry::from_constructor(agent, constructor, created)
+                else {
+                    self.promote_to_megamorphic();
+                    return;
+                };
+                self.entries[usize::from(self.entry_count)] = Some(entry);
+                self.entry_count = self.entry_count.saturating_add(1);
+                self.cache_state = InlineCacheState::Polymorphic;
+            }
+            InlineCacheState::Polymorphic => {
+                for index in 0..usize::from(self.entry_count) {
+                    if self.refresh_matching_entry_created_shape(
+                        agent,
+                        index,
+                        constructor,
+                        created,
+                    ) {
+                        return;
+                    }
+                }
+                if usize::from(self.entry_count) >= POLYMORPHIC_CALL_CACHE_LIMIT {
+                    self.promote_to_megamorphic();
+                    return;
+                }
+                let Some(entry) =
+                    ConstructCacheEntry::from_constructor(agent, constructor, created)
+                else {
+                    self.promote_to_megamorphic();
+                    return;
+                };
+                self.entries[usize::from(self.entry_count)] = Some(entry);
+                self.entry_count = self.entry_count.saturating_add(1);
+            }
+        }
+    }
+
+    #[inline]
+    fn refresh_matching_entry_created_shape(
+        &mut self,
+        agent: &Agent,
+        index: usize,
+        constructor: ObjectRef,
+        created: Option<ObjectRef>,
+    ) -> bool {
+        let Some(mut entry) = self.entries[index] else {
+            return false;
+        };
+        if entry.constructor != constructor {
+            return false;
+        }
+        if entry.created_shape.is_none() {
+            entry.created_shape = ConstructCacheEntry::created_shape(agent, created);
+            self.entries[index] = Some(entry);
+        }
+        true
+    }
+
+    #[inline]
+    fn active_entries(&self) -> impl Iterator<Item = ConstructCacheEntry> + '_ {
+        self.entries
+            .iter()
+            .take(usize::from(self.entry_count))
+            .filter_map(|entry| *entry)
+    }
+
+    #[inline]
+    const fn install_first_entry(&mut self, entry: ConstructCacheEntry) {
+        self.entries[0] = Some(entry);
+        self.entry_count = 1;
+        self.cache_state = InlineCacheState::Monomorphic;
+    }
+
+    #[inline]
+    const fn promote_to_megamorphic(&mut self) {
+        self.cache_state = InlineCacheState::Megamorphic;
+        self.entry_count = 0;
+        self.entries = [None; POLYMORPHIC_CALL_CACHE_LIMIT];
+    }
+}
+
 impl FeedbackSiteState {
     #[inline]
     const fn for_descriptor(descriptor: FeedbackSiteDescriptor) -> Self {
@@ -1177,10 +1431,9 @@ impl FeedbackSiteState {
             FeedbackSiteKind::Call => {
                 Self::Call(CallFeedback::new(descriptor.metadata().expected_arity()))
             }
-            FeedbackSiteKind::Construct => Self::Construct(ConstructFeedback {
-                execution_count: 0,
-                expected_arity: descriptor.metadata().expected_arity(),
-            }),
+            FeedbackSiteKind::Construct => Self::Construct(ConstructFeedback::new(
+                descriptor.metadata().expected_arity(),
+            )),
         }
     }
 
@@ -1214,6 +1467,22 @@ impl FeedbackSiteState {
             Self::Call(feedback) => {
                 feedback.execution_count = feedback.execution_count.saturating_add(1);
                 feedback.observe_target(agent, callee);
+            }
+            _ => self.record_execution(),
+        }
+    }
+
+    #[inline]
+    fn record_construct_target(
+        &mut self,
+        agent: &Agent,
+        constructor: ObjectRef,
+        created: Option<ObjectRef>,
+    ) {
+        match self {
+            Self::Construct(feedback) => {
+                feedback.execution_count = feedback.execution_count.saturating_add(1);
+                feedback.observe_target(agent, constructor, created);
             }
             _ => self.record_execution(),
         }
@@ -1254,9 +1523,7 @@ impl FeedbackSiteState {
             Self::Construct(feedback) => FeedbackSiteSnapshot::new(
                 descriptor,
                 feedback.execution_count,
-                FeedbackSiteDetail::Construct {
-                    expected_arity: feedback.expected_arity,
-                },
+                FeedbackSiteDetail::Construct(ConstructFeedbackSnapshot::from_feedback(feedback)),
             ),
         }
     }
@@ -1275,9 +1542,9 @@ impl FeedbackSiteState {
             FeedbackSiteKind::Call => FeedbackSiteDetail::Call(
                 CallFeedbackSnapshot::uninitialized(descriptor.metadata().expected_arity(), 0),
             ),
-            FeedbackSiteKind::Construct => FeedbackSiteDetail::Construct {
-                expected_arity: descriptor.metadata().expected_arity(),
-            },
+            FeedbackSiteKind::Construct => FeedbackSiteDetail::Construct(
+                ConstructFeedbackSnapshot::uninitialized(descriptor.metadata().expected_arity(), 0),
+            ),
         };
         FeedbackSiteSnapshot::new(descriptor, 0, detail)
     }
@@ -1476,6 +1743,41 @@ impl Vm {
         let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
             if let FeedbackSiteState::Call(feedback) = site {
                 feedback.observe_target(agent, callee);
+            }
+        });
+    }
+
+    #[inline]
+    pub(super) fn observe_construct_target(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        instruction_offset: u32,
+        constructor: ObjectRef,
+        created: Option<ObjectRef>,
+    ) {
+        let index = code_index(code);
+        if let Some(descriptor) = self.feedback_descriptor_for_site(code, instruction_offset)
+            && let Some(site) = self
+                .feedback_vectors
+                .get_mut(index)
+                .and_then(Option::as_mut)
+                .and_then(|vector| vector.site_mut(descriptor.slot()))
+        {
+            site.record_construct_target(agent, constructor, created);
+            self.observe_tier_feedback_event(code);
+            return;
+        }
+
+        if self
+            .ensure_feedback_site_execution(code, instruction_offset)
+            .is_none()
+        {
+            return;
+        }
+        let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
+            if let FeedbackSiteState::Construct(feedback) = site {
+                feedback.observe_target(agent, constructor, created);
             }
         });
     }

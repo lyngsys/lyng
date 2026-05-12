@@ -439,6 +439,13 @@ impl Vm {
                     &collected_arguments,
                     Some(new_target),
                 )?;
+                self.observe_construct_target(
+                    agent,
+                    frame.code(),
+                    frame.instruction_offset(),
+                    callee,
+                    Some(result),
+                );
                 self.write_register(frame, result_register, Value::from_object_ref(result));
                 self.advance_instruction();
                 return Ok(());
@@ -448,10 +455,10 @@ impl Vm {
                 let derived_construct = self
                     .installed_function(code)
                     .is_some_and(|function| function.flags().derived_class_constructor());
-                let this_value = if derived_construct {
-                    Value::undefined()
+                let construct_this = if derived_construct {
+                    None
                 } else {
-                    Value::from_object_ref(self.create_construct_this(
+                    Some(self.create_construct_this(
                         agent,
                         host,
                         registry,
@@ -460,6 +467,14 @@ impl Vm {
                         new_target,
                     )?)
                 };
+                let this_value = construct_this.map_or(Value::undefined(), Value::from_object_ref);
+                self.observe_construct_target(
+                    agent,
+                    frame.code(),
+                    frame.instruction_offset(),
+                    callee,
+                    construct_this,
+                );
                 self.advance_instruction();
                 return self.enter_bytecode_call(
                     agent,
@@ -502,6 +517,13 @@ impl Vm {
                 )
                 .map_err(VmError::Abrupt)?
             };
+            self.observe_construct_target(
+                agent,
+                frame.code(),
+                frame.instruction_offset(),
+                callee,
+                Some(result),
+            );
             self.write_register(frame, result_register, Value::from_object_ref(result));
             self.advance_instruction();
             Ok(())

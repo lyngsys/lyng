@@ -90,6 +90,11 @@ struct MemoryResult {
     call_cache_mono_sites: Option<usize>,
     call_cache_poly_sites: Option<usize>,
     call_cache_mega_sites: Option<usize>,
+    construct_cache_uninit_sites: Option<usize>,
+    construct_cache_mono_sites: Option<usize>,
+    construct_cache_poly_sites: Option<usize>,
+    construct_cache_mega_sites: Option<usize>,
+    construct_created_shape_entries: Option<usize>,
     note: &'static str,
 }
 
@@ -115,6 +120,11 @@ struct FeedbackTotals {
     call_cache_mono_sites: usize,
     call_cache_poly_sites: usize,
     call_cache_mega_sites: usize,
+    construct_cache_uninit_sites: usize,
+    construct_cache_mono_sites: usize,
+    construct_cache_poly_sites: usize,
+    construct_cache_mega_sites: usize,
+    construct_created_shape_entries: usize,
 }
 
 #[derive(Clone)]
@@ -625,6 +635,11 @@ fn capture_memory(
                 call_cache_mono_sites: Some(feedback.call_cache_mono_sites),
                 call_cache_poly_sites: Some(feedback.call_cache_poly_sites),
                 call_cache_mega_sites: Some(feedback.call_cache_mega_sites),
+                construct_cache_uninit_sites: Some(feedback.construct_cache_uninit_sites),
+                construct_cache_mono_sites: Some(feedback.construct_cache_mono_sites),
+                construct_cache_poly_sites: Some(feedback.construct_cache_poly_sites),
+                construct_cache_mega_sites: Some(feedback.construct_cache_mega_sites),
+                construct_created_shape_entries: Some(feedback.construct_created_shape_entries),
                 note: "Warmed script-template and feedback-vector footprint.",
             })
         }
@@ -974,26 +989,54 @@ fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> BenchResult<FeedbackTotals
         }
         if let Some(snapshot) = vm.feedback_vector_snapshot(code) {
             for site in snapshot.sites() {
-                let FeedbackSiteDetail::Call(call) = site.detail() else {
-                    continue;
-                };
-                match call.state() {
-                    FeedbackInlineCacheState::Uninitialized => {
-                        totals.call_cache_uninit_sites =
-                            totals.call_cache_uninit_sites.saturating_add(1);
+                match site.detail() {
+                    FeedbackSiteDetail::Call(call) => match call.state() {
+                        FeedbackInlineCacheState::Uninitialized => {
+                            totals.call_cache_uninit_sites =
+                                totals.call_cache_uninit_sites.saturating_add(1);
+                        }
+                        FeedbackInlineCacheState::Monomorphic => {
+                            totals.call_cache_mono_sites =
+                                totals.call_cache_mono_sites.saturating_add(1);
+                        }
+                        FeedbackInlineCacheState::Polymorphic => {
+                            totals.call_cache_poly_sites =
+                                totals.call_cache_poly_sites.saturating_add(1);
+                        }
+                        FeedbackInlineCacheState::Megamorphic => {
+                            totals.call_cache_mega_sites =
+                                totals.call_cache_mega_sites.saturating_add(1);
+                        }
+                    },
+                    FeedbackSiteDetail::Construct(construct) => {
+                        match construct.state() {
+                            FeedbackInlineCacheState::Uninitialized => {
+                                totals.construct_cache_uninit_sites =
+                                    totals.construct_cache_uninit_sites.saturating_add(1);
+                            }
+                            FeedbackInlineCacheState::Monomorphic => {
+                                totals.construct_cache_mono_sites =
+                                    totals.construct_cache_mono_sites.saturating_add(1);
+                            }
+                            FeedbackInlineCacheState::Polymorphic => {
+                                totals.construct_cache_poly_sites =
+                                    totals.construct_cache_poly_sites.saturating_add(1);
+                            }
+                            FeedbackInlineCacheState::Megamorphic => {
+                                totals.construct_cache_mega_sites =
+                                    totals.construct_cache_mega_sites.saturating_add(1);
+                            }
+                        }
+                        totals.construct_created_shape_entries =
+                            totals.construct_created_shape_entries.saturating_add(
+                                construct
+                                    .entries()
+                                    .iter()
+                                    .filter(|entry| entry.created_shape().is_some())
+                                    .count(),
+                            );
                     }
-                    FeedbackInlineCacheState::Monomorphic => {
-                        totals.call_cache_mono_sites =
-                            totals.call_cache_mono_sites.saturating_add(1);
-                    }
-                    FeedbackInlineCacheState::Polymorphic => {
-                        totals.call_cache_poly_sites =
-                            totals.call_cache_poly_sites.saturating_add(1);
-                    }
-                    FeedbackInlineCacheState::Megamorphic => {
-                        totals.call_cache_mega_sites =
-                            totals.call_cache_mega_sites.saturating_add(1);
-                    }
+                    _ => {}
                 }
             }
         }
@@ -1248,16 +1291,16 @@ fn write_template_feedback_section(output: &mut String, reports: &[WorkloadRepor
     output.push('\n');
     let _ = writeln!(
         output,
-        "| Benchmark | Pipeline | Functions | Encoded bytes | Metadata records | Template bytes | Atom payload bytes | Feedback slots | Live sites | Feedback codes | Allocated feedback bytes | Call IC uninit | Call IC mono | Call IC poly | Call IC mega | Memory note |"
+        "| Benchmark | Pipeline | Functions | Encoded bytes | Metadata records | Template bytes | Atom payload bytes | Feedback slots | Live sites | Feedback codes | Allocated feedback bytes | Call IC uninit | Call IC mono | Call IC poly | Call IC mega | Construct IC uninit | Construct IC mono | Construct IC poly | Construct IC mega | Construct created shapes | Memory note |"
     );
     let _ = writeln!(
         output,
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
     );
     for report in reports {
         let _ = writeln!(
             output,
-            "| `{}` | `{}` | {} | {} | {} | {} | `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+            "| `{}` | `{}` | {} | {} | {} | {} | `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
             report.workload.name,
             report.workload.pipeline.label(),
             opt_usize_cell(report.memory.functions),
@@ -1273,6 +1316,11 @@ fn write_template_feedback_section(output: &mut String, reports: &[WorkloadRepor
             opt_usize_cell(report.memory.call_cache_mono_sites),
             opt_usize_cell(report.memory.call_cache_poly_sites),
             opt_usize_cell(report.memory.call_cache_mega_sites),
+            opt_usize_cell(report.memory.construct_cache_uninit_sites),
+            opt_usize_cell(report.memory.construct_cache_mono_sites),
+            opt_usize_cell(report.memory.construct_cache_poly_sites),
+            opt_usize_cell(report.memory.construct_cache_mega_sites),
+            opt_usize_cell(report.memory.construct_created_shape_entries),
             report.memory.note,
         );
     }
@@ -1465,6 +1513,11 @@ fn runtime_workload_json(report: &WorkloadReport, previous: Option<&Value>) -> V
             "call_cache_mono_sites": report.memory.call_cache_mono_sites,
             "call_cache_poly_sites": report.memory.call_cache_poly_sites,
             "call_cache_mega_sites": report.memory.call_cache_mega_sites,
+            "construct_cache_uninit_sites": report.memory.construct_cache_uninit_sites,
+            "construct_cache_mono_sites": report.memory.construct_cache_mono_sites,
+            "construct_cache_poly_sites": report.memory.construct_cache_poly_sites,
+            "construct_cache_mega_sites": report.memory.construct_cache_mega_sites,
+            "construct_created_shape_entries": report.memory.construct_created_shape_entries,
             "note": report.memory.note,
         },
         "delta": delta,
@@ -2210,6 +2263,11 @@ mod tests {
                 call_cache_mono_sites: Some(2),
                 call_cache_poly_sites: Some(3),
                 call_cache_mega_sites: Some(4),
+                construct_cache_uninit_sites: Some(5),
+                construct_cache_mono_sites: Some(6),
+                construct_cache_poly_sites: Some(7),
+                construct_cache_mega_sites: Some(8),
+                construct_created_shape_entries: Some(9),
                 note: "Synthetic memory row.",
             },
         };
@@ -2245,7 +2303,8 @@ mod tests {
         assert!(markdown.contains("Median ns/work-unit delta"));
         assert!(markdown.contains("+500.00"));
         assert!(markdown.contains("Call IC mono"));
-        assert!(markdown.contains("| `delta-runtime` | `script.runtime` | `1` | `40` | `3` | `128` | `7` | `2` | `2` | `1` | `96` | `1` | `2` | `3` | `4` | Synthetic memory row. |"));
+        assert!(markdown.contains("Construct created shapes"));
+        assert!(markdown.contains("| `delta-runtime` | `script.runtime` | `1` | `40` | `3` | `128` | `7` | `2` | `2` | `1` | `96` | `1` | `2` | `3` | `4` | `5` | `6` | `7` | `8` | `9` | Synthetic memory row. |"));
 
         let json = render_json_report(
             &options,
@@ -2262,6 +2321,14 @@ mod tests {
         assert_eq!(json["workloads"][0]["memory"]["call_cache_mono_sites"], 2);
         assert_eq!(json["workloads"][0]["memory"]["call_cache_poly_sites"], 3);
         assert_eq!(json["workloads"][0]["memory"]["call_cache_mega_sites"], 4);
+        assert_eq!(
+            json["workloads"][0]["memory"]["construct_cache_mono_sites"],
+            6
+        );
+        assert_eq!(
+            json["workloads"][0]["memory"]["construct_created_shape_entries"],
+            9
+        );
     }
 
     #[test]

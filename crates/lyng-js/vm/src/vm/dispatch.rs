@@ -337,7 +337,6 @@ impl Vm {
                             let Some(()) = self.handle_vm_result(agent, construct_result)? else {
                                 continue;
                             };
-                            self.record_feedback_site(frame.code(), frame.instruction_offset());
                         }
                         Opcode::CreateForIn => {
                             let value = self.read_register(frame, b);

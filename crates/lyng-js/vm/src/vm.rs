@@ -72,8 +72,9 @@ use values::{bytecode_index, code_index, decode_env_operand, string_text_array_i
 pub use modules::LoadedModuleRoot;
 
 pub use feedback::{
-    CallCacheEntrySnapshot, CallFeedbackSnapshot, FeedbackInlineCacheState,
-    FeedbackKeyedPropertyFamily, FeedbackSiteDetail, FeedbackSiteSnapshot, FeedbackVectorSnapshot,
+    CallCacheEntrySnapshot, CallFeedbackSnapshot, ConstructCacheEntrySnapshot,
+    ConstructFeedbackSnapshot, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily,
+    FeedbackSiteDetail, FeedbackSiteSnapshot, FeedbackVectorSnapshot,
     KeyedNamedPropertyCacheEntrySnapshot, KeyedPropertyFeedbackSnapshot,
     NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot,
 };
