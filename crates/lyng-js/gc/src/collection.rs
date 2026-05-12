@@ -55,6 +55,9 @@ pub struct PrimitiveHeapAccounting {
     pub last_major_max_mark_slice_work_items: usize,
     pub last_major_total_mark_pause_ns: u128,
     pub last_major_max_mark_pause_ns: u128,
+    pub last_major_mark_finish_work_items: usize,
+    pub last_major_mark_finish_pause_ns: u128,
+    pub last_major_gray_work_items_after_finish: usize,
 }
 
 /// Which collector policy produced a collection report.
@@ -195,6 +198,9 @@ impl PrimitiveHeap {
             last_major_max_mark_slice_work_items: self.last_major_max_mark_slice_work_items,
             last_major_total_mark_pause_ns: self.last_major_total_mark_pause_ns,
             last_major_max_mark_pause_ns: self.last_major_max_mark_pause_ns,
+            last_major_mark_finish_work_items: self.last_major_mark_finish_work_items,
+            last_major_mark_finish_pause_ns: self.last_major_mark_finish_pause_ns,
+            last_major_gray_work_items_after_finish: self.last_major_gray_work_items_after_finish,
         }
     }
 
@@ -361,6 +367,10 @@ impl PrimitiveHeap {
         self.last_major_max_mark_slice_work_items = stats.max_major_mark_slice_work_items;
         self.last_major_total_mark_pause_ns = stats.total_major_mark_pause_ns;
         self.last_major_max_mark_pause_ns = stats.max_major_mark_pause_ns;
+        self.last_major_mark_finish_work_items = stats.major_mark_finish_work_items;
+        self.last_major_mark_finish_pause_ns = stats.major_mark_finish_pause_ns;
+        self.last_major_gray_work_items_after_finish =
+            stats.major_mark_gray_work_items_after_finish;
     }
 }
 
@@ -908,7 +918,7 @@ mod tests {
         let mut heap = PrimitiveHeap::new();
         heap.set_major_mark_slice_budget(1);
         let roots = PrimitiveRoots::new();
-        let (root, child) = {
+        let (root, child, extra_root_a, extra_root_b) = {
             let mut mutator = heap.mutator();
             let child = mutator.alloc_object(
                 RuntimeObjectRecord::new(None, None, None, None, None),
@@ -923,18 +933,31 @@ mod tests {
                 RuntimeObjectRecord::new(None, None, Some(root_slots), None, None),
                 AllocationLifetime::Default,
             );
-            (root, child)
+            let extra_root_a = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+            let extra_root_b = mutator.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+            (root, child, extra_root_a, extra_root_b)
         };
         let _rooted = roots.root_object(root);
+        let _extra_root_a = roots.root_object(extra_root_a);
+        let _extra_root_b = roots.root_object(extra_root_b);
 
         let report = heap.force_collect(&roots);
 
-        assert_eq!(report.stats.trace.objects_marked, 2);
+        assert_eq!(report.stats.trace.objects_marked, 4);
         assert!(report.stats.major_mark_slices >= 2);
         assert_eq!(report.stats.major_mark_slice_budget, 1);
         assert_eq!(report.stats.max_major_mark_slice_work_items, 1);
         assert!(report.stats.total_major_mark_pause_ns > 0);
         assert!(report.stats.max_major_mark_pause_ns > 0);
+        assert!(report.stats.major_mark_finish_work_items > 0);
+        assert!(report.stats.major_mark_finish_pause_ns > 0);
+        assert_eq!(report.stats.major_mark_gray_work_items_after_finish, 0);
         assert_eq!(
             heap.accounting().last_major_mark_slices,
             report.stats.major_mark_slices
@@ -943,6 +966,15 @@ mod tests {
             heap.accounting().last_major_max_mark_slice_work_items,
             report.stats.max_major_mark_slice_work_items
         );
+        assert_eq!(
+            heap.accounting().last_major_mark_finish_work_items,
+            report.stats.major_mark_finish_work_items
+        );
+        assert_eq!(
+            heap.accounting().last_major_mark_finish_pause_ns,
+            report.stats.major_mark_finish_pause_ns
+        );
+        assert_eq!(heap.accounting().last_major_gray_work_items_after_finish, 0);
         assert!(heap.view().object(child).is_some());
     }
 

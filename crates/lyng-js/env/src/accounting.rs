@@ -145,6 +145,17 @@ pub const fn merge_primitive_heap_accounting(
         } else {
             right.last_major_max_mark_pause_ns
         },
+        last_major_mark_finish_work_items: left.last_major_mark_finish_work_items
+            + right.last_major_mark_finish_work_items,
+        last_major_mark_finish_pause_ns: if left.last_major_mark_finish_pause_ns
+            > right.last_major_mark_finish_pause_ns
+        {
+            left.last_major_mark_finish_pause_ns
+        } else {
+            right.last_major_mark_finish_pause_ns
+        },
+        last_major_gray_work_items_after_finish: left.last_major_gray_work_items_after_finish
+            + right.last_major_gray_work_items_after_finish,
     }
 }
 

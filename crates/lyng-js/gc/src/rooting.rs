@@ -43,6 +43,9 @@ pub struct PrimitiveCollectionStats {
     pub max_major_mark_slice_work_items: usize,
     pub total_major_mark_pause_ns: u128,
     pub max_major_mark_pause_ns: u128,
+    pub major_mark_finish_work_items: usize,
+    pub major_mark_finish_pause_ns: u128,
+    pub major_mark_gray_work_items_after_finish: usize,
     pub ephemeron_fixes: usize,
     pub weak_refs_cleared: usize,
     pub finalization_cells_queued: usize,
@@ -121,6 +124,9 @@ pub struct PrimitiveMajorMarkMetrics {
     max_work_items: usize,
     total_pause_ns: u128,
     max_pause_ns: u128,
+    finish_work_items: usize,
+    finish_pause_ns: u128,
+    gray_work_items_after_finish: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -493,16 +499,30 @@ impl PrimitiveMajorMarkMetrics {
             max_work_items: 0,
             total_pause_ns: 0,
             max_pause_ns: 0,
+            finish_work_items: 0,
+            finish_pause_ns: 0,
+            gray_work_items_after_finish: 0,
         }
     }
 
-    fn record(&mut self, work_items: usize, pause: std::time::Duration) {
+    fn record_slice(&mut self, work_items: usize, pause: std::time::Duration) {
         self.slices += 1;
         self.work_items += work_items;
         self.max_work_items = self.max_work_items.max(work_items);
         let pause_ns = pause.as_nanos();
         self.total_pause_ns = self.total_pause_ns.saturating_add(pause_ns);
         self.max_pause_ns = self.max_pause_ns.max(pause_ns);
+    }
+
+    fn record_finish(
+        &mut self,
+        work_items: usize,
+        pause: std::time::Duration,
+        remaining_work_items: usize,
+    ) {
+        self.finish_work_items = work_items;
+        self.finish_pause_ns = pause.as_nanos().max(1);
+        self.gray_work_items_after_finish = remaining_work_items;
     }
 }
 
@@ -1270,16 +1290,34 @@ impl PrimitiveHeap {
         mut metrics: Option<&mut PrimitiveMajorMarkMetrics>,
     ) -> PrimitiveCollectionStats {
         let budget = budget.max(1);
-        while marker.has_work() {
+        while marker.pending_work_items() > budget {
             let start = std::time::Instant::now();
             let step = self.mark_step(marker, budget);
             if let Some(metrics) = metrics.as_deref_mut() {
-                metrics.record(step.work_items_processed, start.elapsed());
+                metrics.record_slice(step.work_items_processed, start.elapsed());
+            }
+            if step.is_complete() {
+                break;
             }
         }
 
+        let finish_start = std::time::Instant::now();
+        let mut finish_work_items = self.drain_mark_work_unbounded(marker);
         let ephemeron_fixes =
-            self.trace_weak_structures_to_fixpoint(marker, budget, metrics.as_deref_mut());
+            self.trace_weak_structures_to_fixpoint(marker, &mut finish_work_items);
+        let gray_work_items_after_finish = marker.pending_work_items();
+        if let Some(metrics) = metrics.as_deref_mut() {
+            metrics.record_finish(
+                finish_work_items,
+                finish_start.elapsed(),
+                gray_work_items_after_finish,
+            );
+        }
+        assert_eq!(
+            gray_work_items_after_finish, 0,
+            "atomic major mark finish must drain all gray work before sweep"
+        );
+
         let trace = marker.trace_stats();
         let (weak_refs_cleared, finalization_cells_queued, pending_finalization_registries) =
             self.sweep_weak_state();
@@ -1293,6 +1331,9 @@ impl PrimitiveHeap {
             max_major_mark_slice_work_items: major.max_work_items,
             total_major_mark_pause_ns: major.total_pause_ns,
             max_major_mark_pause_ns: major.max_pause_ns,
+            major_mark_finish_work_items: major.finish_work_items,
+            major_mark_finish_pause_ns: major.finish_pause_ns,
+            major_mark_gray_work_items_after_finish: major.gray_work_items_after_finish,
             ephemeron_fixes,
             weak_refs_cleared,
             finalization_cells_queued,
@@ -1310,11 +1351,18 @@ impl PrimitiveHeap {
         }
     }
 
+    fn drain_mark_work_unbounded(&mut self, marker: &mut PrimitiveIncrementalMark) -> usize {
+        let mut work_items = 0;
+        while marker.has_work() {
+            work_items += self.mark_step(marker, usize::MAX).work_items_processed;
+        }
+        work_items
+    }
+
     fn trace_weak_structures_to_fixpoint(
         &mut self,
         marker: &mut PrimitiveIncrementalMark,
-        budget: usize,
-        mut metrics: Option<&mut PrimitiveMajorMarkMetrics>,
+        finish_work_items: &mut usize,
     ) -> usize {
         let mut ephemeron_fixes = 0;
 
@@ -1345,13 +1393,7 @@ impl PrimitiveHeap {
                 }
             }
 
-            while marker.has_work() {
-                let start = std::time::Instant::now();
-                let step = self.mark_step(marker, budget);
-                if let Some(metrics) = metrics.as_deref_mut() {
-                    metrics.record(step.work_items_processed, start.elapsed());
-                }
-            }
+            *finish_work_items += self.drain_mark_work_unbounded(marker);
 
             let after = marker.total_live_marks();
             if after == before {
