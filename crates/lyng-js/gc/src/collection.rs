@@ -58,6 +58,13 @@ pub struct PrimitiveHeapAccounting {
     pub last_major_mark_finish_work_items: usize,
     pub last_major_mark_finish_pause_ns: u128,
     pub last_major_gray_work_items_after_finish: usize,
+    pub last_major_background_sweep_started: bool,
+    pub last_major_background_sweep_completed: bool,
+    pub last_major_background_sweep_worker_thread_id: u64,
+    pub last_major_background_sweep_candidates: usize,
+    pub last_major_background_sweep_reclaimed: usize,
+    pub last_major_background_sweep_duration_ns: u128,
+    pub last_major_background_sweep_apply_pause_ns: u128,
 }
 
 /// Which collector policy produced a collection report.
@@ -126,6 +133,7 @@ impl PrimitiveHeap {
         let shapes = domain_accounting::<RuntimeShapeRecord>(self.shape_stats());
 
         let nursery_stats = self.nursery_stats();
+        let background_sweep = self.last_major_background_sweep;
 
         PrimitiveHeapAccounting {
             strings,
@@ -201,6 +209,13 @@ impl PrimitiveHeap {
             last_major_mark_finish_work_items: self.last_major_mark_finish_work_items,
             last_major_mark_finish_pause_ns: self.last_major_mark_finish_pause_ns,
             last_major_gray_work_items_after_finish: self.last_major_gray_work_items_after_finish,
+            last_major_background_sweep_started: background_sweep.started,
+            last_major_background_sweep_completed: background_sweep.completed,
+            last_major_background_sweep_worker_thread_id: background_sweep.worker_thread_id,
+            last_major_background_sweep_candidates: background_sweep.candidates,
+            last_major_background_sweep_reclaimed: background_sweep.reclaimed,
+            last_major_background_sweep_duration_ns: background_sweep.duration_ns,
+            last_major_background_sweep_apply_pause_ns: background_sweep.apply_pause_ns,
         }
     }
 
@@ -371,6 +386,13 @@ impl PrimitiveHeap {
         self.last_major_mark_finish_pause_ns = stats.major_mark_finish_pause_ns;
         self.last_major_gray_work_items_after_finish =
             stats.major_mark_gray_work_items_after_finish;
+        self.last_major_background_sweep.started = stats.background_sweep_started;
+        self.last_major_background_sweep.completed = stats.background_sweep_completed;
+        self.last_major_background_sweep.worker_thread_id = stats.background_sweep_worker_thread_id;
+        self.last_major_background_sweep.candidates = stats.background_sweep_candidates;
+        self.last_major_background_sweep.reclaimed = stats.background_sweep_reclaimed;
+        self.last_major_background_sweep.duration_ns = stats.background_sweep_duration_ns;
+        self.last_major_background_sweep.apply_pause_ns = stats.background_sweep_apply_pause_ns;
     }
 }
 
@@ -449,6 +471,72 @@ mod tests {
         assert!(report.next_budget_bytes >= report.after.live_bytes);
         assert_eq!(heap.accounting(), report.after);
         assert_eq!(heap.collection_budget_bytes(), report.next_budget_bytes);
+    }
+
+    #[test]
+    fn force_collect_reports_background_sweep_completion() {
+        let mut heap = PrimitiveHeap::new();
+        let roots = PrimitiveRoots::new();
+        let live = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let dead = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let _rooted = roots.root_object(live);
+
+        let report = heap.force_collect(&roots);
+
+        assert!(report.stats.background_sweep_started);
+        assert!(report.stats.background_sweep_completed);
+        assert_ne!(report.stats.background_sweep_worker_thread_id, 0);
+        assert!(report.stats.background_sweep_candidates >= 1);
+        assert_eq!(report.stats.background_sweep_reclaimed, 1);
+        assert!(report.stats.background_sweep_duration_ns > 0);
+        assert!(report.stats.background_sweep_apply_pause_ns > 0);
+        assert_eq!(
+            heap.accounting().last_major_background_sweep_reclaimed,
+            report.stats.background_sweep_reclaimed
+        );
+        assert!(heap.view().object(live).is_some());
+        assert!(heap.view().object(dead).is_none());
+    }
+
+    #[test]
+    fn pending_background_sweep_defers_reuse_until_synchronized() {
+        let mut heap = PrimitiveHeap::new();
+        let dead = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+
+        let candidates = heap.collect_major_sweep_candidates();
+        heap.start_background_sweep(candidates);
+        assert!(
+            heap.view().object(dead).is_some(),
+            "candidate storage must stay occupied until the sweep plan is applied"
+        );
+
+        let allocated_while_pending = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        assert_ne!(
+            dead, allocated_while_pending,
+            "allocation must not reuse pending sweep candidates before synchronization"
+        );
+
+        let (reclaimed, stats) = heap
+            .complete_background_sweep()
+            .expect("background sweep should be pending");
+
+        assert_eq!(reclaimed.objects, 1);
+        assert!(stats.completed);
+        assert_eq!(stats.reclaimed, 1);
+        assert!(heap.view().object(dead).is_none());
+        assert!(heap.view().object(allocated_while_pending).is_some());
     }
 
     #[test]

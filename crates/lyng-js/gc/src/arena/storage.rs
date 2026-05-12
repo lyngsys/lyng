@@ -290,21 +290,12 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
         stats
     }
 
-    pub(super) fn sweep(&mut self, mut reclaim: impl FnMut(Record)) -> usize {
-        let mut reclaimed = 0;
-
-        for page_index in 0..self.pages.len() {
-            let (was_available, is_available, page_reclaimed) = {
-                let page = &mut self.pages[page_index];
-                let was_available = page.has_available_slot();
-                let page_reclaimed = page.sweep(&mut reclaim);
-                (was_available, page.has_available_slot(), page_reclaimed)
-            };
-            self.update_page_availability(page_index, was_available, is_available);
-            reclaimed += page_reclaimed;
+    pub(super) fn unmarked_handles(&self) -> Vec<Handle> {
+        let mut handles = Vec::new();
+        for (page_index, page) in self.pages.iter().enumerate() {
+            page.collect_unmarked_handles(page_index, &mut handles);
         }
-
-        reclaimed
+        handles
     }
 
     pub(super) fn update(&mut self, handle: Handle, mut update: impl FnMut(&mut Record)) -> bool {
@@ -523,33 +514,16 @@ impl<Record: Copy> SlotPage<Record> {
         }
     }
 
-    fn sweep(&mut self, reclaim: &mut impl FnMut(Record)) -> usize {
-        let mut reclaimed = 0;
-
+    fn collect_unmarked_handles<Handle: ArenaHandle>(
+        &self,
+        page_index: usize,
+        handles: &mut Vec<Handle>,
+    ) {
         for slot_index in 0..self.next_uninitialized {
-            match self.slots[slot_index] {
-                Some(record) if self.marks[slot_index] => {
-                    self.marks[slot_index] = false;
-                }
-                Some(record) => {
-                    self.slots[slot_index] = None;
-                    self.marks[slot_index] = false;
-                    self.generations[slot_index] = HeapGeneration::Old;
-                    self.lifetimes[slot_index] = AllocationLifetime::Default;
-                    self.ages[slot_index] = 0;
-                    self.occupied -= 1;
-                    self.free_list.push(
-                        u16::try_from(slot_index)
-                            .expect("primitive page slot index must fit into u16"),
-                    );
-                    reclaim(record);
-                    reclaimed += 1;
-                }
-                None => {}
+            if self.slots[slot_index].is_some() && !self.marks[slot_index] {
+                handles.push(make_handle::<Handle>(page_index, slot_index));
             }
         }
-
-        reclaimed
     }
 
     fn marked_slots(&self) -> usize {

@@ -18,6 +18,7 @@ use lyng_js_types::StringRef;
 mod arena;
 mod card_table;
 mod collection;
+mod concurrent_sweep;
 mod mutator;
 mod nursery;
 mod rooting;
@@ -38,6 +39,7 @@ pub use collection::{
     PrimitiveCollectionKind, PrimitiveCollectionReport, PrimitiveCollectionTrigger,
     PrimitiveDomainAccounting, PrimitiveHeapAccounting, PrimitiveMinorCollectionStats,
 };
+pub use concurrent_sweep::PrimitiveBackgroundSweepStats;
 pub use mutator::{
     CodeHandleStoreTarget, EnvironmentHandleStoreTarget, ObjectHandleStoreTarget,
     ObjectSlotsHandleStoreTarget, PrimitiveHeapView, PrimitiveMutator, RealmHandleStoreTarget,

@@ -46,6 +46,13 @@ pub struct PrimitiveCollectionStats {
     pub major_mark_finish_work_items: usize,
     pub major_mark_finish_pause_ns: u128,
     pub major_mark_gray_work_items_after_finish: usize,
+    pub background_sweep_started: bool,
+    pub background_sweep_completed: bool,
+    pub background_sweep_worker_thread_id: u64,
+    pub background_sweep_candidates: usize,
+    pub background_sweep_reclaimed: usize,
+    pub background_sweep_duration_ns: u128,
+    pub background_sweep_apply_pause_ns: u128,
     pub ephemeron_fixes: usize,
     pub weak_refs_cleared: usize,
     pub finalization_cells_queued: usize,
@@ -1321,6 +1328,9 @@ impl PrimitiveHeap {
         let trace = marker.trace_stats();
         let (weak_refs_cleared, finalization_cells_queued, pending_finalization_registries) =
             self.sweep_weak_state();
+        let sweep_candidates = self.collect_major_sweep_candidates();
+        let (reclaimed, background_sweep) =
+            self.run_background_sweep_to_completion(sweep_candidates);
 
         let major = metrics.as_deref().copied().unwrap_or_default();
         PrimitiveCollectionStats {
@@ -1334,20 +1344,27 @@ impl PrimitiveHeap {
             major_mark_finish_work_items: major.finish_work_items,
             major_mark_finish_pause_ns: major.finish_pause_ns,
             major_mark_gray_work_items_after_finish: major.gray_work_items_after_finish,
+            background_sweep_started: background_sweep.started,
+            background_sweep_completed: background_sweep.completed,
+            background_sweep_worker_thread_id: background_sweep.worker_thread_id,
+            background_sweep_candidates: background_sweep.candidates,
+            background_sweep_reclaimed: background_sweep.reclaimed,
+            background_sweep_duration_ns: background_sweep.duration_ns,
+            background_sweep_apply_pause_ns: background_sweep.apply_pause_ns,
             ephemeron_fixes,
             weak_refs_cleared,
             finalization_cells_queued,
             pending_finalization_registries,
-            strings_reclaimed: self.sweep_unmarked_strings(),
-            symbols_reclaimed: self.sweep_unmarked_symbols(),
-            bigints_reclaimed: self.sweep_unmarked_bigints(),
-            value_cells_reclaimed: self.sweep_unmarked_value_cells(),
-            objects_reclaimed: self.sweep_unmarked_objects(),
-            suspended_executions_reclaimed: self.sweep_unmarked_suspended_executions(),
-            environments_reclaimed: self.sweep_unmarked_environments(),
-            codes_reclaimed: self.sweep_unmarked_codes(),
-            realms_reclaimed: self.sweep_unmarked_realms(),
-            shapes_reclaimed: self.sweep_unmarked_shapes(),
+            strings_reclaimed: reclaimed.strings,
+            symbols_reclaimed: reclaimed.symbols,
+            bigints_reclaimed: reclaimed.bigints,
+            value_cells_reclaimed: reclaimed.value_cells,
+            objects_reclaimed: reclaimed.objects,
+            suspended_executions_reclaimed: reclaimed.suspended_executions,
+            environments_reclaimed: reclaimed.environments,
+            codes_reclaimed: reclaimed.codes,
+            realms_reclaimed: reclaimed.realms,
+            shapes_reclaimed: reclaimed.shapes,
         }
     }
 

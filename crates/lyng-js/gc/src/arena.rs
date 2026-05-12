@@ -2,6 +2,10 @@ use crate::nursery::{Nursery, NurseryDomain};
 use crate::{
     card_table::{CardDomain, CardKey, CardTable},
     collection::{DEFAULT_COLLECTION_BUDGET_BYTES, DEFAULT_MAJOR_MARK_SLICE_BUDGET},
+    concurrent_sweep::{
+        PrimitiveBackgroundSweepStats, PrimitivePendingSweep, PrimitiveSweepCandidates,
+        PrimitiveSweepReclaimStats,
+    },
     rooting::PrimitiveIncrementalMark,
     weak::FinalizationRegistryState,
     weak::WeakMapState,
@@ -58,6 +62,8 @@ pub struct PrimitiveHeap {
     pub(crate) last_major_mark_finish_work_items: usize,
     pub(crate) last_major_mark_finish_pause_ns: u128,
     pub(crate) last_major_gray_work_items_after_finish: usize,
+    pub(crate) last_major_background_sweep: PrimitiveBackgroundSweepStats,
+    pub(crate) pending_major_sweep: Option<PrimitivePendingSweep>,
     pub(crate) active_major_mark: Option<PrimitiveIncrementalMark>,
     nursery: Nursery,
     card_table: CardTable,
@@ -358,14 +364,6 @@ impl PrimitiveHeap {
         self.strings.stats(self.string_payloads.stats())
     }
 
-    pub(crate) fn sweep_unmarked_strings(&mut self) -> usize {
-        self.strings.sweep(|record| {
-            if let Some(payload) = record.payload() {
-                self.string_payloads.free(payload);
-            }
-        })
-    }
-
     #[inline]
     pub(crate) fn alloc_symbol(
         &mut self,
@@ -424,10 +422,6 @@ impl PrimitiveHeap {
     #[inline]
     pub(crate) fn symbol_stats(&self) -> PrimitiveDomainStats {
         self.symbols.stats(SideAllocationStats::default())
-    }
-
-    pub(crate) fn sweep_unmarked_symbols(&mut self) -> usize {
-        self.symbols.sweep(|_| {})
     }
 
     pub(crate) fn alloc_bigint(
@@ -1102,67 +1096,6 @@ impl PrimitiveHeap {
         self.shapes.stats(SideAllocationStats::default())
     }
 
-    pub(crate) fn sweep_unmarked_bigints(&mut self) -> usize {
-        self.bigints.sweep(|record| {
-            if let Some(storage) = record.limb_storage() {
-                self.bigint_payloads.free(storage);
-            }
-        })
-    }
-
-    pub(crate) fn sweep_unmarked_value_cells(&mut self) -> usize {
-        self.value_cells.sweep(|_| {})
-    }
-
-    pub(crate) fn sweep_unmarked_objects(&mut self) -> usize {
-        self.objects.sweep(|record| {
-            if let Some(slots) = record.named_slots() {
-                self.object_slots.free(slots);
-            }
-            if let Some(elements) = record.elements() {
-                self.object_slots.free(elements);
-            }
-            if let Some(function_payload) = record.function_payload() {
-                self.function_payloads.free(function_payload);
-            }
-            if let Some(ordinary_payload) = record.ordinary_payload() {
-                self.value_cells.free(ordinary_payload);
-            }
-        })
-    }
-
-    pub(crate) fn sweep_unmarked_suspended_executions(&mut self) -> usize {
-        self.suspended_executions.sweep(|record| {
-            if let Some(registers) = record.registers() {
-                self.suspended_registers.free(registers);
-            }
-        })
-    }
-
-    pub(crate) fn sweep_unmarked_environments(&mut self) -> usize {
-        self.environments.sweep(|record| {
-            if let Some(slots) = record.slots() {
-                self.environment_slots.free(slots);
-            }
-        })
-    }
-
-    pub(crate) fn sweep_unmarked_codes(&mut self) -> usize {
-        self.codes.sweep(|record| {
-            if let Some(constants) = record.constants() {
-                self.code_slots.free(constants);
-            }
-        })
-    }
-
-    pub(crate) fn sweep_unmarked_realms(&mut self) -> usize {
-        self.realms.sweep(|_| {})
-    }
-
-    pub(crate) fn sweep_unmarked_shapes(&mut self) -> usize {
-        self.shapes.sweep(|_| {})
-    }
-
     #[inline]
     pub(crate) fn is_young_object(&self, id: ObjectRef) -> bool {
         self.objects.generation(id) == Some(HeapGeneration::Young)
@@ -1407,6 +1340,95 @@ impl PrimitiveHeap {
         self.clear_shape_marks();
     }
 
+    pub(crate) fn collect_major_sweep_candidates(&self) -> PrimitiveSweepCandidates {
+        PrimitiveSweepCandidates {
+            strings: self.strings.unmarked_handles(),
+            symbols: self.symbols.unmarked_handles(),
+            bigints: self.bigints.unmarked_handles(),
+            value_cells: self.value_cells.unmarked_handles(),
+            objects: self.objects.unmarked_handles(),
+            suspended_executions: self.suspended_executions.unmarked_handles(),
+            environments: self.environments.unmarked_handles(),
+            codes: self.codes.unmarked_handles(),
+            realms: self.realms.unmarked_handles(),
+            shapes: self.shapes.unmarked_handles(),
+        }
+    }
+
+    pub(crate) fn start_background_sweep(&mut self, candidates: PrimitiveSweepCandidates) {
+        assert!(
+            self.pending_major_sweep.is_none(),
+            "a heap cannot start a second background sweep before synchronizing the previous one"
+        );
+        self.pending_major_sweep = Some(PrimitivePendingSweep::spawn(candidates));
+    }
+
+    pub(crate) fn complete_background_sweep(
+        &mut self,
+    ) -> Option<(PrimitiveSweepReclaimStats, PrimitiveBackgroundSweepStats)> {
+        let pending = self.pending_major_sweep.take()?;
+        let mut plan = pending.join();
+        let apply_start = std::time::Instant::now();
+        let reclaimed = self.apply_sweep_plan(plan.candidates());
+        let stats = plan.stats_mut();
+        stats.reclaimed = reclaimed.total();
+        stats.apply_pause_ns = apply_start.elapsed().as_nanos().max(1);
+        self.clear_all_marks();
+        let stats = plan.stats();
+        self.last_major_background_sweep = stats;
+        Some((reclaimed, stats))
+    }
+
+    pub(crate) fn run_background_sweep_to_completion(
+        &mut self,
+        candidates: PrimitiveSweepCandidates,
+    ) -> (PrimitiveSweepReclaimStats, PrimitiveBackgroundSweepStats) {
+        self.start_background_sweep(candidates);
+        self.complete_background_sweep()
+            .expect("just-started background sweep must be pending")
+    }
+
+    fn apply_sweep_plan(
+        &mut self,
+        candidates: &PrimitiveSweepCandidates,
+    ) -> PrimitiveSweepReclaimStats {
+        let mut reclaimed = PrimitiveSweepReclaimStats::default();
+
+        for &id in &candidates.strings {
+            reclaimed.strings += usize::from(self.free_string(id).is_some());
+        }
+        for &id in &candidates.symbols {
+            reclaimed.symbols += usize::from(self.free_symbol(id).is_some());
+        }
+        for &id in &candidates.bigints {
+            reclaimed.bigints += usize::from(self.free_bigint(id).is_some());
+        }
+        for &id in &candidates.value_cells {
+            reclaimed.value_cells += usize::from(self.free_value_cell(id).is_some());
+        }
+        for &id in &candidates.objects {
+            reclaimed.objects += usize::from(self.free_object(id).is_some());
+        }
+        for &id in &candidates.suspended_executions {
+            reclaimed.suspended_executions +=
+                usize::from(self.free_suspended_execution(id).is_some());
+        }
+        for &id in &candidates.environments {
+            reclaimed.environments += usize::from(self.free_environment(id).is_some());
+        }
+        for &id in &candidates.codes {
+            reclaimed.codes += usize::from(self.free_code(id).is_some());
+        }
+        for &id in &candidates.realms {
+            reclaimed.realms += usize::from(self.free_realm(id).is_some());
+        }
+        for &id in &candidates.shapes {
+            reclaimed.shapes += usize::from(self.free_shape(id).is_some());
+        }
+
+        reclaimed
+    }
+
     pub(crate) fn sweep_young_generation(
         &mut self,
         cards_dirtied: usize,
@@ -1521,6 +1543,8 @@ impl Default for PrimitiveHeap {
             last_major_mark_finish_work_items: 0,
             last_major_mark_finish_pause_ns: 0,
             last_major_gray_work_items_after_finish: 0,
+            last_major_background_sweep: PrimitiveBackgroundSweepStats::default(),
+            pending_major_sweep: None,
             active_major_mark: None,
             nursery: Nursery::default(),
             card_table: CardTable::default(),

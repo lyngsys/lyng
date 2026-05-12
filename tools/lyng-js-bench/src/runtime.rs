@@ -822,7 +822,7 @@ fn capture_nursery_minor_gc_snapshot() -> BenchResult<RuntimeSnapshot> {
 fn capture_major_gc_snapshot() -> BenchResult<RuntimeSnapshot> {
     let mut runtime = Runtime::new(NoopHostHooks);
     let roots = PrimitiveRoots::new();
-    let (root, extra_root_a, extra_root_b) = {
+    let (root, extra_root_a, extra_root_b, dead) = {
         let heap = runtime.root_agent_mut().heap_mut();
         heap.set_major_mark_slice_budget(1);
         let mut mutator = heap.mutator();
@@ -856,7 +856,11 @@ fn capture_major_gc_snapshot() -> BenchResult<RuntimeSnapshot> {
             RuntimeObjectRecord::new(None, None, None, None, None),
             AllocationLifetime::Default,
         );
-        (root, extra_root_a, extra_root_b)
+        let dead = mutator.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        (root, extra_root_a, extra_root_b, dead)
     };
     let rooted = roots.root_object(root);
     let rooted_extra_a = roots.root_object(extra_root_a);
@@ -865,6 +869,7 @@ fn capture_major_gc_snapshot() -> BenchResult<RuntimeSnapshot> {
     black_box(rooted.get());
     black_box(rooted_extra_a.get());
     black_box(rooted_extra_b.get());
+    black_box(dead);
     black_box(report.stats.major_mark_slices);
 
     let accounting = runtime.phase6_accounting();
@@ -876,11 +881,16 @@ fn capture_major_gc_snapshot() -> BenchResult<RuntimeSnapshot> {
     {
         return Err("major-GC fixture did not produce a verified atomic finish".to_string());
     }
+    if !accounting.heap.last_major_background_sweep_completed
+        || accounting.heap.last_major_background_sweep_reclaimed == 0
+    {
+        return Err("major-GC fixture did not produce a completed background sweep".to_string());
+    }
 
     Ok(RuntimeSnapshot {
         label: "runtime.major-gc-mark-slices",
         accounting,
-        note: "Forced a major collection over rooted objects with a one-item mark budget so mark-slice distribution and atomic finish pause are visible.",
+        note: "Forced a major collection over rooted and dead objects with a one-item mark budget so mark-slice distribution, atomic finish pause, and background sweep reporting are visible.",
     })
 }
 
@@ -1233,16 +1243,16 @@ fn write_runtime_accounting_section(output: &mut String, snapshots: &[RuntimeSna
     output.push('\n');
     let _ = writeln!(
         output,
-        "| Snapshot | Heap live bytes | Heap young live bytes | Heap old live bytes | Heap reserved bytes | Nursery allocation % | Minor GCs | Last minor pause ns | Last survivors | Last tenured | Last cards dirtied/minor | Major mark slices | Major mark budget | Major mark work items | Max major mark pause ns | Major mark finish work items | Major mark finish pause ns | Gray after finish | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
+        "| Snapshot | Heap live bytes | Heap young live bytes | Heap old live bytes | Heap reserved bytes | Nursery allocation % | Minor GCs | Last minor pause ns | Last survivors | Last tenured | Last cards dirtied/minor | Major mark slices | Major mark budget | Major mark work items | Max major mark pause ns | Major mark finish work items | Major mark finish pause ns | Gray after finish | Background sweep completed | Background sweep candidates | Background sweep reclaimed | Background sweep duration ns | Background sweep apply pause ns | Iterator records | RegExp payloads | RegExp literal cache | Module caches | Promise jobs | Backing stores | Total live bytes | Note |"
     );
     let _ = writeln!(
         output,
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | --- | ---: | --- |"
     );
     for snapshot in snapshots {
         let _ = writeln!(
             output,
-            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
+            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
             snapshot.label,
             snapshot.accounting.heap.live_bytes,
             snapshot.accounting.heap.young_live_bytes,
@@ -1265,6 +1275,11 @@ fn write_runtime_accounting_section(output: &mut String, snapshots: &[RuntimeSna
             snapshot.accounting.heap.last_major_mark_finish_work_items,
             snapshot.accounting.heap.last_major_mark_finish_pause_ns,
             snapshot.accounting.heap.last_major_gray_work_items_after_finish,
+            snapshot.accounting.heap.last_major_background_sweep_completed,
+            snapshot.accounting.heap.last_major_background_sweep_candidates,
+            snapshot.accounting.heap.last_major_background_sweep_reclaimed,
+            snapshot.accounting.heap.last_major_background_sweep_duration_ns,
+            snapshot.accounting.heap.last_major_background_sweep_apply_pause_ns,
             domain_cell(snapshot.accounting.iterator_records),
             domain_cell(snapshot.accounting.regexp_payloads),
             domain_cell(snapshot.accounting.regexp_literal_cache),
@@ -1450,6 +1465,13 @@ fn runtime_snapshot_json(snapshot: &RuntimeSnapshot) -> Value {
             "last_mark_finish_work_items": snapshot.accounting.heap.last_major_mark_finish_work_items,
             "last_mark_finish_pause_ns": snapshot.accounting.heap.last_major_mark_finish_pause_ns,
             "last_gray_work_items_after_finish": snapshot.accounting.heap.last_major_gray_work_items_after_finish,
+            "last_background_sweep_started": snapshot.accounting.heap.last_major_background_sweep_started,
+            "last_background_sweep_completed": snapshot.accounting.heap.last_major_background_sweep_completed,
+            "last_background_sweep_worker_thread_id": snapshot.accounting.heap.last_major_background_sweep_worker_thread_id,
+            "last_background_sweep_candidates": snapshot.accounting.heap.last_major_background_sweep_candidates,
+            "last_background_sweep_reclaimed": snapshot.accounting.heap.last_major_background_sweep_reclaimed,
+            "last_background_sweep_duration_ns": snapshot.accounting.heap.last_major_background_sweep_duration_ns,
+            "last_background_sweep_apply_pause_ns": snapshot.accounting.heap.last_major_background_sweep_apply_pause_ns,
         },
         "iterator_records": runtime_domain_json(snapshot.accounting.iterator_records),
         "regexp_payloads": runtime_domain_json(snapshot.accounting.regexp_payloads),
@@ -2216,6 +2238,8 @@ mod tests {
         assert!(markdown.contains("Max major mark pause ns"));
         assert!(markdown.contains("Major mark finish pause ns"));
         assert!(markdown.contains("Gray after finish"));
+        assert!(markdown.contains("Background sweep completed"));
+        assert!(markdown.contains("Background sweep reclaimed"));
 
         let json = render_json_report(&options, &[], std::slice::from_ref(&snapshot), None);
         assert_eq!(json["runtime_snapshots"][0]["heap"]["young_live_bytes"], 0);
@@ -2239,6 +2263,14 @@ mod tests {
         assert_eq!(
             json["runtime_snapshots"][0]["major_gc"]["last_gray_work_items_after_finish"],
             0
+        );
+        assert_eq!(
+            json["runtime_snapshots"][0]["major_gc"]["last_background_sweep_reclaimed"],
+            0
+        );
+        assert_eq!(
+            json["runtime_snapshots"][0]["major_gc"]["last_background_sweep_completed"],
+            false
         );
     }
 

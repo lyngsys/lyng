@@ -156,6 +156,47 @@ pub const fn merge_primitive_heap_accounting(
         },
         last_major_gray_work_items_after_finish: left.last_major_gray_work_items_after_finish
             + right.last_major_gray_work_items_after_finish,
+        last_major_background_sweep_started: left.last_major_background_sweep_started
+            || right.last_major_background_sweep_started,
+        last_major_background_sweep_completed: match (
+            left.last_major_background_sweep_started,
+            right.last_major_background_sweep_started,
+        ) {
+            (true, true) => {
+                left.last_major_background_sweep_completed
+                    && right.last_major_background_sweep_completed
+            }
+            (true, false) => left.last_major_background_sweep_completed,
+            (false, true) => right.last_major_background_sweep_completed,
+            (false, false) => false,
+        },
+        last_major_background_sweep_worker_thread_id: if left
+            .last_major_background_sweep_worker_thread_id
+            != 0
+        {
+            left.last_major_background_sweep_worker_thread_id
+        } else {
+            right.last_major_background_sweep_worker_thread_id
+        },
+        last_major_background_sweep_candidates: left.last_major_background_sweep_candidates
+            + right.last_major_background_sweep_candidates,
+        last_major_background_sweep_reclaimed: left.last_major_background_sweep_reclaimed
+            + right.last_major_background_sweep_reclaimed,
+        last_major_background_sweep_duration_ns: if left.last_major_background_sweep_duration_ns
+            > right.last_major_background_sweep_duration_ns
+        {
+            left.last_major_background_sweep_duration_ns
+        } else {
+            right.last_major_background_sweep_duration_ns
+        },
+        last_major_background_sweep_apply_pause_ns: if left
+            .last_major_background_sweep_apply_pause_ns
+            > right.last_major_background_sweep_apply_pause_ns
+        {
+            left.last_major_background_sweep_apply_pause_ns
+        } else {
+            right.last_major_background_sweep_apply_pause_ns
+        },
     }
 }
 
