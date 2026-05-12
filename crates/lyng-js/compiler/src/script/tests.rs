@@ -31,27 +31,15 @@ fn compile_script_allocates_persistent_slots_for_global_lexicals_and_explicit_gl
         entry.environment_bindings()[0].name(),
         Some(atoms.intern("local"))
     );
-    assert!(instructions.iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abx {
-            opcode: Opcode::AssignGlobal,
-            ..
-        }
-    )));
-    assert!(instructions.iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abx {
-            opcode: Opcode::LoadGlobal,
-            ..
-        }
-    )));
-    assert!(instructions.iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abx {
-            opcode: Opcode::LoadEnvSlot,
-            ..
-        }
-    )));
+    assert!(instructions
+        .iter()
+        .any(|instruction| instruction.opcode() == Opcode::AssignGlobal));
+    assert!(instructions
+        .iter()
+        .any(|instruction| instruction.opcode() == Opcode::LoadGlobal));
+    assert!(instructions
+        .iter()
+        .any(|instruction| instruction.opcode() == Opcode::LoadEnvSlot));
 }
 
 #[test]
@@ -69,20 +57,14 @@ fn compile_script_assigns_and_loads_global_var_declarations_through_global_ops()
     let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
     let entry = unit.function(unit.entry()).unwrap();
 
-    assert!(entry.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abx {
-            opcode: Opcode::AssignGlobal,
-            ..
-        }
-    )));
-    assert!(entry.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abx {
-            opcode: Opcode::LoadGlobal,
-            ..
-        }
-    )));
+    assert!(entry
+        .instructions()
+        .iter()
+        .any(|instruction| instruction.opcode() == Opcode::AssignGlobal));
+    assert!(entry
+        .instructions()
+        .iter()
+        .any(|instruction| instruction.opcode() == Opcode::LoadGlobal));
 }
 
 #[test]
@@ -322,20 +304,14 @@ fn compile_script_lowers_logical_member_assignments_through_assign_property_ops(
     let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
     let entry = unit.function(unit.entry()).unwrap();
 
-    assert!(entry.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::AssignNamedProperty,
-            ..
-        }
-    )));
-    assert!(entry.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::AssignKeyedProperty,
-            ..
-        }
-    )));
+    assert!(entry
+        .instructions()
+        .iter()
+        .any(|instruction| instruction.opcode() == Opcode::AssignNamedProperty));
+    assert!(entry
+        .instructions()
+        .iter()
+        .any(|instruction| instruction.opcode() == Opcode::AssignKeyedProperty));
 }
 
 #[test]
@@ -370,7 +346,7 @@ fn compile_script_lowers_with_call_targets_through_captured_name_reference() {
                 lyng_js_bytecode::Instruction::Abx {
                     opcode: actual,
                     ..
-                } if *actual == opcode
+                } if actual == opcode
             )),
             "expected {opcode:?} in with-call lowering"
         );
@@ -757,13 +733,10 @@ fn compile_script_supports_large_register_functions_and_high_register_calls() {
 
     assert!(entry.register_count() > 255);
     assert!(!entry.wide_operands().is_empty());
-    assert!(entry.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::Call,
-            ..
-        }
-    )));
+    assert!(entry
+        .instructions()
+        .iter()
+        .any(|instruction| instruction.opcode() == Opcode::Call));
 }
 
 #[test]
@@ -1021,6 +994,49 @@ fn compile_script_specializes_hot_smi_constants_and_arithmetic() {
 }
 
 #[test]
+fn compile_script_emits_short_local_move_opcodes() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(903),
+        r"
+            function passthrough(seed) {
+                var first = seed + 1;
+                seed = first;
+                return seed;
+            }
+            passthrough(1);
+        ",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = unit
+        .functions()
+        .iter()
+        .find(|function| function.name() == Some(atoms.intern("passthrough")))
+        .expect("function should be emitted");
+    let disassembly = lyng_js_bytecode::disassemble(function);
+
+    assert!(
+        function.instructions().iter().any(|instruction| matches!(
+            instruction.opcode(),
+            Opcode::LoadLocal0 | Opcode::LoadLocal1 | Opcode::LoadLocal2 | Opcode::LoadLocal3
+        )),
+        "{disassembly}"
+    );
+    assert!(
+        function.instructions().iter().any(|instruction| matches!(
+            instruction.opcode(),
+            Opcode::StoreLocal0 | Opcode::StoreLocal1 | Opcode::StoreLocal2 | Opcode::StoreLocal3
+        )),
+        "{disassembly}"
+    );
+}
+
+#[test]
 fn compile_script_assigns_named_load_feedback_to_global_loads() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
@@ -1154,13 +1170,10 @@ fn compile_script_marks_direct_tail_calls_explicitly() {
         .find(|function| function.name().and_then(|name| unit.atom_text(name)) == Some("recur"))
         .expect("recursive function should be lowered");
 
-    assert!(recur.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::TailCall,
-            ..
-        }
-    )));
+    assert!(recur
+        .instructions()
+        .iter()
+        .any(|instruction| instruction.opcode() == Opcode::TailCall));
     assert!(!recur
         .instructions()
         .iter()
@@ -1261,15 +1274,7 @@ fn compile_script_marks_conditional_tail_calls_in_each_branch() {
     let tail_calls = branch
         .instructions()
         .iter()
-        .filter(|instruction| {
-            matches!(
-                instruction,
-                lyng_js_bytecode::Instruction::Abc {
-                    opcode: Opcode::TailCall,
-                    ..
-                }
-            )
-        })
+        .filter(|instruction| instruction.opcode() == Opcode::TailCall)
         .count();
 
     assert_eq!(tail_calls, 2);
@@ -1299,13 +1304,10 @@ fn compile_script_keeps_shadowed_eval_fallback_on_the_tail_path() {
         .find(|function| function.name().and_then(|name| unit.atom_text(name)) == Some("recur"))
         .expect("recursive function should be lowered");
 
-    assert!(recur.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::TailCall,
-            ..
-        }
-    )));
+    assert!(recur
+        .instructions()
+        .iter()
+        .any(|instruction| instruction.opcode() == Opcode::TailCall));
     assert!(recur
         .instructions()
         .iter()

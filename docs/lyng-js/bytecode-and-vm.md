@@ -37,6 +37,14 @@ The engine does not execute ASTs and does not use stack bytecode.
 Templates are immutable after compilation. Runtime feedback lives outside templates so
 closures sharing a `CodeRef` share feedback keyed by feedback-site identity.
 
+Instruction templates store the base instruction stream as encoded bytes. The stream is
+variable-width: hot short forms such as `LoadSmi8`, `LoadConst8`, `Jump8`,
+`JumpIfFalse8`, `LoadLocal0..3`, and `StoreLocal0..3` use fewer bytes than the full
+operand forms when their operands fit. Logical instruction offsets remain instruction
+indexes, not byte offsets, while `instruction_bytes()` exposes the compact
+representation and `instructions()` provides a decoded iterator for audit, disassembly,
+validation, and tests.
+
 ## Instruction Model
 
 The bytecode is register-based. Operand spaces include:

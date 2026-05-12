@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use lyng_js_builtins::BootstrapMode;
-use lyng_js_bytecode::{Instruction, Opcode};
+use lyng_js_bytecode::{Instruction, InstructionStream, Opcode};
 use lyng_js_common::{AtomId, Diagnostic, WellKnownAtom};
 use lyng_js_compiler::{
     compile_module, CompiledModuleUnit, ModuleImportKind as CompiledModuleImportKind,
@@ -576,7 +576,7 @@ impl Vm {
         }
     }
 
-    fn module_hoisted_function_prologue_start(instructions: &[Instruction]) -> usize {
+    fn module_hoisted_function_prologue_start(instructions: InstructionStream<'_>) -> usize {
         instructions
             .iter()
             .take_while(|instruction| {
@@ -593,7 +593,7 @@ impl Vm {
 
     fn module_hoisted_function_initializer_at(
         installed: &InstalledFunction,
-        instructions: &[Instruction],
+        instructions: InstructionStream<'_>,
         offset: usize,
     ) -> Option<(u32, u32)> {
         let create_offset = u32::try_from(offset).expect("instruction offset should fit into u32");
@@ -603,7 +603,7 @@ impl Vm {
             opcode: Opcode::CreateClosure,
             a: create_register,
             bx: child_index,
-        } = instructions.get(offset).copied()?
+        } = instructions.get(offset)?
         else {
             return None;
         };
@@ -611,7 +611,7 @@ impl Vm {
             opcode: Opcode::StoreEnvSlot,
             a: store_register,
             bx: env_operand,
-        } = instructions.get(offset + 1).copied()?
+        } = instructions.get(offset + 1)?
         else {
             return None;
         };

@@ -6,10 +6,13 @@ use crate::metadata::{
 };
 use crate::{Instruction, Opcode};
 
-use super::{BytecodeBuildError, BytecodeBuildResult, BytecodeBuilder, BytecodeLimitKind};
+use super::{
+    full_conditional_jump_opcode, short_conditional_jump_opcode, signed_i8_fits,
+    BytecodeBuildError, BytecodeBuildResult, BytecodeBuilder, BytecodeLimitKind,
+};
 
 pub(super) fn optimize(builder: &mut BytecodeBuilder) -> BytecodeBuildResult<()> {
-    if builder.instructions.len() < 2 {
+    if builder.instruction_count() < 2 {
         return Ok(());
     }
 
@@ -18,23 +21,19 @@ pub(super) fn optimize(builder: &mut BytecodeBuilder) -> BytecodeBuildResult<()>
         if !compact_unreachable_and_noop_jumps(builder)? {
             return Ok(());
         }
-        if builder.instructions.len() < 2 {
+        if builder.instruction_count() < 2 {
             return Ok(());
         }
     }
 }
 
 fn thread_jump_targets(builder: &mut BytecodeBuilder) -> BytecodeBuildResult<()> {
-    let offsets = (0..builder.instructions.len())
+    let offsets = (0..builder.instruction_count())
         .map(|offset| u32::try_from(offset).expect("builder offsets should fit u32"))
         .collect::<Vec<_>>();
 
     for offset in offsets {
-        let Some(instruction) = builder
-            .instructions
-            .get(usize::try_from(offset).expect("offset should fit usize"))
-            .copied()
-        else {
+        let Some(instruction) = builder.instruction_at(offset) else {
             continue;
         };
         if !instruction.opcode().is_jump() {
@@ -53,9 +52,9 @@ fn thread_jump_targets(builder: &mut BytecodeBuilder) -> BytecodeBuildResult<()>
 }
 
 fn compact_unreachable_and_noop_jumps(builder: &mut BytecodeBuilder) -> BytecodeBuildResult<bool> {
+    let instructions = builder.decoded_instructions();
     let reachable = reachable_offsets(builder);
-    let keep = builder
-        .instructions
+    let keep = instructions
         .iter()
         .copied()
         .enumerate()
@@ -74,7 +73,7 @@ fn compact_unreachable_and_noop_jumps(builder: &mut BytecodeBuilder) -> Bytecode
     }
 
     let compaction = CompactionMap::new(&keep)?;
-    let old_instructions = std::mem::take(&mut builder.instructions);
+    let old_instructions = instructions;
     let old_wide_operands = std::mem::take(&mut builder.wide_operands);
     let mut new_instructions = Vec::with_capacity(compaction.new_len_usize());
     let mut new_wide_operands = Vec::new();
@@ -101,14 +100,15 @@ fn compact_unreachable_and_noop_jumps(builder: &mut BytecodeBuilder) -> Bytecode
         new_instructions.push(instruction);
     }
 
-    builder.instructions = new_instructions;
+    builder.replace_decoded_instructions(new_instructions);
     builder.wide_operands = new_wide_operands;
     remap_offset_metadata(builder, &compaction);
     Ok(true)
 }
 
 fn reachable_offsets(builder: &BytecodeBuilder) -> Vec<bool> {
-    let len = builder.instructions.len();
+    let instructions = builder.decoded_instructions();
+    let len = instructions.len();
     let mut reachable = vec![false; len];
     let mut queue = VecDeque::new();
     if len != 0 {
@@ -128,22 +128,24 @@ fn reachable_offsets(builder: &BytecodeBuilder) -> Vec<bool> {
         }
         reachable[offset] = true;
         let offset_u32 = u32::try_from(offset).expect("builder offsets should fit u32");
-        match builder.instructions[offset] {
+        match instructions[offset].without_feedback_slot() {
             Instruction::Ax {
-                opcode: Opcode::Jump,
+                opcode: Opcode::Jump | Opcode::Jump8,
                 ..
             } => {
-                if let Some(target) = jump_target(builder, offset_u32, builder.instructions[offset])
-                {
+                if let Some(target) = jump_target(builder, offset_u32, instructions[offset]) {
                     push_target(&mut queue, target, len);
                 }
             }
             Instruction::Abx {
-                opcode: Opcode::JumpIfTrue | Opcode::JumpIfFalse,
+                opcode:
+                    Opcode::JumpIfTrue
+                    | Opcode::JumpIfFalse
+                    | Opcode::JumpIfTrue8
+                    | Opcode::JumpIfFalse8,
                 ..
             } => {
-                if let Some(target) = jump_target(builder, offset_u32, builder.instructions[offset])
-                {
+                if let Some(target) = jump_target(builder, offset_u32, instructions[offset]) {
                     push_target(&mut queue, target, len);
                 }
                 push_target(&mut queue, offset_u32.saturating_add(1), len);
@@ -178,10 +180,10 @@ fn is_noop_jump(builder: &BytecodeBuilder, offset: u32, instruction: Instruction
 }
 
 fn jump_target(builder: &BytecodeBuilder, offset: u32, instruction: Instruction) -> Option<u32> {
-    let len = u32::try_from(builder.instructions.len()).ok()?;
+    let len = u32::try_from(builder.instruction_count()).ok()?;
     match instruction {
         Instruction::Ax {
-            opcode: Opcode::Jump,
+            opcode: Opcode::Jump | Opcode::Jump8,
             ax,
         } => target_from_delta(offset, ax, len),
         Instruction::Abx {
@@ -193,6 +195,15 @@ fn jump_target(builder: &BytecodeBuilder, offset: u32, instruction: Instruction)
             let delta = i32::from_le_bytes(operands.bx().to_le_bytes());
             target_from_delta(offset, delta, len)
         }
+        Instruction::Abx {
+            opcode: Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8,
+            bx,
+            ..
+        } => target_from_delta(
+            offset,
+            i32::from(i8::from_le_bytes([bx.to_le_bytes()[0]])),
+            len,
+        ),
         _ => None,
     }
 }
@@ -206,7 +217,7 @@ fn jump_target_from_parts(
     let len = u32::try_from(instructions.len()).ok()?;
     match instruction {
         Instruction::Ax {
-            opcode: Opcode::Jump,
+            opcode: Opcode::Jump | Opcode::Jump8,
             ax,
         } => target_from_delta(offset, ax, len),
         Instruction::Abx {
@@ -218,6 +229,15 @@ fn jump_target_from_parts(
             let delta = i32::from_le_bytes(operands.bx().to_le_bytes());
             target_from_delta(offset, delta, len)
         }
+        Instruction::Abx {
+            opcode: Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8,
+            bx,
+            ..
+        } => target_from_delta(
+            offset,
+            i32::from(i8::from_le_bytes([bx.to_le_bytes()[0]])),
+            len,
+        ),
         _ => None,
     }
 }
@@ -236,19 +256,18 @@ fn threaded_target(builder: &BytecodeBuilder, target: u32) -> u32 {
     let mut seen = HashSet::new();
     while seen.insert(target) {
         let Some(Instruction::Ax {
-            opcode: Opcode::Jump,
+            opcode: Opcode::Jump | Opcode::Jump8,
             ..
-        }) = builder
-            .instructions
-            .get(usize::try_from(target).unwrap_or(usize::MAX))
-            .copied()
+        }) = builder.instruction_at(target)
         else {
             break;
         };
         let Some(next) = jump_target(
             builder,
             target,
-            builder.instructions[usize::try_from(target).expect("target should fit usize")],
+            builder
+                .instruction_at(target)
+                .expect("target should refer to an instruction"),
         ) else {
             break;
         };
@@ -277,7 +296,7 @@ fn threaded_target_from_parts(
         if !matches!(
             instruction,
             Instruction::Ax {
-                opcode: Opcode::Jump,
+                opcode: Opcode::Jump | Opcode::Jump8,
                 ..
             }
         ) {
@@ -318,32 +337,47 @@ fn rewrite_jump_instruction(
     };
     let delta = i64::from(new_target) - (i64::from(new_offset) + 1);
     match instruction {
-        Instruction::Ax {
-            opcode: Opcode::Jump,
-            ax,
-        } => {
-            *ax = i32::try_from(delta).map_err(|_| BytecodeBuildError::JumpDeltaOverflow {
-                instruction_offset: old_offset,
-                target_offset: old_target,
-            })?;
-        }
-        Instruction::Abx {
-            opcode: Opcode::JumpIfTrue | Opcode::JumpIfFalse,
-            a,
-            bx,
-        } => {
-            let operands = decode_abx_operands(old_wide_operands, old_offset, *a, *bx);
+        Instruction::Ax { opcode, ax } if matches!(*opcode, Opcode::Jump | Opcode::Jump8) => {
             let delta =
                 i32::try_from(delta).map_err(|_| BytecodeBuildError::JumpDeltaOverflow {
                     instruction_offset: old_offset,
                     target_offset: old_target,
                 })?;
-            let updated =
-                WideAbxOperands::new(operands.a(), u32::from_le_bytes(delta.to_le_bytes()));
-            *a = updated.narrow_a();
-            *bx = updated.narrow_bx();
-            if updated.needs_wide() {
-                new_wide_operands.push(WideOperand::new(new_offset, updated.encode_payload()));
+            *opcode = if signed_i8_fits(delta) {
+                Opcode::Jump8
+            } else {
+                Opcode::Jump
+            };
+            *ax = delta;
+        }
+        Instruction::Abx { opcode, a, bx } if opcode.is_jump() => {
+            let condition = if matches!(*opcode, Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8) {
+                u16::from(*a)
+            } else {
+                decode_abx_operands(old_wide_operands, old_offset, *a, *bx).a()
+            };
+            let delta =
+                i32::try_from(delta).map_err(|_| BytecodeBuildError::JumpDeltaOverflow {
+                    instruction_offset: old_offset,
+                    target_offset: old_target,
+                })?;
+            if signed_i8_fits(delta)
+                && let (Ok(condition), Ok(delta)) = (u8::try_from(condition), i8::try_from(delta))
+            {
+                *opcode = short_conditional_jump_opcode(*opcode)
+                    .expect("conditional jump should have a short opcode");
+                *a = condition;
+                *bx = u16::from(delta.cast_unsigned());
+            } else {
+                *opcode = full_conditional_jump_opcode(*opcode)
+                    .expect("conditional jump should have a full opcode");
+                let updated =
+                    WideAbxOperands::new(condition, u32::from_le_bytes(delta.to_le_bytes()));
+                *a = updated.narrow_a();
+                *bx = updated.narrow_bx();
+                if updated.needs_wide() {
+                    new_wide_operands.push(WideOperand::new(new_offset, updated.encode_payload()));
+                }
             }
         }
         _ => {}

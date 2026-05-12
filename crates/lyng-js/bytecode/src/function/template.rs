@@ -1,20 +1,22 @@
 use super::binding::BytecodeEnvironmentBinding;
 use super::header::BytecodeFunctionHeader;
+use crate::decoder::decode_instruction_bytes;
 use crate::ids::{BytecodeFunctionId, EnvironmentLayoutRef};
-use crate::instruction::Instruction;
+use crate::instruction::{Instruction, INSTRUCTION_WIDTH};
 use crate::metadata::{
     ArgumentsMode, BytecodeFunctionFlags, BytecodeFunctionKind, CaptureDescriptor, ConstantValue,
     DeoptSnapshot, DirectEvalLexicalSite, ExceptionHandler, FeedbackSiteDescriptor,
     LoopIterationEnvironmentSite, SafepointDescriptor, SourceMapEntry, ThisMode, WideOperand,
 };
 use lyng_js_common::{AtomId, Span};
+use std::fmt;
 
 /// Immutable bytecode template shared by the compiler and runtime installation layers.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BytecodeFunction {
     header: BytecodeFunctionHeader,
     environment_bindings: Vec<BytecodeEnvironmentBinding>,
-    instructions: Vec<Instruction>,
+    instructions: Vec<u8>,
     constants: Vec<ConstantValue>,
     child_functions: Vec<BytecodeFunctionId>,
     captures: Vec<CaptureDescriptor>,
@@ -31,7 +33,7 @@ pub struct BytecodeFunction {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BytecodeFunctionBody {
     pub(crate) environment_bindings: Vec<BytecodeEnvironmentBinding>,
-    pub(crate) instructions: Vec<Instruction>,
+    pub(crate) instructions: Vec<u8>,
     pub(crate) constants: Vec<ConstantValue>,
     pub(crate) child_functions: Vec<BytecodeFunctionId>,
     pub(crate) captures: Vec<CaptureDescriptor>,
@@ -43,6 +45,133 @@ pub struct BytecodeFunctionBody {
     pub(crate) wide_operands: Vec<WideOperand>,
     pub(crate) safepoints: Vec<SafepointDescriptor>,
     pub(crate) deopt_snapshots: Vec<DeoptSnapshot>,
+}
+
+#[derive(Clone, Copy)]
+pub struct InstructionStream<'a> {
+    bytes: &'a [u8],
+}
+
+impl<'a> InstructionStream<'a> {
+    #[inline]
+    pub const fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes }
+    }
+
+    #[inline]
+    pub fn len(self) -> usize {
+        self.iter().count()
+    }
+
+    #[inline]
+    pub const fn is_empty(self) -> bool {
+        self.bytes.is_empty()
+    }
+
+    #[inline]
+    pub fn get(self, index: usize) -> Option<Instruction> {
+        self.iter().nth(index)
+    }
+
+    #[inline]
+    pub const fn bytes(self) -> &'a [u8] {
+        self.bytes
+    }
+
+    #[inline]
+    pub const fn iter(self) -> InstructionIter<'a> {
+        InstructionIter {
+            bytes: self.bytes,
+            byte_offset: 0,
+        }
+    }
+
+    #[inline]
+    pub const fn byte_offsets(self) -> InstructionByteOffsetIter<'a> {
+        InstructionByteOffsetIter {
+            bytes: self.bytes,
+            byte_offset: 0,
+        }
+    }
+
+    #[inline]
+    pub fn to_vec(self) -> Vec<Instruction> {
+        self.iter().collect()
+    }
+}
+
+impl fmt::Debug for InstructionStream<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl PartialEq<&[Instruction]> for InstructionStream<'_> {
+    fn eq(&self, other: &&[Instruction]) -> bool {
+        self.iter().eq(other.iter().copied())
+    }
+}
+
+impl<const N: usize> PartialEq<&[Instruction; N]> for InstructionStream<'_> {
+    fn eq(&self, other: &&[Instruction; N]) -> bool {
+        self.iter().eq(other.iter().copied())
+    }
+}
+
+impl<'a> IntoIterator for InstructionStream<'a> {
+    type IntoIter = InstructionIter<'a>;
+    type Item = Instruction;
+
+    fn into_iter(self) -> Self::IntoIter {
+        InstructionIter {
+            bytes: self.bytes,
+            byte_offset: 0,
+        }
+    }
+}
+
+pub struct InstructionIter<'a> {
+    bytes: &'a [u8],
+    byte_offset: usize,
+}
+
+impl Iterator for InstructionIter<'_> {
+    type Item = Instruction;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let instruction = decode_instruction_bytes(self.bytes.get(self.byte_offset..)?).ok()?;
+        self.byte_offset = self.byte_offset.checked_add(instruction.encoded_len())?;
+        Some(instruction)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.bytes.len().saturating_sub(self.byte_offset)))
+    }
+}
+
+pub struct InstructionByteOffsetIter<'a> {
+    bytes: &'a [u8],
+    byte_offset: usize,
+}
+
+impl Iterator for InstructionByteOffsetIter<'_> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let offset = self.byte_offset;
+        let instruction = decode_instruction_bytes(self.bytes.get(offset..)?).ok()?;
+        self.byte_offset = self.byte_offset.checked_add(instruction.encoded_len())?;
+        Some(offset)
+    }
+}
+
+fn encode_instructions(instructions: impl IntoIterator<Item = Instruction>) -> Vec<u8> {
+    let iter = instructions.into_iter();
+    let mut bytes = Vec::with_capacity(iter.size_hint().0.saturating_mul(INSTRUCTION_WIDTH));
+    for instruction in iter {
+        instruction.write_bytes(&mut bytes);
+    }
+    bytes
 }
 
 impl BytecodeFunction {
@@ -187,8 +316,24 @@ impl BytecodeFunction {
     }
 
     #[inline]
-    pub fn instructions(&self) -> &[Instruction] {
+    pub fn instructions(&self) -> InstructionStream<'_> {
+        InstructionStream::new(&self.instructions)
+    }
+
+    #[inline]
+    pub fn instruction_bytes(&self) -> &[u8] {
         &self.instructions
+    }
+
+    #[inline]
+    pub fn instruction_count(&self) -> usize {
+        self.instructions().len()
+    }
+
+    #[inline]
+    pub fn instruction_at(&self, instruction_offset: u32) -> Option<Instruction> {
+        self.instructions()
+            .get(usize::try_from(instruction_offset).ok()?)
     }
 
     #[inline]
@@ -371,7 +516,7 @@ impl BytecodeFunction {
 
     #[inline]
     pub fn with_instructions(mut self, instructions: Vec<Instruction>) -> Self {
-        self.instructions = instructions;
+        self.instructions = encode_instructions(instructions);
         self
     }
 

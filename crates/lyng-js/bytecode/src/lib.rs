@@ -25,17 +25,17 @@ pub use builder::{
     BytecodeOperandKind,
 };
 pub use decoder::{
-    decode_instruction_stream, decode_instruction_word, DecodeError, DecodedInstructionStream,
-    InvalidInstructionWord,
+    decode_instruction_bytes, decode_instruction_stream, decode_instruction_word, DecodeError,
+    DecodedInstructionStream, InvalidInstructionWord,
 };
 pub use disassembler::{disassemble, disassemble_instruction};
 pub use function::{
     BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags, BytecodeFunction,
     BytecodeFunctionHeader, CompiledAtom, CompiledFunctionUnit, CompiledScriptUnit,
-    GlobalLexicalBindingPlan, GlobalScriptInstantiationPlan,
+    GlobalLexicalBindingPlan, GlobalScriptInstantiationPlan, InstructionStream,
 };
 pub use ids::{BytecodeFunctionId, EnvironmentLayoutRef};
-pub use instruction::Instruction;
+pub use instruction::{Instruction, INSTRUCTION_WIDTH};
 pub use metadata::{
     ArgumentsMode, BytecodeFunctionFlags, BytecodeFunctionKind, CallRange, CaptureDescriptor,
     CaptureSource, ConstantValue, DeoptFrameValue, DeoptSnapshot, DeoptValueSource,

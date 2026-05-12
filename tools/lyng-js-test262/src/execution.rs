@@ -799,7 +799,7 @@ fn compiled_script_diagnostics(unit: &CompiledScriptUnit) -> Test262RuntimeDiagn
     };
     for function in unit.functions() {
         diagnostics.instruction_words +=
-            function.instructions().len() + function.wide_operands().len();
+            function.instruction_count() + function.wide_operands().len();
         diagnostics.wide_operands += function.wide_operands().len();
         diagnostics.constants += function.constants().len();
         diagnostics.metadata_records += function.constants().len()

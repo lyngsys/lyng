@@ -1088,7 +1088,7 @@ fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> BenchResult<FeedbackTotals
 fn compiled_unit_encoded_bytes(unit: &CompiledScriptUnit) -> usize {
     unit.functions()
         .iter()
-        .map(|function| function.instructions().len() + function.wide_operands().len())
+        .map(|function| function.instruction_count() + function.wide_operands().len())
         .sum::<usize>()
         .saturating_mul(4)
 }
@@ -1136,7 +1136,7 @@ const fn atom_payload_bytes(atoms: &AtomTable) -> usize {
 
 fn function_template_bytes(function: &BytecodeFunction) -> usize {
     size_of::<BytecodeFunction>()
-        + size_of_val(function.instructions())
+        + size_of_val(function.instruction_bytes())
         + size_of_val(function.constants())
         + size_of_val(function.child_functions())
         + size_of_val(function.captures())

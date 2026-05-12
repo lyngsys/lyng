@@ -312,6 +312,103 @@ fn named_property_load_ic_keeps_six_shape_polymorphic_cache() {
 }
 
 #[test]
+fn named_property_load_ic_orders_polymorphic_entries_by_shape() {
+    let unit = compile_test_unit(52, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let mut sources = Vec::new();
+    for index in 0..6 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(24_000 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+            )
+            .unwrap());
+        }
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(index.cast_signed()),
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+        let shape = agent
+            .objects()
+            .object_header(agent.heap().view(), object)
+            .expect("test object should have a header")
+            .shape()
+            .get();
+        sources.push((shape, object, index));
+    }
+    sources.sort_by_key(|(shape, _, _)| std::cmp::Reverse(*shape));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for (_, object, index) in sources {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
+        );
+    }
+
+    let snapshot = vm
+        .feedback_vector_snapshot(installed.code())
+        .expect("entry code should expose a feedback snapshot");
+    let FeedbackSiteDetail::NamedProperty(named) = snapshot
+        .sites()
+        .iter()
+        .find(|site| site.slot() == slot)
+        .expect("named load site should be present")
+        .detail()
+    else {
+        panic!("source.value should expose named-property feedback");
+    };
+    let actual_shapes = named
+        .entries()
+        .iter()
+        .map(|entry| entry.receiver_shape().get())
+        .collect::<Vec<_>>();
+    let mut sorted_shapes = actual_shapes.clone();
+    sorted_shapes.sort_unstable();
+
+    assert_eq!(named.state(), FeedbackInlineCacheState::Polymorphic);
+    assert_eq!(actual_shapes, sorted_shapes);
+}
+
+#[test]
 fn named_property_load_ic_promotes_to_megamorphic_beyond_polymorphic_capacity() {
     let unit = compile_test_unit(47, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
@@ -563,6 +660,100 @@ fn keyed_named_atom_ic_keeps_six_shape_polymorphic_cache() {
         vm.keyed_property_cache_snapshot(installed.code(), slot),
         Some(("Polymorphic", Some("NamedAtom"), 6))
     );
+}
+
+#[test]
+fn keyed_named_atom_ic_orders_polymorphic_entries_by_shape() {
+    let unit = compile_test_unit(53, "source[\"value\"];");
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a keyed-access site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "value"));
+
+    let mut sources = Vec::new();
+    for index in 0..6 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(25_000 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+            )
+            .unwrap());
+        }
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(index.cast_signed()),
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+        let shape = agent
+            .objects()
+            .object_header(agent.heap().view(), object)
+            .expect("test object should have a header")
+            .shape()
+            .get();
+        sources.push((shape, object, index));
+    }
+    sources.sort_by_key(|(shape, _, _)| std::cmp::Reverse(*shape));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for (_, object, index) in sources {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
+        );
+    }
+
+    let snapshot = vm
+        .feedback_vector_snapshot(installed.code())
+        .expect("entry code should expose a feedback snapshot");
+    let FeedbackSiteDetail::KeyedProperty(keyed) = snapshot
+        .sites()
+        .iter()
+        .find(|site| site.slot() == slot)
+        .expect("keyed access site should be present")
+        .detail()
+    else {
+        panic!("source[\"value\"] should expose keyed-property feedback");
+    };
+    let actual_shapes = keyed
+        .entries()
+        .iter()
+        .map(|entry| entry.entry().receiver_shape().get())
+        .collect::<Vec<_>>();
+    let mut sorted_shapes = actual_shapes.clone();
+    sorted_shapes.sort_unstable();
+
+    assert_eq!(keyed.state(), FeedbackInlineCacheState::Polymorphic);
+    assert_eq!(keyed.family(), Some(FeedbackKeyedPropertyFamily::NamedAtom));
+    assert_eq!(actual_shapes, sorted_shapes);
 }
 
 #[test]

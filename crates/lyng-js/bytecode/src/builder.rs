@@ -1,8 +1,10 @@
+use crate::decoder::decode_instruction_bytes;
 use crate::function::{
     BytecodeEnvironmentBinding, BytecodeFunction, BytecodeFunctionBody, BytecodeFunctionHeader,
+    InstructionStream,
 };
 use crate::ids::{BytecodeFunctionId, EnvironmentLayoutRef};
-use crate::instruction::Instruction;
+use crate::instruction::{Instruction, INSTRUCTION_WIDTH};
 use crate::metadata::{
     ArgumentsMode, BytecodeFunctionFlags, BytecodeFunctionKind, CallRange, CaptureDescriptor,
     ConstantValue, DeoptSnapshot, DirectEvalLexicalScope, DirectEvalLexicalSite,
@@ -90,11 +92,119 @@ fn narrow_call_operand(register: u16, kind: BytecodeOperandKind) -> BytecodeBuil
     u8::try_from(register).map_err(|_| BytecodeBuildError::OperandOverflow { kind })
 }
 
+const fn signed_i8_fits(value: i32) -> bool {
+    value >= i8::MIN as i32 && value <= i8::MAX as i32
+}
+
+const fn load_local_opcode(register: u16) -> Option<Opcode> {
+    match register {
+        0 => Some(Opcode::LoadLocal0),
+        1 => Some(Opcode::LoadLocal1),
+        2 => Some(Opcode::LoadLocal2),
+        3 => Some(Opcode::LoadLocal3),
+        _ => None,
+    }
+}
+
+const fn store_local_opcode(register: u16) -> Option<Opcode> {
+    match register {
+        0 => Some(Opcode::StoreLocal0),
+        1 => Some(Opcode::StoreLocal1),
+        2 => Some(Opcode::StoreLocal2),
+        3 => Some(Opcode::StoreLocal3),
+        _ => None,
+    }
+}
+
+fn compact_move_instruction(operands: WideAbcOperands) -> Option<Instruction> {
+    if operands.needs_wide() || operands.c() != 0 {
+        return None;
+    }
+    if let Some(opcode) = store_local_opcode(operands.a()) {
+        return Some(Instruction::abx(opcode, operands.narrow_b(), 0));
+    }
+    load_local_opcode(operands.b()).map(|opcode| Instruction::abx(opcode, operands.narrow_a(), 0))
+}
+
+fn validate_short_abx_operands(
+    operands: WideAbxOperands,
+    bx_kind: BytecodeOperandKind,
+) -> BytecodeBuildResult<(u8, u8)> {
+    let a = u8::try_from(operands.a()).map_err(|_| BytecodeBuildError::OperandOverflow {
+        kind: BytecodeOperandKind::A,
+    })?;
+    let bx = u8::try_from(operands.bx())
+        .map_err(|_| BytecodeBuildError::OperandOverflow { kind: bx_kind })?;
+    Ok((a, bx))
+}
+
+fn compact_abx_instruction(
+    opcode: Opcode,
+    operands: WideAbxOperands,
+) -> BytecodeBuildResult<Option<Instruction>> {
+    match opcode {
+        Opcode::LoadSmi8 | Opcode::LoadConst8 | Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8 => {
+            let (a, bx) = validate_short_abx_operands(operands, BytecodeOperandKind::Bx)?;
+            Ok(Some(Instruction::abx(opcode, a, u16::from(bx))))
+        }
+        Opcode::LoadLocal0
+        | Opcode::LoadLocal1
+        | Opcode::LoadLocal2
+        | Opcode::LoadLocal3
+        | Opcode::StoreLocal0
+        | Opcode::StoreLocal1
+        | Opcode::StoreLocal2
+        | Opcode::StoreLocal3 => {
+            let a =
+                u8::try_from(operands.a()).map_err(|_| BytecodeBuildError::OperandOverflow {
+                    kind: BytecodeOperandKind::A,
+                })?;
+            Ok(Some(Instruction::abx(opcode, a, 0)))
+        }
+        Opcode::LoadConst if !operands.needs_wide() && u8::try_from(operands.bx()).is_ok() => {
+            Ok(Some(Instruction::abx(
+                Opcode::LoadConst8,
+                operands.narrow_a(),
+                operands.narrow_bx(),
+            )))
+        }
+        Opcode::LoadSmi if !operands.needs_wide() => {
+            let raw = operands.narrow_bx();
+            let value = i16::from_le_bytes(raw.to_le_bytes());
+            Ok(i8::try_from(value).ok().map(|value| {
+                Instruction::abx(
+                    Opcode::LoadSmi8,
+                    operands.narrow_a(),
+                    u16::from(value.cast_unsigned()),
+                )
+            }))
+        }
+        _ => Ok(None),
+    }
+}
+
+const fn short_conditional_jump_opcode(opcode: Opcode) -> Option<Opcode> {
+    match opcode {
+        Opcode::JumpIfTrue | Opcode::JumpIfTrue8 => Some(Opcode::JumpIfTrue8),
+        Opcode::JumpIfFalse | Opcode::JumpIfFalse8 => Some(Opcode::JumpIfFalse8),
+        _ => None,
+    }
+}
+
+const fn full_conditional_jump_opcode(opcode: Opcode) -> Option<Opcode> {
+    match opcode {
+        Opcode::JumpIfTrue | Opcode::JumpIfTrue8 => Some(Opcode::JumpIfTrue),
+        Opcode::JumpIfFalse | Opcode::JumpIfFalse8 => Some(Opcode::JumpIfFalse),
+        _ => None,
+    }
+}
+
 /// Incremental builder for one immutable [`BytecodeFunction`].
 pub struct BytecodeBuilder {
     header: BytecodeFunctionHeader,
     environment_bindings: Vec<BytecodeEnvironmentBinding>,
-    instructions: Vec<Instruction>,
+    instructions: Vec<u8>,
+    instruction_byte_offsets: Vec<usize>,
     constants: Vec<ConstantValue>,
     child_functions: Vec<BytecodeFunctionId>,
     captures: Vec<CaptureDescriptor>,
@@ -123,6 +233,7 @@ impl BytecodeBuilder {
             ),
             environment_bindings: Vec::new(),
             instructions: Vec::new(),
+            instruction_byte_offsets: Vec::new(),
             constants: Vec::new(),
             child_functions: Vec::new(),
             captures: Vec::new(),
@@ -366,9 +477,86 @@ impl BytecodeBuilder {
     /// Returns [`BytecodeBuildError::LimitExceeded`] when the instruction stream length no longer
     /// fits in the serialized offset width.
     pub fn current_offset(&self) -> BytecodeBuildResult<u32> {
-        u32::try_from(self.instructions.len()).map_err(|_| BytecodeBuildError::LimitExceeded {
+        u32::try_from(self.instruction_count()).map_err(|_| BytecodeBuildError::LimitExceeded {
             kind: BytecodeLimitKind::InstructionStream,
         })
+    }
+
+    #[inline]
+    const fn instruction_count(&self) -> usize {
+        self.instruction_byte_offsets.len()
+    }
+
+    #[inline]
+    fn instruction_at(&self, instruction_offset: u32) -> Option<Instruction> {
+        let offset = usize::try_from(instruction_offset).ok()?;
+        let start = *self.instruction_byte_offsets.get(offset)?;
+        decode_instruction_bytes(self.instructions.get(start..)?).ok()
+    }
+
+    #[inline]
+    fn replace_instruction(
+        &mut self,
+        instruction_offset: u32,
+        instruction: Instruction,
+    ) -> BytecodeBuildResult<()> {
+        let offset = usize::try_from(instruction_offset)
+            .map_err(|_| BytecodeBuildError::InvalidJumpPatch { instruction_offset })?;
+        let start = *self
+            .instruction_byte_offsets
+            .get(offset)
+            .ok_or(BytecodeBuildError::InvalidJumpPatch { instruction_offset })?;
+        let old_len = self
+            .instruction_byte_offsets
+            .get(offset.saturating_add(1))
+            .copied()
+            .unwrap_or(self.instructions.len())
+            .checked_sub(start)
+            .ok_or(BytecodeBuildError::InvalidJumpPatch { instruction_offset })?;
+        let new_bytes = instruction.encode_bytes();
+        self.instructions.splice(
+            start..start.saturating_add(old_len),
+            new_bytes.iter().copied(),
+        );
+        match new_bytes.len().cmp(&old_len) {
+            std::cmp::Ordering::Less => {
+                let shrink = old_len - new_bytes.len();
+                for byte_offset in self.instruction_byte_offsets.iter_mut().skip(offset + 1) {
+                    *byte_offset -= shrink;
+                }
+            }
+            std::cmp::Ordering::Greater => {
+                let growth = new_bytes.len() - old_len;
+                for byte_offset in self.instruction_byte_offsets.iter_mut().skip(offset + 1) {
+                    *byte_offset += growth;
+                }
+            }
+            std::cmp::Ordering::Equal => {}
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn push_instruction(&mut self, instruction: Instruction) {
+        self.instruction_byte_offsets.push(self.instructions.len());
+        instruction.write_bytes(&mut self.instructions);
+    }
+
+    #[inline]
+    pub(super) fn decoded_instructions(&self) -> Vec<Instruction> {
+        InstructionStream::new(&self.instructions).to_vec()
+    }
+
+    #[inline]
+    pub(super) fn replace_decoded_instructions(&mut self, instructions: Vec<Instruction>) {
+        self.instructions.clear();
+        self.instruction_byte_offsets.clear();
+        self.instructions
+            .reserve(instructions.len().saturating_mul(INSTRUCTION_WIDTH));
+        self.instruction_byte_offsets.reserve(instructions.len());
+        for instruction in instructions {
+            self.push_instruction(instruction);
+        }
     }
 
     #[inline]
@@ -414,7 +602,7 @@ impl BytecodeBuilder {
     /// represented.
     pub fn emit(&mut self, instruction: Instruction) -> BytecodeBuildResult<u32> {
         let offset = self.current_offset()?;
-        self.instructions.push(instruction);
+        self.push_instruction(instruction);
         Ok(offset)
     }
 
@@ -442,6 +630,11 @@ impl BytecodeBuilder {
             operand_u16(b, BytecodeOperandKind::B)?,
             operand_u16(c, BytecodeOperandKind::C)?,
         );
+        if opcode == Opcode::Move
+            && let Some(instruction) = compact_move_instruction(operands)
+        {
+            return self.emit(instruction);
+        }
         let offset = self.emit(Instruction::abc(
             opcode,
             operands.narrow_a(),
@@ -470,6 +663,9 @@ impl BytecodeBuilder {
             operand_u16(a, BytecodeOperandKind::A)?,
             operand_u32(bx, BytecodeOperandKind::Bx)?,
         );
+        if let Some(instruction) = compact_abx_instruction(opcode, operands)? {
+            return self.emit(instruction);
+        }
         let offset = self.emit(Instruction::abx(
             opcode,
             operands.narrow_a(),
@@ -487,7 +683,14 @@ impl BytecodeBuilder {
     /// # Errors
     /// Returns [`BytecodeBuildError::LimitExceeded`] when the instruction offset is too large.
     pub fn emit_ax(&mut self, opcode: Opcode, ax: i32) -> BytecodeBuildResult<u32> {
-        self.emit(Instruction::ax(opcode, ax))
+        match opcode {
+            Opcode::Jump if signed_i8_fits(ax) => self.emit(Instruction::ax(Opcode::Jump8, ax)),
+            Opcode::Jump8 if signed_i8_fits(ax) => self.emit(Instruction::ax(opcode, ax)),
+            Opcode::Jump8 => Err(BytecodeBuildError::OperandOverflow {
+                kind: BytecodeOperandKind::Bx,
+            }),
+            _ => self.emit(Instruction::ax(opcode, ax)),
+        }
     }
 
     #[inline]
@@ -518,7 +721,10 @@ impl BytecodeBuilder {
     where
         A: TryInto<u16>,
     {
-        if !matches!(opcode, Opcode::JumpIfTrue | Opcode::JumpIfFalse) {
+        if !matches!(
+            opcode,
+            Opcode::JumpIfTrue | Opcode::JumpIfFalse | Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8
+        ) {
             return Err(BytecodeBuildError::InvalidJumpOpcode { opcode });
         }
         self.emit_abx(
@@ -641,58 +847,69 @@ impl BytecodeBuilder {
         instruction_offset: u32,
         target_offset: u32,
     ) -> BytecodeBuildResult<()> {
-        let index = usize::try_from(instruction_offset)
-            .map_err(|_| BytecodeBuildError::InvalidJumpPatch { instruction_offset })?;
         let existing = self
-            .instructions
-            .get(index)
+            .instruction_at(instruction_offset)
             .ok_or(BytecodeBuildError::InvalidJumpPatch { instruction_offset })?;
         if !existing.opcode().is_jump() {
             return Err(BytecodeBuildError::InvalidJumpPatch { instruction_offset });
         }
-        let existing_abx = self.instructions.get(index);
-        let existing_abx = match existing_abx {
-            Some(Instruction::Abx { a, bx, .. }) => Some((*a, *bx)),
-            _ => None,
-        };
-        let existing_operands =
-            existing_abx.map(|(a, bx)| self.decode_abx_operands(instruction_offset, a, bx));
-        let instruction = self
-            .instructions
-            .get_mut(index)
-            .ok_or(BytecodeBuildError::InvalidJumpPatch { instruction_offset })?;
         let delta = i64::from(target_offset) - (i64::from(instruction_offset) + 1);
-        match instruction {
-            Instruction::Ax { ax, .. } => {
+        let instruction = match existing {
+            Instruction::Ax {
+                opcode: Opcode::Jump | Opcode::Jump8,
+                ..
+            } => {
                 let delta =
                     i32::try_from(delta).map_err(|_| BytecodeBuildError::JumpDeltaOverflow {
                         instruction_offset,
                         target_offset,
                     })?;
-                *ax = delta;
-            }
-            Instruction::Abx { a, .. } => {
-                let delta =
-                    i32::try_from(delta).map_err(|_| BytecodeBuildError::JumpDeltaOverflow {
-                        instruction_offset,
-                        target_offset,
-                    })?;
-                let operands = existing_operands
-                    .ok_or(BytecodeBuildError::InvalidJumpPatch { instruction_offset })?;
-                let updated =
-                    WideAbxOperands::new(operands.a(), u32::from_le_bytes(delta.to_le_bytes()));
-                *a = updated.narrow_a();
-                instruction.patch_bx(updated.narrow_bx());
-                if updated.needs_wide() {
-                    self.set_wide_operand(instruction_offset, updated.encode_payload());
+                if signed_i8_fits(delta) {
+                    Instruction::ax(Opcode::Jump8, delta)
                 } else {
-                    self.remove_wide_operand(instruction_offset);
+                    Instruction::ax(Opcode::Jump, delta)
                 }
             }
-            Instruction::Abc { .. } => {
+            Instruction::Abx { opcode, a, bx } if opcode.is_jump() => {
+                let delta =
+                    i32::try_from(delta).map_err(|_| BytecodeBuildError::JumpDeltaOverflow {
+                        instruction_offset,
+                        target_offset,
+                    })?;
+                let condition = if matches!(opcode, Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8) {
+                    u16::from(a)
+                } else {
+                    self.decode_abx_operands(instruction_offset, a, bx).a()
+                };
+                if signed_i8_fits(delta)
+                    && let (Ok(condition), Ok(delta)) =
+                        (u8::try_from(condition), i8::try_from(delta))
+                {
+                    self.remove_wide_operand(instruction_offset);
+                    Instruction::abx(
+                        short_conditional_jump_opcode(opcode)
+                            .ok_or(BytecodeBuildError::InvalidJumpPatch { instruction_offset })?,
+                        condition,
+                        u16::from(delta.cast_unsigned()),
+                    )
+                } else {
+                    let opcode = full_conditional_jump_opcode(opcode)
+                        .ok_or(BytecodeBuildError::InvalidJumpPatch { instruction_offset })?;
+                    let updated =
+                        WideAbxOperands::new(condition, u32::from_le_bytes(delta.to_le_bytes()));
+                    if updated.needs_wide() {
+                        self.set_wide_operand(instruction_offset, updated.encode_payload());
+                    } else {
+                        self.remove_wide_operand(instruction_offset);
+                    }
+                    Instruction::abx(opcode, updated.narrow_a(), updated.narrow_bx())
+                }
+            }
+            _ => {
                 return Err(BytecodeBuildError::InvalidJumpPatch { instruction_offset });
             }
-        }
+        };
+        self.replace_instruction(instruction_offset, instruction)?;
         Ok(())
     }
 
@@ -814,7 +1031,18 @@ impl BytecodeBuilder {
                 kind: BytecodeLimitKind::FeedbackSlot,
             },
         )?;
+        if u16::try_from(slot.get()).is_err() {
+            return Err(BytecodeBuildError::LimitExceeded {
+                kind: BytecodeLimitKind::FeedbackSlot,
+            });
+        }
         self.next_feedback_slot = next_feedback_slot;
+        if let Some(profiled_instruction) = self
+            .instruction_at(instruction_offset)
+            .and_then(|instruction| instruction.with_feedback_slot(slot))
+        {
+            self.replace_instruction(instruction_offset, profiled_instruction)?;
+        }
         self.feedback_sites.push(
             FeedbackSiteDescriptor::new(slot, instruction_offset, kind).with_metadata(metadata),
         );
@@ -972,10 +1200,10 @@ mod tests {
         assert_eq!(function.hidden_register_count(), 1);
         assert_eq!(function.instructions().len(), 2);
         assert!(matches!(
-            function.instructions(),
+            function.instructions().to_vec().as_slice(),
             [
                 Instruction::Abx {
-                    opcode: Opcode::LoadConst,
+                    opcode: Opcode::LoadConst8,
                     ..
                 },
                 Instruction::Ax {
@@ -1014,6 +1242,45 @@ mod tests {
     }
 
     #[test]
+    fn builder_inlines_feedback_slot_operand_on_profiled_instructions() -> BytecodeBuildResult<()> {
+        let mut builder = BytecodeBuilder::new(
+            BytecodeFunctionId::new(NonZeroU32::new(90).unwrap()),
+            BytecodeFunctionKind::Function,
+        );
+        builder.alloc_registers(3)?;
+        let add = builder.emit_abc(Opcode::Add, 0, 1, 2)?;
+        let global = builder.emit_abx(Opcode::LoadGlobal, 0, 7)?;
+
+        let add_slot = builder.add_feedback_site(
+            add,
+            FeedbackSiteKind::Arithmetic,
+            FeedbackSiteMetadata::None,
+        )?;
+        let global_slot = builder.add_feedback_site(
+            global,
+            FeedbackSiteKind::NamedPropertyLoad,
+            FeedbackSiteMetadata::NamedProperty(AtomId::from_raw(7)),
+        )?;
+
+        let function = builder.finish()?;
+
+        assert_eq!(
+            function.instructions().get(0),
+            Some(Instruction::profiled_abc(Opcode::Add, 0, 1, 2, add_slot))
+        );
+        assert_eq!(
+            function.instructions().get(1),
+            Some(Instruction::profiled_abx(
+                Opcode::LoadGlobal,
+                0,
+                7,
+                global_slot
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
     fn peephole_threads_jump_to_jump_targets_and_removes_unreachable_jump_chain(
     ) -> BytecodeBuildResult<()> {
         let mut builder = BytecodeBuilder::new(
@@ -1034,14 +1301,14 @@ mod tests {
 
         assert_eq!(function.instructions().len(), 4);
         assert!(matches!(
-            function.instructions(),
+            function.instructions().to_vec().as_slice(),
             [
                 Instruction::Abx {
                     opcode: Opcode::LoadTrue,
                     ..
                 },
                 Instruction::Abx {
-                    opcode: Opcode::JumpIfTrue,
+                    opcode: Opcode::JumpIfTrue8,
                     ..
                 },
                 Instruction::Ax {
@@ -1054,7 +1321,13 @@ mod tests {
                 }
             ]
         ));
-        assert_eq!(function.instructions()[1].bx_value(), Some(1));
+        assert_eq!(
+            function
+                .instructions()
+                .get(1)
+                .and_then(Instruction::bx_value),
+            Some(1)
+        );
         Ok(())
     }
 
@@ -1161,7 +1434,7 @@ mod tests {
 
         assert_eq!(
             text,
-            "function BytecodeFunctionId(3) kind=Function this=Global args=None params=0 min_args=0 regs=2 hidden=0 env=false env_slots=0 rest=false\n0000: LoadConst       r0, const[0] ; Smi(7)\n0001: Return          r0\nconstants:\n  [0] Smi(7)\n"
+            "function BytecodeFunctionId(3) kind=Function this=Global args=None params=0 min_args=0 regs=2 hidden=0 env=false env_slots=0 rest=false\n0000: LoadConst8      r0, const[0] ; Smi(7)\n0001: Return          r0\nconstants:\n  [0] Smi(7)\n"
         );
         Ok(())
     }
@@ -1198,7 +1471,10 @@ mod tests {
         let function = builder.finish()?;
 
         assert_eq!(
-            function.instructions()[usize::try_from(conditional).unwrap()].bx_value(),
+            function
+                .instructions()
+                .get(usize::try_from(conditional).unwrap())
+                .and_then(Instruction::bx_value),
             Some(1)
         );
         Ok(())
@@ -1228,6 +1504,53 @@ mod tests {
         assert_eq!(function.wide_operands().len(), 2);
         assert!(text.contains("LoadConst       r299, const[69999]"));
         assert!(text.contains("Move            r298, r299"));
+        Ok(())
+    }
+
+    #[test]
+    fn builder_emits_variable_width_short_instructions() -> BytecodeBuildResult<()> {
+        let mut builder = BytecodeBuilder::new(
+            BytecodeFunctionId::new(NonZeroU32::new(16).unwrap()),
+            BytecodeFunctionKind::Script,
+        );
+
+        builder.emit_abx(Opcode::LoadSmi8, 0, 0xfb)?;
+        builder.emit_ax(Opcode::Jump8, -1)?;
+        let function = builder.finish()?;
+
+        assert_eq!(function.instruction_count(), 2);
+        assert_eq!(
+            function.instruction_bytes(),
+            &[Opcode::LoadSmi8 as u8, 0, 0xfb, Opcode::Jump8 as u8, 0xff]
+        );
+        assert_eq!(
+            function.instructions().to_vec(),
+            vec![
+                Instruction::abx(Opcode::LoadSmi8, 0, 0xfb),
+                Instruction::ax(Opcode::Jump8, -1),
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn builder_prefers_store_local_when_both_move_operands_are_local() -> BytecodeBuildResult<()> {
+        let mut builder = BytecodeBuilder::new(
+            BytecodeFunctionId::new(NonZeroU32::new(17).unwrap()),
+            BytecodeFunctionKind::Script,
+        );
+
+        builder.emit_abc(Opcode::Move, 2, 1, 0)?;
+        let function = builder.finish()?;
+
+        assert_eq!(
+            function.instructions().to_vec(),
+            vec![Instruction::abx(Opcode::StoreLocal2, 1, 0)]
+        );
+        assert_eq!(
+            function.instruction_bytes(),
+            &[Opcode::StoreLocal2 as u8, 1]
+        );
         Ok(())
     }
 

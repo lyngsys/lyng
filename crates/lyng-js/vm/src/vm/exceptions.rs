@@ -71,10 +71,8 @@ impl Vm {
     ) -> Option<u32> {
         let instruction_offset = frame.instruction_offset().checked_sub(1)?;
         match installed
-            .function
-            .instructions()
-            .get(usize::try_from(instruction_offset).ok()?)
-            .copied()?
+            .instruction_at(instruction_offset)?
+            .without_feedback_slot()
         {
             Instruction::Abc {
                 opcode:

@@ -7,7 +7,7 @@ use lyng_js_gc::AllocationLifetime;
 use lyng_js_host::HostHooks;
 use lyng_js_objects::{NamedPropertyCachePurpose, NativeFunctionRegistry};
 use lyng_js_ops::{errors, object};
-use lyng_js_types::{PropertyDescriptor, PropertyKey, Value};
+use lyng_js_types::{FeedbackSlotId, PropertyDescriptor, PropertyKey, Value};
 
 impl Vm {
     #[expect(
@@ -64,6 +64,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         target: u16,
         receiver_register: u16,
         atom_operand: u16,
@@ -75,7 +76,7 @@ impl Vm {
             if let Some(value) = self.try_named_property_load_inline_cache_hit(
                 agent,
                 frame.code(),
-                frame.instruction_offset(),
+                feedback_slot,
                 object,
             ) {
                 self.write_register(frame, target, value);
@@ -90,7 +91,7 @@ impl Vm {
             self.observe_named_property_slow_path(
                 agent,
                 frame.code(),
-                frame.instruction_offset(),
+                feedback_slot,
                 object,
                 atom,
                 NamedPropertyCachePurpose::Load,
@@ -119,6 +120,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         opcode: Opcode,
         receiver_register: u16,
         value_register: u16,
@@ -137,7 +139,7 @@ impl Vm {
             if let Some(stored) = self.try_named_property_store_inline_cache(
                 agent,
                 frame.code(),
-                frame.instruction_offset(),
+                feedback_slot,
                 object,
                 value,
             ) {
@@ -152,7 +154,7 @@ impl Vm {
                         return Ok(());
                     };
                 }
-                self.record_feedback_site(frame.code(), frame.instruction_offset());
+                self.record_feedback_slot(frame.code(), feedback_slot);
                 self.advance_instruction();
                 return Ok(());
             }
@@ -182,7 +184,7 @@ impl Vm {
             self.observe_named_property_slow_path(
                 agent,
                 frame.code(),
-                frame.instruction_offset(),
+                feedback_slot,
                 object,
                 atom,
                 NamedPropertyCachePurpose::Store,
@@ -239,6 +241,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         target: u16,
         receiver_register: u16,
         key_register: u16,
@@ -257,7 +260,7 @@ impl Vm {
             if let Some(value) = self.try_keyed_dense_index_load_inline_cache_hit(
                 agent,
                 frame.code(),
-                frame.instruction_offset(),
+                feedback_slot,
                 object,
                 index,
             ) {
@@ -277,13 +280,7 @@ impl Vm {
                 Self::try_fast_own_index_value(agent, object, index)?
             };
             if let Some(value) = value {
-                self.observe_keyed_index_access(
-                    agent,
-                    frame.code(),
-                    frame.instruction_offset(),
-                    object,
-                    index,
-                );
+                self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
                 self.write_register(frame, target, value);
                 self.advance_instruction();
                 return Ok(());
@@ -298,7 +295,7 @@ impl Vm {
                 if let Some(value) = self.try_keyed_dense_index_load_inline_cache_hit(
                     agent,
                     frame.code(),
-                    frame.instruction_offset(),
+                    feedback_slot,
                     object,
                     index,
                 ) {
@@ -325,23 +322,17 @@ impl Vm {
                     };
                     value
                 };
-                self.observe_keyed_index_access(
-                    agent,
-                    frame.code(),
-                    frame.instruction_offset(),
-                    object,
-                    index,
-                );
+                self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
                 value
             } else if let Some(atom) = key.as_atom() {
                 if let Some(value) = self.try_keyed_property_load_inline_cache(
                     agent,
                     frame.code(),
-                    frame.instruction_offset(),
+                    feedback_slot,
                     object,
                     atom,
                 ) {
-                    self.record_feedback_site(frame.code(), frame.instruction_offset());
+                    self.record_feedback_slot(frame.code(), feedback_slot);
                     self.write_register(frame, target, value);
                     self.advance_instruction();
                     return Ok(());
@@ -354,7 +345,7 @@ impl Vm {
                 self.observe_keyed_atom_slow_path(
                     agent,
                     frame.code(),
-                    frame.instruction_offset(),
+                    feedback_slot,
                     object,
                     atom,
                     NamedPropertyCachePurpose::Load,
@@ -366,7 +357,7 @@ impl Vm {
                 let Some(value) = self.handle_vm_result(agent, property_result)? else {
                     return Ok(());
                 };
-                self.observe_keyed_generic_slow_path(frame.code(), frame.instruction_offset());
+                self.observe_keyed_generic_slow_path(frame.code(), feedback_slot);
                 value
             }
         } else {
@@ -393,6 +384,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         opcode: Opcode,
         receiver_register: u16,
         value_register: u16,
@@ -418,7 +410,7 @@ impl Vm {
             if let Some(stored) = self.try_keyed_dense_index_store_inline_cache_hit(
                 agent,
                 frame.code(),
-                frame.instruction_offset(),
+                feedback_slot,
                 object,
                 index,
                 value,
@@ -492,13 +484,7 @@ impl Vm {
                 if !used_index_fast_path {
                     Self::sync_engine_array_length(agent, object)?;
                 }
-                self.observe_keyed_index_access(
-                    agent,
-                    frame.code(),
-                    frame.instruction_offset(),
-                    object,
-                    index,
-                );
+                self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
                 self.advance_instruction();
                 return Ok(());
             }
@@ -512,7 +498,7 @@ impl Vm {
                 if let Some(stored) = self.try_keyed_dense_index_store_inline_cache_hit(
                     agent,
                     frame.code(),
-                    frame.instruction_offset(),
+                    feedback_slot,
                     object,
                     index,
                     value,
@@ -595,18 +581,12 @@ impl Vm {
                 if !used_index_fast_path {
                     Self::sync_engine_array_length(agent, object)?;
                 }
-                self.observe_keyed_index_access(
-                    agent,
-                    frame.code(),
-                    frame.instruction_offset(),
-                    object,
-                    index,
-                );
+                self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
             } else if let Some(atom) = key.as_atom() {
                 if let Some(stored) = self.try_keyed_property_store_inline_cache(
                     agent,
                     frame.code(),
-                    frame.instruction_offset(),
+                    feedback_slot,
                     object,
                     atom,
                     value,
@@ -622,7 +602,7 @@ impl Vm {
                             return Ok(());
                         };
                     }
-                    self.record_feedback_site(frame.code(), frame.instruction_offset());
+                    self.record_feedback_slot(frame.code(), feedback_slot);
                     self.advance_instruction();
                     return Ok(());
                 }
@@ -645,7 +625,7 @@ impl Vm {
                 self.observe_keyed_atom_slow_path(
                     agent,
                     frame.code(),
-                    frame.instruction_offset(),
+                    feedback_slot,
                     object,
                     atom,
                     NamedPropertyCachePurpose::Store,
@@ -667,7 +647,7 @@ impl Vm {
                         return Ok(());
                     };
                 }
-                self.observe_keyed_generic_slow_path(frame.code(), frame.instruction_offset());
+                self.observe_keyed_generic_slow_path(frame.code(), feedback_slot);
             }
         } else {
             let store_result =

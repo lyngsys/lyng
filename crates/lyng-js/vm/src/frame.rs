@@ -392,8 +392,209 @@ impl FrameRecord {
     }
 }
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct FrameMetadata {
+    code: CodeRef,
+    parameter_initializer_end_offset: u32,
+    registers: RegisterWindow,
+    return_register: Option<u16>,
+    realm: RealmRef,
+    variable_env: EnvironmentRef,
+    this_value: Value,
+    construct_this: Option<ObjectRef>,
+    new_target: Option<ObjectRef>,
+    callee: Option<ObjectRef>,
+    tail_caller: Option<ObjectRef>,
+    tail_caller_strict: bool,
+    kind: ExecutionContextKind,
+}
+
+#[cfg(test)]
+impl FrameMetadata {
+    #[inline]
+    const fn from_frame(frame: &FrameRecord) -> Self {
+        Self {
+            code: frame.code,
+            parameter_initializer_end_offset: frame.parameter_initializer_end_offset,
+            registers: frame.registers,
+            return_register: frame.return_register,
+            realm: frame.realm,
+            variable_env: frame.variable_env,
+            this_value: frame.this_value,
+            construct_this: frame.construct_this,
+            new_target: frame.new_target,
+            callee: frame.callee,
+            tail_caller: frame.tail_caller,
+            tail_caller_strict: frame.tail_caller_strict,
+            kind: frame.kind,
+        }
+    }
+
+    #[inline]
+    const fn code(&self) -> CodeRef {
+        self.code
+    }
+
+    #[inline]
+    #[cfg(test)]
+    const fn registers(&self) -> RegisterWindow {
+        self.registers
+    }
+
+    #[inline]
+    #[cfg(test)]
+    const fn return_register(&self) -> Option<u16> {
+        self.return_register
+    }
+
+    #[inline]
+    #[cfg(test)]
+    const fn realm(&self) -> RealmRef {
+        self.realm
+    }
+
+    #[inline]
+    #[cfg(test)]
+    const fn variable_env(&self) -> EnvironmentRef {
+        self.variable_env
+    }
+
+    #[inline]
+    #[cfg(test)]
+    const fn kind(&self) -> ExecutionContextKind {
+        self.kind
+    }
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct FrameState {
+    instruction_offset: u32,
+    lexical_env: EnvironmentRef,
+    handler_cursor: u16,
+    flags: FrameFlags,
+    resume_kind: GeneratorResumeKind,
+    resume_value: Value,
+    resume_active: bool,
+}
+
+#[cfg(test)]
+impl FrameState {
+    #[inline]
+    const fn from_frame(frame: &FrameRecord) -> Self {
+        Self {
+            instruction_offset: frame.instruction_offset,
+            lexical_env: frame.lexical_env,
+            handler_cursor: frame.handler_cursor,
+            flags: frame.flags,
+            resume_kind: frame.resume_kind,
+            resume_value: frame.resume_value,
+            resume_active: frame.resume_active,
+        }
+    }
+
+    #[inline]
+    #[cfg(test)]
+    const fn set_instruction_offset(&mut self, instruction_offset: u32) {
+        self.instruction_offset = instruction_offset;
+    }
+
+    #[inline]
+    #[cfg(test)]
+    const fn set_lexical_env(&mut self, lexical_env: EnvironmentRef) {
+        self.lexical_env = lexical_env;
+    }
+
+    #[inline]
+    #[cfg(test)]
+    const fn set_handler_cursor(&mut self, handler_cursor: u16) {
+        self.handler_cursor = handler_cursor;
+    }
+
+    #[inline]
+    #[cfg(test)]
+    const fn clear_resume(&mut self) {
+        self.resume_active = false;
+    }
+
+    #[inline]
+    #[cfg(test)]
+    pub(crate) const fn write_back(&self, frame: &mut FrameRecord) {
+        frame.instruction_offset = self.instruction_offset;
+        frame.lexical_env = self.lexical_env;
+        frame.handler_cursor = self.handler_cursor;
+        frame.flags = self.flags;
+        frame.resume_kind = self.resume_kind;
+        frame.resume_value = self.resume_value;
+        frame.resume_active = self.resume_active;
+    }
+}
+
 /// Reserve a VM-facing evaluation shell without claiming a working interpreter yet.
 #[inline]
 pub fn seed_registers(window: RegisterWindow) -> Vec<Value> {
     vec![Value::undefined(); usize::from(window.len())]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::num::NonZeroU32;
+
+    const fn id(raw: u32) -> NonZeroU32 {
+        match NonZeroU32::new(raw) {
+            Some(id) => id,
+            None => panic!("test ids must be non-zero"),
+        }
+    }
+
+    #[test]
+    fn dispatch_state_writeback_updates_mutable_fields_only() {
+        let code = CodeRef::new(id(1));
+        let lexical_env = EnvironmentRef::new(id(2));
+        let variable_env = EnvironmentRef::new(id(3));
+        let replacement_env = EnvironmentRef::new(id(4));
+        let realm = RealmRef::new(id(5));
+        let registers = RegisterWindow::new(11, 7);
+        let mut frame = FrameRecord::new(
+            code,
+            17,
+            registers,
+            Some(3),
+            realm,
+            lexical_env,
+            variable_env,
+            ExecutionContextKind::Function,
+        )
+        .with_handler_cursor(2)
+        .with_flags(FrameFlags::entry())
+        .with_resume(GeneratorResumeKind::Throw, Value::from_smi(42));
+
+        let metadata = FrameMetadata::from_frame(&frame);
+        let mut state = FrameState::from_frame(&frame);
+        state.set_instruction_offset(41);
+        state.set_handler_cursor(9);
+        state.set_lexical_env(replacement_env);
+        state.clear_resume();
+        state.write_back(&mut frame);
+
+        assert_eq!(metadata.code(), code);
+        assert_eq!(metadata.registers(), registers);
+        assert_eq!(metadata.return_register(), Some(3));
+        assert_eq!(metadata.realm(), realm);
+        assert_eq!(metadata.variable_env(), variable_env);
+        assert_eq!(metadata.kind(), ExecutionContextKind::Function);
+        assert_eq!(frame.code(), code);
+        assert_eq!(frame.registers(), registers);
+        assert_eq!(frame.return_register(), Some(3));
+        assert_eq!(frame.realm(), realm);
+        assert_eq!(frame.variable_env(), variable_env);
+        assert_eq!(frame.kind(), ExecutionContextKind::Function);
+        assert_eq!(frame.instruction_offset(), 41);
+        assert_eq!(frame.handler_cursor(), 9);
+        assert_eq!(frame.lexical_env(), replacement_env);
+        assert_eq!(frame.flags(), FrameFlags::entry());
+        assert!(!frame.resume_active());
+    }
 }

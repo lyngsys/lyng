@@ -1,16 +1,24 @@
 use crate::{Instruction, Opcode};
+use lyng_js_types::FeedbackSlotId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum InstructionForm {
     Abc,
     Abx,
+    Abx8,
     Ax,
+    Ax8,
+    Local,
+    ProfiledAbc,
+    ProfiledAbx,
 }
 
 /// Decoder error for one malformed 4-byte instruction word.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     InvalidOpcode(u8),
+    InvalidFeedbackSlot(u16),
+    TruncatedInstruction { len: usize },
 }
 
 /// One invalid word encountered while decoding an opaque byte stream.
@@ -65,53 +73,131 @@ impl DecodedInstructionStream {
     }
 }
 
-/// Decode one 4-byte instruction word without panicking on malformed opcode bytes.
+/// Decode one instruction word without panicking on malformed opcode bytes.
 ///
 /// # Errors
 /// Returns [`DecodeError::InvalidOpcode`] when the opcode byte does not map to a known
 /// instruction.
 pub fn decode_instruction_word(word: u32) -> Result<Instruction, DecodeError> {
-    let [raw_opcode, first, second, third] = word.to_le_bytes();
-    let opcode = Opcode::from_byte(raw_opcode).ok_or(DecodeError::InvalidOpcode(raw_opcode))?;
+    decode_instruction_bytes(&word.to_le_bytes())
+}
+
+/// Decode one instruction from raw template bytes.
+///
+/// # Errors
+/// Returns [`DecodeError::TruncatedInstruction`] when fewer bytes than the opcode requires are
+/// supplied and
+/// [`DecodeError::InvalidOpcode`] when the opcode byte is not recognized.
+pub fn decode_instruction_bytes(bytes: &[u8]) -> Result<Instruction, DecodeError> {
+    let [raw_opcode, operands @ ..] = bytes else {
+        return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+    };
+    let opcode = Opcode::from_byte(*raw_opcode).ok_or(DecodeError::InvalidOpcode(*raw_opcode))?;
 
     Ok(match instruction_form(opcode) {
-        InstructionForm::Abc => Instruction::abc(opcode, first, second, third),
-        InstructionForm::Abx => {
-            Instruction::abx(opcode, first, u16::from_le_bytes([second, third]))
+        InstructionForm::Abc => {
+            let [a, b, c, ..] = operands else {
+                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+            };
+            Instruction::abc(opcode, *a, *b, *c)
         }
-        InstructionForm::Ax => Instruction::ax(opcode, sign_extend_i24([first, second, third])),
+        InstructionForm::Abx => {
+            let [a, bx_low, bx_high, ..] = operands else {
+                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+            };
+            Instruction::abx(opcode, *a, u16::from_le_bytes([*bx_low, *bx_high]))
+        }
+        InstructionForm::Abx8 => {
+            let [a, bx, ..] = operands else {
+                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+            };
+            Instruction::abx(opcode, *a, u16::from(*bx))
+        }
+        InstructionForm::Ax => {
+            let [first, second, third, ..] = operands else {
+                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+            };
+            Instruction::ax(opcode, sign_extend_i24([*first, *second, *third]))
+        }
+        InstructionForm::Ax8 => {
+            let [ax, ..] = operands else {
+                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+            };
+            Instruction::ax(opcode, i32::from(i8::from_le_bytes([*ax])))
+        }
+        InstructionForm::Local => {
+            let [register, ..] = operands else {
+                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+            };
+            Instruction::abx(opcode, *register, 0)
+        }
+        InstructionForm::ProfiledAbc => {
+            let [raw_opcode, a, b, c, slot_low, slot_high, ..] = operands else {
+                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+            };
+            let opcode =
+                Opcode::from_byte(*raw_opcode).ok_or(DecodeError::InvalidOpcode(*raw_opcode))?;
+            let raw_slot = u16::from_le_bytes([*slot_low, *slot_high]);
+            let slot = FeedbackSlotId::from_raw(u32::from(raw_slot))
+                .ok_or(DecodeError::InvalidFeedbackSlot(raw_slot))?;
+            Instruction::profiled_abc(opcode, *a, *b, *c, slot)
+        }
+        InstructionForm::ProfiledAbx => {
+            let [raw_opcode, a, bx_low, bx_high, slot_low, slot_high, ..] = operands else {
+                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+            };
+            let opcode =
+                Opcode::from_byte(*raw_opcode).ok_or(DecodeError::InvalidOpcode(*raw_opcode))?;
+            let raw_slot = u16::from_le_bytes([*slot_low, *slot_high]);
+            let slot = FeedbackSlotId::from_raw(u32::from(raw_slot))
+                .ok_or(DecodeError::InvalidFeedbackSlot(raw_slot))?;
+            Instruction::profiled_abx(opcode, *a, u16::from_le_bytes([*bx_low, *bx_high]), slot)
+        }
     })
 }
 
-/// Decode as many full 4-byte instruction words as possible from an opaque byte buffer.
+/// Decode as many full instructions as possible from an opaque byte buffer.
 ///
 /// Invalid opcode bytes are recorded and skipped. Trailing bytes that do not form a full
-/// instruction word are also reported.
+/// instruction are also reported.
 ///
 /// # Panics
 /// Panics if the decoded word index does not fit in `u32`.
 pub fn decode_instruction_stream(bytes: &[u8]) -> DecodedInstructionStream {
-    let mut instructions = Vec::with_capacity(bytes.len() / 4);
+    let mut instructions = Vec::new();
     let mut invalid_words = Vec::new();
-    let mut chunks = bytes.chunks_exact(4);
+    let mut trailing_byte_count = 0;
+    let mut byte_offset = 0usize;
+    let mut word_index = 0u32;
 
-    for (index, chunk) in chunks.by_ref().enumerate() {
-        let word = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-        match decode_instruction_word(word) {
-            Ok(instruction) => instructions.push(instruction),
+    while byte_offset < bytes.len() {
+        match decode_instruction_bytes(&bytes[byte_offset..]) {
+            Ok(instruction) => {
+                byte_offset += instruction.encoded_len();
+                instructions.push(instruction);
+            }
             Err(DecodeError::InvalidOpcode(raw_opcode)) => {
-                invalid_words.push(InvalidInstructionWord::new(
-                    u32::try_from(index).expect("decoded instruction index should fit u32"),
-                    raw_opcode,
-                ));
+                invalid_words.push(InvalidInstructionWord::new(word_index, raw_opcode));
+                byte_offset += 1;
+            }
+            Err(DecodeError::InvalidFeedbackSlot(_)) => {
+                invalid_words.push(InvalidInstructionWord::new(word_index, bytes[byte_offset]));
+                byte_offset += 1;
+            }
+            Err(DecodeError::TruncatedInstruction { .. }) => {
+                trailing_byte_count = bytes.len() - byte_offset;
+                break;
             }
         }
+        word_index = word_index
+            .checked_add(1)
+            .expect("decoded instruction index should fit u32");
     }
 
     DecodedInstructionStream {
         instructions,
         invalid_words,
-        trailing_byte_count: chunks.remainder().len(),
+        trailing_byte_count,
     }
 }
 
@@ -180,6 +266,20 @@ const fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::CreateClosure
         | Opcode::CloseForIn
         | Opcode::CloseIterator => InstructionForm::Abx,
+        Opcode::LoadSmi8 | Opcode::LoadConst8 | Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8 => {
+            InstructionForm::Abx8
+        }
+        Opcode::Jump8 => InstructionForm::Ax8,
+        Opcode::LoadLocal0
+        | Opcode::LoadLocal1
+        | Opcode::LoadLocal2
+        | Opcode::LoadLocal3
+        | Opcode::StoreLocal0
+        | Opcode::StoreLocal1
+        | Opcode::StoreLocal2
+        | Opcode::StoreLocal3 => InstructionForm::Local,
+        Opcode::ProfiledAbc => InstructionForm::ProfiledAbc,
+        Opcode::ProfiledAbx => InstructionForm::ProfiledAbx,
         Opcode::Move
         | Opcode::Add
         | Opcode::AddSmi
@@ -273,10 +373,13 @@ mod tests {
         let add = Instruction::abc(Opcode::Add, 1, 2, 3)
             .encode_word()
             .to_le_bytes();
-        let invalid = [0xff, 9, 8, 7];
         let decoded = decode_instruction_stream(&[
-            add[0], add[1], add[2], add[3], invalid[0], invalid[1], invalid[2], invalid[3], 0xaa,
-            0xbb,
+            add[0],
+            add[1],
+            add[2],
+            add[3],
+            0xff,
+            Opcode::LoadConst as u8,
         ]);
 
         assert_eq!(
@@ -287,7 +390,7 @@ mod tests {
             decoded.invalid_words(),
             &[InvalidInstructionWord::new(1, 0xff)]
         );
-        assert_eq!(decoded.trailing_byte_count(), 2);
+        assert_eq!(decoded.trailing_byte_count(), 1);
     }
 
     #[test]
@@ -322,7 +425,7 @@ mod tests {
 
         let _ = disassemble(&function);
         for instruction in function.instructions() {
-            let _ = disassemble_instruction(instruction, &function);
+            let _ = disassemble_instruction(&instruction, &function);
         }
     }
 
@@ -346,7 +449,13 @@ mod tests {
         ]);
 
         assert_eq!(
-            decode_instruction_word(function.instructions()[2].encode_word()),
+            decode_instruction_word(
+                function
+                    .instructions()
+                    .get(2)
+                    .expect("third instruction should decode")
+                    .encode_word()
+            ),
             Ok(Instruction::abc(Opcode::AddSmi, 2, 1, 13))
         );
 

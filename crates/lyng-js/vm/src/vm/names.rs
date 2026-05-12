@@ -14,7 +14,7 @@ use lyng_js_host::HostHooks;
 use lyng_js_host::NoopHostHooks;
 use lyng_js_objects::{NativeFunctionRegistry, ObjectKind};
 use lyng_js_ops::{errors, object, proxy, read};
-use lyng_js_types::PropertyKey;
+use lyng_js_types::{FeedbackSlotId, PropertyKey};
 
 impl Vm {
     fn layout_binding_slot(
@@ -526,7 +526,7 @@ impl Vm {
         frame: FrameRecord,
         name: AtomId,
         code: CodeRef,
-        instruction_offset: u32,
+        feedback_slot: Option<FeedbackSlotId>,
     ) -> VmResult<Value> {
         let global = Self::find_global_environment_ref(agent, frame.variable_env())?;
         if let Some(binding) = Self::lookup_global_lexical_binding_ref(agent, global, name) {
@@ -538,12 +538,9 @@ impl Vm {
         let global_object = agent
             .global_environment_object(global)
             .ok_or(VmError::MissingEnvironment(global))?;
-        if let Some(value) = self.try_named_property_load_inline_cache_hit(
-            agent,
-            code,
-            instruction_offset,
-            global_object,
-        ) {
+        if let Some(value) =
+            self.try_named_property_load_inline_cache_hit(agent, code, feedback_slot, global_object)
+        {
             return Ok(value);
         }
 
@@ -560,7 +557,7 @@ impl Vm {
         self.observe_named_property_slow_path(
             agent,
             code,
-            instruction_offset,
+            feedback_slot,
             global_object,
             name,
             lyng_js_objects::NamedPropertyCachePurpose::Load,
@@ -581,7 +578,7 @@ impl Vm {
         name: AtomId,
         value: Value,
         code: CodeRef,
-        instruction_offset: u32,
+        feedback_slot: Option<FeedbackSlotId>,
     ) -> VmResult<()> {
         let global = Self::find_global_environment(agent, frame.variable_env())?;
         if let Some(binding) = Self::lookup_global_lexical_binding(agent, &global, name) {
@@ -591,16 +588,10 @@ impl Vm {
         }
         let global_object = global.global_object();
         if self
-            .try_named_property_store_inline_cache(
-                agent,
-                code,
-                instruction_offset,
-                global_object,
-                value,
-            )
+            .try_named_property_store_inline_cache(agent, code, feedback_slot, global_object, value)
             .is_some()
         {
-            self.record_feedback_site(code, instruction_offset);
+            self.record_feedback_slot(code, feedback_slot);
             return Ok(());
         }
         let _ = self.set_global_property_with_context(
@@ -615,7 +606,7 @@ impl Vm {
         self.observe_named_property_slow_path(
             agent,
             code,
-            instruction_offset,
+            feedback_slot,
             global_object,
             name,
             lyng_js_objects::NamedPropertyCachePurpose::Store,
@@ -636,7 +627,7 @@ impl Vm {
         name: AtomId,
         value: Value,
         code: CodeRef,
-        instruction_offset: u32,
+        feedback_slot: Option<FeedbackSlotId>,
     ) -> VmResult<()> {
         let global = Self::find_global_environment(agent, frame.variable_env())?;
         if let Some(binding) = Self::lookup_global_lexical_binding(agent, &global, name) {
@@ -656,14 +647,14 @@ impl Vm {
         if let Some(stored) = self.try_named_property_store_inline_cache(
             agent,
             code,
-            instruction_offset,
+            feedback_slot,
             global_object,
             value,
         ) {
             if !stored && self.frame_is_strict(frame) {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             }
-            self.record_feedback_site(code, instruction_offset);
+            self.record_feedback_slot(code, feedback_slot);
             return Ok(());
         }
 
@@ -688,7 +679,7 @@ impl Vm {
         self.observe_named_property_slow_path(
             agent,
             code,
-            instruction_offset,
+            feedback_slot,
             global_object,
             name,
             lyng_js_objects::NamedPropertyCachePurpose::Store,

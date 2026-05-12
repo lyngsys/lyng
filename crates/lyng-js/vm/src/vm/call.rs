@@ -10,7 +10,7 @@ use lyng_js_objects::{
     ObjectRuntime,
 };
 use lyng_js_ops::{errors, object, proxy};
-use lyng_js_types::function_call_builtin;
+use lyng_js_types::{function_call_builtin, FeedbackSlotId};
 
 impl Vm {
     #[expect(
@@ -23,6 +23,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee: ObjectRef,
         this_value: Value,
@@ -33,6 +34,7 @@ impl Vm {
             host,
             registry,
             frame,
+            feedback_slot,
             result_register,
             callee,
             this_value,
@@ -62,6 +64,7 @@ impl Vm {
             host,
             registry,
             frame,
+            feedback_slot,
             result_register,
             callee,
             this_value,
@@ -104,6 +107,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_value: Value,
         this_value: Value,
@@ -124,12 +128,13 @@ impl Vm {
             host,
             registry,
             frame,
+            feedback_slot,
             result_register,
             callee,
             effective_this,
             collected_arguments,
         )?;
-        self.observe_call_target(agent, frame.code(), frame.instruction_offset(), callee);
+        self.observe_call_target(agent, frame.code(), feedback_slot, callee);
         Ok(())
     }
 
@@ -143,16 +148,15 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee: ObjectRef,
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<bool> {
-        let Some(entry) = self.cached_frame_safe_builtin_call_target(
-            frame.code(),
-            frame.instruction_offset(),
-            callee,
-        ) else {
+        let Some(entry) =
+            self.cached_frame_safe_builtin_call_target(frame.code(), feedback_slot, callee)
+        else {
             return Ok(false);
         };
         let Some(result) = self.call_frame_safe_builtin(
@@ -176,6 +180,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee: ObjectRef,
         this_value: Value,
@@ -202,6 +207,7 @@ impl Vm {
                 host,
                 registry,
                 frame,
+                feedback_slot,
                 result_register,
                 target,
                 effective_this,
@@ -216,6 +222,7 @@ impl Vm {
             host,
             registry,
             frame,
+            feedback_slot,
             result_register,
             target,
             effective_this,
@@ -299,6 +306,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_register: u16,
         this_register: u16,
@@ -324,6 +332,7 @@ impl Vm {
                 host,
                 registry,
                 frame,
+                feedback_slot,
                 result_register,
                 callee_value,
                 this_value,
@@ -344,6 +353,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_register: u16,
         call_base_register: u16,
@@ -363,6 +373,7 @@ impl Vm {
             host,
             registry,
             frame,
+            feedback_slot,
             result_register,
             callee_value,
             this_value,
@@ -382,6 +393,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        _feedback_slot: Option<FeedbackSlotId>,
         callee_register: u16,
         this_register: u16,
         arguments: CallRange,
@@ -439,6 +451,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: FrameRecord,
+        feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_register: u16,
         arguments: CallRange,
@@ -487,7 +500,7 @@ impl Vm {
                 self.observe_construct_target(
                     agent,
                     frame.code(),
-                    frame.instruction_offset(),
+                    feedback_slot,
                     callee,
                     Some(result),
                 );
@@ -516,7 +529,7 @@ impl Vm {
                 self.observe_construct_target(
                     agent,
                     frame.code(),
-                    frame.instruction_offset(),
+                    feedback_slot,
                     callee,
                     construct_this,
                 );
@@ -562,13 +575,7 @@ impl Vm {
                 )
                 .map_err(VmError::Abrupt)?
             };
-            self.observe_construct_target(
-                agent,
-                frame.code(),
-                frame.instruction_offset(),
-                callee,
-                Some(result),
-            );
+            self.observe_construct_target(agent, frame.code(), feedback_slot, callee, Some(result));
             self.write_register(frame, result_register, Value::from_object_ref(result));
             self.advance_instruction();
             Ok(())

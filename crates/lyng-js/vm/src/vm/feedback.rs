@@ -9,7 +9,7 @@ use lyng_js_objects::{
     PropertyCacheDependency,
 };
 use lyng_js_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
-use std::mem::size_of;
+use std::{cmp::Ordering, mem::size_of};
 
 const FEEDBACK_ALLOCATION_THRESHOLD: u16 = 2;
 const POLYMORPHIC_PROPERTY_CACHE_LIMIT: usize = 8;
@@ -786,17 +786,13 @@ impl NamedPropertyFeedback {
             .objects()
             .object_header(agent.heap().view(), receiver)?
             .shape();
-        for entry in self.active_entries() {
-            if entry.receiver_shape() != receiver_shape {
-                continue;
-            }
-            if let Ok(Some(value)) =
-                agent
-                    .objects()
-                    .load_from_named_property_cache(agent.heap().view(), receiver, entry)
-            {
-                return Some(value);
-            }
+        let entry = self.entries[self.find_entry_index(receiver_shape)?]?;
+        if let Ok(Some(value)) =
+            agent
+                .objects()
+                .load_from_named_property_cache(agent.heap().view(), receiver, entry)
+        {
+            return Some(value);
         }
         None
     }
@@ -811,17 +807,13 @@ impl NamedPropertyFeedback {
             .objects()
             .object_header(agent.heap().view(), receiver)?
             .shape();
-        for entry in self.active_entries() {
-            if entry.receiver_shape() != receiver_shape {
-                continue;
-            }
-            let result = agent.with_heap_and_objects(|heap, objects| {
-                let mut mutator = heap.mutator();
-                objects.store_to_named_property_cache(&mut mutator, receiver, entry, value)
-            });
-            if let Ok(Some(stored)) = result {
-                return Some(stored);
-            }
+        let entry = self.entries[self.find_entry_index(receiver_shape)?]?;
+        let result = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.store_to_named_property_cache(&mut mutator, receiver, entry, value)
+        });
+        if let Ok(Some(stored)) = result {
+            return Some(stored);
         }
         None
     }
@@ -836,21 +828,10 @@ impl NamedPropertyFeedback {
             InlineCacheState::Megamorphic => {}
             InlineCacheState::Uninitialized => self.install_first_entry(plan),
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
-                if let Some(index) = self.find_entry_index(plan.receiver_shape()) {
-                    self.entries[index] = Some(plan);
-                    return;
+                match self.search_entry_index(plan.receiver_shape()) {
+                    Ok(index) => self.entries[index] = Some(plan),
+                    Err(index) => self.insert_entry_at(index, plan),
                 }
-                if usize::from(self.entry_count) >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
-                    self.promote_to_megamorphic();
-                    return;
-                }
-                self.entries[usize::from(self.entry_count)] = Some(plan);
-                self.entry_count = self.entry_count.saturating_add(1);
-                self.cache_state = if self.entry_count <= 1 {
-                    InlineCacheState::Monomorphic
-                } else {
-                    InlineCacheState::Polymorphic
-                };
             }
         }
     }
@@ -879,9 +860,36 @@ impl NamedPropertyFeedback {
 
     #[inline]
     fn find_entry_index(&self, receiver_shape: ShapeId) -> Option<usize> {
-        self.active_entries()
-            .enumerate()
-            .find_map(|(index, entry)| (entry.receiver_shape() == receiver_shape).then_some(index))
+        self.search_entry_index(receiver_shape).ok()
+    }
+
+    #[inline]
+    fn search_entry_index(&self, receiver_shape: ShapeId) -> Result<usize, usize> {
+        self.entries[..usize::from(self.entry_count)].binary_search_by(|entry| {
+            let Some(entry) = *entry else {
+                return Ordering::Greater;
+            };
+            entry.receiver_shape().cmp(&receiver_shape)
+        })
+    }
+
+    #[inline]
+    fn insert_entry_at(&mut self, index: usize, entry: NamedPropertyCacheEntry) {
+        let count = usize::from(self.entry_count);
+        if count >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
+            self.promote_to_megamorphic();
+            return;
+        }
+        if index < count {
+            self.entries.copy_within(index..count, index + 1);
+        }
+        self.entries[index] = Some(entry);
+        self.entry_count = self.entry_count.saturating_add(1);
+        self.cache_state = if self.entry_count <= 1 {
+            InlineCacheState::Monomorphic
+        } else {
+            InlineCacheState::Polymorphic
+        };
     }
 }
 
@@ -912,17 +920,13 @@ impl KeyedPropertyFeedback {
             .objects()
             .object_header(agent.heap().view(), receiver)?
             .shape();
-        for entry in self.active_named_entries() {
-            if entry.atom != atom || entry.entry.receiver_shape() != receiver_shape {
-                continue;
-            }
-            if let Ok(Some(value)) = agent.objects().load_from_named_property_cache(
-                agent.heap().view(),
-                receiver,
-                entry.entry,
-            ) {
-                return Some(value);
-            }
+        let entry = self.named_entries[self.find_named_entry_index(atom, receiver_shape)?]?;
+        if let Ok(Some(value)) = agent.objects().load_from_named_property_cache(
+            agent.heap().view(),
+            receiver,
+            entry.entry,
+        ) {
+            return Some(value);
         }
         None
     }
@@ -946,17 +950,13 @@ impl KeyedPropertyFeedback {
             .objects()
             .object_header(agent.heap().view(), receiver)?
             .shape();
-        for entry in self.active_named_entries() {
-            if entry.atom != atom || entry.entry.receiver_shape() != receiver_shape {
-                continue;
-            }
-            let result = agent.with_heap_and_objects(|heap, objects| {
-                let mut mutator = heap.mutator();
-                objects.store_to_named_property_cache(&mut mutator, receiver, entry.entry, value)
-            });
-            if let Ok(Some(stored)) = result {
-                return Some(stored);
-            }
+        let entry = self.named_entries[self.find_named_entry_index(atom, receiver_shape)?]?;
+        let result = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.store_to_named_property_cache(&mut mutator, receiver, entry.entry, value)
+        });
+        if let Ok(Some(stored)) = result {
+            return Some(stored);
         }
         None
     }
@@ -1029,23 +1029,11 @@ impl KeyedPropertyFeedback {
                     self.cache_state = InlineCacheState::Monomorphic;
                 }
                 InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
-                    if let Some(index) = self.find_named_entry_index(atom, plan.receiver_shape()) {
-                        self.named_entries[index] =
-                            Some(KeyedNamedPropertyCacheEntry { atom, entry: plan });
-                        return;
+                    let entry = KeyedNamedPropertyCacheEntry { atom, entry: plan };
+                    match self.search_named_entry_index(atom, plan.receiver_shape()) {
+                        Ok(index) => self.named_entries[index] = Some(entry),
+                        Err(index) => self.insert_named_entry_at(index, entry),
                     }
-                    if usize::from(self.named_entry_count) >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
-                        self.promote_to_megamorphic(Some(KeyedPropertyFamily::NamedAtom));
-                        return;
-                    }
-                    self.named_entries[usize::from(self.named_entry_count)] =
-                        Some(KeyedNamedPropertyCacheEntry { atom, entry: plan });
-                    self.named_entry_count = self.named_entry_count.saturating_add(1);
-                    self.cache_state = if self.named_entry_count <= 1 {
-                        InlineCacheState::Monomorphic
-                    } else {
-                        InlineCacheState::Polymorphic
-                    };
                 }
             },
             Some(KeyedPropertyFamily::DenseIndex | KeyedPropertyFamily::Generic) => {
@@ -1222,12 +1210,40 @@ impl KeyedPropertyFeedback {
 
     #[inline]
     fn find_named_entry_index(&self, atom: AtomId, receiver_shape: ShapeId) -> Option<usize> {
-        self.active_named_entries()
-            .enumerate()
-            .find_map(|(index, entry)| {
-                (entry.atom == atom && entry.entry.receiver_shape() == receiver_shape)
-                    .then_some(index)
-            })
+        self.search_named_entry_index(atom, receiver_shape).ok()
+    }
+
+    #[inline]
+    fn search_named_entry_index(
+        &self,
+        atom: AtomId,
+        receiver_shape: ShapeId,
+    ) -> Result<usize, usize> {
+        self.named_entries[..usize::from(self.named_entry_count)].binary_search_by(|entry| {
+            let Some(entry) = *entry else {
+                return Ordering::Greater;
+            };
+            (entry.atom, entry.entry.receiver_shape()).cmp(&(atom, receiver_shape))
+        })
+    }
+
+    #[inline]
+    fn insert_named_entry_at(&mut self, index: usize, entry: KeyedNamedPropertyCacheEntry) {
+        let count = usize::from(self.named_entry_count);
+        if count >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
+            self.promote_to_megamorphic(Some(KeyedPropertyFamily::NamedAtom));
+            return;
+        }
+        if index < count {
+            self.named_entries.copy_within(index..count, index + 1);
+        }
+        self.named_entries[index] = Some(entry);
+        self.named_entry_count = self.named_entry_count.saturating_add(1);
+        self.cache_state = if self.named_entry_count <= 1 {
+            InlineCacheState::Monomorphic
+        } else {
+            InlineCacheState::Polymorphic
+        };
     }
 
     #[inline]
@@ -1646,59 +1662,45 @@ impl Vm {
     }
 
     #[inline]
-    fn feedback_descriptor_for_site(
+    fn feedback_site_for_slot(
         &self,
         code: CodeRef,
-        instruction_offset: u32,
-    ) -> Option<FeedbackSiteDescriptor> {
-        self.installed
-            .get(code_index(code))
-            .and_then(Option::as_ref)?
-            .feedback_descriptor(instruction_offset)
-    }
-
-    #[inline]
-    fn feedback_site_for_site(
-        &self,
-        code: CodeRef,
-        instruction_offset: u32,
+        slot: FeedbackSlotId,
     ) -> Option<&FeedbackSiteState> {
-        let descriptor = self.feedback_descriptor_for_site(code, instruction_offset)?;
         self.feedback_vectors
             .get(code_index(code))
             .and_then(Option::as_ref)?
-            .site(descriptor.slot())
+            .site(slot)
     }
 
-    fn with_feedback_site_mut<R>(
+    fn with_feedback_slot_mut<R>(
         &mut self,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: FeedbackSlotId,
         f: impl FnOnce(&mut FeedbackSiteState) -> R,
     ) -> Option<R> {
-        let descriptor = self.feedback_descriptor_for_site(code, instruction_offset)?;
         self.feedback_vectors
             .get_mut(code_index(code))
             .and_then(Option::as_mut)?
-            .site_mut(descriptor.slot())
+            .site_mut(slot)
             .map(f)
     }
 
-    fn ensure_feedback_site_execution(
-        &mut self,
-        code: CodeRef,
-        instruction_offset: u32,
-    ) -> Option<FeedbackSiteDescriptor> {
+    fn ensure_feedback_slot_execution(&mut self, code: CodeRef, slot: FeedbackSlotId) -> bool {
         self.ensure_feedback_capacity(code);
         let index = code_index(code);
         let needs_allocation = self.feedback_vectors[index].is_none()
             && self.feedback_warmup[index].saturating_add(1) >= FEEDBACK_ALLOCATION_THRESHOLD;
-        let (descriptor, slot_descriptors) = {
-            let installed = self.installed.get(index).and_then(Option::as_ref)?;
-            let descriptor = installed.feedback_descriptor(instruction_offset)?;
-            let slot_descriptors =
-                needs_allocation.then(|| installed.feedback_slot_descriptors().to_vec());
-            (descriptor, slot_descriptors)
+        let Some(installed) = self.installed.get(index).and_then(Option::as_ref) else {
+            return false;
+        };
+        if installed.feedback_descriptor_for_slot(slot).is_none() {
+            return false;
+        }
+        let slot_descriptors = if needs_allocation {
+            Some(installed.feedback_slot_descriptors().to_vec())
+        } else {
+            None
         };
 
         if self.feedback_vectors[index].is_none() {
@@ -1710,16 +1712,15 @@ impl Vm {
         }
 
         if let Some(vector) = self.feedback_vectors[index].as_mut()
-            && let Some(site) = vector.site_mut(descriptor.slot())
+            && let Some(site) = vector.site_mut(slot)
         {
             site.record_execution();
         }
         self.observe_tier_feedback_event(code);
-
-        Some(descriptor)
+        true
     }
 
-    fn record_allocated_feedback_site(&mut self, code: CodeRef, instruction_offset: u32) -> bool {
+    fn record_allocated_feedback_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) -> bool {
         let index = code_index(code);
         if self
             .feedback_vectors
@@ -1729,14 +1730,11 @@ impl Vm {
         {
             return false;
         }
-        let Some(descriptor) = self.feedback_descriptor_for_site(code, instruction_offset) else {
-            return false;
-        };
         let Some(site) = self
             .feedback_vectors
             .get_mut(index)
             .and_then(Option::as_mut)
-            .and_then(|vector| vector.site_mut(descriptor.slot()))
+            .and_then(|vector| vector.site_mut(slot))
         else {
             return false;
         };
@@ -1745,11 +1743,14 @@ impl Vm {
         true
     }
 
-    pub(super) fn record_feedback_site(&mut self, code: CodeRef, instruction_offset: u32) {
-        if self.record_allocated_feedback_site(code, instruction_offset) {
+    pub(super) fn record_feedback_slot(&mut self, code: CodeRef, slot: Option<FeedbackSlotId>) {
+        let Some(slot) = slot else {
+            return;
+        };
+        if self.record_allocated_feedback_slot(code, slot) {
             return;
         }
-        let _ = self.ensure_feedback_site_execution(code, instruction_offset);
+        let _ = self.ensure_feedback_slot_execution(code, slot);
     }
 
     #[inline]
@@ -1757,29 +1758,28 @@ impl Vm {
         &mut self,
         agent: &Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         callee: ObjectRef,
     ) {
+        let Some(slot) = slot else {
+            return;
+        };
         let index = code_index(code);
-        if let Some(descriptor) = self.feedback_descriptor_for_site(code, instruction_offset)
-            && let Some(site) = self
-                .feedback_vectors
-                .get_mut(index)
-                .and_then(Option::as_mut)
-                .and_then(|vector| vector.site_mut(descriptor.slot()))
+        if let Some(site) = self
+            .feedback_vectors
+            .get_mut(index)
+            .and_then(Option::as_mut)
+            .and_then(|vector| vector.site_mut(slot))
         {
             site.record_call_target(agent, callee);
             self.observe_tier_feedback_event(code);
             return;
         }
 
-        if self
-            .ensure_feedback_site_execution(code, instruction_offset)
-            .is_none()
-        {
+        if !self.ensure_feedback_slot_execution(code, slot) {
             return;
         }
-        let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
+        let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::Call(feedback) = site {
                 feedback.observe_target(agent, callee);
             }
@@ -1790,10 +1790,10 @@ impl Vm {
     pub(super) fn cached_frame_safe_builtin_call_target(
         &self,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         callee: ObjectRef,
     ) -> Option<BuiltinFunctionId> {
-        match self.feedback_site_for_site(code, instruction_offset)? {
+        match self.feedback_site_for_slot(code, slot?)? {
             FeedbackSiteState::Call(feedback) => feedback.frame_safe_builtin_target(callee),
             _ => None,
         }
@@ -1804,30 +1804,29 @@ impl Vm {
         &mut self,
         agent: &Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         constructor: ObjectRef,
         created: Option<ObjectRef>,
     ) {
+        let Some(slot) = slot else {
+            return;
+        };
         let index = code_index(code);
-        if let Some(descriptor) = self.feedback_descriptor_for_site(code, instruction_offset)
-            && let Some(site) = self
-                .feedback_vectors
-                .get_mut(index)
-                .and_then(Option::as_mut)
-                .and_then(|vector| vector.site_mut(descriptor.slot()))
+        if let Some(site) = self
+            .feedback_vectors
+            .get_mut(index)
+            .and_then(Option::as_mut)
+            .and_then(|vector| vector.site_mut(slot))
         {
             site.record_construct_target(agent, constructor, created);
             self.observe_tier_feedback_event(code);
             return;
         }
 
-        if self
-            .ensure_feedback_site_execution(code, instruction_offset)
-            .is_none()
-        {
+        if !self.ensure_feedback_slot_execution(code, slot) {
             return;
         }
-        let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
+        let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::Construct(feedback) = site {
                 feedback.observe_target(agent, constructor, created);
             }
@@ -1838,15 +1837,15 @@ impl Vm {
         &mut self,
         agent: &Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
     ) -> Option<Value> {
-        let descriptor = self.feedback_descriptor_for_site(code, instruction_offset)?;
+        let slot = slot?;
         let site = self
             .feedback_vectors
             .get_mut(code_index(code))
             .and_then(Option::as_mut)?
-            .site_mut(descriptor.slot())?;
+            .site_mut(slot)?;
         let value = match site {
             FeedbackSiteState::NamedProperty(feedback) => feedback.try_load(agent, receiver),
             _ => None,
@@ -1860,11 +1859,11 @@ impl Vm {
         &self,
         agent: &mut Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
         value: Value,
     ) -> Option<bool> {
-        match self.feedback_site_for_site(code, instruction_offset) {
+        match self.feedback_site_for_slot(code, slot?) {
             Some(FeedbackSiteState::NamedProperty(feedback)) => {
                 feedback.try_store(agent, receiver, value)
             }
@@ -1876,12 +1875,15 @@ impl Vm {
         &mut self,
         agent: &Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
         atom: AtomId,
         purpose: NamedPropertyCachePurpose,
     ) {
-        let _ = self.ensure_feedback_site_execution(code, instruction_offset);
+        let Some(slot) = slot else {
+            return;
+        };
+        let _ = self.ensure_feedback_slot_execution(code, slot);
         let plan = agent
             .objects()
             .plan_named_property_cache_entry(
@@ -1892,7 +1894,7 @@ impl Vm {
             )
             .ok()
             .flatten();
-        let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
+        let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::NamedProperty(feedback) = site {
                 feedback.observe_slow_path(plan);
             }
@@ -1903,11 +1905,11 @@ impl Vm {
         &self,
         agent: &Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
         atom: AtomId,
     ) -> Option<Value> {
-        match self.feedback_site_for_site(code, instruction_offset) {
+        match self.feedback_site_for_slot(code, slot?) {
             Some(FeedbackSiteState::KeyedProperty(feedback)) => {
                 feedback.try_load(agent, receiver, atom)
             }
@@ -1919,12 +1921,12 @@ impl Vm {
         &self,
         agent: &mut Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
         atom: AtomId,
         value: Value,
     ) -> Option<bool> {
-        match self.feedback_site_for_site(code, instruction_offset) {
+        match self.feedback_site_for_slot(code, slot?) {
             Some(FeedbackSiteState::KeyedProperty(feedback)) => {
                 feedback.try_store(agent, receiver, atom, value)
             }
@@ -1936,16 +1938,16 @@ impl Vm {
         &mut self,
         agent: &Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
         index: u32,
     ) -> Option<Value> {
-        let descriptor = self.feedback_descriptor_for_site(code, instruction_offset)?;
+        let slot = slot?;
         let site = self
             .feedback_vectors
             .get_mut(code_index(code))
             .and_then(Option::as_mut)?
-            .site_mut(descriptor.slot())?;
+            .site_mut(slot)?;
         let value = match site {
             FeedbackSiteState::KeyedProperty(feedback) => {
                 feedback.try_dense_index_load(agent, receiver, index)
@@ -1961,17 +1963,17 @@ impl Vm {
         &mut self,
         agent: &mut Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
         index: u32,
         value: Value,
     ) -> Option<bool> {
-        let descriptor = self.feedback_descriptor_for_site(code, instruction_offset)?;
+        let slot = slot?;
         let site = self
             .feedback_vectors
             .get_mut(code_index(code))
             .and_then(Option::as_mut)?
-            .site_mut(descriptor.slot())?;
+            .site_mut(slot)?;
         let stored = match site {
             FeedbackSiteState::KeyedProperty(feedback) => {
                 feedback.try_dense_index_store(agent, receiver, index, value)
@@ -1987,12 +1989,15 @@ impl Vm {
         &mut self,
         agent: &Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
         atom: AtomId,
         purpose: NamedPropertyCachePurpose,
     ) {
-        let _ = self.ensure_feedback_site_execution(code, instruction_offset);
+        let Some(slot) = slot else {
+            return;
+        };
+        let _ = self.ensure_feedback_slot_execution(code, slot);
         let plan = agent
             .objects()
             .plan_named_property_cache_entry(
@@ -2003,7 +2008,7 @@ impl Vm {
             )
             .ok()
             .flatten();
-        let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
+        let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::KeyedProperty(feedback) = site {
                 feedback.observe_named_atom_slow_path(atom, plan);
             }
@@ -2013,11 +2018,11 @@ impl Vm {
     fn observe_keyed_index_slow_path(
         &mut self,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: FeedbackSlotId,
         plan: Option<DenseIndexCacheEntry>,
     ) {
-        let _ = self.ensure_feedback_site_execution(code, instruction_offset);
-        let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
+        let _ = self.ensure_feedback_slot_execution(code, slot);
+        let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::KeyedProperty(feedback) = site {
                 let _ = feedback.observe_dense_index(plan);
             }
@@ -2028,21 +2033,27 @@ impl Vm {
         &mut self,
         agent: &Agent,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
         index: u32,
     ) {
+        let Some(slot) = slot else {
+            return;
+        };
         let plan = KeyedPropertyFeedback::dense_index_plan(agent, receiver, index);
-        self.observe_keyed_index_slow_path(code, instruction_offset, plan);
+        self.observe_keyed_index_slow_path(code, slot, plan);
     }
 
     pub(super) fn observe_keyed_generic_slow_path(
         &mut self,
         code: CodeRef,
-        instruction_offset: u32,
+        slot: Option<FeedbackSlotId>,
     ) {
-        let _ = self.ensure_feedback_site_execution(code, instruction_offset);
-        let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
+        let Some(slot) = slot else {
+            return;
+        };
+        let _ = self.ensure_feedback_slot_execution(code, slot);
+        let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::KeyedProperty(feedback) = site {
                 feedback.observe_generic();
             }

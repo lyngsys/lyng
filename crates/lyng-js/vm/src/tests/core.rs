@@ -295,7 +295,7 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_cover_dispatch_modes() {
         assert_eq!(counts.total(), 4);
         assert_eq!(counts.count(Opcode::LoadOne), 1);
         assert_eq!(counts.count(Opcode::AddSmi), 1);
-        assert_eq!(counts.count(Opcode::Move), 1);
+        assert_eq!(counts.count(Opcode::StoreLocal2), 1);
         assert_eq!(counts.count(Opcode::Return), 1);
         assert_eq!(counts.top(2)[0].opcode(), Opcode::AddSmi);
 

@@ -15,10 +15,10 @@ pub(super) struct InstalledFunction {
     pub(super) function: BytecodeFunction,
     pub(super) child_codes: Vec<CodeRef>,
     canonical_atoms: Arc<[Option<AtomId>]>,
+    instructions: Vec<Instruction>,
     pub(super) wide_payloads: Vec<Option<u32>>,
     direct_eval_lexical_sites_by_offset: Vec<Option<lyng_js_bytecode::DirectEvalLexicalSite>>,
     loop_iteration_sites_by_offset: Vec<Option<lyng_js_bytecode::LoopIterationEnvironmentSite>>,
-    feedback_sites_by_offset: Vec<Option<lyng_js_bytecode::FeedbackSiteDescriptor>>,
     feedback_sites_by_slot: Vec<Option<lyng_js_bytecode::FeedbackSiteDescriptor>>,
 }
 
@@ -33,7 +33,8 @@ impl InstalledFunction {
         child_codes: Vec<CodeRef>,
         canonical_atoms: Arc<[Option<AtomId>]>,
     ) -> Self {
-        let mut wide_payloads = vec![None; function.instructions().len()];
+        let instructions = function.instructions().iter().collect::<Vec<_>>();
+        let mut wide_payloads = vec![None; instructions.len()];
         for operand in function.wide_operands() {
             if let Some(slot) = wide_payloads.get_mut(
                 usize::try_from(operand.instruction_offset())
@@ -146,16 +147,9 @@ impl InstalledFunction {
                 *slot = Some(site.clone());
             }
         }
-        let mut feedback_sites_by_offset = vec![None; function.instructions().len()];
         let mut feedback_sites_by_slot =
             vec![None; usize::try_from(function.feedback_slot_count()).unwrap_or(usize::MAX)];
         for descriptor in function.feedback_sites() {
-            if let Some(slot) = feedback_sites_by_offset.get_mut(
-                usize::try_from(descriptor.instruction_offset())
-                    .expect("instruction offset should fit usize"),
-            ) {
-                *slot = Some(*descriptor);
-            }
             if let Some(slot) = feedback_sites_by_slot.get_mut(
                 usize::try_from(descriptor.slot().get().saturating_sub(1))
                     .expect("feedback slot should fit usize"),
@@ -167,10 +161,10 @@ impl InstalledFunction {
             function,
             child_codes,
             canonical_atoms,
+            instructions,
             wide_payloads,
             direct_eval_lexical_sites_by_offset,
             loop_iteration_sites_by_offset,
-            feedback_sites_by_offset,
             feedback_sites_by_slot,
         }
     }
@@ -184,12 +178,18 @@ impl InstalledFunction {
     }
 
     #[inline]
-    pub(super) fn feedback_descriptor(
-        &self,
-        instruction_offset: u32,
-    ) -> Option<lyng_js_bytecode::FeedbackSiteDescriptor> {
-        self.feedback_sites_by_offset
+    pub(super) fn instruction_at(&self, instruction_offset: u32) -> Option<Instruction> {
+        self.instructions
             .get(usize::try_from(instruction_offset).ok()?)
+            .copied()
+    }
+
+    pub(super) fn feedback_descriptor_for_slot(
+        &self,
+        slot: lyng_js_types::FeedbackSlotId,
+    ) -> Option<lyng_js_bytecode::FeedbackSiteDescriptor> {
+        self.feedback_sites_by_slot
+            .get(usize::try_from(slot.get().saturating_sub(1)).ok()?)
             .copied()
             .flatten()
     }
@@ -285,7 +285,7 @@ fn validate_register_operands(code: CodeRef, function: &BytecodeFunction) -> VmR
             code,
             register: u16::MAX,
         })?;
-    for (offset, instruction) in function.instructions().iter().copied().enumerate() {
+    for (offset, instruction) in function.instructions().iter().enumerate() {
         validate_instruction_registers(
             code,
             function,
@@ -308,6 +308,7 @@ fn validate_instruction_registers(
     instruction_offset: u32,
     instruction: Instruction,
 ) -> VmResult<()> {
+    let instruction = instruction.without_feedback_slot();
     match instruction {
         Instruction::Abc { opcode, a, b, c } => {
             let (a, b, c) =
@@ -398,7 +399,9 @@ fn validate_instruction_registers(
                 | Opcode::LoadZero
                 | Opcode::LoadOne
                 | Opcode::LoadSmi
+                | Opcode::LoadSmi8
                 | Opcode::LoadConst
+                | Opcode::LoadConst8
                 | Opcode::LoadEnvSlot
                 | Opcode::StoreEnvSlot
                 | Opcode::AssignEnvSlot
@@ -418,6 +421,8 @@ fn validate_instruction_registers(
                 | Opcode::LoadNewTarget
                 | Opcode::JumpIfTrue
                 | Opcode::JumpIfFalse
+                | Opcode::JumpIfTrue8
+                | Opcode::JumpIfFalse8
                 | Opcode::CreateObject
                 | Opcode::CreateArray
                 | Opcode::CheckObjectCoercible
@@ -425,6 +430,32 @@ fn validate_instruction_registers(
                 | Opcode::CreateClosure
                 | Opcode::CloseForIn
                 | Opcode::CloseIterator => validate_registers(code, register_len, [a]),
+                Opcode::LoadLocal0
+                | Opcode::LoadLocal1
+                | Opcode::LoadLocal2
+                | Opcode::LoadLocal3 => validate_registers(
+                    code,
+                    register_len,
+                    [
+                        a,
+                        opcode
+                            .local_load_index()
+                            .expect("load-local opcode should have an index"),
+                    ],
+                ),
+                Opcode::StoreLocal0
+                | Opcode::StoreLocal1
+                | Opcode::StoreLocal2
+                | Opcode::StoreLocal3 => validate_registers(
+                    code,
+                    register_len,
+                    [
+                        opcode
+                            .local_store_index()
+                            .expect("store-local opcode should have an index"),
+                        a,
+                    ],
+                ),
                 Opcode::LoadCapturedName
                 | Opcode::LoadCapturedNameThis
                 | Opcode::AssignCapturedName => {
@@ -449,6 +480,9 @@ fn validate_instruction_registers(
             }
             _ => Ok(()),
         },
+        Instruction::ProfiledAbc { .. } | Instruction::ProfiledAbx { .. } => {
+            unreachable!("profiled instructions are stripped before register validation")
+        }
     }
 }
 

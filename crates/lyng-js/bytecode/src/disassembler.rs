@@ -247,7 +247,7 @@ fn format_abx_instruction(
     function: &BytecodeFunction,
 ) -> String {
     match bytecode_opcode {
-        crate::Opcode::LoadConst => {
+        crate::Opcode::LoadConst | crate::Opcode::LoadConst8 => {
             let constant = function
                 .constants()
                 .get(usize::try_from(operands.bx()).unwrap_or(usize::MAX))
@@ -261,6 +261,28 @@ fn format_abx_instruction(
         crate::Opcode::LoadSmi => {
             let value = decode_smi_operand(operands.bx());
             format!("{opcode}r{}, {value}", operands.a())
+        }
+        crate::Opcode::LoadSmi8 => {
+            let value = i8::from_le_bytes([operands.bx().to_le_bytes()[0]]);
+            format!("{opcode}r{}, {value}", operands.a())
+        }
+        crate::Opcode::LoadLocal0
+        | crate::Opcode::LoadLocal1
+        | crate::Opcode::LoadLocal2
+        | crate::Opcode::LoadLocal3 => {
+            let local = bytecode_opcode
+                .local_load_index()
+                .expect("load-local opcode should have an index");
+            format!("{opcode}r{}, r{local}", operands.a())
+        }
+        crate::Opcode::StoreLocal0
+        | crate::Opcode::StoreLocal1
+        | crate::Opcode::StoreLocal2
+        | crate::Opcode::StoreLocal3 => {
+            let local = bytecode_opcode
+                .local_store_index()
+                .expect("store-local opcode should have an index");
+            format!("{opcode}r{local}, r{}", operands.a())
         }
         crate::Opcode::LoadZero | crate::Opcode::LoadOne => format!("{opcode}r{}", operands.a()),
         crate::Opcode::CreateClosure => {
@@ -303,6 +325,10 @@ fn format_abx_instruction(
             let delta = i32::from_le_bytes(operands.bx().to_le_bytes());
             format!("{opcode}r{}, {delta:+}", operands.a())
         }
+        crate::Opcode::JumpIfTrue8 | crate::Opcode::JumpIfFalse8 => {
+            let delta = i8::from_le_bytes([operands.bx().to_le_bytes()[0]]);
+            format!("{opcode}r{}, {delta:+}", operands.a())
+        }
         _ => format!("{opcode}r{}, {}", operands.a(), operands.bx()),
     }
 }
@@ -331,7 +357,7 @@ pub fn disassemble(function: &BytecodeFunction) -> String {
         let _ = writeln!(
             output,
             "{index:04}: {}",
-            disassemble_instruction_at(index, *instruction, function)
+            disassemble_instruction_at(index, instruction, function)
         );
     }
 
@@ -407,9 +433,11 @@ fn disassemble_instruction_at(
     instruction: Instruction,
     function: &BytecodeFunction,
 ) -> String {
+    let feedback_slot = instruction.feedback_slot();
+    let instruction = instruction.without_feedback_slot();
     let opcode = instruction.opcode().name();
     let opcode = format!("{opcode:<16}");
-    match instruction {
+    let mut text = match instruction {
         Instruction::Abc { opcode: _, a, b, c } => match instruction.opcode() {
             crate::Opcode::Call0
             | crate::Opcode::Call1
@@ -440,7 +468,7 @@ fn disassemble_instruction_at(
             format_abx_instruction(&opcode, instruction.opcode(), operands, function)
         }
         Instruction::Ax { opcode, ax } => match opcode {
-            crate::Opcode::Jump | crate::Opcode::JumpIfTrue | crate::Opcode::JumpIfFalse => {
+            crate::Opcode::Jump | crate::Opcode::Jump8 => {
                 format!("{opcode_name:<16}{ax:+}", opcode_name = opcode.name())
             }
             crate::Opcode::Return
@@ -454,5 +482,10 @@ fn disassemble_instruction_at(
             crate::Opcode::ReturnUndefined => opcode.name().to_owned(),
             _ => format!("{opcode_name:<16}{ax}", opcode_name = opcode.name()),
         },
+        Instruction::ProfiledAbc { .. } | Instruction::ProfiledAbx { .. } => unreachable!(),
+    };
+    if let Some(slot) = feedback_slot {
+        let _ = write!(text, " ; feedback s{}", slot.get());
     }
+    text
 }

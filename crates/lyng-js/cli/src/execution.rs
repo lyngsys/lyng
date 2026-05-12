@@ -162,7 +162,9 @@ fn execute_module(invocation: &CliInvocation, host: &CliHost) -> Result<ScriptOu
             return Err(CliError::lowering("SyntaxError: module lowering failed"));
         }
         Err(ModuleLoadError::Vm(error)) => {
-            return Err(CliError::vm(format!("SyntaxError: module loading failed: {error:?}")));
+            return Err(CliError::vm(format!(
+                "SyntaxError: module loading failed: {error:?}"
+            )));
         }
         Err(ModuleLoadError::Parse | ModuleLoadError::Sema) => {
             return Ok(ScriptOutcome {
@@ -275,12 +277,7 @@ fn write_diagnostic(
         Severity::Error => "SyntaxError",
         Severity::Warning => "warning",
     };
-    writeln!(
-        stderr,
-        "{label}: {} ({location})",
-        diagnostic.message
-    )
-    .map_err(CliError::io)
+    writeln!(stderr, "{label}: {} ({location})", diagnostic.message).map_err(CliError::io)
 }
 
 fn describe_uncaught_exception(agent: &mut Agent, thrown: Value) -> String {

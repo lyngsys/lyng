@@ -287,16 +287,22 @@ fn collect_density_metrics(unit: &CompiledScriptUnit) -> DensityMetrics {
     let entry = unit
         .function(unit.entry())
         .expect("compiled unit should contain its entry function");
-    let entry_words = entry.instructions().len() + entry.wide_operands().len();
+    let entry_words = entry.instruction_count() + entry.wide_operands().len();
+    let entry_bytes = entry.instruction_bytes().len() + entry.wide_operands().len() * 4;
     let unit_words = unit
         .functions()
         .iter()
-        .map(|function| function.instructions().len() + function.wide_operands().len())
+        .map(|function| function.instruction_count() + function.wide_operands().len())
+        .sum::<usize>();
+    let unit_bytes = unit
+        .functions()
+        .iter()
+        .map(|function| function.instruction_bytes().len() + function.wide_operands().len() * 4)
         .sum::<usize>();
     let base_words = unit
         .functions()
         .iter()
-        .map(|function| function.instructions().len())
+        .map(lyng_js_bytecode::BytecodeFunction::instruction_count)
         .sum::<usize>();
     let wide_words = unit
         .functions()
@@ -332,9 +338,9 @@ fn collect_density_metrics(unit: &CompiledScriptUnit) -> DensityMetrics {
     DensityMetrics {
         functions: unit.functions().len(),
         entry_words,
-        entry_bytes: entry_words * 4,
+        entry_bytes,
         unit_words,
-        unit_bytes: unit_words * 4,
+        unit_bytes,
         base_words,
         wide_words,
         wide_share_percent: percent_of(wide_words, encoded_words),
@@ -944,6 +950,9 @@ fn wide_register_workload(loop_trip_count: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lyng_js_bytecode::{
+        ArgumentsMode, BytecodeFunction, BytecodeFunctionId, Instruction, Opcode,
+    };
 
     #[test]
     fn generated_workloads_compile() {
@@ -966,6 +975,24 @@ mod tests {
         assert!(density.wide_words > 0);
         assert!(density.unit_bytes >= density.entry_bytes);
         assert!(density.max_registers > 255);
+    }
+
+    #[test]
+    fn density_metrics_use_encoded_instruction_bytes() {
+        let id = BytecodeFunctionId::from_raw(1).expect("test bytecode id should be non-zero");
+        let function =
+            BytecodeFunction::new(id, None, ArgumentsMode::None).with_instructions(vec![
+                Instruction::abx(Opcode::LoadSmi8, 0, 0x7f),
+                Instruction::ax(Opcode::Jump8, -1),
+            ]);
+        let unit = CompiledScriptUnit::new(SourceId::new(1), id, vec![function]);
+
+        let density = collect_density_metrics(&unit);
+
+        assert_eq!(density.entry_words, 2);
+        assert_eq!(density.base_words, 2);
+        assert_eq!(density.entry_bytes, 5);
+        assert_eq!(density.unit_bytes, 5);
     }
 
     #[test]

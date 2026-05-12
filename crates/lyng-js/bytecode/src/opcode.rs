@@ -122,9 +122,24 @@ pub enum Opcode {
     EnterHandler,
     LeaveHandler,
     LoadException,
+    LoadSmi8,
+    LoadConst8,
+    Jump8,
+    JumpIfTrue8,
+    JumpIfFalse8,
+    LoadLocal0,
+    LoadLocal1,
+    LoadLocal2,
+    LoadLocal3,
+    StoreLocal0,
+    StoreLocal1,
+    StoreLocal2,
+    StoreLocal3,
+    ProfiledAbc,
+    ProfiledAbx,
 }
 
-pub const OPCODE_COUNT: u8 = Opcode::LoadException as u8 + 1;
+pub const OPCODE_COUNT: u8 = Opcode::ProfiledAbx as u8 + 1;
 
 const OPCODES: [Opcode; OPCODE_COUNT as usize] = [
     Opcode::Nop,
@@ -247,6 +262,21 @@ const OPCODES: [Opcode; OPCODE_COUNT as usize] = [
     Opcode::EnterHandler,
     Opcode::LeaveHandler,
     Opcode::LoadException,
+    Opcode::LoadSmi8,
+    Opcode::LoadConst8,
+    Opcode::Jump8,
+    Opcode::JumpIfTrue8,
+    Opcode::JumpIfFalse8,
+    Opcode::LoadLocal0,
+    Opcode::LoadLocal1,
+    Opcode::LoadLocal2,
+    Opcode::LoadLocal3,
+    Opcode::StoreLocal0,
+    Opcode::StoreLocal1,
+    Opcode::StoreLocal2,
+    Opcode::StoreLocal3,
+    Opcode::ProfiledAbc,
+    Opcode::ProfiledAbx,
 ];
 
 impl Opcode {
@@ -382,12 +412,35 @@ impl Opcode {
             Self::EnterHandler => "EnterHandler",
             Self::LeaveHandler => "LeaveHandler",
             Self::LoadException => "LoadException",
+            Self::LoadSmi8 => "LoadSmi8",
+            Self::LoadConst8 => "LoadConst8",
+            Self::Jump8 => "Jump8",
+            Self::JumpIfTrue8 => "JumpIfTrue8",
+            Self::JumpIfFalse8 => "JumpIfFalse8",
+            Self::LoadLocal0 => "LoadLocal0",
+            Self::LoadLocal1 => "LoadLocal1",
+            Self::LoadLocal2 => "LoadLocal2",
+            Self::LoadLocal3 => "LoadLocal3",
+            Self::StoreLocal0 => "StoreLocal0",
+            Self::StoreLocal1 => "StoreLocal1",
+            Self::StoreLocal2 => "StoreLocal2",
+            Self::StoreLocal3 => "StoreLocal3",
+            Self::ProfiledAbc => "ProfiledAbc",
+            Self::ProfiledAbx => "ProfiledAbx",
         }
     }
 
     #[inline]
     pub const fn is_jump(self) -> bool {
-        matches!(self, Self::Jump | Self::JumpIfTrue | Self::JumpIfFalse)
+        matches!(
+            self,
+            Self::Jump
+                | Self::JumpIfTrue
+                | Self::JumpIfFalse
+                | Self::Jump8
+                | Self::JumpIfTrue8
+                | Self::JumpIfFalse8
+        )
     }
 
     #[inline]
@@ -400,6 +453,28 @@ impl Opcode {
             _ => None,
         }
     }
+
+    #[inline]
+    pub const fn local_load_index(self) -> Option<u16> {
+        match self {
+            Self::LoadLocal0 => Some(0),
+            Self::LoadLocal1 => Some(1),
+            Self::LoadLocal2 => Some(2),
+            Self::LoadLocal3 => Some(3),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn local_store_index(self) -> Option<u16> {
+        match self {
+            Self::StoreLocal0 => Some(0),
+            Self::StoreLocal1 => Some(1),
+            Self::StoreLocal2 => Some(2),
+            Self::StoreLocal3 => Some(3),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -408,7 +483,7 @@ mod tests {
 
     #[test]
     fn opcode_count_matches_last_discriminant() {
-        assert_eq!(Opcode::LoadException as u8 + 1, OPCODE_COUNT);
+        assert_eq!(Opcode::ProfiledAbx as u8 + 1, OPCODE_COUNT);
     }
 
     #[test]
@@ -416,6 +491,9 @@ mod tests {
         assert!(Opcode::Jump.is_jump());
         assert!(Opcode::JumpIfTrue.is_jump());
         assert!(Opcode::JumpIfFalse.is_jump());
+        assert!(Opcode::Jump8.is_jump());
+        assert!(Opcode::JumpIfTrue8.is_jump());
+        assert!(Opcode::JumpIfFalse8.is_jump());
         assert!(!Opcode::Return.is_jump());
     }
 

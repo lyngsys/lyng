@@ -40,7 +40,7 @@ fuzz_target!(|data: &[u8]| {
     let _ = decoded.trailing_byte_count();
     let _ = disassemble(&function);
     for instruction in function.instructions() {
-        let _ = disassemble_instruction(instruction, &function);
+        let _ = disassemble_instruction(&instruction, &function);
     }
 });
 
