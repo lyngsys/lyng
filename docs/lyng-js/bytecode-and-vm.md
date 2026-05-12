@@ -89,6 +89,36 @@ site data through explicit feedback structures.
 Inline-cache state is part of interpreter execution. The current tier status surface is
 metadata and reporting only; native-code execution is not part of the engine.
 
+## Opcode Dispatch Counters
+
+`lyng-js-vm` exposes optional per-opcode dispatch counters for profiler and JIT bring-up
+work. Counters are disabled by default; when enabled through `Vm`, the interpreter records
+one dispatch count per executed bytecode opcode and exposes an immutable
+`OpcodeDispatchCounts` snapshot to embedders. The snapshot is runtime observability state,
+not bytecode-template metadata.
+
+`lyng-js-bench runtime --count-opcodes` enables the VM counters for executable runtime
+workload rows and renders the top 20 opcodes per row in Markdown and JSON reports. Leave
+the flag off for normal throughput baselines.
+
+## Inspector Safepoints
+
+`lyng-js-vm` also exposes a minimal debugger hook for interpreter-level inspection. An
+embedder installs a `VmDebugHook`, requests a pause globally or at one installed
+`CodeRef` and bytecode offset, then receives a `VmDebugPauseContext` at the next matching
+safepoint.
+
+The initial safepoints are function entry and `LoopHeader`. The pause context exposes
+top-frame-first frame enumeration, register reads, and lexical environment-slot reads.
+Step commands are part of the hook return value: step-in pauses at the next observed
+safepoint, step-over pauses when the observed frame depth is less than or equal to the
+origin depth, and step-out pauses when the observed frame depth is less than the origin
+depth.
+
+The debugger path is disabled by default. The interpreter selects a dispatch variant with
+debug polling only when a hook is installed and a pause or step request is active, so the
+normal no-debugger path does not add an inspector check to every opcode.
+
 ## Exceptions And Abrupt Completion
 
 Exception handlers are bytecode metadata. VM operations propagate guest-visible abrupt

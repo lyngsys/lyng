@@ -2,7 +2,8 @@ use super::activation_objects::ActivationObjectInit;
 use super::{
     Agent, AllocationLifetime, ArgumentsMode, CodeRef, EnvironmentRef, ExecutionContext,
     FrameFlags, FrameRecord, HostHooks, ObjectAllocation, ObjectRef, RealmRef, RegisterWindow,
-    ThisBindingStatus, ThisState, Value, Vm, VmError, VmResult, WellKnownAtom,
+    ThisBindingStatus, ThisState, Value, Vm, VmDebugSafepointKind, VmError, VmResult,
+    WellKnownAtom,
 };
 use lyng_js_objects::{FunctionEntryIdentity, FunctionThisMode, NativeFunctionRegistry};
 use lyng_js_ops::errors;
@@ -322,6 +323,7 @@ impl Vm {
         agent.push_execution_context(context);
         self.frames.push(frame);
         self.note_frame_depth();
+        self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
         Ok(())
     }
 

@@ -1,4 +1,6 @@
 use lyng_js_builtins::BootstrapMode;
+#[cfg(test)]
+use lyng_js_bytecode::Opcode;
 use lyng_js_bytecode::{BytecodeFunction, CompiledAtom, CompiledScriptUnit};
 use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_compiler::{compile_module, compile_script, CompiledModuleUnit};
@@ -8,7 +10,7 @@ use lyng_js_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
 use lyng_js_parser::{parse_module, parse_script};
 use lyng_js_sema::{analyze_module, analyze_script};
 use lyng_js_types::{CodeRef, Value as JsValue};
-use lyng_js_vm::{FeedbackInlineCacheState, FeedbackSiteDetail, Vm};
+use lyng_js_vm::{FeedbackInlineCacheState, FeedbackSiteDetail, OpcodeDispatchCounts, Vm};
 use serde_json::{json, Value};
 use std::cmp::Ordering;
 use std::env;
@@ -37,6 +39,7 @@ struct Options {
     warmup_runs: usize,
     loop_trip_count: usize,
     frontend_repetitions: usize,
+    count_opcodes: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -73,6 +76,7 @@ struct ThroughputResult {
     median_total: Duration,
     median_us_per_run: f64,
     median_ns_per_operation: f64,
+    opcode_dispatch_counts: Option<OpcodeDispatchCounts>,
 }
 
 #[derive(Clone, Default)]
@@ -105,9 +109,10 @@ struct WorkloadReport {
     memory: MemoryResult,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct SampleResult {
     elapsed: Duration,
+    opcode_dispatch_counts: Option<OpcodeDispatchCounts>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -183,6 +188,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
         warmup_runs: DEFAULT_WARMUP_RUNS,
         loop_trip_count: DEFAULT_LOOP_TRIPS,
         frontend_repetitions: DEFAULT_FRONTEND_REPETITIONS,
+        count_opcodes: false,
     };
 
     let mut args = args.iter();
@@ -223,6 +229,9 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
                 options.frontend_repetitions =
                     parse_usize_arg("--frontend-repetitions", args.next())?;
             }
+            "--count-opcodes" | "--counter-opcodes" => {
+                options.count_opcodes = true;
+            }
             "--help" | "-h" => {
                 return Err(usage());
             }
@@ -250,7 +259,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
 }
 
 fn usage() -> String {
-    "Usage: lyng-js-bench runtime [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--runs <n>] [--warmup-runs <n>] [--loop-trips <n>] [--frontend-repetitions <n>]".to_string()
+    "Usage: lyng-js-bench runtime [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--runs <n>] [--warmup-runs <n>] [--loop-trips <n>] [--frontend-repetitions <n>] [--count-opcodes]".to_string()
 }
 
 fn apply_preset(options: &mut Options, preset: &str) -> Result<(), String> {
@@ -467,6 +476,10 @@ fn measure_script_runtime_sample(
             .map_err(|error| format!("warmup execution failed for {}: {error:?}", workload.name))?;
         black_box(value.bits());
     }
+    if options.count_opcodes {
+        vm.enable_opcode_dispatch_counts();
+        vm.reset_opcode_dispatch_counts();
+    }
 
     let start = Instant::now();
     let mut checksum = 0_u64;
@@ -482,6 +495,9 @@ fn measure_script_runtime_sample(
     black_box(checksum);
     Ok(SampleResult {
         elapsed: start.elapsed(),
+        opcode_dispatch_counts: options
+            .count_opcodes
+            .then(|| vm.opcode_dispatch_counts().unwrap_or_default()),
     })
 }
 
@@ -502,6 +518,7 @@ fn measure_script_frontend_samples(
         }
         samples.push(SampleResult {
             elapsed: start.elapsed(),
+            opcode_dispatch_counts: None,
         });
     }
     Ok(samples)
@@ -549,6 +566,7 @@ fn measure_module_compile_samples(
         }
         samples.push(SampleResult {
             elapsed: start.elapsed(),
+            opcode_dispatch_counts: None,
         });
     }
     Ok(samples)
@@ -580,7 +598,22 @@ fn throughput_result(
         median_total,
         median_us_per_run,
         median_ns_per_operation,
+        opcode_dispatch_counts: merge_opcode_dispatch_counts(samples),
     })
+}
+
+fn merge_opcode_dispatch_counts(samples: &[SampleResult]) -> Option<OpcodeDispatchCounts> {
+    let counts = samples
+        .iter()
+        .filter_map(|sample| sample.opcode_dispatch_counts.as_ref())
+        .flat_map(|counts| {
+            counts
+                .iter()
+                .filter(|entry| entry.count() != 0)
+                .map(|entry| (entry.opcode(), entry.count()))
+        });
+    let merged = OpcodeDispatchCounts::from_counts(counts);
+    (merged.total() != 0).then_some(merged)
 }
 
 fn capture_memory(
@@ -1165,13 +1198,17 @@ fn render_report(
     previous: Option<&Value>,
 ) -> String {
     let mut output = String::new();
-    let command = format!(
+    let mut command = format!(
         "cargo run --release -p lyng-js-bench -- runtime --report {} --json {}",
         options.report_path, options.json_path
     );
+    if options.count_opcodes {
+        command.push_str(" --count-opcodes");
+    }
 
     write_runtime_report_intro(&mut output, options, &command);
     write_workload_throughput_section(&mut output, reports, previous);
+    write_opcode_dispatch_counts_section(&mut output, reports);
     write_template_feedback_section(&mut output, reports);
     write_runtime_accounting_section(&mut output, snapshots);
     if let Ok(watch_items) = RuntimeWatchItems::collect(reports, snapshots) {
@@ -1217,6 +1254,15 @@ fn write_runtime_report_intro(output: &mut String, options: &Options, command: &
         output,
         "- Frontend repetition count: `{}`",
         options.frontend_repetitions
+    );
+    let _ = writeln!(
+        output,
+        "- Opcode dispatch counters: `{}`",
+        if options.count_opcodes {
+            "enabled"
+        } else {
+            "disabled"
+        }
     );
     let _ = writeln!(output, "- JSON: `{}`", options.json_path);
     output.push('\n');
@@ -1284,6 +1330,49 @@ fn write_workload_throughput_section(
         }
     }
     output.push('\n');
+}
+
+fn write_opcode_dispatch_counts_section(output: &mut String, reports: &[WorkloadReport]) {
+    if !reports
+        .iter()
+        .any(|report| report.throughput.opcode_dispatch_counts.is_some())
+    {
+        return;
+    }
+
+    let _ = writeln!(output, "## Opcode Dispatch Counts");
+    output.push('\n');
+    let _ = writeln!(output, "| Benchmark | Total dispatches | Top opcodes |");
+    let _ = writeln!(output, "| --- | ---: | --- |");
+    for report in reports {
+        let Some(counts) = report.throughput.opcode_dispatch_counts.as_ref() else {
+            continue;
+        };
+        let _ = writeln!(
+            output,
+            "| `{}` | `{}` | {} |",
+            report.workload.name,
+            counts.total(),
+            format_opcode_top_counts(counts, 20),
+        );
+    }
+    output.push('\n');
+}
+
+fn format_opcode_top_counts(counts: &OpcodeDispatchCounts, limit: usize) -> String {
+    let top = counts.top(limit);
+    if top.is_empty() {
+        return "`none`".to_string();
+    }
+
+    let mut output = String::new();
+    for (index, entry) in top.iter().enumerate() {
+        if index != 0 {
+            output.push_str(", ");
+        }
+        let _ = write!(output, "`{}`: `{}`", entry.opcode().name(), entry.count());
+    }
+    output
 }
 
 fn write_template_feedback_section(output: &mut String, reports: &[WorkloadReport]) {
@@ -1465,6 +1554,7 @@ fn render_json_report(
             "warmup_runs": options.warmup_runs,
             "loop_trip_count": options.loop_trip_count,
             "frontend_repetitions": options.frontend_repetitions,
+            "count_opcodes": options.count_opcodes,
         },
         "has_previous": previous.is_some(),
         "workloads": reports
@@ -1520,7 +1610,28 @@ fn runtime_workload_json(report: &WorkloadReport, previous: Option<&Value>) -> V
             "construct_created_shape_entries": report.memory.construct_created_shape_entries,
             "note": report.memory.note,
         },
+        "opcode_dispatch_counts": report
+            .throughput
+            .opcode_dispatch_counts
+            .as_ref()
+            .map(opcode_dispatch_counts_json),
         "delta": delta,
+    })
+}
+
+fn opcode_dispatch_counts_json(counts: &OpcodeDispatchCounts) -> Value {
+    json!({
+        "total": counts.total(),
+        "top": counts
+            .top(20)
+            .into_iter()
+            .map(|entry| {
+                json!({
+                    "opcode": entry.opcode().name(),
+                    "count": entry.count(),
+                })
+            })
+            .collect::<Vec<_>>(),
     })
 }
 
@@ -2063,6 +2174,7 @@ mod tests {
             warmup_runs: 1,
             loop_trip_count: 16,
             frontend_repetitions: 4,
+            count_opcodes: false,
         };
         let baseline_atom_payload = AtomTable::new().payload_bytes();
 
@@ -2228,10 +2340,22 @@ mod tests {
         assert_eq!(options.warmup_runs, 1);
         assert_eq!(options.loop_trip_count, 64);
         assert_eq!(options.frontend_repetitions, 4);
+        assert!(!options.count_opcodes);
     }
 
     #[test]
-    fn runtime_report_and_json_include_previous_deltas() {
+    fn runtime_options_enable_opcode_dispatch_counts() {
+        let options = parse_options(&[
+            "--preset".to_string(),
+            "smoke".to_string(),
+            "--count-opcodes".to_string(),
+        ])
+        .expect("runtime smoke preset should parse with opcode counters");
+
+        assert!(options.count_opcodes);
+    }
+
+    fn synthetic_delta_workload_report() -> WorkloadReport {
         let workload = Workload {
             name: "delta-runtime",
             pipeline: WorkloadPipeline::ScriptRuntime,
@@ -2239,7 +2363,7 @@ mod tests {
             source: String::new(),
             operations_per_run: 10,
         };
-        let report = WorkloadReport {
+        WorkloadReport {
             workload,
             throughput: ThroughputResult {
                 samples: 1,
@@ -2248,6 +2372,10 @@ mod tests {
                 median_total: Duration::from_micros(20),
                 median_us_per_run: 20.0,
                 median_ns_per_operation: 2_000.0,
+                opcode_dispatch_counts: Some(OpcodeDispatchCounts::from_counts([
+                    (Opcode::AddSmi, 12),
+                    (Opcode::LoopHeader, 3),
+                ])),
             },
             memory: MemoryResult {
                 functions: Some(1),
@@ -2270,13 +2398,19 @@ mod tests {
                 construct_created_shape_entries: Some(9),
                 note: "Synthetic memory row.",
             },
-        };
-        let snapshot = RuntimeSnapshot {
+        }
+    }
+
+    fn synthetic_runtime_snapshot() -> RuntimeSnapshot {
+        RuntimeSnapshot {
             label: "runtime.synthetic",
             accounting: RuntimeAccounting::default(),
             note: "Synthetic snapshot.",
-        };
-        let options = Options {
+        }
+    }
+
+    fn synthetic_runtime_options(count_opcodes: bool) -> Options {
+        Options {
             report_path: "/tmp/runtime.md".to_string(),
             json_path: "/tmp/runtime.json".to_string(),
             samples: 1,
@@ -2284,7 +2418,15 @@ mod tests {
             warmup_runs: 1,
             loop_trip_count: 10,
             frontend_repetitions: 4,
-        };
+            count_opcodes,
+        }
+    }
+
+    #[test]
+    fn runtime_report_and_json_include_previous_deltas() {
+        let report = synthetic_delta_workload_report();
+        let snapshot = synthetic_runtime_snapshot();
+        let options = synthetic_runtime_options(true);
         let previous = serde_json::json!({
             "workloads": [{
                 "name": "delta-runtime",
@@ -2304,6 +2446,8 @@ mod tests {
         assert!(markdown.contains("+500.00"));
         assert!(markdown.contains("Call IC mono"));
         assert!(markdown.contains("Construct created shapes"));
+        assert!(markdown.contains("## Opcode Dispatch Counts"));
+        assert!(markdown.contains("| `delta-runtime` | `15` | `AddSmi`: `12`, `LoopHeader`: `3` |"));
         assert!(markdown.contains("| `delta-runtime` | `script.runtime` | `1` | `40` | `3` | `128` | `7` | `2` | `2` | `1` | `96` | `1` | `2` | `3` | `4` | `5` | `6` | `7` | `8` | `9` | Synthetic memory row. |"));
 
         let json = render_json_report(
@@ -2329,24 +2473,21 @@ mod tests {
             json["workloads"][0]["memory"]["construct_created_shape_entries"],
             9
         );
+        assert_eq!(json["workloads"][0]["opcode_dispatch_counts"]["total"], 15);
+        assert_eq!(
+            json["workloads"][0]["opcode_dispatch_counts"]["top"][0]["opcode"],
+            "AddSmi"
+        );
+        assert_eq!(
+            json["workloads"][0]["opcode_dispatch_counts"]["top"][0]["count"],
+            12
+        );
     }
 
     #[test]
     fn runtime_report_and_json_include_heap_generation_split() {
-        let snapshot = RuntimeSnapshot {
-            label: "runtime.synthetic",
-            accounting: RuntimeAccounting::default(),
-            note: "Synthetic snapshot.",
-        };
-        let options = Options {
-            report_path: "/tmp/runtime.md".to_string(),
-            json_path: "/tmp/runtime.json".to_string(),
-            samples: 1,
-            runs_per_sample: 1,
-            warmup_runs: 1,
-            loop_trip_count: 10,
-            frontend_repetitions: 4,
-        };
+        let snapshot = synthetic_runtime_snapshot();
+        let options = synthetic_runtime_options(false);
 
         let markdown = render_report(&options, &[], std::slice::from_ref(&snapshot), None);
         assert!(markdown.contains("Heap young live bytes"));

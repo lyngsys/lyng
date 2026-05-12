@@ -1,13 +1,15 @@
 pub(super) use crate::{
     seed_registers, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FeedbackSiteDetail,
     FeedbackVectorSnapshot, FrameFlags, FrameRecord, InstalledCode, RegisterWindow, TierStatus, Vm,
-    VmDispatchMode, VmError,
+    VmDebugCommand, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason, VmDebugSafepointKind,
+    VmDebugStepMode, VmDispatchMode, VmError,
 };
 pub(super) use lyng_js_bytecode::{
-    ArgumentsMode, BytecodeBuilder, BytecodeFunction, BytecodeFunctionId, BytecodeFunctionKind,
-    CompiledAtom, CompiledFunctionUnit, CompiledScriptUnit, ConstantValue, DeoptFrameValue,
-    DeoptValueSource, ExceptionHandler, ExceptionHandlerKind, FeedbackSiteKind,
-    FeedbackSiteMetadata, Instruction, Opcode, SafepointKind,
+    ArgumentsMode, BytecodeBuilder, BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags,
+    BytecodeFunction, BytecodeFunctionId, BytecodeFunctionKind, CompiledAtom, CompiledFunctionUnit,
+    CompiledScriptUnit, ConstantValue, DeoptFrameValue, DeoptValueSource, ExceptionHandler,
+    ExceptionHandlerKind, FeedbackSiteKind, FeedbackSiteMetadata, Instruction, Opcode,
+    SafepointKind,
 };
 pub(super) use lyng_js_common::{AtomId, AtomTable, SourceId, WellKnownAtom};
 pub(super) use lyng_js_compiler::{compile_module, compile_script, CompiledModuleUnit};

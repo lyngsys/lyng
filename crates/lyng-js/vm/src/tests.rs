@@ -8,6 +8,7 @@ mod support;
 mod async_and_generators;
 mod classes;
 mod core;
+mod debugger;
 mod disposables;
 mod dynamic_import;
 mod errors;

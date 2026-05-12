@@ -19,6 +19,7 @@ mod extensions;
 mod frame;
 mod installed;
 mod name_refs;
+mod opcode_counts;
 mod vm;
 
 #[cfg(test)]
@@ -31,11 +32,13 @@ pub use extensions::{
 };
 pub use frame::{seed_registers, FrameFlags, FrameRecord, RegisterWindow};
 pub use installed::InstalledCode;
+pub use opcode_counts::{OpcodeDispatchCount, OpcodeDispatchCounts};
 pub use vm::{
     CallCacheEntrySnapshot, CallFeedbackSnapshot, ConstructCacheEntrySnapshot,
     ConstructFeedbackSnapshot, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily,
     FeedbackSiteDetail, FeedbackSiteSnapshot, FeedbackVectorFootprint, FeedbackVectorSnapshot,
     KeyedNamedPropertyCacheEntrySnapshot, KeyedPropertyFeedbackSnapshot, LoadedModuleRoot,
     NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot, TierStatus, TieringSnapshot,
-    Vm, VmDispatchMode, VmEvaluationObserver,
+    Vm, VmDebugCommand, VmDebugFrame, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason,
+    VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode, VmDispatchMode, VmEvaluationObserver,
 };
