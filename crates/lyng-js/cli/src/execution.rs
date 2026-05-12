@@ -2,7 +2,7 @@ use crate::error::CliError;
 use crate::extensions::CliRealmExtension;
 use crate::host::{CliHost, CliHostSnapshot};
 use crate::CliInvocation;
-use lyng_js_common::{Diagnostic, SourceId, WellKnownAtom};
+use lyng_js_common::{Diagnostic, Severity, SourceId, WellKnownAtom};
 use lyng_js_compiler::compile_script;
 use lyng_js_env::{Agent, Runtime};
 use lyng_js_host::{
@@ -262,10 +262,14 @@ fn write_diagnostic(
             span.range.end.raw()
         );
     }
+    let label = match diagnostic.severity {
+        Severity::Error => "SyntaxError",
+        Severity::Warning => "warning",
+    };
     writeln!(
         stderr,
-        "{}: {} ({location})",
-        diagnostic.severity, diagnostic.message
+        "{label}: {} ({location})",
+        diagnostic.message
     )
     .map_err(CliError::io)
 }
