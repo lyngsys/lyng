@@ -380,7 +380,7 @@ mod tests {
         let stderr = String::from_utf8(stderr).expect("stderr should stay UTF-8");
         assert_eq!(exit_code, 1);
         assert!(stdout.is_empty());
-        assert!(stderr.contains("error:"));
+        assert!(stderr.contains("SyntaxError:"));
         assert!(stderr.contains("cli-parse-error.js"));
     }
 
