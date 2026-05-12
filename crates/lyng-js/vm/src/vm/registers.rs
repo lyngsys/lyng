@@ -9,9 +9,7 @@ impl Vm {
             absolute < self.register_stack_top(),
             "validated register window should be reserved on the VM stack"
         );
-        // SAFETY: bytecode installation validates every register operand against the function's
-        // register window, and frame creation reserves that full window on `register_stack`.
-        unsafe { *self.register_stack.get_unchecked(absolute) }
+        self.register_stack[absolute]
     }
 
     pub(super) fn write_register(&mut self, frame: FrameRecord, register: u16, value: Value) {
@@ -20,11 +18,7 @@ impl Vm {
             absolute < self.register_stack_top(),
             "validated register window should be reserved on the VM stack"
         );
-        // SAFETY: bytecode installation validates every register operand against the function's
-        // register window, and frame creation reserves that full window on `register_stack`.
-        unsafe {
-            *self.register_stack.get_unchecked_mut(absolute) = value;
-        }
+        self.register_stack[absolute] = value;
     }
 
     pub(super) fn advance_instruction(&mut self) {

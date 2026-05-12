@@ -139,7 +139,7 @@ behavior, memory reporting, or bytecode density.
 ## Memory And Safety
 
 - Rooting and tracing must be explicit around allocation paths.
-- `unsafe` must have a local invariant comment and a narrow scope.
+- Do not use `unsafe` code in Lyng JS crates.
 - Preserve compact handle and value representations unless the task explicitly requires a
   layout change.
 - Represent sentinels explicitly and prevent them from escaping as guest values.

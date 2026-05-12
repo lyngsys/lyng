@@ -105,9 +105,9 @@ impl Vm {
             let installed = self
                 .installed
                 .get(code_index(code))
-                .and_then(Option::as_deref)
-                .ok_or(VmError::MissingInstalledCode(code))?
-                as *const InstalledFunction;
+                .and_then(Option::as_ref)
+                .cloned()
+                .ok_or(VmError::MissingInstalledCode(code))?;
 
             loop {
                 let frame = self
@@ -119,10 +119,6 @@ impl Vm {
                     break;
                 }
                 let instruction_offset = frame.instruction_offset();
-                // SAFETY: installed code is stored behind `Arc<InstalledFunction>` in
-                // `self.installed`. The pointed-to allocation remains stable even if the
-                // installed-code vector grows while executing this frame.
-                let installed = unsafe { &*installed };
                 let instruction = installed.instruction_at(instruction_offset).ok_or(
                     VmError::InstructionOutOfBounds {
                         code,
@@ -137,14 +133,14 @@ impl Vm {
                     }
                 }
                 #[cfg(debug_assertions)]
-                self.assert_deopt_safepoint_state(agent, frame, installed);
+                self.assert_deopt_safepoint_state(agent, frame, installed.as_ref());
                 let feedback_slot = instruction.feedback_slot();
                 let instruction = instruction.without_feedback_slot();
 
                 match instruction {
                     Instruction::Abc { opcode, a, b, c } => {
                         let (a, b, c) =
-                            Self::decode_abc_operands(installed, frame, opcode, a, b, c);
+                            Self::decode_abc_operands(installed.as_ref(), frame, opcode, a, b, c);
                         match opcode {
                             Opcode::Move => {
                                 let value = self.read_register(frame, b);
@@ -512,7 +508,7 @@ impl Vm {
                         }
                     }
                     Instruction::Abx { opcode, a, bx } => {
-                        let (a, bx) = Self::decode_abx_operands(installed, frame, a, bx);
+                        let (a, bx) = Self::decode_abx_operands(installed.as_ref(), frame, a, bx);
                         match opcode {
                             Opcode::LoadUndefined => {
                                 self.write_register(frame, a, Value::undefined());

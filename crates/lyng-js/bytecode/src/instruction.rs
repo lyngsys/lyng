@@ -130,11 +130,17 @@ impl Instruction {
     }
 
     #[inline]
+    /// # Panics
+    /// Panics if this instruction does not encode to the fixed 4-byte word format.
     pub fn encode_word(self) -> u32 {
         let bytes = self.encode_bytes();
+        assert!(
+            bytes.len() == INSTRUCTION_WIDTH,
+            "encode_word requires exactly {INSTRUCTION_WIDTH} encoded bytes, got {}",
+            bytes.len()
+        );
         let mut word = [0; INSTRUCTION_WIDTH];
-        word[..bytes.len().min(INSTRUCTION_WIDTH)]
-            .copy_from_slice(&bytes[..bytes.len().min(INSTRUCTION_WIDTH)]);
+        word.copy_from_slice(&bytes);
         u32::from_le_bytes(word)
     }
 
@@ -166,6 +172,8 @@ impl Instruction {
     }
 
     #[inline]
+    /// # Panics
+    /// Panics if a compact short-form instruction carries an operand outside its encoded range.
     pub fn write_bytes(self, bytes: &mut Vec<u8>) {
         match self {
             Self::Abc { opcode, a, b, c } => bytes.extend_from_slice(&[opcode as u8, a, b, c]),
@@ -189,7 +197,10 @@ impl Instruction {
                         | Opcode::JumpIfTrue8
                         | Opcode::JumpIfFalse8
                 ) {
-                    debug_assert!(u8::try_from(bx).is_ok());
+                    assert!(
+                        u8::try_from(bx).is_ok(),
+                        "compact Abx operand must fit in u8"
+                    );
                     bytes.extend_from_slice(&[opcode as u8, a, bx.to_le_bytes()[0]]);
                 } else {
                     let bx = bx.to_le_bytes();
@@ -198,7 +209,10 @@ impl Instruction {
             }
             Self::Ax { opcode, ax } => {
                 if opcode == Opcode::Jump8 {
-                    debug_assert!((i32::from(i8::MIN)..=i32::from(i8::MAX)).contains(&ax));
+                    assert!(
+                        (i32::from(i8::MIN)..=i32::from(i8::MAX)).contains(&ax),
+                        "Jump8 operand must fit in i8"
+                    );
                     bytes.extend_from_slice(&[opcode as u8, ax.to_le_bytes()[0]]);
                 } else {
                     let raw = ax & 0x00ff_ffff;
@@ -298,6 +312,25 @@ mod tests {
     fn abx_words_encode_u16_payload() {
         let word = Instruction::abx(Opcode::LoadConst, 7, 0x1234).encode_word();
         assert_eq!(word.to_le_bytes(), [Opcode::LoadConst as u8, 7, 0x34, 0x12]);
+    }
+
+    #[test]
+    #[should_panic(expected = "encode_word requires exactly 4 encoded bytes")]
+    fn profiled_instruction_encode_word_panics_instead_of_truncating() {
+        let slot = FeedbackSlotId::from_raw(1).expect("test slot should be non-zero");
+        Instruction::profiled_abx(Opcode::Call, 1, 2, slot).encode_word();
+    }
+
+    #[test]
+    #[should_panic(expected = "compact Abx operand must fit in u8")]
+    fn compact_abx_write_panics_when_payload_would_truncate() {
+        Instruction::abx(Opcode::LoadSmi8, 0, u16::from(u8::MAX) + 1).encode_bytes();
+    }
+
+    #[test]
+    #[should_panic(expected = "Jump8 operand must fit in i8")]
+    fn jump8_write_panics_when_payload_would_truncate() {
+        Instruction::ax(Opcode::Jump8, i32::from(i8::MAX) + 1).encode_bytes();
     }
 
     #[test]

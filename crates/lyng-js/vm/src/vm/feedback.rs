@@ -885,11 +885,7 @@ impl NamedPropertyFeedback {
         }
         self.entries[index] = Some(entry);
         self.entry_count = self.entry_count.saturating_add(1);
-        self.cache_state = if self.entry_count <= 1 {
-            InlineCacheState::Monomorphic
-        } else {
-            InlineCacheState::Polymorphic
-        };
+        self.cache_state = InlineCacheState::Polymorphic;
     }
 }
 
@@ -1239,11 +1235,7 @@ impl KeyedPropertyFeedback {
         }
         self.named_entries[index] = Some(entry);
         self.named_entry_count = self.named_entry_count.saturating_add(1);
-        self.cache_state = if self.named_entry_count <= 1 {
-            InlineCacheState::Monomorphic
-        } else {
-            InlineCacheState::Polymorphic
-        };
+        self.cache_state = InlineCacheState::Polymorphic;
     }
 
     #[inline]
