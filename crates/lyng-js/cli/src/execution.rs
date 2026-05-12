@@ -155,10 +155,14 @@ fn execute_module(invocation: &CliInvocation, host: &CliHost) -> Result<ScriptOu
     };
     let loaded = match load_result {
         Ok(loaded) => loaded,
-        Err(ModuleLoadError::Host(error)) => return Err(CliError::host(error)),
-        Err(ModuleLoadError::Lowering) => return Err(CliError::lowering("module lowering failed")),
+        Err(ModuleLoadError::Host(error)) => {
+            return Err(CliError::host(format!("SyntaxError: {error}")));
+        }
+        Err(ModuleLoadError::Lowering) => {
+            return Err(CliError::lowering("SyntaxError: module lowering failed"));
+        }
         Err(ModuleLoadError::Vm(error)) => {
-            return Err(CliError::vm(format!("module loading failed: {error:?}")));
+            return Err(CliError::vm(format!("SyntaxError: module loading failed: {error:?}")));
         }
         Err(ModuleLoadError::Parse | ModuleLoadError::Sema) => {
             return Ok(ScriptOutcome {
