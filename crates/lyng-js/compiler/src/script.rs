@@ -12,7 +12,8 @@ use lyng_js_bytecode::{
     BytecodeFunctionKind, BytecodeLimitKind, CallRange, CaptureDescriptor, CaptureSource,
     CompiledAtom, CompiledScriptUnit, ConstantValue, DeoptFrameValue, DeoptSnapshot,
     DeoptValueSource, DirectEvalLexicalScope, ExceptionHandler, ExceptionHandlerKind,
-    FeedbackSiteKind, FeedbackSiteMetadata, Opcode, SafepointKind, ThisMode,
+    FeedbackSiteKind, FeedbackSiteMetadata, Opcode, RuntimeStateCapture, SafepointDescriptor,
+    SafepointKind, ThisMode,
 };
 use lyng_js_common::{AtomId, AtomTable, Span, WellKnownAtom};
 use lyng_js_sema::{

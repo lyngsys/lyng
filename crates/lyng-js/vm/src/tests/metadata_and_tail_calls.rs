@@ -1,5 +1,52 @@
 use super::support::*;
 
+#[cfg(debug_assertions)]
+use lyng_js_bytecode::{DeoptSnapshot, RuntimeStateCapture, SafepointDescriptor};
+
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "deopt safepoint register-window mismatch")]
+fn debug_deopt_assertion_reports_register_window_mismatch() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let function = BytecodeFunction::new(
+        BytecodeFunctionId::from_raw(62).unwrap(),
+        None,
+        ArgumentsMode::None,
+    )
+    .with_kind(BytecodeFunctionKind::Script)
+    .with_register_counts(0, 0)
+    .with_instructions(vec![
+        Instruction::ax(Opcode::LoopHeader, 0),
+        Instruction::ax(Opcode::ReturnUndefined, 0),
+    ])
+    .with_safepoints(vec![SafepointDescriptor::new(
+        1,
+        0,
+        SafepointKind::LoopBackedge,
+        1,
+    )
+    .with_runtime_state(
+        RuntimeStateCapture::new()
+            .with_lexical_env(true)
+            .with_variable_env(true)
+            .with_this_value(true),
+    )])
+    .with_deopt_snapshots(vec![DeoptSnapshot::new(
+        1,
+        vec![DeoptValueSource::FrameValue(DeoptFrameValue::ThisValue)],
+    )]);
+    let unit = CompiledScriptUnit::new(SourceId::new(62), function.id(), vec![function]);
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let _ = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+}
+
 #[test]
 fn vm_addresses_metadata_by_code_and_instruction_offset() {
     let unit = compile_test_unit(

@@ -1386,12 +1386,8 @@ impl ConstructFeedback {
             }
             InlineCacheState::Polymorphic => {
                 for index in 0..usize::from(self.entry_count) {
-                    if self.refresh_matching_entry_created_shape(
-                        agent,
-                        index,
-                        constructor,
-                        created,
-                    ) {
+                    if self.refresh_matching_entry_created_shape(agent, index, constructor, created)
+                    {
                         return;
                     }
                 }

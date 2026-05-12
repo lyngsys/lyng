@@ -9,10 +9,11 @@ use super::{
     internal_set_function_home_object_builtin, object_set_prototype_of_builtin, ActiveClassContext,
     AtomId, BuiltinFunctionId, BytecodeBuilder, BytecodeEnvironmentBinding,
     BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionFlags, BytecodeFunctionId,
-    BytecodeFunctionKind, CallRange, ConstantValue, DeclId, DeclarationKind, Expr, ExprId,
-    FunctionCompiler, FunctionId, HashMap, HashSet, LoweringError, LoweringResult, NodeList,
-    Opcode, SafepointKind, ScopeId, ScopeKind, SemanticBindingId, Span, StmtId, StorageClass,
-    ThisMode, WellKnownAtom,
+    BytecodeFunctionKind, CallRange, ConstantValue, DeclId, DeclarationKind, DeoptFrameValue,
+    DeoptSnapshot, DeoptValueSource, Expr, ExprId, FunctionCompiler, FunctionId, HashMap, HashSet,
+    LoweringError, LoweringResult, NodeList, Opcode, RuntimeStateCapture, SafepointDescriptor,
+    SafepointKind, ScopeId, ScopeKind, SemanticBindingId, Span, StmtId, StorageClass, ThisMode,
+    WellKnownAtom,
 };
 use lyng_js_types::{
     internal_construct_super_array_like_builtin, internal_require_constructor_builtin,
@@ -973,7 +974,30 @@ impl FunctionCompiler<'_, '_> {
             CallRange::new(receiver, argument_count),
         )?;
         let register_window_len = if is_setter { 8 } else { 6 };
-        builder.add_safepoint_at(call_offset, SafepointKind::Allocation, register_window_len)?;
+        let safepoint_id = builder.alloc_safepoint_id()?;
+        let runtime_state = RuntimeStateCapture::new()
+            .with_lexical_env(true)
+            .with_variable_env(true)
+            .with_this_value(true)
+            .with_new_target(true)
+            .with_callee(true);
+        builder.add_safepoint(
+            SafepointDescriptor::new(
+                safepoint_id,
+                call_offset,
+                SafepointKind::Allocation,
+                register_window_len,
+            )
+            .with_runtime_state(runtime_state),
+        );
+        builder.add_deopt_snapshot(DeoptSnapshot::new(
+            safepoint_id,
+            vec![
+                DeoptValueSource::FrameValue(DeoptFrameValue::ThisValue),
+                DeoptValueSource::FrameValue(DeoptFrameValue::NewTarget),
+                DeoptValueSource::FrameValue(DeoptFrameValue::Callee),
+            ],
+        ));
         if is_setter {
             builder.emit_ax(Opcode::ReturnUndefined, 0)?;
         } else {

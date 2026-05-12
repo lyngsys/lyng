@@ -123,6 +123,8 @@ impl Vm {
                     self.record_opcode_dispatch(instruction.opcode());
                 }
             }
+            #[cfg(debug_assertions)]
+            self.assert_deopt_safepoint_state(agent, frame, installed.as_ref());
 
             match instruction {
                 Instruction::Abc { opcode, a, b, c } => {
@@ -1070,6 +1072,8 @@ impl Vm {
             if COUNT_OPCODES {
                 self.record_opcode_dispatch(instruction.opcode());
             }
+            #[cfg(debug_assertions)]
+            self.assert_deopt_safepoint_state(agent, frame, installed.as_ref());
             if DEBUG && instruction.opcode() == Opcode::LoopHeader {
                 self.poll_debug_safepoint(agent, VmDebugSafepointKind::LoopHeader);
             }

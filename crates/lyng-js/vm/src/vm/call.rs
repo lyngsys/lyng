@@ -156,15 +156,9 @@ impl Vm {
             return Ok(false);
         };
         let Some(result) = self.call_frame_safe_builtin(
-            agent,
-            host,
-            registry,
-            frame,
-            callee,
-            entry,
-            this_value,
-            arguments,
-        )? else {
+            agent, host, registry, frame, callee, entry, this_value, arguments,
+        )?
+        else {
             return Ok(false);
         };
         self.write_register(frame, result_register, result);
