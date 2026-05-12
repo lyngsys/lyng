@@ -102,7 +102,7 @@ fn compact_unreachable_and_noop_jumps(builder: &mut BytecodeBuilder) -> Bytecode
 
     builder.replace_decoded_instructions(new_instructions);
     builder.wide_operands = new_wide_operands;
-    remap_offset_metadata(builder, &compaction);
+    remap_offset_metadata(builder, &compaction)?;
     Ok(true)
 }
 
@@ -385,7 +385,19 @@ fn rewrite_jump_instruction(
     Ok(())
 }
 
-fn remap_offset_metadata(builder: &mut BytecodeBuilder, compaction: &CompactionMap) {
+fn remap_offset_metadata(
+    builder: &mut BytecodeBuilder,
+    compaction: &CompactionMap,
+) -> BytecodeBuildResult<()> {
+    let parameter_initializer_end = builder.header.parameter_initializer_end_offset();
+    builder.header = builder.header.with_parameter_initializer_end_offset(
+        compaction.remap_boundary(parameter_initializer_end).ok_or(
+            BytecodeBuildError::LimitExceeded {
+                kind: BytecodeLimitKind::InstructionStream,
+            },
+        )?,
+    );
+
     builder.direct_eval_lexical_sites = builder
         .direct_eval_lexical_sites
         .drain(..)
@@ -474,6 +486,8 @@ fn remap_offset_metadata(builder: &mut BytecodeBuilder, compaction: &CompactionM
     builder
         .deopt_snapshots
         .retain(|snapshot| kept_safepoints.contains(&snapshot.safepoint_id()));
+
+    Ok(())
 }
 
 fn remap_exception_handler(

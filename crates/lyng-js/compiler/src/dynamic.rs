@@ -497,4 +497,19 @@ mod tests {
         );
         assert_eq!(close.err().map(|error| error.stage().clone()), None);
     }
+
+    #[test]
+    fn compile_direct_eval_allows_nested_destructuring_parameter_default() {
+        let mut atoms = AtomTable::new();
+        let result = compile_dynamic_script_source(
+            &mut atoms,
+            SourceId::new(3),
+            "function f8([x=[a=1]=[]]) {}\nf8([]);",
+            DynamicScriptAnalysisMode::DirectEval {
+                initial_strict: false,
+                options: DirectEvalScriptAnalysisOptions::new(),
+            },
+        );
+        assert_eq!(result.err().map(|error| error.stage().clone()), None);
+    }
 }

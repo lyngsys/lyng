@@ -1071,11 +1071,8 @@ impl Vm {
                             }
                         }
                         Opcode::SuspendGeneratorStart => {
-                            self.suspend_generator_start(
-                                agent,
-                                frame,
-                                frame.instruction_offset().saturating_add(1),
-                            )?;
+                            let resume_offset = self.next_instruction_offset(frame);
+                            self.suspend_generator_start(agent, frame, resume_offset)?;
                         }
                         Opcode::Yield => {
                             let register =
@@ -1088,7 +1085,7 @@ impl Vm {
                                 agent,
                                 frame,
                                 value,
-                                frame.instruction_offset().saturating_add(1),
+                                self.next_instruction_offset(frame),
                                 false,
                             )?;
                         }

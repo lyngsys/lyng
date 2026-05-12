@@ -353,7 +353,11 @@ pub fn disassemble(function: &BytecodeFunction) -> String {
         header.has_rest_parameter(),
     );
 
-    for (index, instruction) in function.instructions().iter().enumerate() {
+    for (index, instruction) in function
+        .instructions()
+        .byte_offsets()
+        .zip(function.instructions().iter())
+    {
         let _ = writeln!(
             output,
             "{index:04}: {}",

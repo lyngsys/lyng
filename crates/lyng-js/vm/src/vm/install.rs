@@ -3,7 +3,9 @@ use super::{
     BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode, RealmRef,
     TieringState, Value, Vm, VmError, VmResult,
 };
-use lyng_js_bytecode::{CallRange, Instruction, Opcode, WideAbcOperands, WideAbxOperands};
+use lyng_js_bytecode::{
+    decode_instruction_bytes, CallRange, Instruction, Opcode, WideAbcOperands, WideAbxOperands,
+};
 use lyng_js_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
 };
@@ -15,138 +17,26 @@ pub(super) struct InstalledFunction {
     pub(super) function: BytecodeFunction,
     pub(super) child_codes: Vec<CodeRef>,
     canonical_atoms: Arc<[Option<AtomId>]>,
-    instructions: Vec<Instruction>,
-    pub(super) wide_payloads: Vec<Option<u32>>,
-    direct_eval_lexical_sites_by_offset: Vec<Option<lyng_js_bytecode::DirectEvalLexicalSite>>,
-    loop_iteration_sites_by_offset: Vec<Option<lyng_js_bytecode::LoopIterationEnvironmentSite>>,
+    pub(super) wide_payloads: Vec<lyng_js_bytecode::WideOperand>,
+    direct_eval_lexical_sites: Vec<lyng_js_bytecode::DirectEvalLexicalSite>,
+    loop_iteration_sites: Vec<lyng_js_bytecode::LoopIterationEnvironmentSite>,
     feedback_sites_by_slot: Vec<Option<lyng_js_bytecode::FeedbackSiteDescriptor>>,
 }
 
 impl InstalledFunction {
     #[inline]
-    #[expect(
-        clippy::too_many_lines,
-        reason = "installed bytecode side tables are built in one pass per metadata family for locality"
-    )]
     pub(super) fn new(
         function: BytecodeFunction,
         child_codes: Vec<CodeRef>,
         canonical_atoms: Arc<[Option<AtomId>]>,
     ) -> Self {
-        let instructions = function.instructions().iter().collect::<Vec<_>>();
-        let mut wide_payloads = vec![None; instructions.len()];
-        for operand in function.wide_operands() {
-            if let Some(slot) = wide_payloads.get_mut(
-                usize::try_from(operand.instruction_offset())
-                    .expect("instruction offset should fit usize"),
-            ) {
-                *slot = Some(operand.payload());
-            }
-        }
-        let mut direct_eval_lexical_sites_by_offset = vec![
-            None;
-            offset_table_len(
-                function
-                    .direct_eval_lexical_sites()
-                    .iter()
-                    .map(lyng_js_bytecode::DirectEvalLexicalSite::instruction_offset),
-            )
-        ];
-        for site in function.direct_eval_lexical_sites() {
-            if let Some(slot) = direct_eval_lexical_sites_by_offset.get_mut(
-                usize::try_from(site.instruction_offset())
-                    .expect("instruction offset should fit usize"),
-            ) {
-                let canonical_scopes = site
-                    .scopes()
-                    .iter()
-                    .map(|scope| {
-                        let canonical_scope = lyng_js_bytecode::DirectEvalLexicalScope::new(
-                            scope.source_base(),
-                            scope
-                                .bindings()
-                                .iter()
-                                .copied()
-                                .map(|binding| {
-                                    lyng_js_bytecode::BytecodeEnvironmentBinding::new(
-                                        binding.name().map(|atom| {
-                                            canonical_atoms
-                                                .get(
-                                                    usize::try_from(atom.raw())
-                                                        .unwrap_or(usize::MAX),
-                                                )
-                                                .copied()
-                                                .flatten()
-                                                .unwrap_or(atom)
-                                        }),
-                                        binding.flags(),
-                                    )
-                                })
-                                .collect::<Vec<_>>(),
-                        );
-                        if let Some(name) = scope.annex_b_catch_name() {
-                            canonical_scope.with_annex_b_catch_name(
-                                canonical_atoms
-                                    .get(usize::try_from(name.raw()).unwrap_or(usize::MAX))
-                                    .copied()
-                                    .flatten()
-                                    .unwrap_or(name),
-                            )
-                        } else {
-                            canonical_scope
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                let canonical_annex_b_catch_names = site
-                    .annex_b_catch_names()
-                    .iter()
-                    .copied()
-                    .map(|name| {
-                        canonical_atoms
-                            .get(usize::try_from(name.raw()).unwrap_or(usize::MAX))
-                            .copied()
-                            .flatten()
-                            .unwrap_or(name)
-                    })
-                    .collect::<Vec<_>>();
-                let canonical_parameter_names = site
-                    .parameter_names()
-                    .iter()
-                    .copied()
-                    .map(|name| {
-                        canonical_atoms
-                            .get(usize::try_from(name.raw()).unwrap_or(usize::MAX))
-                            .copied()
-                            .flatten()
-                            .unwrap_or(name)
-                    })
-                    .collect::<Vec<_>>();
-                *slot = Some(lyng_js_bytecode::DirectEvalLexicalSite::new(
-                    site.instruction_offset(),
-                    canonical_scopes,
-                    site.flags(),
-                    canonical_annex_b_catch_names,
-                    canonical_parameter_names,
-                ));
-            }
-        }
-        let mut loop_iteration_sites_by_offset = vec![
-            None;
-            offset_table_len(
-                function
-                    .loop_iteration_environment_sites()
-                    .iter()
-                    .map(lyng_js_bytecode::LoopIterationEnvironmentSite::instruction_offset),
-            )
-        ];
-        for site in function.loop_iteration_environment_sites() {
-            if let Some(slot) = loop_iteration_sites_by_offset.get_mut(
-                usize::try_from(site.instruction_offset())
-                    .expect("instruction offset should fit usize"),
-            ) {
-                *slot = Some(site.clone());
-            }
-        }
+        let wide_payloads = function.wide_operands().to_vec();
+        let direct_eval_lexical_sites = function
+            .direct_eval_lexical_sites()
+            .iter()
+            .map(|site| canonical_direct_eval_site(site, &canonical_atoms))
+            .collect::<Vec<_>>();
+        let loop_iteration_sites = function.loop_iteration_environment_sites().to_vec();
         let mut feedback_sites_by_slot =
             vec![None; usize::try_from(function.feedback_slot_count()).unwrap_or(usize::MAX)];
         for descriptor in function.feedback_sites() {
@@ -161,10 +51,9 @@ impl InstalledFunction {
             function,
             child_codes,
             canonical_atoms,
-            instructions,
             wide_payloads,
-            direct_eval_lexical_sites_by_offset,
-            loop_iteration_sites_by_offset,
+            direct_eval_lexical_sites,
+            loop_iteration_sites,
             feedback_sites_by_slot,
         }
     }
@@ -172,16 +61,34 @@ impl InstalledFunction {
     #[inline]
     pub(super) fn wide_payload(&self, instruction_offset: u32) -> Option<u32> {
         self.wide_payloads
-            .get(usize::try_from(instruction_offset).ok()?)
-            .copied()
-            .flatten()
+            .binary_search_by_key(&instruction_offset, |operand| operand.instruction_offset())
+            .ok()
+            .and_then(|index| self.wide_payloads.get(index))
+            .map(|operand| operand.payload())
     }
 
     #[inline]
     pub(super) fn instruction_at(&self, instruction_offset: u32) -> Option<Instruction> {
-        self.instructions
-            .get(usize::try_from(instruction_offset).ok()?)
-            .copied()
+        decode_instruction_bytes(
+            self.function
+                .instruction_bytes()
+                .get(usize::try_from(instruction_offset).ok()?..)?,
+        )
+        .ok()
+    }
+
+    pub(super) fn instruction_before(&self, instruction_offset: u32) -> Option<(u32, Instruction)> {
+        let mut previous = None;
+        for offset in self.function.instructions().byte_offsets() {
+            let offset = u32::try_from(offset).ok()?;
+            if offset >= instruction_offset {
+                break;
+            }
+            previous = self
+                .instruction_at(offset)
+                .map(|instruction| (offset, instruction));
+        }
+        previous
     }
 
     pub(super) fn feedback_descriptor_for_slot(
@@ -199,9 +106,13 @@ impl InstalledFunction {
         &self,
         instruction_offset: u32,
     ) -> Option<&lyng_js_bytecode::LoopIterationEnvironmentSite> {
-        self.loop_iteration_sites_by_offset
-            .get(usize::try_from(instruction_offset).ok()?)?
-            .as_ref()
+        self.loop_iteration_sites
+            .binary_search_by_key(
+                &instruction_offset,
+                lyng_js_bytecode::LoopIterationEnvironmentSite::instruction_offset,
+            )
+            .ok()
+            .and_then(|index| self.loop_iteration_sites.get(index))
     }
 
     #[inline]
@@ -209,9 +120,13 @@ impl InstalledFunction {
         &self,
         instruction_offset: u32,
     ) -> Option<&lyng_js_bytecode::DirectEvalLexicalSite> {
-        self.direct_eval_lexical_sites_by_offset
-            .get(usize::try_from(instruction_offset).ok()?)?
-            .as_ref()
+        self.direct_eval_lexical_sites
+            .binary_search_by_key(
+                &instruction_offset,
+                lyng_js_bytecode::DirectEvalLexicalSite::instruction_offset,
+            )
+            .ok()
+            .and_then(|index| self.direct_eval_lexical_sites.get(index))
     }
 
     #[inline]
@@ -264,17 +179,68 @@ impl InstalledFunction {
 
     #[cfg(test)]
     const fn cold_metadata_index_footprint(&self) -> usize {
-        self.direct_eval_lexical_sites_by_offset.len() + self.loop_iteration_sites_by_offset.len()
+        self.direct_eval_lexical_sites.len() + self.loop_iteration_sites.len()
     }
 }
 
-#[inline]
-fn offset_table_len(offsets: impl Iterator<Item = u32>) -> usize {
-    offsets.max().map_or(0, |offset| {
-        usize::try_from(offset)
-            .unwrap_or(usize::MAX)
-            .saturating_add(1)
-    })
+fn canonical_direct_eval_site(
+    site: &lyng_js_bytecode::DirectEvalLexicalSite,
+    canonical_atoms: &[Option<AtomId>],
+) -> lyng_js_bytecode::DirectEvalLexicalSite {
+    let canonical_scopes = site
+        .scopes()
+        .iter()
+        .map(|scope| {
+            let canonical_scope = lyng_js_bytecode::DirectEvalLexicalScope::new(
+                scope.source_base(),
+                scope
+                    .bindings()
+                    .iter()
+                    .copied()
+                    .map(|binding| {
+                        lyng_js_bytecode::BytecodeEnvironmentBinding::new(
+                            binding
+                                .name()
+                                .map(|atom| canonical_atom(canonical_atoms, atom)),
+                            binding.flags(),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            );
+            if let Some(name) = scope.annex_b_catch_name() {
+                canonical_scope.with_annex_b_catch_name(canonical_atom(canonical_atoms, name))
+            } else {
+                canonical_scope
+            }
+        })
+        .collect::<Vec<_>>();
+    let canonical_annex_b_catch_names = site
+        .annex_b_catch_names()
+        .iter()
+        .copied()
+        .map(|name| canonical_atom(canonical_atoms, name))
+        .collect::<Vec<_>>();
+    let canonical_parameter_names = site
+        .parameter_names()
+        .iter()
+        .copied()
+        .map(|name| canonical_atom(canonical_atoms, name))
+        .collect::<Vec<_>>();
+    lyng_js_bytecode::DirectEvalLexicalSite::new(
+        site.instruction_offset(),
+        canonical_scopes,
+        site.flags(),
+        canonical_annex_b_catch_names,
+        canonical_parameter_names,
+    )
+}
+
+fn canonical_atom(canonical_atoms: &[Option<AtomId>], atom: AtomId) -> AtomId {
+    canonical_atoms
+        .get(usize::try_from(atom.raw()).unwrap_or(usize::MAX))
+        .copied()
+        .flatten()
+        .unwrap_or(atom)
 }
 
 fn validate_register_operands(code: CodeRef, function: &BytecodeFunction) -> VmResult<()> {
@@ -285,7 +251,11 @@ fn validate_register_operands(code: CodeRef, function: &BytecodeFunction) -> VmR
             code,
             register: u16::MAX,
         })?;
-    for (offset, instruction) in function.instructions().iter().enumerate() {
+    for (offset, instruction) in function
+        .instructions()
+        .byte_offsets()
+        .zip(function.instructions().iter())
+    {
         validate_instruction_registers(
             code,
             function,

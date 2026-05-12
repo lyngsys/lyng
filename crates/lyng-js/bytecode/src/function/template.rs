@@ -332,8 +332,11 @@ impl BytecodeFunction {
 
     #[inline]
     pub fn instruction_at(&self, instruction_offset: u32) -> Option<Instruction> {
-        self.instructions()
-            .get(usize::try_from(instruction_offset).ok()?)
+        decode_instruction_bytes(
+            self.instructions
+                .get(usize::try_from(instruction_offset).ok()?..)?,
+        )
+        .ok()
     }
 
     #[inline]

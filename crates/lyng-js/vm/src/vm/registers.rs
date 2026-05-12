@@ -1,4 +1,5 @@
 use super::call::finalize_frame_result;
+use super::values::code_index;
 use super::{Agent, FrameRecord, Value, Vm, VmError, VmResult};
 use lyng_js_types::AbruptCompletion;
 
@@ -24,12 +25,14 @@ impl Vm {
     pub(super) fn advance_instruction(&mut self) {
         let frame = self
             .frames
+            .last()
+            .copied()
+            .expect("advance requires one active frame");
+        let next = self.next_instruction_offset(frame);
+        let frame = self
+            .frames
             .last_mut()
             .expect("advance requires one active frame");
-        let next = frame
-            .instruction_offset()
-            .checked_add(1)
-            .expect("instruction offset should stay within u32");
         frame.set_instruction_offset(next);
     }
 
@@ -42,11 +45,17 @@ impl Vm {
     }
 
     pub(super) fn jump_by(&mut self, delta: i32) -> VmResult<()> {
+        let frame_snapshot = self
+            .frames
+            .last()
+            .copied()
+            .expect("jump requires one active frame");
+        let instruction_len = i64::from(self.active_instruction_len(frame_snapshot));
         let frame = self
             .frames
             .last_mut()
             .expect("jump requires one active frame");
-        let next = i64::from(frame.instruction_offset()) + 1 + i64::from(delta);
+        let next = i64::from(frame.instruction_offset()) + instruction_len + i64::from(delta);
         if next < 0 {
             return Err(VmError::InvalidJumpTarget {
                 code: frame.code(),
@@ -62,6 +71,28 @@ impl Vm {
             }
         })?);
         Ok(())
+    }
+
+    pub(super) fn next_instruction_offset(&self, frame: FrameRecord) -> u32 {
+        frame
+            .instruction_offset()
+            .checked_add(self.active_instruction_len(frame))
+            .expect("instruction offset should stay within u32")
+    }
+
+    fn active_instruction_len(&self, frame: FrameRecord) -> u32 {
+        let installed = self
+            .installed
+            .get(code_index(frame.code()))
+            .and_then(Option::as_ref)
+            .expect("active frame should have installed code");
+        u32::try_from(
+            installed
+                .instruction_at(frame.instruction_offset())
+                .expect("active frame should point at an instruction")
+                .encoded_len(),
+        )
+        .expect("encoded instruction length should fit u32")
     }
 
     pub(super) fn finish_frame(

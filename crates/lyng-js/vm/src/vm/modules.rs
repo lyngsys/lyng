@@ -551,11 +551,11 @@ impl Vm {
         let instructions = installed.function.instructions();
         let mut offset = Self::module_hoisted_function_prologue_start(instructions);
         let mut initializers = Vec::new();
-        while let Some((slot, child_index)) =
-            Self::module_hoisted_function_initializer_at(installed, instructions, offset)
+        while let Some((slot, child_index, next_offset)) =
+            Self::module_hoisted_function_initializer_at(installed, offset)
         {
             initializers.push((slot, child_index));
-            offset += 2;
+            offset = next_offset;
         }
         initializers
     }
@@ -564,57 +564,64 @@ impl Vm {
         let instructions = installed.function.instructions();
         let start = Self::module_hoisted_function_prologue_start(instructions);
         let mut offset = start;
-        while Self::module_hoisted_function_initializer_at(installed, instructions, offset)
-            .is_some()
+        while let Some((_, _, next_offset)) =
+            Self::module_hoisted_function_initializer_at(installed, offset)
         {
-            offset += 2;
+            offset = next_offset;
         }
         if offset == start {
             0
         } else {
-            u32::try_from(offset).expect("instruction offset should fit into u32")
+            offset
         }
     }
 
-    fn module_hoisted_function_prologue_start(instructions: InstructionStream<'_>) -> usize {
-        instructions
-            .iter()
-            .take_while(|instruction| {
-                matches!(
-                    instruction,
-                    Instruction::Abx {
-                        opcode: Opcode::LoadUndefined,
-                        ..
-                    }
-                )
-            })
-            .count()
+    fn module_hoisted_function_prologue_start(instructions: InstructionStream<'_>) -> u32 {
+        let mut start = 0;
+        for (offset, instruction) in instructions.byte_offsets().zip(instructions.iter()) {
+            if !matches!(
+                instruction,
+                Instruction::Abx {
+                    opcode: Opcode::LoadUndefined,
+                    ..
+                }
+            ) {
+                break;
+            }
+            let next = offset
+                .checked_add(instruction.encoded_len())
+                .expect("instruction offset should stay within usize");
+            start = u32::try_from(next).expect("instruction offset should fit into u32");
+        }
+        start
     }
 
     fn module_hoisted_function_initializer_at(
         installed: &InstalledFunction,
-        instructions: InstructionStream<'_>,
-        offset: usize,
-    ) -> Option<(u32, u32)> {
-        let create_offset = u32::try_from(offset).expect("instruction offset should fit into u32");
-        let store_offset =
-            u32::try_from(offset + 1).expect("instruction offset should fit into u32");
+        create_offset: u32,
+    ) -> Option<(u32, u32, u32)> {
+        let create_instruction = installed.instruction_at(create_offset)?;
         let Instruction::Abx {
             opcode: Opcode::CreateClosure,
             a: create_register,
             bx: child_index,
-        } = instructions.get(offset)?
+        } = create_instruction.without_feedback_slot()
         else {
             return None;
         };
+        let store_offset =
+            create_offset.checked_add(u32::try_from(create_instruction.encoded_len()).ok()?)?;
+        let store_instruction = installed.instruction_at(store_offset)?;
         let Instruction::Abx {
             opcode: Opcode::StoreEnvSlot,
             a: store_register,
             bx: env_operand,
-        } = instructions.get(offset + 1)?
+        } = store_instruction.without_feedback_slot()
         else {
             return None;
         };
+        let next_offset =
+            store_offset.checked_add(u32::try_from(store_instruction.encoded_len()).ok()?)?;
         let create_operands = installed.wide_payload(create_offset).map_or_else(
             || lyng_js_bytecode::WideAbxOperands::narrow(create_register, child_index),
             |payload| {
@@ -631,7 +638,7 @@ impl Vm {
             return None;
         }
         let (depth, slot) = decode_env_operand(store_operands.bx());
-        (depth == 0).then_some((slot, create_operands.bx()))
+        (depth == 0).then_some((slot, create_operands.bx(), next_offset))
     }
 
     #[expect(

@@ -169,7 +169,7 @@ fn inspector_fixture_unit() -> (CompiledScriptUnit, u32) {
     builder
         .emit_abx(Opcode::StoreEnvSlot, 0, env_operand)
         .expect("test bytecode should build");
-    let loop_offset = builder
+    builder
         .emit_ax(Opcode::LoopHeader, 0)
         .expect("test bytecode should build");
     builder
@@ -179,6 +179,7 @@ fn inspector_fixture_unit() -> (CompiledScriptUnit, u32) {
         .emit_ax(Opcode::Return, 1)
         .expect("test bytecode should build");
     let function = builder.finish().expect("test bytecode should build");
+    let loop_offset = loop_header_offsets(&function)[0];
     (
         CompiledScriptUnit::new(SourceId::new(15), function.id(), vec![function]),
         loop_offset,
@@ -263,7 +264,7 @@ fn stepping_fixture_unit() -> (CompiledScriptUnit, StepFixtureOffsets) {
     outer
         .emit_ax(Opcode::Nop, 0)
         .expect("test bytecode should build");
-    let outer_entry = outer
+    outer
         .emit_ax(Opcode::LoopHeader, 0)
         .expect("test bytecode should build");
     outer
@@ -275,13 +276,16 @@ fn stepping_fixture_unit() -> (CompiledScriptUnit, StepFixtureOffsets) {
     outer
         .emit_abc(Opcode::Call0, 2, 0, 1)
         .expect("test bytecode should build");
-    let outer_after_inner = outer
+    outer
         .emit_ax(Opcode::LoopHeader, 0)
         .expect("test bytecode should build");
     outer
         .emit_ax(Opcode::Return, 2)
         .expect("test bytecode should build");
     let outer = outer.finish().expect("test bytecode should build");
+    let outer_loop_offsets = loop_header_offsets(&outer);
+    let outer_entry = outer_loop_offsets[0];
+    let outer_after_inner = outer_loop_offsets[1];
 
     let mut script = BytecodeBuilder::new(script_id, BytecodeFunctionKind::Script);
     script
@@ -299,13 +303,14 @@ fn stepping_fixture_unit() -> (CompiledScriptUnit, StepFixtureOffsets) {
     script
         .emit_abc(Opcode::Call0, 2, 0, 1)
         .expect("test bytecode should build");
-    let script_after_outer = script
+    script
         .emit_ax(Opcode::LoopHeader, 0)
         .expect("test bytecode should build");
     script
         .emit_ax(Opcode::Return, 2)
         .expect("test bytecode should build");
     let script = script.finish().expect("test bytecode should build");
+    let script_after_outer = loop_header_offsets(&script)[0];
 
     (
         CompiledScriptUnit::new(SourceId::new(16), script.id(), vec![script, outer, inner]),
@@ -315,6 +320,16 @@ fn stepping_fixture_unit() -> (CompiledScriptUnit, StepFixtureOffsets) {
             outer_after_inner,
         },
     )
+}
+
+fn loop_header_offsets(function: &BytecodeFunction) -> Vec<u32> {
+    function
+        .instructions()
+        .byte_offsets()
+        .zip(function.instructions().iter())
+        .filter(|(_, instruction)| instruction.opcode() == Opcode::LoopHeader)
+        .map(|(offset, _)| u32::try_from(offset).expect("instruction offset should fit u32"))
+        .collect()
 }
 
 const fn encode_env_operand(depth: u8, slot: u32) -> u32 {

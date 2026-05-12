@@ -1947,9 +1947,9 @@ fn compile_script_covers_direct_eval_internal_call_inside_try_with_catch_handler
         .expect("entry script should lower");
     let direct_eval_call_offset = entry
         .instructions()
-        .iter()
-        .enumerate()
-        .find_map(|(index, instruction)| {
+        .byte_offsets()
+        .zip(entry.instructions().iter())
+        .find_map(|(offset, instruction)| {
             matches!(
                 instruction,
                 lyng_js_bytecode::Instruction::Abc {
@@ -1957,15 +1957,19 @@ fn compile_script_covers_direct_eval_internal_call_inside_try_with_catch_handler
                     ..
                 }
             )
-            .then_some(checked_u32_index(index))
+            .then(|| u32::try_from(offset).expect("instruction offset should fit u32"))
         })
         .expect("direct eval should lower through an internal builtin call");
 
     assert!(entry
         .instructions()
-        .iter()
-        .take(usize::try_from(direct_eval_call_offset).unwrap_or(usize::MAX))
-        .any(|instruction| {
+        .byte_offsets()
+        .zip(entry.instructions().iter())
+        .take_while(|(offset, _)| {
+            u32::try_from(*offset).expect("instruction offset should fit u32")
+                < direct_eval_call_offset
+        })
+        .any(|(_, instruction)| {
             matches!(
                 instruction,
                 lyng_js_bytecode::Instruction::Abx {
@@ -1976,9 +1980,13 @@ fn compile_script_covers_direct_eval_internal_call_inside_try_with_catch_handler
         }));
     assert!(!entry
         .instructions()
-        .iter()
-        .take(usize::try_from(direct_eval_call_offset).unwrap_or(usize::MAX))
-        .any(|instruction| {
+        .byte_offsets()
+        .zip(entry.instructions().iter())
+        .take_while(|(offset, _)| {
+            u32::try_from(*offset).expect("instruction offset should fit u32")
+                < direct_eval_call_offset
+        })
+        .any(|(_, instruction)| {
             matches!(
                 instruction,
                 lyng_js_bytecode::Instruction::Abx {

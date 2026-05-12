@@ -9,12 +9,13 @@ use crate::metadata::{
     ArgumentsMode, BytecodeFunctionFlags, BytecodeFunctionKind, CallRange, CaptureDescriptor,
     ConstantValue, DeoptSnapshot, DirectEvalLexicalScope, DirectEvalLexicalSite,
     DirectEvalSiteFlags, ExceptionHandler, FeedbackSiteDescriptor, FeedbackSiteKind,
-    FeedbackSiteMetadata, LoopIterationEnvironmentSite, SafepointDescriptor, SafepointKind,
-    SourceMapEntry, ThisMode, WideAbcOperands, WideAbxOperands, WideOperand,
+    FeedbackSiteMetadata, LoopIterationEnvironmentSite, RuntimeStateCapture, SafepointDescriptor,
+    SafepointKind, SourceMapEntry, ThisMode, WideAbcOperands, WideAbxOperands, WideOperand,
 };
 use crate::Opcode;
 use lyng_js_common::{AtomId, SourceId, Span};
 use lyng_js_types::FeedbackSlotId;
+use std::collections::HashMap;
 
 mod peephole;
 
@@ -197,6 +198,190 @@ const fn full_conditional_jump_opcode(opcode: Opcode) -> Option<Opcode> {
         Opcode::JumpIfFalse | Opcode::JumpIfFalse8 => Some(Opcode::JumpIfFalse),
         _ => None,
     }
+}
+
+fn byte_offsets_for(instructions: &[Instruction]) -> BytecodeBuildResult<(Vec<u32>, u32)> {
+    let mut offsets = Vec::with_capacity(instructions.len());
+    let mut next_offset = 0u32;
+    for instruction in instructions {
+        offsets.push(next_offset);
+        next_offset = next_offset
+            .checked_add(u32::try_from(instruction.encoded_len()).map_err(|_| {
+                BytecodeBuildError::LimitExceeded {
+                    kind: BytecodeLimitKind::InstructionStream,
+                }
+            })?)
+            .ok_or(BytecodeBuildError::LimitExceeded {
+                kind: BytecodeLimitKind::InstructionStream,
+            })?;
+    }
+    Ok((offsets, next_offset))
+}
+
+fn checked_instruction_offset(offset: usize) -> BytecodeBuildResult<u32> {
+    u32::try_from(offset).map_err(|_| BytecodeBuildError::LimitExceeded {
+        kind: BytecodeLimitKind::InstructionStream,
+    })
+}
+
+fn byte_offset_for(byte_offsets: &[u32], logical_offset: u32) -> Option<u32> {
+    byte_offsets
+        .get(usize::try_from(logical_offset).ok()?)
+        .copied()
+}
+
+fn byte_boundary_for(byte_offsets: &[u32], byte_len: u32, logical_offset: u32) -> Option<u32> {
+    if usize::try_from(logical_offset).ok()? == byte_offsets.len() {
+        return Some(byte_len);
+    }
+    byte_offset_for(byte_offsets, logical_offset)
+}
+
+fn logical_jump_target(
+    logical_offset: u32,
+    instruction: Instruction,
+    wide_operands: &[WideOperand],
+    instruction_len: usize,
+) -> Option<u32> {
+    let delta = match instruction {
+        Instruction::Ax {
+            opcode: Opcode::Jump | Opcode::Jump8,
+            ax,
+        } => ax,
+        Instruction::Abx {
+            opcode: Opcode::JumpIfTrue | Opcode::JumpIfFalse,
+            a,
+            bx,
+        } => {
+            let operands = decode_abx_operands(wide_operands, logical_offset, a, bx);
+            i32::from_le_bytes(operands.bx().to_le_bytes())
+        }
+        Instruction::Abx {
+            opcode: Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8,
+            bx,
+            ..
+        } => i32::from(i8::from_le_bytes([bx.to_le_bytes()[0]])),
+        _ => return None,
+    };
+    let target = i64::from(logical_offset) + 1 + i64::from(delta);
+    if (0..=i64::try_from(instruction_len).ok()?).contains(&target) {
+        u32::try_from(target).ok()
+    } else {
+        None
+    }
+}
+
+fn rewrite_jump_for_byte_target(
+    instruction: Instruction,
+    logical_offset: u32,
+    byte_offset: u32,
+    target_byte: u32,
+    wide_operands: &[WideOperand],
+) -> BytecodeBuildResult<Instruction> {
+    match instruction {
+        Instruction::Ax {
+            opcode: Opcode::Jump | Opcode::Jump8,
+            ..
+        } => {
+            let short_delta = i64::from(target_byte) - (i64::from(byte_offset) + 2);
+            if let Ok(delta) = i32::try_from(short_delta)
+                && signed_i8_fits(delta)
+            {
+                return Ok(Instruction::ax(Opcode::Jump8, delta));
+            }
+            let full_delta = i64::from(target_byte) - (i64::from(byte_offset) + 4);
+            Ok(Instruction::ax(
+                Opcode::Jump,
+                i32::try_from(full_delta).map_err(|_| BytecodeBuildError::JumpDeltaOverflow {
+                    instruction_offset: logical_offset,
+                    target_offset: target_byte,
+                })?,
+            ))
+        }
+        Instruction::Abx { opcode, a, bx } if opcode.is_jump() => {
+            let condition = if matches!(opcode, Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8) {
+                u16::from(a)
+            } else {
+                decode_abx_operands(wide_operands, logical_offset, a, bx).a()
+            };
+            let short_delta = i64::from(target_byte) - (i64::from(byte_offset) + 3);
+            if let (Ok(condition), Ok(delta)) =
+                (u8::try_from(condition), i32::try_from(short_delta))
+                && signed_i8_fits(delta)
+            {
+                return Ok(Instruction::abx(
+                    short_conditional_jump_opcode(opcode).ok_or(
+                        BytecodeBuildError::InvalidJumpPatch {
+                            instruction_offset: logical_offset,
+                        },
+                    )?,
+                    condition,
+                    u16::from(
+                        i8::try_from(delta)
+                            .expect("delta should fit i8")
+                            .cast_unsigned(),
+                    ),
+                ));
+            }
+            let full_delta = i64::from(target_byte) - (i64::from(byte_offset) + 4);
+            let delta =
+                i32::try_from(full_delta).map_err(|_| BytecodeBuildError::JumpDeltaOverflow {
+                    instruction_offset: logical_offset,
+                    target_offset: target_byte,
+                })?;
+            let updated = WideAbxOperands::new(condition, u32::from_le_bytes(delta.to_le_bytes()));
+            Ok(Instruction::abx(
+                full_conditional_jump_opcode(opcode).ok_or(
+                    BytecodeBuildError::InvalidJumpPatch {
+                        instruction_offset: logical_offset,
+                    },
+                )?,
+                updated.narrow_a(),
+                updated.narrow_bx(),
+            ))
+        }
+        _ => Ok(instruction),
+    }
+}
+
+fn decode_abx_operands(
+    wide_operands: &[WideOperand],
+    instruction_offset: u32,
+    a: u8,
+    bx: u16,
+) -> WideAbxOperands {
+    wide_payload(wide_operands, instruction_offset).map_or_else(
+        || WideAbxOperands::narrow(a, bx),
+        |payload| WideAbxOperands::decode(a, bx, payload),
+    )
+}
+
+fn wide_payload(wide_operands: &[WideOperand], instruction_offset: u32) -> Option<u32> {
+    wide_operands.iter().find_map(|operand| {
+        (operand.instruction_offset() == instruction_offset).then_some(operand.payload())
+    })
+}
+
+const fn remap_safepoint_descriptor(
+    descriptor: SafepointDescriptor,
+    instruction_offset: u32,
+) -> SafepointDescriptor {
+    let runtime_state = RuntimeStateCapture::new()
+        .with_lexical_env(descriptor.captures_lexical_env())
+        .with_variable_env(descriptor.captures_variable_env())
+        .with_this_value(descriptor.captures_this())
+        .with_new_target(descriptor.captures_new_target())
+        .with_callee(descriptor.captures_callee())
+        .with_exception_state(descriptor.captures_exception_state())
+        .with_completion_state(descriptor.captures_completion_state());
+    SafepointDescriptor::new(
+        descriptor.id(),
+        instruction_offset,
+        descriptor.kind(),
+        descriptor.register_window_len(),
+    )
+    .with_environment_layout(descriptor.environment_layout())
+    .with_runtime_state(runtime_state)
 }
 
 /// Incremental builder for one immutable [`BytecodeFunction`].
@@ -1037,12 +1222,6 @@ impl BytecodeBuilder {
             });
         }
         self.next_feedback_slot = next_feedback_slot;
-        if let Some(profiled_instruction) = self
-            .instruction_at(instruction_offset)
-            .and_then(|instruction| instruction.with_feedback_slot(slot))
-        {
-            self.replace_instruction(instruction_offset, profiled_instruction)?;
-        }
         self.feedback_sites.push(
             FeedbackSiteDescriptor::new(slot, instruction_offset, kind).with_metadata(metadata),
         );
@@ -1114,6 +1293,242 @@ impl BytecodeBuilder {
         self.deopt_snapshots.push(snapshot);
     }
 
+    fn attach_feedback_slots(&self, logical_instructions: &[Instruction]) -> Vec<Instruction> {
+        let feedback_slots = self
+            .feedback_sites
+            .iter()
+            .map(|site| (site.instruction_offset(), site.slot()))
+            .collect::<HashMap<_, _>>();
+        logical_instructions
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(offset, instruction)| {
+                feedback_slots
+                    .get(&u32::try_from(offset).expect("instruction offset should fit u32"))
+                    .and_then(|slot| instruction.with_feedback_slot(*slot))
+                    .unwrap_or(instruction)
+            })
+            .collect()
+    }
+
+    fn rewrite_jumps_to_byte_offsets(
+        &self,
+        logical_instructions: &[Instruction],
+        lowered: &mut Vec<Instruction>,
+    ) -> BytecodeBuildResult<()> {
+        for _ in 0..8 {
+            let (byte_offsets, byte_len) = byte_offsets_for(lowered)?;
+            let mut next = lowered.clone();
+            for (logical_offset, instruction) in logical_instructions.iter().copied().enumerate() {
+                if !instruction.opcode().is_jump() {
+                    continue;
+                }
+                let logical_offset_u32 = checked_instruction_offset(logical_offset)?;
+                let Some(logical_target) = logical_jump_target(
+                    logical_offset_u32,
+                    instruction,
+                    &self.wide_operands,
+                    logical_instructions.len(),
+                ) else {
+                    continue;
+                };
+                let target_byte = byte_boundary_for(&byte_offsets, byte_len, logical_target)
+                    .ok_or(BytecodeBuildError::JumpDeltaOverflow {
+                        instruction_offset: logical_offset_u32,
+                        target_offset: logical_target,
+                    })?;
+                next[logical_offset] = rewrite_jump_for_byte_target(
+                    instruction,
+                    logical_offset_u32,
+                    byte_offsets[logical_offset],
+                    target_byte,
+                    &self.wide_operands,
+                )?;
+            }
+            if next == *lowered {
+                return Ok(());
+            }
+            *lowered = next;
+        }
+        Ok(())
+    }
+
+    fn rebuild_wide_operands_for_byte_offsets(
+        &mut self,
+        logical_instructions: &[Instruction],
+        lowered: &[Instruction],
+        byte_offsets: &[u32],
+        byte_len: u32,
+    ) -> BytecodeBuildResult<()> {
+        let old_wide_operands = std::mem::take(&mut self.wide_operands);
+        let mut byte_wide_operands = Vec::new();
+        for (logical_offset, instruction) in logical_instructions.iter().copied().enumerate() {
+            let logical_offset_u32 = checked_instruction_offset(logical_offset)?;
+            let byte_offset = byte_offsets[logical_offset];
+            if instruction.opcode().is_jump() {
+                if let Some(Instruction::Abx {
+                    opcode: Opcode::JumpIfTrue | Opcode::JumpIfFalse,
+                    a,
+                    bx,
+                }) = lowered.get(logical_offset).copied()
+                {
+                    let condition =
+                        decode_abx_operands(&old_wide_operands, logical_offset_u32, a, bx).a();
+                    let Some(logical_target) = logical_jump_target(
+                        logical_offset_u32,
+                        instruction,
+                        &old_wide_operands,
+                        logical_instructions.len(),
+                    ) else {
+                        continue;
+                    };
+                    let Some(target_byte) =
+                        byte_boundary_for(byte_offsets, byte_len, logical_target)
+                    else {
+                        continue;
+                    };
+                    let delta = i64::from(target_byte)
+                        - (i64::from(byte_offset)
+                            + i64::try_from(lowered[logical_offset].encoded_len())
+                                .expect("instruction length should fit i64"));
+                    let delta = i32::try_from(delta).map_err(|_| {
+                        BytecodeBuildError::JumpDeltaOverflow {
+                            instruction_offset: logical_offset_u32,
+                            target_offset: logical_target,
+                        }
+                    })?;
+                    let updated =
+                        WideAbxOperands::new(condition, u32::from_le_bytes(delta.to_le_bytes()));
+                    if updated.needs_wide() {
+                        byte_wide_operands
+                            .push(WideOperand::new(byte_offset, updated.encode_payload()));
+                    }
+                }
+            } else if let Some(payload) = wide_payload(&old_wide_operands, logical_offset_u32) {
+                byte_wide_operands.push(WideOperand::new(byte_offset, payload));
+            }
+        }
+        self.wide_operands = byte_wide_operands;
+        Ok(())
+    }
+
+    fn lower_labels_to_byte_offsets(&mut self) -> BytecodeBuildResult<()> {
+        let logical_instructions = InstructionStream::new(&self.instructions).to_vec();
+        let mut lowered = self.attach_feedback_slots(&logical_instructions);
+        self.rewrite_jumps_to_byte_offsets(&logical_instructions, &mut lowered)?;
+
+        let (byte_offsets, byte_len) = byte_offsets_for(&lowered)?;
+        self.rebuild_wide_operands_for_byte_offsets(
+            &logical_instructions,
+            &lowered,
+            &byte_offsets,
+            byte_len,
+        )?;
+        self.remap_label_metadata_to_byte_offsets(&byte_offsets, byte_len)?;
+        self.replace_decoded_instructions(lowered);
+        Ok(())
+    }
+
+    fn remap_label_metadata_to_byte_offsets(
+        &mut self,
+        byte_offsets: &[u32],
+        byte_len: u32,
+    ) -> BytecodeBuildResult<()> {
+        let remap_instruction = |offset| {
+            byte_offset_for(byte_offsets, offset).ok_or(BytecodeBuildError::LimitExceeded {
+                kind: BytecodeLimitKind::InstructionStream,
+            })
+        };
+        let remap_boundary = |offset| {
+            byte_boundary_for(byte_offsets, byte_len, offset).ok_or(
+                BytecodeBuildError::LimitExceeded {
+                    kind: BytecodeLimitKind::InstructionStream,
+                },
+            )
+        };
+
+        self.header = self
+            .header
+            .with_parameter_initializer_end_offset(remap_boundary(
+                self.header.parameter_initializer_end_offset(),
+            )?);
+        self.direct_eval_lexical_sites = self
+            .direct_eval_lexical_sites
+            .drain(..)
+            .map(|site| {
+                Ok(DirectEvalLexicalSite::new(
+                    remap_instruction(site.instruction_offset())?,
+                    site.scopes().to_vec(),
+                    site.flags(),
+                    site.annex_b_catch_names().to_vec(),
+                    site.parameter_names().to_vec(),
+                ))
+            })
+            .collect::<BytecodeBuildResult<_>>()?;
+        self.loop_iteration_environment_sites = self
+            .loop_iteration_environment_sites
+            .drain(..)
+            .map(|site| {
+                Ok(LoopIterationEnvironmentSite::new(
+                    remap_instruction(site.instruction_offset())?,
+                    site.iteration_slots().to_vec(),
+                    site.shared_slots().to_vec(),
+                    site.detached_slots().to_vec(),
+                ))
+            })
+            .collect::<BytecodeBuildResult<_>>()?;
+        self.feedback_sites = self
+            .feedback_sites
+            .drain(..)
+            .map(|site| {
+                Ok(FeedbackSiteDescriptor::new(
+                    site.slot(),
+                    remap_instruction(site.instruction_offset())?,
+                    site.kind(),
+                )
+                .with_metadata(site.metadata()))
+            })
+            .collect::<BytecodeBuildResult<_>>()?;
+        self.source_map = self
+            .source_map
+            .drain(..)
+            .map(|entry| {
+                Ok(SourceMapEntry::new(
+                    entry.source(),
+                    remap_instruction(entry.instruction_offset())?,
+                    entry.start(),
+                    entry.end(),
+                ))
+            })
+            .collect::<BytecodeBuildResult<_>>()?;
+        self.exception_handlers = self
+            .exception_handlers
+            .drain(..)
+            .map(|handler| {
+                Ok(ExceptionHandler::new(
+                    remap_boundary(handler.protected_start())?,
+                    remap_boundary(handler.protected_end())?,
+                    remap_instruction(handler.handler())?,
+                    handler.kind(),
+                    handler.stack_depth(),
+                    handler.target_register(),
+                ))
+            })
+            .collect::<BytecodeBuildResult<_>>()?;
+        self.safepoints = self
+            .safepoints
+            .drain(..)
+            .map(|descriptor| {
+                Ok(remap_safepoint_descriptor(
+                    descriptor,
+                    remap_instruction(descriptor.instruction_offset())?,
+                ))
+            })
+            .collect::<BytecodeBuildResult<_>>()?;
+        Ok(())
+    }
+
     #[inline]
     /// Finalize the immutable bytecode function.
     ///
@@ -1122,6 +1537,7 @@ impl BytecodeBuilder {
     /// not fit in the final register window.
     pub fn finish(mut self) -> BytecodeBuildResult<BytecodeFunction> {
         peephole::optimize(&mut self)?;
+        self.lower_labels_to_byte_offsets()?;
         let final_register_window = self
             .header
             .register_count()
@@ -1213,8 +1629,8 @@ mod tests {
             ]
         ));
         assert_eq!(function.exception_handlers()[0].protected_start(), 0);
-        assert_eq!(function.exception_handlers()[0].protected_end(), 1);
-        assert_eq!(function.exception_handlers()[0].handler(), 1);
+        assert_eq!(function.exception_handlers()[0].protected_end(), 3);
+        assert_eq!(function.exception_handlers()[0].handler(), 3);
         Ok(())
     }
 
@@ -1281,6 +1697,68 @@ mod tests {
     }
 
     #[test]
+    fn final_function_metadata_uses_profiled_instruction_byte_offsets() -> BytecodeBuildResult<()> {
+        let mut builder = BytecodeBuilder::new(
+            BytecodeFunctionId::new(NonZeroU32::new(91).unwrap()),
+            BytecodeFunctionKind::Function,
+        );
+        builder.alloc_registers(3)?;
+        let add = builder.emit_abc(Opcode::Add, 0, 1, 2)?;
+        let global = builder.emit_abx(Opcode::LoadGlobal, 0, 7)?;
+
+        let add_slot = builder.add_feedback_site(
+            add,
+            FeedbackSiteKind::Arithmetic,
+            FeedbackSiteMetadata::None,
+        )?;
+        let global_slot = builder.add_feedback_site(
+            global,
+            FeedbackSiteKind::NamedPropertyLoad,
+            FeedbackSiteMetadata::NamedProperty(AtomId::from_raw(7)),
+        )?;
+
+        let function = builder.finish()?;
+
+        assert_eq!(
+            function.instruction_at(0),
+            Some(Instruction::profiled_abc(Opcode::Add, 0, 1, 2, add_slot))
+        );
+        assert_eq!(
+            function.instruction_at(7),
+            Some(Instruction::profiled_abx(
+                Opcode::LoadGlobal,
+                0,
+                7,
+                global_slot
+            ))
+        );
+        assert_eq!(function.feedback_sites()[0].instruction_offset(), 0);
+        assert_eq!(function.feedback_sites()[1].instruction_offset(), 7);
+        Ok(())
+    }
+
+    #[test]
+    fn final_jump_deltas_are_encoded_in_bytes() -> BytecodeBuildResult<()> {
+        let mut builder = BytecodeBuilder::new(
+            BytecodeFunctionId::new(NonZeroU32::new(92).unwrap()),
+            BytecodeFunctionKind::Script,
+        );
+        builder.alloc_registers(1)?;
+
+        let conditional = builder.emit_cond_jump_placeholder(Opcode::JumpIfFalse, 0)?;
+        builder.emit_abx(Opcode::LoadSmi8, 0, 1)?;
+        let target = builder.emit_ax(Opcode::ReturnUndefined, 0)?;
+        builder.patch_jump_to(conditional, target)?;
+        let function = builder.finish()?;
+
+        assert_eq!(
+            function.instruction_at(0).and_then(Instruction::bx_value),
+            Some(3)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn peephole_threads_jump_to_jump_targets_and_removes_unreachable_jump_chain(
     ) -> BytecodeBuildResult<()> {
         let mut builder = BytecodeBuilder::new(
@@ -1326,7 +1804,7 @@ mod tests {
                 .instructions()
                 .get(1)
                 .and_then(Instruction::bx_value),
-            Some(1)
+            Some(4)
         );
         Ok(())
     }
@@ -1434,7 +1912,7 @@ mod tests {
 
         assert_eq!(
             text,
-            "function BytecodeFunctionId(3) kind=Function this=Global args=None params=0 min_args=0 regs=2 hidden=0 env=false env_slots=0 rest=false\n0000: LoadConst8      r0, const[0] ; Smi(7)\n0001: Return          r0\nconstants:\n  [0] Smi(7)\n"
+            "function BytecodeFunctionId(3) kind=Function this=Global args=None params=0 min_args=0 regs=2 hidden=0 env=false env_slots=0 rest=false\n0000: LoadConst8      r0, const[0] ; Smi(7)\n0003: Return          r0\nconstants:\n  [0] Smi(7)\n"
         );
         Ok(())
     }
@@ -1475,7 +1953,7 @@ mod tests {
                 .instructions()
                 .get(usize::try_from(conditional).unwrap())
                 .and_then(Instruction::bx_value),
-            Some(1)
+            Some(4)
         );
         Ok(())
     }
@@ -1521,13 +1999,13 @@ mod tests {
         assert_eq!(function.instruction_count(), 2);
         assert_eq!(
             function.instruction_bytes(),
-            &[Opcode::LoadSmi8 as u8, 0, 0xfb, Opcode::Jump8 as u8, 0xff]
+            &[Opcode::LoadSmi8 as u8, 0, 0xfb, Opcode::Jump8 as u8, 0xfe]
         );
         assert_eq!(
             function.instructions().to_vec(),
             vec![
                 Instruction::abx(Opcode::LoadSmi8, 0, 0xfb),
-                Instruction::ax(Opcode::Jump8, -1),
+                Instruction::ax(Opcode::Jump8, -2),
             ]
         );
         Ok(())
@@ -1738,7 +2216,7 @@ mod tests {
             .any(|operand| operand.instruction_offset() == conditional));
         assert!(text.contains("JumpIfFalse"));
         assert!(text.contains("r299"));
-        assert!(text.contains("+40000"));
+        assert!(text.contains("+160000"));
         Ok(())
     }
 }

@@ -69,11 +69,9 @@ impl Vm {
         frame: FrameRecord,
         installed: &InstalledFunction,
     ) -> Option<u32> {
-        let instruction_offset = frame.instruction_offset().checked_sub(1)?;
-        match installed
-            .instruction_at(instruction_offset)?
-            .without_feedback_slot()
-        {
+        let (instruction_offset, instruction) =
+            installed.instruction_before(frame.instruction_offset())?;
+        match instruction.without_feedback_slot() {
             Instruction::Abc {
                 opcode:
                     Opcode::Call0
