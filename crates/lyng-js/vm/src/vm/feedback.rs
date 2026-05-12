@@ -1,4 +1,6 @@
-use super::{code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, Value, Vm};
+use super::{
+    code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, RealmRef, Value, Vm,
+};
 use lyng_js_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
 use lyng_js_gc::ValueStoreTarget;
 use lyng_js_objects::{
@@ -10,6 +12,7 @@ use std::mem::size_of;
 
 const FEEDBACK_ALLOCATION_THRESHOLD: u16 = 2;
 const POLYMORPHIC_PROPERTY_CACHE_LIMIT: usize = 8;
+const POLYMORPHIC_CALL_CACHE_LIMIT: usize = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FeedbackInlineCacheState {
@@ -219,6 +222,92 @@ impl KeyedPropertyFeedbackSnapshot {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CallCacheEntrySnapshot {
+    callee: ObjectRef,
+    callee_shape: ShapeId,
+    realm: Option<RealmRef>,
+}
+
+impl CallCacheEntrySnapshot {
+    #[inline]
+    const fn from_entry(entry: CallCacheEntry) -> Self {
+        Self {
+            callee: entry.callee,
+            callee_shape: entry.callee_shape,
+            realm: entry.realm,
+        }
+    }
+
+    #[inline]
+    pub const fn callee(self) -> ObjectRef {
+        self.callee
+    }
+
+    #[inline]
+    pub const fn callee_shape(self) -> ShapeId {
+        self.callee_shape
+    }
+
+    #[inline]
+    pub const fn realm(self) -> Option<RealmRef> {
+        self.realm
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CallFeedbackSnapshot {
+    execution_count: u32,
+    expected_arity: Option<u16>,
+    state: FeedbackInlineCacheState,
+    entries: Vec<CallCacheEntrySnapshot>,
+}
+
+impl CallFeedbackSnapshot {
+    #[inline]
+    const fn uninitialized(expected_arity: Option<u16>, execution_count: u32) -> Self {
+        Self {
+            execution_count,
+            expected_arity,
+            state: FeedbackInlineCacheState::Uninitialized,
+            entries: Vec::new(),
+        }
+    }
+
+    #[inline]
+    fn from_feedback(feedback: &CallFeedback) -> Self {
+        Self {
+            execution_count: feedback.execution_count,
+            expected_arity: feedback.expected_arity,
+            state: feedback.cache_state.into(),
+            entries: feedback
+                .active_entries()
+                .map(CallCacheEntrySnapshot::from_entry)
+                .collect(),
+        }
+    }
+
+    #[inline]
+    pub const fn execution_count(&self) -> u32 {
+        self.execution_count
+    }
+
+    #[inline]
+    pub const fn expected_arity(&self) -> Option<u16> {
+        self.expected_arity
+    }
+
+    #[inline]
+    pub const fn state(&self) -> FeedbackInlineCacheState {
+        self.state
+    }
+
+    #[inline]
+    pub fn entries(&self) -> &[CallCacheEntrySnapshot] {
+        &self.entries
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DenseIndexCacheEntrySnapshot {
     receiver_shape: ShapeId,
     receiver_flags: ObjectFlags,
@@ -250,7 +339,7 @@ pub enum FeedbackSiteDetail {
     Comparison,
     NamedProperty(NamedPropertyFeedbackSnapshot),
     KeyedProperty(KeyedPropertyFeedbackSnapshot),
-    Call { expected_arity: Option<u16> },
+    Call(CallFeedbackSnapshot),
     Construct { expected_arity: Option<u16> },
 }
 
@@ -458,9 +547,38 @@ struct KeyedPropertyFeedback {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CallCacheEntry {
+    callee: ObjectRef,
+    callee_shape: ShapeId,
+    realm: Option<RealmRef>,
+}
+
+impl CallCacheEntry {
+    #[inline]
+    fn from_callee(agent: &Agent, callee: ObjectRef) -> Option<Self> {
+        let callee_shape = agent
+            .objects()
+            .object_header(agent.heap().view(), callee)?
+            .shape();
+        let realm = agent
+            .objects()
+            .function_data(callee)
+            .and_then(lyng_js_objects::FunctionObjectData::realm);
+        Some(Self {
+            callee,
+            callee_shape,
+            realm,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct CallFeedback {
     execution_count: u32,
     expected_arity: Option<u16>,
+    cache_state: InlineCacheState,
+    entry_count: u8,
+    entries: [Option<CallCacheEntry>; POLYMORPHIC_CALL_CACHE_LIMIT],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -962,6 +1080,84 @@ impl KeyedPropertyFeedback {
     }
 }
 
+impl CallFeedback {
+    #[inline]
+    const fn new(expected_arity: Option<u16>) -> Self {
+        Self {
+            execution_count: 0,
+            expected_arity,
+            cache_state: InlineCacheState::Uninitialized,
+            entry_count: 0,
+            entries: [None; POLYMORPHIC_CALL_CACHE_LIMIT],
+        }
+    }
+
+    #[inline]
+    fn observe_target(&mut self, agent: &Agent, callee: ObjectRef) {
+        match self.cache_state {
+            InlineCacheState::Megamorphic => {}
+            InlineCacheState::Uninitialized => {
+                let Some(entry) = CallCacheEntry::from_callee(agent, callee) else {
+                    self.promote_to_megamorphic();
+                    return;
+                };
+                self.install_first_entry(entry);
+            }
+            InlineCacheState::Monomorphic => {
+                if self.entries[0].is_some_and(|entry| entry.callee == callee) {
+                    return;
+                }
+                let Some(entry) = CallCacheEntry::from_callee(agent, callee) else {
+                    self.promote_to_megamorphic();
+                    return;
+                };
+                self.entries[usize::from(self.entry_count)] = Some(entry);
+                self.entry_count = self.entry_count.saturating_add(1);
+                self.cache_state = InlineCacheState::Polymorphic;
+            }
+            InlineCacheState::Polymorphic => {
+                for index in 0..usize::from(self.entry_count) {
+                    if self.entries[index].is_some_and(|entry| entry.callee == callee) {
+                        return;
+                    }
+                }
+                if usize::from(self.entry_count) >= POLYMORPHIC_CALL_CACHE_LIMIT {
+                    self.promote_to_megamorphic();
+                    return;
+                }
+                let Some(entry) = CallCacheEntry::from_callee(agent, callee) else {
+                    self.promote_to_megamorphic();
+                    return;
+                };
+                self.entries[usize::from(self.entry_count)] = Some(entry);
+                self.entry_count = self.entry_count.saturating_add(1);
+            }
+        }
+    }
+
+    #[inline]
+    fn active_entries(&self) -> impl Iterator<Item = CallCacheEntry> + '_ {
+        self.entries
+            .iter()
+            .take(usize::from(self.entry_count))
+            .filter_map(|entry| *entry)
+    }
+
+    #[inline]
+    const fn install_first_entry(&mut self, entry: CallCacheEntry) {
+        self.entries[0] = Some(entry);
+        self.entry_count = 1;
+        self.cache_state = InlineCacheState::Monomorphic;
+    }
+
+    #[inline]
+    const fn promote_to_megamorphic(&mut self) {
+        self.cache_state = InlineCacheState::Megamorphic;
+        self.entry_count = 0;
+        self.entries = [None; POLYMORPHIC_CALL_CACHE_LIMIT];
+    }
+}
+
 impl FeedbackSiteState {
     #[inline]
     const fn for_descriptor(descriptor: FeedbackSiteDescriptor) -> Self {
@@ -978,10 +1174,9 @@ impl FeedbackSiteState {
             FeedbackSiteKind::KeyedPropertyAccess => {
                 Self::KeyedProperty(KeyedPropertyFeedback::new())
             }
-            FeedbackSiteKind::Call => Self::Call(CallFeedback {
-                execution_count: 0,
-                expected_arity: descriptor.metadata().expected_arity(),
-            }),
+            FeedbackSiteKind::Call => {
+                Self::Call(CallFeedback::new(descriptor.metadata().expected_arity()))
+            }
             FeedbackSiteKind::Construct => Self::Construct(ConstructFeedback {
                 execution_count: 0,
                 expected_arity: descriptor.metadata().expected_arity(),
@@ -1010,6 +1205,17 @@ impl FeedbackSiteState {
             Self::Construct(feedback) => {
                 feedback.execution_count = feedback.execution_count.saturating_add(1);
             }
+        }
+    }
+
+    #[inline]
+    fn record_call_target(&mut self, agent: &Agent, callee: ObjectRef) {
+        match self {
+            Self::Call(feedback) => {
+                feedback.execution_count = feedback.execution_count.saturating_add(1);
+                feedback.observe_target(agent, callee);
+            }
+            _ => self.record_execution(),
         }
     }
 
@@ -1043,9 +1249,7 @@ impl FeedbackSiteState {
             Self::Call(feedback) => FeedbackSiteSnapshot::new(
                 descriptor,
                 feedback.execution_count,
-                FeedbackSiteDetail::Call {
-                    expected_arity: feedback.expected_arity,
-                },
+                FeedbackSiteDetail::Call(CallFeedbackSnapshot::from_feedback(feedback)),
             ),
             Self::Construct(feedback) => FeedbackSiteSnapshot::new(
                 descriptor,
@@ -1068,9 +1272,9 @@ impl FeedbackSiteState {
             FeedbackSiteKind::KeyedPropertyAccess => {
                 FeedbackSiteDetail::KeyedProperty(KeyedPropertyFeedbackSnapshot::uninitialized(0))
             }
-            FeedbackSiteKind::Call => FeedbackSiteDetail::Call {
-                expected_arity: descriptor.metadata().expected_arity(),
-            },
+            FeedbackSiteKind::Call => FeedbackSiteDetail::Call(
+                CallFeedbackSnapshot::uninitialized(descriptor.metadata().expected_arity(), 0),
+            ),
             FeedbackSiteKind::Construct => FeedbackSiteDetail::Construct {
                 expected_arity: descriptor.metadata().expected_arity(),
             },
@@ -1240,6 +1444,40 @@ impl Vm {
             return;
         }
         let _ = self.ensure_feedback_site_execution(code, instruction_offset);
+    }
+
+    #[inline]
+    pub(super) fn observe_call_target(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        instruction_offset: u32,
+        callee: ObjectRef,
+    ) {
+        let index = code_index(code);
+        if let Some(descriptor) = self.feedback_descriptor_for_site(code, instruction_offset)
+            && let Some(site) = self
+                .feedback_vectors
+                .get_mut(index)
+                .and_then(Option::as_mut)
+                .and_then(|vector| vector.site_mut(descriptor.slot()))
+        {
+            site.record_call_target(agent, callee);
+            self.observe_tier_feedback_event(code);
+            return;
+        }
+
+        if self
+            .ensure_feedback_site_execution(code, instruction_offset)
+            .is_none()
+        {
+            return;
+        }
+        let _ = self.with_feedback_site_mut(code, instruction_offset, |site| {
+            if let FeedbackSiteState::Call(feedback) = site {
+                feedback.observe_target(agent, callee);
+            }
+        });
     }
 
     pub(super) fn try_named_property_load_inline_cache_hit(

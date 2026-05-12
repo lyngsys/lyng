@@ -257,7 +257,6 @@ impl Vm {
                             let Some(()) = self.handle_vm_result(agent, call_result)? else {
                                 continue;
                             };
-                            self.record_feedback_site(frame.code(), frame.instruction_offset());
                         }
                         Opcode::Call => {
                             let payload = installed
@@ -284,7 +283,6 @@ impl Vm {
                             let Some(()) = self.handle_vm_result(agent, call_result)? else {
                                 continue;
                             };
-                            self.record_feedback_site(frame.code(), frame.instruction_offset());
                         }
                         Opcode::TailCall => {
                             let payload = installed
@@ -1467,7 +1465,6 @@ impl Vm {
             let Some(()) = self.handle_vm_result(agent, call_result)? else {
                 return Ok(ThreadedStep::Continue);
             };
-            self.record_feedback_site(frame.code(), frame.instruction_offset());
             return Ok(ThreadedStep::Continue);
         }
         if opcode != Opcode::Call {
@@ -1498,7 +1495,6 @@ impl Vm {
         let Some(()) = self.handle_vm_result(agent, call_result)? else {
             return Ok(ThreadedStep::Continue);
         };
-        self.record_feedback_site(frame.code(), frame.instruction_offset());
         Ok(ThreadedStep::Continue)
     }
 

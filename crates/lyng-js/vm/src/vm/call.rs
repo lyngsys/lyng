@@ -116,7 +116,9 @@ impl Vm {
             callee,
             effective_this,
             collected_arguments,
-        )
+        )?;
+        self.observe_call_target(agent, frame.code(), frame.instruction_offset(), callee);
+        Ok(())
     }
 
     #[expect(

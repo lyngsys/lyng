@@ -8,7 +8,7 @@ use lyng_js_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
 use lyng_js_parser::{parse_module, parse_script};
 use lyng_js_sema::{analyze_module, analyze_script};
 use lyng_js_types::{CodeRef, Value as JsValue};
-use lyng_js_vm::Vm;
+use lyng_js_vm::{FeedbackInlineCacheState, FeedbackSiteDetail, Vm};
 use serde_json::{json, Value};
 use std::cmp::Ordering;
 use std::env;
@@ -86,6 +86,10 @@ struct MemoryResult {
     live_feedback_sites: Option<usize>,
     allocated_feedback_code_count: Option<usize>,
     allocated_feedback_bytes: Option<usize>,
+    call_cache_uninit_sites: Option<usize>,
+    call_cache_mono_sites: Option<usize>,
+    call_cache_poly_sites: Option<usize>,
+    call_cache_mega_sites: Option<usize>,
     note: &'static str,
 }
 
@@ -107,6 +111,10 @@ struct FeedbackTotals {
     live_site_count: usize,
     allocated_code_count: usize,
     allocated_bytes: usize,
+    call_cache_uninit_sites: usize,
+    call_cache_mono_sites: usize,
+    call_cache_poly_sites: usize,
+    call_cache_mega_sites: usize,
 }
 
 #[derive(Clone)]
@@ -613,6 +621,10 @@ fn capture_memory(
                 live_feedback_sites: Some(feedback.live_site_count),
                 allocated_feedback_code_count: Some(feedback.allocated_code_count),
                 allocated_feedback_bytes: Some(feedback.allocated_bytes),
+                call_cache_uninit_sites: Some(feedback.call_cache_uninit_sites),
+                call_cache_mono_sites: Some(feedback.call_cache_mono_sites),
+                call_cache_poly_sites: Some(feedback.call_cache_poly_sites),
+                call_cache_mega_sites: Some(feedback.call_cache_mega_sites),
                 note: "Warmed script-template and feedback-vector footprint.",
             })
         }
@@ -960,6 +972,31 @@ fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> BenchResult<FeedbackTotals
                 totals.allocated_code_count = totals.allocated_code_count.saturating_add(1);
             }
         }
+        if let Some(snapshot) = vm.feedback_vector_snapshot(code) {
+            for site in snapshot.sites() {
+                let FeedbackSiteDetail::Call(call) = site.detail() else {
+                    continue;
+                };
+                match call.state() {
+                    FeedbackInlineCacheState::Uninitialized => {
+                        totals.call_cache_uninit_sites =
+                            totals.call_cache_uninit_sites.saturating_add(1);
+                    }
+                    FeedbackInlineCacheState::Monomorphic => {
+                        totals.call_cache_mono_sites =
+                            totals.call_cache_mono_sites.saturating_add(1);
+                    }
+                    FeedbackInlineCacheState::Polymorphic => {
+                        totals.call_cache_poly_sites =
+                            totals.call_cache_poly_sites.saturating_add(1);
+                    }
+                    FeedbackInlineCacheState::Megamorphic => {
+                        totals.call_cache_mega_sites =
+                            totals.call_cache_mega_sites.saturating_add(1);
+                    }
+                }
+            }
+        }
         for child_index in 0..function.child_functions().len() {
             let child_index = u32::try_from(child_index)
                 .map_err(|_| "child function count exceeds installed-code range".to_string())?;
@@ -1211,16 +1248,16 @@ fn write_template_feedback_section(output: &mut String, reports: &[WorkloadRepor
     output.push('\n');
     let _ = writeln!(
         output,
-        "| Benchmark | Pipeline | Functions | Encoded bytes | Metadata records | Template bytes | Atom payload bytes | Feedback slots | Live sites | Feedback codes | Allocated feedback bytes | Memory note |"
+        "| Benchmark | Pipeline | Functions | Encoded bytes | Metadata records | Template bytes | Atom payload bytes | Feedback slots | Live sites | Feedback codes | Allocated feedback bytes | Call IC uninit | Call IC mono | Call IC poly | Call IC mega | Memory note |"
     );
     let _ = writeln!(
         output,
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
     );
     for report in reports {
         let _ = writeln!(
             output,
-            "| `{}` | `{}` | {} | {} | {} | {} | `{}` | {} | {} | {} | {} | {} |",
+            "| `{}` | `{}` | {} | {} | {} | {} | `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
             report.workload.name,
             report.workload.pipeline.label(),
             opt_usize_cell(report.memory.functions),
@@ -1232,6 +1269,10 @@ fn write_template_feedback_section(output: &mut String, reports: &[WorkloadRepor
             opt_usize_cell(report.memory.live_feedback_sites),
             opt_usize_cell(report.memory.allocated_feedback_code_count),
             opt_usize_cell(report.memory.allocated_feedback_bytes),
+            opt_usize_cell(report.memory.call_cache_uninit_sites),
+            opt_usize_cell(report.memory.call_cache_mono_sites),
+            opt_usize_cell(report.memory.call_cache_poly_sites),
+            opt_usize_cell(report.memory.call_cache_mega_sites),
             report.memory.note,
         );
     }
@@ -1420,6 +1461,10 @@ fn runtime_workload_json(report: &WorkloadReport, previous: Option<&Value>) -> V
             "live_feedback_sites": report.memory.live_feedback_sites,
             "allocated_feedback_code_count": report.memory.allocated_feedback_code_count,
             "allocated_feedback_bytes": report.memory.allocated_feedback_bytes,
+            "call_cache_uninit_sites": report.memory.call_cache_uninit_sites,
+            "call_cache_mono_sites": report.memory.call_cache_mono_sites,
+            "call_cache_poly_sites": report.memory.call_cache_poly_sites,
+            "call_cache_mega_sites": report.memory.call_cache_mega_sites,
             "note": report.memory.note,
         },
         "delta": delta,
@@ -2161,6 +2206,10 @@ mod tests {
                 live_feedback_sites: Some(2),
                 allocated_feedback_code_count: Some(1),
                 allocated_feedback_bytes: Some(96),
+                call_cache_uninit_sites: Some(1),
+                call_cache_mono_sites: Some(2),
+                call_cache_poly_sites: Some(3),
+                call_cache_mega_sites: Some(4),
                 note: "Synthetic memory row.",
             },
         };
@@ -2195,6 +2244,8 @@ mod tests {
         );
         assert!(markdown.contains("Median ns/work-unit delta"));
         assert!(markdown.contains("+500.00"));
+        assert!(markdown.contains("Call IC mono"));
+        assert!(markdown.contains("| `delta-runtime` | `script.runtime` | `1` | `40` | `3` | `128` | `7` | `2` | `2` | `1` | `96` | `1` | `2` | `3` | `4` | Synthetic memory row. |"));
 
         let json = render_json_report(
             &options,
@@ -2208,6 +2259,9 @@ mod tests {
             json["workloads"][0]["delta"]["median_ns_per_operation"],
             500.0
         );
+        assert_eq!(json["workloads"][0]["memory"]["call_cache_mono_sites"], 2);
+        assert_eq!(json["workloads"][0]["memory"]["call_cache_poly_sites"], 3);
+        assert_eq!(json["workloads"][0]["memory"]["call_cache_mega_sites"], 4);
     }
 
     #[test]
