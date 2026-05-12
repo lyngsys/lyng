@@ -174,6 +174,11 @@ pub struct Vm {
     dispatch_mode: VmDispatchMode,
     register_stack: Vec<Value>,
     register_stack_top: usize,
+    /// Encoded byte length of the instruction currently dispatched by `run`. The dispatch loop
+    /// decodes the next instruction once, caches its `encoded_len` here, and then uses this when
+    /// the active opcode handler calls `advance_instruction` or `jump_by` — so neither helper has
+    /// to re-decode the same bytes a second time. Reset to `0` outside an active dispatch.
+    current_instruction_len: u32,
     frames: Vec<FrameRecord>,
     installed: Vec<Option<Arc<InstalledFunction>>>,
     current_exception: Option<Value>,
@@ -234,6 +239,7 @@ impl Vm {
             dispatch_mode: VmDispatchMode::configured(),
             register_stack: Vec::new(),
             register_stack_top: 0,
+            current_instruction_len: 0,
             frames: Vec::new(),
             installed: Vec::new(),
             current_exception: None,

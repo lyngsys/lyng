@@ -1,5 +1,4 @@
 use super::call::finalize_frame_result;
-use super::values::code_index;
 use super::{Agent, FrameRecord, Value, Vm, VmError, VmResult};
 use lyng_js_types::AbruptCompletion;
 
@@ -23,16 +22,15 @@ impl Vm {
     }
 
     pub(super) fn advance_instruction(&mut self) {
-        let frame = self
-            .frames
-            .last()
-            .copied()
-            .expect("advance requires one active frame");
-        let next = self.next_instruction_offset(frame);
+        let encoded_len = self.current_instruction_encoded_len();
         let frame = self
             .frames
             .last_mut()
             .expect("advance requires one active frame");
+        let next = frame
+            .instruction_offset()
+            .checked_add(encoded_len)
+            .expect("instruction offset should stay within u32");
         frame.set_instruction_offset(next);
     }
 
@@ -45,17 +43,12 @@ impl Vm {
     }
 
     pub(super) fn jump_by(&mut self, delta: i32) -> VmResult<()> {
-        let frame_snapshot = self
-            .frames
-            .last()
-            .copied()
-            .expect("jump requires one active frame");
-        let instruction_len = i64::from(self.active_instruction_len(frame_snapshot));
+        let encoded_len = i64::from(self.current_instruction_encoded_len());
         let frame = self
             .frames
             .last_mut()
             .expect("jump requires one active frame");
-        let next = i64::from(frame.instruction_offset()) + instruction_len + i64::from(delta);
+        let next = i64::from(frame.instruction_offset()) + encoded_len + i64::from(delta);
         if next < 0 {
             return Err(VmError::InvalidJumpTarget {
                 code: frame.code(),
@@ -73,26 +66,28 @@ impl Vm {
         Ok(())
     }
 
+    /// Encoded byte length of the instruction the dispatch loop is currently executing.
+    ///
+    /// The dispatch loop writes this once per opcode after decoding from the byte stream so
+    /// opcode handlers (and the `advance_instruction` / `jump_by` helpers they call) do not
+    /// have to re-decode the same bytes to learn how far to move the program counter.
+    #[inline]
+    fn current_instruction_encoded_len(&self) -> u32 {
+        debug_assert!(
+            self.current_instruction_len > 0,
+            "current_instruction_len should be set by the dispatch loop before advance_instruction or jump_by",
+        );
+        self.current_instruction_len
+    }
+
+    /// Byte offset of the instruction immediately following the one the dispatch loop is
+    /// currently executing. Used by generator/yield/await suspends to record where the
+    /// suspended frame should resume.
     pub(super) fn next_instruction_offset(&self, frame: FrameRecord) -> u32 {
         frame
             .instruction_offset()
-            .checked_add(self.active_instruction_len(frame))
+            .checked_add(self.current_instruction_encoded_len())
             .expect("instruction offset should stay within u32")
-    }
-
-    fn active_instruction_len(&self, frame: FrameRecord) -> u32 {
-        let installed = self
-            .installed
-            .get(code_index(frame.code()))
-            .and_then(Option::as_ref)
-            .expect("active frame should have installed code");
-        u32::try_from(
-            installed
-                .instruction_at(frame.instruction_offset())
-                .expect("active frame should point at an instruction")
-                .encoded_len(),
-        )
-        .expect("encoded instruction length should fit u32")
     }
 
     pub(super) fn finish_frame(

@@ -227,7 +227,10 @@ impl Instruction {
                 c,
                 slot,
             } => {
-                debug_assert!(u16::try_from(slot.get()).is_ok());
+                assert!(
+                    u16::try_from(slot.get()).is_ok(),
+                    "profiled feedback slot must fit in u16"
+                );
                 let slot = slot.get().to_le_bytes();
                 bytes.extend_from_slice(&[
                     Opcode::ProfiledAbc as u8,
@@ -245,7 +248,10 @@ impl Instruction {
                 bx,
                 slot,
             } => {
-                debug_assert!(u16::try_from(slot.get()).is_ok());
+                assert!(
+                    u16::try_from(slot.get()).is_ok(),
+                    "profiled feedback slot must fit in u16"
+                );
                 let bx = bx.to_le_bytes();
                 let slot = slot.get().to_le_bytes();
                 bytes.extend_from_slice(&[
@@ -331,6 +337,22 @@ mod tests {
     #[should_panic(expected = "Jump8 operand must fit in i8")]
     fn jump8_write_panics_when_payload_would_truncate() {
         Instruction::ax(Opcode::Jump8, i32::from(i8::MAX) + 1).encode_bytes();
+    }
+
+    #[test]
+    #[should_panic(expected = "profiled feedback slot must fit in u16")]
+    fn profiled_abc_write_panics_when_slot_overflows_u16() {
+        let slot = FeedbackSlotId::from_raw(u32::from(u16::MAX) + 1)
+            .expect("test slot should be non-zero");
+        Instruction::profiled_abc(Opcode::GetNamedProperty, 0, 1, 2, slot).encode_bytes();
+    }
+
+    #[test]
+    #[should_panic(expected = "profiled feedback slot must fit in u16")]
+    fn profiled_abx_write_panics_when_slot_overflows_u16() {
+        let slot = FeedbackSlotId::from_raw(u32::from(u16::MAX) + 1)
+            .expect("test slot should be non-zero");
+        Instruction::profiled_abx(Opcode::LoadGlobal, 0, 1, slot).encode_bytes();
     }
 
     #[test]

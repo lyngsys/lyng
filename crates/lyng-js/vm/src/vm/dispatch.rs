@@ -52,7 +52,14 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
-        match (
+        // `current_instruction_len` is per-active-dispatch state shared across opcode handlers.
+        // Recursive entries (internal calls, generator resume, async resume, dynamic eval, ...)
+        // would otherwise leave the caller's cache holding the inner loop's last instruction
+        // length, so `advance_instruction` after the inner returns would move the caller PC
+        // by the wrong amount. Save and restore around every re-entry.
+        let saved_instruction_len = self.current_instruction_len;
+        self.current_instruction_len = 0;
+        let result = match (
             self.dispatch_mode(),
             self.opcode_dispatch_counts_enabled(),
             self.debug_poll_enabled(),
@@ -81,7 +88,9 @@ impl Vm {
             (VmDispatchMode::FunctionTable, true, true) => {
                 self.run_function_table::<true, true>(agent, host, registry)
             }
-        }
+        };
+        self.current_instruction_len = saved_instruction_len;
+        result
     }
 
     #[expect(
@@ -125,6 +134,8 @@ impl Vm {
                         instruction_offset,
                     },
                 )?;
+                self.current_instruction_len = u32::try_from(instruction.encoded_len())
+                    .expect("encoded instruction length should fit u32");
                 if COUNT_OPCODES {
                     if skip_first_opcode_count {
                         skip_first_opcode_count = false;
@@ -1185,6 +1196,8 @@ impl Vm {
                     instruction_offset,
                 },
             )?;
+            self.current_instruction_len = u32::try_from(instruction.encoded_len())
+                .expect("encoded instruction length should fit u32");
             if COUNT_OPCODES {
                 self.record_opcode_dispatch(instruction.opcode());
             }
