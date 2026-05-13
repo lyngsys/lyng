@@ -19,7 +19,7 @@ impl Vm {
             {
                 return Ok(false);
             }
-            if let Some((index, handler)) = self.select_exception_handler(frame) {
+            if let Some((index, handler)) = self.select_exception_handler(&frame) {
                 self.current_exception = Some(thrown);
                 let frame = self
                     .frames
@@ -39,7 +39,7 @@ impl Vm {
         }
     }
 
-    fn select_exception_handler(&self, frame: FrameRecord) -> Option<(usize, ExceptionHandler)> {
+    fn select_exception_handler(&self, frame: &FrameRecord) -> Option<(usize, ExceptionHandler)> {
         let installed = self
             .installed
             .get(code_index(frame.code()))
@@ -66,7 +66,7 @@ impl Vm {
     }
 
     fn suspended_call_instruction_offset(
-        frame: FrameRecord,
+        frame: &FrameRecord,
         installed: &InstalledFunction,
     ) -> Option<u32> {
         let (instruction_offset, instruction) =
