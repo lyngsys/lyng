@@ -8,7 +8,7 @@ impl Vm {
     pub(super) fn push_loop_iteration_environment(
         &mut self,
         agent: &mut Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         site: Option<lyng_js_bytecode::LoopIterationEnvironmentSite>,
         mirrored_slot: Option<u32>,
     ) -> VmResult<()> {

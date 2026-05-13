@@ -973,7 +973,7 @@ impl Vm {
                         } else {
                             None
                         };
-                        self.push_loop_iteration_environment(agent, frame, site, mirrored_slot)?;
+                        self.push_loop_iteration_environment(agent, &frame, site, mirrored_slot)?;
                         self.advance_instruction();
                     }
                     Opcode::PopClosureEnv => {
