@@ -76,10 +76,9 @@ impl Vm {
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
         loop {
-            let outer_frame = self
+            let outer_frame = *self
                 .frames
                 .last()
-                .copied()
                 .expect("evaluation should install one active frame");
             let code = outer_frame.code();
             let installed = self
@@ -90,10 +89,9 @@ impl Vm {
                 .ok_or(VmError::MissingInstalledCode(code))?;
 
             loop {
-                let frame = self
+                let frame = *self
                     .frames
                     .last()
-                    .copied()
                     .expect("evaluation should install one active frame");
                 if frame.code() != code {
                     break;
