@@ -234,7 +234,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             callee_object,
             this_value,
             arguments,
@@ -251,7 +251,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             callee_object,
             arguments,
             new_target,
@@ -437,7 +437,7 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             callee_object,
             this_value,
             arguments,
@@ -932,7 +932,7 @@ impl Vm {
                 return Ok(value);
             }
             if let Some(value) =
-                self.call_property_getter(agent, host, registry, *caller, descriptor, receiver)?
+                self.call_property_getter(agent, host, registry, caller, descriptor, receiver)?
             {
                 return Ok(value);
             }
@@ -1429,7 +1429,7 @@ impl Vm {
     ) -> VmResult<bool> {
         if descriptor.has_get() || descriptor.has_set() {
             return self
-                .call_property_setter(agent, host, registry, *caller, descriptor, receiver, value);
+                .call_property_setter(agent, host, registry, caller, descriptor, receiver, value);
         }
 
         if !descriptor.writable().unwrap_or(false) {

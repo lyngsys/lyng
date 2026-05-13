@@ -75,7 +75,7 @@ impl iterator::IteratorOpsContext for VmIteratorBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             callee_object,
             this_value,
             arguments,
@@ -786,7 +786,7 @@ impl Vm {
         let receiver = Value::from_object_ref(record.iterator());
         let next_method = Self::require_callable_object(agent, *frame, record.next_method())?;
         let result =
-            self.call_to_completion(agent, host, registry, *frame, next_method, receiver, &[])?;
+            self.call_to_completion(agent, host, registry, frame, next_method, receiver, &[])?;
         match record.kind() {
             iterator::IteratorKind::Async => {
                 let promise = self.promise_resolve_in_realm(
@@ -948,7 +948,7 @@ impl Vm {
             Err(error) => return Err(error),
         };
         let result =
-            self.call_to_completion(agent, host, registry, *frame, return_method, receiver, &[]);
+            self.call_to_completion(agent, host, registry, frame, return_method, receiver, &[]);
         let result = match result {
             Ok(result) => result,
             Err(_) if preserve_completion => {
@@ -1070,7 +1070,7 @@ impl Vm {
             return;
         };
         let Ok(result) =
-            self.call_to_completion(agent, host, registry, *frame, return_method, receiver, &[])
+            self.call_to_completion(agent, host, registry, frame, return_method, receiver, &[])
         else {
             return;
         };

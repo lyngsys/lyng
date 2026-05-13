@@ -239,7 +239,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                *caller,
+                caller,
                 has_instance,
                 constructor_value,
                 &[value],

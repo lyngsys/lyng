@@ -202,7 +202,7 @@ impl Vm {
             agent,
             host,
             registry,
-            *caller,
+            caller,
             super_constructor,
             arguments,
             Some(context.new_target),

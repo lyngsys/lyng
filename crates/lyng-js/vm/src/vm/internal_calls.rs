@@ -53,7 +53,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         callee_object: ObjectRef,
         this_value: Value,
         arguments: &[Value],
@@ -76,7 +76,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &caller_frame,
+            caller_frame,
             callee_object,
             this_value,
             arguments,
@@ -91,7 +91,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: &caller_frame,
+                    frame: caller_frame,
                 },
                 callee_object,
                 this_value,
@@ -107,7 +107,7 @@ impl Vm {
         let prior_context_depth = agent.execution_contexts().len();
         let prior_register_len = self.register_stack_top();
         let prepared =
-            self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, None)?;
+            self.prepare_bytecode_call(agent, *caller_frame, callee_object, this_value, None)?;
         let register_base =
             u32::try_from(prior_register_len).expect("register stack length should fit u32");
         if self
@@ -160,7 +160,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         callee_object: ObjectRef,
         arguments: &[Value],
         new_target: Option<ObjectRef>,
@@ -181,7 +181,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: &caller_frame,
+                    frame: caller_frame,
                 },
                 callee,
                 &combined_arguments,
@@ -196,7 +196,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                &caller_frame,
+                caller_frame,
                 callee,
                 Value::undefined(),
                 &combined_arguments,
@@ -229,14 +229,14 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                caller_frame,
+                *caller_frame,
                 caller_frame.realm(),
                 effective_new_target,
             )?)
         };
         let prepared = self.prepare_bytecode_call(
             agent,
-            caller_frame,
+            *caller_frame,
             callee,
             construct_this.map_or(Value::undefined(), Value::from_object_ref),
             Some(effective_new_target),
@@ -279,7 +279,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         callback: Value,
         this_value: Value,
         arguments: &[Value],
@@ -287,7 +287,7 @@ impl Vm {
         if callback == Value::undefined() {
             return Ok(None);
         }
-        let callback = Self::require_callable_object(agent, caller_frame, callback)?;
+        let callback = Self::require_callable_object(agent, *caller_frame, callback)?;
         self.call_to_completion(
             agent,
             host,
@@ -309,7 +309,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         callback: Value,
         this_value: Value,
         arguments: &[Value],
@@ -334,7 +334,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         descriptor: PropertyDescriptor,
         receiver: Value,
     ) -> VmResult<Option<Value>> {
@@ -351,7 +351,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         descriptor: PropertyDescriptor,
         receiver: Value,
         value: Value,

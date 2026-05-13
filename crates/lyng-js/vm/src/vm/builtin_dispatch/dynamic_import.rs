@@ -183,7 +183,7 @@ impl Vm {
             agent,
             host,
             registry,
-            *caller_frame,
+            caller_frame,
             constructor,
             &[Value::from_object_ref(executor)],
             Some(constructor),
