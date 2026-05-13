@@ -111,7 +111,7 @@ impl Vm {
                     self.record_opcode_dispatch(instruction.opcode());
                 }
                 #[cfg(debug_assertions)]
-                self.assert_deopt_safepoint_state(agent, frame, installed.as_ref());
+                self.assert_deopt_safepoint_state(agent, &frame, installed.as_ref());
                 let feedback_slot = instruction.feedback_slot();
                 let stripped = instruction.without_feedback_slot();
                 let opcode = stripped.opcode();

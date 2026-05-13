@@ -211,13 +211,13 @@ impl TraceHeapEdges for EntryExecutionOverride {
 
 impl TraceHeapEdges for ActiveVmRoots<'_> {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        trace_frame_record(*self.caller_frame, tracer);
+        trace_frame_record(self.caller_frame, tracer);
 
         for value in self.vm.register_stack() {
             value.trace_heap_edges(tracer);
         }
         for frame in &self.vm.frames {
-            trace_frame_record(*frame, tracer);
+            trace_frame_record(frame, tracer);
         }
         self.vm.current_exception.trace_heap_edges(tracer);
 
@@ -312,7 +312,7 @@ struct MaterializedRuntimeState {
 
 #[cfg(debug_assertions)]
 impl MaterializedRuntimeState {
-    fn capture(vm: &Vm, frame: FrameRecord, safepoint: SafepointDescriptor) -> Self {
+    fn capture(vm: &Vm, frame: &FrameRecord, safepoint: SafepointDescriptor) -> Self {
         Self {
             lexical_env: safepoint
                 .captures_lexical_env()
@@ -340,7 +340,7 @@ impl MaterializedRuntimeState {
 
     fn assert_matches_snapshot(
         &self,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         safepoint: SafepointDescriptor,
         snapshot: &DeoptSnapshot,
     ) {
@@ -426,7 +426,7 @@ impl Vm {
     pub(in crate::vm) fn assert_deopt_safepoint_state(
         &self,
         agent: &Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         installed: &InstalledFunction,
     ) {
         let Some(safepoint) = installed.safepoint(frame.instruction_offset()) else {
@@ -471,7 +471,7 @@ impl Vm {
     fn materialize_deopt_snapshot(
         &self,
         agent: &Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         installed: &InstalledFunction,
         safepoint: SafepointDescriptor,
         snapshot: &DeoptSnapshot,
@@ -491,7 +491,7 @@ impl Vm {
     fn materialize_deopt_value(
         &self,
         agent: &Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         _installed: &InstalledFunction,
         safepoint: SafepointDescriptor,
         source_index: usize,
@@ -586,7 +586,7 @@ impl Vm {
 }
 
 #[cfg(debug_assertions)]
-fn materialize_deopt_frame_value(vm: &Vm, frame: FrameRecord, value: DeoptFrameValue) -> Value {
+fn materialize_deopt_frame_value(vm: &Vm, frame: &FrameRecord, value: DeoptFrameValue) -> Value {
     match value {
         DeoptFrameValue::ThisValue => frame.this_value(),
         DeoptFrameValue::NewTarget => frame
@@ -604,7 +604,7 @@ fn materialize_deopt_frame_value(vm: &Vm, frame: FrameRecord, value: DeoptFrameV
 
 #[cfg(debug_assertions)]
 fn assert_frame_value_capture(
-    frame: FrameRecord,
+    frame: &FrameRecord,
     safepoint: SafepointDescriptor,
     snapshot: &DeoptSnapshot,
     label: &str,
@@ -643,7 +643,7 @@ const fn is_completion_frame_value(source: DeoptValueSource) -> bool {
 
 #[cfg(debug_assertions)]
 fn panic_runtime_state_mismatch(
-    frame: FrameRecord,
+    frame: &FrameRecord,
     safepoint: SafepointDescriptor,
     detail: &str,
 ) -> ! {
@@ -657,7 +657,7 @@ fn panic_runtime_state_mismatch(
     );
 }
 
-fn trace_frame_record(frame: FrameRecord, tracer: &mut PrimitiveTracer<'_>) {
+fn trace_frame_record(frame: &FrameRecord, tracer: &mut PrimitiveTracer<'_>) {
     frame.code().trace_heap_edges(tracer);
     frame.realm().trace_heap_edges(tracer);
     frame.lexical_env().trace_heap_edges(tracer);
