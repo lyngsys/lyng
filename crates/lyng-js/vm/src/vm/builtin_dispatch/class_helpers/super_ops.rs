@@ -337,7 +337,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller,
+            &caller,
             caller.realm(),
             array_like,
         )?;
