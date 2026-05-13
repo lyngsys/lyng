@@ -511,7 +511,7 @@ impl Vm {
                     register,
                     frame.registers().len()
                 );
-                MaterializedDeoptValue::Value(self.read_register(frame, register))
+                MaterializedDeoptValue::Value(self.read_register(frame.registers(), register))
             }
             DeoptValueSource::EnvironmentSlot { depth, slot } => {
                 let Ok(depth) = u8::try_from(depth) else {

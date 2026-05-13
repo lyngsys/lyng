@@ -170,8 +170,8 @@ impl Vm {
                 )]
                 match opcode {
                     Opcode::Move => {
-                        let value = self.read_register(frame, b);
-                        self.write_register(frame, a, value);
+                        let value = self.read_register(frame.registers(), b);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::Add
@@ -205,7 +205,7 @@ impl Vm {
                             continue;
                         };
                         self.record_feedback_slot(frame.code(), feedback_slot);
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::In => {
@@ -217,7 +217,7 @@ impl Vm {
                             continue;
                         };
                         self.record_feedback_slot(frame.code(), feedback_slot);
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::BitNot => {
@@ -227,7 +227,7 @@ impl Vm {
                             continue;
                         };
                         self.record_feedback_slot(frame.code(), feedback_slot);
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::Increment | Opcode::Decrement => {
@@ -243,9 +243,9 @@ impl Vm {
                         else {
                             continue;
                         };
-                        self.write_register(frame, b, numeric);
+                        self.write_register(frame.registers(), b, numeric);
                         self.record_feedback_slot(frame.code(), feedback_slot);
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::GetNamedProperty => {
@@ -314,7 +314,7 @@ impl Vm {
                     }
                     Opcode::SetFunctionName => {
                         let function = self.object_register(frame, a)?;
-                        let name_value = self.read_register(frame, b);
+                        let name_value = self.read_register(frame.registers(), b);
                         let set_result = Self::set_function_name(agent, function, name_value);
                         let Some(()) = self.handle_vm_result(agent, set_result)? else {
                             continue;
@@ -442,7 +442,7 @@ impl Vm {
                         };
                     }
                     Opcode::CreateForIn => {
-                        let value = self.read_register(frame, b);
+                        let value = self.read_register(frame.registers(), b);
                         let enumerator_result = self.create_for_in_enumerator_for_value(
                             agent, host, registry, frame, value,
                         );
@@ -466,15 +466,15 @@ impl Vm {
                         let done = next.is_none();
                         if let Some(key) = next {
                             let value = self.property_key_to_enumeration_value(agent, key);
-                            self.write_register(frame, b, value);
+                            self.write_register(frame.registers(), b, value);
                         } else {
-                            self.write_register(frame, b, Value::undefined());
+                            self.write_register(frame.registers(), b, Value::undefined());
                         }
-                        self.write_register(frame, c, Value::from_bool(done));
+                        self.write_register(frame.registers(), c, Value::from_bool(done));
                         self.advance_instruction();
                     }
                     Opcode::CreateIterator => {
-                        let value = self.read_register(frame, b);
+                        let value = self.read_register(frame.registers(), b);
                         let iterator_result = self.create_iterator_for_value(
                             agent,
                             host,
@@ -496,8 +496,8 @@ impl Vm {
                             continue;
                         };
                         let done = next.is_none();
-                        self.write_register(frame, b, next.unwrap_or(Value::undefined()));
-                        self.write_register(frame, c, Value::from_bool(done));
+                        self.write_register(frame.registers(), b, next.unwrap_or(Value::undefined()));
+                        self.write_register(frame.registers(), c, Value::from_bool(done));
                         self.advance_instruction();
                     }
                     Opcode::DelegateYield => {
@@ -509,47 +509,47 @@ impl Vm {
                     }
                     // === Abx-form arms ===
                     Opcode::LoadUndefined => {
-                        self.write_register(frame, a, Value::undefined());
+                        self.write_register(frame.registers(), a, Value::undefined());
                         self.advance_instruction();
                     }
                     Opcode::LoadUninitializedLexical => {
-                        self.write_register(frame, a, Value::uninitialized_lexical());
+                        self.write_register(frame.registers(), a, Value::uninitialized_lexical());
                         self.advance_instruction();
                     }
                     Opcode::LoadNull => {
-                        self.write_register(frame, a, Value::null());
+                        self.write_register(frame.registers(), a, Value::null());
                         self.advance_instruction();
                     }
                     Opcode::LoadTrue => {
-                        self.write_register(frame, a, Value::from_bool(true));
+                        self.write_register(frame.registers(), a, Value::from_bool(true));
                         self.advance_instruction();
                     }
                     Opcode::LoadFalse => {
-                        self.write_register(frame, a, Value::from_bool(false));
+                        self.write_register(frame.registers(), a, Value::from_bool(false));
                         self.advance_instruction();
                     }
                     Opcode::LoadZero => {
-                        self.write_register(frame, a, Value::from_smi(0));
+                        self.write_register(frame.registers(), a, Value::from_smi(0));
                         self.advance_instruction();
                     }
                     Opcode::LoadOne => {
-                        self.write_register(frame, a, Value::from_smi(1));
+                        self.write_register(frame.registers(), a, Value::from_smi(1));
                         self.advance_instruction();
                     }
                     Opcode::LoadSmi => {
                         let bytes = bx.to_le_bytes();
                         let value = i16::from_le_bytes([bytes[0], bytes[1]]);
-                        self.write_register(frame, a, Value::from_smi(i32::from(value)));
+                        self.write_register(frame.registers(), a, Value::from_smi(i32::from(value)));
                         self.advance_instruction();
                     }
                     Opcode::LoadSmi8 => {
                         let value = i8::from_le_bytes([bx.to_le_bytes()[0]]);
-                        self.write_register(frame, a, Value::from_smi(i32::from(value)));
+                        self.write_register(frame.registers(), a, Value::from_smi(i32::from(value)));
                         self.advance_instruction();
                     }
                     Opcode::LoadConst | Opcode::LoadConst8 => {
                         let value = self.read_constant(agent, frame.code(), bx)?;
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::LoadLocal0
@@ -559,8 +559,8 @@ impl Vm {
                         let local = opcode
                             .local_load_index()
                             .expect("load-local opcode should have an index");
-                        let value = self.read_register(frame, local);
-                        self.write_register(frame, a, value);
+                        let value = self.read_register(frame.registers(), local);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::StoreLocal0
@@ -570,8 +570,8 @@ impl Vm {
                         let local = opcode
                             .local_store_index()
                             .expect("store-local opcode should have an index");
-                        let value = self.read_register(frame, a);
-                        self.write_register(frame, local, value);
+                        let value = self.read_register(frame.registers(), a);
+                        self.write_register(frame.registers(), local, value);
                         self.advance_instruction();
                     }
                     Opcode::LoadEnvSlot => {
@@ -586,7 +586,7 @@ impl Vm {
                         let Some(value) = self.handle_vm_result(agent, slot_value)? else {
                             continue;
                         };
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::StoreEnvSlot => {
@@ -597,7 +597,7 @@ impl Vm {
                             depth,
                             slot,
                         )?;
-                        let value = self.read_register(frame, a);
+                        let value = self.read_register(frame.registers(), a);
                         let store_result =
                             self.write_environment_slot(agent, environment, slot, value);
                         let Some(()) = self.handle_vm_result(agent, store_result)? else {
@@ -613,7 +613,7 @@ impl Vm {
                             depth,
                             slot,
                         )?;
-                        let value = self.read_register(frame, a);
+                        let value = self.read_register(frame.registers(), a);
                         let assign_result = self.assign_environment_slot(
                             agent,
                             environment,
@@ -648,7 +648,7 @@ impl Vm {
                         let Some(value) = self.handle_vm_result(agent, load_result)? else {
                             continue;
                         };
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::LoadName => {
@@ -658,7 +658,7 @@ impl Vm {
                         let Some(value) = self.handle_vm_result(agent, load_result)? else {
                             continue;
                         };
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::ResolveName => {
@@ -668,7 +668,7 @@ impl Vm {
                         let Some(value) = self.handle_vm_result(agent, resolve_result)? else {
                             continue;
                         };
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::ResolveGlobal => {
@@ -678,12 +678,12 @@ impl Vm {
                         let Some(value) = self.handle_vm_result(agent, resolve_result)? else {
                             continue;
                         };
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::AssignName => {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
-                        let value = self.read_register(frame, a);
+                        let value = self.read_register(frame.registers(), a);
                         let assign_result = self
                             .assign_name_with_context(agent, host, registry, frame, atom, value);
                         let Some(()) = self.handle_vm_result(agent, assign_result)? else {
@@ -693,7 +693,7 @@ impl Vm {
                     }
                     Opcode::AssignVariableName => {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
-                        let value = self.read_register(frame, a);
+                        let value = self.read_register(frame.registers(), a);
                         let assign_result = self.assign_variable_name_with_context(
                             agent, host, registry, frame, atom, value,
                         );
@@ -709,7 +709,7 @@ impl Vm {
                         let Some(deleted) = self.handle_vm_result(agent, delete_result)? else {
                             continue;
                         };
-                        self.write_register(frame, a, Value::from_bool(deleted));
+                        self.write_register(frame.registers(), a, Value::from_bool(deleted));
                         self.advance_instruction();
                     }
                     Opcode::CaptureName => {
@@ -737,7 +737,7 @@ impl Vm {
                         let Some(value) = self.handle_vm_result(agent, load_result)? else {
                             continue;
                         };
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::LoadCapturedNameThis => {
@@ -751,7 +751,7 @@ impl Vm {
                         let Some(value) = self.handle_vm_result(agent, load_result)? else {
                             continue;
                         };
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::AssignCapturedName => {
@@ -760,7 +760,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: u16::MAX,
                             })?;
-                        let value = self.read_register(frame, a);
+                        let value = self.read_register(frame.registers(), a);
                         let assign_result = self.assign_captured_name_with_context(
                             agent,
                             host,
@@ -776,7 +776,7 @@ impl Vm {
                     }
                     Opcode::StoreGlobal => {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
-                        let value = self.read_register(frame, a);
+                        let value = self.read_register(frame.registers(), a);
                         let store_result = self.store_global_with_feedback(
                             agent,
                             host,
@@ -794,7 +794,7 @@ impl Vm {
                     }
                     Opcode::AssignGlobal => {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
-                        let value = self.read_register(frame, a);
+                        let value = self.read_register(frame.registers(), a);
                         let assign_result = self.assign_global_with_feedback(
                             agent,
                             host,
@@ -816,7 +816,7 @@ impl Vm {
                         let Some(deleted) = self.handle_vm_result(agent, delete_result)? else {
                             continue;
                         };
-                        self.write_register(frame, a, Value::from_bool(deleted));
+                        self.write_register(frame.registers(), a, Value::from_bool(deleted));
                         self.advance_instruction();
                     }
                     Opcode::LoadThis => {
@@ -835,28 +835,28 @@ impl Vm {
                         let Some(value) = self.handle_vm_result(agent, load_this)? else {
                             continue;
                         };
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::LoadCallee => {
                         let value = frame
                             .callee()
                             .map_or(Value::undefined(), Value::from_object_ref);
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::LoadNewTarget => {
                         let value = frame
                             .new_target()
                             .map_or(Value::undefined(), Value::from_object_ref);
-                        self.write_register(frame, a, value);
+                        self.write_register(frame.registers(), a, value);
                         self.advance_instruction();
                     }
                     Opcode::JumpIfTrue
                     | Opcode::JumpIfFalse
                     | Opcode::JumpIfTrue8
                     | Opcode::JumpIfFalse8 => {
-                        let condition = self.read_register(frame, a);
+                        let condition = self.read_register(frame.registers(), a);
                         let Some(truthy) = self.handle_vm_result(
                             agent,
                             read::to_boolean_agent(agent, condition).map_err(VmError::Abrupt),
@@ -890,7 +890,7 @@ impl Vm {
                             frame.realm(),
                             usize::try_from(bx).unwrap_or(usize::MAX),
                         )?;
-                        self.write_register(frame, a, Value::from_object_ref(object));
+                        self.write_register(frame.registers(), a, Value::from_object_ref(object));
                         self.advance_instruction();
                     }
                     Opcode::CreateArray => {
@@ -900,11 +900,11 @@ impl Vm {
                         if length != 0 {
                             Self::define_length_property(agent, object, length, false)?;
                         }
-                        self.write_register(frame, a, Value::from_object_ref(object));
+                        self.write_register(frame.registers(), a, Value::from_object_ref(object));
                         self.advance_instruction();
                     }
                     Opcode::CheckObjectCoercible => {
-                        let value = self.read_register(frame, a);
+                        let value = self.read_register(frame.registers(), a);
                         let coercible = Self::check_object_coercible(agent, value);
                         let Some(()) = self.handle_vm_result(agent, coercible)? else {
                             continue;
@@ -912,7 +912,7 @@ impl Vm {
                         self.advance_instruction();
                     }
                     Opcode::ThrowIfUninitialized => {
-                        let value = self.read_register(frame, a);
+                        let value = self.read_register(frame.registers(), a);
                         if value == Value::uninitialized_lexical() {
                             let result = Err(VmError::Abrupt(errors::throw_reference_error(agent)));
                             let Some(()) = self.handle_vm_result(agent, result)? else {
@@ -926,7 +926,7 @@ impl Vm {
                         let Some(closure) = self.handle_vm_result(agent, closure_result)? else {
                             continue;
                         };
-                        self.write_register(frame, a, Value::from_object_ref(closure));
+                        self.write_register(frame.registers(), a, Value::from_object_ref(closure));
                         self.advance_instruction();
                     }
                     Opcode::CloseForIn => {
@@ -986,7 +986,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        let value = self.read_register(frame, register);
+                        let value = self.read_register(frame.registers(), register);
                         let push_result = self.push_with_environment(agent, frame, value);
                         let Some(()) = self.handle_vm_result(agent, push_result)? else {
                             continue;
@@ -1003,9 +1003,9 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        let value = self.read_register(frame, register);
+                        let value = self.read_register(frame.registers(), register);
                         let type_string = Self::type_of_value(agent, value);
-                        self.write_register(frame, register, type_string);
+                        self.write_register(frame.registers(), register, type_string);
                         self.advance_instruction();
                     }
                     Opcode::Return => {
@@ -1014,7 +1014,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        let value = self.read_register(frame, register);
+                        let value = self.read_register(frame.registers(), register);
                         let _ = agent.pop_execution_context();
                         if let Some(result) = self.finish_frame(agent, value)? {
                             return Ok(result);
@@ -1027,7 +1027,7 @@ impl Vm {
                         }
                     }
                     Opcode::SuspendGeneratorStart => {
-                        let resume_offset = self.next_instruction_offset(frame);
+                        let resume_offset = self.next_instruction_offset(frame.instruction_offset());
                         self.suspend_generator_start(agent, frame, resume_offset)?;
                     }
                     Opcode::Yield => {
@@ -1036,12 +1036,12 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        let value = self.read_register(frame, register);
+                        let value = self.read_register(frame.registers(), register);
                         self.suspend_current_generator_frame(
                             agent,
                             frame,
                             value,
-                            self.next_instruction_offset(frame),
+                            self.next_instruction_offset(frame.instruction_offset()),
                             false,
                         )?;
                     }
@@ -1059,7 +1059,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        let value = self.read_register(frame, register);
+                        let value = self.read_register(frame.registers(), register);
                         if self.transfer_to_exception_handler(agent, value)? {
                             continue;
                         }
@@ -1073,7 +1073,7 @@ impl Vm {
                                 register: 0,
                             })?;
                         let value = self.current_exception.unwrap_or(Value::undefined());
-                        self.write_register(frame, register, value);
+                        self.write_register(frame.registers(), register, value);
                         self.advance_instruction();
                     }
                     Opcode::LoadResumeKind => {
@@ -1082,8 +1082,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        self.write_register(
-                            frame,
+                        self.write_register(frame.registers(),
                             register,
                             Value::from_smi(i32::from(frame.resume_kind().raw())),
                         );
@@ -1095,7 +1094,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        self.write_register(frame, register, frame.resume_value());
+                        self.write_register(frame.registers(), register, frame.resume_value());
                         self.clear_active_resume();
                         self.advance_instruction();
                     }

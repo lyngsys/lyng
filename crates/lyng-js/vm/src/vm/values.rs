@@ -68,8 +68,8 @@ impl Vm {
             host,
             registry,
             frame,
-            self.read_register(frame, left_register),
-            self.read_register(frame, right_register),
+            self.read_register(frame.registers(), left_register),
+            self.read_register(frame.registers(), right_register),
         )
     }
 
@@ -82,7 +82,7 @@ impl Vm {
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
-        let left = self.read_register(frame, left_register);
+        let left = self.read_register(frame.registers(), left_register);
         if let Some(left) = left.as_smi() {
             return Ok(encode_number(f64::from(left) + f64::from(immediate)));
         }
@@ -190,7 +190,7 @@ impl Vm {
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
-        let left = self.read_register(frame, left_register);
+        let left = self.read_register(frame.registers(), left_register);
         if let Some(left) = left.as_smi() {
             return Ok(encode_number(f64::from(left) - f64::from(immediate)));
         }
@@ -221,7 +221,7 @@ impl Vm {
             host,
             registry,
             frame,
-            self.read_register(frame, register),
+            self.read_register(frame.registers(), register),
             ToPrimitiveHint::Number,
         )?;
         if value.is_bigint() {
@@ -309,7 +309,7 @@ impl Vm {
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
-        let left = self.read_register(frame, left_register);
+        let left = self.read_register(frame.registers(), left_register);
         if let Some(left) = left.as_smi() {
             return Ok(encode_number(f64::from(left) * f64::from(immediate)));
         }
@@ -413,7 +413,7 @@ impl Vm {
             host,
             registry,
             frame,
-            self.read_register(frame, register),
+            self.read_register(frame.registers(), register),
         )
     }
 
@@ -551,7 +551,7 @@ impl Vm {
     }
 
     pub(super) fn object_register(&self, frame: FrameRecord, register: u16) -> VmResult<ObjectRef> {
-        let value = self.read_register(frame, register);
+        let value = self.read_register(frame.registers(), register);
         Self::require_object(frame, value)
     }
 

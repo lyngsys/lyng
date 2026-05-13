@@ -741,7 +741,7 @@ impl Vm {
 
     fn job_caller_code(&self) -> CodeRef {
         self.frame()
-            .map(FrameRecord::code)
+            .map(|frame| frame.code())
             .or_else(|| {
                 self.installed
                     .iter()

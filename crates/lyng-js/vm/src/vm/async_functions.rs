@@ -163,12 +163,12 @@ impl Vm {
                 }
                 return Err(VmError::Abrupt(AbruptCompletion::Throw(resume_value)));
             }
-            self.write_register(frame, register, resume_value);
+            self.write_register(frame.registers(), register, resume_value);
             self.advance_instruction();
             return Ok(());
         }
 
-        let value = self.read_register(frame, register);
+        let value = self.read_register(frame.registers(), register);
         let promise =
             self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)?;
         self.suspend_for_await_promise(agent, frame, promise)

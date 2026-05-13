@@ -1,11 +1,11 @@
 use super::call::finalize_frame_result;
-use super::{Agent, FrameRecord, Value, Vm, VmError, VmResult};
+use super::{Agent, RegisterWindow, Value, Vm, VmError, VmResult};
 use lyng_js_types::AbruptCompletion;
 
 impl Vm {
     #[inline]
-    pub(super) fn read_register(&self, frame: FrameRecord, register: u16) -> Value {
-        let absolute = absolute_register(frame, register);
+    pub(super) fn read_register(&self, registers: RegisterWindow, register: u16) -> Value {
+        let absolute = absolute_register(registers, register);
         debug_assert!(
             absolute < self.register_stack_top(),
             "validated register window should be reserved on the VM stack"
@@ -14,8 +14,13 @@ impl Vm {
     }
 
     #[inline]
-    pub(super) fn write_register(&mut self, frame: FrameRecord, register: u16, value: Value) {
-        let absolute = absolute_register(frame, register);
+    pub(super) fn write_register(
+        &mut self,
+        registers: RegisterWindow,
+        register: u16,
+        value: Value,
+    ) {
+        let absolute = absolute_register(registers, register);
         debug_assert!(
             absolute < self.register_stack_top(),
             "validated register window should be reserved on the VM stack"
@@ -87,9 +92,8 @@ impl Vm {
     /// Byte offset of the instruction immediately following the one the dispatch loop is
     /// currently executing. Used by generator/yield/await suspends to record where the
     /// suspended frame should resume.
-    pub(super) fn next_instruction_offset(&self, frame: FrameRecord) -> u32 {
-        frame
-            .instruction_offset()
+    pub(super) fn next_instruction_offset(&self, current_offset: u32) -> u32 {
+        current_offset
             .checked_add(self.current_instruction_encoded_len())
             .expect("instruction offset should stay within u32")
     }
@@ -142,7 +146,7 @@ impl Vm {
 
         if let Some(caller) = self.frames.last().copied() {
             if let Some(return_register) = frame.return_register() {
-                self.write_register(caller, return_register, result);
+                self.write_register(caller.registers(), return_register, result);
             }
             return Ok(None);
         }
@@ -152,14 +156,14 @@ impl Vm {
 }
 
 #[inline]
-fn absolute_register(frame: FrameRecord, register: u16) -> usize {
+fn absolute_register(registers: RegisterWindow, register: u16) -> usize {
     debug_assert!(
-        register < frame.registers().len(),
+        register < registers.len(),
         "bytecode register operand should be validated before execution"
     );
-    let absolute = frame.registers().base() + u32::from(register);
+    let absolute = registers.base() + u32::from(register);
     debug_assert!(
-        absolute < frame.registers().end(),
+        absolute < registers.end(),
         "register should remain inside the active frame window"
     );
     absolute as usize

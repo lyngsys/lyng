@@ -30,7 +30,9 @@ pub use extensions::{
     EmbeddingFunctionContext, EmbeddingFunctionMetadata, EmbeddingInvocation,
     RealmExtensionInstallation, RealmExtensionProvider, SharedRealmExtensionProvider,
 };
-pub use frame::{seed_registers, FrameFlags, FrameRecord, RegisterWindow};
+pub use frame::{
+    seed_registers, FrameFlags, FrameMetadata, FrameRecord, FrameState, RegisterWindow,
+};
 pub use installed::InstalledCode;
 pub use opcode_counts::{OpcodeDispatchCount, OpcodeDispatchCounts};
 pub use vm::{

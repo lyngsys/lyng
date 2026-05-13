@@ -92,7 +92,7 @@ impl Vm {
         } else {
             object::call(agent, callee, this_value, arguments, registry).map_err(VmError::Abrupt)?
         };
-        self.write_register(frame, result_register, result);
+        self.write_register(frame.registers(), result_register, result);
         self.advance_instruction();
         Ok(())
     }
@@ -165,7 +165,7 @@ impl Vm {
         else {
             return Ok(false);
         };
-        self.write_register(frame, result_register, result);
+        self.write_register(frame.registers(), result_register, result);
         self.advance_instruction();
         Ok(true)
     }
@@ -313,8 +313,8 @@ impl Vm {
         arguments: CallRange,
         spread_mask: Option<u64>,
     ) -> VmResult<()> {
-        let callee_value = self.read_register(frame, callee_register);
-        let this_value = self.read_register(frame, this_register);
+        let callee_value = self.read_register(frame.registers(), callee_register);
+        let this_value = self.read_register(frame.registers(), this_register);
         let mut collected_arguments = std::mem::take(&mut self.argument_scratch);
         collected_arguments.clear();
         let result = (|| {
@@ -359,14 +359,14 @@ impl Vm {
         call_base_register: u16,
         argument_count: u8,
     ) -> VmResult<()> {
-        let callee_value = self.read_register(frame, callee_register);
-        let this_value = self.read_register(frame, call_base_register);
+        let callee_value = self.read_register(frame.registers(), callee_register);
+        let this_value = self.read_register(frame.registers(), call_base_register);
         let mut collected_arguments = std::mem::take(&mut self.argument_scratch);
         collected_arguments.clear();
         collected_arguments.reserve(usize::from(argument_count));
         for offset in 0..argument_count {
             collected_arguments
-                .push(self.read_register(frame, call_base_register + 1 + u16::from(offset)));
+                .push(self.read_register(frame.registers(), call_base_register + 1 + u16::from(offset)));
         }
         let result = self.invoke_collected_call_value(
             agent,
@@ -399,8 +399,8 @@ impl Vm {
         arguments: CallRange,
         spread_mask: Option<u64>,
     ) -> VmResult<Option<Value>> {
-        let callee_value = self.read_register(frame, callee_register);
-        let this_value = self.read_register(frame, this_register);
+        let callee_value = self.read_register(frame.registers(), callee_register);
+        let this_value = self.read_register(frame.registers(), this_register);
         let mut collected_arguments = std::mem::take(&mut self.argument_scratch);
         collected_arguments.clear();
         let result = (|| {
@@ -457,7 +457,7 @@ impl Vm {
         arguments: CallRange,
         spread_mask: Option<u64>,
     ) -> VmResult<()> {
-        let callee_value = self.read_register(frame, callee_register);
+        let callee_value = self.read_register(frame.registers(), callee_register);
         let mut collected_arguments = std::mem::take(&mut self.argument_scratch);
         collected_arguments.clear();
         let result = (|| {
@@ -504,7 +504,7 @@ impl Vm {
                     callee,
                     Some(result),
                 );
-                self.write_register(frame, result_register, Value::from_object_ref(result));
+                self.write_register(frame.registers(), result_register, Value::from_object_ref(result));
                 self.advance_instruction();
                 return Ok(());
             }
@@ -576,7 +576,7 @@ impl Vm {
                 .map_err(VmError::Abrupt)?
             };
             self.observe_construct_target(agent, frame.code(), feedback_slot, callee, Some(result));
-            self.write_register(frame, result_register, Value::from_object_ref(result));
+            self.write_register(frame.registers(), result_register, Value::from_object_ref(result));
             self.advance_instruction();
             Ok(())
         })();
@@ -683,7 +683,7 @@ impl Vm {
         arguments.reserve(usize::from(range.argument_count()));
         let spread_mask = spread_mask.unwrap_or(0);
         for offset in 0..range.argument_count() {
-            let value = self.read_register(frame, range.argument_base() + offset);
+            let value = self.read_register(frame.registers(), range.argument_base() + offset);
             let is_spread = usize::from(offset) < u64::BITS as usize
                 && (spread_mask & (1_u64 << u32::from(offset))) != 0;
             if !is_spread {

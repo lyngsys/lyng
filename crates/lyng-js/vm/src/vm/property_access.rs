@@ -686,7 +686,7 @@ impl Vm {
         let Some(caller) = self.frames[..active_index]
             .iter()
             .rev()
-            .find_map(|frame| frame.callee())
+            .find_map(FrameRecord::callee)
         else {
             return Some(Value::null());
         };

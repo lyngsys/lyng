@@ -181,7 +181,7 @@ impl<'a> VmDebugPauseContext<'a> {
 
     pub fn read_register(&self, frame_index: usize, register: u16) -> Option<Value> {
         let frame = self.frame_at(frame_index)?;
-        (register < frame.registers().len()).then(|| self.vm.read_register(frame, register))
+        (register < frame.registers().len()).then(|| self.vm.read_register(frame.registers(), register))
     }
 
     pub fn read_env_slot(&self, frame_index: usize, depth: u8, slot: u32) -> Option<Value> {

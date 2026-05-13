@@ -56,15 +56,15 @@ impl Vm {
                 self.unsigned_shift_right(agent, host, registry, frame, left, right)
             }
             Opcode::Equal => {
-                let left = self.read_register(frame, left);
-                let right = self.read_register(frame, right);
+                let left = self.read_register(frame.registers(), left);
+                let right = self.read_register(frame.registers(), right);
                 Ok(Value::from_bool(self.loosely_equal(
                     agent, host, registry, frame, left, right,
                 )?))
             }
             Opcode::StrictEqual => {
-                let left = self.read_register(frame, left);
-                let right = self.read_register(frame, right);
+                let left = self.read_register(frame.registers(), left);
+                let right = self.read_register(frame.registers(), right);
                 if let Some(result) = pure::is_strictly_equal(left, right) {
                     return Ok(Value::from_bool(result));
                 }
@@ -132,7 +132,7 @@ impl Vm {
                 Some(self.bitwise_and_value_and_smi(agent, host, registry, frame, left, immediate))
             }
             Opcode::EqualZero => {
-                let value = self.read_register(frame, left);
+                let value = self.read_register(frame.registers(), left);
                 Some(Ok(Value::from_bool(
                     value.as_f64().is_some_and(|number| number == 0.0),
                 )))
@@ -152,8 +152,8 @@ impl Vm {
         left: u16,
         right: u16,
     ) -> Option<Value> {
-        let left = self.read_register(frame, left);
-        let right = self.read_register(frame, right);
+        let left = self.read_register(frame.registers(), left);
+        let right = self.read_register(frame.registers(), right);
         if let (Some(left), Some(right)) = (left.as_smi(), right.as_smi()) {
             let value = match opcode {
                 Opcode::Add => encode_number(f64::from(left) + f64::from(right)),
@@ -313,7 +313,7 @@ impl Vm {
             host,
             registry,
             frame,
-            self.read_register(frame, register),
+            self.read_register(frame.registers(), register),
             ToPrimitiveHint::Number,
         )?;
         Self::to_numeric_primitive(agent, primitive)
@@ -357,7 +357,7 @@ impl Vm {
             host,
             registry,
             frame,
-            self.read_register(frame, left_register),
+            self.read_register(frame.registers(), left_register),
             ToPrimitiveHint::Number,
         )?;
         let right = self.to_primitive(
@@ -365,7 +365,7 @@ impl Vm {
             host,
             registry,
             frame,
-            self.read_register(frame, right_register),
+            self.read_register(frame.registers(), right_register),
             ToPrimitiveHint::Number,
         )?;
         if left.is_string() && right.is_string() {
@@ -432,7 +432,7 @@ impl Vm {
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
-        let left = self.read_register(frame, left_register);
+        let left = self.read_register(frame.registers(), left_register);
         if let Some(left) = left.as_smi() {
             return Ok(Value::from_smi(left & i32::from(immediate)));
         }
@@ -457,7 +457,7 @@ impl Vm {
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
-        let left = self.read_register(frame, left_register);
+        let left = self.read_register(frame.registers(), left_register);
         if let Some(left) = left.as_smi() {
             return Ok(encode_number(f64::from(left) / f64::from(immediate)));
         }
@@ -484,7 +484,7 @@ impl Vm {
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
-        let left = self.read_register(frame, left_register);
+        let left = self.read_register(frame.registers(), left_register);
         if let Some(left) = left.as_smi() {
             return Ok(encode_number(f64::from(left) % f64::from(immediate)));
         }
