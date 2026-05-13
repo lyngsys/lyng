@@ -536,7 +536,7 @@ impl Vm {
                 module_env,
                 lyng_js_env::ExecutionContextKind::Module,
             );
-            let closure = self.create_closure(agent, frame, child_index)?;
+            let closure = self.create_closure(agent, &frame, child_index)?;
             Self::initialize_environment_slot(
                 agent,
                 module_env,

@@ -704,7 +704,7 @@ impl Vm {
         value: Value,
         arguments: &mut Vec<Value>,
     ) -> VmResult<()> {
-        self.append_iterator_values(agent, host, registry, frame, value, arguments)
+        self.append_iterator_values(agent, host, registry, &frame, value, arguments)
     }
 }
 

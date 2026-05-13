@@ -741,7 +741,7 @@ impl Vm {
             return Ok(());
         };
         let delete_result =
-            self.delete_property_from_value(agent, host, registry, frame, receiver, key);
+            self.delete_property_from_value(agent, host, registry, &frame, receiver, key);
         let Some(deleted) = self.handle_vm_result(agent, delete_result)? else {
             return Ok(());
         };

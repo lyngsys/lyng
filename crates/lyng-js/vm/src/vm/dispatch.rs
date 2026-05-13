@@ -444,7 +444,7 @@ impl Vm {
                     Opcode::CreateForIn => {
                         let value = self.read_register(frame.registers(), b);
                         let enumerator_result = self.create_for_in_enumerator_for_value(
-                            agent, host, registry, frame, value,
+                            agent, host, registry, &frame, value,
                         );
                         let Some(enumerator) = self.handle_vm_result(agent, enumerator_result)?
                         else {
@@ -479,7 +479,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             value,
                             c != 0,
                         );
@@ -491,7 +491,7 @@ impl Vm {
                         self.advance_instruction();
                     }
                     Opcode::AdvanceIterator => {
-                        let next = self.advance_iterator_state(agent, host, registry, frame, a);
+                        let next = self.advance_iterator_state(agent, host, registry, &frame, a);
                         let Some(next) = self.handle_vm_result(agent, next)? else {
                             continue;
                         };
@@ -922,7 +922,7 @@ impl Vm {
                         self.advance_instruction();
                     }
                     Opcode::CreateClosure => {
-                        let closure_result = self.create_closure(agent, frame, bx);
+                        let closure_result = self.create_closure(agent, &frame, bx);
                         let Some(closure) = self.handle_vm_result(agent, closure_result)? else {
                             continue;
                         };
@@ -935,7 +935,7 @@ impl Vm {
                     }
                     Opcode::CloseIterator => {
                         let close_result =
-                            self.close_iterator_state(agent, host, registry, frame, a, bx != 0);
+                            self.close_iterator_state(agent, host, registry, &frame, a, bx != 0);
                         let Some(()) = self.handle_vm_result(agent, close_result)? else {
                             continue;
                         };

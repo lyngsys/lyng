@@ -134,7 +134,7 @@ impl Vm {
     pub(super) fn create_closure(
         &self,
         agent: &mut Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         child_index: u32,
     ) -> VmResult<ObjectRef> {
         let child_code = self
@@ -414,7 +414,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<bool> {
@@ -425,11 +425,11 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &frame,
+                frame,
             };
             return proxy::delete_property(&mut bridge, object, key);
         }
-        self.evaluate_deferred_module_namespace(agent, host, registry, &frame, object, key)?;
+        self.evaluate_deferred_module_namespace(agent, host, registry, frame, object, key)?;
         self.delete_property_from_object(agent, object, key)
     }
 
@@ -438,7 +438,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         receiver: Value,
     ) -> VmResult<ForInEnumerator> {
         if receiver.is_null() || receiver.is_undefined() {
@@ -453,7 +453,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &frame,
+            frame,
         };
 
         while let Some(object) = current {
@@ -478,7 +478,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         value: Value,
         async_iteration: bool,
     ) -> VmResult<iterator::IteratorRecord> {
@@ -487,7 +487,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &frame,
+            frame,
         };
         if async_iteration {
             iterator::get_async_iterator(&mut bridge, value)
@@ -501,7 +501,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         value: Value,
         values: &mut Vec<Value>,
     ) -> VmResult<()> {
@@ -510,7 +510,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &frame,
+            frame,
         };
         let mut iterator = iterator::get_iterator(&mut bridge, value)?;
         loop {
@@ -533,7 +533,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         iterator_register: u16,
     ) -> VmResult<Option<Value>> {
         let mut record = self
@@ -555,7 +555,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &frame,
+            frame,
         };
         let Some(result) = iterator::iterator_step(&mut bridge, &mut record)? else {
             self.iterator_states
@@ -573,7 +573,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         iterator_register: u16,
         preserve_completion: bool,
     ) -> VmResult<()> {
@@ -603,7 +603,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &frame,
+            frame,
         };
         let _: () = iterator::iterator_close(&mut bridge, &mut record, Ok(()))?;
         Ok(())
@@ -618,7 +618,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         value: Value,
         done: bool,
         close_on_rejection: Option<(ObjectRef, ObjectRef)>,
@@ -626,7 +626,7 @@ impl Vm {
         let capability = Self::create_intrinsic_promise_capability(agent, frame.realm())?;
         let promise = Self::promise_capability_promise(agent, capability)?;
         let value_wrapper =
-            match self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)
+            match self.promise_resolve_in_realm(agent, host, registry, *frame, frame.realm(), value)
             {
                 Ok(value_wrapper) => value_wrapper,
                 Err(VmError::Abrupt(completion)) => {
@@ -640,7 +640,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame: &frame,
+                            frame,
                         };
                         match iterator::iterator_close::<_, ()>(
                             &mut bridge,
@@ -705,7 +705,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         iterator_register: u16,
         mut record: iterator::IteratorRecord,
     ) -> VmResult<Option<Value>> {
@@ -729,7 +729,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame: &frame,
+                        frame,
                     };
                     if iterator::iterator_complete(&mut bridge, iter_result)? {
                         record.set_done(true);
@@ -755,7 +755,7 @@ impl Vm {
                                 agent,
                                 host,
                                 registry,
-                                frame: &frame,
+                                frame,
                             };
                             if iterator::iterator_complete(&mut bridge, iter_result)? {
                                 record.set_done(true);
@@ -784,22 +784,22 @@ impl Vm {
         }
 
         let receiver = Value::from_object_ref(record.iterator());
-        let next_method = Self::require_callable_object(agent, frame, record.next_method())?;
+        let next_method = Self::require_callable_object(agent, *frame, record.next_method())?;
         let result =
-            self.call_to_completion(agent, host, registry, frame, next_method, receiver, &[])?;
+            self.call_to_completion(agent, host, registry, *frame, next_method, receiver, &[])?;
         match record.kind() {
             iterator::IteratorKind::Async => {
                 let promise = self.promise_resolve_in_realm(
                     agent,
                     host,
                     registry,
-                    frame,
+                    *frame,
                     frame.realm(),
                     result,
                 )?;
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
-                self.suspend_for_await_promise(agent, frame, promise)?;
+                self.suspend_for_await_promise(agent, *frame, promise)?;
                 Ok(None)
             }
             iterator::IteratorKind::AsyncFromSync => {
@@ -812,7 +812,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame: &frame,
+                        frame,
                     };
                     (
                         iterator::iterator_complete(&mut bridge, iter_result)?,
@@ -835,14 +835,14 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    *frame,
                     frame.realm(),
                     Value::from_object_ref(promise),
                 )?;
                 record.set_async_from_sync_state(iterator::AsyncFromSyncState::Next { done });
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
-                self.suspend_for_await_promise(agent, frame, promise)?;
+                self.suspend_for_await_promise(agent, *frame, promise)?;
                 Ok(None)
             }
             iterator::IteratorKind::Sync => Err(VmError::Abrupt(errors::throw_type_error(agent))),
@@ -862,7 +862,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         iterator_register: u16,
         mut record: iterator::IteratorRecord,
         preserve_completion: bool,
@@ -923,7 +923,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &frame,
+            frame,
             receiver,
             PropertyKey::from_atom(WellKnownAtom::r#return.id()),
         );
@@ -939,7 +939,7 @@ impl Vm {
             record.set_done(true);
             return Ok(());
         }
-        let return_method = match Self::require_callable_object(agent, frame, return_value) {
+        let return_method = match Self::require_callable_object(agent, *frame, return_value) {
             Ok(return_method) => return_method,
             Err(_) if preserve_completion => {
                 record.set_done(true);
@@ -948,7 +948,7 @@ impl Vm {
             Err(error) => return Err(error),
         };
         let result =
-            self.call_to_completion(agent, host, registry, frame, return_method, receiver, &[]);
+            self.call_to_completion(agent, host, registry, *frame, return_method, receiver, &[]);
         let result = match result {
             Ok(result) => result,
             Err(_) if preserve_completion => {
@@ -963,7 +963,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    *frame,
                     frame.realm(),
                     result,
                 ) {
@@ -977,7 +977,7 @@ impl Vm {
                 record.set_preserve_completion_on_close(preserve_completion);
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
-                self.suspend_for_await_promise(agent, frame, promise)
+                self.suspend_for_await_promise(agent, *frame, promise)
             }
             iterator::IteratorKind::AsyncFromSync => {
                 let iter_result = match result.as_object_ref() {
@@ -994,7 +994,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame: &frame,
+                        frame,
                     };
                     match iterator::iterator_value(&mut bridge, iter_result) {
                         Ok(value) => value,
@@ -1019,7 +1019,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    *frame,
                     frame.realm(),
                     Value::from_object_ref(promise),
                 ) {
@@ -1034,7 +1034,7 @@ impl Vm {
                 record.set_preserve_completion_on_close(preserve_completion);
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
-                self.suspend_for_await_promise(agent, frame, promise)
+                self.suspend_for_await_promise(agent, *frame, promise)
             }
             iterator::IteratorKind::Sync => Err(VmError::Abrupt(errors::throw_type_error(agent))),
         }
@@ -1045,7 +1045,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         mut record: iterator::IteratorRecord,
     ) {
         if record.done() {
@@ -1057,7 +1057,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &frame,
+            frame,
             receiver,
             PropertyKey::from_atom(WellKnownAtom::r#return.id()),
         ) else {
@@ -1066,11 +1066,11 @@ impl Vm {
         if return_value.is_undefined() || return_value.is_null() {
             return;
         }
-        let Ok(return_method) = Self::require_callable_object(agent, frame, return_value) else {
+        let Ok(return_method) = Self::require_callable_object(agent, *frame, return_value) else {
             return;
         };
         let Ok(result) =
-            self.call_to_completion(agent, host, registry, frame, return_method, receiver, &[])
+            self.call_to_completion(agent, host, registry, *frame, return_method, receiver, &[])
         else {
             return;
         };
@@ -1278,7 +1278,7 @@ mod tests {
         );
 
         let closure = vm
-            .create_closure(agent, frame, 0)
+            .create_closure(agent, &frame, 0)
             .expect("closure creation should succeed");
         let function_data = agent
             .objects()
@@ -1331,7 +1331,7 @@ mod tests {
         );
 
         let closure = vm
-            .create_closure(agent, frame, 0)
+            .create_closure(agent, &frame, 0)
             .expect("closure creation should succeed");
         let descriptor = object::ordinary_get_own_property(
             agent,
@@ -1389,7 +1389,7 @@ mod tests {
         );
 
         let closure = vm
-            .create_closure(agent, frame, 0)
+            .create_closure(agent, &frame, 0)
             .expect("closure creation should succeed");
         let name_atom = agent.atoms_mut().intern_collectible("C");
         let function_name = Value::from_string_ref(agent.alloc_runtime_string(
@@ -1478,7 +1478,7 @@ mod tests {
         );
 
         let closure = vm
-            .create_closure(agent, frame, 0)
+            .create_closure(agent, &frame, 0)
             .expect("closure creation should succeed");
         let prototype = object::ordinary_get_own_property(
             agent,
