@@ -108,7 +108,7 @@ impl Vm {
         self.close_with_environment_frames(self.frames.len());
         self.close_direct_eval_frames(self.frames.len());
         self.close_env_scope_frames(self.frames.len());
-        let finalized = finalize_frame_result(agent, frame, result);
+        let finalized = finalize_frame_result(agent, &frame, result);
         self.for_in_states.clear_window(frame.registers());
         self.iterator_states.clear_window(frame.registers());
         self.captured_name_references

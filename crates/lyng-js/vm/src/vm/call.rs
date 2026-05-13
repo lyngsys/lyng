@@ -22,7 +22,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee: ObjectRef,
@@ -49,7 +49,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                *frame,
                 result_register,
                 callee,
                 this_value,
@@ -73,7 +73,7 @@ impl Vm {
             return Ok(());
         }
         let result = if let Some(result) = self.call_builtin(
-            agent, host, registry, &frame, callee, this_value, arguments, None,
+            agent, host, registry, frame, callee, this_value, arguments, None,
         )? {
             result
         } else if agent.objects().is_proxy_object(callee) {
@@ -83,7 +83,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: &frame,
+                    frame,
                 },
                 callee,
                 this_value,
@@ -106,14 +106,14 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_value: Value,
         this_value: Value,
         collected_arguments: &mut Vec<Value>,
     ) -> VmResult<()> {
-        let mut callee = Self::require_callable_object(agent, frame, callee_value)?;
+        let mut callee = Self::require_callable_object(agent, *frame, callee_value)?;
         let mut effective_this = this_value;
         Self::resolve_bound_call_chain(
             agent,
@@ -147,7 +147,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee: ObjectRef,
@@ -160,7 +160,7 @@ impl Vm {
             return Ok(false);
         };
         let Some(result) = self.call_frame_safe_builtin(
-            agent, host, registry, &frame, callee, entry, this_value, arguments,
+            agent, host, registry, frame, callee, entry, this_value, arguments,
         )?
         else {
             return Ok(false);
@@ -179,7 +179,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee: ObjectRef,
@@ -190,7 +190,7 @@ impl Vm {
             return Ok(None);
         }
 
-        let mut target = Self::require_callable_object(agent, frame, this_value)?;
+        let mut target = Self::require_callable_object(agent, *frame, this_value)?;
         let mut effective_this = arguments.first().copied().unwrap_or(Value::undefined());
         let call_arguments = arguments.get(1..).unwrap_or(&[]);
         if Self::bound_function_record(agent, target).is_some() {
@@ -240,7 +240,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         callee: ObjectRef,
         this_value: Value,
         arguments: &[Value],
@@ -251,7 +251,7 @@ impl Vm {
                 .is_some_and(|function| function.flags().generator())
             {
                 let prepared =
-                    self.prepare_bytecode_call(agent, frame, callee, this_value, None)?;
+                    self.prepare_bytecode_call(agent, *frame, callee, this_value, None)?;
                 let generator =
                     self.instantiate_generator_call(agent, host, registry, prepared, arguments)?;
                 let _ = agent.pop_execution_context();
@@ -262,18 +262,18 @@ impl Vm {
                 .is_some_and(|function| function.flags().async_function())
             {
                 let prepared =
-                    self.prepare_bytecode_call(agent, frame, callee, this_value, None)?;
+                    self.prepare_bytecode_call(agent, *frame, callee, this_value, None)?;
                 let promise = self
                     .instantiate_async_function_call(agent, host, registry, prepared, arguments)?;
                 let _ = agent.pop_execution_context();
                 return self.finish_frame(agent, Value::from_object_ref(promise));
             }
-            self.recycle_tail_bytecode_call(agent, frame, callee, this_value, arguments)?;
+            self.recycle_tail_bytecode_call(agent, *frame, callee, this_value, arguments)?;
             return Ok(None);
         }
 
         let result = if let Some(result) = self.call_builtin(
-            agent, host, registry, &frame, callee, this_value, arguments, None,
+            agent, host, registry, frame, callee, this_value, arguments, None,
         )? {
             result
         } else if agent.objects().is_proxy_object(callee) {
@@ -283,7 +283,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: &frame,
+                    frame,
                 },
                 callee,
                 this_value,
@@ -305,7 +305,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_register: u16,
@@ -352,7 +352,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_register: u16,
@@ -392,7 +392,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         _feedback_slot: Option<FeedbackSlotId>,
         callee_register: u16,
         this_register: u16,
@@ -413,7 +413,7 @@ impl Vm {
                 spread_mask,
                 &mut collected_arguments,
             )?;
-            let mut callee = Self::require_callable_object(agent, frame, callee_value)?;
+            let mut callee = Self::require_callable_object(agent, *frame, callee_value)?;
             let mut effective_this = this_value;
             Self::resolve_bound_call_chain(
                 agent,
@@ -450,7 +450,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_register: u16,
@@ -491,7 +491,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame: &frame,
+                        frame,
                     },
                     callee,
                     &collected_arguments,
@@ -520,7 +520,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame,
+                        *frame,
                         frame.realm(),
                         new_target,
                     )?)
@@ -538,7 +538,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    *frame,
                     result_register,
                     callee,
                     this_value,
@@ -556,7 +556,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                &frame,
+                frame,
                 callee,
                 Value::undefined(),
                 &collected_arguments,
@@ -674,7 +674,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         range: CallRange,
         spread_mask: Option<u64>,
         arguments: &mut Vec<Value>,
@@ -700,17 +700,17 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         value: Value,
         arguments: &mut Vec<Value>,
     ) -> VmResult<()> {
-        self.append_iterator_values(agent, host, registry, &frame, value, arguments)
+        self.append_iterator_values(agent, host, registry, frame, value, arguments)
     }
 }
 
 pub(super) fn finalize_frame_result(
     agent: &mut Agent,
-    frame: FrameRecord,
+    frame: &FrameRecord,
     result: Value,
 ) -> VmResult<Value> {
     if frame.flags().contains(FrameFlags::construct()) && result.as_object_ref().is_none() {

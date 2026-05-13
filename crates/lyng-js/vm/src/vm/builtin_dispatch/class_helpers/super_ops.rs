@@ -317,7 +317,7 @@ impl Vm {
             agent,
             host,
             registry,
-            *caller,
+            caller,
             spread_source,
             &mut spread_arguments,
         )?;
