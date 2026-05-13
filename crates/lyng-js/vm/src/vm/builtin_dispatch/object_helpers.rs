@@ -112,7 +112,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         object_ref: ObjectRef,
         freeze: bool,
     ) -> VmResult<bool> {
@@ -121,7 +121,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &frame,
+            frame,
         };
         if !proxy::prevent_extensions(&mut bridge, object_ref)? {
             return Ok(false);
@@ -157,7 +157,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         object_ref: ObjectRef,
         frozen: bool,
     ) -> VmResult<bool> {
@@ -166,7 +166,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &frame,
+            frame,
         };
         if proxy::is_extensible(&mut bridge, object_ref)? {
             return Ok(false);
@@ -195,7 +195,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let value = arguments.first().copied().unwrap_or(Value::undefined());
@@ -213,7 +213,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &caller,
+                frame: caller,
             };
             object::get_with_receiver_in_context(
                 &mut bridge,
@@ -234,12 +234,12 @@ impl Vm {
                 )?;
                 return Ok(Value::from_bool(is_instance));
             }
-            let has_instance = Self::require_callable_object(agent, caller, has_instance)?;
+            let has_instance = Self::require_callable_object(agent, *caller, has_instance)?;
             let result = self.call_to_completion(
                 agent,
                 host,
                 registry,
-                caller,
+                *caller,
                 has_instance,
                 constructor_value,
                 &[value],
@@ -248,7 +248,7 @@ impl Vm {
             return Ok(Value::from_bool(is_instance));
         }
 
-        let constructor = Self::require_callable_object(agent, caller, constructor_value)?;
+        let constructor = Self::require_callable_object(agent, *caller, constructor_value)?;
         let Some(object) = value.as_object_ref() else {
             return Ok(Value::from_bool(false));
         };
@@ -257,7 +257,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &caller,
+            frame: caller,
         };
         let prototype = object::get_with_receiver_in_context(
             &mut bridge,
@@ -298,7 +298,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         constructor: Value,
         value: Value,
     ) -> VmResult<bool> {
@@ -327,7 +327,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &caller,
+            frame: caller,
         };
         let prototype = object::get_with_receiver_in_context(
             &mut bridge,

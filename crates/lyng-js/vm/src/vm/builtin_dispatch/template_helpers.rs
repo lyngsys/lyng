@@ -125,7 +125,7 @@ impl Vm {
         }
         Self::sync_engine_array_length(agent, cooked)?;
         Self::sync_engine_array_length(agent, raw)?;
-        if !self.set_integrity_level(agent, host, registry, caller, raw, true)? {
+        if !self.set_integrity_level(agent, host, registry, &caller, raw, true)? {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
 
@@ -139,7 +139,7 @@ impl Vm {
             false,
             false,
         )?;
-        if !self.set_integrity_level(agent, host, registry, caller, cooked, true)? {
+        if !self.set_integrity_level(agent, host, registry, &caller, cooked, true)? {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         self.template_cache.insert(key, cooked);
