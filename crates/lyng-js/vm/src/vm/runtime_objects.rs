@@ -626,7 +626,7 @@ impl Vm {
         let capability = Self::create_intrinsic_promise_capability(agent, frame.realm())?;
         let promise = Self::promise_capability_promise(agent, capability)?;
         let value_wrapper =
-            match self.promise_resolve_in_realm(agent, host, registry, *frame, frame.realm(), value)
+            match self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)
             {
                 Ok(value_wrapper) => value_wrapper,
                 Err(VmError::Abrupt(completion)) => {
@@ -793,13 +793,13 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    *frame,
+                    frame,
                     frame.realm(),
                     result,
                 )?;
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
-                self.suspend_for_await_promise(agent, *frame, promise)?;
+                self.suspend_for_await_promise(agent, frame, promise)?;
                 Ok(None)
             }
             iterator::IteratorKind::AsyncFromSync => {
@@ -835,14 +835,14 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    *frame,
+                    frame,
                     frame.realm(),
                     Value::from_object_ref(promise),
                 )?;
                 record.set_async_from_sync_state(iterator::AsyncFromSyncState::Next { done });
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
-                self.suspend_for_await_promise(agent, *frame, promise)?;
+                self.suspend_for_await_promise(agent, frame, promise)?;
                 Ok(None)
             }
             iterator::IteratorKind::Sync => Err(VmError::Abrupt(errors::throw_type_error(agent))),
@@ -963,7 +963,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    *frame,
+                    frame,
                     frame.realm(),
                     result,
                 ) {
@@ -977,7 +977,7 @@ impl Vm {
                 record.set_preserve_completion_on_close(preserve_completion);
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
-                self.suspend_for_await_promise(agent, *frame, promise)
+                self.suspend_for_await_promise(agent, frame, promise)
             }
             iterator::IteratorKind::AsyncFromSync => {
                 let iter_result = match result.as_object_ref() {
@@ -1019,7 +1019,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    *frame,
+                    frame,
                     frame.realm(),
                     Value::from_object_ref(promise),
                 ) {
@@ -1034,7 +1034,7 @@ impl Vm {
                 record.set_preserve_completion_on_close(preserve_completion);
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
-                self.suspend_for_await_promise(agent, *frame, promise)
+                self.suspend_for_await_promise(agent, frame, promise)
             }
             iterator::IteratorKind::Sync => Err(VmError::Abrupt(errors::throw_type_error(agent))),
         }

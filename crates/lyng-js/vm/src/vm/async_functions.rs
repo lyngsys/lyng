@@ -150,7 +150,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         register: u16,
     ) -> VmResult<()> {
         if frame.resume_active() {
@@ -244,7 +244,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         realm: RealmRef,
         value: Value,
     ) -> VmResult<ObjectRef> {
@@ -260,7 +260,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                &frame,
+                frame,
                 Value::from_object_ref(promise),
                 PropertyKey::from_atom(WellKnownAtom::constructor.id()),
             )?;
@@ -333,16 +333,16 @@ impl Vm {
     pub(super) fn suspend_for_await_promise(
         &mut self,
         agent: &mut Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         promise: ObjectRef,
     ) -> VmResult<()> {
         let suspended =
-            self.snapshot_suspended_execution(agent, &frame, frame.instruction_offset())?;
+            self.snapshot_suspended_execution(agent, frame, frame.instruction_offset())?;
         let active = self
             .frames
             .pop()
             .expect("await suspension requires one active frame");
-        debug_assert_eq!(active, frame);
+        debug_assert_eq!(active, *frame);
         self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();

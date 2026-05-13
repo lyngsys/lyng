@@ -1051,7 +1051,7 @@ impl Vm {
                                 code: frame.code(),
                                 register: 0,
                             })?;
-                        self.await_value(agent, host, registry, frame, register)?;
+                        self.await_value(agent, host, registry, &frame, register)?;
                     }
                     Opcode::Throw => {
                         let register =

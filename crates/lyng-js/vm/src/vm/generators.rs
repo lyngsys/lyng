@@ -614,7 +614,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller,
+            &caller,
             request.realm,
             request.value,
         ) {
@@ -664,7 +664,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller,
+            &caller,
             request.realm,
             request.value,
         ) {
@@ -1275,13 +1275,13 @@ impl Vm {
         return_completion: bool,
     ) -> VmResult<()> {
         let promise =
-            self.promise_resolve_in_realm(agent, host, registry, *frame, frame.realm(), result)?;
+            self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), result)?;
         record.set_delegate_yield_await_state(iterator::DelegateYieldAwaitState::IteratorResult {
             return_completion,
         });
         self.iterator_states
             .insert(frame.registers().base(), iterator_register, record);
-        self.suspend_for_await_promise(agent, *frame, promise)
+        self.suspend_for_await_promise(agent, frame, promise)
     }
 
     #[expect(
@@ -1301,7 +1301,7 @@ impl Vm {
         return_completion: bool,
     ) -> VmResult<()> {
         let promise =
-            match self.promise_resolve_in_realm(agent, host, registry, *frame, frame.realm(), value)
+            match self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)
             {
                 Ok(promise) => promise,
                 Err(VmError::Abrupt(completion)) if record.is_async_from_sync() && !done => {
@@ -1330,7 +1330,7 @@ impl Vm {
         });
         self.iterator_states
             .insert(frame.registers().base(), iterator_register, record);
-        self.suspend_for_await_promise(agent, *frame, promise)
+        self.suspend_for_await_promise(agent, frame, promise)
     }
 
     #[expect(
