@@ -73,7 +73,7 @@ impl Vm {
             return Ok(());
         }
         let result = if let Some(result) = self.call_builtin(
-            agent, host, registry, frame, callee, this_value, arguments, None,
+            agent, host, registry, &frame, callee, this_value, arguments, None,
         )? {
             result
         } else if agent.objects().is_proxy_object(callee) {
@@ -160,7 +160,7 @@ impl Vm {
             return Ok(false);
         };
         let Some(result) = self.call_frame_safe_builtin(
-            agent, host, registry, frame, callee, entry, this_value, arguments,
+            agent, host, registry, &frame, callee, entry, this_value, arguments,
         )?
         else {
             return Ok(false);
@@ -273,7 +273,7 @@ impl Vm {
         }
 
         let result = if let Some(result) = self.call_builtin(
-            agent, host, registry, frame, callee, this_value, arguments, None,
+            agent, host, registry, &frame, callee, this_value, arguments, None,
         )? {
             result
         } else if agent.objects().is_proxy_object(callee) {
@@ -556,7 +556,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                &frame,
                 callee,
                 Value::undefined(),
                 &collected_arguments,

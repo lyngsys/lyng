@@ -88,7 +88,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         callee_object: ObjectRef,
         this_value: Value,
         arguments: &[Value],
@@ -104,7 +104,7 @@ impl Vm {
                 host,
                 registry,
                 &provider,
-                &caller_frame,
+                caller_frame,
                 callee_object,
             );
             let invocation = EmbeddingInvocation::new(this_value, arguments, new_target);
@@ -123,22 +123,22 @@ impl Vm {
             return Ok(None);
         };
         if entry == internal_import_meta_builtin() {
-            return Self::import_meta_builtin(agent, &caller_frame).map(Some);
+            return Self::import_meta_builtin(agent, caller_frame).map(Some);
         }
         if entry == internal_dynamic_import_builtin() {
             return self
-                .dynamic_import_builtin(agent, host, registry, &caller_frame, arguments)
+                .dynamic_import_builtin(agent, host, registry, caller_frame, arguments)
                 .map(Some);
         }
         if entry == internal_regexp_literal_builtin() {
-            return Self::regexp_literal_builtin(agent, &caller_frame, arguments).map(Some);
+            return Self::regexp_literal_builtin(agent, caller_frame, arguments).map(Some);
         }
         let mut bridge = VmBuiltinDispatch {
             vm: self,
             agent,
             host,
             registry,
-            caller_frame: &caller_frame,
+            caller_frame,
             callee_object,
         };
         dispatch_builtin(
@@ -157,7 +157,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         callee_object: ObjectRef,
         entry: BuiltinFunctionId,
         this_value: Value,
@@ -169,7 +169,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller_frame: &caller_frame,
+            caller_frame,
             callee_object,
         };
         dispatch_builtin(
@@ -182,7 +182,7 @@ impl Vm {
     fn builtin_realm(
         agent: &Agent,
         callee_object: ObjectRef,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
     ) -> RealmRef {
         agent
             .objects()

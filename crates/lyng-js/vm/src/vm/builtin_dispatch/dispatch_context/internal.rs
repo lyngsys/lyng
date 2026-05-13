@@ -381,7 +381,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         _invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        let realm = Vm::builtin_realm(self.agent, self.callee_object, *self.caller_frame);
+        let realm = Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame);
         Err(Vm::abrupt_intrinsic_error(
             self.agent,
             realm,
@@ -399,7 +399,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .copied()
             .unwrap_or(Value::undefined());
         let Some(object) = value.as_object_ref() else {
-            let realm = Vm::builtin_realm(self.agent, self.callee_object, *self.caller_frame);
+            let realm = Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame);
             return Err(Vm::abrupt_intrinsic_error(
                 self.agent,
                 realm,
@@ -410,7 +410,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             return Ok(Value::undefined());
         }
 
-        let realm = Vm::builtin_realm(self.agent, self.callee_object, *self.caller_frame);
+        let realm = Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame);
         Err(Vm::abrupt_intrinsic_error(
             self.agent,
             realm,

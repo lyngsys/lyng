@@ -33,7 +33,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     }
 
     fn builtin_realm(&self) -> RealmRef {
-        Vm::builtin_realm(self.agent, self.callee_object, *self.caller_frame)
+        Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame)
     }
 
     fn caller_realm(&self) -> RealmRef {
