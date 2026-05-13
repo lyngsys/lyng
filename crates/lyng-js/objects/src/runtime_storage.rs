@@ -1,3 +1,4 @@
+use super::object_metadata::ObjectKindPayload;
 use super::{
     dense_element_growth_capacity, ordinary_property_attrs, AllocationLifetime, ClassRecord,
     DescriptorAttributes, ElementStorageMetadata, InvalidationCause, InvalidationEvent,
@@ -19,19 +20,11 @@ impl ObjectRuntime {
     }
 
     pub(crate) fn store_map_slot(&mut self, id: ObjectRef, map: super::MapObjectData) {
-        let index = object_index(id);
-        if self.maps.len() <= index {
-            self.maps.resize_with(index + 1, || None);
-        }
-        self.maps[index] = Some(map);
+        self.set_payload(id, ObjectKindPayload::Map(Box::new(map)));
     }
 
     pub(crate) fn store_set_slot(&mut self, id: ObjectRef, set: super::SetObjectData) {
-        let index = object_index(id);
-        if self.sets.len() <= index {
-            self.sets.resize_with(index + 1, || None);
-        }
-        self.sets[index] = Some(set);
+        self.set_payload(id, ObjectKindPayload::Set(Box::new(set)));
     }
 
     pub(crate) fn store_array_buffer_slot(
@@ -39,11 +32,7 @@ impl ObjectRuntime {
         id: ObjectRef,
         array_buffer: super::ArrayBufferObjectData,
     ) {
-        let index = object_index(id);
-        if self.array_buffers.len() <= index {
-            self.array_buffers.resize_with(index + 1, || None);
-        }
-        self.array_buffers[index] = Some(array_buffer);
+        self.set_payload(id, ObjectKindPayload::ArrayBuffer(array_buffer));
     }
 
     pub(crate) fn store_data_view_slot(
@@ -51,11 +40,7 @@ impl ObjectRuntime {
         id: ObjectRef,
         data_view: super::DataViewObjectData,
     ) {
-        let index = object_index(id);
-        if self.data_views.len() <= index {
-            self.data_views.resize_with(index + 1, || None);
-        }
-        self.data_views[index] = Some(data_view);
+        self.set_payload(id, ObjectKindPayload::DataView(data_view));
     }
 
     pub(crate) fn store_typed_array_slot(
@@ -63,6 +48,8 @@ impl ObjectRuntime {
         id: ObjectRef,
         typed_array: super::TypedArrayObjectData,
     ) {
+        // TypedArray retains its own contiguous side table; see ObjectKindPayload docs
+        // for why this kind opts out of the unified payload.
         let index = object_index(id);
         if self.typed_arrays.len() <= index {
             self.typed_arrays.resize_with(index + 1, || None);
@@ -75,11 +62,7 @@ impl ObjectRuntime {
         id: ObjectRef,
         payload: TemporalObjectData,
     ) {
-        let index = object_index(id);
-        if self.temporal_objects.len() <= index {
-            self.temporal_objects.resize_with(index + 1, || None);
-        }
-        self.temporal_objects[index] = Some(payload);
+        self.set_payload(id, ObjectKindPayload::Temporal(Box::new(payload)));
     }
 
     pub(crate) fn object_metadata(&self, id: ObjectRef) -> Option<&ObjectMetadata> {
@@ -95,11 +78,7 @@ impl ObjectRuntime {
     }
 
     pub(crate) fn store_regexp_payload_slot(&mut self, id: ObjectRef, payload: RegExpPayload) {
-        let index = object_index(id);
-        if self.regexp_payloads.len() <= index {
-            self.regexp_payloads.resize_with(index + 1, || None);
-        }
-        self.regexp_payloads[index] = Some(payload);
+        self.set_payload(id, ObjectKindPayload::RegExp(Box::new(payload)));
     }
 
     pub(crate) fn store_generator_state_slot(
@@ -107,19 +86,11 @@ impl ObjectRuntime {
         id: ObjectRef,
         state: super::GeneratorState,
     ) {
-        let index = object_index(id);
-        if self.generator_states.len() <= index {
-            self.generator_states.resize_with(index + 1, || None);
-        }
-        self.generator_states[index] = Some(state);
+        self.set_payload(id, ObjectKindPayload::Generator(state));
     }
 
     pub(crate) fn store_class_record_slot(&mut self, id: ObjectRef, record: ClassRecord) {
-        let index = object_index(id);
-        if self.class_records.len() <= index {
-            self.class_records.resize_with(index + 1, || None);
-        }
-        self.class_records[index] = Some(record);
+        self.set_payload(id, ObjectKindPayload::ClassRecord(Box::new(record)));
     }
 
     pub(crate) fn store_module_namespace_slot(
@@ -127,77 +98,77 @@ impl ObjectRuntime {
         id: ObjectRef,
         namespace: ModuleNamespaceObject,
     ) {
-        let index = object_index(id);
-        if self.module_namespaces.len() <= index {
-            self.module_namespaces.resize_with(index + 1, || None);
+        self.set_payload(id, ObjectKindPayload::ModuleNamespace(Box::new(namespace)));
+    }
+
+    /// Internal helper: write the kind payload on an object's metadata. Silently no-ops if
+    /// the object has no metadata (no allocation). Preserves the prior `store_*_slot`
+    /// semantics of "replace whatever is there with this payload".
+    #[inline]
+    fn set_payload(&mut self, id: ObjectRef, payload: ObjectKindPayload) {
+        if let Some(metadata) = self.object_metadata_mut(id) {
+            metadata.payload = Some(payload);
         }
-        self.module_namespaces[index] = Some(namespace);
     }
 
     pub(crate) fn class_record_slot(&self, id: ObjectRef) -> Option<&ClassRecord> {
-        self.class_records.get(object_index(id))?.as_ref()
+        match self.object_metadata(id)?.payload.as_ref()? {
+            ObjectKindPayload::ClassRecord(record) => Some(record.as_ref()),
+            _ => None,
+        }
     }
 
     pub(crate) fn module_namespace_slot(&self, id: ObjectRef) -> Option<&ModuleNamespaceObject> {
-        self.module_namespaces.get(object_index(id))?.as_ref()
+        match self.object_metadata(id)?.payload.as_ref()? {
+            ObjectKindPayload::ModuleNamespace(namespace) => Some(namespace.as_ref()),
+            _ => None,
+        }
     }
 
     pub(crate) fn map_slot(&self, id: ObjectRef) -> Option<&super::MapObjectData> {
-        self.maps.get(object_index(id))?.as_ref()
+        match self.object_metadata(id)?.payload.as_ref()? {
+            ObjectKindPayload::Map(data) => Some(data.as_ref()),
+            _ => None,
+        }
     }
 
     pub(crate) fn map_slot_mut(&mut self, id: ObjectRef) -> Option<&mut super::MapObjectData> {
-        self.maps.get_mut(object_index(id))?.as_mut()
+        match self.object_metadata_mut(id)?.payload.as_mut()? {
+            ObjectKindPayload::Map(data) => Some(data.as_mut()),
+            _ => None,
+        }
     }
 
     pub(crate) fn set_slot(&self, id: ObjectRef) -> Option<&super::SetObjectData> {
-        self.sets.get(object_index(id))?.as_ref()
+        match self.object_metadata(id)?.payload.as_ref()? {
+            ObjectKindPayload::Set(data) => Some(data.as_ref()),
+            _ => None,
+        }
     }
 
     pub(crate) fn set_slot_mut(&mut self, id: ObjectRef) -> Option<&mut super::SetObjectData> {
-        self.sets.get_mut(object_index(id))?.as_mut()
+        match self.object_metadata_mut(id)?.payload.as_mut()? {
+            ObjectKindPayload::Set(data) => Some(data.as_mut()),
+            _ => None,
+        }
     }
 
     pub(crate) fn array_buffer_slot(&self, id: ObjectRef) -> Option<super::ArrayBufferObjectData> {
-        self.array_buffers.get(object_index(id)).copied().flatten()
+        match self.object_metadata(id)?.payload.as_ref()? {
+            ObjectKindPayload::ArrayBuffer(data) => Some(*data),
+            _ => None,
+        }
     }
 
     pub(crate) fn data_view_slot(&self, id: ObjectRef) -> Option<super::DataViewObjectData> {
-        self.data_views.get(object_index(id)).copied().flatten()
+        match self.object_metadata(id)?.payload.as_ref()? {
+            ObjectKindPayload::DataView(data) => Some(*data),
+            _ => None,
+        }
     }
 
     pub(crate) fn typed_array_slot(&self, id: ObjectRef) -> Option<super::TypedArrayObjectData> {
         self.typed_arrays.get(object_index(id)).copied().flatten()
-    }
-
-    pub(crate) fn temporal_object_slot(&self, id: ObjectRef) -> Option<&TemporalObjectData> {
-        self.temporal_objects.get(object_index(id))?.as_ref()
-    }
-
-    pub(crate) fn take_class_record_slot(&mut self, id: ObjectRef) -> Option<ClassRecord> {
-        self.class_records.get_mut(object_index(id))?.take()
-    }
-
-    pub(crate) fn take_module_namespace_slot(
-        &mut self,
-        id: ObjectRef,
-    ) -> Option<ModuleNamespaceObject> {
-        self.module_namespaces.get_mut(object_index(id))?.take()
-    }
-
-    pub(crate) fn take_map_slot(&mut self, id: ObjectRef) -> Option<super::MapObjectData> {
-        self.maps.get_mut(object_index(id))?.take()
-    }
-
-    pub(crate) fn take_set_slot(&mut self, id: ObjectRef) -> Option<super::SetObjectData> {
-        self.sets.get_mut(object_index(id))?.take()
-    }
-
-    pub(crate) fn take_data_view_slot(
-        &mut self,
-        id: ObjectRef,
-    ) -> Option<super::DataViewObjectData> {
-        self.data_views.get_mut(object_index(id))?.take()
     }
 
     pub(crate) fn take_typed_array_slot(
@@ -207,33 +178,25 @@ impl ObjectRuntime {
         self.typed_arrays.get_mut(object_index(id))?.take()
     }
 
-    pub(crate) fn take_temporal_object_slot(
-        &mut self,
-        id: ObjectRef,
-    ) -> Option<TemporalObjectData> {
-        self.temporal_objects.get_mut(object_index(id))?.take()
+    pub(crate) fn temporal_object_slot(&self, id: ObjectRef) -> Option<&TemporalObjectData> {
+        match self.object_metadata(id)?.payload.as_ref()? {
+            ObjectKindPayload::Temporal(data) => Some(data.as_ref()),
+            _ => None,
+        }
     }
 
     pub(crate) fn regexp_payload_slot(&self, id: ObjectRef) -> Option<&RegExpPayload> {
-        self.regexp_payloads.get(object_index(id))?.as_ref()
+        match self.object_metadata(id)?.payload.as_ref()? {
+            ObjectKindPayload::RegExp(data) => Some(data.as_ref()),
+            _ => None,
+        }
     }
 
     pub(crate) fn generator_state_slot(&self, id: ObjectRef) -> Option<super::GeneratorState> {
-        self.generator_states
-            .get(object_index(id))
-            .copied()
-            .flatten()
-    }
-
-    pub(crate) fn take_regexp_payload_slot(&mut self, id: ObjectRef) -> Option<RegExpPayload> {
-        self.regexp_payloads.get_mut(object_index(id))?.take()
-    }
-
-    pub(crate) fn take_generator_state_slot(
-        &mut self,
-        id: ObjectRef,
-    ) -> Option<super::GeneratorState> {
-        self.generator_states.get_mut(object_index(id))?.take()
+        match self.object_metadata(id)?.payload.as_ref()? {
+            ObjectKindPayload::Generator(state) => Some(*state),
+            _ => None,
+        }
     }
 
     pub(crate) fn store_shape_metadata(&mut self, id: ShapeId, metadata: ShapeMetadata) {

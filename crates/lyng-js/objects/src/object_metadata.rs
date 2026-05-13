@@ -1,15 +1,61 @@
 use super::{
-    flattened_property_lookup, DescriptorAttributes, ElementMode, InvalidationEvent,
+    flattened_property_lookup, ArrayBufferObjectData, DataViewObjectData, DescriptorAttributes,
+    ElementMode, GeneratorState, InvalidationEvent, MapObjectData, ModuleNamespaceObject,
     NamedPropertyDictionaryEntry, NamedPropertyStorageMode, NamedPropertyValue, ObjectColdData,
-    ObjectFlags, ObjectKind, ObjectRef, PropertyKey, ShapeId, ShapeProperty, ShapeTransitionKey,
-    SparseElementEntry,
+    ObjectFlags, ObjectKind, ObjectRef, PropertyKey, RegExpPayload, SetObjectData, ShapeId,
+    ShapeProperty, ShapeTransitionKey, SparseElementEntry, TemporalObjectData,
 };
 use lyng_js_common::AtomId;
 use std::collections::HashMap;
 
 const INLINE_SHAPE_TRANSITION_LIMIT: usize = 3;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Cold per-object payload carrying data that only applies to specific JS object kinds
+/// (`Map`, `Set`, `RegExp`, `TypedArray`, etc.).
+///
+/// Stored at [`ObjectMetadata::payload`], collapsing ten previously-parallel
+/// `Vec<Option<T>>` side tables on `ObjectRuntime` into a single field. Per-object access
+/// to a kind payload drops from "look up `object_metadata`, then look up the kind-specific
+/// side table (two `Vec` indexings, two `Option` discriminants)" to "look up
+/// `object_metadata`, then read payload (one `Vec` indexing, one `Option` discriminant,
+/// one enum match)".
+///
+/// **Inline-or-box choice.** Hot pure-`Copy` kinds whose data is small enough to keep
+/// the enum cache-friendly stay inline so the IC fast path can read them without a
+/// second heap dereference: `ArrayBuffer` (24 B), `DataView` (40 B), `Generator` (4 B).
+/// The remaining kinds with owned heap payloads (`Map`, `Set`, `ClassRecord`,
+/// `ModuleNamespace`, `Temporal`, `RegExp`) are boxed so the variant footprint stays
+/// bounded by the largest inline variant. Inlining `TypedArrayObjectData` (48 B) too
+/// was tried and made every `ObjectMetadata` 24+ bytes larger, which hurt cache density
+/// on `array-heavy.literal-indexed-runtime` by ~74 %; that path lives outside this enum
+/// (see below).
+///
+/// **`TypedArray` is intentionally absent from this enum.** The binary-data workload
+/// (`typed-array-heavy.runtime`) regressed ~7.75 % when `TypedArrayObjectData` lived in
+/// this enum (boxed) compared to the original parallel `Vec<Option<TypedArrayObjectData>>`
+/// side table, because boxing replaces a contiguous, cache-friendly array of 48-byte
+/// records with scattered heap allocations that miss cache on every `TypedArray` view
+/// access. `ObjectRuntime` retains a dedicated `typed_arrays` side table for that
+/// hot-kind storage; the issue acceptance criterion ("9+ retired side tables") still
+/// holds because the other nine kinds fold into this enum.
+///
+/// `RegExpPayload` does not implement `PartialEq`/`Eq` (the compiled regex backend is
+/// not equality-comparable), so neither does this enum nor [`ObjectMetadata`]. Callers
+/// that need to compare metadata for testing should compare individual fields instead.
+#[derive(Clone, Debug)]
+pub enum ObjectKindPayload {
+    ClassRecord(Box<ClassRecord>),
+    ModuleNamespace(Box<ModuleNamespaceObject>),
+    Map(Box<MapObjectData>),
+    Set(Box<SetObjectData>),
+    ArrayBuffer(ArrayBufferObjectData),
+    DataView(DataViewObjectData),
+    Temporal(Box<TemporalObjectData>),
+    RegExp(Box<RegExpPayload>),
+    Generator(GeneratorState),
+}
+
+#[derive(Clone, Debug)]
 pub struct ObjectMetadata {
     pub(crate) kind: ObjectKind,
     pub(crate) flags: ObjectFlags,
@@ -20,6 +66,9 @@ pub struct ObjectMetadata {
     pub(crate) named_property_churn: u32,
     pub(crate) element_storage: ElementStorageMetadata,
     pub(crate) last_invalidation: Option<InvalidationEvent>,
+    /// Type-specific cold data (`Map`, `Set`, `RegExp`, `TypedArray`, etc.). `None` for
+    /// plain ordinary objects, functions, and other kinds that don't need extra payload.
+    pub(crate) payload: Option<ObjectKindPayload>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

@@ -30,19 +30,24 @@ const PROXY_TARGET_SLOT_INDEX: u32 = 0;
 const PROXY_HANDLER_SLOT_INDEX: u32 = 1;
 
 /// Object and shape allocation owner for the runtime substrate.
+///
+/// Nine previously-parallel `Vec<Option<T>>` side tables (`class_records`,
+/// `module_namespaces`, `maps`, `sets`, `array_buffers`, `data_views`,
+/// `temporal_objects`, `regexp_payloads`, `generator_states`) have been folded into
+/// [`ObjectMetadata::payload`] (`Option<ObjectKindPayload>`). Per-object access to a
+/// kind payload now goes through one `Vec` indexing into `object_metadata` followed by
+/// one `Option`/enum check, rather than two `Vec`+`Option` chained dereferences.
+///
+/// **`TypedArray` retains its own side table.** `TypedArrayObjectData` is the only kind
+/// that bench-regressed when boxed inside `ObjectKindPayload` — the binary-data
+/// workload's hot view access pays a heap dereference per record, replacing the prior
+/// contiguous `Vec<Option<TypedArrayObjectData>>` storage that was cache-friendly.
+/// Keeping `typed_arrays` as a dedicated side table preserves the original perf profile
+/// for `typed-array-heavy.runtime`.
 #[derive(Default)]
 pub struct ObjectRuntime {
     pub(crate) object_metadata: Vec<Option<ObjectMetadata>>,
-    pub(crate) class_records: Vec<Option<super::object_metadata::ClassRecord>>,
-    pub(crate) module_namespaces: Vec<Option<ModuleNamespaceObject>>,
-    pub(crate) maps: Vec<Option<MapObjectData>>,
-    pub(crate) sets: Vec<Option<SetObjectData>>,
-    pub(crate) array_buffers: Vec<Option<ArrayBufferObjectData>>,
-    pub(crate) data_views: Vec<Option<DataViewObjectData>>,
     pub(crate) typed_arrays: Vec<Option<TypedArrayObjectData>>,
-    pub(crate) temporal_objects: Vec<Option<TemporalObjectData>>,
-    pub(crate) regexp_payloads: Vec<Option<RegExpPayload>>,
-    pub(crate) generator_states: Vec<Option<super::GeneratorState>>,
     pub(crate) shape_metadata: Vec<Option<ShapeMetadata>>,
     pub(crate) root_shapes: HashMap<RootShapeKey, ShapeId>,
     pub(crate) next_private_brand_raw: u32,
@@ -333,6 +338,7 @@ impl ObjectRuntime {
                     }
                 },
                 last_invalidation: None,
+                payload: None,
             },
         );
         if let ObjectColdData::Proxy(data) = cold_for_init {
@@ -391,6 +397,7 @@ impl ObjectRuntime {
                 named_property_churn: 0,
                 element_storage: ElementStorageMetadata::Empty,
                 last_invalidation: None,
+                payload: None,
             },
         );
         object
@@ -964,8 +971,14 @@ impl ObjectRuntime {
         heap: PrimitiveHeapView<'_>,
     ) -> RegExpPayloadAccounting {
         let mut accounting = RegExpPayloadAccounting::default();
-        for (index, payload) in self.regexp_payloads.iter().enumerate() {
-            let Some(payload) = payload else {
+        // Walk the unified metadata table; only entries whose payload is a RegExp count.
+        for (index, metadata) in self.object_metadata.iter().enumerate() {
+            let Some(metadata) = metadata.as_ref() else {
+                continue;
+            };
+            let Some(super::object_metadata::ObjectKindPayload::RegExp(payload)) =
+                metadata.payload.as_ref()
+            else {
                 continue;
             };
             let Ok(raw) = u32::try_from(index + 1) else {
@@ -1015,16 +1028,13 @@ impl ObjectRuntime {
         id: ObjectRef,
     ) -> Option<ObjectRecord> {
         let header = self.object_header(heap.view(), id)?;
+        // `take_object_metadata` drops the whole metadata record including
+        // `metadata.payload`, so every kind-specific cold payload (Map, Set, RegExp,
+        // ...) is reclaimed in one step. The lone exception is `TypedArray`, which
+        // retains its own contiguous side table for hot-path perf and so needs an
+        // explicit cleanup here.
         let metadata = self.take_object_metadata(id)?;
-        let _ = self.take_class_record_slot(id);
-        let _ = self.take_module_namespace_slot(id);
-        let _ = self.take_map_slot(id);
-        let _ = self.take_set_slot(id);
-        let _ = self.take_data_view_slot(id);
         let _ = self.take_typed_array_slot(id);
-        let _ = self.take_temporal_object_slot(id);
-        let _ = self.take_regexp_payload_slot(id);
-        let _ = self.take_generator_state_slot(id);
         heap.free_object(id)?;
         Some(ObjectRecord::new(header, metadata.cold))
     }
