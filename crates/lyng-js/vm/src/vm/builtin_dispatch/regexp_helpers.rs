@@ -5,7 +5,7 @@ use lyng_js_parser::validate_regexp_literal;
 impl Vm {
     pub(super) fn regexp_literal_builtin(
         agent: &mut Agent,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let site = arguments

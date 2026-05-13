@@ -131,7 +131,7 @@ impl Vm {
                 .map(Some);
         }
         if entry == internal_regexp_literal_builtin() {
-            return Self::regexp_literal_builtin(agent, caller_frame, arguments).map(Some);
+            return Self::regexp_literal_builtin(agent, &caller_frame, arguments).map(Some);
         }
         let mut bridge = VmBuiltinDispatch {
             vm: self,
