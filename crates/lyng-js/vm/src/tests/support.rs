@@ -2,7 +2,7 @@ pub(super) use crate::{
     seed_registers, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FeedbackSiteDetail,
     FeedbackVectorSnapshot, FrameFlags, FrameRecord, InstalledCode, RegisterWindow, TierStatus, Vm,
     VmDebugCommand, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason, VmDebugSafepointKind,
-    VmDebugStepMode, VmDispatchMode, VmError,
+    VmDebugStepMode, VmError,
 };
 pub(super) use lyng_js_bytecode::{
     ArgumentsMode, BytecodeBuilder, BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags,

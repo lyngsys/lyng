@@ -511,6 +511,7 @@ impl Vm {
         Ok(())
     }
 
+    #[inline]
     pub(super) fn decode_abc_operands(
         installed: &InstalledFunction,
         frame: FrameRecord,
@@ -533,6 +534,7 @@ impl Vm {
         (operands.a(), operands.b(), operands.c())
     }
 
+    #[inline]
     pub(super) fn decode_abx_operands(
         installed: &InstalledFunction,
         frame: FrameRecord,

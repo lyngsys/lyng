@@ -3,6 +3,7 @@ use super::{Agent, FrameRecord, Value, Vm, VmError, VmResult};
 use lyng_js_types::AbruptCompletion;
 
 impl Vm {
+    #[inline]
     pub(super) fn read_register(&self, frame: FrameRecord, register: u16) -> Value {
         let absolute = absolute_register(frame, register);
         debug_assert!(
@@ -12,6 +13,7 @@ impl Vm {
         self.register_stack[absolute]
     }
 
+    #[inline]
     pub(super) fn write_register(&mut self, frame: FrameRecord, register: u16, value: Value) {
         let absolute = absolute_register(frame, register);
         debug_assert!(
@@ -21,6 +23,7 @@ impl Vm {
         self.register_stack[absolute] = value;
     }
 
+    #[inline]
     pub(super) fn advance_instruction(&mut self) {
         let encoded_len = self.current_instruction_encoded_len();
         let frame = self
@@ -42,6 +45,7 @@ impl Vm {
         frame.clear_resume();
     }
 
+    #[inline]
     pub(super) fn jump_by(&mut self, delta: i32) -> VmResult<()> {
         let encoded_len = i64::from(self.current_instruction_encoded_len());
         let frame = self

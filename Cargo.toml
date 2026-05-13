@@ -66,3 +66,11 @@ lyng-js-builtins = { path = "crates/lyng-js/builtins" }
 lyng-js-cli = { path = "crates/lyng-js/cli" }
 lyng-js-test262-harness = { path = "crates/lyng-js/test262-harness" }
 lyng-js-tests = { path = "crates/lyng-js/tests" }
+
+[profile.release]
+# Thin LTO enables cross-crate inlining of the VM dispatch helpers
+# (`read_register`, `decode_*_operands`, `lyng_js_ops::*`) into the
+# `Vm::run_dispatch_loop` hot path. Without it, the per-arm work of the
+# single-loop dispatch sits behind an out-of-line call into `lyng-js-ops`,
+# defeating the jump-table fast path.
+lto = "thin"

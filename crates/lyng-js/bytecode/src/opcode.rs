@@ -285,6 +285,30 @@ impl Opcode {
         OPCODES.get(usize::from(raw)).copied()
     }
 
+    /// Encoded byte length of one instruction with this opcode, matching the layout
+    /// produced by [`crate::Instruction::write_bytes`] and consumed by the VM dispatch
+    /// loop. Mirrors the table in [`crate::Instruction::encoded_len`] without first
+    /// materializing an `Instruction` enum value — used by the byte-stream dispatcher to
+    /// advance the program counter after each opcode.
+    #[inline]
+    #[must_use]
+    pub const fn encoded_len(self) -> u8 {
+        match self {
+            Self::Jump8
+            | Self::LoadLocal0
+            | Self::LoadLocal1
+            | Self::LoadLocal2
+            | Self::LoadLocal3
+            | Self::StoreLocal0
+            | Self::StoreLocal1
+            | Self::StoreLocal2
+            | Self::StoreLocal3 => 2,
+            Self::LoadSmi8 | Self::LoadConst8 | Self::JumpIfTrue8 | Self::JumpIfFalse8 => 3,
+            Self::ProfiledAbc | Self::ProfiledAbx => 7,
+            _ => 4,
+        }
+    }
+
     #[inline]
     #[allow(
         clippy::too_many_lines,

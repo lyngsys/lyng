@@ -204,48 +204,7 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
 }
 
 #[test]
-fn vm_function_table_dispatch_mode_executes_installed_bytecode() {
-    let mut runtime = Runtime::new(NoopHostHooks);
-    let agent = runtime.root_agent_mut();
-    let realm = agent.default_realm().expect("default realm should exist");
-
-    let mut builder = BytecodeBuilder::new(
-        BytecodeFunctionId::from_raw(12).unwrap(),
-        BytecodeFunctionKind::Script,
-    );
-    builder
-        .alloc_registers(3)
-        .expect("test bytecode registers should allocate");
-    builder
-        .emit_abx(Opcode::LoadOne, 0, 0)
-        .expect("test bytecode should build");
-    builder
-        .emit_abc(Opcode::AddSmi, 1, 0, 41)
-        .expect("test bytecode should build");
-    builder
-        .emit_abc(Opcode::Move, 2, 1, 0)
-        .expect("test bytecode should build");
-    builder
-        .emit_ax(Opcode::Return, 2)
-        .expect("test bytecode should build");
-    let function = builder.finish().expect("test bytecode should build");
-    let unit = CompiledScriptUnit::new(SourceId::new(12), function.id(), vec![function]);
-
-    let mut vm = Vm::new();
-    vm.set_dispatch_mode(VmDispatchMode::FunctionTable);
-    assert_eq!(vm.dispatch_mode(), VmDispatchMode::FunctionTable);
-
-    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    let result = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
-        .unwrap();
-
-    assert_eq!(result, Value::from_smi(42));
-    assert!(vm.frames().is_empty());
-}
-
-#[test]
-fn vm_opcode_dispatch_counters_are_opt_in_and_cover_dispatch_modes() {
+fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
     let mut builder = BytecodeBuilder::new(
         BytecodeFunctionId::from_raw(13).unwrap(),
         BytecodeFunctionKind::Script,
@@ -268,12 +227,11 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_cover_dispatch_modes() {
     let function = builder.finish().expect("test bytecode should build");
     let unit = CompiledScriptUnit::new(SourceId::new(13), function.id(), vec![function]);
 
-    for dispatch_mode in [VmDispatchMode::Match, VmDispatchMode::FunctionTable] {
+    {
         let mut runtime = Runtime::new(NoopHostHooks);
         let agent = runtime.root_agent_mut();
         let realm = agent.default_realm().expect("default realm should exist");
         let mut vm = Vm::new();
-        vm.set_dispatch_mode(dispatch_mode);
         let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
         assert!(vm.opcode_dispatch_counts().is_none());
@@ -307,42 +265,6 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_cover_dispatch_modes() {
 }
 
 #[test]
-fn vm_function_table_opcode_counters_do_not_double_count_match_fallback() {
-    let mut builder = BytecodeBuilder::new(
-        BytecodeFunctionId::from_raw(14).unwrap(),
-        BytecodeFunctionKind::Script,
-    );
-    builder
-        .alloc_registers(1)
-        .expect("test bytecode registers should allocate");
-    builder
-        .emit_abx(Opcode::LoadThis, 0, 0)
-        .expect("test bytecode should build");
-    builder
-        .emit_ax(Opcode::ReturnUndefined, 0)
-        .expect("test bytecode should build");
-    let function = builder.finish().expect("test bytecode should build");
-    let unit = CompiledScriptUnit::new(SourceId::new(14), function.id(), vec![function]);
-
-    let mut runtime = Runtime::new(NoopHostHooks);
-    let agent = runtime.root_agent_mut();
-    let realm = agent.default_realm().expect("default realm should exist");
-    let mut vm = Vm::new();
-    vm.set_dispatch_mode(VmDispatchMode::FunctionTable);
-    vm.enable_opcode_dispatch_counts();
-    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    let result = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
-        .unwrap();
-
-    assert_eq!(result, Value::undefined());
-    let counts = vm.opcode_dispatch_counts().unwrap();
-    assert_eq!(counts.total(), 2);
-    assert_eq!(counts.count(Opcode::LoadThis), 1);
-    assert_eq!(counts.count(Opcode::ReturnUndefined), 1);
-}
-
-#[test]
 fn vm_loop_backedges_poll_active_incremental_major_mark() {
     let unit = compile_test_unit(
         151,
@@ -355,12 +277,11 @@ fn vm_loop_backedges_poll_active_incremental_major_mark() {
         ",
     );
 
-    for dispatch_mode in [VmDispatchMode::Match, VmDispatchMode::FunctionTable] {
+    {
         let mut runtime = Runtime::new(NoopHostHooks);
         let agent = runtime.root_agent_mut();
         let realm = agent.default_realm().expect("default realm should exist");
         let mut vm = Vm::new();
-        vm.set_dispatch_mode(dispatch_mode);
         let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
         let roots = PrimitiveRoots::new();

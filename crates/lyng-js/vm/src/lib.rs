@@ -40,5 +40,5 @@ pub use vm::{
     KeyedNamedPropertyCacheEntrySnapshot, KeyedPropertyFeedbackSnapshot, LoadedModuleRoot,
     NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot, TierStatus, TieringSnapshot,
     Vm, VmDebugCommand, VmDebugFrame, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason,
-    VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode, VmDispatchMode, VmEvaluationObserver,
+    VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode, VmEvaluationObserver,
 };
