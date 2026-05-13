@@ -337,7 +337,7 @@ impl Vm {
         promise: ObjectRef,
     ) -> VmResult<()> {
         let suspended =
-            self.snapshot_suspended_execution(agent, frame, frame.instruction_offset())?;
+            self.snapshot_suspended_execution(agent, &frame, frame.instruction_offset())?;
         let active = self
             .frames
             .pop()

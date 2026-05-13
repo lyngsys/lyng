@@ -502,7 +502,7 @@ impl Vm {
                     }
                     Opcode::DelegateYield => {
                         let delegate_result =
-                            self.delegate_yield(agent, host, registry, frame, a, b, c);
+                            self.delegate_yield(agent, host, registry, &frame, a, b, c);
                         let Some(()) = self.handle_vm_result(agent, delegate_result)? else {
                             continue;
                         };
@@ -1028,7 +1028,7 @@ impl Vm {
                     }
                     Opcode::SuspendGeneratorStart => {
                         let resume_offset = self.next_instruction_offset(frame.instruction_offset());
-                        self.suspend_generator_start(agent, frame, resume_offset)?;
+                        self.suspend_generator_start(agent, &frame, resume_offset)?;
                     }
                     Opcode::Yield => {
                         let register =
@@ -1039,7 +1039,7 @@ impl Vm {
                         let value = self.read_register(frame.registers(), register);
                         self.suspend_current_generator_frame(
                             agent,
-                            frame,
+                            &frame,
                             value,
                             self.next_instruction_offset(frame.instruction_offset()),
                             false,

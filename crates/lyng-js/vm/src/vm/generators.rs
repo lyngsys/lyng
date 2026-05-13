@@ -95,7 +95,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         generator: ObjectRef,
         resume_kind: GeneratorResumeKind,
         value: Value,
@@ -191,7 +191,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         generator: ObjectRef,
         resume_kind: GeneratorResumeKind,
         value: Value,
@@ -223,7 +223,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         this_value: Value,
         resume_kind: GeneratorResumeKind,
         value: Value,
@@ -776,7 +776,7 @@ impl Vm {
     pub(super) fn suspend_current_generator_frame(
         &mut self,
         agent: &mut Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         yielded_value: Value,
         resume_instruction_offset: u32,
         raw_iterator_result: bool,
@@ -787,7 +787,7 @@ impl Vm {
             .frames
             .pop()
             .expect("generator suspension requires one active frame");
-        debug_assert_eq!(active, frame);
+        debug_assert_eq!(active, *frame);
         self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
@@ -801,7 +801,7 @@ impl Vm {
     pub(super) fn suspend_generator_start(
         &mut self,
         agent: &mut Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         resume_instruction_offset: u32,
     ) -> VmResult<()> {
         let suspended =
@@ -810,7 +810,7 @@ impl Vm {
             .frames
             .pop()
             .expect("generator start suspension requires one active frame");
-        debug_assert_eq!(active, frame);
+        debug_assert_eq!(active, *frame);
         self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
@@ -830,7 +830,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         iterator_register: u16,
         result_register: u16,
         done_register: u16,
@@ -860,7 +860,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &frame,
+                frame,
             };
             let receiver = Value::from_object_ref(record.iterator());
             let resume_kind = frame.resume_kind();
@@ -911,12 +911,12 @@ impl Vm {
                         )?;
                         if !return_method.is_undefined() && !return_method.is_null() {
                             let return_method =
-                                Self::require_callable_object(bridge.agent, frame, return_method)?;
+                                Self::require_callable_object(bridge.agent, *frame, return_method)?;
                             let close_result = bridge.vm.call_to_completion(
                                 bridge.agent,
                                 bridge.host,
                                 bridge.registry,
-                                frame,
+                                *frame,
                                 return_method,
                                 receiver,
                                 &[],
@@ -928,12 +928,12 @@ impl Vm {
                         return Err(VmError::Abrupt(errors::throw_type_error(bridge.agent)));
                     }
                     let throw_method =
-                        Self::require_callable_object(bridge.agent, frame, throw_method)?;
+                        Self::require_callable_object(bridge.agent, *frame, throw_method)?;
                     let result = bridge.vm.call_to_completion(
                         bridge.agent,
                         bridge.host,
                         bridge.registry,
-                        frame,
+                        *frame,
                         throw_method,
                         receiver,
                         &[resume_value],
@@ -991,12 +991,12 @@ impl Vm {
                         }
                     } else {
                         let return_method =
-                            Self::require_callable_object(bridge.agent, frame, return_method)?;
+                            Self::require_callable_object(bridge.agent, *frame, return_method)?;
                         let result = bridge.vm.call_to_completion(
                             bridge.agent,
                             bridge.host,
                             bridge.registry,
-                            frame,
+                            *frame,
                             return_method,
                             receiver,
                             &[resume_value],
@@ -1041,7 +1041,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         iterator_register: u16,
         result_register: u16,
         done_register: u16,
@@ -1055,7 +1055,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &frame,
+                frame,
             };
             let return_method = bridge.get_property_value(
                 receiver,
@@ -1080,12 +1080,12 @@ impl Vm {
                 }
             } else {
                 let return_method =
-                    Self::require_callable_object(bridge.agent, frame, return_method)?;
+                    Self::require_callable_object(bridge.agent, *frame, return_method)?;
                 let result = bridge.vm.call_to_completion(
                     bridge.agent,
                     bridge.host,
                     bridge.registry,
-                    frame,
+                    *frame,
                     return_method,
                     receiver,
                     &[resume_value],
@@ -1139,7 +1139,7 @@ impl Vm {
     fn finish_delegate_yield_outcome(
         &mut self,
         agent: &mut Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         result_register: u16,
         done_register: u16,
         register_base: u32,
@@ -1182,7 +1182,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         iterator_register: u16,
         record: iterator::IteratorRecord,
         argument: Option<Value>,
@@ -1191,7 +1191,7 @@ impl Vm {
             iterator::IteratorKind::Async => {
                 let receiver = Value::from_object_ref(record.iterator());
                 let next_method =
-                    Self::require_callable_object(agent, frame, record.next_method())?;
+                    Self::require_callable_object(agent, *frame, record.next_method())?;
                 let mut arguments = [Value::undefined(); 1];
                 let arguments = if let Some(argument) = argument {
                     arguments[0] = argument;
@@ -1203,7 +1203,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    *frame,
                     next_method,
                     receiver,
                     arguments,
@@ -1226,7 +1226,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame: &frame,
+                        frame,
                     };
                     iterator::iterator_next(&mut bridge, &record, argument)?
                 };
@@ -1236,7 +1236,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame: &frame,
+                        frame,
                     };
                     (
                         iterator::iterator_complete(&mut bridge, iter_result)?,
@@ -1268,20 +1268,20 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         iterator_register: u16,
         mut record: iterator::IteratorRecord,
         result: Value,
         return_completion: bool,
     ) -> VmResult<()> {
         let promise =
-            self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), result)?;
+            self.promise_resolve_in_realm(agent, host, registry, *frame, frame.realm(), result)?;
         record.set_delegate_yield_await_state(iterator::DelegateYieldAwaitState::IteratorResult {
             return_completion,
         });
         self.iterator_states
             .insert(frame.registers().base(), iterator_register, record);
-        self.suspend_for_await_promise(agent, frame, promise)
+        self.suspend_for_await_promise(agent, *frame, promise)
     }
 
     #[expect(
@@ -1293,7 +1293,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         iterator_register: u16,
         mut record: iterator::IteratorRecord,
         value: Value,
@@ -1301,7 +1301,7 @@ impl Vm {
         return_completion: bool,
     ) -> VmResult<()> {
         let promise =
-            match self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)
+            match self.promise_resolve_in_realm(agent, host, registry, *frame, frame.realm(), value)
             {
                 Ok(promise) => promise,
                 Err(VmError::Abrupt(completion)) if record.is_async_from_sync() && !done => {
@@ -1311,7 +1311,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame: &frame,
+                        frame,
                     };
                     match iterator::iterator_close::<_, ()>(
                         &mut bridge,
@@ -1330,7 +1330,7 @@ impl Vm {
         });
         self.iterator_states
             .insert(frame.registers().base(), iterator_register, record);
-        self.suspend_for_await_promise(agent, frame, promise)
+        self.suspend_for_await_promise(agent, *frame, promise)
     }
 
     #[expect(
@@ -1346,7 +1346,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         iterator_register: u16,
         result_register: u16,
         done_register: u16,
@@ -1405,7 +1405,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame,
+                        &frame,
                         iterator_register,
                         record,
                         value,
@@ -1425,7 +1425,7 @@ impl Vm {
                 };
                 self.finish_delegate_yield_outcome(
                     agent,
-                    frame,
+                    &frame,
                     result_register,
                     done_register,
                     frame.registers().base(),
@@ -1444,7 +1444,7 @@ impl Vm {
                     }
                     self.finish_delegate_yield_outcome(
                         agent,
-                        frame,
+                        &frame,
                         result_register,
                         done_register,
                         frame.registers().base(),
@@ -1456,7 +1456,7 @@ impl Vm {
                 } else {
                     self.finish_delegate_yield_outcome(
                         agent,
-                        frame,
+                        &frame,
                         result_register,
                         done_register,
                         frame.registers().base(),
@@ -1603,7 +1603,7 @@ impl Vm {
     pub(super) fn snapshot_suspended_execution(
         &mut self,
         agent: &mut Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         instruction_offset: u32,
     ) -> VmResult<SuspendedExecutionRef> {
         let context = agent
