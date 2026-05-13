@@ -619,7 +619,7 @@ impl Vm {
                             environment,
                             slot,
                             value,
-                            self.frame_is_strict(frame),
+                            self.frame_is_strict(&frame),
                         );
                         let Some(()) = self.handle_vm_result(agent, assign_result)? else {
                             continue;
@@ -627,11 +627,11 @@ impl Vm {
                         self.advance_instruction();
                     }
                     Opcode::EnterEnvScope => {
-                        self.enter_env_scope(agent, frame, a, bx)?;
+                        self.enter_env_scope(agent, &frame, a, bx)?;
                         self.advance_instruction();
                     }
                     Opcode::LeaveEnvScope => {
-                        self.leave_env_scope(frame, a, bx);
+                        self.leave_env_scope(&frame, a, bx);
                         self.advance_instruction();
                     }
                     Opcode::LoadGlobal => {
@@ -640,7 +640,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             atom,
                             frame.code(),
                             feedback_slot,
@@ -654,7 +654,7 @@ impl Vm {
                     Opcode::LoadName => {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let load_result =
-                            self.load_name_with_context(agent, host, registry, frame, atom);
+                            self.load_name_with_context(agent, host, registry, &frame, atom);
                         let Some(value) = self.handle_vm_result(agent, load_result)? else {
                             continue;
                         };
@@ -664,7 +664,7 @@ impl Vm {
                     Opcode::ResolveName => {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let resolve_result =
-                            self.resolve_name_with_context(agent, host, registry, frame, atom);
+                            self.resolve_name_with_context(agent, host, registry, &frame, atom);
                         let Some(value) = self.handle_vm_result(agent, resolve_result)? else {
                             continue;
                         };
@@ -674,7 +674,7 @@ impl Vm {
                     Opcode::ResolveGlobal => {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let resolve_result =
-                            self.resolve_global(agent, host, registry, frame, atom);
+                            self.resolve_global(agent, host, registry, &frame, atom);
                         let Some(value) = self.handle_vm_result(agent, resolve_result)? else {
                             continue;
                         };
@@ -685,7 +685,7 @@ impl Vm {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let value = self.read_register(frame.registers(), a);
                         let assign_result = self
-                            .assign_name_with_context(agent, host, registry, frame, atom, value);
+                            .assign_name_with_context(agent, host, registry, &frame, atom, value);
                         let Some(()) = self.handle_vm_result(agent, assign_result)? else {
                             continue;
                         };
@@ -695,7 +695,7 @@ impl Vm {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let value = self.read_register(frame.registers(), a);
                         let assign_result = self.assign_variable_name_with_context(
-                            agent, host, registry, frame, atom, value,
+                            agent, host, registry, &frame, atom, value,
                         );
                         let Some(()) = self.handle_vm_result(agent, assign_result)? else {
                             continue;
@@ -705,7 +705,7 @@ impl Vm {
                     Opcode::DeleteName => {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let delete_result =
-                            self.delete_name_with_context(agent, host, registry, frame, atom);
+                            self.delete_name_with_context(agent, host, registry, &frame, atom);
                         let Some(deleted) = self.handle_vm_result(agent, delete_result)? else {
                             continue;
                         };
@@ -715,7 +715,7 @@ impl Vm {
                     Opcode::CaptureName => {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let capture_result =
-                            self.capture_name_with_context(agent, host, registry, frame, a, atom);
+                            self.capture_name_with_context(agent, host, registry, &frame, a, atom);
                         let Some(()) = self.handle_vm_result(agent, capture_result)? else {
                             continue;
                         };
@@ -731,7 +731,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             reference_register,
                         );
                         let Some(value) = self.handle_vm_result(agent, load_result)? else {
@@ -747,7 +747,7 @@ impl Vm {
                                 register: u16::MAX,
                             })?;
                         let load_result =
-                            self.load_captured_name_this_with_context(frame, reference_register);
+                            self.load_captured_name_this_with_context(&frame, reference_register);
                         let Some(value) = self.handle_vm_result(agent, load_result)? else {
                             continue;
                         };
@@ -765,7 +765,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             reference_register,
                             value,
                         );
@@ -781,7 +781,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             atom,
                             value,
                             frame.code(),
@@ -799,7 +799,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             atom,
                             value,
                             frame.code(),
@@ -812,7 +812,7 @@ impl Vm {
                     }
                     Opcode::DeleteGlobal => {
                         let atom = self.read_atom_constant(frame.code(), bx)?;
-                        let delete_result = Self::delete_global(agent, frame, atom);
+                        let delete_result = Self::delete_global(agent, &frame, atom);
                         let Some(deleted) = self.handle_vm_result(agent, delete_result)? else {
                             continue;
                         };

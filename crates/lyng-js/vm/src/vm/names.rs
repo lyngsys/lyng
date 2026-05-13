@@ -71,7 +71,7 @@ impl Vm {
     pub(super) fn enter_env_scope(
         &mut self,
         agent: &Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         base: u16,
         count: u32,
     ) -> VmResult<()> {
@@ -86,7 +86,7 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn leave_env_scope(&mut self, frame: FrameRecord, base: u16, count: u32) {
+    pub(super) fn leave_env_scope(&mut self, frame: &FrameRecord, base: u16, count: u32) {
         let start = u32::from(base);
         let end = start.saturating_add(count);
         let frame_depth = self.frames.len();
@@ -134,7 +134,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         record: ObjectEnvironmentRecord,
         name: AtomId,
     ) -> VmResult<bool> {
@@ -147,7 +147,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &frame,
+                frame,
             };
             object::has_property_in_context(&mut bridge, binding_object, key)?
         };
@@ -166,7 +166,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &frame,
+            frame,
             binding_object,
             receiver,
             PropertyKey::from_symbol(unscopables_symbol),
@@ -178,7 +178,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &frame,
+            frame,
             unscopables_object,
             Value::from_object_ref(unscopables_object),
             key,
@@ -195,7 +195,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         record: ObjectEnvironmentRecord,
         name: AtomId,
         strict: bool,
@@ -208,7 +208,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &frame,
+                frame,
             };
             object::has_property_in_context(&mut bridge, binding_object, key)?
         };
@@ -222,7 +222,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &frame,
+            frame,
             binding_object,
             Value::from_object_ref(binding_object),
             key,
@@ -238,7 +238,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         record: ObjectEnvironmentRecord,
         name: AtomId,
         value: Value,
@@ -252,7 +252,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &frame,
+                frame,
             };
             object::has_property_in_context(&mut bridge, binding_object, key)?
         };
@@ -264,7 +264,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &frame,
+            frame,
             binding_object,
             Value::from_object_ref(binding_object),
             key,
@@ -281,7 +281,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         record: ObjectEnvironmentRecord,
         name: AtomId,
     ) -> VmResult<bool> {
@@ -290,7 +290,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &frame,
+            frame: frame,
         };
         proxy::delete_property(
             &mut bridge,
@@ -308,7 +308,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         start: EnvironmentRef,
         name: AtomId,
         strict: bool,
@@ -415,7 +415,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         start: EnvironmentRef,
         name: AtomId,
     ) -> VmResult<CapturedNameTarget> {
@@ -523,7 +523,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
         code: CodeRef,
         feedback_slot: Option<FeedbackSlotId>,
@@ -574,7 +574,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
         value: Value,
         code: CodeRef,
@@ -623,7 +623,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
         value: Value,
         code: CodeRef,
@@ -692,10 +692,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
     ) -> VmResult<CapturedNameReference> {
-        let lexical_env = self.dynamic_name_start_environment(agent, &frame);
+        let lexical_env = self.dynamic_name_start_environment(agent, frame);
         let target = self.resolve_dynamic_name_target_with_context(
             agent,
             host,
@@ -716,7 +716,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         environment: EnvironmentRef,
         name: AtomId,
         strict: bool,
@@ -744,7 +744,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         environment: EnvironmentRef,
         name: AtomId,
         value: Value,
@@ -787,7 +787,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         global_environment: EnvironmentRef,
         name: AtomId,
         value: Value,
@@ -814,7 +814,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         reference_register: u16,
     ) -> VmResult<Value> {
         let reference = self
@@ -856,7 +856,7 @@ impl Vm {
 
     pub(super) fn load_captured_name_this_with_context(
         &self,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         reference_register: u16,
     ) -> VmResult<Value> {
         let reference = self
@@ -882,7 +882,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         reference_register: u16,
         value: Value,
     ) -> VmResult<()> {
@@ -943,10 +943,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
     ) -> VmResult<Value> {
-        let lexical_env = self.dynamic_name_start_environment(agent, &frame);
+        let lexical_env = self.dynamic_name_start_environment(agent, frame);
         if let Some(value) = self.probe_identifier_value_with_context(
             agent,
             host,
@@ -975,7 +975,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
     ) -> VmResult<Value> {
         Ok(self
@@ -995,10 +995,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
     ) -> VmResult<Value> {
-        let lexical_env = self.dynamic_name_start_environment(agent, &frame);
+        let lexical_env = self.dynamic_name_start_environment(agent, frame);
         if let Some(value) = self.probe_identifier_value_with_context(
             agent,
             host,
@@ -1026,7 +1026,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         reference_register: u16,
         name: AtomId,
     ) -> VmResult<()> {
@@ -1045,7 +1045,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
         value: Value,
     ) -> VmResult<()> {
@@ -1101,7 +1101,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
         value: Value,
     ) -> VmResult<()> {
@@ -1163,10 +1163,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
     ) -> VmResult<bool> {
-        let lexical_env = self.dynamic_name_start_environment(agent, &frame);
+        let lexical_env = self.dynamic_name_start_environment(agent, frame);
         let target = self.resolve_dynamic_name_target_with_context(
             agent,
             host,
@@ -1208,7 +1208,7 @@ impl Vm {
     pub(super) fn load_name(
         &mut self,
         agent: &mut Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
     ) -> VmResult<Value> {
         let host = NoopHostHooks;
@@ -1218,7 +1218,7 @@ impl Vm {
 
     pub(super) fn delete_global(
         agent: &mut Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         name: AtomId,
     ) -> VmResult<bool> {
         let global = Self::find_global_environment(agent, frame.variable_env())?;
@@ -1371,7 +1371,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         global_object: ObjectRef,
         name: AtomId,
     ) -> VmResult<bool> {
@@ -1390,7 +1390,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         global_object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<bool> {
@@ -1400,7 +1400,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &frame,
+                frame,
             },
             global_object,
             key,
@@ -1416,7 +1416,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         global_object: ObjectRef,
         name: AtomId,
         value: Value,
@@ -1441,7 +1441,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         global_object: ObjectRef,
         key: PropertyKey,
         value: Value,
@@ -1450,7 +1450,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &frame,
+            frame,
             global_object,
             Value::from_object_ref(global_object),
             key,
@@ -1463,7 +1463,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         start: EnvironmentRef,
         name: AtomId,
     ) -> VmResult<Option<Value>> {
@@ -1479,7 +1479,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &frame,
+            frame,
             global_object,
             Value::from_object_ref(global_object),
             key,
@@ -1580,7 +1580,7 @@ impl Vm {
         Some(GlobalLexicalBindingRecord::new(name, global.id(), index))
     }
 
-    pub(super) fn frame_is_strict(&self, frame: FrameRecord) -> bool {
+    pub(super) fn frame_is_strict(&self, frame: &FrameRecord) -> bool {
         self.installed_function(frame.code())
             .is_some_and(|function| function.flags().strict())
     }

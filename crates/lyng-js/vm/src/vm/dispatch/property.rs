@@ -746,7 +746,7 @@ impl Vm {
         let Some(deleted) = self.handle_vm_result(agent, delete_result)? else {
             return Ok(());
         };
-        if !deleted && self.frame_is_strict(*frame) {
+        if !deleted && self.frame_is_strict(frame) {
             let type_error = Err(VmError::Abrupt(errors::throw_type_error(agent)));
             let Some(()) = self.handle_vm_result(agent, type_error)? else {
                 return Ok(());
@@ -954,7 +954,7 @@ impl Vm {
         stored: bool,
         strict_override: bool,
     ) -> VmResult<()> {
-        if !stored && (strict_override || self.frame_is_strict(*frame)) {
+        if !stored && (strict_override || self.frame_is_strict(frame)) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         Ok(())

@@ -80,7 +80,7 @@ impl Vm {
         arguments: &[Value],
     ) -> VmResult<()> {
         let tail_caller = caller_frame.callee();
-        let tail_caller_strict = self.frame_is_strict(*caller_frame);
+        let tail_caller_strict = self.frame_is_strict(caller_frame);
         let prepared =
             self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, None)?;
         let register_base = caller_frame.registers().base();
@@ -737,7 +737,7 @@ mod tests {
             .expect("prepared call should leave one active frame");
         let eval_atom = agent.atoms_mut().intern_collectible("eval");
         let eval_value = vm
-            .load_name(agent, frame, eval_atom)
+            .load_name(agent, &frame, eval_atom)
             .expect("prepared runtime closure frame should resolve eval");
         let builtin_eval = vm
             .builtin_cache
@@ -808,7 +808,7 @@ mod tests {
             .expect("prepared call should leave one active frame");
         let math_atom = agent.atoms_mut().intern_collectible("Math");
         let math_value = vm
-            .load_name(agent, frame, math_atom)
+            .load_name(agent, &frame, math_atom)
             .expect("prepared actual closure frame should resolve Math");
 
         assert!(math_value.as_object_ref().is_some());
