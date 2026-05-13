@@ -1610,20 +1610,66 @@ impl FeedbackSiteState {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Per-code-object feedback storage.
+///
+/// Stored contiguously in `Vm::feedback_vectors: Vec<FeedbackVector>` (one entry per installed
+/// code object). The default-constructed value is an "unallocated" sentinel — empty `sites`
+/// and `warmup_counter == 0` — so the hot path can dispatch through `Vec` indexing with no
+/// `Option` discrimination. Once the warmup counter crosses
+/// `FEEDBACK_ALLOCATION_THRESHOLD`, [`allocate_sites`](Self::allocate_sites) populates the
+/// slot storage in place; `is_allocated()` flips to `true` from then on.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct FeedbackVector {
     sites: Vec<Option<FeedbackSiteState>>,
+    warmup_counter: u16,
 }
 
 impl FeedbackVector {
+    /// Populate slot storage on a previously-empty vector. The warmup counter is preserved
+    /// so [`feedback_vector_footprint`](Vm::feedback_vector_footprint) keeps reporting it
+    /// after the cold-to-warm transition.
     #[inline]
-    fn from_slot_descriptors(slot_descriptors: &[Option<FeedbackSiteDescriptor>]) -> Self {
-        let sites = slot_descriptors
+    fn allocate_sites(&mut self, slot_descriptors: &[Option<FeedbackSiteDescriptor>]) {
+        debug_assert!(
+            !self.is_allocated(),
+            "allocate_sites should only run on an unallocated FeedbackVector"
+        );
+        self.sites = slot_descriptors
             .iter()
             .copied()
             .map(|descriptor| descriptor.map(FeedbackSiteState::for_descriptor))
             .collect();
-        Self { sites }
+    }
+
+    /// Returns `true` once `sites` has been populated. Stays `true` for the lifetime of the
+    /// vector (sites are never cleared once allocated).
+    #[inline]
+    fn is_allocated(&self) -> bool {
+        !self.sites.is_empty()
+    }
+
+    #[inline]
+    fn warmup_counter(&self) -> u16 {
+        self.warmup_counter
+    }
+
+    /// Saturating increment of the warmup counter; returns the new value. Used on the cold
+    /// path before allocation; once allocated the dispatch loop skips this entirely.
+    #[inline]
+    fn bump_warmup(&mut self) -> u16 {
+        self.warmup_counter = self.warmup_counter.saturating_add(1);
+        self.warmup_counter
+    }
+
+    #[cfg(test)]
+    #[inline]
+    fn set_warmup_for_test(&mut self, value: u16) {
+        self.warmup_counter = value;
+    }
+
+    #[inline]
+    fn sites_capacity_bytes(&self) -> usize {
+        self.sites.len() * size_of::<Option<FeedbackSiteState>>()
     }
 
     #[inline]
@@ -1645,11 +1691,9 @@ impl Vm {
     #[inline]
     fn ensure_feedback_capacity(&mut self, code: CodeRef) {
         let index = code_index(code);
-        if self.feedback_warmup.len() <= index {
-            self.feedback_warmup.resize(index + 1, 0);
-        }
         if self.feedback_vectors.len() <= index {
-            self.feedback_vectors.resize_with(index + 1, || None);
+            self.feedback_vectors
+                .resize_with(index + 1, FeedbackVector::default);
         }
     }
 
@@ -1659,10 +1703,7 @@ impl Vm {
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> Option<&FeedbackSiteState> {
-        self.feedback_vectors
-            .get(code_index(code))
-            .and_then(Option::as_ref)?
-            .site(slot)
+        self.feedback_vectors.get(code_index(code))?.site(slot)
     }
 
     fn with_feedback_slot_mut<R>(
@@ -1672,8 +1713,7 @@ impl Vm {
         f: impl FnOnce(&mut FeedbackSiteState) -> R,
     ) -> Option<R> {
         self.feedback_vectors
-            .get_mut(code_index(code))
-            .and_then(Option::as_mut)?
+            .get_mut(code_index(code))?
             .site_mut(slot)
             .map(f)
     }
@@ -1681,8 +1721,11 @@ impl Vm {
     fn ensure_feedback_slot_execution(&mut self, code: CodeRef, slot: FeedbackSlotId) -> bool {
         self.ensure_feedback_capacity(code);
         let index = code_index(code);
-        let needs_allocation = self.feedback_vectors[index].is_none()
-            && self.feedback_warmup[index].saturating_add(1) >= FEEDBACK_ALLOCATION_THRESHOLD;
+        let needs_allocation = !self.feedback_vectors[index].is_allocated()
+            && self.feedback_vectors[index]
+                .warmup_counter()
+                .saturating_add(1)
+                >= FEEDBACK_ALLOCATION_THRESHOLD;
         let Some(installed) = self.installed.get(index).and_then(Option::as_ref) else {
             return false;
         };
@@ -1695,17 +1738,14 @@ impl Vm {
             None
         };
 
-        if self.feedback_vectors[index].is_none() {
-            self.feedback_warmup[index] = self.feedback_warmup[index].saturating_add(1);
+        if !self.feedback_vectors[index].is_allocated() {
+            self.feedback_vectors[index].bump_warmup();
             if let Some(slot_descriptors) = slot_descriptors.filter(|slots| !slots.is_empty()) {
-                self.feedback_vectors[index] =
-                    Some(FeedbackVector::from_slot_descriptors(&slot_descriptors));
+                self.feedback_vectors[index].allocate_sites(&slot_descriptors);
             }
         }
 
-        if let Some(vector) = self.feedback_vectors[index].as_mut()
-            && let Some(site) = vector.site_mut(slot)
-        {
+        if let Some(site) = self.feedback_vectors[index].site_mut(slot) {
             site.record_execution();
         }
         self.observe_tier_feedback_event(code);
@@ -1714,20 +1754,13 @@ impl Vm {
 
     fn record_allocated_feedback_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) -> bool {
         let index = code_index(code);
-        if self
-            .feedback_vectors
-            .get(index)
-            .and_then(Option::as_ref)
-            .is_none()
-        {
+        let Some(vector) = self.feedback_vectors.get_mut(index) else {
+            return false;
+        };
+        if !vector.is_allocated() {
             return false;
         }
-        let Some(site) = self
-            .feedback_vectors
-            .get_mut(index)
-            .and_then(Option::as_mut)
-            .and_then(|vector| vector.site_mut(slot))
-        else {
+        let Some(site) = vector.site_mut(slot) else {
             return false;
         };
         site.record_execution();
@@ -1760,7 +1793,6 @@ impl Vm {
         if let Some(site) = self
             .feedback_vectors
             .get_mut(index)
-            .and_then(Option::as_mut)
             .and_then(|vector| vector.site_mut(slot))
         {
             site.record_call_target(agent, callee);
@@ -1807,7 +1839,6 @@ impl Vm {
         if let Some(site) = self
             .feedback_vectors
             .get_mut(index)
-            .and_then(Option::as_mut)
             .and_then(|vector| vector.site_mut(slot))
         {
             site.record_construct_target(agent, constructor, created);
@@ -1835,8 +1866,7 @@ impl Vm {
         let slot = slot?;
         let site = self
             .feedback_vectors
-            .get_mut(code_index(code))
-            .and_then(Option::as_mut)?
+            .get_mut(code_index(code))?
             .site_mut(slot)?;
         let value = match site {
             FeedbackSiteState::NamedProperty(feedback) => feedback.try_load(agent, receiver),
@@ -1937,8 +1967,7 @@ impl Vm {
         let slot = slot?;
         let site = self
             .feedback_vectors
-            .get_mut(code_index(code))
-            .and_then(Option::as_mut)?
+            .get_mut(code_index(code))?
             .site_mut(slot)?;
         let value = match site {
             FeedbackSiteState::KeyedProperty(feedback) => {
@@ -1963,8 +1992,7 @@ impl Vm {
         let slot = slot?;
         let site = self
             .feedback_vectors
-            .get_mut(code_index(code))
-            .and_then(Option::as_mut)?
+            .get_mut(code_index(code))?
             .site_mut(slot)?;
         let stored = match site {
             FeedbackSiteState::KeyedProperty(feedback) => {
@@ -2056,8 +2084,7 @@ impl Vm {
     pub(crate) fn has_feedback_vector(&self, code: CodeRef) -> bool {
         self.feedback_vectors
             .get(code_index(code))
-            .and_then(Option::as_ref)
-            .is_some()
+            .is_some_and(FeedbackVector::is_allocated)
     }
 
     #[inline]
@@ -2070,21 +2097,25 @@ impl Vm {
             .iter()
             .flatten()
             .count();
-        let allocated_bytes = self
-            .feedback_vectors
-            .get(index)
-            .and_then(Option::as_ref)
-            .map_or(0, |vector| {
-                size_of::<FeedbackVector>()
-                    + vector.sites.len() * size_of::<Option<FeedbackSiteState>>()
-            });
+        let vector = self.feedback_vectors.get(index);
+        // Match prior reporting semantics: the "allocated_bytes" total only counts the heap
+        // budget for an actually-populated vector (sites populated). The sentinel default
+        // value in `Vec<FeedbackVector>` reports 0 bytes so callers continue to use
+        // `allocated == allocated_bytes > 0` as the cold-vs-warm signal.
+        let allocated_bytes = vector.map_or(0, |vector| {
+            if vector.is_allocated() {
+                size_of::<FeedbackVector>() + vector.sites_capacity_bytes()
+            } else {
+                0
+            }
+        });
 
         Some(FeedbackVectorFootprint {
             allocated: allocated_bytes > 0,
             slot_count,
             live_site_count,
             allocated_bytes,
-            warmup_counter: self.feedback_warmup.get(index).copied().unwrap_or(0),
+            warmup_counter: vector.map_or(0, FeedbackVector::warmup_counter),
         })
     }
 
@@ -2092,7 +2123,8 @@ impl Vm {
     pub fn feedback_vector_snapshot(&self, code: CodeRef) -> Option<FeedbackVectorSnapshot> {
         let index = code_index(code);
         let installed = self.installed.get(index).and_then(Option::as_ref)?;
-        let vector = self.feedback_vectors.get(index).and_then(Option::as_ref);
+        let vector = self.feedback_vectors.get(index);
+        let allocated = vector.is_some_and(FeedbackVector::is_allocated);
         let sites = installed
             .feedback_slot_descriptors()
             .iter()
@@ -2109,8 +2141,8 @@ impl Vm {
             .collect::<Vec<_>>();
 
         Some(FeedbackVectorSnapshot::new(
-            vector.is_some(),
-            self.feedback_warmup.get(index).copied().unwrap_or(0),
+            allocated,
+            vector.map_or(0, FeedbackVector::warmup_counter),
             installed.feedback_slot_descriptors().len(),
             sites,
         ))
@@ -2118,7 +2150,9 @@ impl Vm {
 
     #[cfg(test)]
     pub(crate) fn feedback_warmup_counter(&self, code: CodeRef) -> Option<u16> {
-        self.feedback_warmup.get(code_index(code)).copied()
+        self.feedback_vectors
+            .get(code_index(code))
+            .map(FeedbackVector::warmup_counter)
     }
 
     #[cfg(test)]
@@ -2128,8 +2162,7 @@ impl Vm {
         slot: FeedbackSlotId,
     ) -> Option<u32> {
         self.feedback_vectors
-            .get(code_index(code))
-            .and_then(Option::as_ref)?
+            .get(code_index(code))?
             .site(slot)
             .map(FeedbackSiteState::execution_count)
     }
@@ -2144,11 +2177,7 @@ impl Vm {
         u8,
         Option<lyng_js_objects::NamedPropertyCachePath>,
     )> {
-        let state = self
-            .feedback_vectors
-            .get(code_index(code))
-            .and_then(Option::as_ref)?
-            .site(slot)?;
+        let state = self.feedback_vectors.get(code_index(code))?.site(slot)?;
         match state {
             FeedbackSiteState::NamedProperty(feedback) => Some((
                 match feedback.cache_state {
@@ -2170,11 +2199,7 @@ impl Vm {
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> Option<(&'static str, Option<&'static str>, u8)> {
-        let state = self
-            .feedback_vectors
-            .get(code_index(code))
-            .and_then(Option::as_ref)?
-            .site(slot)?;
+        let state = self.feedback_vectors.get(code_index(code))?.site(slot)?;
         match state {
             FeedbackSiteState::KeyedProperty(feedback) => Some((
                 match feedback.cache_state {
@@ -2202,13 +2227,70 @@ impl Vm {
 #[cfg(test)]
 mod tests {
     use super::{
-        call_feedback_builtin_is_frame_safe, DenseIndexCacheEntry, InlineCacheState,
-        KeyedPropertyFamily, KeyedPropertyFeedback,
+        call_feedback_builtin_is_frame_safe, DenseIndexCacheEntry, FeedbackVector,
+        InlineCacheState, KeyedPropertyFamily, KeyedPropertyFeedback,
     };
+    use lyng_js_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
     use lyng_js_objects::ObjectFlags;
     use lyng_js_types::{
-        eval_builtin, function_builtin, function_call_builtin, string_char_code_at_builtin, ShapeId,
+        eval_builtin, function_builtin, function_call_builtin, string_char_code_at_builtin,
+        FeedbackSlotId, ShapeId,
     };
+
+    #[test]
+    fn default_feedback_vector_is_unallocated_with_zero_warmup() {
+        let vector = FeedbackVector::default();
+        assert!(
+            !vector.is_allocated(),
+            "default FeedbackVector should report unallocated so the hot path skips it"
+        );
+        assert_eq!(vector.warmup_counter(), 0);
+    }
+
+    #[test]
+    fn bump_warmup_increments_saturating_and_returns_new_value() {
+        let mut vector = FeedbackVector::default();
+        assert_eq!(vector.bump_warmup(), 1);
+        assert_eq!(vector.bump_warmup(), 2);
+        assert_eq!(vector.warmup_counter(), 2);
+    }
+
+    #[test]
+    fn bump_warmup_saturates_at_u16_max() {
+        let mut vector = FeedbackVector::default();
+        vector.set_warmup_for_test(u16::MAX);
+        assert_eq!(vector.bump_warmup(), u16::MAX);
+        assert_eq!(vector.warmup_counter(), u16::MAX);
+    }
+
+    #[test]
+    fn vector_with_populated_sites_reports_allocated() {
+        let slot = FeedbackSlotId::from_raw(1).expect("test slot id should be non-zero");
+        let descriptor = FeedbackSiteDescriptor::new(slot, 0, FeedbackSiteKind::Arithmetic);
+        let mut vector = FeedbackVector::default();
+        vector.allocate_sites(&[Some(descriptor)]);
+        assert!(
+            vector.is_allocated(),
+            "vector with non-empty site storage should report allocated"
+        );
+    }
+
+    #[test]
+    fn allocate_sites_preserves_warmup_counter() {
+        let slot = FeedbackSlotId::from_raw(1).expect("test slot id should be non-zero");
+        let descriptor = FeedbackSiteDescriptor::new(slot, 0, FeedbackSiteKind::Arithmetic);
+        let mut vector = FeedbackVector::default();
+        vector.bump_warmup();
+        vector.bump_warmup();
+        assert_eq!(vector.warmup_counter(), 2);
+        vector.allocate_sites(&[Some(descriptor)]);
+        assert!(vector.is_allocated());
+        assert_eq!(
+            vector.warmup_counter(),
+            2,
+            "warmup counter survives transition to allocated so footprint reporting stays correct"
+        );
+    }
 
     #[test]
     fn dense_index_observation_reports_whether_classification_changed() {

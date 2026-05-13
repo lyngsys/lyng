@@ -188,8 +188,12 @@ pub struct Vm {
     atom_texts: HashMap<AtomId, Box<str>>,
     preferred_atoms_by_text: HashMap<Box<str>, AtomId>,
     source_texts: HashMap<SourceId, Arc<str>>,
-    feedback_warmup: Vec<u16>,
-    feedback_vectors: Vec<Option<FeedbackVector>>,
+    /// Per-installed-code feedback storage, keyed by `code_index(code_ref)`. Every entry is a
+    /// real `FeedbackVector` rather than `Option<FeedbackVector>` — the default-constructed
+    /// value is the "unallocated" sentinel (empty slot storage, `warmup_counter == 0`), so
+    /// IC-bearing opcodes drop one Option discriminant on the hot path. The warmup counter
+    /// lives inside the vector itself, replacing the older parallel `feedback_warmup: Vec<u16>`.
+    feedback_vectors: Vec<FeedbackVector>,
     tiering: Vec<Option<TieringState>>,
     activation_tables: ActivationSideTables,
     for_in_states: ForInStateTable,
@@ -249,7 +253,6 @@ impl Vm {
             atom_texts: HashMap::new(),
             preferred_atoms_by_text: HashMap::new(),
             source_texts: HashMap::new(),
-            feedback_warmup: Vec::new(),
             feedback_vectors: Vec::new(),
             tiering: Vec::new(),
             activation_tables: ActivationSideTables::default(),

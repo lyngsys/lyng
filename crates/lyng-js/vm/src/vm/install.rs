@@ -1,7 +1,7 @@
 use super::{
-    bytecode_index, code_index, Agent, AllocationLifetime, AtomId, BytecodeFunction,
-    BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode, RealmRef,
-    TieringState, Value, Vm, VmError, VmResult,
+    bytecode_index, code_index, feedback::FeedbackVector, Agent, AllocationLifetime, AtomId,
+    BytecodeFunction, BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode,
+    RealmRef, TieringState, Value, Vm, VmError, VmResult,
 };
 use lyng_js_bytecode::{
     decode_instruction_bytes, CallRange, Instruction, Opcode, WideAbcOperands, WideAbxOperands,
@@ -790,11 +790,9 @@ impl Vm {
         if self.installed.len() <= index {
             self.installed.resize_with(index + 1, || None);
         }
-        if self.feedback_warmup.len() <= index {
-            self.feedback_warmup.resize(index + 1, 0);
-        }
         if self.feedback_vectors.len() <= index {
-            self.feedback_vectors.resize_with(index + 1, || None);
+            self.feedback_vectors
+                .resize_with(index + 1, FeedbackVector::default);
         }
         self.ensure_tiering_capacity(code);
         self.tiering[index] = Some(TieringState::default());
