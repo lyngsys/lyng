@@ -200,7 +200,7 @@ impl Vm {
                     | Opcode::GreaterThan
                     | Opcode::GreaterEqual => {
                         let opcode_result = self
-                            .execute_abc_value_opcode(agent, host, registry, frame, opcode, b, c);
+                            .execute_abc_value_opcode(agent, host, registry, &frame, opcode, b, c);
                         let Some(value) = self.handle_vm_result(agent, opcode_result)? else {
                             continue;
                         };
@@ -235,7 +235,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             b,
                             opcode == Opcode::Increment,
                         );
