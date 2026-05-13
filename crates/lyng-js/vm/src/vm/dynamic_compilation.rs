@@ -687,7 +687,7 @@ impl Vm {
         {
             return Ok((value, context.new_target()));
         }
-        Self::lexical_call_state(agent, lexical_env, caller)
+        Self::lexical_call_state(agent, lexical_env, &caller)
     }
 
     const fn sema_private_element_kind(

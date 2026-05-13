@@ -62,7 +62,7 @@ impl Vm {
                 .get(2)
                 .and_then(|value| value.as_object_ref())
                 .map_or_else(
-                    || Self::resolve_super_home_object(agent, caller.lexical_env(), *caller),
+                    || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
                     Ok,
                 )?;
             object::super_base(agent, home_object).map_err(VmError::Abrupt)?
@@ -90,7 +90,7 @@ impl Vm {
                 .get(3)
                 .and_then(|value| value.as_object_ref())
                 .map_or_else(
-                    || Self::resolve_super_home_object(agent, caller.lexical_env(), *caller),
+                    || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
                     Ok,
                 )?;
             object::super_base(agent, home_object).map_err(VmError::Abrupt)?
@@ -114,7 +114,7 @@ impl Vm {
             .first()
             .and_then(|value| value.as_object_ref())
             .map_or_else(
-                || Self::resolve_super_home_object(agent, caller.lexical_env(), *caller),
+                || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
                 Ok,
             )?;
         let base = object::ordinary_get_prototype_of(agent, home_object)

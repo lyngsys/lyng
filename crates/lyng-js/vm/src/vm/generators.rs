@@ -911,7 +911,7 @@ impl Vm {
                         )?;
                         if !return_method.is_undefined() && !return_method.is_null() {
                             let return_method =
-                                Self::require_callable_object(bridge.agent, *frame, return_method)?;
+                                Self::require_callable_object(bridge.agent, frame, return_method)?;
                             let close_result = bridge.vm.call_to_completion(
                                 bridge.agent,
                                 bridge.host,
@@ -928,7 +928,7 @@ impl Vm {
                         return Err(VmError::Abrupt(errors::throw_type_error(bridge.agent)));
                     }
                     let throw_method =
-                        Self::require_callable_object(bridge.agent, *frame, throw_method)?;
+                        Self::require_callable_object(bridge.agent, frame, throw_method)?;
                     let result = bridge.vm.call_to_completion(
                         bridge.agent,
                         bridge.host,
@@ -991,7 +991,7 @@ impl Vm {
                         }
                     } else {
                         let return_method =
-                            Self::require_callable_object(bridge.agent, *frame, return_method)?;
+                            Self::require_callable_object(bridge.agent, frame, return_method)?;
                         let result = bridge.vm.call_to_completion(
                             bridge.agent,
                             bridge.host,
@@ -1080,7 +1080,7 @@ impl Vm {
                 }
             } else {
                 let return_method =
-                    Self::require_callable_object(bridge.agent, *frame, return_method)?;
+                    Self::require_callable_object(bridge.agent, frame, return_method)?;
                 let result = bridge.vm.call_to_completion(
                     bridge.agent,
                     bridge.host,
@@ -1191,7 +1191,7 @@ impl Vm {
             iterator::IteratorKind::Async => {
                 let receiver = Value::from_object_ref(record.iterator());
                 let next_method =
-                    Self::require_callable_object(agent, *frame, record.next_method())?;
+                    Self::require_callable_object(agent, frame, record.next_method())?;
                 let mut arguments = [Value::undefined(); 1];
                 let arguments = if let Some(argument) = argument {
                     arguments[0] = argument;

@@ -234,7 +234,7 @@ impl Vm {
                 )?;
                 return Ok(Value::from_bool(is_instance));
             }
-            let has_instance = Self::require_callable_object(agent, *caller, has_instance)?;
+            let has_instance = Self::require_callable_object(agent, caller, has_instance)?;
             let result = self.call_to_completion(
                 agent,
                 host,
@@ -248,7 +248,7 @@ impl Vm {
             return Ok(Value::from_bool(is_instance));
         }
 
-        let constructor = Self::require_callable_object(agent, *caller, constructor_value)?;
+        let constructor = Self::require_callable_object(agent, caller, constructor_value)?;
         let Some(object) = value.as_object_ref() else {
             return Ok(Value::from_bool(false));
         };

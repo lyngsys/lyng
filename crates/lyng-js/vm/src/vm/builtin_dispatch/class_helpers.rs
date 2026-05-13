@@ -155,7 +155,7 @@ impl Vm {
             Some(Self::resolve_super_home_object(
                 agent,
                 caller.lexical_env(),
-                *caller,
+                caller,
             )?)
         } else {
             Some(

@@ -11,7 +11,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
         let target =
-            Vm::require_callable_object(self.agent, *self.caller_frame, invocation.this_value())?;
+            Vm::require_callable_object(self.agent, self.caller_frame, invocation.this_value())?;
         let rebound_this = invocation
             .arguments()
             .first()
@@ -37,7 +37,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .first()
             .copied()
             .unwrap_or(Value::undefined());
-        let target = Vm::require_callable_object(self.agent, *self.caller_frame, callee)?;
+        let target = Vm::require_callable_object(self.agent, self.caller_frame, callee)?;
         let builtin_eval = self
             .vm
             .builtin_cache

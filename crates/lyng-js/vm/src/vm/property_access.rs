@@ -424,7 +424,7 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
     }
 
     fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
-        Vm::require_callable_object(self.agent, *self.frame, value)
+        Vm::require_callable_object(self.agent, self.frame, value)
     }
 
     fn call_to_completion(

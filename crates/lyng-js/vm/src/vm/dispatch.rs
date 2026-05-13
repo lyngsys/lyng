@@ -829,7 +829,7 @@ impl Vm {
                                 Err(VmError::Abrupt(errors::throw_reference_error(agent)))
                             }
                             ThisState::Lexical => {
-                                Self::resolve_this_binding(agent, frame.lexical_env(), frame)
+                                Self::resolve_this_binding(agent, frame.lexical_env(), &frame)
                             }
                         };
                         let Some(value) = self.handle_vm_result(agent, load_this)? else {

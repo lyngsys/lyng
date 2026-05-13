@@ -62,7 +62,7 @@ impl iterator::IteratorOpsContext for VmIteratorBridge<'_> {
     }
 
     fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
-        Vm::require_callable_object(self.agent, *self.frame, value)
+        Vm::require_callable_object(self.agent, self.frame, value)
     }
 
     fn call_to_completion(
@@ -784,7 +784,7 @@ impl Vm {
         }
 
         let receiver = Value::from_object_ref(record.iterator());
-        let next_method = Self::require_callable_object(agent, *frame, record.next_method())?;
+        let next_method = Self::require_callable_object(agent, frame, record.next_method())?;
         let result =
             self.call_to_completion(agent, host, registry, frame, next_method, receiver, &[])?;
         match record.kind() {
@@ -939,7 +939,7 @@ impl Vm {
             record.set_done(true);
             return Ok(());
         }
-        let return_method = match Self::require_callable_object(agent, *frame, return_value) {
+        let return_method = match Self::require_callable_object(agent, frame, return_value) {
             Ok(return_method) => return_method,
             Err(_) if preserve_completion => {
                 record.set_done(true);
@@ -1066,7 +1066,7 @@ impl Vm {
         if return_value.is_undefined() || return_value.is_null() {
             return;
         }
-        let Ok(return_method) = Self::require_callable_object(agent, *frame, return_value) else {
+        let Ok(return_method) = Self::require_callable_object(agent, frame, return_value) else {
             return;
         };
         let Ok(result) =

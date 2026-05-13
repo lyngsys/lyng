@@ -21,7 +21,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         result_register: u16,
         callee_object: ObjectRef,
         this_value: Value,
@@ -74,13 +74,13 @@ impl Vm {
     pub(super) fn recycle_tail_bytecode_call(
         &mut self,
         agent: &mut Agent,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         callee_object: ObjectRef,
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<()> {
         let tail_caller = caller_frame.callee();
-        let tail_caller_strict = self.frame_is_strict(caller_frame);
+        let tail_caller_strict = self.frame_is_strict(*caller_frame);
         let prepared =
             self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, None)?;
         let register_base = caller_frame.registers().base();
@@ -114,7 +114,7 @@ impl Vm {
     pub(super) fn prepare_bytecode_call(
         &self,
         agent: &mut Agent,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         callee_object: ObjectRef,
         this_value: Value,
         new_target: Option<ObjectRef>,
@@ -325,12 +325,12 @@ impl Vm {
         Ok(())
     }
 
-    fn teardown_tail_frame(&mut self, agent: &mut Agent, frame: FrameRecord) -> VmResult<()> {
+    fn teardown_tail_frame(&mut self, agent: &mut Agent, frame: &FrameRecord) -> VmResult<()> {
         let Some(active) = self.frames.pop() else {
             debug_assert!(false, "tail-call recycling requires one active frame");
             return Err(VmError::MissingActiveFrame);
         };
-        debug_assert_eq!(active, frame);
+        debug_assert_eq!(active, *frame);
         self.close_loop_iteration_frames(self.frames.len());
         self.close_env_scope_frames(self.frames.len());
         self.for_in_states.clear_window(frame.registers());
@@ -374,7 +374,7 @@ impl Vm {
 
     pub(super) fn require_callable_object(
         agent: &mut Agent,
-        _frame: FrameRecord,
+        _frame: &FrameRecord,
         value: Value,
     ) -> VmResult<ObjectRef> {
         let object = value
@@ -408,7 +408,7 @@ impl Vm {
     pub(super) fn lexical_call_state(
         agent: &Agent,
         start: EnvironmentRef,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
     ) -> VmResult<(Value, Option<ObjectRef>)> {
         if let Some(record) = Self::this_environment_record(agent, start)? {
             return Ok((record.this_value(), record.new_target()));
@@ -419,7 +419,7 @@ impl Vm {
     pub(super) fn resolve_this_binding(
         agent: &mut Agent,
         start: EnvironmentRef,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
     ) -> VmResult<Value> {
         let Some(record) = Self::this_environment_record(agent, start)? else {
             return Ok(caller_frame.this_value());
@@ -439,7 +439,7 @@ impl Vm {
     pub(super) fn resolve_super_home_object(
         agent: &mut Agent,
         start: EnvironmentRef,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
     ) -> VmResult<ObjectRef> {
         if let Some(record) = Self::this_environment_record(agent, start)? {
             if let Some(home_object) = record.home_object() {
@@ -514,7 +514,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         realm: RealmRef,
         new_target: ObjectRef,
     ) -> VmResult<ObjectRef> {
@@ -522,7 +522,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &frame,
+            frame,
             new_target,
             Value::from_object_ref(new_target),
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),
@@ -646,7 +646,7 @@ mod tests {
         );
 
         let prepared = vm
-            .prepare_bytecode_call(agent, caller_frame, callee, Value::undefined(), None)
+            .prepare_bytecode_call(agent, &caller_frame, callee, Value::undefined(), None)
             .expect("bytecode call should prepare");
         assert_eq!(prepared.private_env, Some(private_env));
         vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
@@ -726,7 +726,7 @@ mod tests {
         );
 
         let prepared = vm
-            .prepare_bytecode_call(agent, caller_frame, callee, Value::undefined(), None)
+            .prepare_bytecode_call(agent, &caller_frame, callee, Value::undefined(), None)
             .expect("bytecode call should prepare");
         vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
             .expect("bytecode call should install");
@@ -797,7 +797,7 @@ mod tests {
         );
 
         let prepared = vm
-            .prepare_bytecode_call(agent, caller, function_object, Value::undefined(), None)
+            .prepare_bytecode_call(agent, &caller, function_object, Value::undefined(), None)
             .expect("bytecode call should prepare");
         vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
             .expect("bytecode call should install");
@@ -854,7 +854,7 @@ mod tests {
         );
 
         let prepared = vm
-            .prepare_bytecode_call(agent, caller, function_object, Value::undefined(), None)
+            .prepare_bytecode_call(agent, &caller, function_object, Value::undefined(), None)
             .expect("bytecode call should prepare");
         vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
             .expect("bytecode call should install");
@@ -913,7 +913,7 @@ mod tests {
         vm.frames.push(caller);
 
         let prepared = vm
-            .prepare_bytecode_call(agent, caller, function_object, Value::undefined(), None)
+            .prepare_bytecode_call(agent, &caller, function_object, Value::undefined(), None)
             .expect("bytecode call should prepare");
         vm.install_prepared_bytecode_call(agent, prepared, &[], 4, Some(0), None, false)
             .expect("bytecode call should install");

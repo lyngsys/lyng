@@ -49,7 +49,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                *frame,
+                frame,
                 result_register,
                 callee,
                 this_value,
@@ -113,7 +113,7 @@ impl Vm {
         this_value: Value,
         collected_arguments: &mut Vec<Value>,
     ) -> VmResult<()> {
-        let mut callee = Self::require_callable_object(agent, *frame, callee_value)?;
+        let mut callee = Self::require_callable_object(agent, frame, callee_value)?;
         let mut effective_this = this_value;
         Self::resolve_bound_call_chain(
             agent,
@@ -190,7 +190,7 @@ impl Vm {
             return Ok(None);
         }
 
-        let mut target = Self::require_callable_object(agent, *frame, this_value)?;
+        let mut target = Self::require_callable_object(agent, frame, this_value)?;
         let mut effective_this = arguments.first().copied().unwrap_or(Value::undefined());
         let call_arguments = arguments.get(1..).unwrap_or(&[]);
         if Self::bound_function_record(agent, target).is_some() {
@@ -251,7 +251,7 @@ impl Vm {
                 .is_some_and(|function| function.flags().generator())
             {
                 let prepared =
-                    self.prepare_bytecode_call(agent, *frame, callee, this_value, None)?;
+                    self.prepare_bytecode_call(agent, frame, callee, this_value, None)?;
                 let generator =
                     self.instantiate_generator_call(agent, host, registry, prepared, arguments)?;
                 let _ = agent.pop_execution_context();
@@ -262,13 +262,13 @@ impl Vm {
                 .is_some_and(|function| function.flags().async_function())
             {
                 let prepared =
-                    self.prepare_bytecode_call(agent, *frame, callee, this_value, None)?;
+                    self.prepare_bytecode_call(agent, frame, callee, this_value, None)?;
                 let promise = self
                     .instantiate_async_function_call(agent, host, registry, prepared, arguments)?;
                 let _ = agent.pop_execution_context();
                 return self.finish_frame(agent, Value::from_object_ref(promise));
             }
-            self.recycle_tail_bytecode_call(agent, *frame, callee, this_value, arguments)?;
+            self.recycle_tail_bytecode_call(agent, frame, callee, this_value, arguments)?;
             return Ok(None);
         }
 
@@ -413,7 +413,7 @@ impl Vm {
                 spread_mask,
                 &mut collected_arguments,
             )?;
-            let mut callee = Self::require_callable_object(agent, *frame, callee_value)?;
+            let mut callee = Self::require_callable_object(agent, frame, callee_value)?;
             let mut effective_this = this_value;
             Self::resolve_bound_call_chain(
                 agent,
@@ -520,7 +520,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        *frame,
+                        frame,
                         frame.realm(),
                         new_target,
                     )?)
@@ -538,7 +538,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    *frame,
+                    frame,
                     result_register,
                     callee,
                     this_value,
