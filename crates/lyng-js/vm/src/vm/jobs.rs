@@ -328,7 +328,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: caller,
+                    frame: &caller,
                 };
                 let completion = AbruptCompletion::throw(argument);
                 match iterator::iterator_close::<_, ()>(&mut bridge, &mut record, Err(completion)) {

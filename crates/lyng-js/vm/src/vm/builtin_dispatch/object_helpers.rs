@@ -121,7 +121,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            frame: &frame,
         };
         if !proxy::prevent_extensions(&mut bridge, object_ref)? {
             return Ok(false);
@@ -166,7 +166,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            frame: &frame,
         };
         if proxy::is_extensible(&mut bridge, object_ref)? {
             return Ok(false);
@@ -213,7 +213,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                frame: &caller,
             };
             object::get_with_receiver_in_context(
                 &mut bridge,
@@ -257,7 +257,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: caller,
+            frame: &caller,
         };
         let prototype = object::get_with_receiver_in_context(
             &mut bridge,
@@ -327,7 +327,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: caller,
+            frame: &caller,
         };
         let prototype = object::get_with_receiver_in_context(
             &mut bridge,

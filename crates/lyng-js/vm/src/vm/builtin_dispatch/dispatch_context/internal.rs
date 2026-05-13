@@ -11,7 +11,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
         let target =
-            Vm::require_callable_object(self.agent, self.caller_frame, invocation.this_value())?;
+            Vm::require_callable_object(self.agent, *self.caller_frame, invocation.this_value())?;
         let rebound_this = invocation
             .arguments()
             .first()
@@ -21,7 +21,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             target,
             rebound_this,
             invocation.arguments().get(1..).unwrap_or(&[]),
@@ -37,7 +37,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .first()
             .copied()
             .unwrap_or(Value::undefined());
-        let target = Vm::require_callable_object(self.agent, self.caller_frame, callee)?;
+        let target = Vm::require_callable_object(self.agent, *self.caller_frame, callee)?;
         let builtin_eval = self
             .vm
             .builtin_cache
@@ -49,7 +49,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
                 self.agent,
                 self.host,
                 self.registry,
-                self.caller_frame,
+                *self.caller_frame,
                 target,
                 Value::undefined(),
                 invocation.arguments().get(1..).unwrap_or(&[]),
@@ -78,7 +78,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             &source_text,
             this_override,
         )
@@ -97,7 +97,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             value,
         )
     }
@@ -110,7 +110,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -123,7 +123,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -136,7 +136,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -149,7 +149,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
             true,
             true,
@@ -164,7 +164,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
             false,
             true,
@@ -179,7 +179,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
             true,
             false,
@@ -194,7 +194,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
             false,
             false,
@@ -205,14 +205,14 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        Vm::define_private_field_builtin(self.agent, self.caller_frame, invocation.arguments())
+        Vm::define_private_field_builtin(self.agent, *self.caller_frame, invocation.arguments())
     }
 
     fn private_field_init_builtin(
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        Vm::private_field_init_builtin(self.agent, self.caller_frame, invocation.arguments())
+        Vm::private_field_init_builtin(self.agent, *self.caller_frame, invocation.arguments())
     }
 
     fn private_field_get_builtin(
@@ -223,7 +223,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -236,7 +236,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -245,7 +245,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        Vm::private_has_builtin(self.agent, self.caller_frame, invocation.arguments())
+        Vm::private_has_builtin(self.agent, *self.caller_frame, invocation.arguments())
     }
 
     fn super_property_get_builtin(
@@ -256,7 +256,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -269,7 +269,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -278,7 +278,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        Vm::super_base_builtin(self.agent, self.caller_frame, invocation.arguments())
+        Vm::super_base_builtin(self.agent, *self.caller_frame, invocation.arguments())
     }
 
     fn super_constructor_builtin(
@@ -286,7 +286,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         _invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
         self.vm
-            .super_constructor_builtin(self.agent, self.caller_frame)
+            .super_constructor_builtin(self.agent, *self.caller_frame)
     }
 
     fn construct_super_builtin(
@@ -297,7 +297,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -310,7 +310,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -323,7 +323,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -354,7 +354,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        Vm::capture_arrow_context_builtin(self.agent, self.caller_frame, invocation.arguments())
+        Vm::capture_arrow_context_builtin(self.agent, *self.caller_frame, invocation.arguments())
     }
 
     fn install_instance_field_key_builtin(
@@ -365,7 +365,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             invocation.arguments(),
         )
     }
@@ -381,7 +381,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         _invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        let realm = Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame);
+        let realm = Vm::builtin_realm(self.agent, self.callee_object, *self.caller_frame);
         Err(Vm::abrupt_intrinsic_error(
             self.agent,
             realm,
@@ -399,7 +399,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .copied()
             .unwrap_or(Value::undefined());
         let Some(object) = value.as_object_ref() else {
-            let realm = Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame);
+            let realm = Vm::builtin_realm(self.agent, self.callee_object, *self.caller_frame);
             return Err(Vm::abrupt_intrinsic_error(
                 self.agent,
                 realm,
@@ -410,7 +410,7 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             return Ok(Value::undefined());
         }
 
-        let realm = Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame);
+        let realm = Vm::builtin_realm(self.agent, self.callee_object, *self.caller_frame);
         Err(Vm::abrupt_intrinsic_error(
             self.agent,
             realm,

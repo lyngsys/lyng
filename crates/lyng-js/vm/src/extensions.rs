@@ -269,7 +269,7 @@ pub struct EmbeddingFunctionContext<'a> {
     host: &'a dyn HostHooks,
     registry: &'a mut dyn NativeFunctionRegistry,
     provider: &'a SharedRealmExtensionProvider,
-    caller_frame: FrameRecord,
+    caller_frame: &'a FrameRecord,
     callee_object: ObjectRef,
 }
 
@@ -281,7 +281,7 @@ impl<'a> EmbeddingFunctionContext<'a> {
         host: &'a dyn HostHooks,
         registry: &'a mut dyn NativeFunctionRegistry,
         provider: &'a SharedRealmExtensionProvider,
-        caller_frame: FrameRecord,
+        caller_frame: &'a FrameRecord,
         callee_object: ObjectRef,
     ) -> Self {
         Self {
@@ -351,7 +351,7 @@ impl<'a> EmbeddingFunctionContext<'a> {
     pub fn force_collect(&mut self) -> PrimitiveCollectionReport {
         let mut report = self
             .vm
-            .force_collect_with_active_roots(self.agent, self.caller_frame);
+            .force_collect_with_active_roots(self.agent, *self.caller_frame);
         let next_budget = report.next_budget_bytes.max(
             report
                 .after

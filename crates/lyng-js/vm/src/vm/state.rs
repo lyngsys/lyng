@@ -84,7 +84,7 @@ pub(in crate::vm) struct EntryExecutionOverride {
 
 pub(in crate::vm) struct ActiveVmRoots<'a> {
     pub(in crate::vm) vm: &'a Vm,
-    pub(in crate::vm) caller_frame: FrameRecord,
+    pub(in crate::vm) caller_frame: &'a FrameRecord,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -211,7 +211,7 @@ impl TraceHeapEdges for EntryExecutionOverride {
 
 impl TraceHeapEdges for ActiveVmRoots<'_> {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        trace_frame_record(self.caller_frame, tracer);
+        trace_frame_record(*self.caller_frame, tracer);
 
         for value in self.vm.register_stack() {
             value.trace_heap_edges(tracer);

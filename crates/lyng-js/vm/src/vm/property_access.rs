@@ -57,7 +57,7 @@ struct VmToPrimitiveBridge<'a> {
     agent: &'a mut Agent,
     host: &'a dyn HostHooks,
     registry: &'a mut dyn NativeFunctionRegistry,
-    frame: FrameRecord,
+    frame: &'a FrameRecord,
 }
 
 pub(super) struct VmProxyBridge<'a> {
@@ -65,7 +65,7 @@ pub(super) struct VmProxyBridge<'a> {
     pub(super) agent: &'a mut Agent,
     pub(super) host: &'a dyn HostHooks,
     pub(super) registry: &'a mut dyn NativeFunctionRegistry,
-    pub(super) frame: FrameRecord,
+    pub(super) frame: &'a FrameRecord,
 }
 
 impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
@@ -92,7 +92,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             receiver,
             key,
         )
@@ -108,7 +108,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             object,
             receiver,
             key,
@@ -124,7 +124,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             object,
             key,
         )
@@ -142,7 +142,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             object,
             receiver,
             key,
@@ -161,7 +161,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             object,
             key,
         )?;
@@ -169,7 +169,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             object,
             key,
             descriptor,
@@ -189,7 +189,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             object,
             key,
         )?;
@@ -204,7 +204,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             object,
         )
     }
@@ -218,7 +218,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             object,
             key,
         )
@@ -234,7 +234,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             callee_object,
             this_value,
             arguments,
@@ -251,7 +251,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             callee_object,
             arguments,
             new_target,
@@ -260,7 +260,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
 
     fn to_property_key(&mut self, value: Value) -> Result<PropertyKey, Self::Error> {
         self.vm
-            .property_key_from_value(self.agent, self.host, self.registry, self.frame, value)
+            .property_key_from_value(self.agent, self.host, self.registry, *self.frame, value)
     }
 
     fn to_property_descriptor(
@@ -416,7 +416,7 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             object,
             Value::from_object_ref(object),
             key,
@@ -424,7 +424,7 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
     }
 
     fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
-        Vm::require_callable_object(self.agent, self.frame, value)
+        Vm::require_callable_object(self.agent, *self.frame, value)
     }
 
     fn call_to_completion(
@@ -437,7 +437,7 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             callee_object,
             this_value,
             arguments,
@@ -788,7 +788,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    frame: &frame,
                 },
                 excluded_object,
             )?;
@@ -821,7 +821,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                frame: &frame,
             },
             source,
         )?;
@@ -835,7 +835,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    frame: &frame,
                 },
                 source,
                 key,
@@ -893,7 +893,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                frame: &caller,
             },
             object,
             key,
@@ -1295,7 +1295,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                frame: &caller,
             },
             object,
             key,
@@ -1469,7 +1469,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                frame: &caller,
             },
             receiver,
             key,
@@ -1489,7 +1489,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: caller,
+                    frame: &caller,
                 },
                 receiver,
                 key,
@@ -1510,7 +1510,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                frame: &caller,
             },
             receiver,
             key,
@@ -1542,7 +1542,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                frame: &caller,
             };
             typed_array::storage_bits_from_value(&mut bridge, typed_array.kind(), value)?
         };
@@ -1587,7 +1587,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            frame: &frame,
         };
         lyng_js_ops::object::to_primitive(&mut bridge, value, hint)
     }

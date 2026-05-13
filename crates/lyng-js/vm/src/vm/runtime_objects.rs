@@ -24,7 +24,7 @@ pub(super) struct VmIteratorBridge<'a> {
     pub(super) agent: &'a mut Agent,
     pub(super) host: &'a dyn HostHooks,
     pub(super) registry: &'a mut dyn NativeFunctionRegistry,
-    pub(super) frame: FrameRecord,
+    pub(super) frame: &'a FrameRecord,
 }
 
 impl iterator::IteratorOpsContext for VmIteratorBridge<'_> {
@@ -55,14 +55,14 @@ impl iterator::IteratorOpsContext for VmIteratorBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             receiver,
             key,
         )
     }
 
     fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
-        Vm::require_callable_object(self.agent, self.frame, value)
+        Vm::require_callable_object(self.agent, *self.frame, value)
     }
 
     fn call_to_completion(
@@ -75,7 +75,7 @@ impl iterator::IteratorOpsContext for VmIteratorBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            *self.frame,
             callee_object,
             this_value,
             arguments,
@@ -425,7 +425,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                frame: &frame,
             };
             return proxy::delete_property(&mut bridge, object, key);
         }
@@ -453,7 +453,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            frame: &frame,
         };
 
         while let Some(object) = current {
@@ -487,7 +487,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            frame: &frame,
         };
         if async_iteration {
             iterator::get_async_iterator(&mut bridge, value)
@@ -510,7 +510,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            frame: &frame,
         };
         let mut iterator = iterator::get_iterator(&mut bridge, value)?;
         loop {
@@ -555,7 +555,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            frame: &frame,
         };
         let Some(result) = iterator::iterator_step(&mut bridge, &mut record)? else {
             self.iterator_states
@@ -603,7 +603,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            frame: &frame,
         };
         let _: () = iterator::iterator_close(&mut bridge, &mut record, Ok(()))?;
         Ok(())
@@ -640,7 +640,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            frame: &frame,
                         };
                         match iterator::iterator_close::<_, ()>(
                             &mut bridge,
@@ -729,7 +729,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame,
+                        frame: &frame,
                     };
                     if iterator::iterator_complete(&mut bridge, iter_result)? {
                         record.set_done(true);
@@ -755,7 +755,7 @@ impl Vm {
                                 agent,
                                 host,
                                 registry,
-                                frame,
+                                frame: &frame,
                             };
                             if iterator::iterator_complete(&mut bridge, iter_result)? {
                                 record.set_done(true);
@@ -812,7 +812,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame,
+                        frame: &frame,
                     };
                     (
                         iterator::iterator_complete(&mut bridge, iter_result)?,
@@ -994,7 +994,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame,
+                        frame: &frame,
                     };
                     match iterator::iterator_value(&mut bridge, iter_result) {
                         Ok(value) => value,

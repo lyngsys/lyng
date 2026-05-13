@@ -147,7 +147,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                frame: &frame,
             };
             object::has_property_in_context(&mut bridge, binding_object, key)?
         };
@@ -208,7 +208,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                frame: &frame,
             };
             object::has_property_in_context(&mut bridge, binding_object, key)?
         };
@@ -252,7 +252,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                frame: &frame,
             };
             object::has_property_in_context(&mut bridge, binding_object, key)?
         };
@@ -290,7 +290,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            frame: &frame,
         };
         proxy::delete_property(
             &mut bridge,
@@ -1400,7 +1400,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                frame: &frame,
             },
             global_object,
             key,

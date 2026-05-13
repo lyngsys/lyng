@@ -234,7 +234,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller_frame,
+                frame: &caller_frame,
             },
             attributes_object,
         )?;
@@ -246,7 +246,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: caller_frame,
+                    frame: &caller_frame,
                 },
                 attributes_object,
                 key,

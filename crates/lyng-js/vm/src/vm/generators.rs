@@ -860,7 +860,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                frame: &frame,
             };
             let receiver = Value::from_object_ref(record.iterator());
             let resume_kind = frame.resume_kind();
@@ -1055,7 +1055,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                frame: &frame,
             };
             let return_method = bridge.get_property_value(
                 receiver,
@@ -1226,7 +1226,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame,
+                        frame: &frame,
                     };
                     iterator::iterator_next(&mut bridge, &record, argument)?
                 };
@@ -1236,7 +1236,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame,
+                        frame: &frame,
                     };
                     (
                         iterator::iterator_complete(&mut bridge, iter_result)?,
@@ -1311,7 +1311,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame,
+                        frame: &frame,
                     };
                     match iterator::iterator_close::<_, ()>(
                         &mut bridge,
@@ -1369,7 +1369,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    frame: &frame,
                 };
                 let _: () = iterator::iterator_close(
                     &mut bridge,
@@ -1393,7 +1393,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame,
+                        frame: &frame,
                     };
                     (
                         iterator::iterator_complete(&mut bridge, iter_result)?,

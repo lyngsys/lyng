@@ -104,7 +104,7 @@ impl Vm {
                 host,
                 registry,
                 &provider,
-                caller_frame,
+                &caller_frame,
                 callee_object,
             );
             let invocation = EmbeddingInvocation::new(this_value, arguments, new_target);
@@ -138,7 +138,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller_frame,
+            caller_frame: &caller_frame,
             callee_object,
         };
         dispatch_builtin(
@@ -169,7 +169,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller_frame,
+            caller_frame: &caller_frame,
             callee_object,
         };
         dispatch_builtin(

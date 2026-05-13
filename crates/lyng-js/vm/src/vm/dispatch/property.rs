@@ -42,7 +42,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                frame: &frame,
             };
             object::has_property_in_context(&mut bridge, object, key)
         };
@@ -927,7 +927,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                frame: &frame,
             },
             object,
             key,

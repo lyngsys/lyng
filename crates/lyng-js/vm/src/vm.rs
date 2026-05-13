@@ -463,7 +463,7 @@ impl Vm {
     ) -> PrimitiveCollectionReport {
         agent.force_collect_with_additional_roots(&ActiveVmRoots {
             vm: self,
-            caller_frame,
+            caller_frame: &caller_frame,
         })
     }
 

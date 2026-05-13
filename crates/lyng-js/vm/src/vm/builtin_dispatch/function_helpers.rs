@@ -36,7 +36,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                frame: &caller,
             },
             target,
         )?;
@@ -90,7 +90,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                frame: &caller,
             },
             target,
             length_key,

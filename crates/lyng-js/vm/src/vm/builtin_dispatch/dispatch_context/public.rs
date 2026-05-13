@@ -33,7 +33,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     }
 
     fn builtin_realm(&self) -> RealmRef {
-        Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame)
+        Vm::builtin_realm(self.agent, self.callee_object, *self.caller_frame)
     }
 
     fn caller_realm(&self) -> RealmRef {
@@ -41,7 +41,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     }
 
     fn caller_is_strict(&self) -> bool {
-        self.vm.caller_is_strict(self.caller_frame)
+        self.vm.caller_is_strict(*self.caller_frame)
     }
 
     fn abrupt(&mut self, completion: AbruptCompletion) -> Self::Error {
@@ -81,7 +81,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             object,
             receiver,
             key,
@@ -97,7 +97,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             object,
             key,
         )
@@ -114,7 +114,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             object,
             receiver,
             key,
@@ -133,7 +133,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             object,
             key,
         )?;
@@ -141,7 +141,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             object,
             key,
             descriptor,
@@ -195,7 +195,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             object,
             key,
         )?;
@@ -210,7 +210,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             object,
         )
     }
@@ -224,7 +224,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             object,
             key,
         )
@@ -294,7 +294,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             object,
             freeze,
         )
@@ -309,7 +309,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             object,
             frozen,
         )
@@ -389,7 +389,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             callee_object,
             this_value,
             arguments,
@@ -435,7 +435,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             callee_object,
             arguments,
             new_target,
@@ -451,7 +451,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             realm,
             value,
         )
@@ -467,7 +467,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             target,
             bound_this,
             bound_arguments,
@@ -522,7 +522,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
                 self.agent,
                 self.host,
                 self.registry,
-                self.caller_frame,
+                *self.caller_frame,
                 generator,
                 GeneratorResumeKind::Next,
                 value,
@@ -532,7 +532,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             generator,
             GeneratorResumeKind::Next,
             value,
@@ -549,7 +549,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
                 self.agent,
                 self.host,
                 self.registry,
-                self.caller_frame,
+                *self.caller_frame,
                 generator,
                 GeneratorResumeKind::Return,
                 value,
@@ -559,7 +559,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             generator,
             GeneratorResumeKind::Return,
             value,
@@ -576,7 +576,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
                 self.agent,
                 self.host,
                 self.registry,
-                self.caller_frame,
+                *self.caller_frame,
                 generator,
                 GeneratorResumeKind::Throw,
                 value,
@@ -586,7 +586,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             generator,
             GeneratorResumeKind::Throw,
             value,
@@ -602,7 +602,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             this_value,
             GeneratorResumeKind::Next,
             value,
@@ -618,7 +618,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             this_value,
             GeneratorResumeKind::Return,
             value,
@@ -634,7 +634,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            *self.caller_frame,
             this_value,
             GeneratorResumeKind::Throw,
             value,
