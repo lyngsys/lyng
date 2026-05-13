@@ -4,7 +4,7 @@ impl Vm {
     pub(super) fn push_with_environment(
         &mut self,
         agent: &mut Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         value: Value,
     ) -> VmResult<()> {
         let previous_lexical_env = frame.lexical_env();

@@ -987,7 +987,7 @@ impl Vm {
                                 register: 0,
                             })?;
                         let value = self.read_register(frame.registers(), register);
-                        let push_result = self.push_with_environment(agent, frame, value);
+                        let push_result = self.push_with_environment(agent, &frame, value);
                         let Some(()) = self.handle_vm_result(agent, push_result)? else {
                             continue;
                         };
