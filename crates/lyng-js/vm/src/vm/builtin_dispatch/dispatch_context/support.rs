@@ -84,7 +84,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            *self.caller_frame,
+            self.caller_frame,
             receiver,
             key,
         )

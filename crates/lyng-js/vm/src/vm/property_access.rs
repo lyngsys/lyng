@@ -92,7 +92,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             receiver,
             key,
         )
@@ -108,7 +108,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             object,
             receiver,
             key,
@@ -124,7 +124,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             object,
             key,
         )
@@ -142,7 +142,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             object,
             receiver,
             key,
@@ -161,7 +161,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             object,
             key,
         )?;
@@ -169,7 +169,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             object,
             key,
             descriptor,
@@ -189,7 +189,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             object,
             key,
         )?;
@@ -204,7 +204,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             object,
         )
     }
@@ -218,7 +218,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             object,
             key,
         )
@@ -260,7 +260,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
 
     fn to_property_key(&mut self, value: Value) -> Result<PropertyKey, Self::Error> {
         self.vm
-            .property_key_from_value(self.agent, self.host, self.registry, *self.frame, value)
+            .property_key_from_value(self.agent, self.host, self.registry, self.frame, value)
     }
 
     fn to_property_descriptor(
@@ -416,7 +416,7 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             object,
             Value::from_object_ref(object),
             key,
@@ -451,7 +451,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         value: Value,
     ) -> VmResult<PropertyKey> {
         if let Some(symbol) = value.as_symbol_ref() {
@@ -461,7 +461,7 @@ impl Vm {
             self.to_primitive(agent, host, registry, frame, value, ToPrimitiveHint::String)?;
         self.value_to_property_key(
             agent,
-            frame,
+            *frame,
             frame.code(),
             frame.instruction_offset(),
             primitive,
@@ -473,7 +473,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<Value> {
@@ -495,7 +495,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         string: StringRef,
         receiver: Value,
         key: PropertyKey,
@@ -527,7 +527,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         receiver: Value,
         key: PropertyKey,
         value: Value,
@@ -769,7 +769,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         target: ObjectRef,
         source: Value,
         excluded_keys: Value,
@@ -788,7 +788,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: &frame,
+                    frame,
                 },
                 excluded_object,
             )?;
@@ -821,7 +821,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &frame,
+                frame,
             },
             source,
         )?;
@@ -835,7 +835,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: &frame,
+                    frame,
                 },
                 source,
                 key,
@@ -881,7 +881,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
         receiver: Value,
         key: PropertyKey,
@@ -893,7 +893,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &caller,
+                frame: caller,
             },
             object,
             key,
@@ -910,7 +910,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
         receiver: Value,
         key: PropertyKey,
@@ -932,7 +932,7 @@ impl Vm {
                 return Ok(value);
             }
             if let Some(value) =
-                self.call_property_getter(agent, host, registry, caller, descriptor, receiver)?
+                self.call_property_getter(agent, host, registry, *caller, descriptor, receiver)?
             {
                 return Ok(value);
             }
@@ -960,7 +960,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<()> {
@@ -981,7 +981,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
     ) -> VmResult<()> {
         self.evaluate_deferred_module_namespace_object(agent, host, registry, caller, object)
@@ -992,7 +992,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
     ) -> VmResult<()> {
         let Some(key) = self.deferred_module_namespaces.get(&object).cloned() else {
@@ -1083,7 +1083,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<Option<PropertyDescriptor>> {
@@ -1136,7 +1136,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
         index: u32,
         value: Value,
@@ -1219,7 +1219,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
         key: PropertyKey,
         descriptor: PropertyDescriptor,
@@ -1283,7 +1283,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
         receiver: Value,
         key: PropertyKey,
@@ -1295,7 +1295,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &caller,
+                frame: caller,
             },
             object,
             key,
@@ -1314,7 +1314,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
         receiver: Value,
         key: PropertyKey,
@@ -1377,7 +1377,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         value: Value,
     ) -> VmResult<Value> {
         let primitive = self.to_primitive(
@@ -1421,7 +1421,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         descriptor: PropertyDescriptor,
         receiver: Value,
         key: PropertyKey,
@@ -1429,7 +1429,7 @@ impl Vm {
     ) -> VmResult<bool> {
         if descriptor.has_get() || descriptor.has_set() {
             return self
-                .call_property_setter(agent, host, registry, caller, descriptor, receiver, value);
+                .call_property_setter(agent, host, registry, *caller, descriptor, receiver, value);
         }
 
         if !descriptor.writable().unwrap_or(false) {
@@ -1449,7 +1449,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         receiver: Value,
         key: PropertyKey,
         mut value: Value,
@@ -1469,7 +1469,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &caller,
+                frame: caller,
             },
             receiver,
             key,
@@ -1489,7 +1489,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: &caller,
+                    frame: caller,
                 },
                 receiver,
                 key,
@@ -1510,7 +1510,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &caller,
+                frame: caller,
             },
             receiver,
             key,
@@ -1528,7 +1528,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         object: ObjectRef,
         numeric_index: f64,
         value: Value,
@@ -1542,7 +1542,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &caller,
+                frame: caller,
             };
             typed_array::storage_bits_from_value(&mut bridge, typed_array.kind(), value)?
         };
@@ -1578,7 +1578,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         value: Value,
         hint: ToPrimitiveHint,
     ) -> VmResult<Value> {
@@ -1587,7 +1587,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: &frame,
+            frame,
         };
         lyng_js_ops::object::to_primitive(&mut bridge, value, hint)
     }

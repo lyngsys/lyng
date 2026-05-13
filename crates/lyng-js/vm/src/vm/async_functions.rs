@@ -260,7 +260,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                &frame,
                 Value::from_object_ref(promise),
                 PropertyKey::from_atom(WellKnownAtom::constructor.id()),
             )?;

@@ -271,7 +271,7 @@ impl Vm {
         }
         if left.is_object() && !right.is_object() {
             let left =
-                self.to_primitive(agent, host, registry, frame, left, ToPrimitiveHint::Default)?;
+                self.to_primitive(agent, host, registry, &frame, left, ToPrimitiveHint::Default)?;
             return self.loosely_equal(agent, host, registry, frame, left, right);
         }
         if right.is_object() && !left.is_object() {
@@ -279,7 +279,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                &frame,
                 right,
                 ToPrimitiveHint::Default,
             )?;
@@ -312,7 +312,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            &frame,
             self.read_register(frame.registers(), register),
             ToPrimitiveHint::Number,
         )?;
@@ -356,7 +356,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            &frame,
             self.read_register(frame.registers(), left_register),
             ToPrimitiveHint::Number,
         )?;
@@ -364,7 +364,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            &frame,
             self.read_register(frame.registers(), right_register),
             ToPrimitiveHint::Number,
         )?;

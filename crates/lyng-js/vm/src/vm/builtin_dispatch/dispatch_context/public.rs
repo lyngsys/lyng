@@ -81,7 +81,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            *self.caller_frame,
+            self.caller_frame,
             object,
             receiver,
             key,
@@ -97,7 +97,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            *self.caller_frame,
+            self.caller_frame,
             object,
             key,
         )
@@ -114,7 +114,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            *self.caller_frame,
+            self.caller_frame,
             object,
             receiver,
             key,
@@ -133,7 +133,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            *self.caller_frame,
+            self.caller_frame,
             object,
             key,
         )?;
@@ -141,7 +141,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            *self.caller_frame,
+            self.caller_frame,
             object,
             key,
             descriptor,
@@ -195,7 +195,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            *self.caller_frame,
+            self.caller_frame,
             object,
             key,
         )?;
@@ -210,7 +210,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            *self.caller_frame,
+            self.caller_frame,
             object,
         )
     }
@@ -224,7 +224,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            *self.caller_frame,
+            self.caller_frame,
             object,
             key,
         )

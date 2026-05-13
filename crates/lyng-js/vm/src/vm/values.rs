@@ -112,12 +112,12 @@ impl Vm {
         right: Value,
     ) -> VmResult<Value> {
         let left =
-            self.to_primitive(agent, host, registry, frame, left, ToPrimitiveHint::Default)?;
+            self.to_primitive(agent, host, registry, &frame, left, ToPrimitiveHint::Default)?;
         let right = self.to_primitive(
             agent,
             host,
             registry,
-            frame,
+            &frame,
             right,
             ToPrimitiveHint::Default,
         )?;
@@ -220,7 +220,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            &frame,
             self.read_register(frame.registers(), register),
             ToPrimitiveHint::Number,
         )?;
@@ -426,7 +426,7 @@ impl Vm {
         value: Value,
     ) -> VmResult<Value> {
         let primitive =
-            self.to_primitive(agent, host, registry, frame, value, ToPrimitiveHint::Number)?;
+            self.to_primitive(agent, host, registry, &frame, value, ToPrimitiveHint::Number)?;
         read::to_numeric(agent.heap().view(), primitive)
             .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
     }

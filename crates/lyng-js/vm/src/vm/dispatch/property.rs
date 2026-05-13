@@ -32,7 +32,7 @@ impl Vm {
         let Some(object) = self.handle_vm_result(agent, object_result)? else {
             return Ok(());
         };
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
+        let key_result = self.property_key_from_value(agent, host, registry, &frame, key_value);
         let Some(key) = self.handle_vm_result(agent, key_result)? else {
             return Ok(());
         };
@@ -84,7 +84,7 @@ impl Vm {
                 return Ok(());
             }
             let property_result =
-                self.get_property_from_value(agent, host, registry, frame, receiver, key);
+                self.get_property_from_value(agent, host, registry, &frame, receiver, key);
             let Some(value) = self.handle_vm_result(agent, property_result)? else {
                 return Ok(());
             };
@@ -99,7 +99,7 @@ impl Vm {
             value
         } else {
             let property_result =
-                self.get_property_from_value(agent, host, registry, frame, receiver, key);
+                self.get_property_from_value(agent, host, registry, &frame, receiver, key);
             let Some(value) = self.handle_vm_result(agent, property_result)? else {
                 return Ok(());
             };
@@ -159,7 +159,7 @@ impl Vm {
                 return Ok(());
             }
             let set_result = if Self::prototype_chain_has_proxy(agent, object) {
-                self.set_property_on_value(agent, host, registry, frame, receiver, key, value)
+                self.set_property_on_value(agent, host, registry, &frame, receiver, key, value)
             } else {
                 let set_result =
                     object::ordinary_set(agent, object, key, value, AllocationLifetime::Default)
@@ -167,7 +167,7 @@ impl Vm {
                 match set_result {
                     Ok(result) => Ok(result),
                     Err(VmError::Abrupt(_)) => self
-                        .set_property_on_value(agent, host, registry, frame, receiver, key, value),
+                        .set_property_on_value(agent, host, registry, &frame, receiver, key, value),
                     Err(error) => Err(error),
                 }
             };
@@ -191,7 +191,7 @@ impl Vm {
             );
         } else {
             let store_result =
-                self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
+                self.set_property_on_value(agent, host, registry, &frame, receiver, key, value);
             let Some(stored) = self.handle_vm_result(agent, store_result)? else {
                 return Ok(());
             };
@@ -286,7 +286,7 @@ impl Vm {
                 return Ok(());
             }
         }
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
+        let key_result = self.property_key_from_value(agent, host, registry, &frame, key_value);
         let Some(key) = self.handle_vm_result(agent, key_result)? else {
             return Ok(());
         };
@@ -316,7 +316,7 @@ impl Vm {
                     value
                 } else {
                     let property_result =
-                        self.get_property_from_value(agent, host, registry, frame, receiver, key);
+                        self.get_property_from_value(agent, host, registry, &frame, receiver, key);
                     let Some(value) = self.handle_vm_result(agent, property_result)? else {
                         return Ok(());
                     };
@@ -338,7 +338,7 @@ impl Vm {
                     return Ok(());
                 }
                 let property_result =
-                    self.get_property_from_value(agent, host, registry, frame, receiver, key);
+                    self.get_property_from_value(agent, host, registry, &frame, receiver, key);
                 let Some(value) = self.handle_vm_result(agent, property_result)? else {
                     return Ok(());
                 };
@@ -353,7 +353,7 @@ impl Vm {
                 value
             } else {
                 let property_result =
-                    self.get_property_from_value(agent, host, registry, frame, receiver, key);
+                    self.get_property_from_value(agent, host, registry, &frame, receiver, key);
                 let Some(value) = self.handle_vm_result(agent, property_result)? else {
                     return Ok(());
                 };
@@ -362,7 +362,7 @@ impl Vm {
             }
         } else {
             let property_result =
-                self.get_property_from_value(agent, host, registry, frame, receiver, key);
+                self.get_property_from_value(agent, host, registry, &frame, receiver, key);
             let Some(value) = self.handle_vm_result(agent, property_result)? else {
                 return Ok(());
             };
@@ -439,7 +439,7 @@ impl Vm {
                 Some(true)
             } else {
                 let fast_result = self.try_fast_set_typed_array_index(
-                    agent, host, registry, frame, object, index, value,
+                    agent, host, registry, &frame, object, index, value,
                 );
                 let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
                     return Ok(());
@@ -489,7 +489,7 @@ impl Vm {
                 return Ok(());
             }
         }
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
+        let key_result = self.property_key_from_value(agent, host, registry, &frame, key_value);
         let Some(key) = self.handle_vm_result(agent, key_result)? else {
             return Ok(());
         };
@@ -527,7 +527,7 @@ impl Vm {
                     true
                 } else {
                     let fast_result = self.try_fast_set_typed_array_index(
-                        agent, host, registry, frame, object, index, value,
+                        agent, host, registry, &frame, object, index, value,
                     );
                     let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
                         return Ok(());
@@ -557,7 +557,7 @@ impl Vm {
                                 stored
                             } else {
                                 let set_result = self.set_property_on_value(
-                                    agent, host, registry, frame, receiver, key, value,
+                                    agent, host, registry, &frame, receiver, key, value,
                                 );
                                 let Some(stored) = self.handle_vm_result(agent, set_result)? else {
                                     return Ok(());
@@ -607,7 +607,7 @@ impl Vm {
                     return Ok(());
                 }
                 let set_result =
-                    self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
+                    self.set_property_on_value(agent, host, registry, &frame, receiver, key, value);
                 let Some(stored) = self.handle_vm_result(agent, set_result)? else {
                     return Ok(());
                 };
@@ -632,7 +632,7 @@ impl Vm {
                 );
             } else {
                 let set_result =
-                    self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
+                    self.set_property_on_value(agent, host, registry, &frame, receiver, key, value);
                 let Some(stored) = self.handle_vm_result(agent, set_result)? else {
                     return Ok(());
                 };
@@ -651,7 +651,7 @@ impl Vm {
             }
         } else {
             let store_result =
-                self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
+                self.set_property_on_value(agent, host, registry, &frame, receiver, key, value);
             let Some(stored) = self.handle_vm_result(agent, store_result)? else {
                 return Ok(());
             };
@@ -684,7 +684,7 @@ impl Vm {
         let object = self.object_register(frame, object_register)?;
         let value = self.read_register(frame.registers(), value_register);
         let key_value = self.read_register(frame.registers(), key_register);
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
+        let key_result = self.property_key_from_value(agent, host, registry, &frame, key_value);
         let Some(key) = self.handle_vm_result(agent, key_result)? else {
             return Ok(());
         };
@@ -706,7 +706,7 @@ impl Vm {
         key_register: u16,
     ) -> VmResult<()> {
         let key_value = self.read_register(frame.registers(), key_register);
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
+        let key_result = self.property_key_from_value(agent, host, registry, &frame, key_value);
         let Some(key) = self.handle_vm_result(agent, key_result)? else {
             return Ok(());
         };
@@ -736,7 +736,7 @@ impl Vm {
         let Some(()) = self.handle_vm_result(agent, coercible_result)? else {
             return Ok(());
         };
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
+        let key_result = self.property_key_from_value(agent, host, registry, &frame, key_value);
         let Some(key) = self.handle_vm_result(agent, key_result)? else {
             return Ok(());
         };
@@ -774,7 +774,7 @@ impl Vm {
         let source = self.read_register(frame.registers(), source_register);
         let excluded_keys = self.read_register(frame.registers(), excluded_register);
         let copy_result =
-            self.copy_data_properties(agent, host, registry, frame, target, source, excluded_keys);
+            self.copy_data_properties(agent, host, registry, &frame, target, source, excluded_keys);
         let Some(()) = self.handle_vm_result(agent, copy_result)? else {
             return Ok(());
         };
@@ -819,7 +819,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                &frame,
                 receiver,
                 PropertyKey::Index(u32::from(index_operand)),
                 value,
@@ -863,7 +863,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    &frame,
                     receiver,
                     PropertyKey::Index(u32::from(index_operand)),
                 );
@@ -888,7 +888,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                &frame,
                 receiver,
                 PropertyKey::Index(u32::from(index_operand)),
             );

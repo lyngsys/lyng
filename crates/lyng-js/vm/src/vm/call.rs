@@ -876,7 +876,7 @@ mod tests {
                 agent,
                 &lyng_js_host::NoopHostHooks,
                 &mut registry,
-                frame,
+                &frame,
                 Value::from_object_ref(object),
                 PropertyKey::Index(1),
             )

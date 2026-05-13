@@ -522,7 +522,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            &frame,
             new_target,
             Value::from_object_ref(new_target),
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),

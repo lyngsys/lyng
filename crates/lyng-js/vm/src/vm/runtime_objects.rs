@@ -55,7 +55,7 @@ impl iterator::IteratorOpsContext for VmIteratorBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            *self.frame,
+            self.frame,
             receiver,
             key,
         )
@@ -429,7 +429,7 @@ impl Vm {
             };
             return proxy::delete_property(&mut bridge, object, key);
         }
-        self.evaluate_deferred_module_namespace(agent, host, registry, frame, object, key)?;
+        self.evaluate_deferred_module_namespace(agent, host, registry, &frame, object, key)?;
         self.delete_property_from_object(agent, object, key)
     }
 
@@ -923,7 +923,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            &frame,
             receiver,
             PropertyKey::from_atom(WellKnownAtom::r#return.id()),
         );
@@ -1057,7 +1057,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            &frame,
             receiver,
             PropertyKey::from_atom(WellKnownAtom::r#return.id()),
         ) else {
