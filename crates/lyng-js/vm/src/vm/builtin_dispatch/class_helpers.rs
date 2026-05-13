@@ -18,7 +18,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
         is_getter: bool,
         enumerable: bool,
@@ -34,7 +34,7 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
 
-        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
+        let key = self.property_key_from_value(agent, host, registry, *caller, key_value)?;
         if let Some(accessor) = accessor.as_object_ref() {
             Self::set_function_name_from_property_key(
                 agent,
@@ -73,7 +73,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let object = arguments
@@ -83,7 +83,7 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
         let value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
+        let key = self.property_key_from_value(agent, host, registry, *caller, key_value)?;
         if let Some(function) = value.as_object_ref() {
             Self::set_function_name_from_property_key(agent, function, key, None)?;
         }
@@ -141,7 +141,7 @@ impl Vm {
 
     pub(super) fn capture_arrow_context_builtin(
         agent: &mut Agent,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let function = arguments
@@ -155,7 +155,7 @@ impl Vm {
             Some(Self::resolve_super_home_object(
                 agent,
                 caller.lexical_env(),
-                caller,
+                *caller,
             )?)
         } else {
             Some(

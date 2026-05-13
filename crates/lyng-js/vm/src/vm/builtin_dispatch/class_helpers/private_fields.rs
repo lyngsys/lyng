@@ -65,7 +65,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let class_object = arguments
@@ -80,7 +80,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let key_value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
+        let key = self.property_key_from_value(agent, host, registry, *caller, key_value)?;
         let canonical_key = self.property_key_to_enumeration_value(agent, key);
         object::install_instance_public_field_key(agent, class_object, field_index, canonical_key)
             .map_err(VmError::Abrupt)
@@ -106,7 +106,7 @@ impl Vm {
 
     pub(in crate::vm::builtin_dispatch) fn private_context_class_key(
         agent: &Agent,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         receiver: ObjectRef,
         descriptor_index: u32,
         class_depth: u32,
@@ -191,7 +191,7 @@ impl Vm {
 
     pub(in crate::vm::builtin_dispatch) fn define_private_field_builtin(
         agent: &mut Agent,
-        _caller: FrameRecord,
+        _caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let class_object = arguments
@@ -235,7 +235,7 @@ impl Vm {
 
     pub(in crate::vm::builtin_dispatch) fn private_field_init_builtin(
         agent: &mut Agent,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments
@@ -267,7 +267,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments
@@ -318,7 +318,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    caller,
+                    *caller,
                     getter,
                     Value::from_object_ref(receiver),
                     &[],
@@ -336,7 +336,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments
@@ -380,7 +380,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    caller,
+                    *caller,
                     setter,
                     Value::from_object_ref(receiver),
                     &arguments,
@@ -395,7 +395,7 @@ impl Vm {
 
     pub(in crate::vm::builtin_dispatch) fn private_has_builtin(
         agent: &mut Agent,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments

@@ -50,7 +50,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments.first().copied().unwrap_or(Value::undefined());
@@ -62,14 +62,14 @@ impl Vm {
                 .get(2)
                 .and_then(|value| value.as_object_ref())
                 .map_or_else(
-                    || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
+                    || Self::resolve_super_home_object(agent, caller.lexical_env(), *caller),
                     Ok,
                 )?;
             object::super_base(agent, home_object).map_err(VmError::Abrupt)?
         };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
-        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
-        self.get_property_from_object(agent, host, registry, caller, base, receiver, key)
+        let key = self.property_key_from_value(agent, host, registry, *caller, key_value)?;
+        self.get_property_from_object(agent, host, registry, *caller, base, receiver, key)
     }
 
     pub(in crate::vm::builtin_dispatch) fn super_property_set_builtin(
@@ -77,7 +77,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments.first().copied().unwrap_or(Value::undefined());
@@ -90,16 +90,16 @@ impl Vm {
                 .get(3)
                 .and_then(|value| value.as_object_ref())
                 .map_or_else(
-                    || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
+                    || Self::resolve_super_home_object(agent, caller.lexical_env(), *caller),
                     Ok,
                 )?;
             object::super_base(agent, home_object).map_err(VmError::Abrupt)?
         };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
-        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
-        let updated =
-            self.set_property_on_object(agent, host, registry, caller, base, receiver, key, value)?;
-        if !updated && self.caller_is_strict(caller) {
+        let key = self.property_key_from_value(agent, host, registry, *caller, key_value)?;
+        let updated = self
+            .set_property_on_object(agent, host, registry, *caller, base, receiver, key, value)?;
+        if !updated && self.caller_is_strict(*caller) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         Ok(value)
@@ -107,14 +107,14 @@ impl Vm {
 
     pub(in crate::vm::builtin_dispatch) fn super_base_builtin(
         agent: &mut Agent,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let home_object = arguments
             .first()
             .and_then(|value| value.as_object_ref())
             .map_or_else(
-                || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
+                || Self::resolve_super_home_object(agent, caller.lexical_env(), *caller),
                 Ok,
             )?;
         let base = object::ordinary_get_prototype_of(agent, home_object)
@@ -126,7 +126,7 @@ impl Vm {
     pub(in crate::vm::builtin_dispatch) fn super_constructor_builtin(
         &self,
         agent: &mut Agent,
-        caller: FrameRecord,
+        caller: &FrameRecord,
     ) -> VmResult<Value> {
         let context = self.super_construct_context(agent, caller)?;
         let super_constructor = object::ordinary_get_prototype_of(agent, context.active_function)
@@ -138,7 +138,7 @@ impl Vm {
     fn super_construct_context(
         &self,
         agent: &mut Agent,
-        caller: FrameRecord,
+        caller: &FrameRecord,
     ) -> VmResult<SuperConstructContext> {
         let record = Self::super_constructor_this_environment_record(agent, caller.lexical_env())?;
         let function_env = record.map(|record| record.declarative().id());
@@ -193,7 +193,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         super_constructor: ObjectRef,
         arguments: &[Value],
     ) -> VmResult<Value> {
@@ -202,7 +202,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller,
+            *caller,
             super_constructor,
             arguments,
             Some(context.new_target),
@@ -262,7 +262,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let context = self.super_construct_context(agent, caller)?;
@@ -284,7 +284,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let Some(super_constructor_value) = arguments.first().copied() else {
@@ -308,7 +308,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let spread_source = arguments.first().copied().unwrap_or(Value::undefined());
@@ -317,7 +317,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller,
+            *caller,
             spread_source,
             &mut spread_arguments,
         )?;
@@ -329,7 +329,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let array_like = arguments.first().copied().unwrap_or(Value::undefined());
@@ -337,7 +337,7 @@ impl Vm {
             agent,
             host,
             registry,
-            &caller,
+            caller,
             caller.realm(),
             array_like,
         )?;
