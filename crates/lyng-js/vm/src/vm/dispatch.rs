@@ -209,7 +209,7 @@ impl Vm {
                         self.advance_instruction();
                     }
                     Opcode::In => {
-                        self.execute_in_opcode(agent, host, registry, frame, a, b, c)?;
+                        self.execute_in_opcode(agent, host, registry, &frame, a, b, c)?;
                     }
                     Opcode::Negate => {
                         let negate_result = self.negate_value(agent, host, registry, &frame, b);
@@ -253,7 +253,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             feedback_slot,
                             a,
                             b,
@@ -267,7 +267,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             feedback_slot,
                             opcode,
                             a,
@@ -277,7 +277,7 @@ impl Vm {
                     }
                     Opcode::DefineNamedProperty => {
                         self.execute_define_named_property_opcode(
-                            agent, host, registry, frame, a, b, c,
+                            agent, host, registry, &frame, a, b, c,
                         )?;
                     }
                     Opcode::GetKeyedProperty => {
@@ -285,7 +285,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             feedback_slot,
                             a,
                             b,
@@ -299,7 +299,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame,
+                            &frame,
                             feedback_slot,
                             opcode,
                             a,
@@ -309,7 +309,7 @@ impl Vm {
                     }
                     Opcode::DefineKeyedProperty => {
                         self.execute_define_keyed_property_opcode(
-                            agent, host, registry, frame, a, b, c,
+                            agent, host, registry, &frame, a, b, c,
                         )?;
                     }
                     Opcode::SetFunctionName => {
@@ -322,24 +322,24 @@ impl Vm {
                         self.advance_instruction();
                     }
                     Opcode::ToPropertyKey => {
-                        self.execute_to_property_key_opcode(agent, host, registry, frame, a, b)?;
+                        self.execute_to_property_key_opcode(agent, host, registry, &frame, a, b)?;
                     }
                     Opcode::DeleteProperty => {
-                        self.execute_delete_property_opcode(agent, host, registry, frame, a, b, c)?;
+                        self.execute_delete_property_opcode(agent, host, registry, &frame, a, b, c)?;
                     }
                     Opcode::CopyDataProperties => {
                         self.execute_copy_data_properties_opcode(
-                            agent, host, registry, frame, a, b, c,
+                            agent, host, registry, &frame, a, b, c,
                         )?;
                     }
                     Opcode::StoreDenseElement => {
                         self.execute_store_dense_element_opcode(
-                            agent, host, registry, frame, a, b, c,
+                            agent, host, registry, &frame, a, b, c,
                         )?;
                     }
                     Opcode::LoadDenseElement => {
                         self.execute_load_dense_element_opcode(
-                            agent, host, registry, frame, a, b, c,
+                            agent, host, registry, &frame, a, b, c,
                         )?;
                     }
                     Opcode::Call0 | Opcode::Call1 | Opcode::Call2 | Opcode::Call3 => {
