@@ -334,7 +334,7 @@ impl Vm {
         let Some(frame) = self.frame() else {
             return;
         };
-        let safepoint = VmDebugSafepoint::new(kind, frame, self.frames.len());
+        let safepoint = VmDebugSafepoint::new(kind, &frame, self.frames.len());
         let Some(reason) = self.debug_state.consume_pause(safepoint) else {
             return;
         };

@@ -56,7 +56,7 @@ pub struct VmDebugSafepoint {
 impl VmDebugSafepoint {
     pub(super) const fn new(
         kind: VmDebugSafepointKind,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         frame_depth: usize,
     ) -> Self {
         Self {
