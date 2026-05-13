@@ -341,6 +341,13 @@ pub struct ShapeMetadata {
     pub(crate) properties: Vec<ShapeProperty>,
     pub(crate) property_lookup: Option<HashMap<PropertyKey, usize>>,
     pub(crate) transitions: ShapeTransitionStorage,
+    /// Number of slots this shape's transition chain has packed into the inline
+    /// `ObjectMetadata.inline_slots` array. Monotonically non-decreasing along the chain;
+    /// capped at [`super::INLINE_NAMED_SLOT_COUNT`]. Properties whose `slot_offset` carries
+    /// [`super::INLINE_SLOT_OFFSET_FLAG`] live in slots `0..inline_slot_count` of the inline
+    /// array; the remainder live in the heap-allocated `NamedSlotStorage` and are indexed by
+    /// `slot_count - inline_slot_count` consecutive positions starting at 0.
+    pub(crate) inline_slot_count: u32,
 }
 
 impl ShapeMetadata {
@@ -351,12 +358,14 @@ impl ShapeMetadata {
             properties: Vec::new(),
             property_lookup: None,
             transitions: ShapeTransitionStorage::new(),
+            inline_slot_count: 0,
         }
     }
 
     pub(crate) fn derived(
         transition_key: ShapeTransitionKey,
         properties: Vec<ShapeProperty>,
+        inline_slot_count: u32,
     ) -> Self {
         let property_lookup = flattened_property_lookup(&properties);
         Self {
@@ -365,6 +374,7 @@ impl ShapeMetadata {
             properties,
             property_lookup,
             transitions: ShapeTransitionStorage::new(),
+            inline_slot_count,
         }
     }
 

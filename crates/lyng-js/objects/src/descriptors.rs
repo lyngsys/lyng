@@ -1,9 +1,9 @@
 use super::{
-    DescriptorAttributes, InternalMethodError, InternalMethodResult, NamedPropertyValue,
-    ShapeProperty, ShapePropertyKind, Value, MIN_DENSE_ELEMENT_CAPACITY,
-    SMALL_SHAPE_INLINE_PROPERTY_LIMIT,
+    DescriptorAttributes, InternalMethodError, InternalMethodResult, NamedPropertyValue, ObjectRef,
+    ObjectRuntime, ShapeProperty, ShapePropertyKind, SlotLocation, Value,
+    MIN_DENSE_ELEMENT_CAPACITY, SMALL_SHAPE_INLINE_PROPERTY_LIMIT,
 };
-use lyng_js_gc::{ObjectSlotsRef, PrimitiveHeapView, PrimitiveMutator, ValueStoreTarget};
+use lyng_js_gc::{PrimitiveHeapView, PrimitiveMutator, ValueStoreTarget};
 use lyng_js_types::{PropertyDescriptor, PropertyKey};
 use std::collections::HashMap;
 
@@ -308,13 +308,36 @@ pub fn resolve_get_from_descriptor(
     }
 }
 
+/// Write one shape-stable named-property payload into the holder's slot storage.
+///
+/// Dispatches on the encoded `slot_offset` via the decoded [`SlotLocation`]:
+/// - inline → routes the write to [`ValueStoreTarget::InlineNamedSlot`], which targets
+///   `RuntimeObjectRecord.inline_named_slots` and runs the standard incremental-marking
+///   value barrier on the holder.
+/// - out-of-line → routes the write to [`ValueStoreTarget::ObjectSlot`] against
+///   `holder.named_slots()` exactly as before.
+///
+/// For accessor properties the setter is written at the next consecutive position within
+/// the same storage tier (inline slot `index+1` or out-of-line slot `offset+1`).
 pub fn write_named_payload(
+    _runtime: &mut ObjectRuntime,
     heap: &mut PrimitiveMutator<'_>,
-    slots: ObjectSlotsRef,
+    holder: ObjectRef,
     slot_offset: u32,
     payload: NamedPropertyValue,
     initialize: bool,
 ) -> InternalMethodResult<()> {
+    let primary_target = match SlotLocation::decode(slot_offset) {
+        SlotLocation::Inline(index) => ValueStoreTarget::InlineNamedSlot(holder, index),
+        SlotLocation::OutOfLine(offset) => {
+            let slots = heap
+                .view()
+                .object(holder)
+                .and_then(super::RuntimeObjectRecord::named_slots)
+                .ok_or(InternalMethodError::CorruptObjectState)?;
+            ValueStoreTarget::ObjectSlot(slots, offset)
+        }
+    };
     let store = if initialize {
         PrimitiveMutator::init_store_value
     } else {
@@ -322,21 +345,24 @@ pub fn write_named_payload(
     };
 
     let success = match payload {
-        NamedPropertyValue::Data(value) => store(
-            heap,
-            ValueStoreTarget::ObjectSlot(slots, slot_offset),
-            value,
-        ),
+        NamedPropertyValue::Data(value) => store(heap, primary_target, value),
         NamedPropertyValue::Accessor { get, set } => {
-            let setter_offset = slot_offset
-                .checked_add(1)
-                .expect("accessor setter slot offset overflowed supported u32 range");
-            store(heap, ValueStoreTarget::ObjectSlot(slots, slot_offset), get)
-                && store(
-                    heap,
-                    ValueStoreTarget::ObjectSlot(slots, setter_offset),
-                    set,
-                )
+            let setter_target = match primary_target {
+                ValueStoreTarget::InlineNamedSlot(id, index) => {
+                    let setter_index = index
+                        .checked_add(1)
+                        .expect("inline accessor setter index overflowed");
+                    ValueStoreTarget::InlineNamedSlot(id, setter_index)
+                }
+                ValueStoreTarget::ObjectSlot(slots, offset) => {
+                    let setter_offset = offset
+                        .checked_add(1)
+                        .expect("out-of-line accessor setter slot offset overflowed");
+                    ValueStoreTarget::ObjectSlot(slots, setter_offset)
+                }
+                _ => unreachable!("named payload targets are slot-shaped"),
+            };
+            store(heap, primary_target, get) && store(heap, setter_target, set)
         }
     };
 

@@ -101,6 +101,12 @@ impl ObjectRuntime {
 
     /// Attempts to load one value through a previously planned named-property cache entry.
     ///
+    /// The cached `slot_offset` carries an inline/out-of-line bit
+    /// ([`super::SlotLocation::decode`]). Inline slots read directly from the holder's
+    /// `ObjectMetadata.inline_slots` (one indexed load past the metadata struct), matching
+    /// V8's in-object property fast path; out-of-line slots read from the heap-allocated
+    /// `named_slots` array as before.
+    ///
     /// # Errors
     /// Returns an error when the cached holder object or its slot storage is missing or corrupt.
     pub fn load_from_named_property_cache(
@@ -120,18 +126,25 @@ impl ObjectRuntime {
         let holder = heap
             .object(holder_id)
             .ok_or(InternalMethodError::MissingObject)?;
-        let slots = holder
-            .named_slots()
-            .and_then(|slots| heap.object_slots(slots))
-            .ok_or(InternalMethodError::CorruptObjectState)?;
-        let value = slots
-            .get(entry.slot_offset() as usize)
-            .copied()
-            .ok_or(InternalMethodError::CorruptObjectState)?;
-        Ok(Some(value))
+        match SlotLocation::decode(entry.slot_offset()) {
+            SlotLocation::Inline(index) => Ok(holder.inline_named_slot(index as usize)),
+            SlotLocation::OutOfLine(offset) => {
+                let slots = holder
+                    .named_slots()
+                    .and_then(|slots| heap.object_slots(slots))
+                    .ok_or(InternalMethodError::CorruptObjectState)?;
+                Ok(slots.get(offset as usize).copied())
+            }
+        }
     }
 
     /// Attempts to store one value through a previously planned named-property cache entry.
+    ///
+    /// Same inline/out-of-line dispatch as the load path. Inline writes are followed by an
+    /// explicit incremental-marking value barrier on the holder so any heap reference newly
+    /// embedded in the inline slot is shaded gray when an incremental mark is in flight
+    /// (inline storage lives outside the GC heap arena, so the arena's automatic barrier
+    /// doesn't fire on those writes).
     ///
     /// # Errors
     /// Returns an error when the cached holder object or its slot storage is missing or corrupt.
@@ -152,20 +165,28 @@ impl ObjectRuntime {
             return Ok(Some(false));
         }
 
-        let holder = heap
-            .view()
-            .object(receiver)
-            .ok_or(InternalMethodError::MissingObject)?;
-        let slots = holder
-            .named_slots()
-            .ok_or(InternalMethodError::CorruptObjectState)?;
-        if !heap.mut_store_value(
-            ValueStoreTarget::ObjectSlot(slots, entry.slot_offset()),
-            value,
-        ) {
-            return Err(InternalMethodError::CorruptObjectState);
+        match SlotLocation::decode(entry.slot_offset()) {
+            SlotLocation::Inline(index) => {
+                if !heap.mut_store_value(ValueStoreTarget::InlineNamedSlot(receiver, index), value)
+                {
+                    return Err(InternalMethodError::CorruptObjectState);
+                }
+                Ok(Some(true))
+            }
+            SlotLocation::OutOfLine(offset) => {
+                let holder = heap
+                    .view()
+                    .object(receiver)
+                    .ok_or(InternalMethodError::MissingObject)?;
+                let slots = holder
+                    .named_slots()
+                    .ok_or(InternalMethodError::CorruptObjectState)?;
+                if !heap.mut_store_value(ValueStoreTarget::ObjectSlot(slots, offset), value) {
+                    return Err(InternalMethodError::CorruptObjectState);
+                }
+                Ok(Some(true))
+            }
         }
-        Ok(Some(true))
     }
 
     #[allow(

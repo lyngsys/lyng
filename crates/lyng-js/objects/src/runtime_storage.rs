@@ -5,7 +5,7 @@ use super::{
     ModuleNamespaceObject, NamedPropertyDictionary, NamedPropertyDictionaryEntry,
     NamedPropertyValue, ObjectMetadata, ObjectRef, ObjectRuntime, ObjectSlotsHandleStoreTarget,
     PrimitiveHeapView, PrimitiveMutator, RegExpPayload, RuntimeObjectRecord, ShapeId,
-    ShapeMetadata, ShapePropertyKind, SparseElementEntry, TemporalObjectData, Value,
+    ShapeMetadata, ShapePropertyKind, SlotLocation, SparseElementEntry, TemporalObjectData, Value,
     ValueStoreTarget, DENSE_ELEMENT_SPARSE_GAP_THRESHOLD,
 };
 use std::collections::HashMap;
@@ -241,40 +241,43 @@ impl ObjectRuntime {
     pub(crate) fn snapshot_named_property_dictionary(
         &self,
         heap: PrimitiveHeapView<'_>,
-        object: RuntimeObjectRecord,
+        id: ObjectRef,
     ) -> NamedPropertyDictionary {
-        let shape = object
+        let Some(record) = heap.object(id) else {
+            return NamedPropertyDictionary::new(HashMap::new(), 0);
+        };
+        let shape = record
             .shape()
             .and_then(|shape| self.shape_properties(shape))
             .unwrap_or(&[]);
-        let named_slots = object
+        // Inline slots are packed directly into the heap-side object record; out-of-line
+        // slots live in the heap-allocated `NamedSlotStorage`. Read each property's
+        // payload through the encoded `slot_offset` so dictionary entries snapshot from
+        // whichever tier the slot currently uses.
+        let named_slots = record
             .named_slots()
             .and_then(|slots| heap.object_slots(slots))
             .unwrap_or(&[]);
+        let read_slot = |location: SlotLocation| match location {
+            SlotLocation::Inline(index) => record
+                .inline_named_slot(index as usize)
+                .unwrap_or(Value::empty_internal_slot()),
+            SlotLocation::OutOfLine(offset) => named_slots
+                .get(offset as usize)
+                .copied()
+                .unwrap_or(Value::empty_internal_slot()),
+        };
 
         let mut entries = HashMap::with_capacity(shape.len());
         let mut next_index = 0;
         for property in shape {
+            let primary = property.slot_location();
             let payload = match property.kind() {
-                ShapePropertyKind::Data => NamedPropertyValue::data(
-                    named_slots
-                        .get(property.slot_offset() as usize)
-                        .copied()
-                        .unwrap_or(Value::empty_internal_slot()),
+                ShapePropertyKind::Data => NamedPropertyValue::data(read_slot(primary)),
+                ShapePropertyKind::Accessor => NamedPropertyValue::accessor(
+                    read_slot(primary),
+                    read_slot(primary.accessor_setter_location()),
                 ),
-                ShapePropertyKind::Accessor => {
-                    let slot = property.slot_offset() as usize;
-                    NamedPropertyValue::accessor(
-                        named_slots
-                            .get(slot)
-                            .copied()
-                            .unwrap_or(Value::empty_internal_slot()),
-                        named_slots
-                            .get(slot + 1)
-                            .copied()
-                            .unwrap_or(Value::empty_internal_slot()),
-                    )
-                }
             };
             next_index = next_index.max(property.enumeration_index().saturating_add(1));
             entries.insert(

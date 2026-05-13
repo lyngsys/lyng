@@ -53,12 +53,15 @@ impl ObjectAllocation {
 
     #[inline]
     pub const fn proxy(shape: ShapeId, data: ProxyObjectData) -> Self {
+        // Proxy target and handler live in `ObjectMetadata.inline_slots[0..2]` (the proxy
+        // shape's first two named slots pack inline by the `INLINE_NAMED_SLOT_COUNT == 4`
+        // rule). No heap-allocated `named_slots` is required for this kind.
         Self {
             kind: ObjectKind::Proxy,
             flags: ObjectFlags::extensible(),
             prototype: None,
             shape,
-            named_slot_count: 2,
+            named_slot_count: 0,
             named_slot_fill: Value::undefined(),
             element_capacity: 0,
             element_fill: Value::array_hole(),

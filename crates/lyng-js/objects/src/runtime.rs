@@ -7,8 +7,8 @@ use super::{
     OrdinaryObjectData, PrimitiveHeapView, PrimitiveMutator, PropertyKey, ProxyObjectData,
     RegExpPayload, RegExpPayloadAccounting, RootShapeKey, RuntimeObjectRecord, RuntimeShapeRecord,
     SetObjectData, ShapeAllocation, ShapeId, ShapeMetadata, ShapeProperty, ShapeRecord,
-    ShapeTransitionKey, SparseElementEntry, TemporalObjectData, TemporalObjectKind,
-    TypedArrayObjectData, Value,
+    ShapeTransitionKey, SlotLocation, SparseElementEntry, TemporalObjectData, TemporalObjectKind,
+    TypedArrayObjectData, Value, INLINE_NAMED_SLOT_COUNT,
 };
 use std::collections::HashMap;
 
@@ -26,8 +26,12 @@ pub const NAMED_PROPERTY_CHURN_DICTIONARY_THRESHOLD: u32 =
 /// beyond this checked-in threshold.
 pub const DENSE_ELEMENT_SPARSE_GAP_THRESHOLD: u32 = 16;
 pub const MIN_DENSE_ELEMENT_CAPACITY: usize = 4;
-const PROXY_TARGET_SLOT_INDEX: u32 = 0;
-const PROXY_HANDLER_SLOT_INDEX: u32 = 1;
+// Proxy target/handler live in the first two named-property slots of the proxy shape. With
+// `INLINE_NAMED_SLOT_COUNT == 4`, both fit inline and these constants carry the
+// inline-encoded `slot_offset` form so they can be passed straight to `init_named_slot` and
+// `mut_named_slot`, which dispatch on the encoded bit.
+const PROXY_TARGET_SLOT_OFFSET: u32 = SlotLocation::Inline(0).encode();
+const PROXY_HANDLER_SLOT_OFFSET: u32 = SlotLocation::Inline(1).encode();
 
 /// Object and shape allocation owner for the runtime substrate.
 ///
@@ -107,6 +111,14 @@ impl ObjectRuntime {
     /// key already exists on the parent shape, since that is a redefine path
     /// rather than an add-property transition.
     ///
+    /// The new property's `slot_offset` is assigned **inline** (in the object's
+    /// `inline_slots` array) when the parent shape still has space in its first
+    /// [`INLINE_NAMED_SLOT_COUNT`] slots and the property's full slot width
+    /// (1 for data, 2 for accessor) fits in the remaining inline capacity. Otherwise
+    /// the slot goes out-of-line into the heap-allocated `NamedSlotStorage`. The
+    /// shape's `inline_slot_count` and total `slot_count` are both updated to
+    /// reflect the chosen storage.
+    ///
     /// # Panics
     /// Panics if the parent shape property count does not fit into `u32`.
     pub fn transition_shape(
@@ -130,10 +142,33 @@ impl ObjectRuntime {
         }
 
         let parent_record = heap.view().shape(parent)?;
+        let parent_inline_slot_count = self.shape_metadata(parent)?.inline_slot_count;
+        let parent_total_slot_count = parent_record.slot_count();
         let parent_properties = self.shape_metadata(parent)?.properties.clone();
+        let property_width = transition.property_kind().slot_width();
+
+        // Inline-first slot allocation: place the new property in the inline array when
+        // the full slot width fits in the remaining inline capacity. Accessor properties
+        // (width 2) that would span the inline/out-of-line boundary are pushed entirely
+        // out-of-line so a single `slot_offset` identifies both halves.
+        let inline_remaining = INLINE_NAMED_SLOT_COUNT.saturating_sub(parent_inline_slot_count);
+        let (new_slot_offset, new_inline_slot_count) = if property_width <= inline_remaining {
+            (
+                SlotLocation::Inline(parent_inline_slot_count).encode(),
+                parent_inline_slot_count + property_width,
+            )
+        } else {
+            let parent_out_of_line_slot_count =
+                parent_total_slot_count.saturating_sub(parent_inline_slot_count);
+            (
+                SlotLocation::OutOfLine(parent_out_of_line_slot_count).encode(),
+                parent_inline_slot_count,
+            )
+        };
+
         let property = ShapeProperty::from_transition(
             transition,
-            parent_record.slot_count(),
+            new_slot_offset,
             u32::try_from(parent_properties.len()).expect("shape property count must fit into u32"),
         );
         let mut properties = parent_properties;
@@ -143,17 +178,57 @@ impl ObjectRuntime {
             RuntimeShapeRecord::new(
                 Some(parent),
                 parent_record.prototype_guard(),
-                parent_record
-                    .slot_count()
-                    .saturating_add(transition.property_kind().slot_width()),
+                parent_total_slot_count.saturating_add(property_width),
             ),
             lifetime,
         );
-        self.store_shape_metadata(id, ShapeMetadata::derived(transition, properties));
+        self.store_shape_metadata(
+            id,
+            ShapeMetadata::derived(transition, properties, new_inline_slot_count),
+        );
         self.shape_metadata_mut(parent)?
             .transitions
             .insert(transition, id);
         Some(id)
+    }
+
+    /// Test-only accessor for an object's inline named-slot array. Returns the four
+    /// `Value`s from `RuntimeObjectRecord.inline_named_slots`. Production callers should
+    /// read through [`Self::read_named_property_slot`] (which dispatches on the encoded
+    /// `slot_offset`).
+    #[doc(hidden)]
+    #[cfg(test)]
+    pub fn object_inline_slots_for_test(
+        &self,
+        heap: PrimitiveHeapView<'_>,
+        id: ObjectRef,
+    ) -> [Value; INLINE_NAMED_SLOT_COUNT as usize] {
+        heap.object(id).map_or_else(
+            || [Value::empty_internal_slot(); INLINE_NAMED_SLOT_COUNT as usize],
+            |record| *record.inline_named_slots(),
+        )
+    }
+
+    /// Number of out-of-line named-property slots this shape requires in the
+    /// heap-allocated `NamedSlotStorage`. Equals the shape's total slot count minus the
+    /// number packed into [`ObjectMetadata::inline_slots`]. Used to size newly-allocated
+    /// `NamedSlotStorage` arrays and to walk slot storage during shape migrations.
+    #[inline]
+    pub fn shape_out_of_line_slot_count(
+        &self,
+        heap: PrimitiveHeapView<'_>,
+        id: ShapeId,
+    ) -> Option<u32> {
+        let total = heap.shape(id)?.slot_count();
+        let inline = self.shape_metadata(id)?.inline_slot_count;
+        Some(total.saturating_sub(inline))
+    }
+
+    /// Inline named-slot count packed into [`ObjectMetadata::inline_slots`] for objects of
+    /// this shape. Always `<= INLINE_NAMED_SLOT_COUNT`.
+    #[inline]
+    pub fn shape_inline_slot_count(&self, id: ShapeId) -> Option<u32> {
+        Some(self.shape_metadata(id)?.inline_slot_count)
     }
 
     #[inline]
@@ -230,10 +305,16 @@ impl ObjectRuntime {
         mut allocation: ObjectAllocation,
         lifetime: AllocationLifetime,
     ) -> ObjectRef {
-        let shape_slot_count = self
-            .shape(heap.view(), allocation.shape)
-            .map_or(0, ShapeRecord::slot_count) as usize;
-        let named_slot_count = allocation.named_slot_count.max(shape_slot_count);
+        // Only the out-of-line tail of the shape's slot count goes into the heap-allocated
+        // `NamedSlotStorage`; the first `inline_slot_count` slots live inside the
+        // `ObjectMetadata.inline_slots` array, so we subtract them here to avoid
+        // double-allocating slot space.
+        let shape_out_of_line_slot_count = self
+            .shape_out_of_line_slot_count(heap.view(), allocation.shape)
+            .unwrap_or(0) as usize;
+        let named_slot_count = allocation
+            .named_slot_count
+            .max(shape_out_of_line_slot_count);
 
         let named_slots = if named_slot_count == 0 {
             None
@@ -345,7 +426,7 @@ impl ObjectRuntime {
             let initialized_target = self.init_named_slot(
                 heap,
                 object,
-                PROXY_TARGET_SLOT_INDEX,
+                PROXY_TARGET_SLOT_OFFSET,
                 Value::from_object_ref(data.target()),
             );
             debug_assert!(
@@ -355,7 +436,7 @@ impl ObjectRuntime {
             let initialized_handler = self.init_named_slot(
                 heap,
                 object,
-                PROXY_HANDLER_SLOT_INDEX,
+                PROXY_HANDLER_SLOT_OFFSET,
                 data.handler()
                     .map_or(Value::undefined(), Value::from_object_ref),
             );
@@ -452,16 +533,9 @@ impl ObjectRuntime {
             return true;
         }
         *data = data.with_handler(None).with_revoked(true);
-        let Some(record) = heap.view().object(id) else {
-            return false;
-        };
-        let Some(named_slots) = record.named_slots() else {
-            return false;
-        };
-        heap.mut_store_value(
-            lyng_js_gc::ValueStoreTarget::ObjectSlot(named_slots, PROXY_HANDLER_SLOT_INDEX),
-            Value::undefined(),
-        )
+        // PROXY_HANDLER_SLOT_OFFSET carries the encoded inline slot offset; the dispatching
+        // helper handles the inline-array write and the incremental-marking barrier.
+        self.mut_named_slot(heap, id, PROXY_HANDLER_SLOT_OFFSET, Value::undefined())
     }
 
     #[inline]

@@ -976,10 +976,13 @@ fn canonical_transitions_assign_slots_and_reuse_existing_shapes() {
     let second_shape = runtime.shape(mutator.view(), second).unwrap();
 
     assert_eq!(first, first_again);
-    assert_eq!(first_property.slot_offset(), 0);
+    // With inline slots packed into `ObjectMetadata.inline_slots[0..4]`, the first four
+    // property positions live inline. Shapes encode that via `SlotLocation::Inline(N)`
+    // on `ShapeProperty.slot_offset`, so the raw u32 carries the high inline bit.
+    assert_eq!(first_property.slot_location(), SlotLocation::Inline(0));
     assert_eq!(first_property.slot_width(), 1);
     assert_eq!(first_property.enumeration_index(), 0);
-    assert_eq!(second_property.slot_offset(), 1);
+    assert_eq!(second_property.slot_location(), SlotLocation::Inline(1));
     assert_eq!(second_property.slot_width(), 2);
     assert_eq!(second_property.enumeration_index(), 1);
     assert_eq!(second_shape.property_count(), 2);
@@ -1295,10 +1298,10 @@ fn object_runtime_allocates_hot_header_and_cold_payload_out_of_line() {
     assert_eq!(header.prototype(), Some(prototype));
     assert_eq!(header.shape(), shaped);
     assert!(matches!(record.cold(), ObjectColdData::Ordinary(_)));
-    assert_eq!(
-        runtime.named_slots(mutator.view(), object).unwrap(),
-        &[Value::empty_internal_slot(), Value::empty_internal_slot()]
-    );
+    // Both properties pack into `ObjectMetadata.inline_slots[0..2]`, so the heap-allocated
+    // `named_slots` array is never allocated for this shape (it lives in the runtime, not
+    // the GC heap).
+    assert!(runtime.named_slots(mutator.view(), object).is_none());
     assert_eq!(
         runtime.elements(mutator.view(), object).unwrap(),
         &[
@@ -1349,13 +1352,12 @@ fn proxy_objects_allocate_kind_payload_and_idempotent_revocation_state() {
     assert_eq!(runtime.is_proxy_revoked(proxy), Some(false));
     assert!(runtime.is_callable(proxy));
     assert!(!runtime.is_constructor(proxy));
-    assert_eq!(
-        runtime.named_slots(mutator.view(), proxy).unwrap(),
-        &[
-            Value::from_object_ref(target),
-            Value::from_object_ref(handler)
-        ]
-    );
+    // Proxy target/handler live in the proxy shape's first two named slots, which pack
+    // into `ObjectMetadata.inline_slots[0]` and `[1]` (no heap-allocated `named_slots`).
+    let inline_slots = runtime.object_inline_slots_for_test(mutator.view(), proxy);
+    assert_eq!(inline_slots[0], Value::from_object_ref(target));
+    assert_eq!(inline_slots[1], Value::from_object_ref(handler));
+    assert!(runtime.named_slots(mutator.view(), proxy).is_none());
 
     assert!(runtime.revoke_proxy(&mut mutator, proxy));
     assert_eq!(
@@ -1366,10 +1368,9 @@ fn proxy_objects_allocate_kind_payload_and_idempotent_revocation_state() {
     assert_eq!(runtime.is_proxy_revoked(proxy), Some(true));
     assert!(runtime.is_callable(proxy));
     assert!(!runtime.is_constructor(proxy));
-    assert_eq!(
-        runtime.named_slots(mutator.view(), proxy).unwrap(),
-        &[Value::from_object_ref(target), Value::undefined()]
-    );
+    let inline_slots_after_revoke = runtime.object_inline_slots_for_test(mutator.view(), proxy);
+    assert_eq!(inline_slots_after_revoke[0], Value::from_object_ref(target));
+    assert_eq!(inline_slots_after_revoke[1], Value::undefined());
     assert!(runtime.revoke_proxy(&mut mutator, proxy));
 }
 
@@ -1464,16 +1465,26 @@ fn slot_store_helpers_route_named_and_element_writes_through_gc_helpers() {
         ObjectAllocation::ordinary(shape).with_element_capacity(2),
         AllocationLifetime::Default,
     );
+    // The shape's single property is packed inline (`SlotLocation::Inline(0)`), so the
+    // slot offset passed to `init_named_slot` / `mut_named_slot` is the encoded inline
+    // form rather than a raw 0-based index into the heap-allocated `named_slots` array.
+    let slot_offset = runtime
+        .shape_property(shape, PropertyKey::from_atom(AtomId::from_raw(1)))
+        .expect("shape should record the transitioned property")
+        .slot_offset();
 
-    assert!(runtime.init_named_slot(&mut mutator, object, 0, Value::from_smi(7)));
-    assert!(runtime.mut_named_slot(&mut mutator, object, 0, Value::from_smi(9),));
+    assert!(runtime.init_named_slot(&mut mutator, object, slot_offset, Value::from_smi(7)));
+    assert!(runtime.mut_named_slot(&mut mutator, object, slot_offset, Value::from_smi(9)));
     assert!(runtime.init_element(&mut mutator, object, 0, Value::from_smi(3)));
-    assert!(runtime.mut_element(&mut mutator, object, 1, Value::from_smi(5),));
+    assert!(runtime.mut_element(&mut mutator, object, 1, Value::from_smi(5)));
 
+    // Inline-packed slot — the value lives in `ObjectMetadata.inline_slots`, not in the
+    // heap-side `named_slots` array (which stays unallocated for shapes with ≤4 props).
     assert_eq!(
-        runtime.named_slots(mutator.view(), object).unwrap(),
-        &[Value::from_smi(9)]
+        runtime.read_named_property_slot(mutator.view(), object, slot_offset),
+        Some(Value::from_smi(9))
     );
+    assert!(runtime.named_slots(mutator.view(), object).is_none());
     assert_eq!(
         runtime.elements(mutator.view(), object).unwrap(),
         &[Value::from_smi(3), Value::from_smi(5)]
@@ -1547,8 +1558,12 @@ fn structural_named_property_churn_transitions_objects_at_explicit_cap() {
         ObjectAllocation::ordinary(shape),
         AllocationLifetime::Default,
     );
+    let slot_offset = runtime
+        .shape_property(shape, PropertyKey::from_atom(AtomId::from_raw(1)))
+        .expect("shape should record the transitioned property")
+        .slot_offset();
 
-    assert!(runtime.init_named_slot(&mut mutator, object, 0, Value::from_smi(41)));
+    assert!(runtime.init_named_slot(&mut mutator, object, slot_offset, Value::from_smi(41)));
     for _ in 1..NAMED_PROPERTY_STRUCTURAL_CHURN_DICTIONARY_THRESHOLD {
         assert!(runtime.note_named_property_churn(&mut mutator, object));
         assert_eq!(
@@ -1693,8 +1708,12 @@ fn redefine_delete_and_prototype_mutation_bump_invalidation_epochs() {
         ObjectAllocation::ordinary(shape),
         AllocationLifetime::Default,
     );
+    let slot_offset = runtime
+        .shape_property(shape, PropertyKey::from_atom(AtomId::from_raw(7)))
+        .expect("shape should record the transitioned property")
+        .slot_offset();
 
-    assert!(runtime.init_named_slot(&mut mutator, object, 0, Value::from_smi(5)));
+    assert!(runtime.init_named_slot(&mut mutator, object, slot_offset, Value::from_smi(5)));
     assert!(runtime.redefine_named_property(
         &mut mutator,
         object,
@@ -2422,7 +2441,16 @@ fn ordinary_internal_methods_cover_prototype_extensibility_and_set_receiver_path
         ObjectAllocation::ordinary(proto_shape),
         AllocationLifetime::Default,
     );
-    assert!(runtime.init_named_slot(&mut mutator, prototype, 0, Value::from_smi(11)));
+    let prototype_slot_offset = runtime
+        .shape_property(proto_shape, PropertyKey::from_atom(AtomId::from_raw(30)))
+        .expect("prototype shape should record its single transitioned property")
+        .slot_offset();
+    assert!(runtime.init_named_slot(
+        &mut mutator,
+        prototype,
+        prototype_slot_offset,
+        Value::from_smi(11),
+    ));
 
     let object = runtime.alloc_object(
         &mut mutator,
@@ -2901,9 +2929,15 @@ fn leaf_shape_free_removes_canonical_transition_entry() {
         runtime.shape(mutator.view(), recreated).unwrap().parent(),
         Some(root)
     );
+    // Properties packed inline carry the `SlotLocation::Inline` flag on `slot_offset`;
+    // single-property shapes hold their first slot in `ObjectMetadata.inline_slots[0]`.
     assert_eq!(
         runtime.shape_property(recreated, PropertyKey::from_atom(AtomId::from_raw(1))),
-        Some(ShapeProperty::from_transition(transition, 0, 0))
+        Some(ShapeProperty::from_transition(
+            transition,
+            SlotLocation::Inline(0).encode(),
+            0,
+        ))
     );
 }
 
@@ -3688,6 +3722,17 @@ fn rooted_proxy_keeps_target_and_handler_alive() {
     };
     let _rooted = roots.root_object(live_proxy);
 
+    // Sanity check: proxy target/handler should be packed inline before GC runs.
+    {
+        let view = heap.view();
+        let inline = runtime.object_inline_slots_for_test(view, live_proxy);
+        assert_eq!(inline[0], Value::from_object_ref(live_target));
+        assert_eq!(inline[1], Value::from_object_ref(live_handler));
+    }
+
+    // Proxy target and handler live in `RuntimeObjectRecord.inline_named_slots`, so the
+    // heap's standard `trace_object_edges` walk traces them naturally — no separate
+    // root scan required. One cycle suffices to reclaim the dead triple.
     let stats = heap.collect(&roots);
     let view = heap.view();
 

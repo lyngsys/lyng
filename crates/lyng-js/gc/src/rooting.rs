@@ -1084,6 +1084,13 @@ impl<'a> PrimitiveMinorTracer<'a> {
         if let Some(payload) = record.ordinary_payload() {
             self.mark_value_cell(payload);
         }
+        // Inline named-property slots packed into the object record itself (mirroring V8's
+        // in-object properties / JSC's butterfly inline section). The tracer marks each
+        // slot's `Value` so any embedded heap refs are kept alive for the lifetime of the
+        // owning object — no separate root scan or write barrier hook needed.
+        for value in record.inline_named_slots().iter().copied() {
+            self.mark_value(value);
+        }
     }
 
     fn trace_function_payload_edges(&mut self, record: RuntimeFunctionRecord) {
@@ -1573,6 +1580,12 @@ impl TraceHeapEdges for RuntimeObjectRecord {
         self.private_slots().trace_heap_edges(tracer);
         self.function_payload().trace_heap_edges(tracer);
         self.ordinary_payload().trace_heap_edges(tracer);
+        // Inline named-property slots packed directly into the object record (V8's
+        // in-object properties / JSC's butterfly inline section). Each Value may
+        // reference the heap and must be traced as part of this object's edges.
+        for value in self.inline_named_slots().iter().copied() {
+            tracer.mark_value(value);
+        }
     }
 }
 
@@ -1892,7 +1905,11 @@ mod tests {
         while heap.mark_step(&mut marker, 16).has_more_work() {}
         let stats = marker.trace_stats();
 
-        assert_eq!(stats.values_traced, 2);
+        // Two heap-referencing Values from the explicit `value.trace_heap_edges` calls,
+        // plus the four empty slots from `record.inline_named_slots` that the object's
+        // own `trace_heap_edges` impl traces (each `Value::empty_internal_slot()` still
+        // bumps the counter through `mark_value`'s unconditional increment).
+        assert_eq!(stats.values_traced, 6);
         assert_eq!(stats.strings_marked, 1);
         assert_eq!(stats.symbols_marked, 1);
         assert_eq!(stats.bigints_marked, 1);

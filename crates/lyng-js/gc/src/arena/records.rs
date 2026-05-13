@@ -338,6 +338,15 @@ impl PrimitiveValueCellRecord {
     }
 }
 
+/// Number of `Value` slots packed directly inside every `RuntimeObjectRecord`.
+///
+/// Mirrors `lyng_js_objects::INLINE_NAMED_SLOT_COUNT`. Objects whose shape places named
+/// properties in slots `0..INLINE_NAMED_SLOT_COUNT` read and write them through this inline
+/// array instead of a separate `NamedSlotStorage` heap allocation, matching V8's in-object
+/// properties / JSC's butterfly inline section. GC tracing walks these slots in
+/// `trace_object_edges`, so their reachability is naturally tied to the object's lifetime.
+pub const RUNTIME_OBJECT_INLINE_SLOT_COUNT: usize = 4;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RuntimeObjectRecord {
     pub(super) prototype: Option<ObjectRef>,
@@ -347,6 +356,11 @@ pub struct RuntimeObjectRecord {
     pub(super) private_slots: Option<ObjectSlotsRef>,
     pub(super) function_payload: Option<FunctionPayloadRef>,
     pub(super) ordinary_payload: Option<PrimitiveValueCellRef>,
+    /// Inline named-property slots packed directly into the object record. Shapes that
+    /// pack named properties into positions `0..INLINE_NAMED_SLOT_COUNT` store the
+    /// values here rather than allocating a separate `NamedSlotStorage`. Unused slots
+    /// hold [`Value::empty_internal_slot`].
+    pub(super) inline_named_slots: [Value; RUNTIME_OBJECT_INLINE_SLOT_COUNT],
 }
 
 impl RuntimeObjectRecord {
@@ -366,6 +380,21 @@ impl RuntimeObjectRecord {
             private_slots: None,
             function_payload,
             ordinary_payload: None,
+            inline_named_slots: [Value::empty_internal_slot(); RUNTIME_OBJECT_INLINE_SLOT_COUNT],
+        }
+    }
+
+    #[inline]
+    pub const fn inline_named_slots(&self) -> &[Value; RUNTIME_OBJECT_INLINE_SLOT_COUNT] {
+        &self.inline_named_slots
+    }
+
+    #[inline]
+    pub const fn inline_named_slot(&self, index: usize) -> Option<Value> {
+        if index < RUNTIME_OBJECT_INLINE_SLOT_COUNT {
+            Some(self.inline_named_slots[index])
+        } else {
+            None
         }
     }
 

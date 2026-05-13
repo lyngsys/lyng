@@ -362,6 +362,76 @@ impl ShapeTransitionKey {
     }
 }
 
+/// Slot-offset encoding used by [`ShapeProperty`] and [`NamedPropertyCacheEntry`].
+///
+/// The high bit of the 32-bit offset distinguishes inline storage (the slot lives in
+/// [`ObjectMetadata::inline_slots`], a fixed-size `[Value; 4]` array packed in the runtime's
+/// `Vec<Option<ObjectMetadata>>`) from out-of-line storage (the slot lives in the
+/// heap-allocated `NamedSlotStorage` array referenced from the object header):
+///
+/// - `0b1_xxxxxxxx…` → inline at position `xxxxxxxx…` (only positions 0..=3 are valid)
+/// - `0b0_xxxxxxxx…` → out-of-line at position `xxxxxxxx…` in the `NamedSlotStorage` array
+///
+/// Property #5+ on any shape goes out-of-line. Accessor properties (2 slots) that would
+/// otherwise span the inline/out-of-line boundary are pushed entirely out-of-line so a single
+/// `slot_offset` value identifies both halves of the slot pair.
+pub const INLINE_SLOT_OFFSET_FLAG: u32 = 0x8000_0000;
+const INLINE_SLOT_OFFSET_MASK: u32 = 0x7FFF_FFFF;
+
+/// Number of inline named-property slots packed into every `ObjectMetadata`.
+pub const INLINE_NAMED_SLOT_COUNT: u32 = 4;
+
+/// Decoded slot-offset target — either a position in an object's inline slot array or an
+/// index into its heap-side `NamedSlotStorage`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SlotLocation {
+    /// Inline slot at index `0..INLINE_NAMED_SLOT_COUNT` of `ObjectMetadata.inline_slots`.
+    Inline(u32),
+    /// Out-of-line slot at the given index of the heap-allocated `NamedSlotStorage` array.
+    OutOfLine(u32),
+}
+
+impl SlotLocation {
+    /// Encode this location back into a `slot_offset: u32` matching the on-shape encoding.
+    #[inline]
+    #[must_use]
+    pub const fn encode(self) -> u32 {
+        match self {
+            Self::Inline(index) => INLINE_SLOT_OFFSET_FLAG | (index & INLINE_SLOT_OFFSET_MASK),
+            Self::OutOfLine(index) => index & INLINE_SLOT_OFFSET_MASK,
+        }
+    }
+
+    /// Decode a raw `slot_offset` field as written into a `ShapeProperty` or
+    /// `NamedPropertyCacheEntry`.
+    #[inline]
+    #[must_use]
+    pub const fn decode(slot_offset: u32) -> Self {
+        if slot_offset & INLINE_SLOT_OFFSET_FLAG == 0 {
+            Self::OutOfLine(slot_offset)
+        } else {
+            Self::Inline(slot_offset & INLINE_SLOT_OFFSET_MASK)
+        }
+    }
+
+    /// Position of the *second* slot used by an accessor property (getter at this location,
+    /// setter at the next consecutive position within the same storage).
+    #[inline]
+    #[must_use]
+    pub const fn accessor_setter_location(self) -> Self {
+        match self {
+            Self::Inline(index) => Self::Inline(index + 1),
+            Self::OutOfLine(index) => Self::OutOfLine(index + 1),
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_inline(self) -> bool {
+        matches!(self, Self::Inline(_))
+    }
+}
+
 /// One canonical property entry recorded by a shape.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ShapeProperty {
@@ -403,9 +473,18 @@ impl ShapeProperty {
         self.attrs
     }
 
+    /// Raw `slot_offset` field as stored on the shape. Use [`Self::slot_location`] to decode
+    /// the inline/out-of-line storage choice.
     #[inline]
     pub const fn slot_offset(self) -> u32 {
         self.slot_offset
+    }
+
+    /// Decoded inline-or-out-of-line slot location for this property's first (or only) slot.
+    /// For accessor properties, the setter sits at `self.slot_location().accessor_setter_location()`.
+    #[inline]
+    pub const fn slot_location(self) -> SlotLocation {
+        SlotLocation::decode(self.slot_offset)
     }
 
     #[inline]

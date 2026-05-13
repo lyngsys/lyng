@@ -116,17 +116,9 @@ impl ObjectRuntime {
         if !property.attrs().writable() {
             return Ok(None);
         }
-        let named_slots = record
-            .named_slots()
-            .ok_or(InternalMethodError::CorruptObjectState)?;
         let old_len = {
-            let slots = heap
-                .view()
-                .object_slots(named_slots)
-                .ok_or(InternalMethodError::CorruptObjectState)?;
-            let value = slots
-                .get(property.slot_offset() as usize)
-                .copied()
+            let value = self
+                .read_named_property_slot(heap.view(), id, property.slot_offset())
                 .ok_or(InternalMethodError::CorruptObjectState)?;
             array_length_from_value(value)?
         };
@@ -173,8 +165,10 @@ impl ObjectRuntime {
         }
 
         if index >= old_len
-            && !heap.mut_store_value(
-                ValueStoreTarget::ObjectSlot(named_slots, property.slot_offset()),
+            && !self.mut_named_slot(
+                heap,
+                id,
+                property.slot_offset(),
                 length_value(index.saturating_add(1)),
             )
         {

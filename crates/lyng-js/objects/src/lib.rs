@@ -77,7 +77,8 @@ pub use self::shapes::{
     ElementMode, InvalidationCause, InvalidationEvent, NamedPropertyCacheEntry,
     NamedPropertyCachePath, NamedPropertyCachePurpose, NamedPropertyDictionaryEntry,
     NamedPropertyStorageMode, NamedPropertyValue, PropertyCacheDependency, ShapeAllocation,
-    ShapeProperty, ShapePropertyKind, ShapeRecord, ShapeTransitionKey, SparseElementEntry,
+    ShapeProperty, ShapePropertyKind, ShapeRecord, ShapeTransitionKey, SlotLocation,
+    SparseElementEntry, INLINE_NAMED_SLOT_COUNT, INLINE_SLOT_OFFSET_FLAG,
     PROPERTY_CACHE_MAX_DEPENDENCIES,
 };
 pub use self::temporal::{

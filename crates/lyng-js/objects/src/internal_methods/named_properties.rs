@@ -24,42 +24,95 @@ impl ObjectRuntime {
         }
     }
 
-    pub fn init_named_slot(
+    /// Writes one [`Value`] into a named-property slot during object initialization.
+    ///
+    /// `slot_offset` is the encoded slot offset taken from
+    /// [`ShapeProperty::slot_offset`] (or built via [`SlotLocation::encode`]). The function
+    /// dispatches on the inline/out-of-line bit: inline writes go into
+    /// `ObjectMetadata.inline_slots`, out-of-line writes go through the existing
+    /// `ValueStoreTarget::ObjectSlot` path on `record.named_slots()`. The init form runs
+    /// no incremental-marking barrier — the slot is assumed freshly allocated.
+    /// Read one [`Value`] from a named-property slot.
+    ///
+    /// Dispatches on the encoded `slot_offset`: inline slots read from
+    /// `RuntimeObjectRecord.inline_named_slots` (packed directly into the heap-side
+    /// object record); out-of-line slots read from the heap-allocated `named_slots`
+    /// array. Returns `None` when the holder is missing or the requested offset is out
+    /// of range for its storage tier.
+    pub fn read_named_property_slot(
         &self,
-        heap: &mut PrimitiveMutator<'_>,
+        heap: PrimitiveHeapView<'_>,
         id: ObjectRef,
-        index: u32,
-        value: Value,
-    ) -> bool {
-        let Some(record) = heap.view().object(id) else {
-            return false;
-        };
-        if self.object_metadata(id).is_none() {
-            return false;
+        slot_offset: u32,
+    ) -> Option<Value> {
+        let record = heap.object(id)?;
+        match SlotLocation::decode(slot_offset) {
+            SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
+            SlotLocation::OutOfLine(offset) => {
+                let slots = record.named_slots().and_then(|h| heap.object_slots(h))?;
+                slots.get(offset as usize).copied()
+            }
         }
-        let Some(slots) = record.named_slots() else {
-            return false;
-        };
-        heap.init_store_value(ValueStoreTarget::ObjectSlot(slots, index), value)
     }
 
-    pub fn mut_named_slot(
-        &self,
+    /// Writes one [`Value`] into a named-property slot during object initialization.
+    ///
+    /// Inline writes go through `ValueStoreTarget::InlineNamedSlot`, which writes into
+    /// `RuntimeObjectRecord.inline_named_slots`. Out-of-line writes go through
+    /// `ValueStoreTarget::ObjectSlot` on `record.named_slots()`. Both paths share the
+    /// heap's standard incremental-marking value barrier and nursery card-marking.
+    pub fn init_named_slot(
+        &mut self,
         heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,
-        index: u32,
+        slot_offset: u32,
         value: Value,
     ) -> bool {
-        let Some(record) = heap.view().object(id) else {
-            return false;
-        };
         if self.object_metadata(id).is_none() {
             return false;
         }
-        let Some(slots) = record.named_slots() else {
+        match SlotLocation::decode(slot_offset) {
+            SlotLocation::Inline(index) => {
+                heap.init_store_value(ValueStoreTarget::InlineNamedSlot(id, index), value)
+            }
+            SlotLocation::OutOfLine(offset) => {
+                let Some(record) = heap.view().object(id) else {
+                    return false;
+                };
+                let Some(slots) = record.named_slots() else {
+                    return false;
+                };
+                heap.init_store_value(ValueStoreTarget::ObjectSlot(slots, offset), value)
+            }
+        }
+    }
+
+    /// Writes one [`Value`] into a named-property slot post-initialization. Same dispatch
+    /// rules as [`Self::init_named_slot`].
+    pub fn mut_named_slot(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        slot_offset: u32,
+        value: Value,
+    ) -> bool {
+        if self.object_metadata(id).is_none() {
             return false;
-        };
-        heap.mut_store_value(ValueStoreTarget::ObjectSlot(slots, index), value)
+        }
+        match SlotLocation::decode(slot_offset) {
+            SlotLocation::Inline(index) => {
+                heap.mut_store_value(ValueStoreTarget::InlineNamedSlot(id, index), value)
+            }
+            SlotLocation::OutOfLine(offset) => {
+                let Some(record) = heap.view().object(id) else {
+                    return false;
+                };
+                let Some(slots) = record.named_slots() else {
+                    return false;
+                };
+                heap.mut_store_value(ValueStoreTarget::ObjectSlot(slots, offset), value)
+            }
+        }
     }
 
     pub fn note_named_property_churn(
@@ -101,7 +154,7 @@ impl ObjectRuntime {
         }
 
         let preserve_named_slots = self.has_reserved_named_slots(heap.view(), record);
-        let dictionary = self.snapshot_named_property_dictionary(heap.view(), record);
+        let dictionary = self.snapshot_named_property_dictionary(heap.view(), id);
         let Some(metadata) = self.object_metadata_mut(id) else {
             return false;
         };
@@ -201,7 +254,7 @@ impl ObjectRuntime {
                 let Some(property) = self.shape_property(shape, key) else {
                     return Ok(None);
                 };
-                let descriptor = Self::descriptor_from_shape_property(heap, record, property)?;
+                let descriptor = self.descriptor_from_shape_property(heap, id, property)?;
                 Ok(Some(descriptor))
             }
             NamedPropertyStorage::Dictionary(dictionary) => Ok(dictionary
@@ -292,36 +345,52 @@ impl ObjectRuntime {
             return Err(InternalMethodError::CorruptObjectState);
         };
 
-        let old_slots = record
-            .named_slots()
-            .and_then(|slots| heap.view().object_slots(slots))
-            .map(<[Value]>::to_vec)
-            .unwrap_or_default();
-        let next_shape_record = self
-            .shape(heap.view(), next_shape)
-            .ok_or(InternalMethodError::CorruptObjectState)?;
-        let new_slots = heap.alloc_object_slots(
-            next_shape_record.slot_count() as usize,
-            Value::empty_internal_slot(),
-            lifetime,
-        );
-        for (index, slot) in old_slots.into_iter().enumerate() {
-            let index = u32::try_from(index).expect("named slot index must fit into u32");
-            if !heap.init_store_value(ValueStoreTarget::ObjectSlot(new_slots, index), slot) {
-                return Err(InternalMethodError::CorruptObjectState);
-            }
-        }
         let property = self
             .shape_property(next_shape, key)
             .ok_or(InternalMethodError::CorruptObjectState)?;
-        write_named_payload(heap, new_slots, property.slot_offset(), payload, true)?;
-        if !heap.mut_store_shape_handle(ShapeHandleStoreTarget::ObjectShape(id), Some(next_shape)) {
+        let next_out_of_line_count = self
+            .shape_out_of_line_slot_count(heap.view(), next_shape)
+            .ok_or(InternalMethodError::CorruptObjectState)?;
+
+        // When the new property is inline, the parent shape's out-of-line slot count is
+        // unchanged, so the object's existing `named_slots` array already has the right size
+        // and contents. We just need to write the new value into the inline slot and update
+        // the shape handle. When the new property is out-of-line, we grow `named_slots` by
+        // the property's slot width, copy the parent's out-of-line tail across, then write
+        // the new payload at the assigned offset.
+        let new_named_slots = if next_out_of_line_count == 0 {
+            None
+        } else if property.slot_location().is_inline() {
+            record.named_slots()
+        } else {
+            let old_slots = record
+                .named_slots()
+                .and_then(|slots| heap.view().object_slots(slots))
+                .map(<[Value]>::to_vec)
+                .unwrap_or_default();
+            let new_slots = heap.alloc_object_slots(
+                next_out_of_line_count as usize,
+                Value::empty_internal_slot(),
+                lifetime,
+            );
+            for (index, slot) in old_slots.into_iter().enumerate() {
+                let index = u32::try_from(index).expect("named slot index must fit into u32");
+                if !heap.init_store_value(ValueStoreTarget::ObjectSlot(new_slots, index), slot) {
+                    return Err(InternalMethodError::CorruptObjectState);
+                }
+            }
+            Some(new_slots)
+        };
+        if new_named_slots != record.named_slots()
+            && !heap.mut_store_object_slots_handle(
+                ObjectSlotsHandleStoreTarget::ObjectNamedSlots(id),
+                new_named_slots,
+            )
+        {
             return Err(InternalMethodError::CorruptObjectState);
         }
-        if !heap.mut_store_object_slots_handle(
-            ObjectSlotsHandleStoreTarget::ObjectNamedSlots(id),
-            Some(new_slots),
-        ) {
+        write_named_payload(self, heap, id, property.slot_offset(), payload, true)?;
+        if !heap.mut_store_shape_handle(ShapeHandleStoreTarget::ObjectShape(id), Some(next_shape)) {
             return Err(InternalMethodError::CorruptObjectState);
         }
         Ok(true)
@@ -351,10 +420,13 @@ impl ObjectRuntime {
 
         let current_payload = payload_from_complete_descriptor(current)?;
         if current_payload.kind() == payload.kind() && property.attrs() == attrs {
-            let Some(slots) = record.named_slots() else {
+            // For inline slots, named_slots may be absent (when the shape's total slot
+            // count fits entirely in the inline array); the write target is selected
+            // inside `write_named_payload` based on the property's encoded slot offset.
+            if !property.slot_location().is_inline() && record.named_slots().is_none() {
                 return Err(InternalMethodError::CorruptObjectState);
-            };
-            write_named_payload(heap, slots, property.slot_offset(), payload, false)?;
+            }
+            write_named_payload(self, heap, id, property.slot_offset(), payload, false)?;
             return Ok(true);
         }
 
@@ -407,37 +479,45 @@ impl ObjectRuntime {
         Ok((strings, symbols))
     }
 
+    #[allow(
+        clippy::unused_self,
+        reason = "kept as a method for symmetry with other ordinary_* helpers and to retain a stable call shape"
+    )]
     fn descriptor_from_shape_property(
+        &self,
         heap: PrimitiveHeapView<'_>,
-        object: RuntimeObjectRecord,
+        id: ObjectRef,
         property: ShapeProperty,
     ) -> InternalMethodResult<PropertyDescriptor> {
-        let Some(named_slots) = object.named_slots() else {
-            return Err(InternalMethodError::CorruptObjectState);
-        };
-        let Some(slots) = heap.object_slots(named_slots) else {
-            return Err(InternalMethodError::CorruptObjectState);
-        };
-        let payload = match property.kind() {
-            ShapePropertyKind::Data => NamedPropertyValue::data(
-                slots
-                    .get(property.slot_offset() as usize)
-                    .copied()
-                    .unwrap_or(Value::empty_internal_slot()),
-            ),
-            ShapePropertyKind::Accessor => {
-                let index = property.slot_offset() as usize;
-                NamedPropertyValue::accessor(
-                    slots
-                        .get(index)
+        let record = heap
+            .object(id)
+            .ok_or(InternalMethodError::CorruptObjectState)?;
+        let read_slot = |location: SlotLocation| -> InternalMethodResult<Value> {
+            match location {
+                SlotLocation::Inline(index) => Ok(record
+                    .inline_named_slot(index as usize)
+                    .unwrap_or(Value::empty_internal_slot())),
+                SlotLocation::OutOfLine(offset) => {
+                    let named_slots = record
+                        .named_slots()
+                        .ok_or(InternalMethodError::CorruptObjectState)?;
+                    let slots = heap
+                        .object_slots(named_slots)
+                        .ok_or(InternalMethodError::CorruptObjectState)?;
+                    Ok(slots
+                        .get(offset as usize)
                         .copied()
-                        .unwrap_or(Value::empty_internal_slot()),
-                    slots
-                        .get(index + 1)
-                        .copied()
-                        .unwrap_or(Value::empty_internal_slot()),
-                )
+                        .unwrap_or(Value::empty_internal_slot()))
+                }
             }
+        };
+        let primary_location = property.slot_location();
+        let payload = match property.kind() {
+            ShapePropertyKind::Data => NamedPropertyValue::data(read_slot(primary_location)?),
+            ShapePropertyKind::Accessor => NamedPropertyValue::accessor(
+                read_slot(primary_location)?,
+                read_slot(primary_location.accessor_setter_location())?,
+            ),
         };
         Ok(descriptor_from_payload(payload, property.attrs()))
     }
@@ -447,14 +527,18 @@ impl ObjectRuntime {
         heap: PrimitiveHeapView<'_>,
         record: RuntimeObjectRecord,
     ) -> bool {
-        let shape_slot_count = record
+        // Compare the heap-allocated named-slot array size against the shape's *out-of-line*
+        // slot count — the inline slots live inside `ObjectMetadata.inline_slots` and aren't
+        // counted here. An object whose `named_slots` array is larger than its shape's
+        // out-of-line tail has extra reserved space from a prior, longer shape.
+        let shape_out_of_line_count = record
             .shape()
-            .and_then(|shape| self.shape(heap, shape))
-            .map_or(0, ShapeRecord::slot_count) as usize;
+            .and_then(|shape| self.shape_out_of_line_slot_count(heap, shape))
+            .unwrap_or(0) as usize;
         let named_slot_count = record
             .named_slots()
             .and_then(|slots| heap.object_slots(slots))
             .map_or(0, <[Value]>::len);
-        named_slot_count > shape_slot_count
+        named_slot_count > shape_out_of_line_count
     }
 }

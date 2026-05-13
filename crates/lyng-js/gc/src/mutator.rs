@@ -35,6 +35,11 @@ pub enum ValueStoreTarget {
     ObjectSlot(ObjectSlotsRef, u32),
     EnvironmentSlot(EnvironmentSlotsRef, u32),
     CodeSlot(CodeSlotsRef, u32),
+    /// Inline named slot packed directly into the object record at the given index in
+    /// `[0, RUNTIME_OBJECT_INLINE_SLOT_COUNT)`. Writes go straight to the record's
+    /// `inline_named_slots` array and run through the standard incremental-marking value
+    /// barrier on the holder.
+    InlineNamedSlot(ObjectRef, u32),
 }
 
 /// Store target for traced `StringRef` handle fields.
@@ -1028,6 +1033,9 @@ impl PrimitiveMutator<'_> {
                 self.heap.write_environment_slot(id, index, value)
             }
             ValueStoreTarget::CodeSlot(id, index) => self.heap.write_code_slot(id, index, value),
+            ValueStoreTarget::InlineNamedSlot(id, index) => {
+                self.heap.write_object_inline_named_slot(id, index, value)
+            }
         }
     }
 

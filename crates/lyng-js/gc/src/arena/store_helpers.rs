@@ -139,6 +139,34 @@ impl PrimitiveHeap {
         wrote
     }
 
+    /// Writes one `Value` into `RuntimeObjectRecord.inline_named_slots[index]`. Used by the
+    /// runtime's named-property fast path when a shape places its slot inline. Returns
+    /// `false` when the index is out of range or the object record has been freed.
+    /// Runs the incremental-marking value barrier on the holder so heap references
+    /// embedded in inline slots are shaded gray when an incremental mark is in flight.
+    pub(crate) fn write_object_inline_named_slot(
+        &mut self,
+        id: ObjectRef,
+        index: u32,
+        value: Value,
+    ) -> bool {
+        let slot_index = index as usize;
+        if slot_index >= super::RUNTIME_OBJECT_INLINE_SLOT_COUNT {
+            return false;
+        }
+        if self.value_points_to_young(value) {
+            self.mark_object_card_if_old(id);
+        }
+        let mut writer = HeapWriter::new();
+        let wrote = self.objects.update(id, |record| {
+            writer.write_value(&mut record.inline_named_slots[slot_index], value);
+        });
+        if wrote {
+            HeapWriter::incremental_value_barrier(self, id, value);
+        }
+        wrote
+    }
+
     pub(crate) fn write_environment_slot(
         &mut self,
         id: EnvironmentSlotsRef,
