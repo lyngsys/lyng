@@ -124,7 +124,7 @@ impl Vm {
     pub(super) fn caller_direct_eval_lexical_environment(
         &mut self,
         agent: &mut Agent,
-        caller: FrameRecord,
+        caller: &FrameRecord,
         lexical_env: EnvironmentRef,
     ) -> VmResult<CallerDirectEvalLexicalEnvironment> {
         let Some(installed) = self
@@ -254,7 +254,7 @@ impl Vm {
             });
     }
 
-    pub(super) fn lexical_name_start_environment(&self, frame: FrameRecord) -> EnvironmentRef {
+    pub(super) fn lexical_name_start_environment(&self, frame: &FrameRecord) -> EnvironmentRef {
         self.active_loop_iteration_environment(frame.lexical_env())
             .unwrap_or_else(|| frame.lexical_env())
     }
@@ -262,7 +262,7 @@ impl Vm {
     pub(super) fn dynamic_name_start_environment(
         &self,
         agent: &Agent,
-        frame: FrameRecord,
+        frame: &FrameRecord,
     ) -> EnvironmentRef {
         let lexical_env = self.lexical_name_start_environment(frame);
         if matches!(

@@ -695,7 +695,7 @@ impl Vm {
         frame: FrameRecord,
         name: AtomId,
     ) -> VmResult<CapturedNameReference> {
-        let lexical_env = self.dynamic_name_start_environment(agent, frame);
+        let lexical_env = self.dynamic_name_start_environment(agent, &frame);
         let target = self.resolve_dynamic_name_target_with_context(
             agent,
             host,
@@ -946,7 +946,7 @@ impl Vm {
         frame: FrameRecord,
         name: AtomId,
     ) -> VmResult<Value> {
-        let lexical_env = self.dynamic_name_start_environment(agent, frame);
+        let lexical_env = self.dynamic_name_start_environment(agent, &frame);
         if let Some(value) = self.probe_identifier_value_with_context(
             agent,
             host,
@@ -998,7 +998,7 @@ impl Vm {
         frame: FrameRecord,
         name: AtomId,
     ) -> VmResult<Value> {
-        let lexical_env = self.dynamic_name_start_environment(agent, frame);
+        let lexical_env = self.dynamic_name_start_environment(agent, &frame);
         if let Some(value) = self.probe_identifier_value_with_context(
             agent,
             host,
@@ -1166,7 +1166,7 @@ impl Vm {
         frame: FrameRecord,
         name: AtomId,
     ) -> VmResult<bool> {
-        let lexical_env = self.dynamic_name_start_environment(agent, frame);
+        let lexical_env = self.dynamic_name_start_environment(agent, &frame);
         let target = self.resolve_dynamic_name_target_with_context(
             agent,
             host,

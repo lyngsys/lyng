@@ -1450,14 +1450,14 @@ impl Vm {
             return Ok(value);
         }
 
-        let caller_name_env_start = self.lexical_name_start_environment(caller);
+        let caller_name_env_start = self.lexical_name_start_environment(&caller);
         let (
             caller_lexical_env,
             direct_eval_site_flags,
             annex_b_catch_environments,
             annex_b_catch_names,
             direct_eval_parameter_names,
-        ) = self.caller_direct_eval_lexical_environment(agent, caller, caller_name_env_start)?;
+        ) = self.caller_direct_eval_lexical_environment(agent, &caller, caller_name_env_start)?;
         let caller_variable_env = caller.variable_env();
         let caller_home_object =
             self.caller_direct_eval_home_object(agent, caller_name_env_start, caller);
