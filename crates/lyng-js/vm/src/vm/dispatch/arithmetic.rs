@@ -41,12 +41,12 @@ impl Vm {
             return Ok(value);
         }
         match opcode {
-            Opcode::Add => self.add_values(agent, host, registry, frame, left, right),
-            Opcode::Sub => self.sub_values(agent, host, registry, frame, left, right),
-            Opcode::Mul => self.mul_values(agent, host, registry, frame, left, right),
-            Opcode::Div => self.div_values(agent, host, registry, frame, left, right),
-            Opcode::Mod => self.rem_values(agent, host, registry, frame, left, right),
-            Opcode::Exp => self.exp_values(agent, host, registry, frame, left, right),
+            Opcode::Add => self.add_values(agent, host, registry, &frame, left, right),
+            Opcode::Sub => self.sub_values(agent, host, registry, &frame, left, right),
+            Opcode::Mul => self.mul_values(agent, host, registry, &frame, left, right),
+            Opcode::Div => self.div_values(agent, host, registry, &frame, left, right),
+            Opcode::Mod => self.rem_values(agent, host, registry, &frame, left, right),
+            Opcode::Exp => self.exp_values(agent, host, registry, &frame, left, right),
             Opcode::BitOr => self.bitwise_or(agent, host, registry, frame, left, right),
             Opcode::BitAnd => self.bitwise_and(agent, host, registry, frame, left, right),
             Opcode::BitXor => self.bitwise_xor(agent, host, registry, frame, left, right),
@@ -114,13 +114,13 @@ impl Vm {
         let immediate = decode_smi_immediate(immediate);
         match opcode {
             Opcode::AddSmi => {
-                Some(self.add_value_and_smi(agent, host, registry, frame, left, immediate))
+                Some(self.add_value_and_smi(agent, host, registry, &frame, left, immediate))
             }
             Opcode::SubSmi => {
-                Some(self.sub_value_and_smi(agent, host, registry, frame, left, immediate))
+                Some(self.sub_value_and_smi(agent, host, registry, &frame, left, immediate))
             }
             Opcode::MulSmi => {
-                Some(self.mul_value_and_smi(agent, host, registry, frame, left, immediate))
+                Some(self.mul_value_and_smi(agent, host, registry, &frame, left, immediate))
             }
             Opcode::DivSmi => {
                 Some(self.div_value_and_smi(agent, host, registry, frame, left, immediate))

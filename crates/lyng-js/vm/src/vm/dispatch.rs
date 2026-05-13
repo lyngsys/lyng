@@ -136,7 +136,7 @@ impl Vm {
                     } => {
                         let (da, db, dc) = Self::decode_abc_operands(
                             installed.as_ref(),
-                            frame,
+                            &frame,
                             form_op,
                             ra,
                             rb,
@@ -148,7 +148,7 @@ impl Vm {
                     }
                     Instruction::Abx { a: ra, bx: rbx, .. } => {
                         let (da, dbx) =
-                            Self::decode_abx_operands(installed.as_ref(), frame, ra, rbx);
+                            Self::decode_abx_operands(installed.as_ref(), &frame, ra, rbx);
                         a = da;
                         bx = dbx;
                     }
@@ -212,7 +212,7 @@ impl Vm {
                         self.execute_in_opcode(agent, host, registry, frame, a, b, c)?;
                     }
                     Opcode::Negate => {
-                        let negate_result = self.negate_value(agent, host, registry, frame, b);
+                        let negate_result = self.negate_value(agent, host, registry, &frame, b);
                         let Some(value) = self.handle_vm_result(agent, negate_result)? else {
                             continue;
                         };
@@ -222,7 +222,7 @@ impl Vm {
                     }
                     Opcode::BitNot => {
                         let bit_not_result =
-                            self.bitwise_not_value(agent, host, registry, frame, b);
+                            self.bitwise_not_value(agent, host, registry, &frame, b);
                         let Some(value) = self.handle_vm_result(agent, bit_not_result)? else {
                             continue;
                         };
@@ -313,7 +313,7 @@ impl Vm {
                         )?;
                     }
                     Opcode::SetFunctionName => {
-                        let function = self.object_register(frame, a)?;
+                        let function = self.object_register(&frame, a)?;
                         let name_value = self.read_register(frame.registers(), b);
                         let set_result = Self::set_function_name(agent, function, name_value);
                         let Some(()) = self.handle_vm_result(agent, set_result)? else {

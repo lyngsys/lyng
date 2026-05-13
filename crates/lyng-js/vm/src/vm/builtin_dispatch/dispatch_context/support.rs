@@ -383,7 +383,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
         let primitive = object::to_primitive(self, value, object::ToPrimitiveHint::String)?;
         self.vm.value_to_property_key(
             self.agent,
-            *self.caller_frame,
+            self.caller_frame,
             self.caller_frame.code(),
             self.caller_frame.instruction_offset(),
             primitive,

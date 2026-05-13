@@ -461,7 +461,7 @@ impl Vm {
             self.to_primitive(agent, host, registry, frame, value, ToPrimitiveHint::String)?;
         self.value_to_property_key(
             agent,
-            *frame,
+            frame,
             frame.code(),
             frame.instruction_offset(),
             primitive,

@@ -221,7 +221,7 @@ impl Vm {
         value_register: u16,
         atom_operand: u16,
     ) -> VmResult<()> {
-        let object = self.object_register(frame, object_register)?;
+        let object = self.object_register(&frame, object_register)?;
         let value = self.read_register(frame.registers(), value_register);
         let key =
             PropertyKey::from_atom(self.read_atom_constant(frame.code(), u32::from(atom_operand))?);
@@ -681,7 +681,7 @@ impl Vm {
         value_register: u16,
         key_register: u16,
     ) -> VmResult<()> {
-        let object = self.object_register(frame, object_register)?;
+        let object = self.object_register(&frame, object_register)?;
         let value = self.read_register(frame.registers(), value_register);
         let key_value = self.read_register(frame.registers(), key_register);
         let key_result = self.property_key_from_value(agent, host, registry, &frame, key_value);
@@ -770,7 +770,7 @@ impl Vm {
         source_register: u16,
         excluded_register: u16,
     ) -> VmResult<()> {
-        let target = self.object_register(frame, target_register)?;
+        let target = self.object_register(&frame, target_register)?;
         let source = self.read_register(frame.registers(), source_register);
         let excluded_keys = self.read_register(frame.registers(), excluded_register);
         let copy_result =

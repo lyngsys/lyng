@@ -59,7 +59,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -78,7 +78,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
@@ -107,17 +107,17 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         left: Value,
         right: Value,
     ) -> VmResult<Value> {
         let left =
-            self.to_primitive(agent, host, registry, &frame, left, ToPrimitiveHint::Default)?;
+            self.to_primitive(agent, host, registry, frame, left, ToPrimitiveHint::Default)?;
         let right = self.to_primitive(
             agent,
             host,
             registry,
-            &frame,
+            frame,
             right,
             ToPrimitiveHint::Default,
         )?;
@@ -164,7 +164,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -186,7 +186,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
@@ -213,14 +213,14 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         register: u16,
     ) -> VmResult<Value> {
         let value = self.to_primitive(
             agent,
             host,
             registry,
-            &frame,
+            frame,
             self.read_register(frame.registers(), register),
             ToPrimitiveHint::Number,
         )?;
@@ -236,7 +236,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         register: u16,
     ) -> VmResult<Value> {
         let value = self.numeric_value(agent, host, registry, frame, register)?;
@@ -283,7 +283,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -305,7 +305,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
@@ -332,7 +332,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -354,7 +354,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -380,7 +380,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -405,7 +405,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         register: u16,
     ) -> VmResult<Value> {
         self.numeric_value_operand(
@@ -422,11 +422,11 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         value: Value,
     ) -> VmResult<Value> {
         let primitive =
-            self.to_primitive(agent, host, registry, &frame, value, ToPrimitiveHint::Number)?;
+            self.to_primitive(agent, host, registry, frame, value, ToPrimitiveHint::Number)?;
         read::to_numeric(agent.heap().view(), primitive)
             .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
     }
@@ -514,7 +514,7 @@ impl Vm {
     #[inline]
     pub(super) fn decode_abc_operands(
         installed: &InstalledFunction,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         opcode: Opcode,
         a: u8,
         b: u8,
@@ -537,7 +537,7 @@ impl Vm {
     #[inline]
     pub(super) fn decode_abx_operands(
         installed: &InstalledFunction,
-        frame: FrameRecord,
+        frame: &FrameRecord,
         a: u8,
         bx: u16,
     ) -> (u16, u32) {
@@ -550,12 +550,12 @@ impl Vm {
         (operands.a(), operands.bx())
     }
 
-    pub(super) fn object_register(&self, frame: FrameRecord, register: u16) -> VmResult<ObjectRef> {
+    pub(super) fn object_register(&self, frame: &FrameRecord, register: u16) -> VmResult<ObjectRef> {
         let value = self.read_register(frame.registers(), register);
         Self::require_object(frame, value)
     }
 
-    pub(super) fn require_object(frame: FrameRecord, value: Value) -> VmResult<ObjectRef> {
+    pub(super) fn require_object(frame: &FrameRecord, value: Value) -> VmResult<ObjectRef> {
         value
             .as_object_ref()
             .ok_or_else(|| VmError::ExpectedObject {
@@ -568,7 +568,7 @@ impl Vm {
     pub(super) fn value_to_property_key(
         &mut self,
         agent: &mut Agent,
-        _frame: FrameRecord,
+        _frame: &FrameRecord,
         code: CodeRef,
         instruction_offset: u32,
         value: Value,
