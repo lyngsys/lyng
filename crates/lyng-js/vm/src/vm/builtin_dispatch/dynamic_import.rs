@@ -24,7 +24,7 @@ enum DynamicImportEvaluationOutcome {
 impl Vm {
     pub(super) fn import_meta_builtin(
         agent: &mut Agent,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
     ) -> VmResult<Value> {
         let module_key = agent
             .module_key_for_environment(caller_frame.lexical_env())
@@ -97,7 +97,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let realm = caller_frame.realm();
@@ -126,7 +126,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    caller_frame,
+                    *caller_frame,
                     specifier,
                     ToPrimitiveHint::String,
                 )
@@ -163,7 +163,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         constructor: ObjectRef,
     ) -> VmResult<lyng_js_env::PromiseCapabilityId> {
         let capability = agent.alloc_promise_capability();
@@ -183,7 +183,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller_frame,
+            *caller_frame,
             constructor,
             &[Value::from_object_ref(executor)],
             Some(constructor),
@@ -203,7 +203,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: FrameRecord,
+        caller_frame: &FrameRecord,
         options: Value,
     ) -> VmResult<Vec<ModuleImportAttribute>> {
         if options.is_undefined() {
@@ -217,7 +217,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller_frame,
+            *caller_frame,
             options_object,
             Value::from_object_ref(options_object),
             with_key,
@@ -234,7 +234,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: &caller_frame,
+                frame: caller_frame,
             },
             attributes_object,
         )?;
@@ -246,7 +246,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: &caller_frame,
+                    frame: caller_frame,
                 },
                 attributes_object,
                 key,
@@ -262,7 +262,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                caller_frame,
+                *caller_frame,
                 attributes_object,
                 Value::from_object_ref(attributes_object),
                 key,

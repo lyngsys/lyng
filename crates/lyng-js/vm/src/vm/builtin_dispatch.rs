@@ -123,11 +123,11 @@ impl Vm {
             return Ok(None);
         };
         if entry == internal_import_meta_builtin() {
-            return Self::import_meta_builtin(agent, caller_frame).map(Some);
+            return Self::import_meta_builtin(agent, &caller_frame).map(Some);
         }
         if entry == internal_dynamic_import_builtin() {
             return self
-                .dynamic_import_builtin(agent, host, registry, caller_frame, arguments)
+                .dynamic_import_builtin(agent, host, registry, &caller_frame, arguments)
                 .map(Some);
         }
         if entry == internal_regexp_literal_builtin() {
