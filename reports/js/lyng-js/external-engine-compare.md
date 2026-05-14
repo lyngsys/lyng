@@ -33,19 +33,9 @@ It runs the same standalone JavaScript workload files through Lyng JS, QuickJS, 
 
 | Workload | Category | Engine | Status | Metric | Samples | Score median | Wall-time median | Min wall-time | Max wall-time | QuickJS score ratio | QuickJS wall-time ratio | Error | Command |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
-| `Richards` | `v8-v7` | `lyng-js` | `completed` | `score` | `1` | `199.000` | `2.034s` | `2.034s` | `2.034s` | `4.88x` | `n/a` | `` | `target/release/lyng-js --shell /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
-| `Richards` | `v8-v7` | `quickjs` | `completed` | `score` | `1` | `971.000` | `2.010s` | `2.010s` | `2.010s` | `1.00x` | `n/a` | `` | `/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
-| `Richards` | `v8-v7` | `boa` | `failed` | `score` | `0` | `n/a` | `n/a` | `n/a` | `n/a` | `n/a` | `n/a` | `external engine `boa` failed for workload `Richards` with status exit status: 101
-stdout:
-
-stderr:
-[31mThe application panicked (crashed).[0m
-Message:  [36mAttempted to create a NULL object.[0m
-Location: [35m/Users/brew/Library/Caches/Homebrew/cargo_cache/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs[0m:[35m154[0m
-[31mThe application panicked (crashed).[0m
-Message:  [36mevent loop thread panicked[0m
-Location: [35m/Users/brew/Library/Caches/Homebrew/cargo_cache/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.12.23/src/blocking/client.rs[0m:[35m1523[0m
-` | `/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
+| `Richards` | `v8-v7` | `lyng-js` | `completed` | `score` | `1` | `221.000` | `2.330s` | `2.330s` | `2.330s` | `4.37x` | `n/a` | `` | `target/release/lyng-js --shell /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
+| `Richards` | `v8-v7` | `quickjs` | `completed` | `score` | `1` | `965.000` | `2.020s` | `2.020s` | `2.020s` | `1.00x` | `n/a` | `` | `/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
+| `Richards` | `v8-v7` | `boa` | `completed` | `score` | `1` | `178.000` | `2.073s` | `2.073s` | `2.073s` | `5.42x` | `n/a` | `` | `/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
 
 ## Profiler Commands
 
@@ -78,5 +68,19 @@ xcrun xctrace record \
   --template 'Time Profiler' \
   --output /tmp/lyng-js-compare-quickjs-Richards.trace \
   --launch -- /opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js
+```
+
+### `Richards` on `boa`
+
+```sh
+/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js &
+pid=$!
+sample "$pid" 10 -file /tmp/lyng-js-compare-boa-Richards.sample.txt
+wait "$pid"
+
+xcrun xctrace record \
+  --template 'Time Profiler' \
+  --output /tmp/lyng-js-compare-boa-Richards.trace \
+  --launch -- /opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js
 ```
 

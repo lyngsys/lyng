@@ -28,17 +28,17 @@
       ],
       "engine": "lyng-js",
       "error": null,
-      "max_ms": 2034.0683749999998,
-      "median_ms": 2034.0683749999998,
-      "median_score": 199.0,
+      "max_ms": 2329.896791,
+      "median_ms": 2329.896791,
+      "median_score": 221.0,
       "metric_kind": "score",
-      "min_ms": 2034.0683749999998,
-      "quickjs_ratio": 4.8793969849246235,
+      "min_ms": 2329.896791,
+      "quickjs_ratio": 4.366515837104072,
       "samples_ms": [
-        2034.0683749999998
+        2329.896791
       ],
       "score_samples": [
-        199.0
+        221.0
       ],
       "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
@@ -53,17 +53,17 @@
       ],
       "engine": "quickjs",
       "error": null,
-      "max_ms": 2010.325125,
-      "median_ms": 2010.325125,
-      "median_score": 971.0,
+      "max_ms": 2020.1096249999998,
+      "median_ms": 2020.1096249999998,
+      "median_score": 965.0,
       "metric_kind": "score",
-      "min_ms": 2010.325125,
+      "min_ms": 2020.1096249999998,
       "quickjs_ratio": 1.0,
       "samples_ms": [
-        2010.325125
+        2020.1096249999998
       ],
       "score_samples": [
-        971.0
+        965.0
       ],
       "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
@@ -76,17 +76,21 @@
         "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js"
       ],
       "engine": "boa",
-      "error": "external engine `boa` failed for workload `Richards` with status exit status: 101\nstdout:\n\nstderr:\n\u001b[31mThe application panicked (crashed).\u001b[0m\nMessage:  \u001b[36mAttempted to create a NULL object.\u001b[0m\nLocation: \u001b[35m/Users/brew/Library/Caches/Homebrew/cargo_cache/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs\u001b[0m:\u001b[35m154\u001b[0m\n\u001b[31mThe application panicked (crashed).\u001b[0m\nMessage:  \u001b[36mevent loop thread panicked\u001b[0m\nLocation: \u001b[35m/Users/brew/Library/Caches/Homebrew/cargo_cache/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.12.23/src/blocking/client.rs\u001b[0m:\u001b[35m1523\u001b[0m\n",
-      "max_ms": null,
-      "median_ms": null,
-      "median_score": null,
+      "error": null,
+      "max_ms": 2073.304708,
+      "median_ms": 2073.304708,
+      "median_score": 178.0,
       "metric_kind": "score",
-      "min_ms": null,
-      "quickjs_ratio": null,
-      "samples_ms": [],
-      "score_samples": [],
+      "min_ms": 2073.304708,
+      "quickjs_ratio": 5.421348314606742,
+      "samples_ms": [
+        2073.304708
+      ],
+      "score_samples": [
+        178.0
+      ],
       "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
-      "status": "failed",
+      "status": "completed",
       "workload": "Richards"
     }
   ],
