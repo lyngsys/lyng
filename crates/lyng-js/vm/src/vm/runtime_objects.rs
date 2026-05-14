@@ -402,7 +402,7 @@ impl Vm {
         object::to_object(agent, realm, value).map_err(VmError::Abrupt)
     }
 
-    pub(super) fn check_object_coercible(agent: &mut Agent, value: Value) -> VmResult<()> {
+    pub(in crate::vm) fn check_object_coercible(agent: &mut Agent, value: Value) -> VmResult<()> {
         if value.is_null() || value.is_undefined() {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }

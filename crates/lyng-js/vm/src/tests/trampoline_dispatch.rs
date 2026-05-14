@@ -376,3 +376,25 @@ fn trampoline_executes_nan_via_load_global() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     assert!(result.is_nan(), "NaN global should resolve to a NaN Value");
 }
+
+#[test]
+fn trampoline_executes_in_operator() {
+    let unit = compile_test_unit(26, "'x' in { x: 1, y: 2 }");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
+fn trampoline_executes_delete_property() {
+    let unit = compile_test_unit(27, "delete ({ x: 42 }).x");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_bool(true));
+}

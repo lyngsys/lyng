@@ -510,7 +510,7 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn object_register(
+    pub(in crate::vm) fn object_register(
         &self,
         frame: &FrameRecord,
         register: u16,

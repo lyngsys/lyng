@@ -54,10 +54,12 @@ pub use names::{
     op_resolve_global, op_resolve_name, op_store_global,
 };
 pub use property::{
-    op_assign_keyed_property, op_assign_named_property, op_create_array, op_create_object,
-    op_define_keyed_property, op_define_named_property, op_get_keyed_property,
-    op_get_named_property, op_load_dense_element, op_set_keyed_property, op_set_named_property,
-    op_store_dense_element, op_strict_assign_keyed_property, op_strict_assign_named_property,
+    op_assign_keyed_property, op_assign_named_property, op_check_object_coercible,
+    op_copy_data_properties, op_create_array, op_create_object, op_define_keyed_property,
+    op_define_named_property, op_delete_property, op_get_keyed_property, op_get_named_property,
+    op_in, op_load_dense_element, op_set_function_name, op_set_keyed_property,
+    op_set_named_property, op_store_dense_element, op_strict_assign_keyed_property,
+    op_strict_assign_named_property, op_throw_if_uninitialized, op_to_property_key,
 };
 
 /// Build the dispatch table at compile time.
@@ -194,6 +196,13 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::CreateArray as u8 as usize] = op_create_array;
     table[Opcode::StoreDenseElement as u8 as usize] = op_store_dense_element;
     table[Opcode::LoadDenseElement as u8 as usize] = op_load_dense_element;
+    table[Opcode::DeleteProperty as u8 as usize] = op_delete_property;
+    table[Opcode::In as u8 as usize] = op_in;
+    table[Opcode::ToPropertyKey as u8 as usize] = op_to_property_key;
+    table[Opcode::CopyDataProperties as u8 as usize] = op_copy_data_properties;
+    table[Opcode::SetFunctionName as u8 as usize] = op_set_function_name;
+    table[Opcode::CheckObjectCoercible as u8 as usize] = op_check_object_coercible;
+    table[Opcode::ThrowIfUninitialized as u8 as usize] = op_throw_if_uninitialized;
 
     // Globals + names + captured names + frame-state loads
     table[Opcode::LoadGlobal as u8 as usize] = op_load_global;
