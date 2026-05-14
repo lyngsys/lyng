@@ -152,4 +152,9 @@ compiler owns lowering. The host crate owns host-provided module and dynamic imp
 - Runtime execution references installed `CodeRef` handles, not compiler-owned objects.
 - Registers are the normal local-access path.
 - Feedback is attached by feedback-site identity.
-- Native-code execution is absent from the current engine.
+- Every IC-shaped opcode carries a mandatory trailing feedback slot operand
+  (Track H, landed). The bytecode encoding is JIT-ready: a future Baseline JIT
+  consumes the same bytes and `FeedbackVector` without reshape.
+  See [`reports/js/lyng-js/jsc-aligned-engine-roadmap.md`](../../reports/js/lyng-js/jsc-aligned-engine-roadmap.md).
+- Native-code execution is absent from the current engine; the JSC-aligned
+  roadmap above plans to add a Sparkplug-style Baseline JIT as Phase 6.
