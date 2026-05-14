@@ -1,7 +1,4 @@
-use super::{
-    AtomId, Expr, ExprId, FeedbackSiteKind, FunctionCompiler, LoweringError, LoweringResult,
-    Opcode, SafepointKind,
-};
+use super::{AtomId, Expr, ExprId, FunctionCompiler, LoweringResult, Opcode};
 
 struct OptionalNullishGuard {
     jump_end: u32,
@@ -742,54 +739,12 @@ impl FunctionCompiler<'_, '_> {
         arguments: lyng_js_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
-        let argument_values = self.lower_call_arguments(arguments)?;
-        let (instruction_offset, argument_count, call_result, move_back) = if let Some(call_base) =
-            self.materialize_small_call_block(
-                this_register,
-                &argument_values.registers,
-                argument_values.spread_mask,
-            )? {
-            let (call_result, call_callee, move_back) =
-                self.bridge_small_call_registers(dest, callee_register)?;
-            let argument_count = u8::try_from(argument_values.registers.len())
-                .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
-            (
-                self.builder.emit_small_call(
-                    self.encode_register(call_result)?,
-                    self.encode_register(call_callee)?,
-                    self.encode_register(call_base)?,
-                    argument_count,
-                )?,
-                u16::from(argument_count),
-                call_result,
-                move_back,
-            )
-        } else {
-            let argument_range = self.materialize_argument_block(&argument_values.registers)?;
-            let (call_result, call_callee, call_this, move_back) =
-                self.bridge_call_registers(dest, callee_register, this_register)?;
-            (
-                self.builder.emit_call(
-                    self.encode_register(call_result)?,
-                    self.encode_register(call_callee)?,
-                    self.encode_register(call_this)?,
-                    argument_range,
-                )?,
-                argument_range.argument_count(),
-                call_result,
-                move_back,
-            )
-        };
-        let span = self.ast().get_expr(expr_id).span();
-        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
-        self.builder.add_feedback_site(
-            instruction_offset,
-            FeedbackSiteKind::Call,
-            self.call_feedback_metadata(argument_count, argument_values.spread_mask),
-        )?;
-        if let Some(dest) = move_back {
-            self.emit_move(dest, call_result)?;
-        }
-        Ok(())
+        self.emit_call_with_prelowered_target(
+            expr_id,
+            callee_register,
+            this_register,
+            arguments,
+            dest,
+        )
     }
 }

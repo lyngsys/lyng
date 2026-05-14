@@ -17,6 +17,91 @@ fn is_ordinary_call_opcode(opcode: Opcode) -> bool {
     opcode == Opcode::Call || opcode.small_call_arity().is_some()
 }
 
+fn opcode_matches(actual: Opcode, expected: Opcode) -> bool {
+    actual == expected || semantic_opcode(actual) == expected
+}
+
+fn small_call_base_and_count(instruction: lyng_js_bytecode::Instruction) -> Option<(u16, u16)> {
+    match instruction {
+        lyng_js_bytecode::Instruction::Abc { opcode, c, .. }
+        | lyng_js_bytecode::Instruction::FeedbackAbc { opcode, c, .. } => {
+            opcode.small_call_arity().map(|arity| (c, u16::from(arity)))
+        }
+        lyng_js_bytecode::Instruction::Abx { .. }
+        | lyng_js_bytecode::Instruction::FeedbackAbx { .. }
+        | lyng_js_bytecode::Instruction::Ax { .. }
+        | lyng_js_bytecode::Instruction::CallRange { .. } => None,
+    }
+}
+
+fn generic_call_argument_range(
+    instruction: lyng_js_bytecode::Instruction,
+) -> Option<lyng_js_bytecode::CallRange> {
+    match instruction {
+        lyng_js_bytecode::Instruction::CallRange { opcode, range, .. }
+            if semantic_opcode(opcode) == Opcode::Call =>
+        {
+            Some(range)
+        }
+        lyng_js_bytecode::Instruction::Abc { .. }
+        | lyng_js_bytecode::Instruction::Abx { .. }
+        | lyng_js_bytecode::Instruction::Ax { .. }
+        | lyng_js_bytecode::Instruction::FeedbackAbc { .. }
+        | lyng_js_bytecode::Instruction::FeedbackAbx { .. }
+        | lyng_js_bytecode::Instruction::CallRange { .. } => None,
+    }
+}
+
+fn has_move_to_register(instructions: &[lyng_js_bytecode::Instruction], dest: u16) -> bool {
+    instructions.iter().any(|instruction| match *instruction {
+        lyng_js_bytecode::Instruction::Abc { opcode, a, .. }
+        | lyng_js_bytecode::Instruction::FeedbackAbc { opcode, a, .. } => {
+            opcode_matches(opcode, Opcode::Move) && a == dest
+        }
+        lyng_js_bytecode::Instruction::Abx { .. }
+        | lyng_js_bytecode::Instruction::FeedbackAbx { .. }
+        | lyng_js_bytecode::Instruction::Ax { .. }
+        | lyng_js_bytecode::Instruction::CallRange { .. } => false,
+    })
+}
+
+fn has_writer_with_opcode(
+    instructions: &[lyng_js_bytecode::Instruction],
+    dest: u16,
+    opcodes: &[Opcode],
+) -> bool {
+    instructions.iter().any(|instruction| match *instruction {
+        lyng_js_bytecode::Instruction::Abc { opcode, a, .. }
+        | lyng_js_bytecode::Instruction::FeedbackAbc { opcode, a, .. }
+        | lyng_js_bytecode::Instruction::Abx { opcode, a, .. }
+        | lyng_js_bytecode::Instruction::FeedbackAbx { opcode, a, .. } => {
+            a == dest
+                && opcodes
+                    .iter()
+                    .any(|expected| opcode_matches(opcode, *expected))
+        }
+        lyng_js_bytecode::Instruction::Ax { .. }
+        | lyng_js_bytecode::Instruction::CallRange { .. } => false,
+    })
+}
+
+fn has_small_call_result_in_register(
+    instructions: &[lyng_js_bytecode::Instruction],
+    dest: u16,
+    argument_count: u8,
+) -> bool {
+    instructions.iter().any(|instruction| match *instruction {
+        lyng_js_bytecode::Instruction::Abc { opcode, a, .. }
+        | lyng_js_bytecode::Instruction::FeedbackAbc { opcode, a, .. } => {
+            a == dest && opcode.small_call_arity() == Some(argument_count)
+        }
+        lyng_js_bytecode::Instruction::Abx { .. }
+        | lyng_js_bytecode::Instruction::FeedbackAbx { .. }
+        | lyng_js_bytecode::Instruction::Ax { .. }
+        | lyng_js_bytecode::Instruction::CallRange { .. } => false,
+    })
+}
+
 #[test]
 fn compile_script_allocates_persistent_slots_for_global_lexicals_and_explicit_global_access() {
     let mut atoms = AtomTable::new();
@@ -785,6 +870,178 @@ fn compile_script_uses_small_arity_call_opcodes_for_non_spread_calls() {
         "four-argument and spread calls should keep the Call fallback:\n{}",
         lyng_js_bytecode::disassemble(entry)
     );
+}
+
+#[test]
+fn compile_script_lowers_small_call_arguments_into_call_base_slots() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(3_142),
+        r"
+            function fnRef(a, b, c) { return a + b + c; }
+            fnRef(11, 22, 33);
+        ",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let instructions = entry.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let (call_base, argument_count) = instructions
+        .iter()
+        .copied()
+        .find_map(small_call_base_and_count)
+        .expect("script should contain a small call");
+
+    assert_eq!(argument_count, 3, "{disassembly}");
+    assert!(
+        has_writer_with_opcode(&instructions, call_base, &[Opcode::LoadUndefined]),
+        "{disassembly}"
+    );
+    for slot in call_base + 1..=call_base + argument_count {
+        assert!(
+            has_writer_with_opcode(&instructions, slot, &[Opcode::LoadSmi, Opcode::LoadSmi8]),
+            "{disassembly}"
+        );
+        assert!(
+            !has_move_to_register(&instructions, slot),
+            "call argument slot r{slot} should be written directly, not by Move:\n{disassembly}"
+        );
+    }
+}
+
+#[test]
+fn compile_script_lowers_generic_call_arguments_into_call_range_slots() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(3_143),
+        r"
+            function fnRef(a, b, c, d) { return a + b + c + d; }
+            fnRef(1, 2, 3, 4);
+        ",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let instructions = entry.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let argument_range = instructions
+        .iter()
+        .copied()
+        .find_map(generic_call_argument_range)
+        .expect("script should contain a generic call");
+
+    assert_eq!(argument_range.argument_count(), 4, "{disassembly}");
+    for offset in 0..argument_range.argument_count() {
+        let slot = argument_range.argument_base() + offset;
+        assert!(
+            has_writer_with_opcode(
+                &instructions,
+                slot,
+                &[Opcode::LoadOne, Opcode::LoadSmi, Opcode::LoadSmi8],
+            ),
+            "{disassembly}"
+        );
+        assert!(
+            !has_move_to_register(&instructions, slot),
+            "call argument slot r{slot} should be written directly, not by Move:\n{disassembly}"
+        );
+    }
+}
+
+#[test]
+fn compile_script_lowers_spread_argument_expression_into_call_range_slot() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(3_144),
+        r"
+            function fnRef(a, b) { return a; }
+            fnRef(...[1, 2], 3);
+        ",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let instructions = entry.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let argument_range = instructions
+        .iter()
+        .copied()
+        .find_map(generic_call_argument_range)
+        .expect("spread call should use the generic call range");
+    let first_argument = argument_range.argument_base();
+
+    assert_eq!(argument_range.argument_count(), 2, "{disassembly}");
+    assert!(
+        has_writer_with_opcode(&instructions, first_argument, &[Opcode::CreateArray]),
+        "{disassembly}"
+    );
+    assert!(
+        !has_move_to_register(&instructions, first_argument),
+        "spread argument slot r{first_argument} should be written directly, not by Move:\n{disassembly}"
+    );
+    assert!(entry.feedback_sites().iter().any(|descriptor| {
+        descriptor.kind() == FeedbackSiteKind::Call
+            && descriptor.metadata()
+                == FeedbackSiteMetadata::CallArguments {
+                    expected_arity: 2,
+                    spread_mask: 1,
+                }
+    }));
+}
+
+#[test]
+fn compile_script_lowers_nested_call_results_into_outer_argument_slots() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(3_145),
+        r"
+            function inner(value) { return value; }
+            function outer(a, b) { return a + b; }
+            outer(inner(1), inner(2));
+        ",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let instructions = entry.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let (call_base, argument_count) = instructions
+        .iter()
+        .copied()
+        .find_map(|instruction| {
+            let (base, count) = small_call_base_and_count(instruction)?;
+            (count == 2).then_some((base, count))
+        })
+        .expect("outer call should use the two-argument small-call form");
+
+    assert_eq!(argument_count, 2, "{disassembly}");
+    for slot in call_base + 1..=call_base + argument_count {
+        assert!(
+            has_small_call_result_in_register(&instructions, slot, 1),
+            "nested inner call should write directly into outer argument slot r{slot}:\n{disassembly}"
+        );
+        assert!(
+            !has_move_to_register(&instructions, slot),
+            "outer argument slot r{slot} should not receive a nested call result by Move:\n{disassembly}"
+        );
+    }
 }
 
 #[test]
