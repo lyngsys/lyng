@@ -4,12 +4,20 @@
 //! - `Jump` (Ax form, signed-i24 relative offset).
 //! - `Jump8` (Ax8 form, signed-i8 relative offset).
 //! - `LoopHeader` — marker plus tier-backedge + incremental-mark safepoint.
+//! - `Return` (Ax form, returns the value in the operand-specified register).
+//! - `ReturnUndefined` (Ax form, returns `Value::undefined()`).
+//!
+//! `Return` and `ReturnUndefined` use `finish_active_frame`, which routes
+//! through `Vm::finish_frame`. For entry-frame returns (`Some(result)`), the
+//! handler emits `Step::Done`; for nested returns, it refreshes the
+//! `DispatchState` to the caller frame and continues dispatching.
 //!
 //! Conditional jumps (`JumpIfTrue`, `JumpIfFalse`, `JumpIfTrue8`,
-//! `JumpIfFalse8`) and `Return` / `ReturnUndefined` land in follow-up
-//! commits — the Return family requires frame-transition handling that
-//! crosses into sub-6 (Calls).
+//! `JumpIfFalse8`) land in follow-up commits.
 
+use lyng_js_types::Value;
+
+use crate::error::VmError;
 use crate::vm::dispatch::{
     advance_dispatch_frame, decode_ax8_operands, decode_ax_operands, jump_dispatch_frame,
 };
@@ -63,4 +71,49 @@ pub extern "C" fn op_loop_header(state: &mut DispatchState) -> Step {
     Vm::poll_incremental_mark_safepoint(state.agent);
     advance_dispatch_frame(&mut state.frame, instruction_len);
     dispatch_next!(state);
+}
+
+pub extern "C" fn op_return(state: &mut DispatchState) -> Step {
+    let code = state.frame.code();
+    let pc = state.frame.instruction_offset();
+    let (ax, _feedback_slot, _instruction_len) =
+        try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
+    let register = match u16::try_from(ax) {
+        Ok(r) => r,
+        Err(_) => {
+            return Step::Error(VmError::RegisterOutOfBounds {
+                code,
+                register: 0,
+            });
+        }
+    };
+    let value = state.vm.read_register(state.frame.registers(), register);
+    finish_return(state, value)
+}
+
+pub extern "C" fn op_return_undefined(state: &mut DispatchState) -> Step {
+    let code = state.frame.code();
+    let pc = state.frame.instruction_offset();
+    let (_ax, _feedback_slot, _instruction_len) =
+        try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
+    finish_return(state, Value::undefined())
+}
+
+/// Shared epilogue for `Return` / `ReturnUndefined`.
+///
+/// `Vm::finish_frame` returns `Some(result)` for the entry frame (script
+/// completed) and `None` when a nested function returns to its caller.
+/// In the latter case the trampoline must re-snapshot from the caller's
+/// frame and continue dispatching.
+fn finish_return(state: &mut DispatchState, value: Value) -> Step {
+    state.sync_active_frame();
+    state.pop_execution_context();
+    match state.finish_active_frame(value) {
+        Ok(Some(result)) => Step::Done(result),
+        Ok(None) => {
+            try_step!(state.refresh_from_active_frame());
+            dispatch_next!(state);
+        }
+        Err(error) => Step::Error(error),
+    }
 }

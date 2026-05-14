@@ -111,6 +111,54 @@ impl<'vm> DispatchState<'vm> {
         // TODO(lyng-54em): integrate with FeedbackVector via
         // self.vm.record_feedback_slot(self.code(), Some(FeedbackSlotId::from_raw(slot)?)).
     }
+
+    /// Write `self.frame` back to `vm.frames[frame_depth - 1]`. Used before
+    /// any handler operation that may inspect the live frame stack
+    /// (return-from-frame, debugger safepoints, etc.).
+    #[inline]
+    pub(crate) fn sync_active_frame(&mut self) {
+        let frame_depth = self.frame_depth;
+        let frame = self.frame;
+        self.vm.sync_dispatch_frame(frame_depth, frame);
+    }
+
+    /// Pop the agent's top execution context. Mirror of the
+    /// `let _ = agent.pop_execution_context();` line in the legacy match.
+    #[inline]
+    pub(crate) fn pop_execution_context(&mut self) {
+        let _ = self.agent.pop_execution_context();
+    }
+
+    /// Wrap `Vm::finish_frame` with the split borrow of `vm` and `agent` that
+    /// the borrow checker requires through `&mut DispatchState`.
+    #[inline]
+    pub(crate) fn finish_active_frame(&mut self, value: Value) -> VmResult<Option<Value>> {
+        let DispatchState { vm, agent, .. } = self;
+        vm.finish_frame(agent, value)
+    }
+
+    /// Re-snapshot frame/depth/installed/epoch after a frame-changing
+    /// operation. Required after a return that didn't terminate the script
+    /// (caller frame is now active) or after a call (callee frame is now
+    /// active).
+    pub(crate) fn refresh_from_active_frame(&mut self) -> VmResult<()> {
+        self.frame_depth = self.vm.frames().len();
+        let frame = self
+            .vm
+            .frames()
+            .last()
+            .copied()
+            .ok_or(VmError::MissingActiveFrame)?;
+        self.frame = frame;
+        let code = frame.code();
+        let installed = self
+            .vm
+            .installed_for_code(code)
+            .ok_or(VmError::MissingInstalledCode(code))?;
+        self.installed = installed;
+        self.frame_check_epoch = self.vm.dispatch_frame_check_epoch();
+        Ok(())
+    }
 }
 
 /// Per-opcode handler ABI. Each handler returns a `Step` describing what the
@@ -185,6 +233,16 @@ pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
 }
 
 impl Vm {
+    /// Look up the `Arc<InstalledFunction>` for a given `CodeRef`. Used by
+    /// `DispatchState::refresh_from_active_frame` after a frame transition.
+    #[inline]
+    pub(in crate::vm) fn installed_for_code(&self, code: CodeRef) -> Option<Arc<InstalledFunction>> {
+        self.installed
+            .get(code_index(code))
+            .and_then(Option::as_ref)
+            .cloned()
+    }
+
     /// Bridge from the live `Vm::run` entrypoint into the trampoline
     /// dispatch path. Constructs a `DispatchState` from the current active
     /// frame, then hands control to `run_trampoline`.
