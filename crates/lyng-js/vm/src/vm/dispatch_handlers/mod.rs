@@ -19,6 +19,7 @@ use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
 use super::dispatch_state::{Handler, DISPATCH_TABLE_LEN};
 
 pub mod arithmetic;
+pub mod calls;
 pub mod control_flow;
 pub mod loads;
 pub mod names;
@@ -47,6 +48,10 @@ pub use loads::{
     op_star_6, op_star_7, op_store_local_0, op_store_local_1, op_store_local_2, op_store_local_3,
 };
 pub use prefix::{op_extra_wide, op_wide};
+pub use calls::{
+    op_call, op_call0, op_call1, op_call2, op_call3, op_construct, op_create_closure,
+    op_tail_call,
+};
 pub use names::{
     op_assign_captured_name, op_assign_global, op_assign_name, op_assign_variable_name,
     op_capture_name, op_delete_global, op_delete_name, op_load_callee, op_load_captured_name,
@@ -222,6 +227,16 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::LoadThis as u8 as usize] = op_load_this;
     table[Opcode::LoadCallee as u8 as usize] = op_load_callee;
     table[Opcode::LoadNewTarget as u8 as usize] = op_load_new_target;
+
+    // sub-6 (lyng-1fie): calls family.
+    table[Opcode::Call0 as u8 as usize] = op_call0;
+    table[Opcode::Call1 as u8 as usize] = op_call1;
+    table[Opcode::Call2 as u8 as usize] = op_call2;
+    table[Opcode::Call3 as u8 as usize] = op_call3;
+    table[Opcode::Call as u8 as usize] = op_call;
+    table[Opcode::TailCall as u8 as usize] = op_tail_call;
+    table[Opcode::Construct as u8 as usize] = op_construct;
+    table[Opcode::CreateClosure as u8 as usize] = op_create_closure;
 
     table
 }

@@ -131,7 +131,7 @@ impl Vm {
         Ok(object)
     }
 
-    pub(super) fn create_closure(
+    pub(in crate::vm) fn create_closure(
         &self,
         agent: &mut Agent,
         frame: &FrameRecord,

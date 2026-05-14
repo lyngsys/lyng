@@ -231,7 +231,7 @@ pub(in crate::vm) const fn sign_extend_i24(bytes: [u8; 3]) -> i32 {
     i32::from_le_bytes([bytes[0], bytes[1], bytes[2], sign])
 }
 
-type DecodedCallRangeOperands = (
+pub(in crate::vm) type DecodedCallRangeOperands = (
     u16,
     u16,
     u16,
@@ -573,7 +573,7 @@ pub(in crate::vm) fn decode_accumulator_register_operands(
 }
 
 #[inline]
-fn decode_call_range_operands(
+pub(in crate::vm) fn decode_call_range_operands(
     bytes: &[u8],
     is_profiled: bool,
     code: CodeRef,
