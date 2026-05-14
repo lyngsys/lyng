@@ -743,7 +743,7 @@ impl Vm {
             .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
     }
 
-    pub(super) fn update_register_value(
+    pub(in crate::vm) fn update_register_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,

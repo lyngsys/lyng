@@ -25,7 +25,10 @@ pub mod opcode_stubs;
 pub mod prefix;
 pub mod stub;
 
-pub use arithmetic::{op_add, op_add_smi, op_mul, op_mul_smi, op_sub, op_sub_smi};
+pub use arithmetic::{
+    op_add, op_add_smi, op_bit_not, op_decrement, op_increment, op_mul, op_mul_smi, op_negate,
+    op_sub, op_sub_smi,
+};
 pub use control_flow::{
     op_jump, op_jump8, op_jump_if_false, op_jump_if_false8, op_jump_if_true, op_jump_if_true8,
     op_loop_header, op_return, op_return_undefined,
@@ -133,6 +136,10 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::SubSmi as u8 as usize] = op_sub_smi;
     table[Opcode::Mul as u8 as usize] = op_mul;
     table[Opcode::MulSmi as u8 as usize] = op_mul_smi;
+    table[Opcode::Negate as u8 as usize] = op_negate;
+    table[Opcode::BitNot as u8 as usize] = op_bit_not;
+    table[Opcode::Increment as u8 as usize] = op_increment;
+    table[Opcode::Decrement as u8 as usize] = op_decrement;
 
     table
 }
