@@ -939,6 +939,11 @@ impl PrimitiveMutator<'_> {
         self.store_object_slots_handle(target, value)
     }
 
+    #[inline]
+    pub fn mut_store_object_invalidation_epoch(&mut self, id: ObjectRef, epoch: u64) -> bool {
+        self.heap.set_object_invalidation_epoch(id, epoch)
+    }
+
     /// Writes into a freshly allocated traced `EnvironmentRef` field before publication.
     #[inline]
     pub fn init_store_environment_handle(
