@@ -23,6 +23,7 @@ pub mod control_flow;
 pub mod loads;
 pub mod opcode_stubs;
 pub mod prefix;
+pub mod property;
 pub mod stub;
 
 pub use arithmetic::{
@@ -45,6 +46,12 @@ pub use loads::{
     op_star_6, op_star_7, op_store_local_0, op_store_local_1, op_store_local_2, op_store_local_3,
 };
 pub use prefix::{op_extra_wide, op_wide};
+pub use property::{
+    op_assign_keyed_property, op_assign_named_property, op_create_array, op_create_object,
+    op_define_keyed_property, op_define_named_property, op_get_keyed_property,
+    op_get_named_property, op_load_dense_element, op_set_keyed_property, op_set_named_property,
+    op_store_dense_element, op_strict_assign_keyed_property, op_strict_assign_named_property,
+};
 
 /// Build the dispatch table at compile time.
 ///
@@ -164,6 +171,22 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::Mod as u8 as usize] = op_mod;
     table[Opcode::ModSmi as u8 as usize] = op_mod_smi;
     table[Opcode::Exp as u8 as usize] = op_exp;
+
+    // sub-5 (lyng-5mqv): property access family.
+    table[Opcode::GetNamedProperty as u8 as usize] = op_get_named_property;
+    table[Opcode::SetNamedProperty as u8 as usize] = op_set_named_property;
+    table[Opcode::AssignNamedProperty as u8 as usize] = op_assign_named_property;
+    table[Opcode::StrictAssignNamedProperty as u8 as usize] = op_strict_assign_named_property;
+    table[Opcode::GetKeyedProperty as u8 as usize] = op_get_keyed_property;
+    table[Opcode::SetKeyedProperty as u8 as usize] = op_set_keyed_property;
+    table[Opcode::AssignKeyedProperty as u8 as usize] = op_assign_keyed_property;
+    table[Opcode::StrictAssignKeyedProperty as u8 as usize] = op_strict_assign_keyed_property;
+    table[Opcode::DefineNamedProperty as u8 as usize] = op_define_named_property;
+    table[Opcode::DefineKeyedProperty as u8 as usize] = op_define_keyed_property;
+    table[Opcode::CreateObject as u8 as usize] = op_create_object;
+    table[Opcode::CreateArray as u8 as usize] = op_create_array;
+    table[Opcode::StoreDenseElement as u8 as usize] = op_store_dense_element;
+    table[Opcode::LoadDenseElement as u8 as usize] = op_load_dense_element;
 
     table
 }

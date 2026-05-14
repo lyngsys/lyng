@@ -317,3 +317,40 @@ fn trampoline_executes_exp_smi() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     assert_eq!(result, Value::from_smi(1024));
 }
+
+// =====================================================================
+// sub-5 (lyng-5mqv): property access parity tests
+// =====================================================================
+
+#[test]
+fn trampoline_executes_object_literal_and_property_load() {
+    let unit = compile_test_unit(21, "({ x: 42 }).x");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(42));
+}
+
+#[test]
+fn trampoline_executes_multi_property_load() {
+    let unit = compile_test_unit(22, "({ x: 1, y: 2, z: 3 }).x + ({ x: 1, y: 2, z: 3 }).z");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(4));
+}
+
+#[test]
+fn trampoline_executes_array_literal_and_indexed_load() {
+    let unit = compile_test_unit(23, "[10, 20, 30][1]");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(20));
+}

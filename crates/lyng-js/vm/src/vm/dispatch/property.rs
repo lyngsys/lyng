@@ -16,7 +16,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
-    pub(super) fn execute_in_opcode(
+    pub(in crate::vm) fn execute_in_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -66,7 +66,7 @@ impl Vm {
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
     #[inline]
-    pub(super) fn execute_get_named_property_opcode(
+    pub(in crate::vm) fn execute_get_named_property_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -131,7 +131,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
-    pub(super) fn execute_set_named_property_opcode(
+    pub(in crate::vm) fn execute_set_named_property_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -241,7 +241,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
-    pub(super) fn execute_define_named_property_opcode(
+    pub(in crate::vm) fn execute_define_named_property_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -277,7 +277,7 @@ impl Vm {
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
     #[inline]
-    pub(super) fn execute_get_keyed_property_opcode(
+    pub(in crate::vm) fn execute_get_keyed_property_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -434,7 +434,7 @@ impl Vm {
         clippy::too_many_lines,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
-    pub(super) fn execute_set_keyed_property_opcode(
+    pub(in crate::vm) fn execute_set_keyed_property_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -784,7 +784,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
-    pub(super) fn execute_define_keyed_property_opcode(
+    pub(in crate::vm) fn execute_define_keyed_property_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -824,7 +824,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and dispatch state explicitly at call sites"
     )]
-    pub(super) fn execute_to_property_key_opcode(
+    pub(in crate::vm) fn execute_to_property_key_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -850,7 +850,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
-    pub(super) fn execute_delete_property_opcode(
+    pub(in crate::vm) fn execute_delete_property_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -896,7 +896,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
-    pub(super) fn execute_copy_data_properties_opcode(
+    pub(in crate::vm) fn execute_copy_data_properties_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -924,7 +924,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
-    pub(super) fn execute_store_dense_element_opcode(
+    pub(in crate::vm) fn execute_store_dense_element_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -977,7 +977,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
-    pub(super) fn execute_load_dense_element_opcode(
+    pub(in crate::vm) fn execute_load_dense_element_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
