@@ -2,8 +2,15 @@
 
 This note defines the Lyng JS performance loop. Test262 remains the first corpus because
 it is semantically meaningful and visible in checked-in reports. The external-engine
-comparison loop also has a local V8 v7 benchmark corpus for QuickJS/Boa parity work after
-a bottleneck needs cross-engine measurement.
+comparison loop also has a local V8 v7 benchmark corpus for cross-engine measurement
+once a bottleneck has been isolated.
+
+> **Strategic goal update (2026-05-14).** The earlier "match QuickJS" target was
+> scoped too low. The current strategic plan is the
+> [JSC-aligned engine roadmap](../../reports/js/lyng-js/jsc-aligned-engine-roadmap.md):
+> aim for JSC LLInt-class interpreter performance (~2.5–4× past QuickJS) and JSC
+> Baseline-class JIT performance (~8–12× past QuickJS). The measurement workflow
+> below is unchanged; the framing of *what counts as a good result* shifted.
 
 Run commands from the workspace root. Use release builds for measurements. Write
 exploratory reports under `/tmp`; refresh checked-in reports only when intentionally
@@ -20,8 +27,9 @@ a broader engine strategy.
 
 Use benchmarks to find and verify bottlenecks, not as targets to game. If a proposed fix
 only helps because it special-cases a benchmark artifact, stop and either redesign it as a
-general optimization or record the profiling finding for follow-up. The gold-standard goal
-is QuickJS/Boa parity through better engine behavior, not by cheating benchmark suites.
+general optimization or record the profiling finding for follow-up. Optimizations should
+be defensible against the JSC-aligned roadmap's structural goals (threaded dispatch,
+inline IC fast path, JIT readiness), not just benchmark deltas.
 
 ## Loop Shape
 

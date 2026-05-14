@@ -11,6 +11,7 @@ top-level architecture note and the subsystem note for the area being changed.
 1. [Engine Overview](../../crates/lyng-js/README.md)
 2. [Architecture](architecture.md)
 3. [Engineering Standards](engineering-standards.md)
+4. [JSC-Aligned Engine Roadmap](../../reports/js/lyng-js/jsc-aligned-engine-roadmap.md) — the active strategic plan: phased work toward JSC LLInt-class interpreter and Baseline JIT performance.
 
 ## Architecture Notes
 

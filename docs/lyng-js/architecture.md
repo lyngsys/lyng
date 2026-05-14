@@ -51,8 +51,12 @@ or host hooks live outside the VM.
 
 ## Architecture Constraints
 
-- The engine executes through an interpreter. Native-code execution is not part of the
-  current engine.
+- The engine currently executes through an interpreter. A JSC-aligned threaded-dispatch
+  interpreter and a Sparkplug-style Baseline JIT are planned as the next phases —
+  see [`reports/js/lyng-js/jsc-aligned-engine-roadmap.md`](../../reports/js/lyng-js/jsc-aligned-engine-roadmap.md).
+  Today's substrate is interpreter-only; new code should not assume native-code
+  execution exists yet, but the data model (FeedbackVector, Structures, NaN-boxed
+  Value, 32-bit ShapeId) is being maintained as forward-compatible with the JIT.
 - `Value`, typed handles, atoms, object storage, environment storage, bytecode templates,
   and call frames are architecture-level contracts.
 - Normal local access uses frame registers or environment slots, not name lookup.
