@@ -271,3 +271,27 @@ fn trampoline_executes_if_with_comparison_chooses_consequent() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     assert_eq!(result, Value::from_smi(1));
 }
+
+#[test]
+fn trampoline_executes_bitwise_ops() {
+    let unit = compile_test_unit(17, "(5 & 3) + (5 | 3) + (5 ^ 3)");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    // (5 & 3) = 1; (5 | 3) = 7; (5 ^ 3) = 6 → 14
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(14));
+}
+
+#[test]
+fn trampoline_executes_shifts() {
+    let unit = compile_test_unit(18, "(1 << 4) + (32 >> 2)");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    // (1 << 4) = 16; (32 >> 2) = 8 → 24
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(24));
+}

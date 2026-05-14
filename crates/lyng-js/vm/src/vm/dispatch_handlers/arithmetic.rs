@@ -370,29 +370,30 @@ pub extern "C" fn op_decrement(state: &mut DispatchState) -> Step {
 // =====================================================================
 
 pub extern "C" fn op_equal(state: &mut DispatchState) -> Step {
-    op_binary_compare_general(state, Vm::execute_equal_opcode)
+    op_binary_general(state, Vm::execute_equal_opcode)
 }
 
 pub extern "C" fn op_less_than(state: &mut DispatchState) -> Step {
-    op_binary_compare_general(state, Vm::execute_less_than_opcode)
+    op_binary_general(state, Vm::execute_less_than_opcode)
 }
 
 pub extern "C" fn op_less_equal(state: &mut DispatchState) -> Step {
-    op_binary_compare_general(state, Vm::execute_less_equal_opcode)
+    op_binary_general(state, Vm::execute_less_equal_opcode)
 }
 
 pub extern "C" fn op_greater_than(state: &mut DispatchState) -> Step {
-    op_binary_compare_general(state, Vm::execute_greater_than_opcode)
+    op_binary_general(state, Vm::execute_greater_than_opcode)
 }
 
 pub extern "C" fn op_greater_equal(state: &mut DispatchState) -> Step {
-    op_binary_compare_general(state, Vm::execute_greater_equal_opcode)
+    op_binary_general(state, Vm::execute_greater_equal_opcode)
 }
 
-/// Shared body for Equal / Less* / Greater*. They all share the
-/// same (b, c) register pair + host/registry/frame signature.
+/// Shared body for binary opcodes that delegate to a Vm helper with
+/// the `(agent, host, registry, frame, b, c) -> VmResult<Value>`
+/// signature: Equal / Less* / Greater* / BitOr / BitXor / Shift* etc.
 #[inline]
-fn op_binary_compare_general(
+fn op_binary_general(
     state: &mut DispatchState,
     op: fn(
         &mut Vm,
@@ -505,6 +506,169 @@ pub extern "C" fn op_equal_zero(state: &mut DispatchState) -> Step {
     state.vm.write_register_unchecked(registers, a, value);
     state.advance(instruction_len);
     dispatch_next!(state);
+}
+
+// =====================================================================
+// Bitwise + Shifts — BitAnd has an inline SMI fast path (`l & r` can't
+// overflow); BitOr / BitXor / Shift* / UnsignedShiftRight always go
+// through their Vm helpers (the Smi → i32 → result conversion has spec
+// ToNumeric edge cases the helpers cover in one place).
+// =====================================================================
+
+pub extern "C" fn op_bit_and(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        true,
+        code,
+        pc,
+    ));
+    let registers = state.frame.registers();
+    let left = state.vm.read_register_unchecked(registers, b);
+    let right = state.vm.read_register_unchecked(registers, c);
+    if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi()) {
+        state.vm.record_feedback_slot(code, feedback_slot);
+        state
+            .vm
+            .write_register_unchecked(registers, a, Value::from_smi(l & r));
+        state.advance(instruction_len);
+        dispatch_next!(state);
+    }
+    op_bit_and_slow(state, a, b, c, feedback_slot, instruction_len)
+}
+
+#[cold]
+#[inline(never)]
+fn op_bit_and_slow(
+    state: &mut DispatchState,
+    a: u16,
+    b: u16,
+    c: u16,
+    feedback_slot: Option<FeedbackSlotId>,
+    instruction_len: u32,
+) -> Step {
+    let result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            ..
+        } = &mut *state;
+        vm.execute_bitand_opcode(agent, *host, &mut **registry, frame, b, c)
+    };
+    let finish = {
+        let DispatchState {
+            vm,
+            agent,
+            frame,
+            frame_depth,
+            ..
+        } = &mut *state;
+        vm.finish_abc_value_result(
+            agent,
+            *frame_depth,
+            frame,
+            instruction_len,
+            feedback_slot,
+            a,
+            result,
+        )
+    };
+    try_step!(finish);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_bit_and_smi(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        true,
+        code,
+        pc,
+    ));
+    let registers = state.frame.registers();
+    let left = state.vm.read_register_unchecked(registers, b);
+    let imm = i32::from(decode_smi_immediate(c));
+    if let Some(l) = left.as_smi() {
+        state.vm.record_feedback_slot(code, feedback_slot);
+        state
+            .vm
+            .write_register_unchecked(registers, a, Value::from_smi(l & imm));
+        state.advance(instruction_len);
+        dispatch_next!(state);
+    }
+    op_bit_and_smi_slow(state, a, b, c, feedback_slot, instruction_len)
+}
+
+#[cold]
+#[inline(never)]
+fn op_bit_and_smi_slow(
+    state: &mut DispatchState,
+    a: u16,
+    b: u16,
+    c: u16,
+    feedback_slot: Option<FeedbackSlotId>,
+    instruction_len: u32,
+) -> Step {
+    let result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            ..
+        } = &mut *state;
+        vm.execute_bitand_smi_opcode(agent, *host, &mut **registry, frame, b, c)
+    };
+    let finish = {
+        let DispatchState {
+            vm,
+            agent,
+            frame,
+            frame_depth,
+            ..
+        } = &mut *state;
+        vm.finish_abc_value_result(
+            agent,
+            *frame_depth,
+            frame,
+            instruction_len,
+            feedback_slot,
+            a,
+            result,
+        )
+    };
+    try_step!(finish);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_bit_or(state: &mut DispatchState) -> Step {
+    op_binary_general(state, Vm::execute_bitor_opcode)
+}
+
+pub extern "C" fn op_bit_xor(state: &mut DispatchState) -> Step {
+    op_binary_general(state, Vm::execute_bitxor_opcode)
+}
+
+pub extern "C" fn op_shift_left(state: &mut DispatchState) -> Step {
+    op_binary_general(state, Vm::execute_shift_left_opcode)
+}
+
+pub extern "C" fn op_shift_right(state: &mut DispatchState) -> Step {
+    op_binary_general(state, Vm::execute_shift_right_opcode)
+}
+
+pub extern "C" fn op_unsigned_shift_right(state: &mut DispatchState) -> Step {
+    op_binary_general(state, Vm::execute_unsigned_shift_right_opcode)
 }
 
 // =====================================================================
