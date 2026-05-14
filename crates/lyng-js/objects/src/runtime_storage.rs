@@ -228,9 +228,20 @@ impl ObjectRuntime {
         }
     }
 
-    pub(crate) fn bump_invalidation(&mut self, id: ObjectRef, cause: InvalidationCause) -> bool {
+    pub(crate) fn bump_invalidation(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        cause: InvalidationCause,
+    ) -> bool {
+        if self.object_metadata(id).is_none() || heap.view().object(id).is_none() {
+            return false;
+        }
         self.next_invalidation_epoch = self.next_invalidation_epoch.saturating_add(1);
         let epoch = self.next_invalidation_epoch;
+        if !heap.mut_store_object_invalidation_epoch(id, epoch) {
+            return false;
+        }
         let Some(metadata) = self.object_metadata_mut(id) else {
             return false;
         };

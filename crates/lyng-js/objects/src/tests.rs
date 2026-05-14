@@ -1745,6 +1745,13 @@ fn redefine_delete_and_prototype_mutation_bump_invalidation_epochs() {
         runtime.invalidation_event(object).unwrap().cause(),
         InvalidationCause::PropertyDeletion
     );
+    assert_eq!(
+        mutator
+            .view()
+            .object(object)
+            .and_then(RuntimeObjectRecord::last_invalidation_epoch),
+        Some(4)
+    );
 }
 
 #[test]
