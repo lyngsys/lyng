@@ -26,6 +26,7 @@ pub mod names;
 pub mod opcode_stubs;
 pub mod prefix;
 pub mod property;
+pub mod scope;
 pub mod stub;
 
 pub use arithmetic::{
@@ -57,6 +58,11 @@ pub use names::{
     op_capture_name, op_delete_global, op_delete_name, op_load_callee, op_load_captured_name,
     op_load_captured_name_this, op_load_global, op_load_name, op_load_new_target, op_load_this,
     op_resolve_global, op_resolve_name, op_store_global,
+};
+pub use scope::{
+    op_assign_env_slot, op_enter_env_scope, op_leave_env_scope, op_load_env_slot,
+    op_pop_closure_env, op_pop_with_env, op_push_closure_env, op_push_with_env, op_store_env_slot,
+    op_type_of,
 };
 pub use property::{
     op_assign_keyed_property, op_assign_named_property, op_check_object_coercible,
@@ -237,6 +243,18 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::TailCall as u8 as usize] = op_tail_call;
     table[Opcode::Construct as u8 as usize] = op_construct;
     table[Opcode::CreateClosure as u8 as usize] = op_create_closure;
+
+    // sub-7 (lyng-59e6) round 1: environment scopes + TypeOf.
+    table[Opcode::LoadEnvSlot as u8 as usize] = op_load_env_slot;
+    table[Opcode::StoreEnvSlot as u8 as usize] = op_store_env_slot;
+    table[Opcode::AssignEnvSlot as u8 as usize] = op_assign_env_slot;
+    table[Opcode::EnterEnvScope as u8 as usize] = op_enter_env_scope;
+    table[Opcode::LeaveEnvScope as u8 as usize] = op_leave_env_scope;
+    table[Opcode::PushClosureEnv as u8 as usize] = op_push_closure_env;
+    table[Opcode::PopClosureEnv as u8 as usize] = op_pop_closure_env;
+    table[Opcode::PushWithEnv as u8 as usize] = op_push_with_env;
+    table[Opcode::PopWithEnv as u8 as usize] = op_pop_with_env;
+    table[Opcode::TypeOf as u8 as usize] = op_type_of;
 
     table
 }

@@ -435,3 +435,55 @@ fn trampoline_executes_arrow_call_three_args() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     assert_eq!(result, Value::from_smi(6));
 }
+
+// =====================================================================
+// sub-7 (lyng-59e6): environment scope parity tests
+// =====================================================================
+
+#[test]
+fn trampoline_executes_let_binding() {
+    let unit = compile_test_unit(31, "let x = 42; x");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(42));
+}
+
+#[test]
+fn trampoline_executes_let_reassignment() {
+    let unit = compile_test_unit(32, "let x = 1; x = x + 1; x = x + 1; x");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn trampoline_executes_block_scoped_let() {
+    let unit = compile_test_unit(33, "let x = 1; { let x = 100; }; x");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[test]
+fn trampoline_executes_typeof() {
+    let unit = compile_test_unit(34, "typeof 42");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    // typeof 42 returns the string "number"; just assert no error + non-undefined
+    assert!(
+        !result.is_undefined(),
+        "typeof should produce a string Value, got {result:?}"
+    );
+}

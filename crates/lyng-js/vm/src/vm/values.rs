@@ -652,7 +652,7 @@ impl Vm {
         Self::set_environment_slot_raw(agent, environment, slot, value)
     }
 
-    pub(super) fn write_environment_slot(
+    pub(in crate::vm) fn write_environment_slot(
         &mut self,
         agent: &mut Agent,
         environment: EnvironmentRef,
@@ -669,7 +669,7 @@ impl Vm {
         self.sync_loop_iteration_slot(agent, environment, slot, value)
     }
 
-    pub(super) fn assign_environment_slot(
+    pub(in crate::vm) fn assign_environment_slot(
         &mut self,
         agent: &mut Agent,
         environment: EnvironmentRef,
@@ -1204,7 +1204,7 @@ fn decode_string_view(view: &PrimitiveStringView<'_>) -> String {
 }
 
 #[inline]
-pub(super) const fn decode_env_operand(operand: u32) -> (u8, u32) {
+pub(in crate::vm) const fn decode_env_operand(operand: u32) -> (u8, u32) {
     ((operand >> 24) as u8, operand & 0x00ff_ffff)
 }
 

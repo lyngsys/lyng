@@ -68,7 +68,7 @@ impl Vm {
             })
     }
 
-    pub(super) fn enter_env_scope(
+    pub(in crate::vm) fn enter_env_scope(
         &mut self,
         agent: &Agent,
         frame: &FrameRecord,
@@ -86,7 +86,7 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn leave_env_scope(&mut self, frame: &FrameRecord, base: u16, count: u32) {
+    pub(in crate::vm) fn leave_env_scope(&mut self, frame: &FrameRecord, base: u16, count: u32) {
         let start = u32::from(base);
         let end = start.saturating_add(count);
         let frame_depth = self.frames.len();
@@ -1315,7 +1315,7 @@ impl Vm {
         false
     }
 
-    pub(super) fn type_of_value(agent: &mut Agent, value: Value) -> Value {
+    pub(in crate::vm) fn type_of_value(agent: &mut Agent, value: Value) -> Value {
         let text = if value.is_undefined() {
             "undefined"
         } else if value.is_null() {
@@ -1580,7 +1580,7 @@ impl Vm {
         Some(GlobalLexicalBindingRecord::new(name, global.id(), index))
     }
 
-    pub(super) fn frame_is_strict(&self, frame: &FrameRecord) -> bool {
+    pub(in crate::vm) fn frame_is_strict(&self, frame: &FrameRecord) -> bool {
         self.installed_function(frame.code())
             .is_some_and(|function| function.flags().strict())
     }

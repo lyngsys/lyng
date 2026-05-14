@@ -1,7 +1,7 @@
 use super::{Agent, AllocationLifetime, FrameRecord, Value, Vm, VmResult, WithEnvironmentState};
 
 impl Vm {
-    pub(super) fn push_with_environment(
+    pub(in crate::vm) fn push_with_environment(
         &mut self,
         agent: &mut Agent,
         frame: &mut FrameRecord,
@@ -26,7 +26,7 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn pop_with_environment(&mut self, frame: &mut FrameRecord) {
+    pub(in crate::vm) fn pop_with_environment(&mut self, frame: &mut FrameRecord) {
         let frame_depth = self.frames.len();
         let Some(index) = self
             .with_environment_states
