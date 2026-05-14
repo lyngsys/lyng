@@ -419,7 +419,7 @@ impl Vm {
         Ok((caller_frame.this_value(), caller_frame.new_target()))
     }
 
-    pub(super) fn resolve_this_binding(
+    pub(in crate::vm) fn resolve_this_binding(
         agent: &mut Agent,
         start: EnvironmentRef,
         caller_frame: &FrameRecord,

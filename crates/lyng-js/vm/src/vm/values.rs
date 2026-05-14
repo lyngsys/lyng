@@ -812,7 +812,7 @@ impl Vm {
         })
     }
 
-    pub(super) fn read_atom_constant(&self, code: CodeRef, index: u32) -> VmResult<AtomId> {
+    pub(in crate::vm) fn read_atom_constant(&self, code: CodeRef, index: u32) -> VmResult<AtomId> {
         let installed = self
             .installed
             .get(code_index(code))
