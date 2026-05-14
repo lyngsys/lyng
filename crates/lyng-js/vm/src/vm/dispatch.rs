@@ -56,7 +56,7 @@ mod tests {
             .expect("dispatch loop should stay in this module");
 
         assert!(
-            run_loop.contains("DispatchState"),
+            run_loop.contains("DispatchFrameSnapshot"),
             "dispatch should make active frame state explicit"
         );
         assert!(
@@ -185,14 +185,14 @@ mod tests {
 }
 
 #[derive(Clone, Copy)]
-pub(in crate::vm) struct DispatchState {
+pub(in crate::vm) struct DispatchFrameSnapshot {
     frame_depth: usize,
     code: CodeRef,
     frame: FrameRecord,
     frame_check_epoch: u32,
 }
 
-impl DispatchState {
+impl DispatchFrameSnapshot {
     fn from_active_frame(vm: &Vm) -> Self {
         let frame_depth = vm.frames.len();
         let frame = vm
@@ -688,7 +688,7 @@ impl Vm {
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
         loop {
-            let mut state = DispatchState::from_active_frame(self);
+            let mut state = DispatchFrameSnapshot::from_active_frame(self);
             let code = state.frame().code();
             let installed = self
                 .installed
