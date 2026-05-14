@@ -26,7 +26,7 @@ pub(in crate::vm) fn smi_mul_result(left: i32, right: i32) -> Option<Value> {
 }
 
 #[inline]
-pub(super) const fn smi_mod_result(left: i32, right: i32) -> Option<Value> {
+pub(in crate::vm) const fn smi_mod_result(left: i32, right: i32) -> Option<Value> {
     if right == 0 || (left == i32::MIN && right == -1) {
         return None;
     }

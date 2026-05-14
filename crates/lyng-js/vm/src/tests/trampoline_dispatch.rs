@@ -295,3 +295,25 @@ fn trampoline_executes_shifts() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     assert_eq!(result, Value::from_smi(24));
 }
+
+#[test]
+fn trampoline_executes_smi_mod() {
+    let unit = compile_test_unit(19, "17 % 5");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(2));
+}
+
+#[test]
+fn trampoline_executes_exp_smi() {
+    let unit = compile_test_unit(20, "2 ** 10");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(1024));
+}
