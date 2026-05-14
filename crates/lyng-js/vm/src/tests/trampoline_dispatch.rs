@@ -398,3 +398,40 @@ fn trampoline_executes_delete_property() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     assert_eq!(result, Value::from_bool(true));
 }
+
+// =====================================================================
+// sub-6 (lyng-1fie): calls family parity tests
+// =====================================================================
+
+#[test]
+fn trampoline_executes_arrow_call_zero_args() {
+    let unit = compile_test_unit(28, "(() => 7)()");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(7));
+}
+
+#[test]
+fn trampoline_executes_arrow_call_one_arg() {
+    let unit = compile_test_unit(29, "((x) => x + 1)(41)");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(42));
+}
+
+#[test]
+fn trampoline_executes_arrow_call_three_args() {
+    let unit = compile_test_unit(30, "((a, b, c) => a + b + c)(1, 2, 3)");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(6));
+}

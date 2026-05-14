@@ -378,7 +378,7 @@ impl Vm {
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
     )]
     #[inline]
-    pub(super) fn call_value_small(
+    pub(in crate::vm) fn call_value_small(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -424,7 +424,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
     )]
-    pub(super) fn tail_call_value(
+    pub(in crate::vm) fn tail_call_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -484,7 +484,7 @@ impl Vm {
         clippy::too_many_lines,
         reason = "spec-shaped VM routine stays contiguous to preserve completion ordering and cleanup invariants"
     )]
-    pub(super) fn construct_value(
+    pub(in crate::vm) fn construct_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,

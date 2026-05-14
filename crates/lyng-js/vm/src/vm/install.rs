@@ -77,7 +77,7 @@ impl InstalledFunction {
         previous
     }
 
-    pub(super) fn feedback_descriptor_for_slot(
+    pub(in crate::vm) fn feedback_descriptor_for_slot(
         &self,
         slot: lyng_js_types::FeedbackSlotId,
     ) -> Option<lyng_js_bytecode::FeedbackSiteDescriptor> {
