@@ -17,12 +17,4 @@ lyng-js-parser = { workspace = true }
 lyng-js-sema = { workspace = true }
 lyng-js-compiler = { workspace = true }
 
-[features]
-# Phase 1 (lyng-33i2) trampoline dispatch path. When enabled, Vm::run uses
-# run_trampoline + the per-handler DISPATCH_TABLE instead of the legacy
-# flat-match run_dispatch_loop. Off by default until sub-3..sub-7 land real
-# handlers for every opcode family. Switching the default is the cutover
-# step (lyng-9gyk).
-trampoline-dispatch = []
-
 [dev-dependencies]

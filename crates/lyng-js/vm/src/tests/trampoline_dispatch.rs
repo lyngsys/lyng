@@ -1,15 +1,10 @@
 //! Phase 1 trampoline-dispatch parity tests (lyng-5zrf).
 //!
-//! Compiled and run only when the `trampoline-dispatch` feature is enabled,
-//! since that feature routes `Vm::run` through `run_via_trampoline` instead
-//! of the legacy `run_dispatch_loop`. Each test compiles a trivial script
-//! that uses only opcodes implemented in sub-3 (Move, Lda*, Load*, Star0..7,
-//! Jump, Jump8, LoopHeader, Return, ReturnUndefined) and asserts the
-//! trampoline produces the expected value — matching what the legacy path
-//! would have produced.
-//!
-//! As subsequent sub-issues port additional opcode families, the script
-//! coverage here grows.
+//! Built progressively across sub-3..sub-7 as families of handlers were
+//! ported off the legacy match. Post sub-8 cutover (`lyng-9gyk`),
+//! `Vm::run` is the trampoline path — these tests now exercise the only
+//! dispatch path and serve as anti-regression coverage for the per-family
+//! handlers under `vm/dispatch_handlers/`.
 
 use super::support::*;
 
