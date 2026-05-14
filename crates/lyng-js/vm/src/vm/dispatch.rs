@@ -334,31 +334,55 @@ pub(in crate::vm) fn decode_abc_operands(
     code: CodeRef,
     instruction_offset: u32,
 ) -> VmResult<(u16, u16, u16, Option<FeedbackSlotId>, u32)> {
-    let (a, b, c, operand_end) = if prefix.is_some() {
-        let [_, _, a_low, b_low, c_low, a_high, b_high, c_high, ..] = bytes else {
-            return Err(VmError::InstructionOutOfBounds {
-                code,
-                instruction_offset,
-            });
-        };
-        (
-            u16::from_le_bytes([*a_low, *a_high]),
-            u16::from_le_bytes([*b_low, *b_high]),
-            u16::from_le_bytes([*c_low, *c_high]),
-            8usize,
-        )
-    } else {
-        let [_, ra, rb, rc, ..] = bytes else {
-            return Err(VmError::InstructionOutOfBounds {
-                code,
-                instruction_offset,
-            });
-        };
-        (u16::from(*ra), u16::from(*rb), u16::from(*rc), 4usize)
+    if prefix.is_some() {
+        return decode_abc_operands_wide(bytes, is_profiled, code, instruction_offset);
+    }
+    let [_, ra, rb, rc, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
     };
     let (feedback_slot, instruction_len) =
-        decode_feedback_slot_operand(bytes, operand_end, is_profiled, code, instruction_offset)?;
-    Ok((a, b, c, feedback_slot, instruction_len))
+        decode_feedback_slot_operand(bytes, 4usize, is_profiled, code, instruction_offset)?;
+    Ok((
+        u16::from(*ra),
+        u16::from(*rb),
+        u16::from(*rc),
+        feedback_slot,
+        instruction_len,
+    ))
+}
+
+/// Wide / ExtraWide-prefixed Abc operand decoding. Extracted to a `#[cold]`
+/// `#[inline(never)]` helper so the narrow path inlines into each handler
+/// without dragging the wide decoder bytes along — the wide path is
+/// "essentially zero share on real workloads" (Phase 1 spec), and per-handler
+/// asm should fit the < 200 byte budget without inline wide code competing
+/// for L1i.
+#[cold]
+#[inline(never)]
+fn decode_abc_operands_wide(
+    bytes: &[u8],
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(u16, u16, u16, Option<FeedbackSlotId>, u32)> {
+    let [_, _, a_low, b_low, c_low, a_high, b_high, c_high, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
+    };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, 8usize, is_profiled, code, instruction_offset)?;
+    Ok((
+        u16::from_le_bytes([*a_low, *a_high]),
+        u16::from_le_bytes([*b_low, *b_high]),
+        u16::from_le_bytes([*c_low, *c_high]),
+        feedback_slot,
+        instruction_len,
+    ))
 }
 
 #[inline]
@@ -369,35 +393,52 @@ pub(in crate::vm) fn decode_abx_operands(
     code: CodeRef,
     instruction_offset: u32,
 ) -> VmResult<(u16, u32, Option<FeedbackSlotId>, u32)> {
-    let (a, bx, operand_end) = if let Some(prefix) = prefix {
-        let [_, _, a_low, bx0, bx1, a_high, bx2, bx3, ..] = bytes else {
-            return Err(VmError::InstructionOutOfBounds {
-                code,
-                instruction_offset,
-            });
-        };
-        let bx3 = if prefix == Opcode::ExtraWide { *bx3 } else { 0 };
-        (
-            u16::from_le_bytes([*a_low, *a_high]),
-            u32::from_le_bytes([*bx0, *bx1, *bx2, bx3]),
-            8usize,
-        )
-    } else {
-        let [_, ra, bx_low, bx_high, ..] = bytes else {
-            return Err(VmError::InstructionOutOfBounds {
-                code,
-                instruction_offset,
-            });
-        };
-        (
-            u16::from(*ra),
-            u32::from(u16::from_le_bytes([*bx_low, *bx_high])),
-            4usize,
-        )
+    if let Some(prefix) = prefix {
+        return decode_abx_operands_wide(bytes, prefix, is_profiled, code, instruction_offset);
+    }
+    let [_, ra, bx_low, bx_high, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
     };
     let (feedback_slot, instruction_len) =
-        decode_feedback_slot_operand(bytes, operand_end, is_profiled, code, instruction_offset)?;
-    Ok((a, bx, feedback_slot, instruction_len))
+        decode_feedback_slot_operand(bytes, 4usize, is_profiled, code, instruction_offset)?;
+    Ok((
+        u16::from(*ra),
+        u32::from(u16::from_le_bytes([*bx_low, *bx_high])),
+        feedback_slot,
+        instruction_len,
+    ))
+}
+
+/// Wide / ExtraWide-prefixed Abx operand decoding. See
+/// `decode_abc_operands_wide` for the rationale on the `#[cold]` /
+/// `#[inline(never)]` placement.
+#[cold]
+#[inline(never)]
+fn decode_abx_operands_wide(
+    bytes: &[u8],
+    prefix: Opcode,
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(u16, u32, Option<FeedbackSlotId>, u32)> {
+    let [_, _, a_low, bx0, bx1, a_high, bx2, bx3, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
+    };
+    let bx3 = if prefix == Opcode::ExtraWide { *bx3 } else { 0 };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, 8usize, is_profiled, code, instruction_offset)?;
+    Ok((
+        u16::from_le_bytes([*a_low, *a_high]),
+        u32::from_le_bytes([*bx0, *bx1, *bx2, bx3]),
+        feedback_slot,
+        instruction_len,
+    ))
 }
 
 #[inline]

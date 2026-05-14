@@ -210,23 +210,24 @@ pub enum Step {
 /// inside `Step::Continue`. The trampoline turns this into one indirect call
 /// per opcode.
 ///
-/// Also clears `state.prefix` so a Wide/ExtraWide prefix consumed by the
-/// just-finishing handler doesn't leak into the next handler. `op_wide` /
-/// `op_extra_wide` manually return `Step::Continue` instead of going
-/// through this macro so the prefix they just set survives until the
-/// semantic handler reads it.
+/// **Prefix handling invariant:** this macro does NOT clear `state.prefix`.
+/// Handlers that consult the prefix (`op_move`, `op_load_*`, `op_jump_if_*`)
+/// must consume it with `state.prefix.take()` to leave `None` for the next
+/// handler. Narrow-only handlers ignore the field entirely; the bytecode
+/// emitter guarantees they never run with a stale prefix set (every Wide /
+/// ExtraWide is immediately followed by a prefix-aware semantic opcode).
+/// This keeps the narrow hot path free of a per-dispatch store.
 ///
 /// `dispatch_next!` is the *only* place in any handler body that should
 /// reference `DISPATCH_TABLE` — Phase 1's acceptance criteria grep for this
 /// invariant.
 #[macro_export]
 macro_rules! dispatch_next {
-    ($state:expr) => {{
-        $state.prefix = None;
+    ($state:expr) => {
         return $crate::vm::dispatch_state::Step::Continue(
             $crate::vm::dispatch_state::DISPATCH_TABLE[$state.next_opcode_byte() as usize],
-        );
-    }};
+        )
+    };
 }
 
 /// `?`-like early-return for handlers. `Result<T, VmError>` → `T` on Ok, or
