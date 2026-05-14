@@ -8,6 +8,11 @@ const CALL_RANGE_WIDTH: usize = 4;
 const ABC_EXTRA_WIDE_THRESHOLD: u16 = 0x01ff;
 
 /// Logical instruction forms used by the bytecode decoder.
+///
+/// IC-shaped opcodes (anything where [`Opcode::has_feedback_slot`] is true) always carry
+/// a mandatory trailing feedback slot, matching V8 / JSC's always-allocate IC design.
+/// `Abc` / `Abx` / `Ax` are for non-IC opcodes; `AbcSlot` / `AbxSlot` / `CallRange` carry
+/// the slot inline.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Instruction {
     Abc {
@@ -25,14 +30,14 @@ pub enum Instruction {
         opcode: Opcode,
         ax: i32,
     },
-    FeedbackAbc {
+    AbcSlot {
         opcode: Opcode,
         a: u16,
         b: u16,
         c: u16,
         slot: FeedbackSlotId,
     },
-    FeedbackAbx {
+    AbxSlot {
         opcode: Opcode,
         a: u16,
         bx: u32,
@@ -44,7 +49,7 @@ pub enum Instruction {
         b: u16,
         c: u16,
         range: CallRange,
-        slot: Option<FeedbackSlotId>,
+        slot: FeedbackSlotId,
     },
 }
 
@@ -65,18 +70,12 @@ impl Instruction {
     }
 
     #[inline]
-    pub const fn feedback_abc(
-        opcode: Opcode,
-        a: u16,
-        b: u16,
-        c: u16,
-        slot: FeedbackSlotId,
-    ) -> Self {
-        let opcode = match opcode.profiled_variant() {
-            Some(profiled) => profiled,
-            None => opcode,
-        };
-        Self::FeedbackAbc {
+    pub const fn abc_slot(opcode: Opcode, a: u16, b: u16, c: u16, slot: FeedbackSlotId) -> Self {
+        debug_assert!(
+            opcode.has_feedback_slot(),
+            "abc_slot requires an IC-shaped opcode"
+        );
+        Self::AbcSlot {
             opcode,
             a,
             b,
@@ -86,12 +85,12 @@ impl Instruction {
     }
 
     #[inline]
-    pub const fn feedback_abx(opcode: Opcode, a: u16, bx: u32, slot: FeedbackSlotId) -> Self {
-        let opcode = match opcode.profiled_variant() {
-            Some(profiled) => profiled,
-            None => opcode,
-        };
-        Self::FeedbackAbx {
+    pub const fn abx_slot(opcode: Opcode, a: u16, bx: u32, slot: FeedbackSlotId) -> Self {
+        debug_assert!(
+            opcode.has_feedback_slot(),
+            "abx_slot requires an IC-shaped opcode"
+        );
+        Self::AbxSlot {
             opcode,
             a,
             bx,
@@ -100,14 +99,25 @@ impl Instruction {
     }
 
     #[inline]
-    pub const fn call_range(opcode: Opcode, a: u16, b: u16, c: u16, range: CallRange) -> Self {
+    pub const fn call_range(
+        opcode: Opcode,
+        a: u16,
+        b: u16,
+        c: u16,
+        range: CallRange,
+        slot: FeedbackSlotId,
+    ) -> Self {
+        debug_assert!(
+            opcode.has_call_range(),
+            "call_range requires a Call / TailCall / Construct opcode"
+        );
         Self::CallRange {
             opcode,
             a,
             b,
             c,
             range,
-            slot: None,
+            slot,
         }
     }
 
@@ -117,8 +127,8 @@ impl Instruction {
             Self::Abc { opcode, .. }
             | Self::Abx { opcode, .. }
             | Self::Ax { opcode, .. }
-            | Self::FeedbackAbc { opcode, .. }
-            | Self::FeedbackAbx { opcode, .. }
+            | Self::AbcSlot { opcode, .. }
+            | Self::AbxSlot { opcode, .. }
             | Self::CallRange { opcode, .. } => opcode,
         }
     }
@@ -126,93 +136,10 @@ impl Instruction {
     #[inline]
     pub const fn feedback_slot(self) -> Option<FeedbackSlotId> {
         match self {
-            Self::FeedbackAbc { slot, .. } | Self::FeedbackAbx { slot, .. } => Some(slot),
-            Self::CallRange { slot, .. } => slot,
+            Self::AbcSlot { slot, .. }
+            | Self::AbxSlot { slot, .. }
+            | Self::CallRange { slot, .. } => Some(slot),
             Self::Abc { .. } | Self::Abx { .. } | Self::Ax { .. } => None,
-        }
-    }
-
-    #[inline]
-    pub const fn without_feedback_slot(self) -> Self {
-        match self {
-            Self::FeedbackAbc {
-                opcode, a, b, c, ..
-            } => Self::Abc {
-                opcode: opcode.profiled_base_opcode(),
-                a,
-                b,
-                c,
-            },
-            Self::FeedbackAbx { opcode, a, bx, .. } => Self::Abx {
-                opcode: opcode.profiled_base_opcode(),
-                a,
-                bx,
-            },
-            Self::CallRange {
-                opcode,
-                a,
-                b,
-                c,
-                range,
-                ..
-            } => Self::CallRange {
-                opcode: opcode.profiled_base_opcode(),
-                a,
-                b,
-                c,
-                range,
-                slot: None,
-            },
-            Self::Abc { .. } | Self::Abx { .. } | Self::Ax { .. } => self,
-        }
-    }
-
-    #[inline]
-    pub const fn with_feedback_slot(self, slot: FeedbackSlotId) -> Option<Self> {
-        match self {
-            Self::Abc { opcode, a, b, c }
-            | Self::FeedbackAbc {
-                opcode, a, b, c, ..
-            } => match opcode.profiled_base_opcode().profiled_variant() {
-                Some(profiled) => Some(Self::FeedbackAbc {
-                    opcode: profiled,
-                    a,
-                    b,
-                    c,
-                    slot,
-                }),
-                None => None,
-            },
-            Self::Abx { opcode, a, bx } | Self::FeedbackAbx { opcode, a, bx, .. } => {
-                match opcode.profiled_base_opcode().profiled_variant() {
-                    Some(profiled) => Some(Self::FeedbackAbx {
-                        opcode: profiled,
-                        a,
-                        bx,
-                        slot,
-                    }),
-                    None => None,
-                }
-            }
-            Self::CallRange {
-                opcode,
-                a,
-                b,
-                c,
-                range,
-                ..
-            } => Some(Self::CallRange {
-                opcode: match opcode.profiled_base_opcode().profiled_variant() {
-                    Some(profiled) => profiled,
-                    None => opcode,
-                },
-                a,
-                b,
-                c,
-                range,
-                slot: Some(slot),
-            }),
-            Self::Ax { .. } => None,
         }
     }
 
@@ -235,21 +162,13 @@ impl Instruction {
     pub const fn encoded_len(self) -> usize {
         match self {
             Self::Abc { opcode, a, b, c } => abc_encoded_len(opcode, a, b, c, false),
-            Self::FeedbackAbc {
+            Self::AbcSlot {
                 opcode, a, b, c, ..
             } => abc_encoded_len(opcode, a, b, c, true),
             Self::Abx { opcode, a, bx } => abx_encoded_len(opcode, a, bx, false),
-            Self::FeedbackAbx { opcode, a, bx, .. } => abx_encoded_len(opcode, a, bx, true),
+            Self::AbxSlot { opcode, a, bx, .. } => abx_encoded_len(opcode, a, bx, true),
             Self::Ax { opcode, .. } => ax_encoded_len(opcode),
-            Self::CallRange { slot, .. } => {
-                INSTRUCTION_WIDTH
-                    + CALL_RANGE_WIDTH
-                    + if slot.is_some() {
-                        FEEDBACK_SLOT_WIDTH
-                    } else {
-                        0
-                    }
-            }
+            Self::CallRange { .. } => INSTRUCTION_WIDTH + CALL_RANGE_WIDTH + FEEDBACK_SLOT_WIDTH,
         }
     }
 
@@ -266,7 +185,7 @@ impl Instruction {
     pub fn write_bytes(self, bytes: &mut Vec<u8>) {
         match self {
             Self::Abc { opcode, a, b, c } => write_abc(bytes, opcode, a, b, c, None),
-            Self::FeedbackAbc {
+            Self::AbcSlot {
                 opcode,
                 a,
                 b,
@@ -274,7 +193,7 @@ impl Instruction {
                 slot,
             } => write_abc(bytes, opcode, a, b, c, Some(slot)),
             Self::Abx { opcode, a, bx } => write_abx(bytes, opcode, a, bx, None),
-            Self::FeedbackAbx {
+            Self::AbxSlot {
                 opcode,
                 a,
                 bx,
@@ -307,7 +226,7 @@ impl Instruction {
     /// Panics if this instruction is not in the `Abx` form.
     pub fn patch_bx(&mut self, bx: u32) {
         match self {
-            Self::Abx { bx: current, .. } | Self::FeedbackAbx { bx: current, .. } => *current = bx,
+            Self::Abx { bx: current, .. } | Self::AbxSlot { bx: current, .. } => *current = bx,
             _ => panic!("only Abx instructions can be patched with a 32-bit immediate"),
         }
     }
@@ -323,7 +242,7 @@ impl Instruction {
     #[inline]
     pub const fn bx_value(self) -> Option<u32> {
         match self {
-            Self::Abx { bx, .. } | Self::FeedbackAbx { bx, .. } => Some(bx),
+            Self::Abx { bx, .. } | Self::AbxSlot { bx, .. } => Some(bx),
             _ => None,
         }
     }
@@ -538,7 +457,7 @@ fn write_call_range(
     b: u16,
     c: u16,
     range: CallRange,
-    slot: Option<FeedbackSlotId>,
+    slot: FeedbackSlotId,
 ) {
     assert!(
         opcode.has_call_range(),
@@ -552,9 +471,7 @@ fn write_call_range(
     ]);
     let range = range.encode().to_le_bytes();
     bytes.extend_from_slice(&range);
-    if let Some(slot) = slot {
-        write_feedback_slot(bytes, slot);
-    }
+    write_feedback_slot(bytes, slot);
 }
 
 fn write_feedback_slot(bytes: &mut Vec<u8>, slot: FeedbackSlotId) {
@@ -602,7 +519,8 @@ mod tests {
     #[should_panic(expected = "encode_word requires exactly 4 encoded bytes")]
     fn feedback_instruction_encode_word_panics_instead_of_truncating() {
         let slot = FeedbackSlotId::from_raw(1).expect("test slot should be non-zero");
-        Instruction::feedback_abx(Opcode::Call0, 1, 2, slot).encode_word();
+        // Add is an IC-shaped ABX-arity opcode; its 6-byte encoding can't fit in a 4-byte word.
+        Instruction::abx_slot(Opcode::LoadGlobal, 1, 2, slot).encode_word();
     }
 
     #[test]
@@ -622,17 +540,18 @@ mod tests {
     fn feedback_abc_write_panics_when_slot_overflows_u16() {
         let slot = FeedbackSlotId::from_raw(u32::from(u16::MAX) + 1)
             .expect("test slot should be non-zero");
-        Instruction::feedback_abc(Opcode::GetNamedProperty, 0, 1, 2, slot).encode_bytes();
+        Instruction::abc_slot(Opcode::GetNamedProperty, 0, 1, 2, slot).encode_bytes();
     }
 
     #[test]
     fn wide_abc_prefix_inlines_high_operand_bytes() {
-        let bytes = Instruction::abc(Opcode::Add, 0x0123, 0x0045, 0x01ab).encode_bytes();
+        // Move is a non-IC ABC opcode; no slot bytes follow.
+        let bytes = Instruction::abc(Opcode::Move, 0x0123, 0x0045, 0x01ab).encode_bytes();
         assert_eq!(
             bytes,
             vec![
                 Opcode::Wide as u8,
-                Opcode::Add as u8,
+                Opcode::Move as u8,
                 0x23,
                 0x45,
                 0xab,
@@ -646,18 +565,24 @@ mod tests {
     #[test]
     fn extra_wide_abc_prefix_inlines_high_operand_bytes() {
         let slot = FeedbackSlotId::from_raw(1).expect("test slot should be non-zero");
+        // IC-shaped Add now carries the slot directly without a *Profiled mirror.
         let bytes =
-            Instruction::feedback_abc(Opcode::Add, 0x0223, 0x0045, 0x01ab, slot).encode_bytes();
+            Instruction::abc_slot(Opcode::Add, 0x0223, 0x0045, 0x01ab, slot).encode_bytes();
         assert_eq!(bytes[0], Opcode::ExtraWide as u8);
-        assert_eq!(bytes[1], Opcode::AddProfiled as u8);
+        assert_eq!(bytes[1], Opcode::Add as u8);
         assert_eq!(&bytes[8..], &[1, 0]);
     }
 
     #[test]
     fn call_range_is_inline() {
+        let slot = FeedbackSlotId::from_raw(7).expect("test slot should be non-zero");
         let bytes =
-            Instruction::call_range(Opcode::Call, 1, 2, 3, CallRange::new(4, 5)).encode_bytes();
-        assert_eq!(bytes, vec![Opcode::Call as u8, 1, 2, 3, 5, 0, 4, 0]);
+            Instruction::call_range(Opcode::Call, 1, 2, 3, CallRange::new(4, 5), slot)
+                .encode_bytes();
+        assert_eq!(
+            bytes,
+            vec![Opcode::Call as u8, 1, 2, 3, 5, 0, 4, 0, 7, 0]
+        );
     }
 
     #[test]

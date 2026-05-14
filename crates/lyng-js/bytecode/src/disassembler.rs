@@ -428,11 +428,17 @@ pub fn disassemble_instruction(instruction: &Instruction, function: &BytecodeFun
 
 fn disassemble_instruction_at(instruction: Instruction, function: &BytecodeFunction) -> String {
     let feedback_slot = instruction.feedback_slot();
-    let instruction = instruction.without_feedback_slot();
     let opcode = instruction.opcode().name();
     let opcode = format!("{opcode:<16}");
     let mut text = match instruction {
-        Instruction::Abc { opcode: _, a, b, c } => match instruction.opcode() {
+        Instruction::Abc { opcode: bytecode_opcode, a, b, c }
+        | Instruction::AbcSlot {
+            opcode: bytecode_opcode,
+            a,
+            b,
+            c,
+            ..
+        } => match bytecode_opcode {
             crate::Opcode::Call0
             | crate::Opcode::Call1
             | crate::Opcode::Call2
@@ -441,25 +447,26 @@ fn disassemble_instruction_at(instruction: Instruction, function: &BytecodeFunct
                 a,
                 b,
                 c,
-                instruction.opcode().small_call_arity().unwrap_or(0),
+                bytecode_opcode.small_call_arity().unwrap_or(0),
             ),
-            crate::Opcode::Call => {
-                format!("{opcode}r{a}, callee=r{b}, this=r{c}")
-            }
-            crate::Opcode::Construct => {
-                format!("{opcode}r{a}, callee=r{b}")
-            }
-            crate::Opcode::TailCall => {
-                format!("{opcode}callee=r{a}, this=r{b}")
-            }
-            bytecode_opcode => {
+            _ => {
                 let operands = abc_operands(a, b, c);
                 format_abc_instruction(&opcode, bytecode_opcode, operands, function)
             }
         },
-        Instruction::Abx { opcode: _, a, bx } => {
+        Instruction::Abx {
+            opcode: bytecode_opcode,
+            a,
+            bx,
+        }
+        | Instruction::AbxSlot {
+            opcode: bytecode_opcode,
+            a,
+            bx,
+            ..
+        } => {
             let operands = abx_operands(a, bx);
-            format_abx_instruction(&opcode, instruction.opcode(), operands, function)
+            format_abx_instruction(&opcode, bytecode_opcode, operands, function)
         }
         Instruction::Ax { opcode, ax } => match opcode {
             crate::Opcode::Jump | crate::Opcode::Jump8 => {
@@ -476,7 +483,6 @@ fn disassemble_instruction_at(instruction: Instruction, function: &BytecodeFunct
             crate::Opcode::ReturnUndefined => opcode.name().to_owned(),
             _ => format!("{opcode_name:<16}{ax}", opcode_name = opcode.name()),
         },
-        Instruction::FeedbackAbc { .. } | Instruction::FeedbackAbx { .. } => unreachable!(),
         Instruction::CallRange {
             opcode: call_opcode,
             a,

@@ -154,56 +154,9 @@ pub enum Opcode {
     StoreLocal1,
     StoreLocal2,
     StoreLocal3,
-    NegateProfiled,
-    BitNotProfiled,
-    IncrementProfiled,
-    DecrementProfiled,
-    AddProfiled,
-    AddSmiProfiled,
-    SubProfiled,
-    SubSmiProfiled,
-    MulProfiled,
-    MulSmiProfiled,
-    DivProfiled,
-    DivSmiProfiled,
-    ModProfiled,
-    ModSmiProfiled,
-    ExpProfiled,
-    BitOrProfiled,
-    BitXorProfiled,
-    BitAndProfiled,
-    BitAndSmiProfiled,
-    ShiftLeftProfiled,
-    ShiftRightProfiled,
-    UnsignedShiftRightProfiled,
-    EqualProfiled,
-    StrictEqualProfiled,
-    EqualZeroProfiled,
-    LessThanProfiled,
-    LessEqualProfiled,
-    GreaterThanProfiled,
-    GreaterEqualProfiled,
-    LoadGlobalProfiled,
-    StoreGlobalProfiled,
-    AssignGlobalProfiled,
-    GetNamedPropertyProfiled,
-    SetNamedPropertyProfiled,
-    AssignNamedPropertyProfiled,
-    StrictAssignNamedPropertyProfiled,
-    GetKeyedPropertyProfiled,
-    SetKeyedPropertyProfiled,
-    AssignKeyedPropertyProfiled,
-    StrictAssignKeyedPropertyProfiled,
-    Call0Profiled,
-    Call1Profiled,
-    Call2Profiled,
-    Call3Profiled,
-    CallProfiled,
-    TailCallProfiled,
-    ConstructProfiled,
 }
 
-pub const OPCODE_COUNT: u8 = Opcode::ConstructProfiled as u8 + 1;
+pub const OPCODE_COUNT: u8 = Opcode::StoreLocal3 as u8 + 1;
 
 const OPCODES: [Opcode; OPCODE_COUNT as usize] = [
     Opcode::Nop,
@@ -358,53 +311,6 @@ const OPCODES: [Opcode; OPCODE_COUNT as usize] = [
     Opcode::StoreLocal1,
     Opcode::StoreLocal2,
     Opcode::StoreLocal3,
-    Opcode::NegateProfiled,
-    Opcode::BitNotProfiled,
-    Opcode::IncrementProfiled,
-    Opcode::DecrementProfiled,
-    Opcode::AddProfiled,
-    Opcode::AddSmiProfiled,
-    Opcode::SubProfiled,
-    Opcode::SubSmiProfiled,
-    Opcode::MulProfiled,
-    Opcode::MulSmiProfiled,
-    Opcode::DivProfiled,
-    Opcode::DivSmiProfiled,
-    Opcode::ModProfiled,
-    Opcode::ModSmiProfiled,
-    Opcode::ExpProfiled,
-    Opcode::BitOrProfiled,
-    Opcode::BitXorProfiled,
-    Opcode::BitAndProfiled,
-    Opcode::BitAndSmiProfiled,
-    Opcode::ShiftLeftProfiled,
-    Opcode::ShiftRightProfiled,
-    Opcode::UnsignedShiftRightProfiled,
-    Opcode::EqualProfiled,
-    Opcode::StrictEqualProfiled,
-    Opcode::EqualZeroProfiled,
-    Opcode::LessThanProfiled,
-    Opcode::LessEqualProfiled,
-    Opcode::GreaterThanProfiled,
-    Opcode::GreaterEqualProfiled,
-    Opcode::LoadGlobalProfiled,
-    Opcode::StoreGlobalProfiled,
-    Opcode::AssignGlobalProfiled,
-    Opcode::GetNamedPropertyProfiled,
-    Opcode::SetNamedPropertyProfiled,
-    Opcode::AssignNamedPropertyProfiled,
-    Opcode::StrictAssignNamedPropertyProfiled,
-    Opcode::GetKeyedPropertyProfiled,
-    Opcode::SetKeyedPropertyProfiled,
-    Opcode::AssignKeyedPropertyProfiled,
-    Opcode::StrictAssignKeyedPropertyProfiled,
-    Opcode::Call0Profiled,
-    Opcode::Call1Profiled,
-    Opcode::Call2Profiled,
-    Opcode::Call3Profiled,
-    Opcode::CallProfiled,
-    Opcode::TailCallProfiled,
-    Opcode::ConstructProfiled,
 ];
 
 impl Opcode {
@@ -413,13 +319,18 @@ impl Opcode {
         OPCODES.get(usize::from(raw)).copied()
     }
 
-    /// Encoded byte length of one instruction with this opcode, matching the layout
+    /// Encoded byte length of one narrow instruction with this opcode, matching the layout
     /// produced by [`crate::Instruction::write_bytes`] and consumed by the VM dispatch
     /// loop. Mirrors the table in [`crate::Instruction::encoded_len`] without first
     /// materializing an `Instruction` enum value — used by the byte-stream dispatcher to
-    /// advance the program counter after each opcode.
+    /// advance the program counter after each opcode. `Wide` / `ExtraWide` forms add their
+    /// prefix and additional operand bytes on top of this length.
     #[inline]
     #[must_use]
+    #[allow(
+        clippy::match_same_arms,
+        reason = "opcode families stay grouped per encoded length to keep the table auditable"
+    )]
     pub const fn encoded_len(self) -> u8 {
         match self {
             Self::LdaUndefined
@@ -449,10 +360,11 @@ impl Opcode {
             | Self::StoreLocal2
             | Self::StoreLocal3 => 2,
             Self::LoadSmi8 | Self::LoadConst8 | Self::JumpIfTrue8 | Self::JumpIfFalse8 => 3,
-            Self::Call | Self::TailCall | Self::Construct => 8,
-            Self::CallProfiled | Self::TailCallProfiled | Self::ConstructProfiled => 10,
-            opcode if opcode.is_profiled() => 6,
+            // Call / TailCall / Construct: 4-byte ABC + 4-byte CallRange + 2-byte slot.
+            Self::Call | Self::TailCall | Self::Construct => 10,
             Self::Wide | Self::ExtraWide => 1,
+            // IC-shaped ABC/ABX opcodes: 4-byte ABC/ABX + 2-byte mandatory feedback slot.
+            opcode if opcode.has_feedback_slot() => 6,
             _ => 4,
         }
     }
@@ -616,53 +528,6 @@ impl Opcode {
             Self::StoreLocal1 => "StoreLocal1",
             Self::StoreLocal2 => "StoreLocal2",
             Self::StoreLocal3 => "StoreLocal3",
-            Self::NegateProfiled => "NegateProfiled",
-            Self::BitNotProfiled => "BitNotProfiled",
-            Self::IncrementProfiled => "IncrementProfiled",
-            Self::DecrementProfiled => "DecrementProfiled",
-            Self::AddProfiled => "AddProfiled",
-            Self::AddSmiProfiled => "AddSmiProfiled",
-            Self::SubProfiled => "SubProfiled",
-            Self::SubSmiProfiled => "SubSmiProfiled",
-            Self::MulProfiled => "MulProfiled",
-            Self::MulSmiProfiled => "MulSmiProfiled",
-            Self::DivProfiled => "DivProfiled",
-            Self::DivSmiProfiled => "DivSmiProfiled",
-            Self::ModProfiled => "ModProfiled",
-            Self::ModSmiProfiled => "ModSmiProfiled",
-            Self::ExpProfiled => "ExpProfiled",
-            Self::BitOrProfiled => "BitOrProfiled",
-            Self::BitXorProfiled => "BitXorProfiled",
-            Self::BitAndProfiled => "BitAndProfiled",
-            Self::BitAndSmiProfiled => "BitAndSmiProfiled",
-            Self::ShiftLeftProfiled => "ShiftLeftProfiled",
-            Self::ShiftRightProfiled => "ShiftRightProfiled",
-            Self::UnsignedShiftRightProfiled => "UnsignedShiftRightProfiled",
-            Self::EqualProfiled => "EqualProfiled",
-            Self::StrictEqualProfiled => "StrictEqualProfiled",
-            Self::EqualZeroProfiled => "EqualZeroProfiled",
-            Self::LessThanProfiled => "LessThanProfiled",
-            Self::LessEqualProfiled => "LessEqualProfiled",
-            Self::GreaterThanProfiled => "GreaterThanProfiled",
-            Self::GreaterEqualProfiled => "GreaterEqualProfiled",
-            Self::LoadGlobalProfiled => "LoadGlobalProfiled",
-            Self::StoreGlobalProfiled => "StoreGlobalProfiled",
-            Self::AssignGlobalProfiled => "AssignGlobalProfiled",
-            Self::GetNamedPropertyProfiled => "GetNamedPropertyProfiled",
-            Self::SetNamedPropertyProfiled => "SetNamedPropertyProfiled",
-            Self::AssignNamedPropertyProfiled => "AssignNamedPropertyProfiled",
-            Self::StrictAssignNamedPropertyProfiled => "StrictAssignNamedPropertyProfiled",
-            Self::GetKeyedPropertyProfiled => "GetKeyedPropertyProfiled",
-            Self::SetKeyedPropertyProfiled => "SetKeyedPropertyProfiled",
-            Self::AssignKeyedPropertyProfiled => "AssignKeyedPropertyProfiled",
-            Self::StrictAssignKeyedPropertyProfiled => "StrictAssignKeyedPropertyProfiled",
-            Self::Call0Profiled => "Call0Profiled",
-            Self::Call1Profiled => "Call1Profiled",
-            Self::Call2Profiled => "Call2Profiled",
-            Self::Call3Profiled => "Call3Profiled",
-            Self::CallProfiled => "CallProfiled",
-            Self::TailCallProfiled => "TailCallProfiled",
-            Self::ConstructProfiled => "ConstructProfiled",
         }
     }
 
@@ -684,139 +549,78 @@ impl Opcode {
         matches!(self, Self::Wide | Self::ExtraWide)
     }
 
-    #[inline]
-    pub const fn is_profiled(self) -> bool {
-        self.profiled_base_opcode() as u8 != self as u8
-    }
-
-    #[inline]
-    #[allow(
-        clippy::too_many_lines,
-        reason = "profiled opcodes intentionally mirror their base semantic opcode table"
-    )]
-    pub const fn profiled_base_opcode(self) -> Self {
-        match self {
-            Self::NegateProfiled => Self::Negate,
-            Self::BitNotProfiled => Self::BitNot,
-            Self::IncrementProfiled => Self::Increment,
-            Self::DecrementProfiled => Self::Decrement,
-            Self::AddProfiled => Self::Add,
-            Self::AddSmiProfiled => Self::AddSmi,
-            Self::SubProfiled => Self::Sub,
-            Self::SubSmiProfiled => Self::SubSmi,
-            Self::MulProfiled => Self::Mul,
-            Self::MulSmiProfiled => Self::MulSmi,
-            Self::DivProfiled => Self::Div,
-            Self::DivSmiProfiled => Self::DivSmi,
-            Self::ModProfiled => Self::Mod,
-            Self::ModSmiProfiled => Self::ModSmi,
-            Self::ExpProfiled => Self::Exp,
-            Self::BitOrProfiled => Self::BitOr,
-            Self::BitXorProfiled => Self::BitXor,
-            Self::BitAndProfiled => Self::BitAnd,
-            Self::BitAndSmiProfiled => Self::BitAndSmi,
-            Self::ShiftLeftProfiled => Self::ShiftLeft,
-            Self::ShiftRightProfiled => Self::ShiftRight,
-            Self::UnsignedShiftRightProfiled => Self::UnsignedShiftRight,
-            Self::EqualProfiled => Self::Equal,
-            Self::StrictEqualProfiled => Self::StrictEqual,
-            Self::EqualZeroProfiled => Self::EqualZero,
-            Self::LessThanProfiled => Self::LessThan,
-            Self::LessEqualProfiled => Self::LessEqual,
-            Self::GreaterThanProfiled => Self::GreaterThan,
-            Self::GreaterEqualProfiled => Self::GreaterEqual,
-            Self::LoadGlobalProfiled => Self::LoadGlobal,
-            Self::StoreGlobalProfiled => Self::StoreGlobal,
-            Self::AssignGlobalProfiled => Self::AssignGlobal,
-            Self::GetNamedPropertyProfiled => Self::GetNamedProperty,
-            Self::SetNamedPropertyProfiled => Self::SetNamedProperty,
-            Self::AssignNamedPropertyProfiled => Self::AssignNamedProperty,
-            Self::StrictAssignNamedPropertyProfiled => Self::StrictAssignNamedProperty,
-            Self::GetKeyedPropertyProfiled => Self::GetKeyedProperty,
-            Self::SetKeyedPropertyProfiled => Self::SetKeyedProperty,
-            Self::AssignKeyedPropertyProfiled => Self::AssignKeyedProperty,
-            Self::StrictAssignKeyedPropertyProfiled => Self::StrictAssignKeyedProperty,
-            Self::Call0Profiled => Self::Call0,
-            Self::Call1Profiled => Self::Call1,
-            Self::Call2Profiled => Self::Call2,
-            Self::Call3Profiled => Self::Call3,
-            Self::CallProfiled => Self::Call,
-            Self::TailCallProfiled => Self::TailCall,
-            Self::ConstructProfiled => Self::Construct,
-            opcode => opcode,
-        }
-    }
-
+    /// True for opcodes that carry a mandatory trailing 2-byte feedback slot operand.
+    ///
+    /// Every IC-shaped opcode (arithmetic, comparison, global/named/keyed property
+    /// access, calls, construct) emits a slot at compile time, mirroring V8 / JSC's
+    /// always-allocate IC design. Non-IC opcodes (moves, loads, jumps, scope ops, etc.)
+    /// have no slot.
     #[inline]
     #[allow(
         clippy::too_many_lines,
         reason = "feedback-capable opcodes are explicit to keep encoding lengths auditable"
     )]
-    pub const fn profiled_variant(self) -> Option<Self> {
-        match self {
-            Self::Negate => Some(Self::NegateProfiled),
-            Self::BitNot => Some(Self::BitNotProfiled),
-            Self::Increment => Some(Self::IncrementProfiled),
-            Self::Decrement => Some(Self::DecrementProfiled),
-            Self::Add => Some(Self::AddProfiled),
-            Self::AddSmi => Some(Self::AddSmiProfiled),
-            Self::Sub => Some(Self::SubProfiled),
-            Self::SubSmi => Some(Self::SubSmiProfiled),
-            Self::Mul => Some(Self::MulProfiled),
-            Self::MulSmi => Some(Self::MulSmiProfiled),
-            Self::Div => Some(Self::DivProfiled),
-            Self::DivSmi => Some(Self::DivSmiProfiled),
-            Self::Mod => Some(Self::ModProfiled),
-            Self::ModSmi => Some(Self::ModSmiProfiled),
-            Self::Exp => Some(Self::ExpProfiled),
-            Self::BitOr => Some(Self::BitOrProfiled),
-            Self::BitXor => Some(Self::BitXorProfiled),
-            Self::BitAnd => Some(Self::BitAndProfiled),
-            Self::BitAndSmi => Some(Self::BitAndSmiProfiled),
-            Self::ShiftLeft => Some(Self::ShiftLeftProfiled),
-            Self::ShiftRight => Some(Self::ShiftRightProfiled),
-            Self::UnsignedShiftRight => Some(Self::UnsignedShiftRightProfiled),
-            Self::Equal => Some(Self::EqualProfiled),
-            Self::StrictEqual => Some(Self::StrictEqualProfiled),
-            Self::EqualZero => Some(Self::EqualZeroProfiled),
-            Self::LessThan => Some(Self::LessThanProfiled),
-            Self::LessEqual => Some(Self::LessEqualProfiled),
-            Self::GreaterThan => Some(Self::GreaterThanProfiled),
-            Self::GreaterEqual => Some(Self::GreaterEqualProfiled),
-            Self::LoadGlobal => Some(Self::LoadGlobalProfiled),
-            Self::StoreGlobal => Some(Self::StoreGlobalProfiled),
-            Self::AssignGlobal => Some(Self::AssignGlobalProfiled),
-            Self::GetNamedProperty => Some(Self::GetNamedPropertyProfiled),
-            Self::SetNamedProperty => Some(Self::SetNamedPropertyProfiled),
-            Self::AssignNamedProperty => Some(Self::AssignNamedPropertyProfiled),
-            Self::StrictAssignNamedProperty => Some(Self::StrictAssignNamedPropertyProfiled),
-            Self::GetKeyedProperty => Some(Self::GetKeyedPropertyProfiled),
-            Self::SetKeyedProperty => Some(Self::SetKeyedPropertyProfiled),
-            Self::AssignKeyedProperty => Some(Self::AssignKeyedPropertyProfiled),
-            Self::StrictAssignKeyedProperty => Some(Self::StrictAssignKeyedPropertyProfiled),
-            Self::Call0 => Some(Self::Call0Profiled),
-            Self::Call1 => Some(Self::Call1Profiled),
-            Self::Call2 => Some(Self::Call2Profiled),
-            Self::Call3 => Some(Self::Call3Profiled),
-            Self::Call => Some(Self::CallProfiled),
-            Self::TailCall => Some(Self::TailCallProfiled),
-            Self::Construct => Some(Self::ConstructProfiled),
-            opcode if opcode.is_profiled() => Some(opcode),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn has_call_range(self) -> bool {
+    pub const fn has_feedback_slot(self) -> bool {
         matches!(
-            self.profiled_base_opcode(),
-            Self::Call | Self::TailCall | Self::Construct
+            self,
+            Self::Negate
+                | Self::BitNot
+                | Self::Increment
+                | Self::Decrement
+                | Self::Add
+                | Self::AddSmi
+                | Self::Sub
+                | Self::SubSmi
+                | Self::Mul
+                | Self::MulSmi
+                | Self::Div
+                | Self::DivSmi
+                | Self::Mod
+                | Self::ModSmi
+                | Self::Exp
+                | Self::BitOr
+                | Self::BitXor
+                | Self::BitAnd
+                | Self::BitAndSmi
+                | Self::ShiftLeft
+                | Self::ShiftRight
+                | Self::UnsignedShiftRight
+                | Self::Equal
+                | Self::StrictEqual
+                | Self::EqualZero
+                | Self::LessThan
+                | Self::LessEqual
+                | Self::GreaterThan
+                | Self::GreaterEqual
+                | Self::LoadGlobal
+                | Self::StoreGlobal
+                | Self::AssignGlobal
+                | Self::GetNamedProperty
+                | Self::SetNamedProperty
+                | Self::AssignNamedProperty
+                | Self::StrictAssignNamedProperty
+                | Self::GetKeyedProperty
+                | Self::SetKeyedProperty
+                | Self::AssignKeyedProperty
+                | Self::StrictAssignKeyedProperty
+                | Self::Call0
+                | Self::Call1
+                | Self::Call2
+                | Self::Call3
+                | Self::Call
+                | Self::TailCall
+                | Self::Construct
         )
     }
 
     #[inline]
+    pub const fn has_call_range(self) -> bool {
+        matches!(self, Self::Call | Self::TailCall | Self::Construct)
+    }
+
+    #[inline]
     pub const fn small_call_arity(self) -> Option<u8> {
-        match self.profiled_base_opcode() {
+        match self {
             Self::Call0 => Some(0),
             Self::Call1 => Some(1),
             Self::Call2 => Some(2),
@@ -869,7 +673,22 @@ mod tests {
 
     #[test]
     fn opcode_count_matches_last_discriminant() {
-        assert_eq!(Opcode::ConstructProfiled as u8 + 1, OPCODE_COUNT);
+        assert_eq!(Opcode::StoreLocal3 as u8 + 1, OPCODE_COUNT);
+    }
+
+    #[test]
+    fn has_feedback_slot_implies_six_byte_narrow_encoding() {
+        // IC-shaped ABC/ABX opcodes encode 4-byte base + 2-byte feedback slot.
+        assert_eq!(Opcode::Add.encoded_len(), 6);
+        assert_eq!(Opcode::GetNamedProperty.encoded_len(), 6);
+        assert_eq!(Opcode::LoadGlobal.encoded_len(), 6);
+        // Call / TailCall / Construct: 4-byte ABC + 4-byte CallRange + 2-byte slot.
+        assert_eq!(Opcode::Call.encoded_len(), 10);
+        assert_eq!(Opcode::TailCall.encoded_len(), 10);
+        assert_eq!(Opcode::Construct.encoded_len(), 10);
+        // Non-IC opcodes retain their original encoding.
+        assert_eq!(Opcode::Move.encoded_len(), 4);
+        assert_eq!(Opcode::Jump.encoded_len(), 4);
     }
 
     #[test]

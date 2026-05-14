@@ -121,7 +121,11 @@ fn reachable_offsets(builder: &BytecodeBuilder) -> Vec<bool> {
         }
         reachable[offset] = true;
         let offset_u32 = u32::try_from(offset).expect("builder offsets should fit u32");
-        match instructions[offset].without_feedback_slot() {
+        // Jump, Return, Throw, TailCall — none of these are IC-shaped, so
+        // matching the raw instruction is sufficient. (After Track H removed the
+        // *Profiled opcode mirror, there is no longer a need to strip a profiled
+        // wrapper to expose the base opcode.)
+        match instructions[offset] {
             Instruction::Ax {
                 opcode: Opcode::Jump | Opcode::Jump8,
                 ..
