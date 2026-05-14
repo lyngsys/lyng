@@ -15,7 +15,7 @@ pub extern "C" fn op_jump_back(state: &mut DispatchState) -> Step {
         .try_into()
         .expect("op_jump_back: encoding invariant — at least 2 bytes from pc");
     let target = u32::from(header[1]);
-    state.pc = target;
+    state.frame.set_instruction_offset(target);
     dispatch_next!(state);
 }
 
