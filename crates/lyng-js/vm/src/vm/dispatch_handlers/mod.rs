@@ -27,9 +27,10 @@ pub mod stub;
 
 pub use arithmetic::{
     op_add, op_add_smi, op_bit_and, op_bit_and_smi, op_bit_not, op_bit_or, op_bit_xor,
-    op_decrement, op_equal, op_equal_zero, op_greater_equal, op_greater_than, op_increment,
-    op_less_equal, op_less_than, op_mul, op_mul_smi, op_negate, op_shift_left, op_shift_right,
-    op_strict_equal, op_sub, op_sub_smi, op_unsigned_shift_right,
+    op_decrement, op_div, op_div_smi, op_equal, op_equal_zero, op_exp, op_greater_equal,
+    op_greater_than, op_increment, op_less_equal, op_less_than, op_mod, op_mod_smi, op_mul,
+    op_mul_smi, op_negate, op_shift_left, op_shift_right, op_strict_equal, op_sub, op_sub_smi,
+    op_unsigned_shift_right,
 };
 pub use control_flow::{
     op_jump, op_jump8, op_jump_if_false, op_jump_if_false8, op_jump_if_true, op_jump_if_true8,
@@ -157,6 +158,12 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::ShiftLeft as u8 as usize] = op_shift_left;
     table[Opcode::ShiftRight as u8 as usize] = op_shift_right;
     table[Opcode::UnsignedShiftRight as u8 as usize] = op_unsigned_shift_right;
+
+    table[Opcode::Div as u8 as usize] = op_div;
+    table[Opcode::DivSmi as u8 as usize] = op_div_smi;
+    table[Opcode::Mod as u8 as usize] = op_mod;
+    table[Opcode::ModSmi as u8 as usize] = op_mod_smi;
+    table[Opcode::Exp as u8 as usize] = op_exp;
 
     table
 }

@@ -25,7 +25,7 @@ use lyng_js_objects::NativeFunctionRegistry;
 use lyng_js_types::{FeedbackSlotId, Value};
 
 use crate::error::VmResult;
-use crate::vm::dispatch::arithmetic::{decode_smi_immediate, smi_mul_result};
+use crate::vm::dispatch::arithmetic::{decode_smi_immediate, smi_mod_result, smi_mul_result};
 use crate::vm::dispatch::decode_abc_operands;
 use crate::vm::dispatch_state::{DispatchState, Step};
 use crate::vm::Vm;
@@ -505,6 +505,161 @@ pub extern "C" fn op_equal_zero(state: &mut DispatchState) -> Step {
     let registers = state.frame.registers();
     state.vm.write_register_unchecked(registers, a, value);
     state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+// =====================================================================
+// Div / Mod / Exp — Mod / ModSmi have an inline SMI fast path
+// (smi_mod_result rejects div-by-zero and i32::MIN / -1); Div /
+// DivSmi / Exp always delegate (non-integer division results, BigInt,
+// f64 dominate).
+// =====================================================================
+
+pub extern "C" fn op_div(state: &mut DispatchState) -> Step {
+    op_binary_general(state, Vm::execute_div_opcode)
+}
+
+pub extern "C" fn op_div_smi(state: &mut DispatchState) -> Step {
+    op_binary_general(state, Vm::execute_div_smi_opcode)
+}
+
+pub extern "C" fn op_exp(state: &mut DispatchState) -> Step {
+    op_binary_general(state, Vm::execute_exp_opcode)
+}
+
+pub extern "C" fn op_mod(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        true,
+        code,
+        pc,
+    ));
+    let registers = state.frame.registers();
+    let left = state.vm.read_register_unchecked(registers, b);
+    let right = state.vm.read_register_unchecked(registers, c);
+    if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi())
+        && let Some(v) = smi_mod_result(l, r)
+    {
+        state.vm.record_feedback_slot(code, feedback_slot);
+        state.vm.write_register_unchecked(registers, a, v);
+        state.advance(instruction_len);
+        dispatch_next!(state);
+    }
+    op_mod_slow(state, a, b, c, feedback_slot, instruction_len)
+}
+
+#[cold]
+#[inline(never)]
+fn op_mod_slow(
+    state: &mut DispatchState,
+    a: u16,
+    b: u16,
+    c: u16,
+    feedback_slot: Option<FeedbackSlotId>,
+    instruction_len: u32,
+) -> Step {
+    let result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            ..
+        } = &mut *state;
+        vm.execute_mod_opcode(agent, *host, &mut **registry, frame, b, c)
+    };
+    let finish = {
+        let DispatchState {
+            vm,
+            agent,
+            frame,
+            frame_depth,
+            ..
+        } = &mut *state;
+        vm.finish_abc_value_result(
+            agent,
+            *frame_depth,
+            frame,
+            instruction_len,
+            feedback_slot,
+            a,
+            result,
+        )
+    };
+    try_step!(finish);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_mod_smi(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        true,
+        code,
+        pc,
+    ));
+    let registers = state.frame.registers();
+    let left = state.vm.read_register_unchecked(registers, b);
+    let imm = i32::from(decode_smi_immediate(c));
+    if let Some(l) = left.as_smi()
+        && let Some(v) = smi_mod_result(l, imm)
+    {
+        state.vm.record_feedback_slot(code, feedback_slot);
+        state.vm.write_register_unchecked(registers, a, v);
+        state.advance(instruction_len);
+        dispatch_next!(state);
+    }
+    op_mod_smi_slow(state, a, b, c, feedback_slot, instruction_len)
+}
+
+#[cold]
+#[inline(never)]
+fn op_mod_smi_slow(
+    state: &mut DispatchState,
+    a: u16,
+    b: u16,
+    c: u16,
+    feedback_slot: Option<FeedbackSlotId>,
+    instruction_len: u32,
+) -> Step {
+    let result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            ..
+        } = &mut *state;
+        vm.execute_mod_smi_opcode(agent, *host, &mut **registry, frame, b, c)
+    };
+    let finish = {
+        let DispatchState {
+            vm,
+            agent,
+            frame,
+            frame_depth,
+            ..
+        } = &mut *state;
+        vm.finish_abc_value_result(
+            agent,
+            *frame_depth,
+            frame,
+            instruction_len,
+            feedback_slot,
+            a,
+            result,
+        )
+    };
+    try_step!(finish);
     dispatch_next!(state);
 }
 
